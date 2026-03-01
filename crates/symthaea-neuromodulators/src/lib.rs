@@ -172,16 +172,22 @@ impl Transmitter {
         // Fast phasic decay: Grace (1991) — burst signals are transient
         self.phasic *= 1.0 - self.phasic_decay;
         // Receptor adaptation (slow): baseline-relative thresholds
+        // Gated: only active before tolerance onset. Once slow tachyphylaxis
+        // (receptor internalization) takes over, fast GPCR phosphorylation
+        // is superseded. Prevents 0.998 × 0.985 double-decay.
+        // Science: Gainetdinov et al. (2004) — GPCR phosphorylation precedes internalization.
         let high = self.baseline + 0.2;
         let low = self.baseline - 0.2;
-        if self.level > high {
-            self.receptor_sensitivity *= 0.998; // tolerance
-        } else if self.level < low {
-            self.receptor_sensitivity *= 1.002; // sensitization
+        if self.high_exposure_cycles <= self.tolerance_onset_cycles {
+            if self.level > high {
+                self.receptor_sensitivity *= 0.998; // fast adaptation (pre-tolerance)
+            } else if self.level < low {
+                self.receptor_sensitivity *= 1.002; // sensitization
+            }
         }
-        // ── Fast tachyphylaxis (Gainetdinov et al. 2004) ─────────────────
-        // Rapid GPCR desensitization via phosphorylation under sustained high exposure.
-        // Per-transmitter curves: Koob & Le Moal (2001) — allostatic addiction model.
+        // ── Slow tachyphylaxis (Koob & Le Moal 2001) ─────────────────────
+        // Receptor internalization under sustained high exposure.
+        // Per-transmitter curves: allostatic addiction model.
         let high_thresh = self.baseline + self.tolerance_threshold;
         if self.level > high_thresh {
             self.high_exposure_cycles = self.high_exposure_cycles.saturating_add(1);
@@ -346,6 +352,14 @@ pub struct NeuromodulatorInputs {
     pub epistemic_confidence: f32,
     /// Whether the system is in flow state
     pub flow_active: bool,
+    /// Unified Psi (consciousness level) from previous cycle (0.0–1.0).
+    /// Feeds back to modulate 5-HT/DA baselines: high integration → mild boost.
+    /// Science: Dehaene et al. (2006) — global workspace access boosts monoaminergic tone.
+    pub consciousness_level: Option<f32>,
+    /// Moral judgment score from ethics engine (-1.0 to 1.0).
+    /// Positive moral actions boost oxytocin (prosocial) and DA (intrinsic reward).
+    /// Science: Zak (2012) — oxytocin mediates moral sentiment.
+    pub moral_signal: Option<f32>,
 }
 
 /// The four core neuromodulator channels.
@@ -660,6 +674,28 @@ impl NeuromodulatorBath {
             self.serotonin.produce(oxy_excess * 0.03);
         }
         self.oxytocin.reuptake();
+
+        // ── CONSCIOUSNESS → BASELINE MODULATION (Dehaene et al. 2006) ──
+        // High conscious integration mildly boosts 5-HT/DA baselines (rich experience
+        // → monoaminergic confidence/reward). Uses previous cycle's Psi to avoid
+        // circular dependency within the same cycle.
+        if let Some(phi) = inputs.consciousness_level {
+            let delta = (phi - 0.5) * 0.001; // ±0.0005/cycle max
+            self.serotonin.adjust_baseline(delta, 0.35, 0.65);
+            self.dopamine.adjust_baseline(delta * 0.5, 0.35, 0.65);
+        }
+
+        // ── MORAL JUDGMENT → OXYTOCIN/DA (Zak 2012; Moll et al. 2006) ──
+        // Ethical actions boost oxytocin (prosocial bonding) and DA (intrinsic reward).
+        // Immoral actions suppress oxytocin. Distinct from reward_signal (RPE pathway).
+        if let Some(moral) = inputs.moral_signal {
+            if moral > 0.3 {
+                self.oxytocin.produce((moral - 0.3) * 0.04);
+                self.dopamine.produce((moral - 0.3) * 0.02);
+            } else if moral < -0.3 {
+                self.oxytocin.level = (self.oxytocin.level - (-moral - 0.3) * 0.03).max(0.0);
+            }
+        }
 
         // ── GLUTAMATE: Learning cost (Olney 1969, Bhatt et al. 2009) ──
         // Production driven by report_learning() externally; here we do reuptake
@@ -1430,6 +1466,21 @@ impl NeuromodulatorBath {
             self.serotonin.set_baseline(sht_base - depression);
         }
 
+        // Burnout release: gradually restore baselines suppressed by burnout cap.
+        // Hysteresis gap (0.80→0.75) prevents oscillation at boundary.
+        // Without this, baselines stay stuck at 0.35 after burnout until 100 sleep cycles.
+        // Science: McEwen (2003) — allostatic recovery follows graded trajectory.
+        if self.allostatic_load < 0.75 {
+            let da_base = self.dopamine.baseline_val();
+            if da_base < 0.45 {
+                self.dopamine.set_baseline(da_base + 0.002);
+            }
+            let sht_base = self.serotonin.baseline_val();
+            if sht_base < 0.45 {
+                self.serotonin.set_baseline(sht_base + 0.002);
+            }
+        }
+
         // Recovery: sleep + low load for 100 consecutive cycles
         if is_sleep && self.allostatic_load < 0.3 {
             self.allostatic_recovery_cycles = self.allostatic_recovery_cycles.saturating_add(1);
@@ -1647,6 +1698,25 @@ pub struct NeuromodSnapshot {
     pub sht_2a_signal: f32,
     pub gaba_a_signal: f32,
     pub gaba_b_signal: f32,
+    // ── Round 3: Per-transmitter tolerance/withdrawal observability ──
+    pub da_high_exposure: u32,
+    pub da_withdrawal: u32,
+    pub ne_high_exposure: u32,
+    pub ne_withdrawal: u32,
+    pub sht_high_exposure: u32,
+    pub sht_withdrawal: u32,
+    pub ach_high_exposure: u32,
+    pub ach_withdrawal: u32,
+    pub gaba_high_exposure: u32,
+    pub gaba_withdrawal: u32,
+    pub oxytocin_high_exposure: u32,
+    pub oxytocin_withdrawal: u32,
+    pub glutamate_high_exposure: u32,
+    pub glutamate_withdrawal: u32,
+    pub adenosine_high_exposure: u32,
+    pub adenosine_withdrawal: u32,
+    pub endocannabinoid_high_exposure: u32,
+    pub endocannabinoid_withdrawal: u32,
 }
 
 impl NeuromodulatorBath {
@@ -1703,6 +1773,24 @@ impl NeuromodulatorBath {
             sht_2a_signal: self.sht_2a_signal(),
             gaba_a_signal: self.gaba_a_signal(),
             gaba_b_signal: self.gaba_b_signal(),
+            da_high_exposure: self.dopamine.high_exposure_cycles,
+            da_withdrawal: self.dopamine.withdrawal_cycles,
+            ne_high_exposure: self.noradrenaline.high_exposure_cycles,
+            ne_withdrawal: self.noradrenaline.withdrawal_cycles,
+            sht_high_exposure: self.serotonin.high_exposure_cycles,
+            sht_withdrawal: self.serotonin.withdrawal_cycles,
+            ach_high_exposure: self.acetylcholine.high_exposure_cycles,
+            ach_withdrawal: self.acetylcholine.withdrawal_cycles,
+            gaba_high_exposure: self.gaba.high_exposure_cycles,
+            gaba_withdrawal: self.gaba.withdrawal_cycles,
+            oxytocin_high_exposure: self.oxytocin.high_exposure_cycles,
+            oxytocin_withdrawal: self.oxytocin.withdrawal_cycles,
+            glutamate_high_exposure: self.glutamate.high_exposure_cycles,
+            glutamate_withdrawal: self.glutamate.withdrawal_cycles,
+            adenosine_high_exposure: self.adenosine.high_exposure_cycles,
+            adenosine_withdrawal: self.adenosine.withdrawal_cycles,
+            endocannabinoid_high_exposure: self.endocannabinoid.high_exposure_cycles,
+            endocannabinoid_withdrawal: self.endocannabinoid.withdrawal_cycles,
         }
     }
 }
@@ -2361,6 +2449,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         // DA should increase from positive reward
@@ -2387,6 +2477,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         // NE should spike from surprise (0.15) + arousal (0.056) + PE (0.03)
@@ -2410,6 +2502,8 @@ mod tests {
             binding_strength: 0.8,      // strong binding
             arousal: 0.4,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         // Run several cycles to accumulate
         for _ in 0..10 {
@@ -2467,6 +2561,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
 
         let mut bath = NeuromodulatorBath::default();
@@ -2512,6 +2608,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
 
@@ -2619,6 +2717,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         for _ in 0..50 {
             bath.update(&inputs);
@@ -2820,6 +2920,8 @@ mod tests {
             binding_strength: 0.7,
             epistemic_confidence: 0.8,
             flow_active: true,
+            consciousness_level: None,
+            moral_signal: None,
         };
         for _ in 0..500 {
             bath.update(&inputs);
@@ -2858,6 +2960,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         for _ in 0..200 {
             bath.update(&inputs);
@@ -3222,6 +3326,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         // DA and NE should have phasic signal immediately
@@ -3245,6 +3351,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         for _ in 0..20 {
             bath.update(&quiet);
@@ -3855,6 +3963,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         // NE phasic > 0.3 after decay but input re-produces... check ACh suppression
@@ -3903,6 +4013,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         for _ in 0..10 {
             bath.update(&inputs);
@@ -3950,6 +4062,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         // Surprise signal = -0.1 should suppress GABA
@@ -3984,6 +4098,8 @@ mod tests {
             binding_strength: 0.8,
             epistemic_confidence: 0.8,
             flow_active: true,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -4009,6 +4125,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         // Oxytocin > 0.5 → suppress NE
@@ -4032,6 +4150,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         // Oxytocin > 0.5 → potentiate 5-HT (produce +0.03 * excess)
@@ -4096,6 +4216,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         // High GABA should oppose glutamate (suppress it)
@@ -4310,6 +4432,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         for _ in 0..50 {
             bath.update(&inputs);
@@ -4549,6 +4673,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -4571,6 +4697,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         let gaba_before = bath.gaba.level;
         bath.update(&inputs);
@@ -4598,6 +4726,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -4622,6 +4752,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -4642,6 +4774,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         for _ in 0..60 {
             bath.update(&inputs);
@@ -4679,6 +4813,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -4700,6 +4836,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -4799,6 +4937,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -4923,6 +5063,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         let before = bath.endocannabinoid.level;
         bath.update(&inputs);
@@ -4948,6 +5090,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -4970,6 +5114,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         let before = bath.endocannabinoid.level;
         bath.update(&inputs);
@@ -5005,6 +5151,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         bath.update(&inputs);
         assert!(
@@ -5116,6 +5264,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         let sht_1a_before = bath.sht_subtypes.excitatory;
         let sht_2a_before = bath.sht_subtypes.inhibitory;
@@ -5181,6 +5331,8 @@ mod tests {
             binding_strength: 0.5,
             epistemic_confidence: 0.5,
             flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
         };
         let da_start = bath.dopamine.receptor_sensitivity;
         let sht_start = bath.serotonin.receptor_sensitivity;
@@ -5523,5 +5675,628 @@ mod tests {
         for i in 0..250 { tracker.record([i as f32 / 250.0; 9]); }
         assert_eq!(tracker.total_recorded, 250);
         assert!(tracker.history.len() <= 200);
+    }
+
+    // ── A1: Tolerance double-application fix ──────────────────────────────
+
+    // ── A3: Per-transmitter snapshot observability ──────────────────
+
+    #[test]
+    fn test_snapshot_default_zeros() {
+        let bath = NeuromodulatorBath::default();
+        let snap = bath.snapshot();
+        assert_eq!(snap.da_high_exposure, 0);
+        assert_eq!(snap.da_withdrawal, 0);
+        assert_eq!(snap.ne_high_exposure, 0);
+        assert_eq!(snap.sht_withdrawal, 0);
+        assert_eq!(snap.gaba_high_exposure, 0);
+        assert_eq!(snap.endocannabinoid_withdrawal, 0);
+    }
+
+    #[test]
+    fn test_snapshot_tracks_da_high_exposure() {
+        let mut bath = NeuromodulatorBath::default();
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.1,
+            surprise: false,
+            reward_signal: 0.8, // high reward → DA burst
+            coherence: 0.5,
+            arousal: 0.3,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
+        };
+        for _ in 0..10 {
+            bath.dopamine.produce(0.3); // force high
+            bath.update(&inputs);
+        }
+        let snap = bath.snapshot();
+        assert!(
+            snap.da_high_exposure > 0,
+            "DA high_exposure should be > 0 after sustained high: got {}",
+            snap.da_high_exposure
+        );
+    }
+
+    #[test]
+    fn test_snapshot_tracks_withdrawal() {
+        let mut bath = NeuromodulatorBath::default();
+        // Force DA past tolerance onset
+        bath.dopamine.high_exposure_cycles = bath.dopamine.tolerance_onset_cycles + 5;
+        bath.dopamine.level = 0.9;
+        // Drop level below baseline to trigger withdrawal
+        bath.dopamine.level = 0.2;
+        bath.dopamine.reuptake(); // triggers withdrawal
+        let snap = bath.snapshot();
+        assert!(
+            snap.da_withdrawal > 0,
+            "DA withdrawal should be > 0 after drop: got {}",
+            snap.da_withdrawal
+        );
+    }
+
+    #[test]
+    fn test_snapshot_aggregates_match_per_transmitter() {
+        let mut bath = NeuromodulatorBath::default();
+        // Set two transmitters past tolerance
+        bath.dopamine.high_exposure_cycles = 25;
+        bath.noradrenaline.high_exposure_cycles = 30;
+        // Set one in withdrawal
+        bath.serotonin.withdrawal_cycles = 10;
+        let snap = bath.snapshot();
+        // Count tolerant from per-transmitter fields
+        let tolerant_from_snapshot = [
+            snap.da_high_exposure > bath.dopamine.tolerance_onset_cycles,
+            snap.ne_high_exposure > bath.noradrenaline.tolerance_onset_cycles,
+            snap.sht_high_exposure > bath.serotonin.tolerance_onset_cycles,
+        ]
+        .iter()
+        .filter(|&&x| x)
+        .count() as u8;
+        assert_eq!(snap.tolerant_count, tolerant_from_snapshot + bath.tolerant_count() - tolerant_from_snapshot);
+        assert_eq!(snap.tolerant_count, bath.tolerant_count());
+        // Withdrawal: per-transmitter should match aggregate
+        let withdrawal_from_snapshot = [
+            snap.da_withdrawal > 0,
+            snap.ne_withdrawal > 0,
+            snap.sht_withdrawal > 0,
+        ]
+        .iter()
+        .filter(|&&x| x)
+        .count();
+        assert_eq!(withdrawal_from_snapshot, 1); // only serotonin
+        assert_eq!(snap.withdrawal_count, bath.withdrawal_count());
+    }
+
+    // ── A2: Allostatic burnout release ──────────────────────────────
+
+    #[test]
+    fn test_burnout_release_when_load_drops() {
+        let mut bath = NeuromodulatorBath::default();
+        // Simulate burnout: force baselines down to 0.35
+        bath.dopamine.set_baseline(0.35);
+        bath.serotonin.set_baseline(0.35);
+        // Set load to 0.6 (below 0.75 release threshold)
+        bath.allostatic_load = 0.6;
+        bath.accumulate_allostatic_load(0.0, false); // cortisol=0 → no new accumulation
+        // Release should have bumped baselines by +0.002
+        assert!(
+            bath.dopamine.baseline_val() > 0.35,
+            "DA baseline should increase when load drops below 0.75: got {}",
+            bath.dopamine.baseline_val()
+        );
+        assert!(
+            bath.serotonin.baseline_val() > 0.35,
+            "5-HT baseline should increase when load drops below 0.75: got {}",
+            bath.serotonin.baseline_val()
+        );
+    }
+
+    #[test]
+    fn test_burnout_hysteresis_gap() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.dopamine.set_baseline(0.35);
+        bath.serotonin.set_baseline(0.35);
+        // Load at 0.78 — in hysteresis gap (0.75–0.80), no release
+        bath.allostatic_load = 0.78;
+        bath.accumulate_allostatic_load(0.0, false);
+        // The > 0.5 depression branch fires but depression is tiny at 0.78
+        // The key check: baselines should NOT have been bumped UP
+        // (depression amount = (0.78-0.5)*0.02 = 0.0056, so baseline goes DOWN)
+        assert!(
+            bath.dopamine.baseline_val() <= 0.35,
+            "DA baseline should not increase in hysteresis gap: got {}",
+            bath.dopamine.baseline_val()
+        );
+    }
+
+    #[test]
+    fn test_burnout_release_rate() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.dopamine.set_baseline(0.35);
+        bath.allostatic_load = 0.4; // well below 0.75
+        let before = bath.dopamine.baseline_val();
+        bath.accumulate_allostatic_load(0.0, false);
+        let after = bath.dopamine.baseline_val();
+        let delta = after - before;
+        assert!(
+            (delta - 0.002).abs() < 0.001,
+            "Release rate should be +0.002/cycle, got {delta}"
+        );
+    }
+
+    #[test]
+    fn test_burnout_release_cap_at_045() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.dopamine.set_baseline(0.449);
+        bath.serotonin.set_baseline(0.449);
+        bath.allostatic_load = 0.4;
+        // Run several cycles — should not exceed 0.45
+        for _ in 0..10 {
+            bath.accumulate_allostatic_load(0.0, false);
+        }
+        assert!(
+            bath.dopamine.baseline_val() <= 0.452, // 0.45 + small margin for f32
+            "DA baseline should cap at ~0.45 during release: got {}",
+            bath.dopamine.baseline_val()
+        );
+    }
+
+    #[test]
+    fn test_full_recovery_still_requires_sleep() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.dopamine.set_baseline(0.35);
+        bath.allostatic_load = 0.1; // very low load
+        // 100 non-sleep cycles — release restores to 0.45 max, not 0.5
+        for _ in 0..100 {
+            bath.accumulate_allostatic_load(0.0, false);
+        }
+        assert!(
+            bath.dopamine.baseline_val() <= 0.452,
+            "Release alone caps at 0.45 — full recovery needs sleep: got {}",
+            bath.dopamine.baseline_val()
+        );
+        // Now add sleep recovery
+        bath.allostatic_load = 0.1;
+        for _ in 0..110 {
+            bath.accumulate_allostatic_load(0.0, true); // sleep=true
+        }
+        assert!(
+            bath.dopamine.baseline_val() > 0.45,
+            "Sleep recovery should push past 0.45: got {}",
+            bath.dopamine.baseline_val()
+        );
+    }
+
+    #[test]
+    fn test_no_double_decay_da() {
+        // DA: tolerance_onset_cycles=15, tolerance_decay_rate=0.985
+        // After onset, only slow decay should apply (0.985/cycle), not 0.998 × 0.985
+        let mut t = Transmitter {
+            tolerance_onset_cycles: 15,
+            tolerance_decay_rate: 0.985,
+            tolerance_threshold: 0.2,
+            ..Transmitter::default()
+        };
+        // Force past tolerance onset
+        t.level = 0.9;
+        t.high_exposure_cycles = 20; // > 15
+        let before = t.receptor_sensitivity;
+        t.reuptake();
+        let after = t.receptor_sensitivity;
+        // Should decay by exactly tolerance_decay_rate (0.985), not 0.998 × 0.985
+        let expected = before * 0.985;
+        assert!(
+            (after - expected).abs() < 0.001,
+            "DA post-onset: expected {expected:.6}, got {after:.6} (before={before:.6})"
+        );
+    }
+
+    #[test]
+    fn test_no_double_decay_gaba() {
+        let mut t = Transmitter {
+            level: 0.8,
+            baseline: 0.4,
+            tolerance_onset_cycles: 20,
+            tolerance_decay_rate: 0.99,
+            tolerance_threshold: 0.2,
+            ..Transmitter::default()
+        };
+        t.high_exposure_cycles = 25;
+        let before = t.receptor_sensitivity;
+        t.reuptake();
+        let after = t.receptor_sensitivity;
+        let expected = before * 0.99;
+        assert!(
+            (after - expected).abs() < 0.001,
+            "GABA post-onset: expected {expected:.6}, got {after:.6}"
+        );
+    }
+
+    #[test]
+    fn test_fast_adaptation_only_before_onset() {
+        let mut t = Transmitter {
+            level: 0.9,
+            baseline: 0.5,
+            tolerance_onset_cycles: 20,
+            tolerance_decay_rate: 0.99,
+            tolerance_threshold: 0.2,
+            ..Transmitter::default()
+        };
+        t.high_exposure_cycles = 5; // well below onset
+        let before = t.receptor_sensitivity;
+        t.reuptake();
+        // Fast adaptation: 0.998 (level > baseline+0.2, and within tolerance_threshold too)
+        // high_exposure_cycles incremented to 6, but 6 <= 20 so no slow decay
+        assert!(
+            t.receptor_sensitivity < before,
+            "Fast adaptation should decrease sensitivity before onset"
+        );
+        // Should NOT have slow decay rate applied
+        let expected_fast = before * 0.998;
+        assert!(
+            (t.receptor_sensitivity - expected_fast).abs() < 0.001,
+            "Before onset: expected fast-only {expected_fast:.6}, got {:.6}",
+            t.receptor_sensitivity
+        );
+    }
+
+    #[test]
+    fn test_slow_only_after_onset() {
+        let mut t = Transmitter {
+            level: 0.9,
+            baseline: 0.5,
+            tolerance_onset_cycles: 10,
+            tolerance_decay_rate: 0.98,
+            tolerance_threshold: 0.2,
+            ..Transmitter::default()
+        };
+        t.high_exposure_cycles = 15; // past onset
+        let before = t.receptor_sensitivity;
+        t.reuptake();
+        // Only slow decay (0.98), not fast (0.998)
+        let expected = before * 0.98;
+        assert!(
+            (t.receptor_sensitivity - expected).abs() < 0.001,
+            "After onset: expected slow-only {expected:.6}, got {:.6}",
+            t.receptor_sensitivity
+        );
+    }
+
+    #[test]
+    fn test_smooth_transition_at_boundary() {
+        // At exactly tolerance_onset_cycles, fast adaptation still applies (<=)
+        let mut t = Transmitter {
+            level: 0.9,
+            baseline: 0.5,
+            tolerance_onset_cycles: 10,
+            tolerance_decay_rate: 0.98,
+            tolerance_threshold: 0.2,
+            ..Transmitter::default()
+        };
+        t.high_exposure_cycles = 10; // exactly at onset
+        let before = t.receptor_sensitivity;
+        t.reuptake();
+        // high_exposure_cycles was 10 = tolerance_onset_cycles, gate passes (<=)
+        // Then high_exposure_cycles becomes 11 > 10, slow decay fires
+        // But fast adaptation IS gated this cycle since 10 <= 10
+        let expected = before * 0.998 * 0.98;
+        assert!(
+            (t.receptor_sensitivity - expected).abs() < 0.002,
+            "Boundary: expected {expected:.6}, got {:.6}",
+            t.receptor_sensitivity
+        );
+    }
+
+    #[test]
+    fn test_post_onset_rate_matches_tolerance_decay() {
+        // Verify the actual decay rate post-onset is exactly tolerance_decay_rate
+        let mut t = Transmitter {
+            level: 0.9,
+            baseline: 0.5,
+            reuptake_rate: 0.0, // disable level decay to keep level high
+            tolerance_onset_cycles: 5,
+            tolerance_decay_rate: 0.975,
+            tolerance_threshold: 0.2,
+            ..Transmitter::default()
+        };
+        t.high_exposure_cycles = 10;
+        let mut sensitivities = Vec::new();
+        for _ in 0..5 {
+            t.level = 0.9; // re-clamp each cycle
+            let before = t.receptor_sensitivity;
+            t.reuptake();
+            let ratio = t.receptor_sensitivity / before;
+            sensitivities.push(ratio);
+        }
+        for (i, &ratio) in sensitivities.iter().enumerate() {
+            assert!(
+                (ratio - 0.975).abs() < 0.002,
+                "Cycle {i}: decay ratio {ratio:.6} should be ~0.975"
+            );
+        }
+    }
+
+    // ── C1: Phi → neuromod baseline modulation ────────────────────────
+
+    #[test]
+    fn test_high_phi_boosts_sht_baseline() {
+        let mut bath = NeuromodulatorBath::default();
+        let sht_before = bath.serotonin.baseline_val();
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: Some(0.9), // high Phi
+            moral_signal: None,
+        };
+        for _ in 0..50 {
+            bath.update(&inputs);
+        }
+        assert!(
+            bath.serotonin.baseline_val() > sht_before,
+            "High Phi should boost 5-HT baseline: before={sht_before}, after={}",
+            bath.serotonin.baseline_val()
+        );
+    }
+
+    #[test]
+    fn test_low_phi_suppresses_sht_baseline() {
+        let mut bath = NeuromodulatorBath::default();
+        let sht_before = bath.serotonin.baseline_val();
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: Some(0.1), // low Phi
+            moral_signal: None,
+        };
+        for _ in 0..50 {
+            bath.update(&inputs);
+        }
+        assert!(
+            bath.serotonin.baseline_val() < sht_before,
+            "Low Phi should suppress 5-HT baseline: before={sht_before}, after={}",
+            bath.serotonin.baseline_val()
+        );
+    }
+
+    #[test]
+    fn test_phi_none_no_effect() {
+        let mut bath = NeuromodulatorBath::default();
+        let sht_before = bath.serotonin.baseline_val();
+        let da_before = bath.dopamine.baseline_val();
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.0,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.0,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
+        };
+        bath.update(&inputs);
+        // With None, consciousness modulation should not change baselines
+        // (other mechanisms may move them slightly, but not the Phi path)
+        assert_eq!(bath.serotonin.baseline_val(), sht_before);
+        assert_eq!(bath.dopamine.baseline_val(), da_before);
+    }
+
+    #[test]
+    fn test_phi_200_cycle_stability() {
+        let mut bath = NeuromodulatorBath::default();
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: Some(0.8), // sustained high
+            moral_signal: None,
+        };
+        for _ in 0..200 {
+            bath.update(&inputs);
+        }
+        // Baselines should be finite and within bounds (clamped by adjust_baseline)
+        let sht = bath.serotonin.baseline_val();
+        let da = bath.dopamine.baseline_val();
+        assert!(sht.is_finite() && sht >= 0.35 && sht <= 0.65, "5-HT baseline out of range: {sht}");
+        assert!(da.is_finite() && da >= 0.35 && da <= 0.65, "DA baseline out of range: {da}");
+    }
+
+    #[test]
+    fn test_phi_da_half_rate() {
+        // DA baseline should move at half the rate of 5-HT
+        let mut bath = NeuromodulatorBath::default();
+        let sht_before = bath.serotonin.baseline_val();
+        let da_before = bath.dopamine.baseline_val();
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.0,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.0,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: Some(0.9),
+            moral_signal: None,
+        };
+        bath.update(&inputs);
+        let sht_delta = (bath.serotonin.baseline_val() - sht_before).abs();
+        let da_delta = (bath.dopamine.baseline_val() - da_before).abs();
+        // DA delta should be approximately half of 5-HT delta
+        if sht_delta > 0.0001 {
+            let ratio = da_delta / sht_delta;
+            assert!(
+                (ratio - 0.5).abs() < 0.1,
+                "DA should move at ~0.5× 5-HT rate: ratio={ratio:.4}"
+            );
+        }
+    }
+
+    // ── C2: Moral judgment → oxytocin/DA feedback ─────────────────────
+
+    #[test]
+    fn test_positive_moral_boosts_oxytocin() {
+        let mut bath = NeuromodulatorBath::default();
+        let oxy_before = bath.oxytocin.level;
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: Some(0.8), // high moral score
+        };
+        bath.update(&inputs);
+        // Oxytocin should increase from moral signal production
+        // Note: reuptake also happens, so check relative to a no-moral run
+        let mut bath_ctrl = NeuromodulatorBath::default();
+        let inputs_ctrl = NeuromodulatorInputs {
+            moral_signal: None,
+            ..inputs
+        };
+        bath_ctrl.update(&inputs_ctrl);
+        assert!(
+            bath.oxytocin.level > bath_ctrl.oxytocin.level,
+            "Positive moral should boost oxytocin: moral={}, ctrl={}",
+            bath.oxytocin.level, bath_ctrl.oxytocin.level
+        );
+    }
+
+    #[test]
+    fn test_negative_moral_suppresses_oxytocin() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.oxytocin.level = 0.6; // start above baseline
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: Some(-0.8), // negative moral score
+        };
+        let mut bath_ctrl = bath.clone();
+        bath.update(&inputs);
+        let inputs_ctrl = NeuromodulatorInputs {
+            moral_signal: None,
+            ..inputs
+        };
+        bath_ctrl.update(&inputs_ctrl);
+        assert!(
+            bath.oxytocin.level < bath_ctrl.oxytocin.level,
+            "Negative moral should suppress oxytocin: moral={}, ctrl={}",
+            bath.oxytocin.level, bath_ctrl.oxytocin.level
+        );
+    }
+
+    #[test]
+    fn test_moral_none_no_effect() {
+        let mut bath1 = NeuromodulatorBath::default();
+        let mut bath2 = NeuromodulatorBath::default();
+        let inputs1 = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
+        };
+        let inputs2 = NeuromodulatorInputs {
+            moral_signal: Some(0.0), // zero moral = within ±0.3 deadzone
+            ..inputs1
+        };
+        bath1.update(&inputs1);
+        bath2.update(&inputs2);
+        // Both should be identical since moral=0.0 is in the ±0.3 deadzone
+        assert!(
+            (bath1.oxytocin.level - bath2.oxytocin.level).abs() < 0.001,
+            "Moral=None vs moral=0.0 should be equivalent: {}, {}",
+            bath1.oxytocin.level, bath2.oxytocin.level
+        );
+    }
+
+    #[test]
+    fn test_moral_boosts_dopamine() {
+        let mut bath = NeuromodulatorBath::default();
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: Some(0.8),
+        };
+        let mut bath_ctrl = NeuromodulatorBath::default();
+        let inputs_ctrl = NeuromodulatorInputs {
+            moral_signal: None,
+            ..inputs
+        };
+        bath.update(&inputs);
+        bath_ctrl.update(&inputs_ctrl);
+        assert!(
+            bath.dopamine.level >= bath_ctrl.dopamine.level,
+            "Positive moral should boost DA: moral={}, ctrl={}",
+            bath.dopamine.level, bath_ctrl.dopamine.level
+        );
+    }
+
+    #[test]
+    fn test_moral_200_cycle_stability() {
+        let mut bath = NeuromodulatorBath::default();
+        let inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: Some(0.9), // sustained high moral
+        };
+        for _ in 0..200 {
+            bath.update(&inputs);
+        }
+        assert!(bath.oxytocin.level.is_finite(), "Oxytocin should be finite after 200 cycles");
+        assert!(bath.dopamine.level.is_finite(), "DA should be finite after 200 cycles");
+        assert!(bath.oxytocin.level <= 1.0, "Oxytocin should not exceed 1.0");
+        assert!(bath.dopamine.level <= 1.0, "DA should not exceed 1.0");
     }
 }

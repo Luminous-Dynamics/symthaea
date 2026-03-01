@@ -94,10 +94,12 @@ impl SrttBenchmark {
             let mut best_sim = f32::NEG_INFINITY;
             let mut best_idx = 0;
             for (i, pos) in positions.iter().enumerate() {
-                let mut sim = stimulus.similarity(pos);
+                // Encoding noise degrades motor sequence learning signal
+                let noise_degrade = config.effective_noise() as f32 * 0.4;
+                let mut sim = stimulus.similarity(pos) * (1.0 - noise_degrade);
                 // SSM boost for predicted transitions
                 if let Some(prev) = prev_pos {
-                    let transition_sim = positions[prev].similarity(pos);
+                    let transition_sim = positions[prev].similarity(pos) * (1.0 - noise_degrade);
                     sim += ssm_activation * transition_sim * 0.3;
                 }
                 xor_shift(&mut rng);

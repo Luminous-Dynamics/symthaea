@@ -91,6 +91,21 @@ pub struct UnifiedConfig {
 
     /// Interpolation bias (controls equilibrium influence)
     pub interp_bias: f32,
+
+    /// Fourier basis injection frequencies (Hz). Empty = disabled.
+    /// When non-empty, sin/cos signals at these frequencies are bundled
+    /// into the equilibrium computation as a time-varying perturbation.
+    #[serde(default)]
+    pub fourier_frequencies: Vec<f32>,
+
+    /// Amplitude of the Fourier basis injection (default: 0.1).
+    /// Kept small so it acts as a perturbation, not a driver.
+    #[serde(default = "default_fourier_amplitude")]
+    pub fourier_amplitude: f32,
+}
+
+fn default_fourier_amplitude() -> f32 {
+    0.1
 }
 
 impl Default for UnifiedConfig {
@@ -105,6 +120,8 @@ impl Default for UnifiedConfig {
             weight_decay: 0.0001,
             gating_steepness: 1.0, // Standard sigmoid
             interp_bias: 0.0,      // Neutral interpolation
+            fourier_frequencies: Vec::new(), // Disabled by default
+            fourier_amplitude: 0.1,
         }
     }
 }
@@ -395,17 +412,23 @@ unsafe fn fused_identity_avx2(
 }
 
 impl HdcLtcUnifiedNeuron {
-    /// Create a new unified neuron with given configuration and seed
+    /// Create a new unified neuron with given configuration and seed.
+    ///
+    /// Uses Gram-Schmidt orthogonalization for the 5 internal HVs to ensure
+    /// minimal interference at initialization (pairwise similarity < 0.01).
     pub fn new(config: UnifiedConfig, seed: u64) -> Self {
         let dim = config.dimension;
 
+        // Generate 5 orthogonal unit vectors via modified Gram-Schmidt
+        let ortho = ContinuousHV::orthogonal_set(dim, 5, seed);
+
         Self {
             state: ContinuousHV::zero(dim),
-            weight_hv: ContinuousHV::random(dim, seed),
-            input_mask: ContinuousHV::random(dim, seed + 1000),
-            tau_modulator: ContinuousHV::random(dim, seed + 2000),
-            gate_weight: ContinuousHV::random(dim, seed + 3000),
-            gate_bias: ContinuousHV::random(dim, seed + 4000).scale(0.1),
+            weight_hv: ortho[0].clone(),
+            input_mask: ortho[1].clone(),
+            tau_modulator: ortho[2].clone(),
+            gate_weight: ortho[3].clone(),
+            gate_bias: ortho[4].scale(0.1), // Scale down for bias
             weight_momentum: ContinuousHV::zero(dim),
             input_momentum: ContinuousHV::zero(dim),
             running_mean: 0.0,
@@ -447,9 +470,52 @@ impl HdcLtcUnifiedNeuron {
         Self::new(UnifiedConfig::default(), seed)
     }
 
+    /// Compute a Fourier basis HV from configured frequencies and current total_time.
+    ///
+    /// For each frequency f, sin(2πf·t) and cos(2πf·t) are distributed across
+    /// the dimension via a strided pattern. Scaled by `fourier_amplitude`.
+    /// Returns None when `fourier_frequencies` is empty.
+    fn compute_fourier_basis(&self) -> Option<ContinuousHV> {
+        let freqs = &self.config.fourier_frequencies;
+        if freqs.is_empty() {
+            return None;
+        }
+
+        let dim = self.config.dimension;
+        let amp = self.config.fourier_amplitude;
+        let t = self.total_time;
+        let mut values = vec![0.0f32; dim];
+        let two_pi = 2.0 * std::f32::consts::PI;
+
+        // Distribute sin/cos pairs across dimension with striding
+        // Each frequency gets 2 channels (sin + cos), striped across dim
+        let total_channels = freqs.len() * 2;
+
+        for (fi, &freq) in freqs.iter().enumerate() {
+            let sin_val = (two_pi * freq * t as f32).sin() * amp;
+            let cos_val = (two_pi * freq * t as f32).cos() * amp;
+
+            // Stride: sin channel at offset 2*fi, cos at 2*fi+1
+            let sin_channel = 2 * fi;
+            let cos_channel = 2 * fi + 1;
+
+            for idx in (sin_channel..dim).step_by(total_channels.max(1)) {
+                values[idx] = sin_val;
+            }
+            if cos_channel < dim {
+                for idx in (cos_channel..dim).step_by(total_channels.max(1)) {
+                    values[idx] = cos_val;
+                }
+            }
+        }
+
+        Some(ContinuousHV::from_vec(values))
+    }
+
     /// Compute the equilibrium state x_∞ for given input
     ///
-    /// x_∞ = f(W⊗x + U⊗u) where f is the activation function
+    /// x_∞ = f(W⊗x + U⊗u) where f is the activation function.
+    /// When Fourier basis is configured, it is bundled in as a third component.
     #[inline]
     fn compute_equilibrium(&self, input: &ContinuousHV) -> ContinuousHV {
         // HDC binding: W⊗x (state transformation via binding, not matrix mul)
@@ -459,7 +525,12 @@ impl HdcLtcUnifiedNeuron {
         let masked_input = self.input_mask.bind(input);
 
         // HDC bundling: combine state and input contributions
-        let combined = ContinuousHV::bundle(&[&transformed_state, &masked_input]);
+        // If Fourier basis exists, bundle as third component
+        let combined = if let Some(ref fourier) = self.compute_fourier_basis() {
+            ContinuousHV::bundle(&[&transformed_state, &masked_input, fourier])
+        } else {
+            ContinuousHV::bundle(&[&transformed_state, &masked_input])
+        };
 
         // Apply activation function
         self.config.activation.apply(&combined)
@@ -2108,6 +2179,197 @@ mod tests {
             decay > 0.0,
             "Decay must be strictly positive, got {}",
             decay
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 2: Orthogonal HV init tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 3: Fourier basis injection tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_fourier_basis_empty_config() {
+        let neuron = HdcLtcUnifiedNeuron::new(UnifiedConfig::default(), 42);
+        assert!(
+            neuron.compute_fourier_basis().is_none(),
+            "Empty fourier_frequencies should return None"
+        );
+    }
+
+    #[test]
+    fn test_fourier_basis_single_freq() {
+        let config = UnifiedConfig {
+            fourier_frequencies: vec![1.0],
+            fourier_amplitude: 0.5,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        neuron.total_time = 0.25; // t=0.25s → sin(2π·1·0.25) = sin(π/2) = 1.0
+        let basis = neuron.compute_fourier_basis().unwrap();
+        // Sin channel should have amplitude ≈ 0.5
+        assert!(
+            (basis.values[0] - 0.5).abs() < 0.01,
+            "Sin(2π·1·0.25) × 0.5 should be ≈ 0.5, got {}",
+            basis.values[0]
+        );
+    }
+
+    #[test]
+    fn test_fourier_basis_multiple_freqs() {
+        let config = UnifiedConfig {
+            fourier_frequencies: vec![1.0, 2.0],
+            fourier_amplitude: 0.1,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        neuron.total_time = 0.5;
+        let basis = neuron.compute_fourier_basis().unwrap();
+        // With 2 freqs, total_channels=4, stride=4
+        // Channel 0 (sin 1Hz), 1 (cos 1Hz), 2 (sin 2Hz), 3 (cos 2Hz)
+        assert!(basis.values[0].abs() <= 0.1 + 0.01); // sin(2π·1·0.5) = sin(π) ≈ 0
+        assert!((basis.values[1] - (-0.1)).abs() < 0.01); // cos(2π·1·0.5) = cos(π) = -1 × 0.1
+    }
+
+    #[test]
+    fn test_fourier_evolve_differs_from_no_fourier() {
+        let input = ContinuousHV::random_default(123);
+
+        // Without Fourier
+        let mut neuron_no = HdcLtcUnifiedNeuron::new(UnifiedConfig::default(), 42);
+        for _ in 0..50 {
+            neuron_no.evolve_closed_form(0.02, &input);
+        }
+
+        // With Fourier
+        let config_fourier = UnifiedConfig {
+            fourier_frequencies: vec![1.0, 5.0],
+            fourier_amplitude: 0.1,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron_f = HdcLtcUnifiedNeuron::new(config_fourier, 42);
+        for _ in 0..50 {
+            neuron_f.evolve_closed_form(0.02, &input);
+        }
+
+        let sim = neuron_no.state().similarity(neuron_f.state());
+        assert!(
+            sim < 0.99,
+            "Fourier injection should produce different state, got similarity {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_fourier_time_varying() {
+        let config = UnifiedConfig {
+            fourier_frequencies: vec![1.0],
+            fourier_amplitude: 0.1,
+            ..UnifiedConfig::default()
+        };
+
+        let mut neuron1 = HdcLtcUnifiedNeuron::new(config.clone(), 42);
+        neuron1.total_time = 0.0;
+        let basis1 = neuron1.compute_fourier_basis().unwrap();
+
+        let mut neuron2 = HdcLtcUnifiedNeuron::new(config, 42);
+        neuron2.total_time = 0.25;
+        let basis2 = neuron2.compute_fourier_basis().unwrap();
+
+        let sim = basis1.similarity(&basis2);
+        assert!(
+            sim < 0.99,
+            "Fourier basis at different times should differ, got similarity {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_fourier_amplitude_scaling() {
+        let config_small = UnifiedConfig {
+            fourier_frequencies: vec![1.0],
+            fourier_amplitude: 0.01,
+            ..UnifiedConfig::default()
+        };
+        let config_large = UnifiedConfig {
+            fourier_frequencies: vec![1.0],
+            fourier_amplitude: 1.0,
+            ..UnifiedConfig::default()
+        };
+
+        let mut neuron_s = HdcLtcUnifiedNeuron::new(config_small, 42);
+        neuron_s.total_time = 0.25;
+        let basis_s = neuron_s.compute_fourier_basis().unwrap();
+
+        let mut neuron_l = HdcLtcUnifiedNeuron::new(config_large, 42);
+        neuron_l.total_time = 0.25;
+        let basis_l = neuron_l.compute_fourier_basis().unwrap();
+
+        let norm_s = basis_s.norm();
+        let norm_l = basis_l.norm();
+        assert!(
+            norm_l > norm_s * 10.0,
+            "Large amplitude should produce larger norm: small={}, large={}",
+            norm_s,
+            norm_l
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 2: Orthogonal HV init tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_neuron_orthogonal_init_separates_hvs() {
+        let neuron = HdcLtcUnifiedNeuron::new(UnifiedConfig::default(), 42);
+        let hvs = [
+            &neuron.weight_hv,
+            &neuron.input_mask,
+            &neuron.tau_modulator,
+            &neuron.gate_weight,
+        ];
+        for i in 0..hvs.len() {
+            for j in (i + 1)..hvs.len() {
+                let sim = hvs[i].similarity(hvs[j]);
+                assert!(
+                    sim.abs() < 0.02,
+                    "HVs {} and {} should be near-orthogonal, got similarity {}",
+                    i,
+                    j,
+                    sim
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_neuron_orthogonal_init_evolves_correctly() {
+        let mut neuron = HdcLtcUnifiedNeuron::new(UnifiedConfig::default(), 42);
+        let input = ContinuousHV::random_default(123);
+
+        // Should evolve without issues
+        for _ in 0..50 {
+            neuron.evolve_closed_form(0.02, &input);
+        }
+        let norm = neuron.state().norm();
+        assert!(norm > 0.0 && norm.is_finite(), "State should evolve, got norm={}", norm);
+    }
+
+    #[test]
+    fn test_neuron_backward_compatible() {
+        // After 100 steps, state should be bounded
+        let mut neuron = HdcLtcUnifiedNeuron::new(UnifiedConfig::default(), 42);
+        let input = ContinuousHV::random_default(100);
+        for _ in 0..100 {
+            neuron.evolve_closed_form(0.01, &input);
+        }
+        let norm = neuron.state().norm();
+        assert!(
+            norm < 200.0,
+            "State should remain bounded after 100 steps, got {}",
+            norm
         );
     }
 }

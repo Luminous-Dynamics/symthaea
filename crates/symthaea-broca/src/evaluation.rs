@@ -633,7 +633,11 @@ pub fn evaluate_liquid_mamba(
 
     // Effective rank from collected output HVs
     let avg_effective_rank = if all_output_hvs.len() >= 4 {
-        gen.projection().effective_rank(&all_output_hvs)
+        if let Some(tp) = gen.temporal_proj() {
+            tp.effective_rank(&all_output_hvs)
+        } else {
+            gen.projection().effective_rank(&all_output_hvs)
+        }
     } else {
         0.0
     };

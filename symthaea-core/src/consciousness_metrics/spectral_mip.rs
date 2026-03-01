@@ -950,4 +950,297 @@ fn focus_dims_for_next_level(
     dims
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// STRUCTURAL HIERARCHICAL PHI — cluster-level decomposition
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Result of structural (cluster-based) hierarchical Phi decomposition.
+///
+/// Uses the Fiedler ordering from [`SpectralMIPResult`] to identify natural
+/// clusters via MI-valley detection, then decomposes Phi into three scales:
+///
+/// - **Micro**: average within-cluster integration (local binding)
+/// - **Meso**: average pairwise MI between clusters (regional coordination)
+/// - **Macro**: global spectral MIP Phi (unified consciousness)
+///
+/// ## Emergence Ratio
+///
+/// `emergence_ratio = macro_phi / (mean(cluster_phis) × num_clusters)`
+///
+/// - `> 1.0`: emergent integration — the whole exceeds the sum of parts
+/// - `< 1.0`: weak global binding — local regions integrate but don't unify
+/// - `≈ 1.0`: additive integration — no emergent or deficient binding
+///
+/// ## Scientific Basis
+///
+/// - Tononi (2004) — Integrated Information Theory (Phi decomposition)
+/// - Kitazono et al. (2018) — Hierarchical MIP and spectral methods
+/// - Mediano et al. (2022) — Multi-scale integrated information
+#[derive(Debug, Clone)]
+pub struct StructuralPhiResult {
+    /// Micro-scale Φ: average Gaussian MI Phi within clusters
+    pub micro_phi: f64,
+    /// Meso-scale Φ: average pairwise Gaussian MI between clusters
+    pub meso_phi: f64,
+    /// Macro-scale Φ: global spectral MIP (same as SpectralMIPResult.phi)
+    pub macro_phi: f64,
+    /// Number of natural clusters detected
+    pub num_clusters: usize,
+    /// Size of each cluster (in spectral order)
+    pub cluster_sizes: Vec<usize>,
+    /// Per-cluster Phi values
+    pub cluster_phis: Vec<f64>,
+    /// Integration bottleneck: |macro - meso| gap (lower = better integration)
+    pub bottleneck_score: f64,
+    /// Emergence ratio: macro / (mean_cluster_phi × num_clusters)
+    pub emergence_ratio: f64,
+}
+
+impl SpectralMIPFinder {
+    /// Compute structural hierarchical Phi decomposition.
+    ///
+    /// Uses the Fiedler ordering from a previous [`compute()`] result to identify
+    /// natural clusters (via MI-valley detection in the cut sweep), then computes
+    /// Phi at three scales: micro (within-cluster), meso (between-cluster), and
+    /// macro (global).
+    ///
+    /// For each cluster, the within-cluster Phi is computed using the same
+    /// bordered Cholesky sweep algorithm as the global MIP, applied to the
+    /// cluster's covariance submatrix.
+    ///
+    /// # Returns
+    ///
+    /// `None` if the window isn't ready or the MIP result is invalid.
+    ///
+    /// # Performance
+    ///
+    /// O(n²) for covariance rebuild + O(Σ m_k³) for per-cluster sweeps,
+    /// where m_k is the size of cluster k. Typically 2-3ms for n=128 with
+    /// 3-5 clusters.
+    pub fn compute_structural_hierarchy(
+        &self,
+        mip_result: &SpectralMIPResult,
+    ) -> Option<StructuralPhiResult> {
+        if !self.ready() || mip_result.spectral_order.len() < 4 {
+            return None;
+        }
+
+        let n = self.config.num_components;
+        let t = self.window.len();
+        let cov = self.build_covariance_matrix(n, t);
+
+        self.compute_structural_hierarchy_from_cov(mip_result, &cov, n)
+    }
+
+    /// Compute structural hierarchical Phi from a pre-built covariance matrix.
+    ///
+    /// Same algorithm as [`compute_structural_hierarchy`] but accepts an external
+    /// covariance matrix instead of building one from the window. Useful for
+    /// testing with known covariance structures.
+    pub fn compute_structural_hierarchy_from_cov(
+        &self,
+        mip_result: &SpectralMIPResult,
+        cov: &[f64],
+        n: usize,
+    ) -> Option<StructuralPhiResult> {
+        if mip_result.spectral_order.len() < 4 || n < 4 || cov.len() != n * n {
+            return None;
+        }
+
+        // Reorder covariance by spectral order (Fiedler ordering)
+        let reordered = reorder_matrix(cov, n, &mip_result.spectral_order);
+
+        // Step 1: Identify clusters from cut_mis valleys
+        let clusters = find_spectral_clusters(&mip_result.cut_mis, n);
+        let num_clusters = clusters.len();
+
+        if num_clusters < 2 {
+            return Some(StructuralPhiResult {
+                micro_phi: mip_result.phi,
+                meso_phi: 0.0,
+                macro_phi: mip_result.phi,
+                num_clusters: 1,
+                cluster_sizes: vec![n],
+                cluster_phis: vec![mip_result.phi],
+                bottleneck_score: 0.0,
+                emergence_ratio: 1.0,
+            });
+        }
+
+        // Step 2: Compute per-cluster Phi (micro)
+        let mut cluster_phis = Vec::with_capacity(num_clusters);
+        let mut cluster_sizes = Vec::with_capacity(num_clusters);
+
+        for cluster_indices in &clusters {
+            let m = cluster_indices.len();
+            cluster_sizes.push(m);
+
+            if m < 2 {
+                cluster_phis.push(0.0);
+                continue;
+            }
+
+            // Extract submatrix for this cluster (in spectral order)
+            let sub_cov = extract_submatrix(&reordered, n, cluster_indices);
+
+            // Compute Phi: MI_total - MI_at_MIP
+            let total_mi = gaussian_mi_total(&sub_cov, m);
+            if m == 2 {
+                // Only one possible cut for n=2
+                cluster_phis.push(total_mi.max(0.0));
+            } else {
+                let cut_mis = sweep_contiguous_cuts(&sub_cov, m);
+                let min_cut = cut_mis
+                    .iter()
+                    .copied()
+                    .fold(f64::MAX, f64::min);
+                cluster_phis.push((total_mi - min_cut).max(0.0));
+            }
+        }
+
+        let micro_phi = if !cluster_phis.is_empty() {
+            cluster_phis.iter().sum::<f64>() / cluster_phis.len() as f64
+        } else {
+            0.0
+        };
+
+        // Step 3: Compute meso-Phi (between-cluster MI)
+        let meso_phi = compute_meso_mi(&reordered, n, &clusters);
+
+        // Step 4: Macro is the original result
+        let macro_phi = mip_result.phi;
+
+        // Step 5: Emergence and bottleneck
+        let mean_cluster_phi = micro_phi;
+        let expected = mean_cluster_phi * num_clusters as f64;
+        let emergence_ratio = if expected > 1e-6 {
+            macro_phi / expected
+        } else {
+            1.0
+        };
+        let bottleneck_score = (macro_phi - meso_phi).abs();
+
+        Some(StructuralPhiResult {
+            micro_phi,
+            meso_phi,
+            macro_phi,
+            num_clusters,
+            cluster_sizes,
+            cluster_phis,
+            bottleneck_score,
+            emergence_ratio,
+        })
+    }
+}
+
+/// Identify natural cluster boundaries from the MI cut sweep.
+///
+/// Clusters are separated by valleys in `cut_mis` — positions where mutual
+/// information between the left and right halves is significantly below the
+/// median. These correspond to weak integration points in the Fiedler ordering.
+///
+/// Returns lists of spectral-order position indices for each cluster.
+fn find_spectral_clusters(cut_mis: &[f64], n: usize) -> Vec<Vec<usize>> {
+    if cut_mis.is_empty() || n < 4 {
+        return vec![(0..n).collect()];
+    }
+
+    // Find the 25th percentile of cut_mis as threshold
+    let mut sorted = cut_mis.to_vec();
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    let p25_idx = sorted.len() / 4;
+    let threshold = sorted[p25_idx];
+
+    // Find local minima below threshold
+    let mut boundaries: Vec<(usize, f64)> = Vec::new();
+    for i in 0..cut_mis.len() {
+        let is_local_min = (i == 0 || cut_mis[i] <= cut_mis[i - 1])
+            && (i == cut_mis.len() - 1 || cut_mis[i] <= cut_mis[i + 1]);
+        if is_local_min && cut_mis[i] < threshold {
+            boundaries.push((i, cut_mis[i]));
+        }
+    }
+
+    // Sort by MI value (weakest = best cluster boundary)
+    boundaries.sort_by(|a, b| a.1.total_cmp(&b.1));
+
+    // Limit cluster count: max 7 clusters (min cluster size ≈ n/7)
+    let max_boundaries = ((n / 4).max(2) - 1).min(6);
+    boundaries.truncate(max_boundaries);
+
+    // Sort boundaries by position for sequential cluster creation
+    let mut cut_positions: Vec<usize> = boundaries.iter().map(|(pos, _)| pos + 1).collect();
+    cut_positions.sort_unstable();
+    cut_positions.dedup();
+
+    // Build clusters from boundaries
+    let mut clusters = Vec::new();
+    let mut start = 0;
+    for &boundary in &cut_positions {
+        let boundary = boundary.min(n);
+        if boundary > start && boundary - start >= 2 {
+            clusters.push((start..boundary).collect());
+            start = boundary;
+        }
+    }
+    // Add final cluster
+    if n > start && n - start >= 2 {
+        clusters.push((start..n).collect());
+    }
+
+    if clusters.is_empty() {
+        vec![(0..n).collect()]
+    } else {
+        clusters
+    }
+}
+
+/// Compute average pairwise Gaussian MI between clusters.
+///
+/// For each pair of clusters (A, B), computes:
+///   `MI(A;B) = 0.5 × (ln|Σ_A| + ln|Σ_B| - ln|Σ_{A∪B}|)`
+///
+/// Returns the average pairwise inter-cluster MI.
+fn compute_meso_mi(cov: &[f64], n: usize, clusters: &[Vec<usize>]) -> f64 {
+    if clusters.len() < 2 {
+        return 0.0;
+    }
+
+    // Cache per-cluster log determinants
+    let ln_dets: Vec<f64> = clusters
+        .iter()
+        .map(|c| {
+            let sub = extract_submatrix(cov, n, c);
+            ln_determinant_cholesky(&sub, c.len())
+        })
+        .collect();
+
+    let mut total_mi = 0.0;
+    let mut pair_count = 0;
+
+    for i in 0..clusters.len() {
+        for j in (i + 1)..clusters.len() {
+            let mut combined: Vec<usize> =
+                Vec::with_capacity(clusters[i].len() + clusters[j].len());
+            combined.extend_from_slice(&clusters[i]);
+            combined.extend_from_slice(&clusters[j]);
+            combined.sort_unstable();
+
+            let sub = extract_submatrix(cov, n, &combined);
+            let ln_det_ab = ln_determinant_cholesky(&sub, combined.len());
+
+            // MI(A;B) = 0.5 × (ln|Σ_A| + ln|Σ_B| - ln|Σ_{A∪B}|)
+            let mi = 0.5 * (ln_dets[i] + ln_dets[j] - ln_det_ab);
+            total_mi += mi.max(0.0);
+            pair_count += 1;
+        }
+    }
+
+    if pair_count > 0 {
+        total_mi / pair_count as f64
+    } else {
+        0.0
+    }
+}
+
 // Tests in consciousness_metrics/tests/spectral_mip_tests.rs

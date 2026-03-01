@@ -107,8 +107,11 @@ impl WisconsinCardSortingBenchmark {
 
         // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
         let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
-        let lr_correct = 0.2; // Moderate reinforcement (lower cap = less needed)
-        let lr_error = 0.8; // Stronger error penalty for faster set-shifting
+        // Encoding noise and time pressure degrade learning rates (impaired feedback)
+        let noise = config.effective_noise();
+        let lr_scale = 1.0 - noise * 0.6;
+        let lr_correct = 0.2 * lr_scale; // Moderate reinforcement (lower cap = less needed)
+        let lr_error = 0.8 * lr_scale; // Stronger error penalty for faster set-shifting
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];
         let all_shapes = [Shape::Triangle, Shape::Circle, Shape::Square, Shape::Star];
@@ -159,7 +162,8 @@ impl WisconsinCardSortingBenchmark {
             // Time pressure: gain 1.5 produces ~15% perseverative errors (Heaton, 1993 WCST norms);
             // -0.8/unit flattens selection toward chance, modeling impaired set-shifting under SAT (Heitz, 2014).
             let diff_model = difficulty_model_for("Executive::WCST");
-            let softmax_gain = (1.5 - config.time_pressure * 0.8)
+            // Time pressure AND encoding noise both flatten softmax selection
+            let softmax_gain = (1.5 - config.time_pressure * 1.2 - noise * 0.8).max(0.1)
                 * diff_model.temperature_multiplier(config.difficulty);
             let max_conf = rule_confidence
                 .iter()

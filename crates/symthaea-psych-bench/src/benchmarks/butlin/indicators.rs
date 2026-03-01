@@ -14,20 +14,42 @@ use std::collections::BTreeMap;
 
 
 /// Suite that evaluates all 14 Butlin consciousness indicators
-/// via static architectural analysis.
+/// via static architectural analysis, optionally blended with runtime
+/// structural Phi measurements.
 pub struct ButlinIndicatorSuite;
 
 impl ButlinIndicatorSuite {
+    /// Normalize a raw Phi value to [0, 1] via shifted sigmoid.
+    /// Same mapping as the consciousness engine: 2/(1+exp(-phi)) - 1.
+    fn normalize_phi(phi: f64) -> f64 {
+        2.0 / (1.0 + (-phi).exp()) - 1.0
+    }
+
+    /// Blend a static architectural score with an optional runtime measurement.
+    /// Ratio: 0.6 × static + 0.4 × runtime (clamped to [0, 1]).
+    /// Falls back to static-only when runtime is None.
+    fn blend_score(static_score: f64, runtime: Option<f64>) -> f64 {
+        match runtime {
+            Some(rt) => 0.6 * static_score + 0.4 * rt.clamp(0.0, 1.0),
+            None => static_score,
+        }
+    }
+
     /// Evaluate all 14 indicators based on Symthaea's known architecture.
     ///
     /// Each indicator is assessed by examining the architectural properties
     /// of the system (CfC recurrence, HDC representations, FEP prediction,
     /// GWT broadcast, metacognition, etc.) without requiring a live
     /// cognitive loop execution.
+    ///
+    /// When `config.runtime_consciousness` is Some, static scores are blended
+    /// with live structural Phi measurements for theory-aligned accuracy.
     pub fn evaluate(config: &BenchmarkConfig) -> ButlinIndicatorReport {
         let mut indicators = Vec::new();
+        let rt = config.runtime_consciousness.as_ref();
 
         // RPT-1: Algorithmic recurrence (CfC feedback loop)
+        let rpt1_runtime = rt.map(|r| Self::normalize_phi(r.micro_phi));
         indicators.push(IndicatorEvidence {
             id: "RPT-1".into(),
             theory: "Recurrent Processing Theory".into(),
@@ -38,10 +60,11 @@ impl ButlinIndicatorSuite {
                 hdc_ltc_unified.rs; each cognitive cycle feeds predictions \
                 back as input to the next cycle"
                 .into(),
-            score: Some(1.0),
+            score: Some(Self::blend_score(1.0, rpt1_runtime)),
         });
 
         // RPT-2: Integrated perceptual representations (Phi > 0 on WM contents)
+        let rpt2_runtime = rt.map(|r| Self::normalize_phi(r.micro_phi) * 0.8);
         indicators.push(IndicatorEvidence {
             id: "RPT-2".into(),
             theory: "Recurrent Processing Theory".into(),
@@ -51,10 +74,11 @@ impl ButlinIndicatorSuite {
                 over HDC state; ContinuousHV bundle operations create holographic \
                 superpositions that integrate features across perceptual modalities"
                 .into(),
-            score: Some(0.8),
+            score: Some(Self::blend_score(0.8, rpt2_runtime)),
         });
 
         // GWT-1: Parallel specialized systems
+        let gwt1_runtime = rt.map(|r| (r.num_clusters as f64 / 3.0).min(1.0));
         indicators.push(IndicatorEvidence {
             id: "GWT-1".into(),
             theory: "Global Workspace Theory".into(),
@@ -66,10 +90,10 @@ impl ButlinIndicatorSuite {
                 (ToM), all coordinated via rayon-parallel post-processing in \
                 cognitive_loop/cycle.rs"
                 .into(),
-            score: Some(0.9),
+            score: Some(Self::blend_score(0.9, gwt1_runtime)),
         });
 
-        // GWT-2: Limited capacity + selective attention
+        // GWT-2: Limited capacity + selective attention (static only)
         indicators.push(IndicatorEvidence {
             id: "GWT-2".into(),
             theory: "Global Workspace Theory".into(),
@@ -85,6 +109,7 @@ impl ButlinIndicatorSuite {
         });
 
         // GWT-3: Global broadcast
+        let gwt3_runtime = rt.map(|r| Self::normalize_phi(r.meso_phi));
         indicators.push(IndicatorEvidence {
             id: "GWT-3".into(),
             theory: "Global Workspace Theory".into(),
@@ -95,10 +120,11 @@ impl ButlinIndicatorSuite {
                 pipeline (perception -> cognition -> translation) in symthaea.rs \
                 distributes processed state to reasoning, moral, and social modules"
                 .into(),
-            score: Some(0.8),
+            score: Some(Self::blend_score(0.8, gwt3_runtime)),
         });
 
         // GWT-4: State-dependent attention
+        let gwt4_runtime = rt.map(|r| (r.emergence_ratio - 0.5).tanh());
         indicators.push(IndicatorEvidence {
             id: "GWT-4".into(),
             theory: "Global Workspace Theory".into(),
@@ -108,10 +134,10 @@ impl ButlinIndicatorSuite {
                 error magnitude; surprise-driven exploration modulates attention \
                 allocation; consciousness_level field tracks dynamic state changes"
                 .into(),
-            score: Some(0.8),
+            score: Some(Self::blend_score(0.8, gwt4_runtime)),
         });
 
-        // HOT-1: Generative/top-down perception
+        // HOT-1: Generative/top-down perception (static only)
         indicators.push(IndicatorEvidence {
             id: "HOT-1".into(),
             theory: "Higher-Order Theories".into(),
@@ -126,6 +152,7 @@ impl ButlinIndicatorSuite {
         });
 
         // HOT-2: Metacognitive monitoring
+        let hot2_runtime = rt.map(|r| (r.bottleneck_score * 2.0).clamp(0.0, 1.0));
         indicators.push(IndicatorEvidence {
             id: "HOT-2".into(),
             theory: "Higher-Order Theories".into(),
@@ -135,10 +162,10 @@ impl ButlinIndicatorSuite {
                 module monitors processing quality and confidence; reasoning engine \
                 7-step cycle includes self-evaluation phase"
                 .into(),
-            score: Some(0.7),
+            score: Some(Self::blend_score(0.7, hot2_runtime)),
         });
 
-        // HOT-3: Agency with belief updating
+        // HOT-3: Agency with belief updating (static only)
         indicators.push(IndicatorEvidence {
             id: "HOT-3".into(),
             theory: "Higher-Order Theories".into(),
@@ -152,7 +179,7 @@ impl ButlinIndicatorSuite {
             score: Some(0.8),
         });
 
-        // HOT-4: Sparse and smooth coding
+        // HOT-4: Sparse and smooth coding (static only)
         indicators.push(IndicatorEvidence {
             id: "HOT-4".into(),
             theory: "Higher-Order Theories".into(),
@@ -169,6 +196,7 @@ impl ButlinIndicatorSuite {
         });
 
         // PP-1: Prediction errors driving learning
+        let pp1_runtime = rt.map(|r| Self::normalize_phi(r.macro_phi));
         indicators.push(IndicatorEvidence {
             id: "PP-1".into(),
             theory: "Predictive Processing".into(),
@@ -179,10 +207,11 @@ impl ButlinIndicatorSuite {
                 exploration, and episodic memory priority (Phi-weighted); \
                 learning_occurred flag tracked per cycle"
                 .into(),
-            score: Some(0.9),
+            score: Some(Self::blend_score(0.9, pp1_runtime)),
         });
 
         // PP-2: Hierarchical prediction
+        let pp2_runtime = rt.map(|r| if r.num_clusters >= 3 { 0.7 } else { 0.3 });
         indicators.push(IndicatorEvidence {
             id: "PP-2".into(),
             theory: "Predictive Processing".into(),
@@ -193,10 +222,10 @@ impl ButlinIndicatorSuite {
                 (hierarchical_free_energy.rs) provides multi-level prediction; \
                 full cortical hierarchy not yet implemented"
                 .into(),
-            score: Some(0.5),
+            score: Some(Self::blend_score(0.5, pp2_runtime)),
         });
 
-        // AST-1: Self-model of attention
+        // AST-1: Self-model of attention (static only)
         indicators.push(IndicatorEvidence {
             id: "AST-1".into(),
             theory: "Attention Schema Theory".into(),
@@ -210,6 +239,7 @@ impl ButlinIndicatorSuite {
         });
 
         // IIT-1: Integrated information > 0
+        let iit1_runtime = rt.map(|r| Self::normalize_phi(r.macro_phi));
         indicators.push(IndicatorEvidence {
             id: "IIT-1".into(),
             theory: "Integrated Information Theory".into(),
@@ -220,7 +250,7 @@ impl ButlinIndicatorSuite {
                 state; consciousness_verifier.rs validates Phi > 0 for non-trivial \
                 network configurations"
                 .into(),
-            score: Some(0.8),
+            score: Some(Self::blend_score(0.8, iit1_runtime)),
         });
 
         ButlinIndicatorReport::from_indicators(indicators)
@@ -358,5 +388,236 @@ mod tests {
         assert!(summary.contains("Butlin"));
         assert!(summary.contains("RPT-1"));
         assert!(summary.contains("IIT-1"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 5: Butlin Indicator Wiring tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    use super::report::RuntimeConsciousnessData;
+
+    #[test]
+    fn test_butlin_no_runtime_data_matches_static() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            runtime_consciousness: None,
+            ..Default::default()
+        };
+        let report = ButlinIndicatorSuite::evaluate(&config);
+        // RPT-1 static = 1.0, no runtime → should remain 1.0
+        let rpt1 = report.indicators.iter().find(|i| i.id == "RPT-1").unwrap();
+        assert_eq!(rpt1.score, Some(1.0));
+    }
+
+    #[test]
+    fn test_butlin_with_runtime_data_changes_scores() {
+        let config_static = BenchmarkConfig {
+            dimension: 256,
+            ..Default::default()
+        };
+        let report_static = ButlinIndicatorSuite::evaluate(&config_static);
+
+        let config_rt = BenchmarkConfig {
+            dimension: 256,
+            runtime_consciousness: Some(RuntimeConsciousnessData {
+                micro_phi: 2.0,
+                meso_phi: 1.5,
+                macro_phi: 3.0,
+                bottleneck_score: 0.8,
+                emergence_ratio: 2.0,
+                num_clusters: 5,
+            }),
+            ..Default::default()
+        };
+        let report_rt = ButlinIndicatorSuite::evaluate(&config_rt);
+
+        // At least some indicators should differ
+        let mut any_different = false;
+        for (s, r) in report_static.indicators.iter().zip(report_rt.indicators.iter()) {
+            if (s.score.unwrap_or(0.0) - r.score.unwrap_or(0.0)).abs() > 0.001 {
+                any_different = true;
+                break;
+            }
+        }
+        assert!(any_different, "Runtime data should change at least some scores");
+    }
+
+    #[test]
+    fn test_butlin_blend_score_no_runtime() {
+        let blended = ButlinIndicatorSuite::blend_score(0.8, None);
+        assert!((blended - 0.8).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_butlin_blend_score_with_runtime() {
+        let blended = ButlinIndicatorSuite::blend_score(0.8, Some(1.0));
+        // 0.6*0.8 + 0.4*1.0 = 0.48 + 0.4 = 0.88
+        assert!(
+            (blended - 0.88).abs() < 1e-10,
+            "Expected 0.88, got {}",
+            blended
+        );
+    }
+
+    #[test]
+    fn test_butlin_high_micro_phi_boosts_rpt() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            runtime_consciousness: Some(RuntimeConsciousnessData {
+                micro_phi: 5.0, // High → normalize_phi ≈ 1.0
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let report = ButlinIndicatorSuite::evaluate(&config);
+        let rpt1 = report.indicators.iter().find(|i| i.id == "RPT-1").unwrap();
+        // blend(1.0, normalize_phi(5.0)≈0.9866) → 0.6*1.0 + 0.4*0.987 ≈ 0.995
+        assert!(rpt1.score.unwrap() > 0.9);
+    }
+
+    #[test]
+    fn test_butlin_zero_phi_reduces_iit() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            runtime_consciousness: Some(RuntimeConsciousnessData {
+                macro_phi: 0.0, // Zero → normalize_phi(0) = 0.0
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let report = ButlinIndicatorSuite::evaluate(&config);
+        let iit1 = report.indicators.iter().find(|i| i.id == "IIT-1").unwrap();
+        // blend(0.8, 0.0) = 0.6*0.8 + 0.4*0.0 = 0.48
+        assert!(
+            iit1.score.unwrap() < 0.8,
+            "Zero Phi should reduce IIT-1, got {}",
+            iit1.score.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_butlin_high_meso_phi_boosts_gwt3() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            runtime_consciousness: Some(RuntimeConsciousnessData {
+                meso_phi: 5.0, // High meso
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let report = ButlinIndicatorSuite::evaluate(&config);
+        let gwt3 = report.indicators.iter().find(|i| i.id == "GWT-3").unwrap();
+        // blend(0.8, ~1.0) ≈ 0.88
+        assert!(gwt3.score.unwrap() > 0.8);
+    }
+
+    #[test]
+    fn test_butlin_bottleneck_affects_hot2() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            runtime_consciousness: Some(RuntimeConsciousnessData {
+                bottleneck_score: 0.9, // High bottleneck
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let report = ButlinIndicatorSuite::evaluate(&config);
+        let hot2 = report.indicators.iter().find(|i| i.id == "HOT-2").unwrap();
+        // blend(0.7, (0.9*2).clamp(0,1)=1.0) = 0.6*0.7 + 0.4*1.0 = 0.82
+        assert!(
+            hot2.score.unwrap() > 0.7,
+            "High bottleneck should boost HOT-2, got {}",
+            hot2.score.unwrap()
+        );
+    }
+
+    #[test]
+    fn test_butlin_still_14_indicators() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            runtime_consciousness: Some(RuntimeConsciousnessData {
+                micro_phi: 1.0,
+                meso_phi: 1.0,
+                macro_phi: 1.0,
+                bottleneck_score: 0.5,
+                emergence_ratio: 1.5,
+                num_clusters: 4,
+            }),
+            ..Default::default()
+        };
+        let report = ButlinIndicatorSuite::evaluate(&config);
+        assert_eq!(report.indicators.len(), 14);
+    }
+
+    #[test]
+    fn test_ablation_still_works() {
+        // Basic ablation presets should still function
+        let config = BenchmarkConfig {
+            dimension: 256,
+            ..Default::default()
+        };
+        let result = ButlinIndicatorSuite.run(&config);
+        let total = result.metrics["present_count"].mean
+            + result.metrics["partial_count"].mean
+            + result.metrics["absent_count"].mean;
+        assert_eq!(total, 14.0);
+    }
+
+    #[test]
+    fn test_runtime_data_default_is_zero() {
+        let rt = RuntimeConsciousnessData::default();
+        assert_eq!(rt.micro_phi, 0.0);
+        assert_eq!(rt.meso_phi, 0.0);
+        assert_eq!(rt.macro_phi, 0.0);
+        assert_eq!(rt.bottleneck_score, 0.0);
+        assert_eq!(rt.emergence_ratio, 0.0);
+        assert_eq!(rt.num_clusters, 0);
+    }
+
+    #[test]
+    fn test_normalize_phi_monotonic() {
+        let values: Vec<f64> = (0..=100).map(|i| i as f64 * 0.1).collect();
+        let normalized: Vec<f64> = values.iter().map(|&v| ButlinIndicatorSuite::normalize_phi(v)).collect();
+        for i in 1..normalized.len() {
+            assert!(
+                normalized[i] >= normalized[i - 1] - 1e-10,
+                "normalize_phi should be monotonic: f({}) = {} < f({}) = {}",
+                values[i],
+                normalized[i],
+                values[i - 1],
+                normalized[i - 1]
+            );
+        }
+    }
+
+    #[test]
+    fn test_runtime_consciousness_data_serializable() {
+        let rt = RuntimeConsciousnessData {
+            micro_phi: 1.5,
+            meso_phi: 0.8,
+            macro_phi: 2.0,
+            bottleneck_score: 0.4,
+            emergence_ratio: 1.3,
+            num_clusters: 3,
+        };
+        let json = serde_json::to_string(&rt).unwrap();
+        let rt2: RuntimeConsciousnessData = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt.micro_phi, rt2.micro_phi);
+        assert_eq!(rt.num_clusters, rt2.num_clusters);
+    }
+
+    #[test]
+    fn test_runtime_consciousness_data_clone() {
+        let rt = RuntimeConsciousnessData {
+            micro_phi: 1.0,
+            meso_phi: 2.0,
+            macro_phi: 3.0,
+            bottleneck_score: 0.5,
+            emergence_ratio: 1.5,
+            num_clusters: 4,
+        };
+        let rt2 = rt.clone();
+        assert_eq!(rt.macro_phi, rt2.macro_phi);
+        assert_eq!(rt.num_clusters, rt2.num_clusters);
     }
 }

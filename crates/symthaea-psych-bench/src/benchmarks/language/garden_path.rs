@@ -113,7 +113,9 @@ impl GardenPathBenchmark {
                 // Reanalysis success: must overcome initial parse
                 xor_shift(&mut rng);
                 let reanalysis_noise_val = (rng % 10000) as f32 / 10000.0 * reanalysis_noise;
-                let reanalysis_score = revised_parse.similarity(&role_verb) + reanalysis_noise_val;
+                // Encoding noise degrades parse representation fidelity
+                let noise_degrade = config.effective_noise() as f32 * 0.4;
+                let reanalysis_score = revised_parse.similarity(&role_verb) * (1.0 - noise_degrade) + reanalysis_noise_val;
 
                 // Higher cost → harder to reanalyze correctly
                 let threshold = 0.15 + cost as f32 * 0.30;

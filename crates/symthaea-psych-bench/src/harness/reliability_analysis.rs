@@ -242,74 +242,78 @@ pub struct ReliabilityBattery {
 impl ReliabilityBattery {
     /// Run a reliability battery across multiple benchmarks.
     ///
-    /// For each benchmark, runs `n_sessions` sessions with different seeds
-    /// (base seed + 0, base seed + 1, ..., base seed + n_sessions - 1).
-    /// Computes ICC and practice effects between consecutive session pairs.
+    /// Uses a multi-subject design: K=10 independent "subjects" (distinct seed
+    /// families), each measured in `n_sessions` sessions. This provides enough
+    /// between-subject variance for meaningful ICC computation.
+    ///
+    /// Each subject uses seeds from a distinct family (base + k*1000), and each
+    /// session within a subject uses a nearby seed (base + k*1000 + s). This
+    /// mirrors human test-retest: different people (seed families) have different
+    /// ability profiles, while the same person tested twice (nearby seeds) should
+    /// produce similar scores if the benchmark is reliable.
     pub fn run(
         benchmarks: &[&dyn PsychBenchmark],
         base_config: &BenchmarkConfig,
         n_sessions: usize,
     ) -> Self {
         let n_sessions = n_sessions.max(2);
+        let n_subjects = 10; // Number of independent "subjects" (seed families)
         let mut results = Vec::new();
 
         for bench in benchmarks {
             let bench_name = bench.name();
             let metric_name = key_metric_for_benchmark(bench_name);
 
-            // Run n_sessions with different seeds
-            let mut session_results: Vec<BenchmarkResult> = Vec::with_capacity(n_sessions);
-            for s in 0..n_sessions {
-                let config = BenchmarkConfig {
-                    seed: base_config.seed + s as u64,
-                    ..base_config.clone()
-                };
-                session_results.push(bench.run(&config));
+            // Collect per-subject, per-session metric values
+            // session_data[session][subject] = metric value
+            let mut session_data: Vec<Vec<f64>> = vec![Vec::new(); n_sessions];
+
+            for k in 0..n_subjects {
+                let family_base = base_config.seed + k as u64 * 1000;
+                for s in 0..n_sessions {
+                    let config = BenchmarkConfig {
+                        seed: family_base + s as u64,
+                        ..base_config.clone()
+                    };
+                    let result = bench.run(&config);
+                    if let Some(mv) = result.metrics.get(metric_name) {
+                        session_data[s].push(mv.mean);
+                    }
+                }
             }
 
-            // Extract key metric means from each session
-            let session_means: Vec<f64> = session_results
-                .iter()
-                .filter_map(|r| r.metrics.get(metric_name).map(|mv| mv.mean))
-                .collect();
-
-            if session_means.len() < 2 {
+            // Need at least 3 subjects with data in all sessions
+            let min_len = session_data.iter().map(|v| v.len()).min().unwrap_or(0);
+            if min_len < 3 {
                 continue;
             }
 
-            // Compute ICC and Pearson r between consecutive session pairs.
-            // For n_sessions > 2, use all consecutive pairs as "subjects".
-            let mut s1_vals = Vec::new();
-            let mut s2_vals = Vec::new();
-            for pair in session_means.windows(2) {
-                s1_vals.push(pair[0]);
-                s2_vals.push(pair[1]);
-            }
+            // Compute ICC between session 1 and session 2 using all subjects
+            let s1 = &session_data[0][..min_len];
+            let s2 = &session_data[1][..min_len];
 
-            let icc = compute_icc(&s1_vals, &s2_vals);
-            let r = pearson_r(&s1_vals, &s2_vals);
+            let icc = compute_icc(s1, s2);
+            let r = pearson_r(s1, s2);
 
             // Pool SD across all sessions for SEM
-            let all_mean = session_means.iter().sum::<f64>() / session_means.len() as f64;
-            let sd = if session_means.len() > 1 {
-                let var = session_means
+            let all_vals: Vec<f64> = session_data.iter().flat_map(|v| v.iter().copied()).collect();
+            let all_mean = all_vals.iter().sum::<f64>() / all_vals.len() as f64;
+            let sd = if all_vals.len() > 1 {
+                let var = all_vals
                     .iter()
                     .map(|x| (x - all_mean).powi(2))
                     .sum::<f64>()
-                    / (session_means.len() - 1) as f64;
+                    / (all_vals.len() - 1) as f64;
                 var.sqrt()
             } else {
                 0.0
             };
             let sem = compute_sem(sd, icc);
 
-            // Practice effect between first and last session
-            let practice = PracticeEffect::compute(
-                bench_name,
-                metric_name,
-                session_means[0],
-                session_means[session_means.len() - 1],
-            );
+            // Practice effect between session 1 and session 2 means
+            let s1_mean = s1.iter().sum::<f64>() / s1.len() as f64;
+            let s2_mean = s2.iter().sum::<f64>() / s2.len() as f64;
+            let practice = PracticeEffect::compute(bench_name, metric_name, s1_mean, s2_mean);
 
             let reliability_class = ReliabilityClass::from_icc(icc);
 

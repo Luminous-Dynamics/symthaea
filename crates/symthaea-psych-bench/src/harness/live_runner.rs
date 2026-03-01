@@ -309,10 +309,12 @@ fn cosine_f32_vec(a: &[f32], b: &[f32]) -> f64 {
 #[cfg(feature = "symthaea-backend")]
 mod impls {
     use super::*;
+    use crate::benchmarks::affect::EmotionalStroopBenchmark;
     use crate::benchmarks::executive::StroopBenchmark;
     use crate::benchmarks::executive::WisconsinCardSortingBenchmark;
     use crate::benchmarks::inhibition::GoNoGoBenchmark;
     use crate::benchmarks::reasoning::ArcFluidBenchmark;
+    use crate::benchmarks::social::UltimatumGameBenchmark;
     use crate::benchmarks::sustained_attention::PvtBenchmark;
     use crate::benchmarks::worm::NBackBenchmark;
 
@@ -619,6 +621,125 @@ mod impls {
                     alternatives: vec![distractor_hv, correct_hv],
                     correct_idx: 1,
                     condition: format!("type_{}", trial % 4),
+                    trial_idx: trial,
+                });
+            }
+            stimuli
+        }
+    }
+
+    impl LoopDrivable for UltimatumGameBenchmark {
+        fn loop_name(&self) -> &str {
+            "Social::UltimatumGame"
+        }
+
+        fn generate_stimuli(
+            &self,
+            config: &super::super::config::BenchmarkConfig,
+        ) -> Vec<LoopStimulus> {
+            let dim = config.dimension;
+            let seed = config.seed;
+            let mut rng = seed ^ 0x9E3779B97F4A7C15;
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
+
+            // Fair (50:50) and unfair (100:0) prototypes
+            let fair_proto = ContinuousHV::random(dim, seed.wrapping_add(500));
+            let unfair_proto = ContinuousHV::random(dim, seed.wrapping_add(501));
+            // Accept / reject response HVs
+            let reject_hv = ContinuousHV::random(dim, seed.wrapping_add(502));
+            let accept_hv = ContinuousHV::random(dim, seed.wrapping_add(503));
+            let alternatives = vec![reject_hv, accept_hv]; // 0=reject, 1=accept
+
+            // 5 offer levels × 8 trials each = 40 trials
+            let offer_levels = [0.10f32, 0.20, 0.30, 0.40, 0.50];
+            let trials_per = 8;
+            let mut stimuli = Vec::with_capacity(offer_levels.len() * trials_per);
+
+            for &offer in &offer_levels {
+                for rep in 0..trials_per {
+                    xor_shift(&mut rng);
+                    let noise = ContinuousHV::random(dim, rng);
+                    // Blend fair/unfair based on offer level
+                    let stimulus_hv = ContinuousHV::weighted_bundle(
+                        &[&fair_proto, &unfair_proto, &noise],
+                        &[offer, 1.0 - offer, 0.05],
+                    );
+
+                    // Human threshold: reject if offer < 30%
+                    let correct_idx = if offer < 0.30 { 0 } else { 1 };
+
+                    stimuli.push(LoopStimulus {
+                        stimulus_hv,
+                        alternatives: alternatives.clone(),
+                        correct_idx,
+                        condition: format!("offer_{:.0}pct", offer * 100.0),
+                        trial_idx: offer_levels.iter().position(|&o| o == offer).unwrap() * trials_per + rep,
+                    });
+                }
+            }
+            stimuli
+        }
+    }
+
+    impl LoopDrivable for EmotionalStroopBenchmark {
+        fn loop_name(&self) -> &str {
+            "Affect::EmotionalStroop"
+        }
+
+        fn generate_stimuli(
+            &self,
+            config: &super::super::config::BenchmarkConfig,
+        ) -> Vec<LoopStimulus> {
+            let dim = config.dimension;
+            let seed = config.seed;
+            let mut rng = seed ^ 0x9E3779B97F4A7C15;
+            let xor_shift = |s: &mut u64| {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+            };
+
+            // 4 color response HVs
+            let colors: Vec<ContinuousHV> = (0..4)
+                .map(|i| ContinuousHV::random(dim, seed.wrapping_add(600 + i)))
+                .collect();
+            // Negative valence prototype (threat content)
+            let neg_proto = ContinuousHV::random(dim, seed.wrapping_add(610));
+
+            let n_trials = 80; // 40 neutral + 40 negative
+            let mut stimuli = Vec::with_capacity(n_trials);
+
+            for trial in 0..n_trials {
+                xor_shift(&mut rng);
+                let ink_idx = (rng % 4) as usize;
+                let is_negative = trial >= 40;
+
+                let stimulus_hv = if is_negative {
+                    // Negative word partially activates competing color
+                    xor_shift(&mut rng);
+                    let competing_idx = ((ink_idx + 1 + (rng % 3) as usize) % 4) as usize;
+                    ContinuousHV::weighted_bundle(
+                        &[&colors[ink_idx], &neg_proto, &colors[competing_idx]],
+                        &[0.65, 0.20, 0.15],
+                    )
+                } else {
+                    xor_shift(&mut rng);
+                    let noise = ContinuousHV::random(dim, rng);
+                    ContinuousHV::weighted_bundle(
+                        &[&colors[ink_idx], &noise],
+                        &[0.85, 0.15],
+                    )
+                };
+
+                stimuli.push(LoopStimulus {
+                    stimulus_hv,
+                    alternatives: colors.clone(),
+                    correct_idx: ink_idx,
+                    condition: if is_negative { "negative" } else { "neutral" }.to_string(),
                     trial_idx: trial,
                 });
             }

@@ -29,14 +29,7 @@ const TEST_DIM: usize = 1024;
 fn test_config() -> UnifiedConfig {
     UnifiedConfig {
         dimension: TEST_DIM,
-        tau_base: 0.1,
-        backbone_tau: 0.5,
-        activation: UnifiedActivation::Tanh,
-        learning_rate: 0.01,
-        momentum: 0.9,
-        weight_decay: 0.0001,
-        gating_steepness: 1.0,
-        interp_bias: 0.0,
+        ..UnifiedConfig::default()
     }
 }
 

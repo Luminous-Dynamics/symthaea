@@ -24,6 +24,7 @@ use symthaea_core::temporal::TemporalPredictor;
 
 use crate::attention::SurpriseMap;
 use crate::encoder::PatchHdcEncoder;
+use crate::training::{BpttResult, ManifoldTrainer};
 use crate::types::{VisionConfig, VisionTelemetry};
 
 /// A CfC temporal manifold over holographic video encodings.
@@ -44,6 +45,7 @@ pub struct VisionManifold {
     coherence: f32,
     frame_count: u64,
     telemetry: VisionTelemetry,
+    trainer: ManifoldTrainer,
 }
 
 impl VisionManifold {
@@ -55,6 +57,7 @@ impl VisionManifold {
         let weight_hv = ContinuousHV::random(dim, config.seed + 300_000);
         let grid = encoder.grid_for(max_width, max_height);
         let surprise = SurpriseMap::new(grid, config.surprise_decay, config.surprise_threshold);
+        let trainer = ManifoldTrainer::new(&config.training, dim);
 
         Self {
             config,
@@ -69,6 +72,7 @@ impl VisionManifold {
             coherence: 0.0,
             frame_count: 0,
             telemetry: VisionTelemetry::default(),
+            trainer,
         }
     }
 
@@ -102,6 +106,10 @@ impl VisionManifold {
                 .salient_patches()
                 .len(),
             frame_sequence: self.frame_count,
+            training_triggered: false,
+            training_loss: None,
+            output_hv_norm: 0.0,
+            attention_boost_applied: 0.0,
         };
 
         self.telemetry.clone()
@@ -115,8 +123,22 @@ impl VisionManifold {
         dt: f32,
     ) {
         // Compute prediction error against previous prediction
-        if let Some(ref predicted) = self.last_prediction {
-            self.prediction_error = 1.0 - frame_hv.similarity(predicted).clamp(-1.0, 1.0);
+        let mut training_triggered = false;
+        let mut training_loss = None;
+
+        if let Some(predicted) = self.last_prediction.clone() {
+            self.prediction_error = 1.0 - frame_hv.similarity(&predicted).clamp(-1.0, 1.0);
+
+            // Trigger training when prediction error exceeds threshold
+            if self.prediction_error > self.config.training.error_threshold {
+                if let Some(last_input) = self.last_frame_hv.clone() {
+                    let result = self.train_step_inner(
+                        &last_input, &predicted, frame_hv, dt,
+                    );
+                    training_triggered = true;
+                    training_loss = Some(result.loss);
+                }
+            }
         }
 
         // Update per-patch surprise map
@@ -135,6 +157,37 @@ impl VisionManifold {
         self.last_frame_hv = Some(frame_hv.clone());
         self.last_patch_hvs = patch_hvs.to_vec();
         self.frame_count += 1;
+
+        // Store training telemetry
+        self.telemetry.training_triggered = training_triggered;
+        self.telemetry.training_loss = training_loss;
+    }
+
+    /// Internal training step: update weight_hv and tau_base from prediction error.
+    fn train_step_inner(
+        &mut self,
+        input: &ContinuousHV,
+        predicted: &ContinuousHV,
+        actual: &ContinuousHV,
+        dt: f32,
+    ) -> BpttResult {
+        let result = self.trainer.train_step(
+            &self.weight_hv,
+            &self.state,
+            input,
+            predicted,
+            actual,
+            self.config.tau_base,
+            dt,
+        );
+
+        // Apply weight update
+        self.weight_hv = self.weight_hv.add(&result.weight_update);
+
+        // Apply tau update with clamping
+        self.config.tau_base = (self.config.tau_base + result.tau_update).clamp(0.01, 10.0);
+
+        result
     }
 
     /// CfC equilibrium: tanh(α · input + (1-α) · W ⊗ state).
@@ -197,6 +250,21 @@ impl VisionManifold {
     /// Access the underlying encoder for external use.
     pub fn encoder(&self) -> &PatchHdcEncoder {
         &self.encoder
+    }
+
+    /// Current tau_base value (may change during training).
+    pub fn current_tau(&self) -> f32 {
+        self.config.tau_base
+    }
+
+    /// Total training steps performed.
+    pub fn training_steps(&self) -> u64 {
+        self.trainer.total_steps()
+    }
+
+    /// Mutable access to the encoder (for contrastive refinement).
+    pub fn encoder_mut(&mut self) -> &mut PatchHdcEncoder {
+        &mut self.encoder
     }
 
     /// Reset manifold to initial state.

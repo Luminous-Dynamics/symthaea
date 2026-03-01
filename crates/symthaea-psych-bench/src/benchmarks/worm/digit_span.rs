@@ -68,6 +68,7 @@ impl DigitSpanBenchmark {
                 config.time_pressure,
                 config.difficulty,
                 config.ssm_backend,
+                config.effective_noise(),
             );
             fwd_rt_sum += fwd_rt;
             fwd_rt_count += 1;
@@ -94,6 +95,7 @@ impl DigitSpanBenchmark {
                 config.time_pressure,
                 config.difficulty,
                 config.ssm_backend,
+                config.effective_noise(),
             );
             bwd_rt_sum += bwd_rt;
             bwd_rt_count += 1;
@@ -147,6 +149,7 @@ impl DigitSpanBenchmark {
         time_pressure: f64,
         difficulty: f64,
         ssm_backend: bool,
+        encoding_noise: f64,
     ) -> (u32, f64) {
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
@@ -182,6 +185,8 @@ impl DigitSpanBenchmark {
         for expected in expected_recall {
             let target_hv = adapter.encode(expected, dim);
 
+            // Encoding noise degrades retrieval similarity
+            let noise_degrade = encoding_noise as f32 * 0.4;
             let recall_score = if ssm_backend {
                 // SSM-driven recall: raw cosine similarity modulated by the
                 // SSM's current memory strength. Step with 0.0 (no new input)
@@ -190,7 +195,7 @@ impl DigitSpanBenchmark {
                 let raw_sim = wm
                     .contents()
                     .iter()
-                    .map(|item| target_hv.similarity(item))
+                    .map(|item| target_hv.similarity(item) * (1.0 - noise_degrade))
                     .fold(f32::NEG_INFINITY, f32::max);
                 // Blend raw similarity with SSM decay; backward recall gets
                 // stronger SSM modulation (items decay more by retrieval time).
@@ -198,12 +203,12 @@ impl DigitSpanBenchmark {
                 raw_sim * (1.0 - ssm_weight + ssm_weight * ssm_activation)
             } else if is_backward {
                 // Legacy: activation-weighted — early items have lower activation
-                wm.activation_weighted_similarity(&target_hv)
+                wm.activation_weighted_similarity(&target_hv) * (1.0 - noise_degrade)
             } else {
                 // Legacy: raw similarity — all items in capacity are fresh
                 wm.contents()
                     .iter()
-                    .map(|item| target_hv.similarity(item))
+                    .map(|item| target_hv.similarity(item) * (1.0 - noise_degrade))
                     .fold(f32::NEG_INFINITY, f32::max)
             };
 

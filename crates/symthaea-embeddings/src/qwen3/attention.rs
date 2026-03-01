@@ -54,7 +54,10 @@ impl Qwen3AttentionConfig {
 
 impl<B: Backend> Qwen3Attention<B> {
     /// Bidirectional attention forward (no causal mask — embedding use-case).
-    pub fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
+    ///
+    /// `mask`: optional `[batch, 1, 1, seq_len]` additive mask.
+    /// Use `0.0` for real tokens and `-1e9` for padding positions.
+    pub fn forward(&self, x: Tensor<B, 3>, mask: Option<Tensor<B, 4>>) -> Tensor<B, 3> {
         let [batch, seq_len, _hidden] = x.dims();
 
         // Q / K / V linear projections (no bias per Qwen3 spec)
@@ -93,9 +96,14 @@ impl<B: Backend> Qwen3Attention<B> {
             (k, v)
         };
 
-        // Scaled dot-product attention: softmax(QK^T / sqrt(d)) * V
+        // Scaled dot-product attention: softmax(QK^T / sqrt(d) + mask) * V
         let inv_scale = 1.0 / (self.head_dim as f32).sqrt();
         let attn = q.matmul(k.swap_dims(2, 3)).mul_scalar(inv_scale);
+        let attn = if let Some(m) = mask {
+            attn + m // broadcasts [batch,1,1,seq] → [batch,heads,seq,seq]
+        } else {
+            attn
+        };
         let attn = burn::tensor::activation::softmax(attn, 3);
         let out = attn.matmul(v);
 

@@ -113,7 +113,9 @@ impl CptBenchmark {
             if buffer.len() >= 3 {
                 let current = &digits[digit_idx];
                 let two_back = &digits[buffer[buffer.len() - 3]];
-                let similarity = current.similarity(two_back);
+                // Encoding noise degrades digit discrimination
+                let noise_degrade = config.effective_noise() as f32 * 0.4;
+                let similarity = current.similarity(two_back) * (1.0 - noise_degrade);
 
                 xor_shift(&mut rng);
                 let noise = (rng % 10000) as f32 / 10000.0 * noise_level;

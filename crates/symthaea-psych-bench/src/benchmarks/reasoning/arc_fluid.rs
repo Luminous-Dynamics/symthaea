@@ -71,10 +71,11 @@ impl ArcFluidBenchmark {
         let tasks_per_type = 5;
 
         let pressure = config.time_pressure;
-        // Time pressure adds noise to rule encoding (Wickelgren 1977)
+        // Time pressure AND encoding noise both add noise to rule encoding (Wickelgren 1977)
+        // Encoding noise: ablated subsystems degrade representational fidelity
         // Difficulty scales temperature via the difficulty model
         let diff_model = difficulty_model_for(self.name());
-        let noise_weight = (0.05 + pressure * 0.15)
+        let noise_weight = (0.05 + pressure * 0.15 + config.encoding_noise * 0.20)
             * diff_model.temperature_multiplier(config.difficulty);
 
         // Generate a random grid

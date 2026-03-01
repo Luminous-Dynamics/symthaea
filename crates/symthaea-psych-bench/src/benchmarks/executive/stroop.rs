@@ -116,9 +116,11 @@ impl StroopBenchmark {
             };
 
             // Compute similarity to each color candidate
+            // Encoding noise degrades color discrimination
+            let noise_degrade = config.effective_noise() as f32 * 0.4;
             let sims: Vec<f64> = color_hvs
                 .iter()
-                .map(|c| combined.similarity(c) as f64)
+                .map(|c| (combined.similarity(c) * (1.0 - noise_degrade)) as f64)
                 .collect();
 
             // Softmax response selection with temperature

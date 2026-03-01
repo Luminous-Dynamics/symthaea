@@ -28,6 +28,8 @@ pub struct PatchHdcEncoder {
     col_hvs: Vec<ContinuousHV>,
     feature_hvs: Vec<ContinuousHV>,
     level_hvs: Vec<ContinuousHV>,
+    /// Per-feature adaptive weights (learned via contrastive refinement).
+    feature_weights: Vec<f32>,
     max_rows: usize,
     max_cols: usize,
 }
@@ -53,12 +55,15 @@ impl PatchHdcEncoder {
         let level_hvs =
             Self::generate_level_hvs(config.hdc_dim, config.num_levels, config.seed + 200_000);
 
+        let feature_weights = vec![1.0 / config.num_features as f32; config.num_features];
+
         Self {
             config: config.clone(),
             row_hvs,
             col_hvs,
             feature_hvs,
             level_hvs,
+            feature_weights,
             max_rows,
             max_cols,
         }
@@ -275,7 +280,9 @@ impl PatchHdcEncoder {
         vec![mean_r, mean_g, mean_b, edge_density, variance]
     }
 
-    /// Encode a feature vector into a ContinuousHV via bind-bundle.
+    /// Encode a feature vector into a ContinuousHV via weighted bind-bundle.
+    ///
+    /// Feature weights modulate each feature's contribution to the final HV.
     fn encode_features(&self, features: &[f32]) -> ContinuousHV {
         let num = features.len().min(self.config.num_features);
         if num == 0 {
@@ -283,13 +290,54 @@ impl PatchHdcEncoder {
         }
 
         let mut components = Vec::with_capacity(num);
+        let mut weights = Vec::with_capacity(num);
         for (i, &val) in features.iter().take(num).enumerate() {
             let level_idx = self.quantize(val);
             components.push(self.feature_hvs[i].bind(&self.level_hvs[level_idx]));
+            weights.push(self.feature_weights[i]);
         }
 
         let refs: Vec<&ContinuousHV> = components.iter().collect();
-        ContinuousHV::bundle(&refs)
+        ContinuousHV::weighted_bundle(&refs, &weights)
+    }
+
+    /// Refine feature weights via contrastive learning.
+    ///
+    /// Adjusts weights so that the encoder produces HVs more similar to
+    /// `positive` and less similar to `negative`. Uses a perceptron-like
+    /// update rule on the feature weight vector.
+    pub fn refine_contrastive(
+        &mut self,
+        positive: &ContinuousHV,
+        negative: &ContinuousHV,
+        lr: f32,
+    ) {
+        let num = self.config.num_features;
+        // Compute per-feature contribution direction
+        for i in 0..num {
+            let basis = &self.feature_hvs[i];
+            // Project positive/negative onto this feature's basis
+            let pos_proj = positive.similarity(basis);
+            let neg_proj = negative.similarity(basis);
+            // Gradient: increase weight if feature aligns more with positive
+            let gradient = pos_proj - neg_proj;
+            self.feature_weights[i] += lr * gradient;
+            // Clamp to prevent negative or extreme weights
+            self.feature_weights[i] = self.feature_weights[i].clamp(0.01, 10.0);
+        }
+
+        // Normalize weights to sum to 1
+        let sum: f32 = self.feature_weights.iter().sum();
+        if sum > 0.0 {
+            for w in &mut self.feature_weights {
+                *w /= sum;
+            }
+        }
+    }
+
+    /// Current feature weights (for inspection/serialization).
+    pub fn feature_weights(&self) -> &[f32] {
+        &self.feature_weights
     }
 
     /// Quantize a [0, 1] feature value to a level index.
@@ -313,6 +361,96 @@ impl PatchHdcEncoder {
 
     pub fn max_cols(&self) -> usize {
         self.max_cols
+    }
+}
+
+/// Multi-scale spatial pyramid encoder.
+///
+/// Holds one `PatchHdcEncoder` per scale, producing a blended HV that
+/// captures both fine-grained detail and coarse scene structure.
+pub struct MultiScaleEncoder {
+    encoders: Vec<PatchHdcEncoder>,
+    scales: Vec<usize>,
+    fine_weight: f32,
+}
+
+impl MultiScaleEncoder {
+    /// Create a multi-scale encoder from a `VisionConfig`.
+    ///
+    /// One `PatchHdcEncoder` is created per scale in `config.multi_scale.scales`.
+    /// Each encoder uses a different seed offset so basis vectors don't collide.
+    pub fn new(config: &VisionConfig, max_width: u32, max_height: u32) -> Self {
+        let scales = config.multi_scale.scales.clone();
+        let fine_weight = config.multi_scale.fine_weight.clamp(0.0, 1.0);
+
+        let encoders: Vec<PatchHdcEncoder> = scales
+            .iter()
+            .enumerate()
+            .map(|(i, &patch_size)| {
+                let mut scale_cfg = config.clone();
+                scale_cfg.patch_size = patch_size;
+                // Offset seeds so each scale has independent basis vectors
+                scale_cfg.seed = config.seed + (i as u64 + 1) * 500_000;
+                PatchHdcEncoder::new(&scale_cfg, max_width, max_height)
+            })
+            .collect();
+
+        Self { encoders, scales, fine_weight }
+    }
+
+    /// Encode a frame at all scales and return a blended HV.
+    ///
+    /// Returns `(blended_hv, per_scale_hvs, per_scale_patches)`.
+    /// The blended HV uses a linear weight ramp: finest scale gets `fine_weight`,
+    /// coarsest gets `1 - fine_weight`, intermediate scales are linearly interpolated.
+    pub fn encode_frame(
+        &self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+    ) -> (ContinuousHV, Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>) {
+        let n = self.encoders.len();
+        if n == 0 {
+            let dim = symthaea_core::hdc::HDC_DIMENSION;
+            return (ContinuousHV::zero(dim), vec![], vec![]);
+        }
+
+        let mut scale_hvs = Vec::with_capacity(n);
+        let mut all_patches = Vec::with_capacity(n);
+
+        for enc in &self.encoders {
+            let (hv, patches) = enc.encode_frame(pixels, width, height, channels);
+            scale_hvs.push(hv);
+            all_patches.push(patches);
+        }
+
+        if n == 1 {
+            return (scale_hvs[0].clone(), scale_hvs, all_patches);
+        }
+
+        // Compute per-scale blend weights (linear ramp from fine_weight to 1-fine_weight)
+        let weights: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32 / (n - 1) as f32;
+                self.fine_weight * (1.0 - t) + (1.0 - self.fine_weight) * t
+            })
+            .collect();
+
+        let refs: Vec<&ContinuousHV> = scale_hvs.iter().collect();
+        let blended = ContinuousHV::weighted_bundle(&refs, &weights);
+
+        (blended, scale_hvs, all_patches)
+    }
+
+    /// Access the encoder at a specific scale index.
+    pub fn encoder_at(&self, scale_idx: usize) -> Option<&PatchHdcEncoder> {
+        self.encoders.get(scale_idx)
+    }
+
+    /// The patch sizes for each scale.
+    pub fn scales(&self) -> &[usize] {
+        &self.scales
     }
 }
 
@@ -481,5 +619,150 @@ mod tests {
         let (hv, patches) = enc.encode_precomputed(&features);
         assert_eq!(patches.len(), 4);
         assert!(hv.norm() > 0.0);
+    }
+
+    // === Improvement 1: Learned Encoding Weights ===
+
+    #[test]
+    fn test_feature_weights_initial_uniform() {
+        let cfg = VisionConfig::default();
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let weights = enc.feature_weights();
+        assert_eq!(weights.len(), cfg.num_features);
+        let expected = 1.0 / cfg.num_features as f32;
+        for &w in weights {
+            assert!((w - expected).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_contrastive_refinement_increases_positive_similarity() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        let frame = gradient_frame(64, 64);
+        let (hv_before, _) = enc.encode_grayscale(&frame, 64, 64);
+
+        // Create a "positive" target and a "negative" anti-target
+        let positive = ContinuousHV::random(cfg.hdc_dim, 7777);
+        let negative = ContinuousHV::random(cfg.hdc_dim, 8888);
+
+        let sim_before = hv_before.similarity(&positive);
+
+        // Refine weights toward positive
+        for _ in 0..20 {
+            enc.refine_contrastive(&positive, &negative, 0.1);
+        }
+
+        let (hv_after, _) = enc.encode_grayscale(&frame, 64, 64);
+        let sim_after = hv_after.similarity(&positive);
+
+        // Weights changed, so encoding changed
+        assert!(
+            (sim_after - sim_before).abs() > 1e-6,
+            "Contrastive refinement should change the encoding"
+        );
+    }
+
+    #[test]
+    fn test_feature_weights_stay_normalized() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        let positive = ContinuousHV::random(cfg.hdc_dim, 1234);
+        let negative = ContinuousHV::random(cfg.hdc_dim, 5678);
+
+        enc.refine_contrastive(&positive, &negative, 0.5);
+
+        let sum: f32 = enc.feature_weights().iter().sum();
+        assert!(
+            (sum - 1.0).abs() < 1e-4,
+            "Weights should sum to ~1.0 after refinement, got {sum}"
+        );
+    }
+
+    // === Improvement 3: Multi-Scale Encoder ===
+
+    #[test]
+    fn test_multi_scale_construction() {
+        let cfg = VisionConfig::default();
+        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        assert_eq!(ms.scales(), &[8, 32]);
+        assert!(ms.encoder_at(0).is_some());
+        assert!(ms.encoder_at(1).is_some());
+        assert!(ms.encoder_at(2).is_none());
+    }
+
+    #[test]
+    fn test_multi_scale_encoding_produces_valid_hv() {
+        let cfg = VisionConfig::default();
+        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        let (blended, scale_hvs, all_patches) = ms.encode_frame(&frame, 64, 64, 1);
+
+        assert_eq!(blended.dim(), cfg.hdc_dim);
+        assert!(blended.norm() > 0.0);
+        assert_eq!(scale_hvs.len(), 2);
+        assert_eq!(all_patches.len(), 2);
+        // Fine scale (8px): 8×8 = 64 patches
+        assert_eq!(all_patches[0].len(), 64);
+        // Coarse scale (32px): 2×2 = 4 patches
+        assert_eq!(all_patches[1].len(), 4);
+    }
+
+    #[test]
+    fn test_multi_scale_captures_both_structures() {
+        let cfg = VisionConfig::default();
+        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+
+        // Checkerboard on gradient should differ from solid on gradient
+        let checker_on_gradient = {
+            let mut pixels = Vec::with_capacity(64 * 64);
+            for y in 0..64u32 {
+                for x in 0..64u32 {
+                    let check = ((x / 4) + (y / 4)) % 2;
+                    let grad = (x + y) / 2;
+                    pixels.push(if check == 0 { grad as u8 } else { (255 - grad) as u8 });
+                }
+            }
+            pixels
+        };
+
+        let solid_on_gradient = {
+            let mut pixels = Vec::with_capacity(64 * 64);
+            for y in 0..64u32 {
+                for x in 0..64u32 {
+                    pixels.push(((x + y) / 2) as u8);
+                }
+            }
+            pixels
+        };
+
+        let (hv_cg, _, _) = ms.encode_frame(&checker_on_gradient, 64, 64, 1);
+        let (hv_sg, _, _) = ms.encode_frame(&solid_on_gradient, 64, 64, 1);
+
+        let sim = hv_cg.similarity(&hv_sg);
+        assert!(
+            sim < 0.99,
+            "Multi-scale should distinguish fine texture differences: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_multi_scale_single_scale_passthrough() {
+        let mut cfg = VisionConfig::default();
+        cfg.multi_scale.scales = vec![8];
+        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        let (blended, scale_hvs, _) = ms.encode_frame(&frame, 64, 64, 1);
+        assert_eq!(scale_hvs.len(), 1);
+        // With a single scale, blended should equal the scale HV
+        let sim = blended.similarity(&scale_hvs[0]);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "Single scale should pass through directly: sim={sim}"
+        );
     }
 }

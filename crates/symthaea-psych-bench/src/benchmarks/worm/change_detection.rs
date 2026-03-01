@@ -124,8 +124,10 @@ impl ChangeDetectionBenchmark {
             ContinuousHV::bundle_owned(contents)
         };
 
-        let sim_to_original = wm_bundle.similarity(&original_bundle);
-        let sim_to_probe = wm_bundle.similarity(&probe_bundle);
+        // Encoding noise degrades WM representation fidelity
+        let noise_degrade = config.effective_noise() as f32 * 0.4;
+        let sim_to_original = wm_bundle.similarity(&original_bundle) * (1.0 - noise_degrade);
+        let sim_to_probe = wm_bundle.similarity(&probe_bundle) * (1.0 - noise_degrade);
 
         // System responds "same" if probe similarity ≈ original similarity.
         // Wider margin (0.06) models the decision noise in human change

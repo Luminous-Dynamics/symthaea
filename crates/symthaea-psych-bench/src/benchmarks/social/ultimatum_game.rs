@@ -76,7 +76,9 @@ impl UltimatumGameBenchmark {
                 );
 
                 // Decision: compare offer similarity to fair prototype
-                let fair_sim = offer_hv.similarity(&fair_proto) + social_bonus;
+                // Encoding noise degrades fairness evaluation
+                let noise_degrade = config.effective_noise() as f32 * 0.4;
+                let fair_sim = offer_hv.similarity(&fair_proto) * (1.0 - noise_degrade) + social_bonus;
                 xor_shift(&mut rng);
                 let noise = (rng % 10000) as f32 / 10000.0 * noise_level;
 

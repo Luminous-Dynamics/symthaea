@@ -142,20 +142,23 @@ pub struct Qwen3DecoderLayer<B: Backend> {
 
 impl<B: Backend> Qwen3Model<B> {
     /// Forward pass returning hidden states `[batch, seq_len, hidden_size]`.
-    pub fn forward(&self, input_ids: Tensor<B, 2, Int>) -> Tensor<B, 3> {
+    ///
+    /// `mask`: optional `[batch, 1, 1, seq_len]` additive attention mask
+    /// (`0.0` = real, `-1e9` = padding). Pass `None` for unpadded inputs.
+    pub fn forward(&self, input_ids: Tensor<B, 2, Int>, mask: Option<Tensor<B, 4>>) -> Tensor<B, 3> {
         let mut hidden = self.embed_tokens.forward(input_ids);
         for layer in &self.layers {
-            hidden = layer.forward(hidden);
+            hidden = layer.forward(hidden, mask.clone());
         }
         self.norm.forward(hidden)
     }
 }
 
 impl<B: Backend> Qwen3DecoderLayer<B> {
-    fn forward(&self, x: Tensor<B, 3>) -> Tensor<B, 3> {
+    fn forward(&self, x: Tensor<B, 3>, mask: Option<Tensor<B, 4>>) -> Tensor<B, 3> {
         // Pre-norm → attention → residual
         let residual = x.clone();
-        let h = self.self_attn.forward(self.input_layernorm.forward(x));
+        let h = self.self_attn.forward(self.input_layernorm.forward(x), mask);
         let h = h + residual;
 
         // Post-norm → MLP → residual

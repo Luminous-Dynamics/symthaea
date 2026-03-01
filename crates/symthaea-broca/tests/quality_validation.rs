@@ -221,11 +221,11 @@ fn test_checkpoint_generation_determinism() {
     // Save checkpoint
     let dir = std::env::temp_dir();
     let path = dir.join("broca_quality_determinism.bin");
-    gen.save_checkpoint(&path, 0, 0.0, None, None)
+    gen.save_checkpoint(&path, 0, 0.0, None, None, None)
         .expect("checkpoint save should succeed");
 
     // Load checkpoint
-    let (mut loaded_gen, _, _) =
+    let (mut loaded_gen, _, _, _) =
         BrocaGenerator::from_checkpoint(&path, &genesis).expect("checkpoint load should succeed");
 
     let result_after = loaded_gen.generate(&channels);
@@ -281,11 +281,11 @@ fn test_checkpoint_training_resume() {
     // Save checkpoint
     let dir = std::env::temp_dir();
     let path = dir.join("broca_quality_resume.bin");
-    gen.save_checkpoint(&path, 10, loss_at_10, adam_state.clone(), None)
+    gen.save_checkpoint(&path, 10, loss_at_10, adam_state.clone(), None, None)
         .expect("checkpoint save should succeed");
 
     // Load and resume training
-    let (mut resumed_gen, loaded_adam, _) =
+    let (mut resumed_gen, loaded_adam, _, _) =
         BrocaGenerator::from_checkpoint(&path, &genesis).expect("checkpoint load should succeed");
 
     let resume_cfg = TrainingConfig {

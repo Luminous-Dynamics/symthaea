@@ -113,8 +113,10 @@ impl FlankerBenchmark {
             };
 
             // Compute similarity to each direction candidate
-            let sim_left = combined.similarity(&dir_left) as f64;
-            let sim_right = combined.similarity(&dir_right) as f64;
+            // Encoding noise degrades direction discrimination
+            let noise_degrade = config.effective_noise() as f32 * 0.4;
+            let sim_left = (combined.similarity(&dir_left) * (1.0 - noise_degrade)) as f64;
+            let sim_right = (combined.similarity(&dir_right) * (1.0 - noise_degrade)) as f64;
             let sims = [sim_left, sim_right];
 
             // Softmax response selection with temperature

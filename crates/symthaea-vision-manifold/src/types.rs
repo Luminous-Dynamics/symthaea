@@ -21,6 +21,12 @@ pub struct VisionConfig {
     pub surprise_decay: f32,
     /// Seed for deterministic basis vector generation.
     pub seed: u64,
+    /// Learning configuration for adaptive encoding weights.
+    pub learning: LearningConfig,
+    /// Multi-scale configuration for spatial pyramid encoding.
+    pub multi_scale: MultiScaleConfig,
+    /// Training configuration for CfC temporal learning.
+    pub training: TrainingConfig,
 }
 
 impl Default for VisionConfig {
@@ -34,6 +40,98 @@ impl Default for VisionConfig {
             surprise_threshold: 0.3,
             surprise_decay: 0.9,
             seed: 42_000,
+            learning: LearningConfig::default(),
+            multi_scale: MultiScaleConfig::default(),
+            training: TrainingConfig::default(),
+        }
+    }
+}
+
+/// Configuration for adaptive/learned encoding weights.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LearningConfig {
+    /// Enable adaptive level quantization boundaries.
+    pub adaptive_levels: bool,
+    /// Learning rate for contrastive weight refinement.
+    pub contrastive_lr: f32,
+}
+
+impl Default for LearningConfig {
+    fn default() -> Self {
+        Self {
+            adaptive_levels: false,
+            contrastive_lr: 0.01,
+        }
+    }
+}
+
+/// Configuration for multi-scale spatial pyramid encoding.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultiScaleConfig {
+    /// Patch sizes at each scale (default: [8, 32]).
+    pub scales: Vec<usize>,
+    /// Blend weight for finest scale (0..1, default: 0.6 = fine-dominant).
+    pub fine_weight: f32,
+}
+
+impl Default for MultiScaleConfig {
+    fn default() -> Self {
+        Self {
+            scales: vec![8, 32],
+            fine_weight: 0.6,
+        }
+    }
+}
+
+/// Training method for CfC temporal dynamics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TrainingMethod {
+    /// Analytical gradient through closed-form CfC.
+    Bptt,
+    /// Zeroth-order Simultaneous Perturbation Stochastic Approximation.
+    Spsa,
+    /// BPTT with SPSA fallback when gradients are unstable.
+    BpttWithSpsaFallback,
+}
+
+impl Default for TrainingMethod {
+    fn default() -> Self {
+        Self::BpttWithSpsaFallback
+    }
+}
+
+/// Configuration for CfC temporal training.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainingConfig {
+    /// Base learning rate.
+    pub learning_rate: f32,
+    /// Scale factor for weight HV learning rate (relative to base).
+    pub weight_lr_scale: f32,
+    /// Scale factor for tau learning rate (slower, 0.1x default).
+    pub tau_lr_scale: f32,
+    /// Gradient clipping threshold.
+    pub grad_clip: f32,
+    /// SPSA perturbation magnitude.
+    pub spsa_epsilon: f32,
+    /// SPSA gain sequence constant.
+    pub spsa_c: f32,
+    /// Training method selection.
+    pub method: TrainingMethod,
+    /// Prediction error threshold to trigger training (adaptive).
+    pub error_threshold: f32,
+}
+
+impl Default for TrainingConfig {
+    fn default() -> Self {
+        Self {
+            learning_rate: 0.001,
+            weight_lr_scale: 1.0,
+            tau_lr_scale: 0.1,
+            grad_clip: 1.0,
+            spsa_epsilon: 0.01,
+            spsa_c: 0.1,
+            method: TrainingMethod::default(),
+            error_threshold: 0.1,
         }
     }
 }
@@ -81,6 +179,14 @@ pub struct VisionTelemetry {
     pub num_salient_patches: usize,
     /// Frame sequence number.
     pub frame_sequence: u64,
+    /// Whether a training step was triggered this cycle.
+    pub training_triggered: bool,
+    /// Training loss after this cycle's training step (if any).
+    pub training_loss: Option<f32>,
+    /// Output HV norm (bridge diagnostic).
+    pub output_hv_norm: f32,
+    /// Attention boost applied (bridge diagnostic).
+    pub attention_boost_applied: f32,
 }
 
 /// Per-patch spatial attention/surprise map.

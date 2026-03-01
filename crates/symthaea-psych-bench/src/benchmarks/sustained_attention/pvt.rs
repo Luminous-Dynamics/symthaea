@@ -75,7 +75,9 @@ impl PvtBenchmark {
                 let noise_hv = ContinuousHV::random(dim, rng);
                 let stimulus =
                     ContinuousHV::weighted_bundle(&[&stimulus_proto, &noise_hv], &[0.80, 0.20]);
-                let detection = stimulus.similarity(&stimulus_proto) as f64;
+                // Encoding noise degrades stimulus detection
+                let noise_degrade = config.effective_noise() as f32 * 0.4;
+                let detection = (stimulus.similarity(&stimulus_proto) * (1.0 - noise_degrade)) as f64;
 
                 xor_shift(&mut rng);
                 let rt_noise = ((rng % 10000) as f64 / 10000.0 - 0.3) * noise_base;

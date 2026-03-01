@@ -26,11 +26,22 @@
 //! - **TemporalPredictor**: Implements the shared trait for cross-domain integration.
 
 pub mod attention;
+pub mod bridge;
+pub mod camera;
 pub mod encoder;
 pub mod manifold;
+pub mod training;
 pub mod types;
 
 pub use attention::SurpriseMap;
-pub use encoder::PatchHdcEncoder;
+pub use bridge::VisionBridge;
+pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
+#[cfg(feature = "camera")]
+pub use camera::CameraSource;
+pub use encoder::{MultiScaleEncoder, PatchHdcEncoder};
 pub use manifold::VisionManifold;
-pub use types::{AttentionMap, PatchGrid, VisionConfig, VisionTelemetry};
+pub use training::{BpttResult, ManifoldTrainer};
+pub use types::{
+    AttentionMap, LearningConfig, MultiScaleConfig, PatchGrid, TrainingConfig, TrainingMethod,
+    VisionConfig, VisionTelemetry,
+};

@@ -16,7 +16,7 @@
 //! enables deterministic testing without network access or model downloads.
 
 use anyhow::{Context, Result};
-use candle_core::{DType, Device, Tensor};
+use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::VarBuilder;
 use crate::mamba_model::{Config, Model, State};
 
@@ -357,17 +357,32 @@ impl MambaWrapper {
     pub fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()> {
         self.reset();
         let d_model = self.config.d_model;
+        let seq_len = sequence.len();
+
+        // Pre-stack all chunks into a single (seq_len, d_model) tensor to avoid
+        // per-chunk allocation overhead. The model processes them sequentially
+        // (SSM scan is inherently sequential) but we save 64 separate Tensor::from_vec calls.
+        let mut flat = Vec::with_capacity(seq_len * d_model);
         for chunk in sequence {
             assert_eq!(
                 chunk.len(),
                 d_model,
                 "Each chunk must be d_model={d_model} dimensions"
             );
-            let embeds = Tensor::from_vec(chunk.clone(), (1, d_model), &self.device)?;
-            // Forward through all 24 layers as continuous embedding — no token lookup
-            let _ = self.model.forward_embeds(&embeds, &mut self.state)?;
+            flat.extend_from_slice(chunk);
         }
-        // SSM state now contains the temporally-integrated thought representation
+        let stacked = Tensor::from_vec(flat, (seq_len, d_model), &self.device)?;
+
+        // Warmstart conv1d history with the mean of the first chunk,
+        // so the first few tokens see meaningful convolution context.
+        if seq_len > 0 {
+            let summary = stacked.i(0)?.unsqueeze(0)?; // (1, d_model)
+            self.model
+                .warmstart_conv_history(&summary, &mut self.state)?;
+        }
+
+        // Forward through all layers using inject_sequence (skips lm_head)
+        self.model.inject_sequence(&stacked, &mut self.state)?;
         Ok(())
     }
 }

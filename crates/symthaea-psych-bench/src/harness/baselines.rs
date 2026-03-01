@@ -2709,6 +2709,304 @@ pub fn neuromod_baselines() -> BaselineMap {
         },
     );
 
+    // ── Dose-Response (Clark 1937; Hill 1910) ──
+    m.insert(
+        "da_monotonicity",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.10),
+            source: "Clark (1937); Hill (1910), dose-response monotonicity expected >0.8",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ne_monotonicity",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.10),
+            source: "Clark (1937), NE dose-response monotonicity",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "sht_monotonicity",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.10),
+            source: "Clark (1937), 5-HT dose-response monotonicity",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ach_monotonicity",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.10),
+            source: "Clark (1937), ACh dose-response monotonicity",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "gaba_monotonicity",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.10),
+            source: "Clark (1937), GABA dose-response monotonicity (negated)",
+            population: "computational model",
+        },
+    );
+
+    // ── Tolerance/Withdrawal (Koob & Le Moal 2001) ──
+    m.insert(
+        "tolerance_count",
+        Baseline {
+            value: 4.0,
+            sd: Some(1.0),
+            source: "Koob & Le Moal (2001), expected tolerant transmitters under sustained dose",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "withdrawal_count",
+        Baseline {
+            value: 4.0,
+            sd: Some(1.0),
+            source: "Koob & Le Moal (2001), expected withdrawal transmitters after dose drop",
+            population: "computational model",
+        },
+    );
+
+    // ── Behavioral Knockout Cohen's d (Doya 2002; Cohen 1988) ──
+    m.insert(
+        "da_ko_gradient_d",
+        Baseline {
+            value: 1.5,
+            sd: Some(0.6),
+            source: "Doya (2002); Schultz (1997), DA knockout gradient scaling Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ne_ko_exploration_d",
+        Baseline {
+            value: 1.8,
+            sd: Some(0.7),
+            source: "Aston-Jones (2005), NE knockout exploration Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ne_ko_flexibility_d",
+        Baseline {
+            value: 1.2,
+            sd: Some(0.5),
+            source: "Aston-Jones (2005), NE knockout flexibility Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "sht_ko_confidence_d",
+        Baseline {
+            value: 1.0,
+            sd: Some(0.4),
+            source: "Dayan & Huys (2009), 5-HT knockout confidence Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "sht_ko_consciousness_d",
+        Baseline {
+            value: 0.8,
+            sd: Some(0.4),
+            source: "Dayan & Huys (2009), 5-HT knockout consciousness Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ach_ko_attention_d",
+        Baseline {
+            value: 1.5,
+            sd: Some(0.6),
+            source: "Yu & Dayan (2005), ACh knockout attention Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ach_ko_threshold_d",
+        Baseline {
+            value: 1.0,
+            sd: Some(0.5),
+            source: "Yu & Dayan (2005), ACh knockout threshold Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "gaba_ko_inhibition_d",
+        Baseline {
+            value: 2.0,
+            sd: Some(0.8),
+            source: "Olsen & Sieghart (2009), GABA knockout inhibition Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "gaba_ko_ei_d",
+        Baseline {
+            value: 1.5,
+            sd: Some(0.6),
+            source: "Bhatt et al. (2009), GABA knockout E/I ratio Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "all_ko_lr_collapse_d",
+        Baseline {
+            value: 2.5,
+            sd: Some(1.0),
+            source: "Doya (2002), total knockout learning rate collapse Cohen's d",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "all_ko_consciousness_collapse_d",
+        Baseline {
+            value: 2.0,
+            sd: Some(0.8),
+            source: "Doya (2002), total knockout consciousness collapse Cohen's d",
+            population: "computational model",
+        },
+    );
+
+    // ── Antagonist Profiles (Stahl 2013) ──
+    m.insert(
+        "d2_flexibility_reduction",
+        Baseline {
+            value: 0.15,
+            sd: Some(0.08),
+            source: "Stahl (2013); Frank (2005), D2 antagonist flexibility reduction",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "gaba_a_ei_increase",
+        Baseline {
+            value: 0.20,
+            sd: Some(0.10),
+            source: "Möhler (2006), GABA-A antagonist E/I ratio increase",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "sht2a_confidence_reduction",
+        Baseline {
+            value: 0.10,
+            sd: Some(0.05),
+            source: "Carhart-Harris & Nutt (2017), 5-HT2A antagonist confidence reduction",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "wearoff_recovery",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.10),
+            source: "Stahl (2013), antagonist wear-off recovery ratio",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "concurrent_flexibility",
+        Baseline {
+            value: 0.40,
+            sd: Some(0.15),
+            source: "Stahl (2013), concurrent D2+GABA-A flexibility",
+            population: "computational model",
+        },
+    );
+
+    // ── Consciousness Pharmacology (Carhart-Harris & Nutt 2017; Stahl 2013) ──
+    m.insert(
+        "psychedelic_proxy_mean",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.05),
+            source: "Carhart-Harris & Nutt (2017), psychedelic mean consciousness proxy",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "anxiolytic_proxy_peak",
+        Baseline {
+            value: 0.52,
+            sd: Some(0.05),
+            source: "Stahl (2013), GABA-A anxiolytic peak consciousness proxy",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "anxiolytic_proxy_mean",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.05),
+            source: "Stahl (2013), GABA-A anxiolytic mean consciousness proxy",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "stimulant_proxy_peak",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.06),
+            source: "Arnsten (2011), stimulant peak consciousness proxy",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "stimulant_proxy_mean",
+        Baseline {
+            value: 0.52,
+            sd: Some(0.05),
+            source: "Arnsten (2011), stimulant mean consciousness proxy",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "sedative_proxy_peak",
+        Baseline {
+            value: 0.48,
+            sd: Some(0.05),
+            source: "Stahl (2013), sedative peak consciousness proxy",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "sedative_proxy_mean",
+        Baseline {
+            value: 0.46,
+            sd: Some(0.05),
+            source: "Stahl (2013), sedative mean consciousness proxy",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ecb_proxy_peak",
+        Baseline {
+            value: 0.51,
+            sd: Some(0.04),
+            source: "Piomelli (2003), endocannabinoid peak consciousness proxy",
+            population: "computational model",
+        },
+    );
+    m.insert(
+        "ecb_proxy_mean",
+        Baseline {
+            value: 0.50,
+            sd: Some(0.04),
+            source: "Piomelli (2003), endocannabinoid mean consciousness proxy",
+            population: "computational model",
+        },
+    );
+
     m
 }
 
@@ -2830,5 +3128,35 @@ mod tests {
                 key
             );
         }
+    }
+
+    #[test]
+    fn test_neuromod_baselines_count() {
+        let baselines = neuromod_baselines();
+        assert!(
+            baselines.len() >= 60,
+            "Expected >= 60 neuromod baselines, got {}",
+            baselines.len()
+        );
+    }
+
+    #[test]
+    fn test_neuromod_baselines_key_entries() {
+        let baselines = neuromod_baselines();
+        // DoseResponse
+        assert!(baselines.contains_key("da_monotonicity"), "Missing da_monotonicity");
+        assert!(baselines.contains_key("gaba_monotonicity"), "Missing gaba_monotonicity");
+        // ToleranceWithdrawal
+        assert!(baselines.contains_key("tolerance_count"), "Missing tolerance_count");
+        assert!(baselines.contains_key("withdrawal_count"), "Missing withdrawal_count");
+        // BehavioralKnockout
+        assert!(baselines.contains_key("ne_ko_exploration_d"), "Missing ne_ko_exploration_d");
+        assert!(baselines.contains_key("gaba_ko_inhibition_d"), "Missing gaba_ko_inhibition_d");
+        // AntagonistProfiles
+        assert!(baselines.contains_key("d2_flexibility_reduction"), "Missing d2_flexibility_reduction");
+        assert!(baselines.contains_key("wearoff_recovery"), "Missing wearoff_recovery");
+        // ConsciousnessPharmacology
+        assert!(baselines.contains_key("anxiolytic_proxy_peak"), "Missing anxiolytic_proxy_peak");
+        assert!(baselines.contains_key("ecb_proxy_mean"), "Missing ecb_proxy_mean");
     }
 }

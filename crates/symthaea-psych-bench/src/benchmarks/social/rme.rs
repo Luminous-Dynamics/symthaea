@@ -63,6 +63,8 @@ impl RmeBenchmark {
 
         // Time pressure: reduces deliberation time (Baron-Cohen et al., 2001).
         let noise_level: f32 = 0.25 + config.time_pressure as f32 * 0.15;
+        // Encoding noise degrades emotion recognition signal
+        let noise_degrade: f32 = config.effective_noise() as f32 * 0.4;
 
         // Social coherence: when enabled, boosts emotion recognition
         let social_bonus: f32 = if config.enable_social { 0.10 } else { 0.0 };
@@ -117,8 +119,8 @@ impl RmeBenchmark {
                 .collect();
 
             // 4-AFC: compare stimulus to target + 3 foils
-            let target_sim = stimulus.similarity(target) + social_bonus;
-            let foil_sims: Vec<f32> = foils.iter().map(|f| stimulus.similarity(f)).collect();
+            let target_sim = stimulus.similarity(target) * (1.0 - noise_degrade) + social_bonus;
+            let foil_sims: Vec<f32> = foils.iter().map(|f| stimulus.similarity(f) * (1.0 - noise_degrade)).collect();
 
             // Add noise to all choices
             xor_shift(&mut rng);
