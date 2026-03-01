@@ -20,7 +20,7 @@
 //!                                                  └───────────────┘
 //! ```
 
-use crate::memory::episodic_replay::{Episode, EpisodicMemory};
+use crate::episodic_replay::{Episode, EpisodicMemory};
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -457,7 +457,7 @@ mod tests {
             is_verified: true,
         });
 
-        let config = crate::memory::episodic_replay::EpisodicReplayConfig {
+        let config = crate::episodic_replay::EpisodicReplayConfig {
             psi_threshold: 0.1, // Low threshold so graduation works
             ..Default::default()
         };
