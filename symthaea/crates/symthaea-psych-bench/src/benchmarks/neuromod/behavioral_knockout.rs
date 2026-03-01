@@ -10,7 +10,9 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::PsychBenchmark;
+use std::collections::BTreeMap;
 use symthaea_neuromodulators::{NeuromodulatorBath, NeuromodulatorInputs};
 
 /// Number of simulation cycles per condition.
@@ -168,8 +170,10 @@ impl PsychBenchmark for BehavioralKnockoutBenchmark {
         "Neuromod::BehavioralKnockout"
     }
 
-    fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
+        let mut trace = Vec::new();
+        let mut trial_idx = 0usize;
         let baseline = run_condition(None);
         let da_ko = run_condition(Some("da"));
         let ne_ko = run_condition(Some("ne"));
@@ -224,6 +228,102 @@ impl PsychBenchmark for BehavioralKnockoutBenchmark {
         result.insert("baseline_attention_mean", MetricValue::from_samples(&[baseline_attention_mean]));
         result.insert("baseline_inhibition_mean", MetricValue::from_samples(&[baseline_inhibition_mean]));
         result.insert("baseline_consciousness_mean", MetricValue::from_samples(&[baseline_consciousness_mean]));
+
+        if config.trial_trace {
+            let baseline_flex = baseline.mean(|s| s.behavioral_flexibility);
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "baseline".to_string(),
+                correct: baseline_flex > 0.0,
+                rt_ticks: 0.0,
+                similarity: baseline_flex,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            let da_flex = da_ko.mean(|s| s.behavioral_flexibility);
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "da_knockout".to_string(),
+                correct: da_ko_lr_d.abs() > 0.0,
+                rt_ticks: 0.0,
+                similarity: da_flex,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            let ne_flex = ne_ko.mean(|s| s.behavioral_flexibility);
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ne_knockout".to_string(),
+                correct: ne_ko_exploration_d.abs() > 0.0,
+                rt_ticks: 0.0,
+                similarity: ne_flex,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            let sht_flex = sht_ko.mean(|s| s.behavioral_flexibility);
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "sht_knockout".to_string(),
+                correct: sht_ko_confidence_d.abs() > 0.0,
+                rt_ticks: 0.0,
+                similarity: sht_flex,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            let ach_flex = ach_ko.mean(|s| s.behavioral_flexibility);
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ach_knockout".to_string(),
+                correct: ach_ko_attention_d.abs() > 0.0,
+                rt_ticks: 0.0,
+                similarity: ach_flex,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            let gaba_flex = gaba_ko.mean(|s| s.behavioral_flexibility);
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "gaba_knockout".to_string(),
+                correct: gaba_ko_inhibition_d.abs() > 0.0,
+                rt_ticks: 0.0,
+                similarity: gaba_flex,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            let all_flex = all_ko.mean(|s| s.behavioral_flexibility);
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "all_knockout".to_string(),
+                correct: all_ko_lr_collapse_d.abs() > 0.0,
+                rt_ticks: 0.0,
+                similarity: all_flex,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            result.trial_trace = trace;
+        }
+        let _ = trial_idx;
 
         result.conditions = 7;
         result.trials_per_condition = 1;

@@ -14,7 +14,9 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::PsychBenchmark;
+use std::collections::BTreeMap;
 use symthaea_neuromodulators::{NeuromodulatorBath, NeuromodulatorInputs};
 
 /// Warmup cycles before injection.
@@ -147,8 +149,10 @@ impl PsychBenchmark for ConsciousnessPharmacologyBenchmark {
         "Neuromod::ConsciousnessPharmacology"
     }
 
-    fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
+        let mut trace = Vec::new();
+        let mut trial_idx = 0usize;
 
         // 1. Psychedelic: 5-HT agonist → consciousness increases via 5-HT2A
         let psychedelic = run_condition("sht", 0.4, 80);
@@ -195,6 +199,71 @@ impl PsychBenchmark for ConsciousnessPharmacologyBenchmark {
 
         // Cross-condition variance (stability metric)
         result.insert("ecb_proxy_variance", MetricValue::from_samples(&[ecb_buffer.variance() as f64]));
+
+        if config.trial_trace {
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "psychedelic".to_string(),
+                correct: (psychedelic.peak() - psychedelic.baseline_proxy).abs() > 0.0001,
+                rt_ticks: 0.0,
+                similarity: psychedelic.peak() as f64,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "anxiolytic".to_string(),
+                correct: (anxiolytic.peak() - anxiolytic.baseline_proxy).abs() > 0.0001,
+                rt_ticks: 0.0,
+                similarity: anxiolytic.peak() as f64,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "stimulant".to_string(),
+                correct: (stimulant.peak() - stimulant.baseline_proxy).abs() > 0.0001,
+                rt_ticks: 0.0,
+                similarity: stimulant.peak() as f64,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "sedative".to_string(),
+                correct: (sedative.peak() - sedative.baseline_proxy).abs() > 0.0001,
+                rt_ticks: 0.0,
+                similarity: sedative.peak() as f64,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            trace.push(TrialOutcome {
+                trial_idx,
+                condition: "ecb_buffer".to_string(),
+                correct: (ecb_buffer.peak() - ecb_buffer.baseline_proxy).abs() > 0.0001,
+                rt_ticks: 0.0,
+                similarity: ecb_buffer.peak() as f64,
+                confidence: 0.0,
+                response_idx: 0,
+                extra: BTreeMap::new(),
+            });
+            trial_idx += 1;
+
+            result.trial_trace = trace;
+        }
+        let _ = trial_idx;
 
         result.conditions = 5;
         result.trials_per_condition = 1;

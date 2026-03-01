@@ -14,7 +14,9 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
+use std::collections::BTreeMap;
 
 /// Lightweight transmitter model for allostatic stress simulations.
 #[derive(Clone)]
@@ -148,8 +150,10 @@ impl PsychBenchmark for AllostaticStressBenchmark {
         "Neuromod::AllostaticStress"
     }
 
-    fn run(&self, _config: &BenchmarkConfig) -> BenchmarkResult {
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let mut result = BenchmarkResult::new(self.name(), None);
+        let mut trace = Vec::new();
+        let mut trial_idx = 0usize;
 
         // ── Condition 1: Baseline ──
         // 100 cycles at cortisol=0.3 → allostatic load stays < 0.1
@@ -172,6 +176,19 @@ impl PsychBenchmark for AllostaticStressBenchmark {
                 "baseline_sht_baseline_final",
                 MetricValue::from_samples(&[bath.sht.baseline as f64]),
             );
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx,
+                    condition: "baseline".to_string(),
+                    correct: peak_load < 0.3,
+                    rt_ticks: 0.0,
+                    similarity: peak_load as f64,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+                trial_idx += 1;
+            }
         }
 
         // ── Condition 2: Acute stress ──
@@ -207,6 +224,19 @@ impl PsychBenchmark for AllostaticStressBenchmark {
                 "acute_sht_baseline_final",
                 MetricValue::from_samples(&[bath.sht.baseline as f64]),
             );
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx,
+                    condition: "acute_stress".to_string(),
+                    correct: true,
+                    rt_ticks: 0.0,
+                    similarity: bath.allostatic_load as f64,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+                trial_idx += 1;
+            }
         }
 
         // ── Condition 3: Chronic stress ──
@@ -230,6 +260,19 @@ impl PsychBenchmark for AllostaticStressBenchmark {
                 "chronic_sht_baseline_final",
                 MetricValue::from_samples(&[bath.sht.baseline as f64]),
             );
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx,
+                    condition: "chronic_stress".to_string(),
+                    correct: bath.allostatic_load < 0.8,
+                    rt_ticks: 0.0,
+                    similarity: bath.allostatic_load as f64,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+                trial_idx += 1;
+            }
         }
 
         // ── Condition 4: Burnout + recovery ──
@@ -272,8 +315,25 @@ impl PsychBenchmark for AllostaticStressBenchmark {
                 "burnout_recovery_cycles_needed",
                 MetricValue::from_samples(&[recovery_cycles_needed as f64]),
             );
+            if config.trial_trace {
+                trace.push(TrialOutcome {
+                    trial_idx,
+                    condition: "burnout_recovery".to_string(),
+                    correct: bath.allostatic_load < burnout_load,
+                    rt_ticks: 0.0,
+                    similarity: bath.allostatic_load as f64,
+                    confidence: 0.0,
+                    response_idx: 0,
+                    extra: BTreeMap::new(),
+                });
+                trial_idx += 1;
+            }
         }
 
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
+        let _ = trial_idx;
         result
     }
 
