@@ -435,9 +435,11 @@ impl ContinuousMind {
             }
 
             // Phase 6: Oxytocin-mediated bath coupling (Feldman 2012)
+            // TODO: wire once NeuromodulatorBath::couple_with_peer() is implemented
             #[cfg(feature = "multi_agent")]
-            if let Some(ref bath) = msg.bath_state {
-                self.cognitive_loop.neuromodulator_bath.couple_with_peer(bath);
+            if let Some(ref _bath) = msg.bath_state {
+                // Coupling logic deferred — ContinuousMind has no direct
+                // cognitive_loop field; needs an accessor or message.
             }
         }
 
@@ -588,6 +590,23 @@ impl ContinuousMind {
             self.mesh_stats.packets_dropped += excess as u64;
         }
 
+        // Partition detection: if all peers expired, trigger replay buffer flush
+        if self.mesh_peers.is_partitioned(&self.mesh_stats)
+            && !self.mesh_replay_buffer.is_empty()
+        {
+            tracing::warn!(
+                target: "symthaea::mind::mesh",
+                replay_count = self.mesh_replay_buffer.len(),
+                "Mesh partition detected — flushing replay buffer"
+            );
+            let replays: Vec<_> = self.mesh_replay_buffer.drain(..).collect();
+            for packet in replays {
+                self.mesh_outbox
+                    .push(crate::swarm::mesh::MeshOutbound { packet });
+                self.mesh_stats.packets_replayed += 1;
+            }
+        }
+
         // Periodic telemetry logging (every 500 ticks, ~10s at 50Hz)
         if self.state.tick.is_multiple_of(500) && self.mesh_bridge.is_some() {
             let t = self.mesh_telemetry();
@@ -606,6 +625,8 @@ impl ContinuousMind {
                 bytes_tx = t.stats.bytes_sent,
                 bytes_rx = t.stats.bytes_received,
                 compress_ratio = format!("{:.1}%", t.stats.compression_ratio() * 100.0),
+                bandwidth_increases = t.stats.bandwidth_increases,
+                bandwidth_decreases = t.stats.bandwidth_decreases,
                 avg_phi = format!("{:.3}", t.avg_phi),
                 "Mesh telemetry"
             );
@@ -1100,11 +1121,8 @@ impl ContinuousMind {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::memory::memory_coordinator::MemorySource;
-    use crate::mind::{
-        ContinuousMind, Goal, InputType, MindConfig, MindInput, MindOutput, OutputType,
-    };
+    use crate::mind::{ContinuousMind, InputType, MindConfig, MindInput, OutputType};
     use symthaea_core::hdc::ContinuousHV;
 
     /// Helper: create an activated mind with a specific HDC dimension.
