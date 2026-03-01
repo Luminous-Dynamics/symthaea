@@ -856,18 +856,18 @@ The output formant frame drives a 5-formant Liljencrants--Fant (LF) glottal mode
 \toprule
 Metric & LTC (ours) & Rule-based \\
 \midrule
-Avg vowel error (Hz) & \textbf{32.4} & 162.0 \\
-Avg consonant error (Hz) & \textbf{8.9} & 127.2 \\
+Avg vowel error (Hz) & \textbf{4.4} & 162.0 \\
+Avg consonant error (Hz) & \textbf{3.0} & 127.2 \\
 Transition smoothness (Hz/frame) & \textbf{0.00} & 16.95 \\
 Source type accuracy & 12/12 & 12/12 \\
 Energy/voicing accuracy & 10/10 & --- \\
-MCD (dB) & \textbf{0.11} & --- \\
-Throughput (Hz) & 356 & --- \\
+MCD (dB) & \textbf{0.02} & --- \\
+Throughput (Hz) & 342 & --- \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The LTC controller with LS output refinement achieves \textbf{$5{\times}$ lower vowel formant error} than rule-based synthesis (32.4\,Hz vs.\ 162.0\,Hz) and \textbf{$14{\times}$ lower consonant error} (8.9\,Hz vs.\ 127.2\,Hz), while maintaining 356\,Hz throughput ($1.8{\times}$ real-time at 200\,Hz motor rate). The analytical LS step resolves inter-phoneme gradient interference on shared output weights, enabling sub-100\,Hz accuracy even for extreme vowels: /IY/ (85.2\,Hz), /UW/ (66.8\,Hz), /AA/ (42.2\,Hz). Mel-cepstral distortion averages 0.11\,dB (Excellent). CfC temporal dynamics produce perfectly smooth phoneme transitions (0.00\,Hz/frame F1 delta vs.\ 16.95\,Hz/frame for instantaneous rule-based switching). Energy and voicing accuracy (10/10) and source type propagation (12/12) confirm that the controller correctly learns manner-specific excitation parameters. Figure~\ref{fig:voice-pipeline} shows per-phoneme accuracy and the summary comparison.
+The LTC controller with full LS output refinement achieves \textbf{$37{\times}$ lower vowel formant error} than rule-based synthesis (4.4\,Hz vs.\ 162.0\,Hz) and \textbf{$42{\times}$ lower consonant error} (3.0\,Hz vs.\ 127.2\,Hz), while maintaining 342\,Hz throughput ($1.7{\times}$ real-time at 200\,Hz motor rate). The analytical LS step fully replaces gradient-trained output weights, resolving inter-phoneme gradient interference and achieving sub-7\,Hz accuracy for all vowels: the worst-case vowel (/IY/) has just 6.9\,Hz error. Mel-cepstral distortion averages 0.02\,dB (near-perfect spectral match). CfC temporal dynamics produce perfectly smooth phoneme transitions (0.00\,Hz/frame F1 delta vs.\ 16.95\,Hz/frame for instantaneous rule-based switching). Energy and voicing accuracy (10/10) and source type propagation (12/12) confirm that the controller correctly learns manner-specific excitation parameters. Figure~\ref{fig:voice-pipeline} shows per-phoneme accuracy and the summary comparison.
 
 \begin{figure}[ht]
 \centering

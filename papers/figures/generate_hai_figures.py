@@ -637,9 +637,9 @@ def fig9_voice_pipeline():
     """Voice pipeline accuracy: vowels, consonants, summary comparison."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
 
-    # Per-vowel formant error (Hz) — Phase 24 benchmark (gradient + LS refinement)
+    # Per-vowel formant error (Hz) — Phase 25 benchmark (gradient + full LS, blend=1.0)
     vowels = ['AH', 'IY', 'UW', 'AE', 'EH', 'IH', 'AA', 'OW', 'AO', 'UH']
-    vowel_errors = [33.4, 85.2, 66.8, 33.0, 34.0, 3.7, 42.2, 2.4, 10.0, 13.2]
+    vowel_errors = [2.9, 6.9, 3.1, 4.0, 4.0, 4.9, 5.7, 4.7, 5.2, 2.8]
     rule_vowel_errors = [98.4, 289.1, 212.2, 85.6, 102.1, 150.7, 141.6, 176.7, 200.1, 164.0]
 
     ax = axes[0]
@@ -654,9 +654,9 @@ def fig9_voice_pipeline():
     ax.legend(fontsize=8)
     ax.set_ylim(0, 310)
 
-    # Per-consonant formant error (Hz) — Phase 24 benchmark (gradient + LS refinement)
+    # Per-consonant formant error (Hz) — Phase 25 benchmark (gradient + full LS, blend=1.0)
     consonants = ['P', 'T', 'K', 'B', 'D', 'G', 'S', 'F', 'M', 'N', 'L', 'R']
-    cons_errors = [4.5, 5.7, 6.1, 8.3, 6.6, 12.9, 9.9, 10.3, 11.8, 3.5, 11.8, 15.7]
+    cons_errors = [4.4, 2.1, 1.3, 4.4, 2.9, 4.5, 1.3, 3.0, 2.5, 1.9, 3.6, 4.4]
     rule_cons_errors = [195.9, 99.1, 44.8, 195.9, 99.1, 44.8, 85.7, 89.6, 186.1, 65.7, 160.2, 259.0]
 
     ax = axes[1]
@@ -673,7 +673,7 @@ def fig9_voice_pipeline():
     # Summary comparison: LTC vs rule-based
     ax = axes[2]
     metrics = ['Vowel\nError', 'Consonant\nError', 'Transition\n(Hz/frame)']
-    ltc_vals = [32.4, 8.9, 0.01]  # Transition 0.00 shown as 0.01 for log scale
+    ltc_vals = [4.4, 3.0, 0.01]  # Transition 0.00 shown as 0.01 for log scale
     rule_vals = [162.0, 127.2, 16.95]
 
     x = np.arange(len(metrics))
@@ -707,12 +707,12 @@ def fig10_spectral_evaluation():
         'UH': (440, 1020), 'UW': (300, 870),  'AH': (520, 1190),
         'ER': (490, 1350), 'EY': (440, 2030), 'OW': (460, 1090),
     }
-    # Achieved formants (Phase 24 benchmark — LS-refined output projection)
+    # Achieved formants (Phase 25 benchmark — full LS, blend=1.0)
     achieved = {
-        'IY': (294, 2214), 'IH': (389, 1987), 'EH': (525, 1806),
-        'AE': (641, 1693), 'AA': (705, 1124), 'AO': (570, 849),
-        'UH': (443, 1032), 'UW': (322, 930),  'AH': (517, 1223),
-        'ER': (491, 1348), 'EY': (442, 2026), 'OW': (496, 912),
+        'IY': (271, 2284), 'IH': (390, 1986), 'EH': (529, 1836),
+        'AE': (658, 1717), 'AA': (726, 1094), 'AO': (568, 845),
+        'UH': (438, 1022), 'UW': (300, 873),  'AH': (518, 1191),
+        'ER': (490, 1349), 'EY': (441, 2028), 'OW': (496, 914),
     }
 
     for name, (f1_t, f2_t) in targets.items():
