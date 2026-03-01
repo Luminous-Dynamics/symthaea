@@ -13,12 +13,7 @@ import type { AppClient, ActionHash, Record } from '@holochain/client';
 import type {
   PrintResult,
   PrintIssue,
-  PrintSettings,
-  EnergyType,
-  MaterialPassport,
   AnomalyEvent,
-  DimensionalMeasurement,
-  PogfAttestationBundle,
   CreatePrintJobInput,
   RecordPrintInput,
 } from '../types';

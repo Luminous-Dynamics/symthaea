@@ -8,25 +8,6 @@ use hdk::prelude::*;
 use printers_integrity::*;
 use fabrication_common::*;
 
-use std::cell::RefCell;
-
-thread_local! {
-    static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
-}
-
-#[allow(dead_code)] // Infrastructure for future rate limiting
-fn get_config() -> FabricationConfig {
-    CONFIG.with(|c| {
-        c.borrow_mut()
-            .get_or_insert_with(|| {
-                dna_info()
-                    .map(|info| FabricationConfig::from_properties_or_default(info.modifiers.properties.bytes()))
-                    .unwrap_or_default()
-            })
-            .clone()
-    })
-}
-
 /// Input for registering a printer
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RegisterPrinterInput {

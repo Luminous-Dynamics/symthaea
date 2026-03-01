@@ -174,6 +174,15 @@ export interface DesignEpistemic {
   usability: number;
 }
 
+export type ParameterValue = string | number | boolean;
+
+export interface GeneratedVariant {
+  designHash: ActionHash;
+  parameters: { [key: string]: ParameterValue };
+  outputFile?: string;
+  generationStatus: string;
+}
+
 // =============================================================================
 // PRINTER TYPES
 // =============================================================================

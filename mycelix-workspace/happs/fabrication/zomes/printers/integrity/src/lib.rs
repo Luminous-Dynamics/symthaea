@@ -9,6 +9,7 @@ use fabrication_common::*;
 use fabrication_common::validation;
 
 /// Entry types for the printers zome
+#[allow(clippy::large_enum_variant)] // Holochain entry serialization requires unboxed variants
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -292,15 +293,6 @@ fn validate_create_link(
         LinkTypes::AvailablePrinters => Ok(ValidateCallbackResult::Valid),
         LinkTypes::PrinterToStatus => Ok(ValidateCallbackResult::Valid),
     }
-}
-
-/// Validate link deletion (reserved for future use)
-#[allow(dead_code)]
-fn validate_delete_link(
-    _link_type: LinkTypes,
-    _original_link: CreateLink,
-) -> ExternResult<ValidateCallbackResult> {
-    Ok(ValidateCallbackResult::Valid)
 }
 
 #[cfg(test)]

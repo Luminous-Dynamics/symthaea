@@ -42,3 +42,7 @@ path = "sweettest_prints.rs"
 [[test]]
 name = "sweettest_materials"
 path = "sweettest_materials.rs"
+
+[[test]]
+name = "sweettest_symthaea"
+path = "sweettest_symthaea.rs"
