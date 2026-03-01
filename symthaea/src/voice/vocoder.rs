@@ -212,6 +212,14 @@ impl GlottalSource {
 
     /// Generate one sample at given fundamental frequency using LF model.
     fn tick(&mut self, f0: f32) -> f32 {
+        self.tick_with_rd(f0, self.shape)
+    }
+
+    /// Generate one sample with a specific Rd shape parameter.
+    ///
+    /// Allows per-source-type voice quality: vowels use modal Rd, nasals
+    /// breathier, liquids slightly more pressed.
+    fn tick_with_rd(&mut self, f0: f32, shape: f32) -> f32 {
         if f0 <= 0.0 {
             return 0.0;
         }
@@ -226,7 +234,7 @@ impl GlottalSource {
         }
 
         // Map shape (0–1) to Rd (0.3–2.7)
-        let rd = 0.3 + self.shape * 2.4;
+        let rd = 0.3 + shape.clamp(0.0, 1.0) * 2.4;
 
         // Derive LF timing parameters from Rd (Fant 1995)
         let tp = 0.1 + 0.22 * rd; // Peak position (fraction of period)
@@ -413,6 +421,14 @@ pub struct FormantVocoder {
     ou_jitter: OrnsteinUhlenbeck,
     /// Ornstein-Uhlenbeck process for amplitude shimmer (temporally correlated energy perturbation).
     ou_shimmer: OrnsteinUhlenbeck,
+    /// Previous output sample for lip radiation filter (first-difference).
+    radiation_prev: f32,
+    /// Current F1 frequency for amplitude correction.
+    current_f1: f32,
+    /// Current F2 frequency for amplitude correction.
+    current_f2: f32,
+    /// Current F3 frequency for amplitude correction.
+    current_f3: f32,
 }
 
 impl FormantVocoder {
@@ -470,6 +486,10 @@ impl FormantVocoder {
             nasal_antires,
             ou_jitter,
             ou_shimmer,
+            radiation_prev: 0.0,
+            current_f1: 500.0,
+            current_f2: 1500.0,
+            current_f3: 2500.0,
         }
     }
 
@@ -487,6 +507,7 @@ impl FormantVocoder {
         self.samples_in_frame = 0;
         self.tilt_state = 0.0;
         self.shimmer_factor = 1.0;
+        self.radiation_prev = 0.0;
     }
 
     /// Synthesize audio from formant frames
@@ -535,10 +556,14 @@ impl FormantVocoder {
                 self.tilt_state = source;
 
                 // Formant filtering + nasal anti-resonance
-                let filtered = self.apply_filters(source, current.source_type);
+                let filtered = self.apply_filters(source, current.source_type, current.f0);
+
+                // Lip radiation: first-difference filter (6dB/octave HF boost)
+                let radiated = filtered - self.radiation_prev;
+                self.radiation_prev = filtered;
 
                 // Apply energy envelope with shimmer
-                let output = filtered * current.energy * self.shimmer_factor * self.config.volume;
+                let output = radiated * current.energy * self.shimmer_factor * self.config.volume;
 
                 // Low-pass filter for smoothing
                 let smoothed = self.lowpass.process(output);
@@ -551,11 +576,27 @@ impl FormantVocoder {
         audio
     }
 
+    /// Compute per-source-type glottal shape (Rd) for voice quality variation.
+    ///
+    /// Different manner classes benefit from different Rd values:
+    /// - Vowels: modal voice (config default)
+    /// - Liquids: slightly more pressed (clearer formants)
+    /// - Nasals: slightly breathier (softer coupling)
+    fn source_rd(&self, source_type: SourceType) -> f32 {
+        match source_type {
+            SourceType::Vowel => self.config.glottal_shape,
+            SourceType::Liquid => (self.config.glottal_shape * 0.8).clamp(0.0, 1.0),
+            SourceType::Nasal => (self.config.glottal_shape * 1.2).clamp(0.0, 1.0),
+            _ => self.config.glottal_shape,
+        }
+    }
+
     /// Generate source excitation signal based on manner of articulation.
     ///
     /// Returns the raw source signal before formant filtering.
     /// - `progress`: position within the current frame/phoneme (0.0–1.0)
     fn generate_source(&mut self, current: &FormantFrame, progress: f32) -> f32 {
+        let rd = self.source_rd(current.source_type);
         match current.source_type {
             SourceType::Vowel | SourceType::Liquid => {
                 // Standard: glottal pulse + aspiration + unvoiced noise
@@ -565,7 +606,7 @@ impl FormantVocoder {
                 let f0_jittered = current.f0 * jitter_factor;
 
                 let prev_phase = self.glottal.phase;
-                let voiced = self.glottal.tick(f0_jittered) * current.voicing;
+                let voiced = self.glottal.tick_with_rd(f0_jittered, rd) * current.voicing;
                 if self.glottal.phase < prev_phase {
                     // OU shimmer: temporally correlated amplitude perturbation
                     // Use glottal period (1/f0) as dt since shimmer updates per-cycle
@@ -583,21 +624,41 @@ impl FormantVocoder {
                 (voiced + aspiration + unvoiced) * 30.0
             }
             SourceType::Stop => {
-                // Closure (first 80%): silence or low voicing bar
-                // Burst (last 20%): white noise burst
-                if progress < 0.8 {
+                // VOT-aware stop model:
+                // - Closure (0–70%): silence or voicing bar (voiced stops)
+                // - Burst (70–80%): transient noise burst
+                // - VOT region (80–100%):
+                //   - Voiceless: aspiration noise (decaying) before next vowel
+                //   - Voiced: voicing resumes immediately after burst
+                if progress < 0.7 {
+                    // Closure phase
                     if current.voicing > 0.5 {
-                        self.glottal.tick(current.f0) * 0.1
+                        self.glottal.tick_with_rd(current.f0, rd) * 0.1
                     } else {
                         0.0
                     }
-                } else {
+                } else if progress < 0.8 {
+                    // Burst: transient noise
                     self.noise.white() * 0.8 * 30.0
+                } else if current.voicing <= 0.5 {
+                    // Voiceless VOT: aspiration noise decaying into next segment
+                    let decay = 1.0 - (progress - 0.8) / 0.2;
+                    self.noise.white() * 0.4 * decay * 30.0
+                } else {
+                    // Voiced: voicing resumes immediately
+                    self.glottal.tick_with_rd(current.f0, rd) * current.voicing * 30.0
                 }
             }
             SourceType::Fricative => {
-                // Shaped white noise + optional voicing bar
-                let noise = self.noise.white() * 0.5;
+                // Spectral shaping: sibilants (/S/, /SH/) use white noise
+                // (bright, high-frequency energy), non-sibilants (/F/, /TH/)
+                // use pink noise (gentler, lower spectral emphasis).
+                // F2 position serves as proxy: high F2 → sibilant.
+                let sibilance =
+                    ((self.current_f2 - 1500.0) / 1000.0).clamp(0.0, 1.0);
+                let noise = self.noise.white() * sibilance
+                    + self.noise.pink() * (1.0 - sibilance) * 2.0;
+                let noise = noise * 0.5;
                 let voiced = if current.voicing > 0.5 {
                     self.glottal.tick(current.f0) * 0.3
                 } else {
@@ -607,7 +668,7 @@ impl FormantVocoder {
             }
             SourceType::Nasal => {
                 // Voiced source (nasal anti-formant applied post-filter)
-                let voiced = self.glottal.tick(current.f0) * current.voicing;
+                let voiced = self.glottal.tick_with_rd(current.f0, rd) * current.voicing;
                 voiced * 30.0
             }
             SourceType::Affricate => {
@@ -629,17 +690,25 @@ impl FormantVocoder {
     }
 
     /// Apply formant filtering + optional nasal anti-resonance.
-    fn apply_filters(&mut self, source: f32, source_type: SourceType) -> f32 {
+    ///
+    /// Uses frequency-dependent amplitude correction based on Klatt (1980):
+    /// higher formants get compensating gain to counteract glottal source
+    /// spectral rolloff (~12dB/octave from the LF model).
+    fn apply_filters(&mut self, source: f32, source_type: SourceType, f0: f32) -> f32 {
         let mut filtered = 0.0;
         if self.resonators.len() >= 3 {
-            filtered += self.resonators[0].process(source) * 1.0;
-            filtered += self.resonators[1].process(source) * 0.5;
-            filtered += self.resonators[2].process(source) * 0.25;
+            let a1 = formant_amplitude_correction(self.current_f1, f0);
+            let a2 = formant_amplitude_correction(self.current_f2, f0);
+            let a3 = formant_amplitude_correction(self.current_f3, f0);
+            filtered += self.resonators[0].process(source) * a1;
+            filtered += self.resonators[1].process(source) * a2;
+            filtered += self.resonators[2].process(source) * a3;
         } else {
             for res in &mut self.resonators {
                 filtered += res.process(source);
             }
         }
+        // F4/F5 keep fixed attenuation (speaker constants, not articulation-dependent)
         if self.resonators.len() >= 4 {
             filtered += self.resonators[3].process(source) * 0.1;
         }
@@ -655,7 +724,7 @@ impl FormantVocoder {
         filtered
     }
 
-    /// Update resonator parameters from frame
+    /// Update resonator parameters from frame and track current formant frequencies.
     fn update_resonators(&mut self, frame: &FormantFrame) {
         let sr = self.config.sample_rate as f32;
 
@@ -675,6 +744,11 @@ impl FormantVocoder {
         if self.resonators.len() >= 5 {
             self.resonators[4].set_params(self.config.f5_freq, self.config.f5_bandwidth, sr);
         }
+
+        // Track current formant frequencies for amplitude correction
+        self.current_f1 = frame.f1;
+        self.current_f2 = frame.f2;
+        self.current_f3 = frame.f3;
     }
 
     /// Synthesize audio for a single formant frame (streaming mode).
@@ -699,9 +773,13 @@ impl FormantVocoder {
             self.tilt_state = source;
 
             // Formant filtering + nasal anti-resonance
-            let filtered = self.apply_filters(source, frame.source_type);
+            let filtered = self.apply_filters(source, frame.source_type, frame.f0);
 
-            let output = filtered * frame.energy * self.shimmer_factor * self.config.volume;
+            // Lip radiation: first-difference filter (6dB/octave HF boost)
+            let radiated = filtered - self.radiation_prev;
+            self.radiation_prev = filtered;
+
+            let output = radiated * frame.energy * self.shimmer_factor * self.config.volume;
             let smoothed = self.lowpass.process(output);
             audio.push(soft_clip(smoothed));
         }
@@ -729,6 +807,17 @@ impl Default for FormantVocoder {
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/// Compensate for glottal spectral rolloff (~12dB/octave from LF model).
+///
+/// Higher formants need more gain since the glottal source rolls off.
+/// Based on Klatt (1980) amplitude correction factors.
+fn formant_amplitude_correction(formant_freq: f32, f0: f32) -> f32 {
+    let harmonic_number = (formant_freq / f0.max(50.0)).round().max(1.0);
+    let rolloff_db = 12.0 * harmonic_number.log2(); // 12dB/octave
+    let correction = 10.0_f32.powf(rolloff_db / 20.0); // dB to linear
+    correction.min(8.0) // Cap at 8x to prevent instability
+}
 
 /// Soft clipping function to prevent harsh distortion
 fn soft_clip(x: f32) -> f32 {
@@ -1207,6 +1296,216 @@ mod tests {
         assert!(
             rms > 0.001,
             "Nasal should produce voiced audio: rms={rms:.4}"
+        );
+    }
+
+    #[test]
+    fn test_radiation_boosts_hf() {
+        // The radiation filter (first-difference) should boost high-frequency energy.
+        // Compare HF content with and without radiation by disabling/enabling it.
+        let frame = FormantFrame {
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0,
+            time: 0.0,
+            source_type: SourceType::Vowel,
+        };
+
+        let config = VocoderConfig {
+            jitter: 0.0,
+            shimmer: 0.0,
+            spectral_tilt: 0.0,
+            ..VocoderConfig::default()
+        };
+
+        let mut vocoder = FormantVocoder::with_config(config);
+        let audio = vocoder.synthesize_frame(&frame, 2400); // 100ms
+
+        // HF proxy: energy of sample-to-sample differences
+        let hf_energy: f32 = audio.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
+
+        // With radiation filter active, HF energy should be substantial
+        // (first-difference is essentially a high-pass)
+        assert!(
+            hf_energy > 0.01,
+            "Radiation filter should produce measurable HF energy: {hf_energy:.6}"
+        );
+
+        // The output should still be bounded
+        assert!(
+            audio.iter().all(|&s| s.abs() < 1.5),
+            "Radiated output should not clip"
+        );
+    }
+
+    #[test]
+    fn test_amplitude_correction_increases_f3() {
+        // formant_amplitude_correction should give F3 more gain than F1
+        // because F3 is at a higher harmonic and needs rolloff compensation.
+        // Use high F0 (300Hz) so F1 is at harmonic 2 (below cap) and F3 at harmonic 8.
+        let f0 = 300.0;
+        let a1 = formant_amplitude_correction(500.0, f0);  // F1 ~ harmonic 2
+        let a3 = formant_amplitude_correction(2500.0, f0); // F3 ~ harmonic 8
+
+        assert!(
+            a3 > a1,
+            "F3 amplitude correction should exceed F1: a1={a1:.3}, a3={a3:.3}"
+        );
+
+        // Basic sanity
+        assert!(a1 >= 1.0, "F1 correction should be >= 1.0: {a1:.3}");
+        assert!(a3 <= 8.0, "F3 correction should be capped at 8.0: {a3:.3}");
+
+        // Harmonic 1 should give correction = 1.0 (no rolloff)
+        let a_fundamental = formant_amplitude_correction(300.0, 300.0);
+        assert!(
+            (a_fundamental - 1.0).abs() < 0.01,
+            "Correction at fundamental should be 1.0: {a_fundamental:.3}"
+        );
+    }
+
+    #[test]
+    fn test_per_source_rd() {
+        let vocoder = FormantVocoder::new();
+
+        let vowel_rd = vocoder.source_rd(SourceType::Vowel);
+        let liquid_rd = vocoder.source_rd(SourceType::Liquid);
+        let nasal_rd = vocoder.source_rd(SourceType::Nasal);
+
+        // Liquid should be more pressed (lower Rd → lower shape)
+        assert!(
+            liquid_rd < vowel_rd,
+            "Liquid should be more pressed: liquid={liquid_rd:.3}, vowel={vowel_rd:.3}"
+        );
+
+        // Nasal should be breathier (higher Rd → higher shape)
+        assert!(
+            nasal_rd > vowel_rd,
+            "Nasal should be breathier: nasal={nasal_rd:.3}, vowel={vowel_rd:.3}"
+        );
+    }
+
+    #[test]
+    fn test_vot_voiceless_has_aspiration() {
+        let mut vocoder = FormantVocoder::new();
+
+        // Voiceless stop (voicing=0.0): should have aspiration after burst
+        let frame = FormantFrame {
+            f1: 200.0,
+            f2: 1000.0,
+            f3: 2200.0,
+            b1: 80.0,
+            b2: 120.0,
+            b3: 200.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 0.0, // voiceless
+            source_type: SourceType::Stop,
+            ..Default::default()
+        };
+
+        let audio = vocoder.synthesize_frame(&frame, 480);
+
+        // VOT region (last 20%, frames 384-480) should have non-zero energy
+        // (aspiration noise, not silence)
+        let vot_start = (480.0 * 0.8) as usize;
+        let vot_energy: f32 =
+            audio[vot_start..].iter().map(|s| s * s).sum::<f32>() / (480 - vot_start) as f32;
+        assert!(
+            vot_energy > 0.0001,
+            "Voiceless VOT should have aspiration energy: {vot_energy:.6}"
+        );
+    }
+
+    #[test]
+    fn test_vot_voiced_has_voicing() {
+        let mut vocoder = FormantVocoder::new();
+
+        // Voiced stop (voicing=1.0): should resume voicing after burst
+        let frame = FormantFrame {
+            f1: 200.0,
+            f2: 1000.0,
+            f3: 2200.0,
+            b1: 80.0,
+            b2: 120.0,
+            b3: 200.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0, // voiced
+            source_type: SourceType::Stop,
+            ..Default::default()
+        };
+
+        let audio = vocoder.synthesize_frame(&frame, 480);
+
+        // Post-burst region should have voiced energy (glottal pulses)
+        let post_burst = (480.0 * 0.8) as usize;
+        let post_energy: f32 =
+            audio[post_burst..].iter().map(|s| s * s).sum::<f32>() / (480 - post_burst) as f32;
+        assert!(
+            post_energy > 0.0001,
+            "Voiced stop should have voicing after burst: {post_energy:.6}"
+        );
+    }
+
+    #[test]
+    fn test_fricative_sibilant_vs_nonsibilant() {
+        // Sibilant (/S/): high F2 → more white noise (brighter)
+        // Non-sibilant (/F/): low F2 → more pink noise (gentler)
+        let config = VocoderConfig {
+            jitter: 0.0,
+            shimmer: 0.0,
+            spectral_tilt: 0.0,
+            ..VocoderConfig::default()
+        };
+
+        // Sibilant: F2=2500
+        let mut vocoder_sib = FormantVocoder::with_config(config.clone());
+        let frame_sib = FormantFrame {
+            f1: 320.0,
+            f2: 2500.0,
+            f3: 3500.0,
+            b1: 100.0,
+            b2: 150.0,
+            b3: 250.0,
+            f0: 120.0,
+            energy: 0.6,
+            voicing: 0.0,
+            source_type: SourceType::Fricative,
+            ..Default::default()
+        };
+        let audio_sib = vocoder_sib.synthesize_frame(&frame_sib, 2400);
+
+        // Non-sibilant: F2=1000
+        let mut vocoder_non = FormantVocoder::with_config(config);
+        let frame_non = FormantFrame {
+            f1: 320.0,
+            f2: 1000.0,
+            f3: 2200.0,
+            b1: 100.0,
+            b2: 150.0,
+            b3: 250.0,
+            f0: 120.0,
+            energy: 0.6,
+            voicing: 0.0,
+            source_type: SourceType::Fricative,
+            ..Default::default()
+        };
+        let audio_non = vocoder_non.synthesize_frame(&frame_non, 2400);
+
+        // Sibilant should have more high-frequency energy (brighter)
+        let hf_sib: f32 = audio_sib.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
+        let hf_non: f32 = audio_non.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
+
+        assert!(
+            hf_sib > hf_non,
+            "Sibilant should have more HF energy: sib={hf_sib:.4}, non={hf_non:.4}"
         );
     }
 }

@@ -33,6 +33,12 @@ impl ContinuousMind {
         self.sync_iroh_bridge();
         #[cfg(feature = "mesh")]
         {
+            // Tick the encryption key pair to expire grace period
+            #[cfg(feature = "mesh-encryption")]
+            if let Some(ref mut pair) = self.mesh_encryption_key {
+                pair.tick(self.state.tick);
+            }
+
             self.process_mesh();
             self.process_sensors();
             self.auto_emit_wisdom();
@@ -65,11 +71,13 @@ impl ContinuousMind {
 
         if self.state.is_dreaming {
             // Periodic Causal Pruning during dreaming (every 100 dream ticks)
-            // TODO: Wire memory_coordinator + episodic_memory fields into ContinuousMind
-            // if self.state.tick % 100 == 0 {
-            //     let load = self.state.thermodynamic_load;
-            //     self.memory_coordinator.prune_memories(&mut self.episodic_memory, load);
-            // }
+            // Science: Sleep-dependent memory triage (Born & Wilhelm 2012)
+            if self.state.tick % 100 == 0 {
+                if let Some(ref mut episodic) = self.episodic_memory {
+                    let load = self.state.thermodynamic_load;
+                    self.memory_coordinator.prune_memories(episodic, load);
+                }
+            }
             return self.process_dream();
         }
 
@@ -233,6 +241,19 @@ impl ContinuousMind {
                 let metadata = self.working_memory_metadata.remove(0);
 
                 let steps_survived = self.state.tick.saturating_sub(arrival_tick);
+                // Graduate evicted item to episodic memory via coordinator
+                self.memory_coordinator.queue_graduation(
+                    crate::memory::memory_coordinator::GraduationEvent {
+                        content: evicted.clone(),
+                        label: metadata.get("topic").cloned().unwrap_or_default(),
+                        steps_survived,
+                        final_activation: 0.5, // default activation for evicted items
+                        psi_at_graduation: self.state.consciousness_level,
+                        coherence_at_graduation: self.state.consciousness_level,
+                        source,
+                        is_verified: verified,
+                    },
+                );
                 self.evicted_items.push(crate::mind::EvictedMemory {
                     content: evicted,
                     steps_survived,

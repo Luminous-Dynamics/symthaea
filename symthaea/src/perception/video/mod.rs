@@ -36,13 +36,11 @@
 //! - Predictive perception (anticipating what comes next)
 
 pub mod frame;
-pub mod ltc_rhythm;
 pub mod optical_flow;
 pub mod source;
 pub mod temporal_features;
 
 pub use frame::{Frame, FrameFormat};
-pub use ltc_rhythm::{LtcRhythmConfig, LtcRhythmDetector, RhythmDetection, RhythmPrototype};
 pub use optical_flow::{MotionVector, OpticalFlow};
 pub use source::{MockPattern, MockVideoSource, VideoSource, VideoSourceConfig, WebcamSource};
 pub use temporal_features::{TemporalFeatureExtractor, TemporalFeatures};

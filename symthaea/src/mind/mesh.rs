@@ -365,8 +365,84 @@ impl ContinuousMind {
     /// When set, all outbound packets are encrypted after compression,
     /// and all inbound packets are decrypted before decompression.
     /// Pass `None` to disable encryption.
+    ///
+    /// The key is propagated to the bridge actor (if attached) so that
+    /// `DualLayerMesh` and `MeshReceiver` pick it up on the next poll cycle.
     #[cfg(feature = "mesh-encryption")]
     pub fn set_mesh_encryption_key(&mut self, key: Option<[u8; 32]>) {
-        self.mesh_encryption_key = key;
+        self.mesh_encryption_key = key.map(crate::swarm::mesh::RotatingKeyPair::new);
+        self.propagate_encryption_key();
+    }
+
+    /// Rotate the mesh encryption key with a grace period.
+    ///
+    /// During the grace period, both old and new keys are accepted for
+    /// decryption. After `grace_ticks` cycles, the old key is discarded.
+    /// The bridge actor is updated with the new key immediately.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn rotate_mesh_key(&mut self, new_key: [u8; 32], grace_ticks: u64) {
+        if let Some(ref mut pair) = self.mesh_encryption_key {
+            pair.rotate(new_key, self.state.tick, grace_ticks);
+        } else {
+            // No previous key — just set the new one
+            self.mesh_encryption_key = Some(crate::swarm::mesh::RotatingKeyPair::new(new_key));
+        }
+        self.propagate_encryption_key();
+    }
+
+    /// Propagate the current encryption key to the bridge actor.
+    #[cfg(feature = "mesh-encryption")]
+    fn propagate_encryption_key(&self) {
+        if let Some(ref handle) = self.mesh_bridge {
+            let key = self
+                .mesh_encryption_key
+                .as_ref()
+                .map(|pair| *pair.current_key());
+            handle.set_encryption_key(key);
+            handle.set_encryption_epoch(self.mesh_encryption_epoch);
+        }
+    }
+
+    /// Initialize the per-peer X25519 key store.
+    ///
+    /// `secret_bytes` is the node's long-term X25519 secret key (32 bytes).
+    /// Returns our public key (send to peers for key agreement).
+    #[cfg(feature = "mesh-key-exchange")]
+    pub fn init_peer_key_store(&mut self, secret_bytes: [u8; 32]) -> [u8; 32] {
+        let store = crate::swarm::mesh::PeerKeyStore::new(secret_bytes);
+        let public = store.public_key();
+        self.mesh_peer_keys = Some(store);
+        public
+    }
+
+    /// Perform X25519 key agreement with a peer.
+    ///
+    /// Derives a per-peer ChaCha20 symmetric key from the DH shared secret.
+    /// Returns the derived key (also stored internally for lookup by source_id).
+    #[cfg(feature = "mesh-key-exchange")]
+    pub fn agree_with_peer(
+        &mut self,
+        peer_source_id: [u8; 8],
+        peer_public: &[u8; 32],
+    ) -> Option<[u8; 32]> {
+        self.mesh_peer_keys
+            .as_mut()
+            .map(|store| store.agree(peer_source_id, peer_public))
+    }
+
+    /// Look up the derived symmetric key for a peer.
+    #[cfg(feature = "mesh-key-exchange")]
+    pub fn peer_encryption_key(&self, source_id: &[u8; 8]) -> Option<&[u8; 32]> {
+        self.mesh_peer_keys
+            .as_ref()
+            .and_then(|store| store.peer_key(source_id))
+    }
+
+    /// Remove a peer's derived key (e.g., on expiry/disconnect).
+    #[cfg(feature = "mesh-key-exchange")]
+    pub fn remove_peer_key(&mut self, source_id: &[u8; 8]) {
+        if let Some(ref mut store) = self.mesh_peer_keys {
+            store.remove_peer(source_id);
+        }
     }
 }

@@ -1349,7 +1349,7 @@ mod tests {
         let mip = find_mip(&tpm, &mechanism, &mechanism, &state);
 
         // MIP partition should cover all mechanism nodes
-        let mut all: Vec<usize> = mip.partition.0.clone();
+        let mut all: Vec<usize> = mip.partition.0.to_vec();
         all.extend(&mip.partition.1);
         all.sort();
 

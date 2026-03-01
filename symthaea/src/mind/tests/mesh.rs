@@ -1741,16 +1741,16 @@ fn test_populate_mesh_metadata() {
     mind.populate_mesh_metadata(&mut metadata);
 
     assert!(
-        metadata.mesh_health_score > 0.0,
+        metadata.mesh.mesh_health_score > 0.0,
         "mesh_health_score should be > 0"
     );
-    assert_eq!(metadata.mesh_peer_count, 1, "Should have 1 peer");
+    assert_eq!(metadata.mesh.mesh_peer_count, 1, "Should have 1 peer");
     assert!(
-        metadata.mesh_bytes_sent > 0,
+        metadata.mesh.mesh_bytes_sent > 0,
         "mesh_bytes_sent should be > 0"
     );
     assert!(
-        metadata.mesh_bytes_received > 0,
+        metadata.mesh.mesh_bytes_received > 0,
         "mesh_bytes_received should be > 0"
     );
 }
@@ -2684,16 +2684,16 @@ fn test_populate_mesh_metadata_compression_fields() {
     mind.populate_mesh_metadata(&mut metadata);
 
     assert!(
-        metadata.mesh_compression_ratio > 0.0 && metadata.mesh_compression_ratio <= 2.0,
+        metadata.mesh.mesh_compression_ratio > 0.0 && metadata.mesh.mesh_compression_ratio <= 2.0,
         "compression_ratio should be > 0 after emissions, got {}",
-        metadata.mesh_compression_ratio
+        metadata.mesh.mesh_compression_ratio
     );
     assert!(
-        metadata.mesh_bandwidth_budget > 0,
+        metadata.mesh.mesh_bandwidth_budget > 0,
         "bandwidth_budget should be > 0"
     );
     assert_eq!(
-        metadata.mesh_packets_throttled, 2,
+        metadata.mesh.mesh_packets_throttled, 2,
         "packets_throttled should reflect stats"
     );
 }
@@ -2811,4 +2811,100 @@ async fn test_mind_encryption_key_mismatch_rejected() {
         0,
         "Mind B should NOT see peers when encryption keys mismatch"
     );
+}
+
+/// Test that encryption keys propagate from Mind → bridge actor automatically.
+///
+/// Unlike the existing tests that set keys on DualLayerMesh/MeshReceiver manually,
+/// this test sets keys via `set_mesh_encryption_key()` AFTER the bridge is attached.
+/// The bridge actor should pick up the key change on its next poll cycle.
+#[cfg(feature = "mesh-encryption")]
+#[tokio::test]
+async fn test_bridge_key_propagation_roundtrip() {
+    use crate::swarm::mesh::{BiLoopbackTransport, DualLayerMesh, MeshBridgeHandle, MeshReceiver};
+
+    let key = [0xCC; 32];
+
+    let (transport_a, transport_b) =
+        BiLoopbackTransport::pair("propagate_a", "propagate_b", 2200);
+
+    // Create mesh routers WITHOUT encryption keys initially
+    let mesh_a = DualLayerMesh::new([0xCC; 32]).with_batman(Box::new(transport_a));
+    let mesh_b = DualLayerMesh::new([0xDD; 32]).with_batman(Box::new(transport_b));
+
+    let (handle_a, actor_a) = MeshBridgeHandle::new(64, 64);
+    let (handle_b, actor_b) = MeshBridgeHandle::new(64, 64);
+    let receiver_a = MeshReceiver::new();
+    let receiver_b = MeshReceiver::new();
+    tokio::spawn(actor_a.run(mesh_a, receiver_a));
+    tokio::spawn(actor_b.run(mesh_b, receiver_b));
+
+    let mut mind_a = ContinuousMind::new(MindConfig::default());
+    let mut mind_b = ContinuousMind::new(MindConfig::default());
+
+    // Attach bridges FIRST, then set encryption keys via Mind API
+    mind_a.set_mesh_bridge(handle_a);
+    mind_b.set_mesh_bridge(handle_b);
+    mind_a.set_mesh_encryption_key(Some(key));
+    mind_b.set_mesh_encryption_key(Some(key));
+
+    // Give the actor time to pick up the new key
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    let hv = ContinuousHV::random(mind_a.config.dimension, 42);
+    mind_a.perceive(hv);
+
+    for _ in 0..10 {
+        mind_a.tick();
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    for _ in 0..10 {
+        mind_b.tick();
+    }
+
+    // Mind B should see Mind A — key propagated through bridge
+    assert!(
+        mind_b.mesh_peers().peer_count() > 0,
+        "Mind B should see Mind A after key propagation through bridge"
+    );
+}
+
+/// Test XChaCha20-Poly1305 roundtrip through DualLayerMesh + MeshReceiver.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_xchacha_send_receive_roundtrip() {
+    use crate::swarm::mesh::{
+        MeshReceiver, WisdomPacket,
+        MeshUrgency, PayloadType, compress_packet, encrypt_packet_xchacha,
+    };
+    use symthaea_core::hdc::BinaryHV;
+
+    let key = [0x42u8; 32];
+    let source_id = [0x01u8; 8];
+
+    let packet = WisdomPacket {
+        source_id,
+        sequence: 42,
+        phi: 0.75,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 12345,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 3,
+        wisdom: BinaryHV([0xAB; 2048]),
+    };
+
+    // Manually encrypt with XChaCha
+    let compressed = compress_packet(&packet.to_bytes());
+    let encrypted = encrypt_packet_xchacha(&compressed, &key);
+
+    // Receiver with standard encryption key should auto-detect XChaCha
+    let mut receiver = MeshReceiver::new().with_encryption_key(key);
+    let decoded = receiver.receive_whole(&encrypted);
+    assert!(decoded.is_some(), "XChaCha-encrypted packet should be decoded");
+    let decoded = decoded.unwrap();
+    assert_eq!(decoded.sequence, 42);
+    assert_eq!(decoded.phi, 0.75);
 }

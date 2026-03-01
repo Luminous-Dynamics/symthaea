@@ -203,10 +203,11 @@ impl VoiceOutputMetrics {
         let articulation_score = formant_accuracy * 0.7 + voicing_stability * 0.3;
 
         // Speech rate estimate: frames * dt → syllables/sec (rough: ~5 frames per syllable at 200Hz)
-        let total_duration = if frames.len() >= 2 {
-            (frames.last().unwrap().time - frames.first().unwrap().time).abs()
-        } else {
-            0.1
+        let total_duration = match (frames.first(), frames.last()) {
+            (Some(first), Some(last)) if frames.len() >= 2 => {
+                (last.time - first.time).abs()
+            }
+            _ => 0.1,
         };
         let speech_rate = if total_duration > 0.01 {
             // Rough estimate: count energy peaks as syllable nuclei

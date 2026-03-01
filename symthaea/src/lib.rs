@@ -242,9 +242,6 @@ pub mod perception;
 // Chronobiology: Time-dependent cognitive modulation
 pub mod chronobiology;
 
-// Hierarchical Cantor-LTC Network
-pub mod hierarchical_cantor_ltc;
-
 // Mind orchestration system
 pub mod mind;
 
@@ -260,9 +257,6 @@ pub mod cognitive_loop;
 
 // Unified LTC (Liquid Time-Constant) network
 pub mod unified_ltc;
-
-// Learnable LTC networks
-pub mod learnable_ltc;
 
 // HDC-LTC Unified Network Bridge (alternative to CfC)
 pub mod hdc_ltc_bridge;

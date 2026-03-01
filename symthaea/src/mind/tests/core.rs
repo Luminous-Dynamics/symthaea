@@ -104,8 +104,8 @@ fn test_current_thought_evolves_with_ema() {
 #[test]
 fn test_cycle_metadata_mesh_defaults_zero() {
     let metadata = crate::cognitive_loop::types::CycleMetadata::default();
-    assert_eq!(metadata.mesh_health_score, 0.0);
-    assert_eq!(metadata.mesh_peer_count, 0);
-    assert_eq!(metadata.mesh_bytes_sent, 0);
-    assert_eq!(metadata.mesh_bytes_received, 0);
+    assert_eq!(metadata.mesh.mesh_health_score, 0.0);
+    assert_eq!(metadata.mesh.mesh_peer_count, 0);
+    assert_eq!(metadata.mesh.mesh_bytes_sent, 0);
+    assert_eq!(metadata.mesh.mesh_bytes_received, 0);
 }

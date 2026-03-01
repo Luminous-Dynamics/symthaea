@@ -155,6 +155,17 @@ pub struct DemoCycleData {
     /// Moral drift (L2 distance between first/second half of trajectory).
     #[serde(default)]
     pub moral_drift: f64,
+
+    // ── Moral Anomaly Detection ──
+    /// Composite anomaly score (0.0–1.0).
+    #[serde(default)]
+    pub moral_anomaly_score: f64,
+    /// True when the dominant harmony axis flipped.
+    #[serde(default)]
+    pub moral_value_inversion: bool,
+    /// True when free energy exceeds 2σ of rolling mean.
+    #[serde(default)]
+    pub moral_free_energy_spike: bool,
 }
 
 /// Client message format.

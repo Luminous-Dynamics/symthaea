@@ -66,8 +66,6 @@ pub mod triune_intent;
 
 // Modules needing HDC submodules that don't exist yet (cfg-gated)
 #[cfg(feature = "full_language")]
-pub mod generative_thought_engine;
-#[cfg(feature = "full_language")]
 pub mod learning_persistence;
 #[cfg(feature = "full_language")]
 pub mod meta_conscious_llm_bridge;
