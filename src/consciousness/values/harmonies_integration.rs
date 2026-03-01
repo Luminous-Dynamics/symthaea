@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
 
+use crate::hdc::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
+
 /// Configuration for harmonies integration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HarmoniesIntegrationConfig {
@@ -89,7 +91,7 @@ impl ValuedAction {
 }
 
 /// Result of value evaluation
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ValueEvaluation {
     /// Overall alignment score (0.0-1.0)
     pub overall_alignment: f32,
@@ -101,6 +103,10 @@ pub struct ValueEvaluation {
     pub reasoning: String,
     /// Suggestions for improvement
     pub suggestions: Vec<String>,
+    /// 7D harmony coordinates (projection onto moral manifold)
+    pub harmony_coordinates: [f64; 7],
+    /// Moral free energy decomposition (FEP)
+    pub moral_free_energy: MoralFreeEnergy,
 }
 
 /// The harmonies integrator
@@ -110,8 +116,14 @@ pub struct HarmoniesIntegrator {
     config: HarmoniesIntegrationConfig,
     /// The seven harmonies system
     harmonies: SevenHarmonies,
-    /// Harmony embeddings
+    /// Harmony embeddings (semantically grounded via HarmonyBasis)
     harmony_embeddings: HashMap<Harmony, ContinuousHV>,
+    /// Shared semantic basis for harmony projection and free energy
+    harmony_basis: HarmonyBasis,
+    /// Running mean of harmony coordinates (prior for moral free energy)
+    harmony_prior: [f64; 7],
+    /// Number of evaluations contributing to the prior (for EMA)
+    prior_count: u64,
     /// Evaluation history
     history: Vec<ValueEvaluation>,
     /// Statistics
@@ -132,37 +144,39 @@ pub struct IntegratorStats {
 }
 
 impl HarmoniesIntegrator {
-    /// Create a new integrator
+    /// Create a new integrator with semantically grounded harmony embeddings.
+    ///
+    /// Harmony basis vectors are built by encoding keyword sets through
+    /// `TextHdcEncoder`, so cosine similarity with an action's embedding
+    /// reflects genuine semantic alignment rather than random projection.
     pub fn new(config: HarmoniesIntegrationConfig) -> Self {
         let harmonies = SevenHarmonies::default();
+        let harmony_basis = HarmonyBasis::new(config.dimension);
 
-        // Create embeddings for each harmony
+        // Build harmony embeddings from the semantic basis vectors
+        let all_harmonies = Harmony::all();
         let mut harmony_embeddings = HashMap::new();
-        for harmony in [
-            Harmony::ResonantCoherence,
-            Harmony::PanSentientFlourishing,
-            Harmony::IntegralWisdom,
-            Harmony::InfinitePlay,
-            Harmony::UniversalInterconnectedness,
-            Harmony::SacredReciprocity,
-            Harmony::EvolutionaryProgression,
-        ] {
-            harmony_embeddings.insert(
-                harmony,
-                ContinuousHV::random(config.dimension, harmony as u64 + 42),
-            );
+        for (i, &harmony) in all_harmonies.iter().enumerate() {
+            harmony_embeddings.insert(harmony, harmony_basis.vectors[i].clone());
         }
 
         Self {
             config,
             harmonies,
             harmony_embeddings,
+            harmony_basis,
+            harmony_prior: [0.0; 7], // uniform prior until data arrives
+            prior_count: 0,
             history: Vec::new(),
             stats: IntegratorStats::default(),
         }
     }
 
-    /// Evaluate an action for value alignment
+    /// Evaluate an action for value alignment.
+    ///
+    /// Projects the action's embedding onto the 7D harmony manifold, computes
+    /// semantic alignment with each harmony, and measures moral free energy
+    /// relative to the running prior (lower F → more consistent moral stance).
     pub fn evaluate(&mut self, action: &ValuedAction) -> ValueEvaluation {
         self.stats.total_evaluations += 1;
 
@@ -170,7 +184,7 @@ impl HarmoniesIntegrator {
         let mut weighted_sum = 0.0;
         let mut weight_total = 0.0;
 
-        // Calculate alignment with each harmony
+        // Calculate alignment with each harmony via semantic basis
         for (harmony, embedding) in &self.harmony_embeddings {
             let similarity = action.embedding.similarity(embedding);
             let weight = self
@@ -190,6 +204,21 @@ impl HarmoniesIntegrator {
         } else {
             0.5
         };
+
+        // Project onto harmony manifold and compute moral free energy
+        let coords = self.harmony_basis.project(&action.embedding);
+        let moral_fe = self.harmony_basis.moral_free_energy(
+            &coords,
+            &self.harmony_prior,
+            1.0, // temperature
+        );
+
+        // Update running prior via EMA (alpha=0.1)
+        let alpha = if self.prior_count == 0 { 1.0 } else { 0.1 };
+        for i in 0..7 {
+            self.harmony_prior[i] = self.harmony_prior[i] * (1.0 - alpha) + coords[i] * alpha;
+        }
+        self.prior_count += 1;
 
         // Determine approval
         let approved = overall_alignment >= self.config.alignment_threshold;
@@ -220,6 +249,8 @@ impl HarmoniesIntegrator {
             approved,
             reasoning,
             suggestions,
+            harmony_coordinates: coords,
+            moral_free_energy: moral_fe,
         };
 
         self.history.push(evaluation.clone());
@@ -337,6 +368,50 @@ impl HarmoniesIntegrator {
             self.stats.approved as f32 / self.stats.total_evaluations as f32
         }
     }
+
+    /// Access the current harmony prior (running mean of coordinates).
+    pub fn harmony_prior(&self) -> &[f64; 7] {
+        &self.harmony_prior
+    }
+
+    /// Update harmony weights from topology feedback.
+    ///
+    /// When `MoralTopology::analyze()` reveals that certain harmony dimensions
+    /// have low variance (moral blind spots), increase their weight to encourage
+    /// broader moral exploration. When a harmony is dominant, slightly reduce
+    /// its weight to prevent moral fixation.
+    pub fn apply_topology_feedback(
+        &mut self,
+        harmony_variance: &[f64; 7],
+        dominant_harmony_idx: u8,
+        completeness: f64,
+    ) {
+        let all = Harmony::all();
+
+        // Boost weights for under-represented harmonies (low variance = blind spot)
+        for i in 0..7 {
+            let harmony = all[i];
+            let weight = self
+                .config
+                .harmony_weights
+                .get(&harmony)
+                .copied()
+                .unwrap_or(1.0);
+
+            let variance = harmony_variance[i];
+            let adjusted = if variance < 1e-4 {
+                // Blind spot: boost weight to encourage exploration
+                (weight * 1.15).min(2.0)
+            } else if i == dominant_harmony_idx as usize && completeness < 0.8 {
+                // Dominant axis with poor completeness: slight attenuation
+                (weight * 0.95).max(0.5)
+            } else {
+                weight
+            };
+
+            self.config.harmony_weights.insert(harmony, adjusted);
+        }
+    }
 }
 
 impl Default for HarmoniesIntegrator {
@@ -353,6 +428,7 @@ mod tests {
     fn test_integrator_creation() {
         let integrator = HarmoniesIntegrator::default();
         assert_eq!(integrator.stats.total_evaluations, 0);
+        assert_eq!(integrator.prior_count, 0);
     }
 
     #[test]
@@ -368,6 +444,69 @@ mod tests {
         let evaluation = integrator.evaluate(&action);
         assert!(evaluation.overall_alignment >= 0.0);
         assert!(evaluation.overall_alignment <= 1.0);
+        // Harmony coordinates should be finite 7D
+        for c in &evaluation.harmony_coordinates {
+            assert!(c.is_finite());
+        }
+        // Moral free energy should be finite
+        assert!(evaluation.moral_free_energy.free_energy.is_finite());
+    }
+
+    #[test]
+    fn test_moral_free_energy_decreases_with_consistency() {
+        let mut integrator = HarmoniesIntegrator::default();
+
+        // Feed the same action repeatedly — free energy should decrease as
+        // the prior converges to the observed distribution.
+        let action = ValuedAction::new(
+            "help",
+            "helping others learn and grow",
+            ContinuousHV::random(512, 42),
+        );
+
+        let mut fe_values = Vec::new();
+        for _ in 0..10 {
+            let eval = integrator.evaluate(&action);
+            fe_values.push(eval.moral_free_energy.kl_divergence);
+        }
+
+        // After the first evaluation, KL divergence should trend downward
+        // (prior converges via EMA)
+        let first_kl = fe_values[1]; // skip 0 (prior starts at zero)
+        let last_kl = fe_values[9];
+        assert!(
+            last_kl <= first_kl + 0.01, // allow small numerical noise
+            "KL divergence should decrease with consistent actions: first={first_kl}, last={last_kl}"
+        );
+    }
+
+    #[test]
+    fn test_topology_feedback_adjusts_weights() {
+        let mut integrator = HarmoniesIntegrator::default();
+
+        // All harmonies at 1.0 initially
+        for h in Harmony::all() {
+            assert!(
+                (*integrator.config.harmony_weights.get(&h).unwrap() - 1.0).abs() < 0.01,
+            );
+        }
+
+        // Simulate low variance on ResonantCoherence (idx 0) = blind spot
+        let mut variance = [0.1; 7];
+        variance[0] = 0.0; // blind spot
+
+        integrator.apply_topology_feedback(&variance, 3, 0.5);
+
+        // ResonantCoherence weight should have increased
+        let rc_weight = *integrator
+            .config
+            .harmony_weights
+            .get(&Harmony::ResonantCoherence)
+            .unwrap();
+        assert!(
+            rc_weight > 1.0,
+            "Blind spot harmony should get boosted weight, got {rc_weight}"
+        );
     }
 
     #[test]
