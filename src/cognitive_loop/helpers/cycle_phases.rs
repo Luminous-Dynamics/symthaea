@@ -465,7 +465,7 @@ impl CognitiveLoopService {
                 // ── Track 5f: FEP surprise → replay batch size modulation ────────
                 // Science: Mnih et al. (2015) — prioritized experience replay:
                 // high surprise = high learning potential → replay more episodes
-                let base_batch = replay.config.batch_size;
+                let base_batch = replay.batch_size();
                 let surprise_batch_boost = if fep_surprise > surprise_thresh {
                     // High surprise → up to 2x batch size
                     let boost_factor =
@@ -496,8 +496,8 @@ impl CognitiveLoopService {
                 let boosted_batch =
                     base_batch + surprise_batch_boost + sleep_boost + phasic_da_boost;
                 // Temporarily set boosted batch size for this replay session
-                let original_batch = replay.config.batch_size;
-                replay.config.batch_size = boosted_batch;
+                let original_batch = replay.batch_size();
+                replay.set_batch_size(boosted_batch);
                 surprise_replay_batch_size = boosted_batch;
 
                 if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
@@ -551,7 +551,7 @@ impl CognitiveLoopService {
                     }
                 }
                 // Restore original batch size after replay session
-                replay.config.batch_size = original_batch;
+                replay.set_batch_size(original_batch);
                 if surprise_batch_boost > 0 {
                     self.stats.surprise_boosted_replays += 1;
                 }
@@ -1144,6 +1144,10 @@ impl CognitiveLoopService {
                 binding_strength: self.carryover.quality.last_phenomenal_binding as f32,
                 epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
                 flow_active: self.flow_state.in_flow,
+                // Consciousness → neuromod baseline modulation (Dehaene et al. 2006)
+                consciousness_level: self.carryover.consciousness.last_sigma.map(|s| s as f32),
+                // Moral judgment → oxytocin/DA (Zak 2012)
+                moral_signal: Some(self.carryover.quality.last_moral_score),
             };
             self.neuromodulator_bath.update(&neuromod_inputs);
         }
@@ -1190,6 +1194,19 @@ impl CognitiveLoopService {
         if let Some(ref mut trainer) = self.async_trainer {
             if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
                 trainer.apply_latest_weights(cfc);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // MORAL INCOMPLETENESS → EXPLORATION BOOST
+        // When fewer than 3 of 7 harmonies have meaningful variance, boost
+        // exploration to encounter scenarios in neglected moral dimensions.
+        // ═══════════════════════════════════════════════════════════════════════
+        {
+            let topo = self.ethics_engine.moral_topology().last_summary();
+            if topo.scenario_count >= 3 && topo.completeness < 0.4 {
+                let boost = (0.4 - topo.completeness) * 0.5; // up to +0.2
+                self.adjust_exploration("moral_incompleteness", boost as f32);
             }
         }
 
