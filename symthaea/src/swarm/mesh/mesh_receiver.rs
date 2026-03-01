@@ -68,6 +68,8 @@ pub struct ReceiverStats {
     pub fragments_duplicate: u64,
     /// Whole packets received (B.A.T.M.A.N./Yggdrasil, no fragmentation).
     pub whole_packets: u64,
+    /// Packets that failed decryption (wrong key or corrupted ciphertext).
+    pub packets_decrypt_failed: u64,
 }
 
 // ============================================================================
@@ -131,6 +133,9 @@ pub struct MeshReceiver {
     max_recent: usize,
     /// Cumulative statistics.
     stats: ReceiverStats,
+    /// Optional ChaCha20-Poly1305 decryption key for incoming packets.
+    #[cfg(feature = "mesh-encryption")]
+    encryption_key: Option<[u8; 32]>,
 }
 
 impl MeshReceiver {
@@ -147,7 +152,19 @@ impl MeshReceiver {
             max_pending: 64,
             max_recent: 32,
             stats: ReceiverStats::default(),
+            #[cfg(feature = "mesh-encryption")]
+            encryption_key: None,
         }
+    }
+
+    /// Set the ChaCha20-Poly1305 decryption key for incoming packets.
+    ///
+    /// When set, incoming data is decrypted before decompression.
+    /// If decryption fails, falls back to unencrypted parsing (backward compat).
+    #[cfg(feature = "mesh-encryption")]
+    pub fn with_encryption_key(mut self, key: [u8; 32]) -> Self {
+        self.encryption_key = Some(key);
+        self
     }
 
     /// Set the timeout for incomplete assemblies.
@@ -231,14 +248,9 @@ impl MeshReceiver {
             let assembly = self.pending.remove(&key).unwrap();
             let used_fec = assembly.assembler.used_fec_recovery();
 
-            // Try decompression first (compressed envelope), then fall back to
-            // raw WisdomPacket::from_bytes for backward compatibility with
-            // uncompressed legacy fragments.
-            let packet = assembly.assembler.assemble().and_then(|assembled| {
-                super::decompress_packet(&assembled)
-                    .and_then(|raw| WisdomPacket::from_bytes(&raw))
-                    .or_else(|| WisdomPacket::from_bytes(&assembled))
-            });
+            // Decrypt (if key set) → decompress → parse, with fallback.
+            let packet = assembly.assembler.assemble()
+                .and_then(|assembled| self.decode_envelope(&assembled));
 
             if let Some(packet) = packet {
                 self.stats.packets_complete += 1;
@@ -263,11 +275,8 @@ impl MeshReceiver {
     /// Handles both compressed envelopes (1-byte header + payload) and
     /// raw legacy packets for backward compatibility.
     pub fn receive_whole(&mut self, raw: &[u8]) -> Option<WisdomPacket> {
-        // Try decompression first (compressed envelope), then fall back to
-        // raw WisdomPacket::from_bytes for backward compatibility.
-        let packet = super::decompress_packet(raw)
-            .and_then(|decompressed| WisdomPacket::from_bytes(&decompressed))
-            .or_else(|| WisdomPacket::from_bytes(raw))?;
+        // Decrypt (if key set) → decompress → parse, with fallback.
+        let packet = self.decode_envelope(raw)?;
 
         self.stats.whole_packets += 1;
         self.stats.packets_complete += 1;
@@ -276,6 +285,33 @@ impl MeshReceiver {
         self.touch_peer(packet.source_id, &packet, now);
 
         Some(packet)
+    }
+
+    /// Decode an assembled/received envelope: decrypt → decompress → parse.
+    ///
+    /// When an encryption key is set, attempts decryption first. If decryption
+    /// fails, falls through to unencrypted parsing for backward compatibility
+    /// with peers that haven't enabled encryption.
+    fn decode_envelope(&mut self, data: &[u8]) -> Option<WisdomPacket> {
+        #[cfg(feature = "mesh-encryption")]
+        if let Some(ref key) = self.encryption_key {
+            if let Some(decrypted) = super::decrypt_packet(data, key) {
+                return super::decompress_packet(&decrypted)
+                    .and_then(|raw| WisdomPacket::from_bytes(&raw))
+                    .or_else(|| WisdomPacket::from_bytes(&decrypted));
+            }
+            // Decryption failed — reject the packet. When an encryption key
+            // is set, only authenticated ciphertext is accepted. Falling back
+            // to unencrypted parsing would allow ciphertext to be misinterpreted
+            // as a (garbled) WisdomPacket, which is a security risk.
+            self.stats.packets_decrypt_failed += 1;
+            return None;
+        }
+
+        // Unencrypted path (no encryption key configured)
+        super::decompress_packet(data)
+            .and_then(|raw| WisdomPacket::from_bytes(&raw))
+            .or_else(|| WisdomPacket::from_bytes(data))
     }
 
     /// Expire stale incomplete assemblies.
@@ -796,5 +832,53 @@ mod tests {
             .expect("should parse legacy raw packet");
         assert_eq!(result.sequence, 20);
         assert_eq!(result.wisdom.0, packet.wisdom.0);
+    }
+
+    // -- Encryption pipeline tests --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_receiver_decrypts_whole_packet() {
+        use crate::swarm::mesh::{compress_packet, encrypt_packet};
+
+        let key = [0xCD; 32];
+        let packet = test_packet(42, PEER_A, 0xEE);
+        let raw = packet.to_bytes();
+
+        // Manually: compress → encrypt (mimics DualLayerMesh send path)
+        let compressed = compress_packet(&raw);
+        let encrypted = encrypt_packet(&compressed, &key, &packet.source_id, packet.sequence);
+
+        // Receiver with matching key should decrypt → decompress → parse
+        let mut receiver = MeshReceiver::new().with_encryption_key(key);
+        let result = receiver
+            .receive_whole(&encrypted)
+            .expect("should decrypt and parse");
+        assert_eq!(result.sequence, 42);
+        assert_eq!(result.wisdom.0, packet.wisdom.0);
+        assert_eq!(receiver.stats().packets_decrypt_failed, 0);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_receiver_rejects_unencrypted_when_key_set() {
+        use crate::swarm::mesh::compress_packet;
+
+        let key = [0xEF; 32];
+        let packet = test_packet(99, PEER_B, 0xFF);
+        let raw = packet.to_bytes();
+
+        // Send unencrypted compressed packet to a receiver WITH key set.
+        // Decryption fails and the packet is rejected — when encryption is
+        // enabled, only authenticated ciphertext is accepted.
+        let compressed = compress_packet(&raw);
+
+        let mut receiver = MeshReceiver::new().with_encryption_key(key);
+        let result = receiver.receive_whole(&compressed);
+        assert!(
+            result.is_none(),
+            "Unencrypted data should be rejected when encryption key is set"
+        );
+        assert_eq!(receiver.stats().packets_decrypt_failed, 1);
     }
 }
