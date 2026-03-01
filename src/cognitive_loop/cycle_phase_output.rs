@@ -286,6 +286,34 @@ impl CognitiveLoopService {
             moral_topo_free_energy: self.ethics_engine.moral_topology().last_summary().moral_free_energy,
             moral_topo_dominant_harmony: self.ethics_engine.moral_topology().last_summary().dominant_harmony,
             moral_topo_scenario_count: self.ethics_engine.moral_topology().last_summary().scenario_count,
+            // Moral geometry: cached harmony projection
+            harmony_coordinates: *self.ethics_engine.last_harmony_coordinates(),
+            moral_scenario_distribution: self.ethics_engine.last_moral_free_energy().scenario_distribution,
+            moral_prior_distribution: self.ethics_engine.last_moral_free_energy().prior_distribution,
+            moral_kl_divergence: self.ethics_engine.last_moral_free_energy().kl_divergence,
+            moral_entropy: self.ethics_engine.last_moral_free_energy().entropy,
+            moral_surprise: self.ethics_engine.last_moral_free_energy().surprise,
+            // Partnership / Phi-Dyad
+            relational_psi: self.relational_psi,
+            // Resonant Speech: response profile from cognitive load.
+            // Combine allostatic load (neuromod bath) with consciousness level.
+            response_profile: {
+                use crate::resonant_speech::CognitiveLoad;
+                let allostatic = self.neuromod.bath.allostatic_load as f64;
+                let psi = feedback.consciousness_level;
+                let load_level = allostatic * 0.6 + (1.0 - psi) * 0.4;
+                let load = CognitiveLoad::from_level(load_level);
+                let profile = load.response_profile();
+                if profile.use_technical_terms {
+                    "technical".to_string()
+                } else if profile.include_explanations {
+                    "balanced".to_string()
+                } else if profile.use_examples {
+                    "simplified".to_string()
+                } else {
+                    "empathic".to_string()
+                }
+            },
             ..Default::default()
         };
 

@@ -165,6 +165,8 @@ struct EthicsEngineCache {
     last_value_score: f64,
     last_harmonies_alignment: f32,
     last_harmonies_approved: bool,
+    last_harmony_coordinates: [f64; 7],
+    last_moral_free_energy: MoralFreeEnergy,
 }
 
 impl EthicsEngine {
@@ -378,6 +380,8 @@ impl EthicsEngine {
                     let eval = integrator.evaluate(&action);
                     self.cache.last_harmonies_alignment = eval.overall_alignment;
                     self.cache.last_harmonies_approved = eval.approved;
+                    self.cache.last_harmony_coordinates = eval.harmony_coordinates;
+                    self.cache.last_moral_free_energy = eval.moral_free_energy.clone();
                     (
                         eval.overall_alignment,
                         eval.approved,
@@ -388,8 +392,8 @@ impl EthicsEngine {
                     (
                         self.cache.last_harmonies_alignment,
                         self.cache.last_harmonies_approved,
-                        [0.0; 7],
-                        MoralFreeEnergy::default(),
+                        self.cache.last_harmony_coordinates,
+                        self.cache.last_moral_free_energy.clone(),
                     )
                 }
             } else {
@@ -439,10 +443,11 @@ impl EthicsEngine {
 
                 // Feed topology back into harmonies integrator weights
                 if let Some(ref mut integrator) = self.harmonies_integrator {
-                    integrator.apply_topology_feedback(
+                    integrator.apply_topology_feedback_with_kl(
                         &assessment.harmony_variance,
                         assessment.dominant_harmony_idx,
                         assessment.completeness,
+                        assessment.moral_free_energy.kl_divergence,
                     );
                 }
 
@@ -589,6 +594,16 @@ impl EthicsEngine {
     /// Access the moral topology analyser.
     pub fn moral_topology(&self) -> &MoralTopology {
         &self.moral_topology
+    }
+
+    /// Cached harmony coordinates from last harmonies evaluation.
+    pub fn last_harmony_coordinates(&self) -> &[f64; 7] {
+        &self.cache.last_harmony_coordinates
+    }
+
+    /// Cached moral free energy from last harmonies evaluation.
+    pub fn last_moral_free_energy(&self) -> &MoralFreeEnergy {
+        &self.cache.last_moral_free_energy
     }
 }
 

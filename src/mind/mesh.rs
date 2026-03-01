@@ -72,6 +72,7 @@ impl ContinuousMind {
             peer_count,
             avg_phi,
             health_score,
+            moral_topology: None,
         }
     }
 
