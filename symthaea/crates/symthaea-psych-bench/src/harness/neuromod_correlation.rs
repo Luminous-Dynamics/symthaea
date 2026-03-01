@@ -238,6 +238,12 @@ mod tests {
                 cycle_time_us: 1000 + (i as u64 * 50),
                 learning_occurred: i % 5 == 0,
                 reward: 0.0,
+                oxytocin: 0.3,
+                moral_score: 0.0,
+                bath_entropy: 0.5,
+                allostatic_load: 0.1,
+                consciousness_mod: 1.0,
+                social_coherence: 1.0,
             })
             .collect()
     }

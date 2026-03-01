@@ -1440,4 +1440,219 @@ mod tests {
             "Should work even when episodes have no bath state"
         );
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 6: Mock TrainableNetwork & Replay Integration Tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// A lightweight mock for testing replay methods without heavy CfCNetwork.
+    struct MockTrainableNetwork {
+        train_calls: usize,
+        should_fail: bool,
+        last_lr: f32,
+    }
+
+    impl MockTrainableNetwork {
+        fn new() -> Self {
+            Self {
+                train_calls: 0,
+                should_fail: false,
+                last_lr: 0.0,
+            }
+        }
+
+        fn failing() -> Self {
+            Self {
+                train_calls: 0,
+                should_fail: true,
+                last_lr: 0.0,
+            }
+        }
+    }
+
+    impl crate::TrainableNetwork for MockTrainableNetwork {
+        fn train_step(
+            &mut self,
+            _input: &ndarray::Array1<f32>,
+            _target: &ndarray::Array1<f32>,
+            _dt: f32,
+            learning_rate: f32,
+        ) -> anyhow::Result<f32> {
+            self.train_calls += 1;
+            self.last_lr = learning_rate;
+            if self.should_fail {
+                anyhow::bail!("mock training failure")
+            } else {
+                Ok(0.01)
+            }
+        }
+    }
+
+    // ── 1A: Mock TrainableNetwork tests ──
+
+    #[test]
+    fn test_mock_trainable_basic() {
+        let mut net = MockTrainableNetwork::new();
+        let input = ndarray::Array1::zeros(128);
+        let target = ndarray::Array1::ones(128);
+        let loss = net.train_step(&input, &target, 0.02, 0.001).unwrap();
+        assert!((loss - 0.01).abs() < 1e-6, "Mock should return stable 0.01 loss");
+        assert_eq!(net.train_calls, 1);
+    }
+
+    #[test]
+    fn test_mock_trainable_call_count() {
+        let mut net = MockTrainableNetwork::new();
+        let input = ndarray::Array1::zeros(64);
+        let target = ndarray::Array1::ones(64);
+        for _ in 0..10 {
+            let _ = net.train_step(&input, &target, 0.02, 0.001);
+        }
+        assert_eq!(net.train_calls, 10, "Should track all invocations");
+    }
+
+    #[test]
+    fn test_mock_trainable_failure_mode() {
+        let mut net = MockTrainableNetwork::failing();
+        let input = ndarray::Array1::zeros(64);
+        let target = ndarray::Array1::ones(64);
+        let result = net.train_step(&input, &target, 0.02, 0.001);
+        assert!(result.is_err(), "Failing mock should return Err");
+        assert_eq!(net.train_calls, 1, "Call count still incremented on failure");
+    }
+
+    #[test]
+    fn test_mock_trainable_zero_lr() {
+        let mut net = MockTrainableNetwork::new();
+        let input = ndarray::Array1::zeros(64);
+        let target = ndarray::Array1::ones(64);
+        let loss = net.train_step(&input, &target, 0.02, 0.0).unwrap();
+        assert!((loss - 0.01).abs() < 1e-6, "Mock returns loss even with lr=0");
+        assert_eq!(net.last_lr, 0.0);
+        assert_eq!(net.train_calls, 1);
+    }
+
+    // ── 1B: Episodic Replay Integration Tests ──
+
+    fn replay_config_immediate() -> EpisodicReplayConfig {
+        EpisodicReplayConfig {
+            capacity: 100,
+            psi_threshold: 0.0,
+            replay_interval: 1,
+            batch_size: 8,
+            min_episodes_for_replay: 1,
+            psi_weighted_sampling: false,
+            ..EpisodicReplayConfig::default()
+        }
+    }
+
+    #[test]
+    fn test_replay_training_step_single() {
+        let mut memory = EpisodicMemory::new(replay_config_immediate());
+        let mut net = MockTrainableNetwork::new();
+
+        let ep = make_test_episode(0.8, 1);
+        memory.store_if_significant(ep.clone());
+
+        let loss = memory.replay_training_step(&mut net, &ep, 0.01, 0.02);
+        assert!(loss.is_finite(), "Loss should be finite");
+        assert_eq!(net.train_calls, 1, "Network train_step should be called once");
+        assert!(net.last_lr > 0.0, "LR should be positive");
+    }
+
+    #[test]
+    fn test_replay_training_step_phi_weighted_lr() {
+        let mut memory = EpisodicMemory::new(replay_config_immediate());
+        let mut net = MockTrainableNetwork::new();
+
+        // High-DA episode should get higher replay LR
+        let mut ep_high_da = make_test_episode(0.8, 1);
+        ep_high_da.dopamine_at_encoding = Some(0.9);
+
+        let mut ep_low_da = make_test_episode(0.8, 2);
+        ep_low_da.dopamine_at_encoding = Some(0.1);
+
+        memory.replay_training_step(&mut net, &ep_high_da, 0.01, 0.02);
+        let lr_high = net.last_lr;
+
+        memory.replay_training_step(&mut net, &ep_low_da, 0.01, 0.02);
+        let lr_low = net.last_lr;
+
+        assert!(
+            lr_high > lr_low,
+            "High-DA episode should produce higher replay LR: {lr_high} vs {lr_low}"
+        );
+    }
+
+    #[test]
+    fn test_replay_session_multiple() {
+        let config = EpisodicReplayConfig {
+            batch_size: 5,
+            ..replay_config_immediate()
+        };
+        let mut memory = EpisodicMemory::new(config);
+        let mut net = MockTrainableNetwork::new();
+
+        // Store 10 episodes
+        for i in 0..10 {
+            let ep = make_test_episode(0.5 + (i as f64 * 0.05), i as u64);
+            memory.store_if_significant(ep);
+        }
+
+        let result = memory.replay_session(&mut net, 0.01);
+        assert!(!result.skipped, "Session should not be skipped");
+        assert_eq!(result.episodes_replayed, 5, "Should replay batch_size episodes");
+        assert_eq!(net.train_calls, 5, "Network should be trained 5 times");
+        assert!(result.average_loss.is_finite());
+        assert!(result.average_psi > 0.0);
+    }
+
+    #[test]
+    fn test_replay_empty_buffer() {
+        let mut memory = EpisodicMemory::new(replay_config_immediate());
+        let mut net = MockTrainableNetwork::new();
+
+        // Force should_replay to true
+        memory.current_cycle = 200;
+        memory.cycles_since_replay = 200;
+
+        let result = memory.replay_session(&mut net, 0.01);
+        assert!(result.skipped, "Empty buffer should skip");
+        assert_eq!(result.episodes_replayed, 0);
+        assert_eq!(net.train_calls, 0, "No training on empty buffer");
+    }
+
+    #[test]
+    fn test_replay_respects_capacity() {
+        let config = EpisodicReplayConfig {
+            capacity: 5,
+            psi_threshold: 0.0,
+            replay_interval: 1,
+            batch_size: 3,
+            min_episodes_for_replay: 1,
+            psi_weighted_sampling: false,
+            ..EpisodicReplayConfig::default()
+        };
+        let mut memory = EpisodicMemory::new(config);
+
+        // Store well beyond capacity
+        for i in 0..20 {
+            let ep = make_test_episode(0.3 + (i as f64 * 0.03), i as u64);
+            memory.store_if_significant(ep);
+        }
+
+        let stats = memory.stats();
+        assert!(stats.total_stored == 20, "All 20 should be counted as stored");
+        assert!(
+            stats.total_evicted > 0,
+            "Some should have been evicted: {}",
+            stats.total_evicted
+        );
+
+        // Replay should still work on remaining episodes
+        let mut net = MockTrainableNetwork::new();
+        let result = memory.replay_session(&mut net, 0.01);
+        assert!(!result.skipped);
+        assert!(result.episodes_replayed > 0);
+    }
 }

@@ -14,17 +14,21 @@
 //! - **DoseResponse** — Graded dose sweeps verify monotonic behavioral output (Clark 1937)
 //! - **ToleranceWithdrawal** — Tolerance/withdrawal curves under sustained injection (Koob 2001)
 //! - **AntagonistProfiles** — Named antagonist methods + behavioral validation (Stahl 2013)
+//! - **MultiTransmitterSynergy** — Paired transmitter interaction validation (Doya 2002)
 
 pub mod allostatic_stress;
 pub mod antagonist_profiles;
 pub mod attention_network;
 pub mod behavioral_knockout;
+pub mod consciousness_feedback;
 pub mod consciousness_pharmacology;
 pub mod dose_response;
 pub mod injection_challenge;
 #[cfg(feature = "symthaea-backend")]
 pub mod live_loop_ablation;
 pub mod mood_induction;
+pub mod moral_oxytocin;
+pub mod multi_transmitter_synergy;
 pub mod pharmacological_ablation;
 pub mod pharmacological_challenge;
 pub mod reward_learning;
@@ -33,6 +37,7 @@ pub mod yerkes_dodson;
 
 pub use allostatic_stress::AllostaticStressBenchmark;
 pub use antagonist_profiles::AntagonistProfilesBenchmark;
+pub use consciousness_feedback::ConsciousnessFeedbackBenchmark;
 pub use attention_network::AttentionNetworkBenchmark;
 pub use behavioral_knockout::BehavioralKnockoutBenchmark;
 pub use consciousness_pharmacology::ConsciousnessPharmacologyBenchmark;
@@ -41,6 +46,8 @@ pub use injection_challenge::InjectionChallengeBenchmark;
 #[cfg(feature = "symthaea-backend")]
 pub use live_loop_ablation::LiveLoopAblationBenchmark;
 pub use mood_induction::MoodInductionBenchmark;
+pub use moral_oxytocin::MoralOxytocinBenchmark;
+pub use multi_transmitter_synergy::MultiTransmitterSynergyBenchmark;
 pub use pharmacological_ablation::PharmacologicalAblationBenchmark;
 pub use pharmacological_challenge::PharmacologicalChallengeBenchmark;
 pub use reward_learning::RewardLearningBenchmark;

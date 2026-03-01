@@ -260,8 +260,8 @@ fn test_cycle_metadata_populated() {
     assert!(!result.metadata.reasoning_gate_blocked); // No reasoning engine in default features
     assert!(result.metadata.reasoning_confidence >= 0.0);
     assert!(result.metadata.reasoning_plan_confidence >= 0.0);
-    assert_eq!(result.metadata.meta_cognitive_accuracy, 0.0); // Not enabled
-    assert_eq!(result.metadata.meta_cognitive_depth, 0); // Not enabled
+    assert_eq!(result.metadata.quality.meta_cognitive_accuracy, 0.0); // Not enabled
+    assert_eq!(result.metadata.quality.meta_cognitive_depth, 0); // Not enabled
 }
 
 #[test]
@@ -368,10 +368,10 @@ fn test_cycle_with_meta_cognition() {
 
     let result = service.cycle("meta check");
     // Meta-cognition accuracy should be between 0 and 1
-    assert!(result.metadata.meta_cognitive_accuracy >= 0.0);
-    assert!(result.metadata.meta_cognitive_accuracy <= 1.0);
+    assert!(result.metadata.quality.meta_cognitive_accuracy >= 0.0);
+    assert!(result.metadata.quality.meta_cognitive_accuracy <= 1.0);
     // Depth should be a valid value (usize is always >= 0)
-    let _ = result.metadata.meta_cognitive_depth;
+    let _ = result.metadata.quality.meta_cognitive_depth;
 }
 
 #[test]
@@ -407,8 +407,8 @@ fn test_cycle_with_attention_schema() {
 
     let result = service.cycle("attention check");
     // Attention schema focus should be valid
-    assert!(result.metadata.attention_schema_focus >= 0.0);
-    assert!(result.metadata.attention_schema_focus <= 1.0);
+    assert!(result.metadata.attention.attention_schema_focus >= 0.0);
+    assert!(result.metadata.attention.attention_schema_focus <= 1.0);
 }
 
 #[test]
@@ -425,7 +425,7 @@ fn test_cycle_with_gwt() {
 
     let result = service.cycle("gwt check");
     // Verify gwt_broadcast is accessible without panicking
-    let _broadcast = result.metadata.gwt_broadcast;
+    let _broadcast = result.metadata.attention.gwt_broadcast;
 }
 
 #[test]
@@ -601,9 +601,9 @@ fn test_resonator_memory_disabled_by_default() {
     // When disabled, resonator metadata should be zero after cycling
     let mut service = CognitiveLoopService::new(config).unwrap();
     let result = service.cycle("test input");
-    assert_eq!(result.metadata.resonator_codebook_size, 0);
-    assert_eq!(result.metadata.resonator_episodes, 0);
-    assert_eq!(result.metadata.resonator_factorization_iters, 0);
+    assert_eq!(result.metadata.memory.resonator_codebook_size, 0);
+    assert_eq!(result.metadata.memory.resonator_episodes, 0);
+    assert_eq!(result.metadata.memory.resonator_factorization_iters, 0);
 }
 
 #[test]
@@ -615,8 +615,8 @@ fn test_resonator_memory_initializes_with_codebooks() {
 
     // First cycle — resonator initializes; episode may be stored if pred_error > 0.1
     let result = service.cycle("first experience in consciousness");
-    assert_eq!(result.metadata.resonator_codebook_size, 8); // 8 proto-symbols
-    assert!(result.metadata.resonator_episodes <= 1); // 0 or 1 depending on pred_error
+    assert_eq!(result.metadata.memory.resonator_codebook_size, 8); // 8 proto-symbols
+    assert!(result.metadata.memory.resonator_episodes <= 1); // 0 or 1 depending on pred_error
 }
 
 #[test]
@@ -641,7 +641,7 @@ fn test_resonator_memory_stores_episodes() {
     let result = service.cycle("final check on consciousness state");
     // Should have stored at least some episodes (exact count depends on pred_error)
     // The key assertion: no panic occurred during encoding/storage
-    assert!(result.metadata.resonator_codebook_size >= 8); // at least proto-symbols
+    assert!(result.metadata.memory.resonator_codebook_size >= 8); // at least proto-symbols
 }
 
 #[test]
@@ -663,9 +663,9 @@ fn test_resonator_codebook_grows_on_novel_patterns() {
     // Codebook should have grown beyond initial proto-symbols
     // (exact growth depends on novelty threshold, but some growth expected)
     assert!(
-        result.metadata.resonator_codebook_size >= initial_size,
+        result.metadata.memory.resonator_codebook_size >= initial_size,
         "Codebook should be at least initial size, got {}",
-        result.metadata.resonator_codebook_size,
+        result.metadata.memory.resonator_codebook_size,
     );
 }
 
@@ -679,9 +679,9 @@ fn test_resonator_recall_no_panic_on_cold_start() {
     // First cycle with empty resonator — recall should gracefully skip
     let result = service.cycle("cold start input with no prior episodes");
     assert!(result.prediction_error.is_finite());
-    assert!(result.metadata.resonator_episodes <= 1); // encoding may fire on high pred_error
+    assert!(result.metadata.memory.resonator_episodes <= 1); // encoding may fire on high pred_error
                                                       // Factorization needs >= 2 episodes, so 0 on first cycle
-    assert_eq!(result.metadata.resonator_factorization_iters, 0);
+    assert_eq!(result.metadata.memory.resonator_factorization_iters, 0);
 }
 
 #[test]
@@ -694,8 +694,8 @@ fn test_resonator_metadata_reported_correctly() {
     // Run cycles and verify metadata is finite/reasonable
     for i in 0..20 {
         let result = service.cycle(&format!("varied input {}", i));
-        assert!(result.metadata.resonator_codebook_size <= 200);
-        assert!(result.metadata.resonator_episodes <= 500);
+        assert!(result.metadata.memory.resonator_codebook_size <= 200);
+        assert!(result.metadata.memory.resonator_episodes <= 500);
         // Timing should be recorded
         // (may be 0 on cycles where urgency gating skipped it)
     }
@@ -718,9 +718,131 @@ fn test_resonator_configurable_parameters() {
 
     let result = service.cycle("final");
     assert!(
-        result.metadata.resonator_codebook_size <= 12,
+        result.metadata.memory.resonator_codebook_size <= 12,
         "Codebook size {} should be <= max_symbols 12",
-        result.metadata.resonator_codebook_size,
+        result.metadata.memory.resonator_codebook_size,
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHI-DYAD INTEGRATION (2A)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_phi_dyad_computes_in_cycle() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Run enough cycles to fill ring buffers (need >= 2 HVs)
+    for i in 0..10 {
+        service.cycle(&format!("phi dyad cycle {i}"));
+    }
+
+    let result = service.cycle("final phi dyad check");
+    // relational_psi should be populated (may be 0.0 if inputs identical)
+    assert!(
+        result.metadata.relational_psi.is_finite(),
+        "relational_psi should be finite, got {}",
+        result.metadata.relational_psi
+    );
+}
+
+#[test]
+fn test_phi_dyad_stability_100_cycles() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    for i in 0..100 {
+        let result = service.cycle(&format!("stability check {i}"));
+        assert!(
+            result.metadata.relational_psi.is_finite(),
+            "relational_psi NaN/Inf at cycle {i}"
+        );
+    }
+}
+
+#[test]
+fn test_phi_dyad_in_metadata() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_primitive_consciousness = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    for _ in 0..5 {
+        service.cycle("phi dyad metadata test");
+    }
+
+    let result = service.cycle("metadata check");
+    // Serialization round-trip should preserve the field
+    let json = serde_json::to_string(&result.metadata).unwrap();
+    assert!(
+        json.contains("relational_psi"),
+        "CycleMetadata JSON should contain relational_psi"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESONANT SPEECH INTEGRATION (2B)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_response_profile_populated() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let result = service.cycle("response profile test");
+    assert!(
+        !result.metadata.response_profile.is_empty(),
+        "response_profile should not be empty"
+    );
+    let valid = ["technical", "balanced", "simplified", "empathic"];
+    assert!(
+        valid.contains(&result.metadata.response_profile.as_str()),
+        "response_profile '{}' should be one of {:?}",
+        result.metadata.response_profile,
+        valid,
+    );
+}
+
+#[test]
+fn test_response_profile_serde_roundtrip() {
+    // Default::default() produces empty string (derive Default)
+    // Serde default function produces "balanced" for omitted fields
+    // But in practice, response_profile is always set by cycle_phase_output
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let result = service.cycle("serde roundtrip test");
+
+    // Serialize and deserialize preserves the profile
+    let json = serde_json::to_string(&result.metadata).unwrap();
+    let deser: super::super::types::CycleMetadata =
+        serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        result.metadata.response_profile, deser.response_profile,
+        "response_profile should survive serde roundtrip"
+    );
+}
+
+#[test]
+fn test_response_profile_stable_across_cycles() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let valid = ["technical", "balanced", "simplified", "empathic"];
+    for i in 0..20 {
+        let result = service.cycle(&format!("stability profile {i}"));
+        assert!(
+            valid.contains(&result.metadata.response_profile.as_str()),
+            "Invalid response_profile '{}' at cycle {i}",
+            result.metadata.response_profile,
+        );
+    }
+}
+
+#[test]
+fn test_response_profile_in_json() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let result = service.cycle("json profile test");
+    let json = serde_json::to_string(&result.metadata).unwrap();
+    assert!(
+        json.contains("response_profile"),
+        "CycleMetadata JSON should contain response_profile"
     );
 }
 

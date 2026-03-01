@@ -30,6 +30,10 @@ impl CognitiveLoopService {
         let selected_strategy_str = perception.selected_strategy.as_str();
 
         let _t = Instant::now();
+        let moral_anomaly_report = {
+            let summary = self.ethics_engine.moral_topology().last_summary().clone();
+            self.ethics_engine.moral_topology().detect_anomalies(&summary)
+        };
         let mut metadata = super::CycleMetadata {
             surprise_triggered: perception.surprise_triggered,
             prefrontal_veto: feedback.prefrontal_veto,
@@ -113,8 +117,16 @@ impl CognitiveLoopService {
                 codebook_utilization_rate: feedback.codebook_utilization_rate,
                 surprise_replay_batch_size: feedback.surprise_replay_batch_size,
             },
-            predictive_free_energy: feedback.predictive_free_energy,
-            predictive_phi_modulation: feedback.predictive_psi_modulation,
+            fep: super::FepTelemetry {
+                fep_action: dynamics.fep_action_idx,
+                fep_pragmatic_value: dynamics.fep_pragmatic_value,
+                fep_accuracy: dynamics.fep_accuracy,
+                fep_complexity: dynamics.fep_complexity,
+                fep_surprise: dynamics.fep_surprise,
+                fep_td_error: dynamics.fep_td_error,
+                predictive_free_energy: feedback.predictive_free_energy,
+                predictive_phi_modulation: feedback.predictive_psi_modulation,
+            },
             cross_modal_binding_strength: feedback.cross_modal_binding_strength,
             cross_modal_psi: feedback.cross_modal_psi,
             affective_valence: feedback.affective_valence,
@@ -134,21 +146,52 @@ impl CognitiveLoopService {
             causal_codebook_entries: feedback.causal_codebook_entries_len,
             compositionality_total: feedback.compositionality_total,
             composition_rule_applied: feedback.composition_rule_applied.clone(),
-            harmonies_alignment: feedback.harmonies_alignment,
-            harmonies_approved: feedback.harmonies_approved,
-            empathic_compassion: feedback.empathic_compassion,
-            empathic_tone_adj: feedback.empathic_tone_adj,
+            harmonics: super::HarmonicMetrics {
+                harmonies_alignment: feedback.harmonies_alignment,
+                harmonies_approved: feedback.harmonies_approved,
+                harmonic_field_coherence: feedback.harmonic_field_coherence,
+                harmonic_love_resonance: feedback.harmonic_love_resonance,
+                harmonic_interferences: feedback.harmonic_interferences,
+                harmony_coordinates: *self.ethics_engine.last_harmony_coordinates(),
+                moral_scenario_distribution: self.ethics_engine.last_moral_free_energy().scenario_distribution,
+                moral_prior_distribution: self.ethics_engine.last_moral_free_energy().prior_distribution,
+                moral_kl_divergence: self.ethics_engine.last_moral_free_energy().kl_divergence,
+                moral_entropy: self.ethics_engine.last_moral_free_energy().entropy,
+                moral_surprise: self.ethics_engine.last_moral_free_energy().surprise,
+                dominant_harmonic: dynamics.dominant_harmonic.clone(),
+                guiding_question: dynamics.guiding_question.clone(),
+                guiding_priority_category: dynamics.guiding_priority_category.clone(),
+            },
+            ethics: super::EthicalTelemetry {
+                moral_score: perception.moral_score,
+                moral_steering_category: dynamics.moral_steering_category.clone(),
+                value_evaluator_score: feedback.value_evaluator_score,
+                value_evaluator_decision: feedback.value_evaluator_decision.clone(),
+                value_feedback_trend: value_trend,
+                value_gate_factor: feedback.value_gate_factor,
+                soul_alignment: perception.soul_alignment,
+                empathic_compassion: feedback.empathic_compassion,
+                empathic_tone_adj: feedback.empathic_tone_adj,
+                empathic_speech_rate_mod: feedback.empathic_speech_rate_mod,
+                moral_topo_beta_0: self.ethics_engine.moral_topology().last_summary().beta_0,
+                moral_topo_beta_1: self.ethics_engine.moral_topology().last_summary().beta_1,
+                moral_topo_beta_2: self.ethics_engine.moral_topology().last_summary().beta_2,
+                moral_topo_unity: self.ethics_engine.moral_topology().last_summary().unity,
+                moral_topo_completeness: self.ethics_engine.moral_topology().last_summary().completeness,
+                moral_topo_circularity: self.ethics_engine.moral_topology().last_summary().circularity,
+                moral_topo_free_energy: self.ethics_engine.moral_topology().last_summary().moral_free_energy,
+                moral_topo_dominant_harmony: self.ethics_engine.moral_topology().last_summary().dominant_harmony,
+                moral_topo_scenario_count: self.ethics_engine.moral_topology().last_summary().scenario_count,
+                moral_anomaly_score: moral_anomaly_report.anomaly_score,
+                moral_value_inversion: moral_anomaly_report.value_inversion,
+                moral_free_energy_spike: moral_anomaly_report.free_energy_spike,
+            },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
-            value_evaluator_score: feedback.value_evaluator_score,
-            value_evaluator_decision: feedback.value_evaluator_decision.clone(),
             consciousness_profile_composite: feedback.consciousness_profile_composite,
             synergy_enhanced_composite: feedback.synergy_enhanced_composite,
             emergent_properties_count: feedback.emergent_properties_count,
             reasoning_context: feedback.reasoning_context.clone(),
             context_phi_weight: feedback.context_phi_weight,
-            harmonic_field_coherence: feedback.harmonic_field_coherence,
-            harmonic_love_resonance: feedback.harmonic_love_resonance,
-            harmonic_interferences: feedback.harmonic_interferences,
             reasoning_chain_confidence: feedback.reasoning_chain_confidence,
             reasoning_chain_depth: feedback.reasoning_chain_depth,
             causal_relations_count: feedback.causal_relations_count,
@@ -182,7 +225,6 @@ impl CognitiveLoopService {
             safety_blocked: false,
             safety_category: None,
             negation_polarity: perception.negation_detected,
-            moral_score: perception.moral_score,
             selected_strategy: selected_strategy_str.into(),
             actual_effective_lr: if dynamics.learning_occurred {
                 dynamics.effective_lr
@@ -190,13 +232,10 @@ impl CognitiveLoopService {
                 0.0
             },
             cycle_reward: dynamics.cycle_reward,
-            fep_action: dynamics.fep_action_idx,
-            value_feedback_trend: value_trend,
             support_triage_count: feedback.support_triage_count,
             support_alert_fired: feedback.support_alert_fired,
             support_federation_graduated: feedback.support_federation_graduated,
             support_efe: feedback.support_efe,
-            soul_alignment: perception.soul_alignment,
             sigma: feedback.sigma,
             spectral_mip_phi: feedback.spectral_mip_phi,
             hierarchical_mip_phi: self.carryover.consciousness.last_hierarchical_mip_phi,
@@ -212,25 +251,16 @@ impl CognitiveLoopService {
             },
             circadian_phase: circadian_phase_str.into(),
             circadian_plasticity: self.biorhythm.plasticity_mod as f32,
-            guiding_question: dynamics.guiding_question.clone(),
-            dominant_harmonic: dynamics.dominant_harmonic.clone(),
-            fep_pragmatic_value: dynamics.fep_pragmatic_value,
-            fep_accuracy: dynamics.fep_accuracy,
-            fep_complexity: dynamics.fep_complexity,
-            fep_surprise: dynamics.fep_surprise,
-            fep_td_error: dynamics.fep_td_error,
             cross_module_agreement: feedback.cross_module_agreement,
             thalamic_depth_score,
             epistemic_gate_gated: !feedback.epistemic_gate_approved,
             causal_attention_edges: dynamics.causal_attention_edges,
             mcts_plan_effectiveness: dynamics.mcts_plan_effectiveness,
-            moral_steering_category: dynamics.moral_steering_category.clone(),
             prediction_coherence: dynamics.prediction_coherence,
             valence_homeostasis_pull: dynamics.valence_homeostasis_pull,
             arousal_homeostasis_pull: dynamics.arousal_homeostasis_pull,
             arousal_recovery_active: dynamics.arousal_recovery_active,
             arousal_recovery_tau_factor: dynamics.arousal_recovery_tau_factor,
-            guiding_priority_category: dynamics.guiding_priority_category.clone(),
             cycle_duration_us: cycle_start.elapsed().as_micros() as u64,
             school_predicted_phi_gain: dynamics.school_predicted_phi_gain,
             epistemic_coherence_gated: feedback.epistemic_coherence_gated,
@@ -244,8 +274,6 @@ impl CognitiveLoopService {
             mode_stability_counter: self.carryover.urgency.mode_stability_counter,
             predicted_urgency: perception.predicted_urgency.into(),
             context_phi_applied: feedback.context_phi_applied,
-            empathic_speech_rate_mod: feedback.empathic_speech_rate_mod,
-            value_gate_factor: feedback.value_gate_factor,
             evolution_confidence_delta: feedback.evolution_confidence_delta,
             homeostasis_pull_strength: dynamics.homeostasis_pull_strength,
             prediction_coherence_urgency_bias: perception.prediction_coherence_urgency_bias,
@@ -276,25 +304,8 @@ impl CognitiveLoopService {
             liquid_mamba_lr: self.stats.last_liquid_mamba_lr,
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
-            // ── Moral topology telemetry ──
-            moral_topo_beta_0: self.ethics_engine.moral_topology().last_summary().beta_0,
-            moral_topo_beta_1: self.ethics_engine.moral_topology().last_summary().beta_1,
-            moral_topo_beta_2: self.ethics_engine.moral_topology().last_summary().beta_2,
-            moral_topo_unity: self.ethics_engine.moral_topology().last_summary().unity,
-            moral_topo_completeness: self.ethics_engine.moral_topology().last_summary().completeness,
-            moral_topo_circularity: self.ethics_engine.moral_topology().last_summary().circularity,
-            moral_topo_free_energy: self.ethics_engine.moral_topology().last_summary().moral_free_energy,
-            moral_topo_dominant_harmony: self.ethics_engine.moral_topology().last_summary().dominant_harmony,
-            moral_topo_scenario_count: self.ethics_engine.moral_topology().last_summary().scenario_count,
-            // Moral geometry: cached harmony projection
-            harmony_coordinates: *self.ethics_engine.last_harmony_coordinates(),
-            moral_scenario_distribution: self.ethics_engine.last_moral_free_energy().scenario_distribution,
-            moral_prior_distribution: self.ethics_engine.last_moral_free_energy().prior_distribution,
-            moral_kl_divergence: self.ethics_engine.last_moral_free_energy().kl_divergence,
-            moral_entropy: self.ethics_engine.last_moral_free_energy().entropy,
-            moral_surprise: self.ethics_engine.last_moral_free_energy().surprise,
             // Partnership / Phi-Dyad
-            relational_psi: self.relational_psi,
+            relational_psi: self.social.relational_psi,
             // Resonant Speech: response profile from cognitive load.
             // Combine allostatic load (neuromod bath) with consciousness level.
             response_profile: {
@@ -303,16 +314,13 @@ impl CognitiveLoopService {
                 let psi = feedback.consciousness_level;
                 let load_level = allostatic * 0.6 + (1.0 - psi) * 0.4;
                 let load = CognitiveLoad::from_level(load_level);
-                let profile = load.response_profile();
-                if profile.use_technical_terms {
-                    "technical".to_string()
-                } else if profile.include_explanations {
-                    "balanced".to_string()
-                } else if profile.use_examples {
-                    "simplified".to_string()
-                } else {
-                    "empathic".to_string()
+                match load {
+                    CognitiveLoad::Low => "technical",
+                    CognitiveLoad::Medium => "balanced",
+                    CognitiveLoad::High => "simplified",
+                    CognitiveLoad::Overloaded => "empathic",
                 }
+                .to_string()
             },
             ..Default::default()
         };
@@ -389,6 +397,14 @@ impl CognitiveLoopService {
             metrics.set_coherence(dynamics.coherence as f64);
             metrics.set_consciousness_level(metadata.consciousness_level);
             metrics.track_execution(metadata.safety_blocked, false);
+
+            // Wire module timings to MetricsRegistry for Prometheus exposure
+            #[cfg(feature = "api_module")]
+            crate::api::metrics::update_timing_metrics(
+                crate::api::metrics::global(),
+                &metadata.module_timings_us,
+                metadata.cycle_duration_us,
+            );
         }
 
         #[cfg(feature = "identity")]
