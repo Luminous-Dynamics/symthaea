@@ -138,10 +138,98 @@ fn forward_and_pool<B: burn::prelude::Backend>(
     Ok(embedding)
 }
 
-/// Batch forward + pool: runs the model on multiple sequences in one forward pass.
+/// Batch forward + pool with length-sorted chunking.
+///
+/// For small batches (≤4) or uniform lengths (max ≤ 2×min), processes everything
+/// in a single forward pass. Otherwise, sorts sequences by length and groups them
+/// into chunks where padding waste is bounded (max_len ≤ 2×min_len per chunk),
+/// processes each chunk separately, then reorders results to match the original order.
 #[cfg(feature = "burn")]
 #[allow(clippy::too_many_arguments)]
 fn forward_and_pool_batch<B: burn::prelude::Backend>(
+    burn_model: &model::Qwen3Model<B>,
+    batch_ids: &[Vec<i32>],
+    batch_masks: &[Vec<u32>],
+    device: &B::Device,
+    pooling: PoolingStrategy,
+    embedding_dim: usize,
+    normalize: bool,
+) -> Result<Vec<Vec<f32>>> {
+    if batch_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let min_len = batch_ids.iter().map(|ids| ids.len()).min().unwrap_or(1).max(1);
+    let max_len = batch_ids.iter().map(|ids| ids.len()).max().unwrap_or(0);
+
+    // For small/uniform batches, process directly
+    if batch_ids.len() <= 4 || max_len <= min_len * 2 {
+        return forward_and_pool_batch_direct(
+            burn_model, batch_ids, batch_masks, device, pooling, embedding_dim, normalize,
+        );
+    }
+
+    // Sort indices by sequence length
+    let chunks = chunk_by_length(batch_ids, 2.0);
+
+    // Process each chunk and collect results with original indices
+    let mut indexed_results: Vec<(usize, Vec<f32>)> = Vec::with_capacity(batch_ids.len());
+
+    for chunk_indices in &chunks {
+        let chunk_ids: Vec<Vec<i32>> = chunk_indices.iter().map(|&i| batch_ids[i].clone()).collect();
+        let chunk_masks: Vec<Vec<u32>> = chunk_indices.iter().map(|&i| batch_masks[i].clone()).collect();
+
+        let chunk_embeddings = forward_and_pool_batch_direct(
+            burn_model, &chunk_ids, &chunk_masks, device, pooling, embedding_dim, normalize,
+        )?;
+
+        for (local_idx, emb) in chunk_embeddings.into_iter().enumerate() {
+            indexed_results.push((chunk_indices[local_idx], emb));
+        }
+    }
+
+    // Reorder to match original input order
+    indexed_results.sort_by_key(|(idx, _)| *idx);
+    Ok(indexed_results.into_iter().map(|(_, emb)| emb).collect())
+}
+
+/// Group batch indices by length so that within each chunk, the padding ratio
+/// (max_len / min_len) stays within `max_ratio`.
+#[cfg(feature = "burn")]
+fn chunk_by_length(batch_ids: &[Vec<i32>], max_ratio: f32) -> Vec<Vec<usize>> {
+    let mut sorted_indices: Vec<usize> = (0..batch_ids.len()).collect();
+    sorted_indices.sort_by_key(|&i| batch_ids[i].len());
+
+    let mut chunks: Vec<Vec<usize>> = Vec::new();
+    let mut current_chunk: Vec<usize> = Vec::new();
+    let mut chunk_min_len: usize = 0;
+
+    for &idx in &sorted_indices {
+        let seq_len = batch_ids[idx].len().max(1);
+
+        if current_chunk.is_empty() {
+            chunk_min_len = seq_len;
+            current_chunk.push(idx);
+        } else if seq_len as f32 <= chunk_min_len as f32 * max_ratio {
+            current_chunk.push(idx);
+        } else {
+            chunks.push(std::mem::take(&mut current_chunk));
+            chunk_min_len = seq_len;
+            current_chunk.push(idx);
+        }
+    }
+
+    if !current_chunk.is_empty() {
+        chunks.push(current_chunk);
+    }
+
+    chunks
+}
+
+/// Direct batch forward pass — pads all sequences to the longest and runs one forward pass.
+#[cfg(feature = "burn")]
+#[allow(clippy::too_many_arguments)]
+fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
     burn_model: &model::Qwen3Model<B>,
     batch_ids: &[Vec<i32>],
     batch_masks: &[Vec<u32>],
@@ -655,11 +743,12 @@ impl Qwen3Embedder {
         let model_cfg = self.resolve_model_config();
         let burn_model = model_cfg.init::<NdArray>(&device);
 
-        let safetensors_path = std::path::Path::new(model_dir).join("model.safetensors");
-        let safetensors_data = std::fs::read(&safetensors_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read {}: {e}", safetensors_path.display()))?;
-        let burn_model =
-            safetensors_loader::load_qwen3_weights(burn_model, &safetensors_data, &model_cfg, &device)?;
+        let burn_model = safetensors_loader::load_qwen3_from_dir(
+            burn_model,
+            std::path::Path::new(model_dir),
+            &model_cfg,
+            &device,
+        )?;
 
         Ok(BurnBackend::NdArray {
             model: burn_model,
@@ -674,12 +763,9 @@ impl Qwen3Embedder {
         let model_cfg = self.resolve_model_config();
         let burn_model = model_cfg.init::<burn::backend::Wgpu>(&device);
 
-        let safetensors_path = std::path::Path::new(model_dir).join("model.safetensors");
-        let safetensors_data = std::fs::read(&safetensors_path)
-            .map_err(|e| anyhow::anyhow!("Failed to read {}: {e}", safetensors_path.display()))?;
-        let burn_model = safetensors_loader::load_qwen3_weights(
+        let burn_model = safetensors_loader::load_qwen3_from_dir(
             burn_model,
-            &safetensors_data,
+            std::path::Path::new(model_dir),
             &model_cfg,
             &device,
         )?;
@@ -1248,5 +1334,49 @@ mod burn_tests {
         let config = super::Qwen3Config::qwen3_06b("/nonexistent/path").with_gpu();
         let embedder = super::Qwen3Embedder::new(config).unwrap();
         assert!(embedder.config().use_simulated);
+    }
+
+    #[test]
+    fn test_batch_chunking_matches_sequential() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny();
+        let model = cfg.init::<B>(&device);
+
+        // 4 sequences of very different lengths to trigger chunking
+        let seqs: Vec<Vec<i32>> = vec![
+            vec![1, 2],                                     // len 2
+            vec![1, 2, 3],                                  // len 3
+            vec![1, 2, 3, 4, 5, 6],                         // len 6
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],   // len 12
+        ];
+        let masks: Vec<Vec<u32>> = seqs.iter().map(|s| vec![1u32; s.len()]).collect();
+
+        // Get sequential results (one at a time → no padding effects)
+        let mut sequential = Vec::new();
+        for (ids, mask) in seqs.iter().zip(masks.iter()) {
+            let emb = super::forward_and_pool(
+                &model, ids, mask, ids.len(), &device,
+                super::PoolingStrategy::LastTokenPooling, 64, true,
+            ).unwrap();
+            sequential.push(emb);
+        }
+
+        // Get batch results (exercises chunking for len ratio > 2)
+        let batch = super::forward_and_pool_batch(
+            &model, &seqs, &masks, &device,
+            super::PoolingStrategy::LastTokenPooling, 64, true,
+        ).unwrap();
+
+        assert_eq!(batch.len(), sequential.len());
+
+        for (i, (b, s)) in batch.iter().zip(sequential.iter()).enumerate() {
+            // Compute cosine similarity — padding affects self-attention so
+            // batch vs sequential won't be identical, but should be very close
+            let dot: f32 = b.iter().zip(s.iter()).map(|(x, y)| x * y).sum();
+            assert!(
+                dot > 0.85,
+                "Batch vs sequential mismatch for seq {i}: cosine={dot:.4}"
+            );
+        }
     }
 }

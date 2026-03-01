@@ -57,6 +57,7 @@ ndarray = { version = "0.16", features = ["rayon", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = "1.3"
+rmp-serde = "1.3"
 anyhow = "1.0"
 thiserror = "1.0"
 rand = "0.8"
@@ -310,6 +311,7 @@ ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-
 hound = { workspace = true, optional = true }
 lz4_flex = { version = "0.11", default-features = false, optional = true }
 chacha20poly1305 = { version = "0.10", optional = true }
+x25519-dalek = { version = "2.0", features = ["static_secrets"], optional = true }
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
 espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
 
@@ -331,7 +333,7 @@ eframe = { version = "0.33", optional = true }
 egui = { version = "0.33", optional = true }
 
 # IPC Protocol Enhancements
-rmp-serde = "1.3"            # MessagePack binary protocol (A1)
+rmp-serde = { workspace = true }  # MessagePack binary protocol (A1)
 
 # Syntax Highlighting (B4)
 tree-sitter-nix = { workspace = true }
@@ -382,6 +384,7 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
 mesh-encryption = ["mesh", "dep:chacha20poly1305"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
+mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek"]  # X25519 Diffie-Hellman per-peer key agreement
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
@@ -464,6 +467,7 @@ all_benchmarks = ["benchmarks", "physics"]              # All benchmarking featu
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.4"
+serial_test = "3.2"
 tempfile = "3.8"  # For perception tests
 
 # Binaries
@@ -631,14 +635,6 @@ name = "conscious_nixos_assistant"
 required-features = ["unstable-examples"]
 
 [[example]]
-name = "primitive_learning_cognitive"
-required-features = ["benchmarks"]
-
-[[example]]
-name = "prediction_gate_experiment"
-required-features = ["benchmarks"]
-
-[[example]]
 name = "quick_primitives"
 required-features = ["benchmarks"]
 
@@ -724,17 +720,9 @@ name = "symthaea_awakens_demo"
 required-features = ["unstable-examples"]
 
 [[example]]
-name = "neuro_autopoietic_demo"
-
-[[example]]
 name = "cfc_lookahead_stress_test"
 # Requires pub(crate) CfCNetwork to be exported — disabled until API stabilizes
 required-features = ["unstable-examples"]
-
-[[example]]
-name = "causal_cantor_test"
-# Requires unimplemented TuebingenAdapter + external dataset — also needs benchmarks
-required-features = ["benchmarks"]
 
 [[example]]
 name = "pattern_differentiation"
@@ -929,13 +917,13 @@ required-features = ["embeddings"]
 name = "robustness_adversarial"
 required-features = ["embeddings"]
 
+[[example]]
+name = "embeddings_benchmark"
+required-features = ["embeddings"]
+
 # Voice examples (require voice-tts feature)
 [[example]]
 name = "hdc_coarticulation_benchmark"
-required-features = ["voice-tts"]
-
-[[example]]
-name = "synesthesia_live"
 required-features = ["voice-tts"]
 
 [[example]]
@@ -1017,6 +1005,10 @@ required-features = ["water-prediction"]
 [[example]]
 name = "benchmark_genesis_multiscale"
 required-features = ["physics-unification"]
+
+[[example]]
+name = "benchmark_genesis_temporal_unified"
+required-features = ["genesis-missions"]
 
 [[example]]
 name = "six_watt_benchmark"
