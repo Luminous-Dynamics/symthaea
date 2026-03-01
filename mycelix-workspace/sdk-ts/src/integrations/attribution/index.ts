@@ -130,6 +130,7 @@ export interface PaginatedResult<T> {
   total: number;
   offset: number;
   limit: number;
+  has_more: boolean;
 }
 
 export interface TopDependency {
@@ -183,7 +184,7 @@ export interface RenewAttestationInput {
 }
 
 export interface UsageSignal {
-  type: 'UsageRecorded' | 'AttestationSubmitted' | 'AttestationVerified' | 'AttestationRevoked';
+  type: 'UsageRecorded' | 'AttestationSubmitted' | 'AttestationVerified' | 'AttestationRevoked' | 'AttestationRenewed';
   payload: {
     dependency_id: string;
     user_did?: string;
@@ -396,6 +397,15 @@ export class AttributionClient {
     }) as Promise<number>;
   }
 
+  async getAttestationCount(): Promise<number> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'usage',
+      fn_name: 'get_attestation_count',
+      payload: null,
+    }) as Promise<number>;
+  }
+
   async submitUsageAttestation(att: UsageAttestation): Promise<Record<string, unknown>> {
     return this.client.callZome({
       role_name: ATTRIBUTION_ROLE,
@@ -507,6 +517,15 @@ export class AttributionClient {
       fn_name: 'get_stewardship_leaderboard',
       payload: limit,
     }) as Promise<LeaderboardEntry[]>;
+  }
+
+  async getPledgeCount(): Promise<number> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'reciprocity',
+      fn_name: 'get_pledge_count',
+      payload: null,
+    }) as Promise<number>;
   }
 
   async getUnderSupportedDependencies(limit: number): Promise<LeaderboardEntry[]> {
