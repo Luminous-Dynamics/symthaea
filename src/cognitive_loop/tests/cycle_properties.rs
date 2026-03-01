@@ -161,7 +161,7 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite_f32(m.body_arousal, "body_arousal");
         assert_finite(m.consciousness_level, "consciousness_level");
         assert_finite_f32(m.predictive_self_safety, "predictive_self_safety");
-        assert_finite_f32(m.attention_schema_focus, "attention_schema_focus");
+        assert_finite_f32(m.attention.attention_schema_focus, "attention_schema_focus");
         assert_finite(m.resonance_frequency, "resonance_frequency");
         assert_finite(m.quantum_coherence_level, "quantum_coherence_level");
         assert_finite(m.temporal_coherence_score, "temporal_coherence_score");
@@ -187,7 +187,7 @@ fn test_cycle_metadata_floats_finite() {
             m.hierarchical_total_free_energy,
             "hierarchical_total_free_energy",
         );
-        assert_finite_f32(m.psi_attention_avg, "psi_attention_avg");
+        assert_finite_f32(m.attention.psi_attention_avg, "psi_attention_avg");
         assert_finite(m.primitive_psi, "primitive_psi");
         assert_finite(m.value_evaluator_score, "value_evaluator_score");
         assert_finite_f32(m.harmonies_alignment, "harmonies_alignment");
@@ -205,11 +205,11 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite_f32(m.value_cache_hit_rate, "value_cache_hit_rate");
         assert_finite(m.epistemic_quality, "epistemic_quality");
         assert_finite(m.phi_validation_correlation, "phi_validation_correlation");
-        assert_finite(m.dissipative_health, "dissipative_health");
-        assert_finite(m.dissipative_entropy_rate, "dissipative_entropy_rate");
-        assert_finite(m.epistemic_phi_eff, "epistemic_phi_eff");
-        assert_finite(m.equation_v2_consciousness, "equation_v2_consciousness");
-        assert_finite_f32(m.hierarchical_ltc_phi, "hierarchical_ltc_phi");
+        assert_finite(m.quality.dissipative_health, "dissipative_health");
+        assert_finite(m.quality.dissipative_entropy_rate, "dissipative_entropy_rate");
+        assert_finite(m.quality.epistemic_phi_eff, "epistemic_phi_eff");
+        assert_finite(m.quality.equation_v2_consciousness, "equation_v2_consciousness");
+        assert_finite_f32(m.quality.hierarchical_ltc_phi, "hierarchical_ltc_phi");
         assert_finite(m.holographic_unity, "holographic_unity");
         assert_finite(m.holographic_binding, "holographic_binding");
         assert_finite(
@@ -244,16 +244,16 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite_f32(m.value_feedback_trend, "value_feedback_trend");
         assert_finite(m.support_efe, "support_efe");
         assert_finite_f32(m.soul_alignment, "soul_alignment");
-        assert_finite_f32(m.meta_cognitive_accuracy, "meta_cognitive_accuracy");
+        assert_finite_f32(m.quality.meta_cognitive_accuracy, "meta_cognitive_accuracy");
         assert_finite_f32(m.circadian_plasticity, "circadian_plasticity");
-        assert_finite_f32(m.phi_attention_weight, "phi_attention_weight");
+        assert_finite_f32(m.attention.phi_attention_weight, "phi_attention_weight");
         assert_finite(m.fep_pragmatic_value, "fep_pragmatic_value");
         assert_finite(m.fep_accuracy, "fep_accuracy");
         assert_finite(m.fep_complexity, "fep_complexity");
         assert_finite(m.fep_surprise, "fep_surprise");
         assert_finite(m.fep_td_error, "fep_td_error");
-        assert_finite_f32(m.resonator_best_sim, "resonator_best_sim");
-        assert_finite_f32(m.codebook_diversity, "codebook_diversity");
+        assert_finite_f32(m.memory.resonator_best_sim, "resonator_best_sim");
+        assert_finite_f32(m.memory.codebook_diversity, "codebook_diversity");
         assert_finite(m.context_phi_weight, "context_phi_weight");
         assert_finite(m.empathic_compassion, "empathic_compassion");
         assert_finite(m.empathic_tone_adj, "empathic_tone_adj");

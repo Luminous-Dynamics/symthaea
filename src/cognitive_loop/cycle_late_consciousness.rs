@@ -240,6 +240,22 @@ impl CognitiveLoopService {
                     .unwrap_or((0.0, 0))
             };
 
+        // ── Moral circularity → deepen meta-cognitive recursion ──
+        // When β₁ > 0 (circular reasoning patterns detected in the moral
+        // topology), trigger additional meta-cognitive introspection.
+        if let Some(ref mut meta) = self.self_model_tier.meta_cognition {
+            let topo = self.ethics_engine.moral_topology().last_summary();
+            if topo.beta_1 > 0 {
+                meta.deepen_recursion();
+                tracing::debug!(
+                    target: "cognitive_loop::moral_topology",
+                    beta_1 = topo.beta_1,
+                    cycle = self.stats.total_cycles,
+                    "Moral circularity detected — deepening meta-cognitive recursion"
+                );
+            }
+        }
+
         module_timings.meta_cognition = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════

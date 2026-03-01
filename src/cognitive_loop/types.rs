@@ -185,6 +185,9 @@ pub(crate) struct QualityMetrics {
     /// Previous cycle's prediction confidence (for crash detection).
     /// Science: Cools et al. (2008) — rapid confidence drop triggers serotonergic dip.
     pub(crate) prev_confidence_for_crash: f32,
+    /// Last moral score from perception phase (cached for neuromod feedback).
+    /// Science: Zak (2012) — moral sentiment drives oxytocin/DA pathways.
+    pub(crate) last_moral_score: f32,
 }
 
 impl Default for QualityMetrics {
@@ -213,6 +216,7 @@ impl Default for QualityMetrics {
             last_grid_norm: 0.0,
             last_grid_complexity: 0.0,
             prev_confidence_for_crash: 0.5,
+            last_moral_score: 0.0,
         }
     }
 }
@@ -578,11 +582,9 @@ pub struct CycleMetadata {
     /// Human-readable reasoning narrative (Tier 2, best-effort)
     pub reasoning_narrative: Option<String>,
 
-    /// Meta-cognitive self-model accuracy (0.0 = uncertain, 1.0 = perfect self-knowledge)
-    pub meta_cognitive_accuracy: f32,
-
-    /// Meta-cognitive recursion depth (0 = off, 1 = basic, 2+ = recursive self-modeling)
-    pub meta_cognitive_depth: u8,
+    /// Quality diagnostics telemetry (meta-cognitive, dissipative, coherence, anomaly).
+    #[serde(flatten)]
+    pub quality: QualityDiagnostics,
 
     /// Narrative self-model's integrated information (0.0 = off/no self, >0 = active self-Φ)
     pub narrative_self_psi: f64,
@@ -606,12 +608,9 @@ pub struct CycleMetadata {
     /// 0.0 when predictive self is not enabled.
     pub predictive_self_safety: f32,
 
-    /// Attention schema focus intensity (0.0 to 1.0).
-    /// 0.0 when attention schema is not enabled.
-    pub attention_schema_focus: f32,
-
-    /// Whether a GWT broadcast occurred this cycle.
-    pub gwt_broadcast: bool,
+    /// Attention subsystem telemetry (schema, GWT, budget, memoization).
+    #[serde(flatten)]
+    pub attention: AttentionMetrics,
 
     /// Consciousness resonance dominant frequency (Hz).
     /// 0.0 when resonance is not enabled or no history.
@@ -666,14 +665,9 @@ pub struct CycleMetadata {
     /// Determines how many subsystems ran this cycle.
     pub urgency: CycleUrgency,
 
-    /// Number of insights gained from dream replay this cycle (0 = no dreaming).
-    pub dream_insights: usize,
-
-    /// Best Phi improvement discovered by dream counterfactuals (0.0 = no improvement).
-    pub dream_phi_improvement: f32,
-
-    /// Total accumulated wisdom entries from dreaming.
-    pub dream_wisdom_count: usize,
+    /// Memory-resonator subsystem telemetry (dreams, codebook, replay).
+    #[serde(flatten)]
+    pub memory: MemoryResonatorMetrics,
 
     /// Predictive processing free energy (0.0 when off).
     pub predictive_free_energy: f64,
@@ -708,9 +702,6 @@ pub struct CycleMetadata {
     /// Hierarchical total free energy (0.0 when off).
     pub hierarchical_total_free_energy: f64,
 
-    /// Rolling average of Phi observations from phi_attention (0.0 when off).
-    pub psi_attention_avg: f32,
-
     /// Phi estimate from primitive consciousness decomposition (0.0 when off).
     pub primitive_psi: f64,
 
@@ -728,8 +719,6 @@ pub struct CycleMetadata {
     pub lattice_join_concept: String,
     /// Number of causal patterns added to resonator codebook this cycle.
     pub causal_codebook_entries: usize,
-    /// Whether a continuity gap triggered demand replay this cycle.
-    pub continuity_replay_triggered: bool,
 
     // ── Session 1: Compositionality + Value Evaluator ──────────────────────
     /// Total compositions registered in the compositionality engine (0 when off).
@@ -800,21 +789,9 @@ pub struct CycleMetadata {
     /// Phi validation Pearson correlation (0.0 when not yet computed).
     pub phi_validation_correlation: f64,
 
-    // ── Session 5: Dissipative + Conflict + Equation + Hierarchical + Evolution ──
-    /// Dissipative consciousness health score (0.0–1.0, 0.0 when off).
-    pub dissipative_health: f64,
-    /// Current thermodynamic regime (e.g., "Subcritical", "Critical", "Supercritical").
-    pub dissipative_regime: String,
-    /// Dissipative entropy production rate (0.0 when off).
-    pub dissipative_entropy_rate: f64,
-    /// Φ_eff = Φ × R^γ from epistemic conflict reliability weighting (0.0 when off).
-    pub epistemic_phi_eff: f64,
+    // ── Session 5: Conflict + Evolution ──
     /// Number of inter-theory conflicts detected (0 when off).
     pub epistemic_conflict_count: usize,
-    /// Consciousness Equation v2 C(t) result (0.0 when off).
-    pub equation_v2_consciousness: f64,
-    /// Hierarchical LTC estimated Phi (0.0 when off).
-    pub hierarchical_ltc_phi: f32,
 
     // ── Session 6: Holographic + Differentiable + Affective + Pipeline + MultiModal ──
     /// Holographic consciousness unity score (0.0–1.0, 0.0 when off).
@@ -920,14 +897,6 @@ pub struct CycleMetadata {
     /// Number of scales used in hierarchical MIP (0 when not computed).
     pub hierarchical_mip_scales: usize,
 
-    /// Number of symbols in the resonator semantic codebook (0 when disabled).
-    pub resonator_codebook_size: usize,
-
-    /// Number of episodes stored in resonator memory (0 when disabled).
-    pub resonator_episodes: usize,
-
-    /// Number of iterations used in last resonator factorization (0 when not run).
-    pub resonator_factorization_iters: usize,
 
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
@@ -938,22 +907,13 @@ pub struct CycleMetadata {
     /// Circadian plasticity modifier (0.0–1.0) applied to learning rate.
     pub circadian_plasticity: f32,
 
-    /// Phi attention gate weight applied to perception (1.0 = neutral).
-    pub phi_attention_weight: f32,
-
     /// Current guiding question from wisdom system (e.g., "What don't I know?").
     pub guiding_question: String,
 
     /// Dominant harmonic mode (e.g., "Wisdom", "Play", "Coherence").
     pub dominant_harmonic: String,
 
-    // ── Phase 9: Resonator-Memory Loop + FEP Deepening ──────────────
-    /// Whether resonator recall primed working memory confidence this cycle.
-    pub resonator_wm_primed: bool,
-    /// Number of episodes reconsolidated via resonator recall this cycle.
-    pub resonator_reconsolidated: usize,
-    /// Number of high-Phi episodes promoted to resonator codebook this cycle.
-    pub resonator_promotions: usize,
+    // ── Phase 9: FEP Deepening ──────────────
     /// FEP pragmatic value for selected action (0.0 when not computed).
     pub fep_pragmatic_value: f64,
     /// FEP accuracy component (expected log likelihood, 0.0 when not computed).
@@ -965,18 +925,7 @@ pub struct CycleMetadata {
     /// FEP TD error magnitude (0.0 when not computed).
     pub fep_td_error: f64,
 
-    // ── Phase 10: Self-Regulating Resonator + FEP-Behavior Coupling ─────
-    /// Best cosine similarity from resonator recall (0.0 when no matches).
-    pub resonator_best_sim: f32,
-    /// Number of codebook entries evicted this cycle (redundancy pruning).
-    pub codebook_evictions: usize,
-    /// Codebook diversity: average pairwise cosine distance (0.0–1.0).
-    pub codebook_diversity: f32,
-
-    // ── Phase 13: Predictive Resonator + Cross-Module Coherence ──────
-    /// Resonator prediction error: cosine distance between last cycle's best match
-    /// and this cycle's compressed state (0.0 = perfect prediction, 1.0 = orthogonal).
-    pub resonator_prediction_error: f32,
+    // ── Phase 13: Cross-Module Coherence ──────
     /// Cross-module agreement score (0.0–1.0): alignment between FEP, MCTS,
     /// resonator confidence, and moral judgment.
     pub cross_module_agreement: f32,
@@ -992,16 +941,8 @@ pub struct CycleMetadata {
     pub mcts_plan_effectiveness: f32,
     /// Moral violation category that triggered specific steering (empty when none).
     pub moral_steering_category: String,
-    /// Codebook utilization rate (fraction of symbols retrieved recently, 0.0–1.0).
-    pub codebook_utilization_rate: f32,
-    /// FEP surprise-modulated replay batch size (0 when replay not triggered).
-    pub surprise_replay_batch_size: usize,
 
     // ── Phase 15: Adaptive Architecture + Emotional Homeostasis ──────
-    /// Whether attention budget was exceeded this cycle (subsystems skipped).
-    pub attention_budget_exceeded: bool,
-    /// Total cycle elapsed at budget check point (microseconds).
-    pub attention_budget_elapsed_us: u64,
     /// Multi-horizon prediction coherence (0.0 = divergent, 1.0 = identical).
     pub prediction_coherence: f32,
     /// Emotional valence homeostasis pull (amount returned toward baseline).
@@ -1012,10 +953,6 @@ pub struct CycleMetadata {
     pub arousal_recovery_active: bool,
     /// CfC tau factor from arousal recovery (1.0 = no change, <1.0 = slowdown).
     pub arousal_recovery_tau_factor: f32,
-    /// Input similarity to previous cycle (cosine, 0.0–1.0).
-    pub input_similarity: f32,
-    /// Whether input memoization was used (skipped re-encoding).
-    pub input_memoized: bool,
     /// Guiding question subsystem priority category (empty when no question active).
     pub guiding_priority_category: String,
     /// Total cycle wall-clock time in microseconds (same as CycleResult.cycle_time_us
@@ -1027,24 +964,10 @@ pub struct CycleMetadata {
     // ── Phase 16: Quality-Aware Adaptive Processing ─────────────────
     /// Whether epistemic gate confidence gated expensive modules this cycle.
     pub epistemic_coherence_gated: bool,
-    /// Unified quality score (fusion of prediction coherence + agreement + anomaly).
-    pub unified_quality_score: f32,
-    /// Whether dissipative health gate dampened learning this cycle.
-    pub dissipative_health_gated: bool,
-    /// Dissipative health gate dampening factor applied (1.0 = no dampening).
-    pub dissipative_lr_factor: f32,
     /// Phi validation correlation from most recent validation run (0.0 when not yet run).
     pub phi_validation_cached: f64,
     /// Adjusted spectral weight used in unified Psi computation.
     pub phi_spectral_weight: f32,
-    /// Coherence velocity (rate of change, negative = dropping).
-    pub coherence_velocity: f32,
-    /// Whether temporal discontinuity triggered coherence gating this cycle.
-    pub coherence_velocity_gated: bool,
-    /// Metacognitive anomaly recovery progress (0.0–1.0, 1.0 = fully recovered).
-    pub anomaly_recovery_progress: f32,
-    /// Whether anomaly recovery is actively in progress.
-    pub anomaly_recovering: bool,
 
     // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
     /// Detected error pattern (Rising/Falling/Oscillating/Spike/Stable).
@@ -1077,16 +1000,12 @@ pub struct CycleMetadata {
     pub prediction_coherence_urgency_bias: f32,
 
     // ── Phase 19: Activating Dormant Pathways ────────────────────────
-    /// Whether attention budget gating skipped expensive subsystems this cycle.
-    pub attention_budget_gated: bool,
     /// Consciousness limiting component that was boosted (empty when none).
     pub limiting_component_boosted: String,
     /// Love resonance confidence boost applied this cycle.
     pub love_resonance_boost: f32,
     /// Whether reasoning chain boosted prediction confidence this cycle.
     pub reasoning_chain_boosted: bool,
-    /// AttentionShift motor command intensity applied to attention_sensitivity.
-    pub attention_shift_applied: f32,
 
     // ── Phase 20: Signal-to-Control Synthesis ────────────────────────
     /// LR modulation from harmonic interferences (>0.5 dampens, <0.2 boosts).
@@ -1216,10 +1135,121 @@ pub struct CycleMetadata {
     pub moral_topo_unity: f64,
     /// Completeness: fraction of harmonies with non-trivial variance.
     pub moral_topo_completeness: f64,
+    /// Circularity: proportion of cycles among persistent features.
+    pub moral_topo_circularity: f64,
+    /// Moral free energy (FEP surprise on harmony manifold, 0.0 when not computed).
+    pub moral_topo_free_energy: f64,
     /// Dominant harmony axis index (0–6, maps to Harmony::all()).
     pub moral_topo_dominant_harmony: u8,
     /// Number of scenarios in the moral topology sliding window.
     pub moral_topo_scenario_count: usize,
+}
+
+/// Memory-resonator subsystem telemetry: dreams, codebook, replay.
+///
+/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
+/// the original JSON format for backwards compatibility.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MemoryResonatorMetrics {
+    /// Number of insights gained from dream replay this cycle (0 = no dreaming).
+    pub dream_insights: usize,
+    /// Best Phi improvement discovered by dream counterfactuals (0.0 = no improvement).
+    pub dream_phi_improvement: f32,
+    /// Total accumulated wisdom entries from dreaming.
+    pub dream_wisdom_count: usize,
+    /// Whether a continuity gap triggered demand replay this cycle.
+    pub continuity_replay_triggered: bool,
+    /// Number of symbols in the resonator semantic codebook (0 when disabled).
+    pub resonator_codebook_size: usize,
+    /// Number of episodes stored in resonator memory (0 when disabled).
+    pub resonator_episodes: usize,
+    /// Number of iterations used in last resonator factorization (0 when not run).
+    pub resonator_factorization_iters: usize,
+    /// Whether resonator recall primed working memory confidence this cycle.
+    pub resonator_wm_primed: bool,
+    /// Number of episodes reconsolidated via resonator recall this cycle.
+    pub resonator_reconsolidated: usize,
+    /// Number of high-Phi episodes promoted to resonator codebook this cycle.
+    pub resonator_promotions: usize,
+    /// Best cosine similarity from resonator recall (0.0 when no matches).
+    pub resonator_best_sim: f32,
+    /// Number of codebook entries evicted this cycle (redundancy pruning).
+    pub codebook_evictions: usize,
+    /// Codebook diversity: average pairwise cosine distance (0.0–1.0).
+    pub codebook_diversity: f32,
+    /// Resonator prediction error: cosine distance between last cycle's best match
+    /// and this cycle's compressed state (0.0 = perfect prediction, 1.0 = orthogonal).
+    pub resonator_prediction_error: f32,
+    /// Codebook utilization rate (fraction of symbols retrieved recently, 0.0–1.0).
+    pub codebook_utilization_rate: f32,
+    /// FEP surprise-modulated replay batch size (0 when replay not triggered).
+    pub surprise_replay_batch_size: usize,
+}
+
+/// Quality diagnostics telemetry: meta-cognitive, dissipative, coherence, anomaly recovery.
+///
+/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
+/// the original JSON format for backwards compatibility.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct QualityDiagnostics {
+    /// Meta-cognitive self-model accuracy (0.0 = uncertain, 1.0 = perfect self-knowledge).
+    pub meta_cognitive_accuracy: f32,
+    /// Meta-cognitive recursion depth (0 = off, 1 = basic, 2+ = recursive self-modeling).
+    pub meta_cognitive_depth: u8,
+    /// Dissipative consciousness health score (0.0–1.0, 0.0 when off).
+    pub dissipative_health: f64,
+    /// Current thermodynamic regime (e.g., "Subcritical", "Critical", "Supercritical").
+    pub dissipative_regime: String,
+    /// Dissipative entropy production rate (0.0 when off).
+    pub dissipative_entropy_rate: f64,
+    /// Φ_eff = Φ × R^γ from epistemic conflict reliability weighting (0.0 when off).
+    pub epistemic_phi_eff: f64,
+    /// Consciousness Equation v2 C(t) result (0.0 when off).
+    pub equation_v2_consciousness: f64,
+    /// Hierarchical LTC estimated Phi (0.0 when off).
+    pub hierarchical_ltc_phi: f32,
+    /// Unified quality score (fusion of prediction coherence + agreement + anomaly).
+    pub unified_quality_score: f32,
+    /// Whether dissipative health gate dampened learning this cycle.
+    pub dissipative_health_gated: bool,
+    /// Dissipative health gate dampening factor applied (1.0 = no dampening).
+    pub dissipative_lr_factor: f32,
+    /// Coherence velocity (rate of change, negative = dropping).
+    pub coherence_velocity: f32,
+    /// Whether temporal discontinuity triggered coherence gating this cycle.
+    pub coherence_velocity_gated: bool,
+    /// Metacognitive anomaly recovery progress (0.0–1.0, 1.0 = fully recovered).
+    pub anomaly_recovery_progress: f32,
+    /// Whether anomaly recovery is actively in progress.
+    pub anomaly_recovering: bool,
+}
+
+/// Attention subsystem telemetry: schema focus, GWT, budget, memoization.
+///
+/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
+/// the original JSON format for backwards compatibility.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AttentionMetrics {
+    /// Attention schema focus intensity (0.0 to 1.0, 0.0 when not enabled).
+    pub attention_schema_focus: f32,
+    /// Whether a GWT broadcast occurred this cycle.
+    pub gwt_broadcast: bool,
+    /// Rolling average of Phi observations from phi_attention (0.0 when off).
+    pub psi_attention_avg: f32,
+    /// Phi attention gate weight applied to perception (1.0 = neutral).
+    pub phi_attention_weight: f32,
+    /// Whether attention budget was exceeded this cycle (subsystems skipped).
+    pub attention_budget_exceeded: bool,
+    /// Total cycle elapsed at budget check point (microseconds).
+    pub attention_budget_elapsed_us: u64,
+    /// Input similarity to previous cycle (cosine, 0.0–1.0).
+    pub input_similarity: f32,
+    /// Whether input memoization was used (skipped re-encoding).
+    pub input_memoized: bool,
+    /// Whether attention budget gating skipped expensive subsystems this cycle.
+    pub attention_budget_gated: bool,
+    /// AttentionShift motor command intensity applied to attention_sensitivity.
+    pub attention_shift_applied: f32,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.
