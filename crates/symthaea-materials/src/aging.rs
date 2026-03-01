@@ -5,7 +5,9 @@ use crate::properties::MaterialProperty;
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
+/// Aging prediction horizons in seconds: 1 day, 1 month, 1 year, 10 years, 50 years.
 pub const AGING_HORIZONS: &[f32] = &[86_400.0, 2_592_000.0, 31_536_000.0, 315_360_000.0, 1_576_800_000.0];
+/// Human-readable labels matching [`AGING_HORIZONS`] in order.
 pub const AGING_HORIZON_LABELS: &[&str] = &["1 day", "1 month", "1 year", "10 years", "50 years"];
 
 /// Result of an O(1) aging prediction at a single time horizon.

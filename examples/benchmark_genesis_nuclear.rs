@@ -51,18 +51,18 @@ fn main() {
         println!("  {} → {:?} (confidence={:.3})", sig.name, r.matched_source, r.confidence);
     }
 
-    // 4. O(1) decay backdating proof
-    println!("\n--- O(1) Decay Backdating Cost ---");
+    // 4. O(1) temporal prediction proof (predict_at_horizon replaces backdate)
+    println!("\n--- O(1) Temporal Prediction Cost ---");
     let decay_model = IsotopeDecayModel::new();
     let spent = IsotopicSignature::spent_fuel();
     for &horizon in symthaea_nuclear_forensics::DECAY_HORIZONS {
         let start = std::time::Instant::now();
         for _ in 0..1000 {
-            let _ = decay_model.backdate(&spent, horizon);
+            let _ = decay_model.predict_at_horizon(&spent, horizon);
         }
         let elapsed = start.elapsed();
         println!(
-            "  {:>10}: {:.1}µs/backdate",
+            "  {:>10}: {:.1}µs/predict",
             symthaea_nuclear_forensics::DECAY_HORIZONS
                 .iter()
                 .position(|&h| h == horizon)

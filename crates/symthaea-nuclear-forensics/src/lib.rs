@@ -6,6 +6,7 @@
 //! matches unknown samples against a reference database for source attribution.
 
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
 
 pub mod attribution;
 pub mod decay_model;
@@ -13,6 +14,6 @@ pub mod encoder;
 pub mod isotope;
 
 pub use attribution::{AttributionResult, NuclearAttributionAgent};
-pub use decay_model::{IsotopeDecayModel, DECAY_HORIZONS, DECAY_HORIZON_LABELS};
+pub use decay_model::{AgeEstimate, BackdatedResult, IsotopeDecayModel, DECAY_HORIZONS, DECAY_HORIZON_LABELS};
 pub use encoder::IsotopicHdcEncoder;
 pub use isotope::{IsotopicSignature, NuclearSource};

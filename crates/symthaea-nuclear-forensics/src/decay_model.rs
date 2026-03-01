@@ -7,6 +7,7 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 /// Backdating horizons in seconds: 1 day, 1 month, 1 year, 10 years, 50 years.
 pub const DECAY_HORIZONS: &[f32] = &[86_400.0, 2_592_000.0, 31_536_000.0, 315_360_000.0, 1_576_800_000.0];
+/// Human-readable labels matching [`DECAY_HORIZONS`] in order.
 pub const DECAY_HORIZON_LABELS: &[&str] = &["1 day", "1 month", "1 year", "10 years", "50 years"];
 
 /// Half-lives in seconds for key isotopes.
@@ -14,26 +15,42 @@ const PU241_HALF_LIFE: f64 = 4.544e8;   // 14.4 years
 const CS137_HALF_LIFE: f64 = 9.467e8;   // 30.0 years
 const SR90_HALF_LIFE:  f64 = 9.119e8;   // 28.9 years
 
+/// Result of a single temporal backdating (or forward prediction) operation.
 #[derive(Debug, Clone)]
 pub struct BackdatedResult {
+    /// Time horizon used, in seconds.
     pub horizon_seconds: f32,
+    /// Human-readable label for the horizon (e.g. "1 year", "50 years").
     pub horizon_label: String,
+    /// The predicted HDC state at the given time horizon.
     pub backdated_state: ContinuousHV,
+    /// Cosine drift between the current and predicted states (1 − similarity).
     pub state_drift: f32,
 }
 
+/// Age estimate derived from classical isotope decay ratios (Pu-241, Cs-137/Sr-90).
 #[derive(Debug, Clone)]
 pub struct AgeEstimate {
+    /// Estimated age in seconds since irradiation or separation.
     pub estimated_age_seconds: f32,
+    /// Confidence in the estimate (0.0–1.0). Higher when multiple decay
+    /// ratios agree; 0.0 when no ratios are usable.
     pub confidence: f32,
 }
 
+/// O(1) isotope decay model using CfC closed-form temporal evolution.
+///
+/// Encodes isotopic signatures into 16,384D hypervectors, then uses
+/// [`HdcLtcUnifiedNeuron::evolve_closed_form`] to jump to any past or future
+/// time in constant cost. Also provides classical age estimation from
+/// Pu-241 and Cs-137/Sr-90 decay ratios.
 pub struct IsotopeDecayModel {
     neuron: HdcLtcUnifiedNeuron,
     encoder: IsotopicHdcEncoder,
 }
 
 impl IsotopeDecayModel {
+    /// Create a new decay model with a 1-year base timescale CfC neuron.
     pub fn new() -> Self {
         let config = UnifiedConfig {
             tau_base: 31_536_000.0, // 1 year base timescale
@@ -73,6 +90,19 @@ impl IsotopeDecayModel {
     /// Backdate at all standard horizons.
     pub fn backdate_all_horizons(&self, sig: &IsotopicSignature) -> Vec<BackdatedResult> {
         DECAY_HORIZONS.iter().map(|&h| self.backdate(sig, h)).collect()
+    }
+
+    /// O(1) temporal prediction — preferred alias for [`Self::backdate`].
+    ///
+    /// This name aligns with the cross-domain [`TemporalPredictor`] trait and
+    /// the materials/hydrology crates.
+    pub fn predict_at_horizon(&self, sig: &IsotopicSignature, horizon_seconds: f32) -> BackdatedResult {
+        self.backdate(sig, horizon_seconds)
+    }
+
+    /// Predict at all standard horizons — preferred alias for [`Self::backdate_all_horizons`].
+    pub fn predict_all_horizons(&self, sig: &IsotopicSignature) -> Vec<BackdatedResult> {
+        self.backdate_all_horizons(sig)
     }
 
     /// Estimate age by classical decay of Pu-241, Cs-137, Sr-90.
