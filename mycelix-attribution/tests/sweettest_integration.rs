@@ -23,6 +23,9 @@ pub enum DependencyEcosystem {
     NpmPackage,
     PythonPackage,
     NixFlake,
+    GoModule,
+    RubyGem,
+    MavenPackage,
     Other,
 }
 
@@ -229,6 +232,13 @@ pub struct EcosystemStatistics {
     pub total_dependencies: u64,
     pub ecosystems: Vec<EcosystemStat>,
     pub verified_count: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RenewAttestationInput {
+    pub original_action_hash: ActionHash,
+    pub new_proof_bytes: Vec<u8>,
+    pub new_witness_commitment: Vec<u8>,
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -1175,4 +1185,172 @@ async fn test_stewardship_leaderboard() {
         .await;
     assert!(!under.is_empty());
     assert_eq!(under[0].dependency_id, "crate:lb2:1.0");
+}
+
+// ── Input Validation Tests ──────────────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_record_usage_rejects_nonexistent_dep() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Try to record usage for a dependency that doesn't exist
+    let receipt = make_usage_receipt(
+        "usage-nonexistent",
+        "crate:nonexistent:99.0",
+        "did:mycelix:user001",
+    );
+
+    let result: Result<Record, _> = conductor
+        .call_fallible(&cell.zome("usage"), "record_usage", receipt)
+        .await;
+    assert!(result.is_err(), "Expected error for nonexistent dependency");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_record_pledge_rejects_nonexistent_dep() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    let pledge = make_pledge(
+        "pledge-nonexistent",
+        "crate:nonexistent:99.0",
+        "did:mycelix:corp001",
+    );
+
+    let result: Result<Record, _> = conductor
+        .call_fallible(&cell.zome("reciprocity"), "record_pledge", pledge)
+        .await;
+    assert!(result.is_err(), "Expected error for nonexistent dependency");
+}
+
+// ── Attestation Lifecycle Tests ─────────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_revoke_attestation() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Submit an attestation
+    let att = make_attestation("attest-revoke", "crate:serde:1.0", "did:mycelix:user001");
+    let record: Record = conductor
+        .call(&cell.zome("usage"), "submit_usage_attestation", att)
+        .await;
+    let action_hash = record.action_address().clone();
+
+    // Revoke it
+    let _delete_hash: ActionHash = conductor
+        .call(&cell.zome("usage"), "revoke_attestation", action_hash)
+        .await;
+
+    // Attestations for this dep should now exclude the deleted one
+    // (DHT eventually consistent — the entry is marked deleted)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_renew_attestation() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Submit original attestation
+    let att = make_attestation("attest-renew", "crate:serde:1.0", "did:mycelix:user001");
+    let record: Record = conductor
+        .call(&cell.zome("usage"), "submit_usage_attestation", att)
+        .await;
+    let original_hash = record.action_address().clone();
+
+    // Renew with new proof
+    let renew_input = RenewAttestationInput {
+        original_action_hash: original_hash,
+        new_proof_bytes: vec![0x02; 256],
+        new_witness_commitment: vec![0xCD; 32],
+    };
+    let renewed: Record = conductor
+        .call(&cell.zome("usage"), "renew_attestation", renew_input)
+        .await;
+    let renewed_att = decode_entry::<UsageAttestation>(&renewed).unwrap();
+    assert_eq!(renewed_att.id, "attest-renew-renewed");
+    assert!(!renewed_att.verified); // Reset to unverified
+    assert_eq!(renewed_att.proof_bytes, vec![0x02; 256]);
+    assert_eq!(renewed_att.witness_commitment, vec![0xCD; 32]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_get_maintainer_dependencies() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor
+        .setup_app("attribution", &[dna])
+        .await
+        .unwrap();
+    let cell = app.cells()[0].clone();
+
+    let maintainer = "did:mycelix:maintainer-xyz";
+
+    // Register 2 deps by same maintainer + 1 by another
+    let dep1 = DependencyIdentity {
+        id: "crate:alpha:1.0".to_string(),
+        name: "alpha".to_string(),
+        ecosystem: DependencyEcosystem::RustCrate,
+        maintainer_did: maintainer.to_string(),
+        repository_url: None,
+        license: None,
+        description: "Alpha lib".to_string(),
+        version: Some("1.0".to_string()),
+        registered_at: now_timestamp(),
+        verified: false,
+    };
+    let dep2 = DependencyIdentity {
+        id: "crate:beta:2.0".to_string(),
+        name: "beta".to_string(),
+        ecosystem: DependencyEcosystem::RustCrate,
+        maintainer_did: maintainer.to_string(),
+        repository_url: None,
+        license: None,
+        description: "Beta lib".to_string(),
+        version: Some("2.0".to_string()),
+        registered_at: now_timestamp(),
+        verified: false,
+    };
+    let dep_other = make_dependency("npm:other:1.0", DependencyEcosystem::NpmPackage);
+
+    let _: Record = conductor
+        .call(&cell.zome("registry"), "register_dependency", dep1)
+        .await;
+    let _: Record = conductor
+        .call(&cell.zome("registry"), "register_dependency", dep2)
+        .await;
+    let _: Record = conductor
+        .call(&cell.zome("registry"), "register_dependency", dep_other)
+        .await;
+
+    // Query by maintainer DID
+    let results: Vec<Record> = conductor
+        .call(
+            &cell.zome("registry"),
+            "get_maintainer_dependencies",
+            maintainer.to_string(),
+        )
+        .await;
+
+    assert_eq!(results.len(), 2, "should find exactly 2 deps for maintainer");
+    let ids: Vec<String> = results
+        .iter()
+        .map(|r| decode_entry::<DependencyIdentity>(r).unwrap().id)
+        .collect();
+    assert!(ids.contains(&"crate:alpha:1.0".to_string()));
+    assert!(ids.contains(&"crate:beta:2.0".to_string()));
 }

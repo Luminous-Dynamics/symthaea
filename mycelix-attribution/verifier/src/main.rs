@@ -65,6 +65,9 @@ struct AttestationInput {
     witness_commitment: String,
     /// STARK proof bytes (hex-encoded)
     proof_bytes: String,
+    /// Public inputs for Winterfell STARK verification (8 u64 values).
+    /// If absent, falls back to structural validation only.
+    public_inputs: Option<Vec<u64>>,
 }
 
 #[derive(Serialize, Debug)]
@@ -98,6 +101,8 @@ enum VerifierError {
     ProofTooSmall(usize),
     #[error("Proof too large: {0} bytes (maximum 512000)")]
     ProofTooLarge(usize),
+    #[error("Proof deserialization failed: {0}")]
+    DeserializationFailed(String),
 }
 
 // ── Verification Logic ──────────────────────────────────────────────
@@ -112,7 +117,10 @@ fn verify_commitment(commitment_bytes: &[u8]) -> Result<bool, VerifierError> {
     Ok(true)
 }
 
-fn verify_proof(proof_bytes: &[u8]) -> Result<bool, VerifierError> {
+fn verify_proof(
+    proof_bytes: &[u8],
+    public_inputs_raw: Option<&[u64]>,
+) -> Result<bool, VerifierError> {
     if proof_bytes.len() < 32 {
         return Err(VerifierError::ProofTooSmall(proof_bytes.len()));
     }
@@ -120,27 +128,60 @@ fn verify_proof(proof_bytes: &[u8]) -> Result<bool, VerifierError> {
         return Err(VerifierError::ProofTooLarge(proof_bytes.len()));
     }
 
-    // TODO: Integrate Winterfell STARK verification here.
-    //
-    // The proof format will be:
-    //   1. Deserialize proof_bytes into winterfell::StarkProof
-    //   2. Define the AIR (Algebraic Intermediate Representation) for usage attestation:
-    //      - Public inputs: dependency_id hash, user_did hash
-    //      - Private inputs: usage scale, organization details
-    //      - Constraints: usage_scale ∈ {Small, Medium, Large, Enterprise}
-    //   3. Call winterfell::verify(proof, pub_inputs, air_params)
-    //   4. Return verification result
-    //
-    // For now: structural validation only (non-empty, within size limits)
-    eprintln!(
-        "  Warning: Full Winterfell STARK verification not yet integrated."
-    );
-    eprintln!(
-        "  Performing structural validation only ({} bytes).",
-        proof_bytes.len()
-    );
+    // Full Winterfell STARK verification requires public inputs
+    let Some(pi_vals) = public_inputs_raw else {
+        eprintln!(
+            "  REJECTED: No public_inputs provided. STARK verification requires public inputs."
+        );
+        return Ok(false);
+    };
 
-    Ok(true)
+    if pi_vals.len() != 8 {
+        eprintln!(
+            "  REJECTED: Expected 8 public inputs, got {}.",
+            pi_vals.len()
+        );
+        return Ok(false);
+    }
+
+    use mycelix_attribution_stark_common::{
+        default_proof_options, PublicInputs, UsageAttestationAir,
+    };
+    use winter_crypto::hashers::Blake3_256;
+    use winter_math::fields::f128::BaseElement;
+    use winterfell::crypto::{DefaultRandomCoin, MerkleTree};
+
+    let pub_inputs = PublicInputs {
+        dep_hash_lo: pi_vals[0],
+        dep_hash_hi: pi_vals[1],
+        did_hash_lo: pi_vals[2],
+        did_hash_hi: pi_vals[3],
+        witness_commitment: [pi_vals[4], pi_vals[5], pi_vals[6], pi_vals[7]],
+    };
+
+    let proof = winterfell::Proof::from_bytes(proof_bytes).map_err(|e| {
+        eprintln!("  Proof deserialization failed: {}", e);
+        VerifierError::DeserializationFailed(e.to_string())
+    })?;
+
+    let acceptable = winterfell::AcceptableOptions::OptionSet(vec![default_proof_options()]);
+
+    match winterfell::verify::<
+        UsageAttestationAir,
+        Blake3_256<BaseElement>,
+        DefaultRandomCoin<Blake3_256<BaseElement>>,
+        MerkleTree<Blake3_256<BaseElement>>,
+    >(proof, pub_inputs, &acceptable)
+    {
+        Ok(_) => {
+            eprintln!("  STARK verification: PASSED");
+            Ok(true)
+        }
+        Err(e) => {
+            eprintln!("  STARK verification: FAILED ({})", e);
+            Ok(false)
+        }
+    }
 }
 
 fn sign_verification(
@@ -179,11 +220,7 @@ fn main() {
         buf
     } else {
         std::fs::read_to_string(&args.attestation).unwrap_or_else(|e| {
-            eprintln!(
-                "Failed to read {}: {}",
-                args.attestation.display(),
-                e
-            );
+            eprintln!("Failed to read {}: {}", args.attestation.display(), e);
             std::process::exit(1);
         })
     };
@@ -205,11 +242,10 @@ fn main() {
 
     let key_bytes: [u8; 32] = if key_content.len() == 64 {
         // Hex-encoded
-        let decoded = hex::decode(&key_content)
-            .unwrap_or_else(|e| {
-                eprintln!("Failed to decode hex signing key: {}", e);
-                std::process::exit(1);
-            });
+        let decoded = hex::decode(&key_content).unwrap_or_else(|e| {
+            eprintln!("Failed to decode hex signing key: {}", e);
+            std::process::exit(1);
+        });
         decoded.try_into().unwrap_or_else(|_| {
             eprintln!("Signing key must be exactly 32 bytes");
             std::process::exit(1);
@@ -255,7 +291,7 @@ fn main() {
         }
     };
 
-    let proof_valid = match verify_proof(&proof_bytes) {
+    let proof_valid = match verify_proof(&proof_bytes, att.public_inputs.as_deref()) {
         Ok(v) => v,
         Err(e) => {
             eprintln!("  Proof verification failed: {}", e);
@@ -266,12 +302,7 @@ fn main() {
     let verdict = commitment_valid && proof_valid;
 
     // Sign
-    let (pubkey, signature) = sign_verification(
-        &signing_key,
-        &att.id,
-        &att.dependency_id,
-        verdict,
-    );
+    let (pubkey, signature) = sign_verification(&signing_key, &att.id, &att.dependency_id, verdict);
 
     eprintln!(
         "  Verdict: {} (commitment={}, proof={})",
@@ -327,32 +358,35 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_proof_valid() {
+    fn test_verify_proof_no_public_inputs_rejected() {
         let proof = vec![0x01; 256];
-        assert!(verify_proof(&proof).unwrap());
+        // Proofs without public_inputs are rejected (not silently accepted)
+        assert!(!verify_proof(&proof, None).unwrap());
+    }
+
+    #[test]
+    fn test_verify_proof_wrong_public_inputs_count() {
+        let proof = vec![0x01; 256];
+        // Wrong number of public inputs (need exactly 8)
+        assert!(!verify_proof(&proof, Some(&[1, 2, 3])).unwrap());
     }
 
     #[test]
     fn test_verify_proof_too_small() {
         let proof = vec![0x01; 16];
-        assert!(verify_proof(&proof).is_err());
+        assert!(verify_proof(&proof, None).is_err());
     }
 
     #[test]
     fn test_verify_proof_too_large() {
         let proof = vec![0x01; 600_000];
-        assert!(verify_proof(&proof).is_err());
+        assert!(verify_proof(&proof, None).is_err());
     }
 
     #[test]
     fn test_sign_verification() {
         let key = SigningKey::from_bytes(&[42u8; 32]);
-        let (pubkey, sig) = sign_verification(
-            &key,
-            "attest-001",
-            "crate:serde:1.0",
-            true,
-        );
+        let (pubkey, sig) = sign_verification(&key, "attest-001", "crate:serde:1.0", true);
         assert_eq!(pubkey.len(), 32);
         assert_eq!(sig.len(), 64);
     }
@@ -363,5 +397,145 @@ mod tests {
         let (_, sig1) = sign_verification(&key, "a", "b", true);
         let (_, sig2) = sign_verification(&key, "a", "b", true);
         assert_eq!(sig1, sig2);
+    }
+
+    /// End-to-end: generate a real STARK proof via Winterfell, then verify it
+    /// through the verifier's `verify_proof` function.
+    #[test]
+    fn test_e2e_prove_then_verify() {
+        use mycelix_attribution_stark_common::{
+            commitment_to_limbs, compute_witness_commitment, default_proof_options,
+            hash_to_u64_pair, PublicInputs, UsageAttestationAir, TRACE_LENGTH, TRACE_WIDTH,
+        };
+        use winter_crypto::hashers::Blake3_256;
+        use winter_math::fields::f128::BaseElement;
+        use winter_math::FieldElement;
+        use winterfell::{
+            crypto::{DefaultRandomCoin, MerkleTree},
+            matrix::ColMatrix,
+            DefaultConstraintCommitment, DefaultConstraintEvaluator, DefaultTraceLde,
+            PartitionOptions, ProofOptions, Prover, StarkDomain, TraceInfo, TraceTable,
+        };
+
+        // -- Inline prover (mirrors prover binary) --
+        struct TestProver {
+            options: ProofOptions,
+            pub_inputs: PublicInputs,
+        }
+        impl Prover for TestProver {
+            type BaseField = BaseElement;
+            type Air = UsageAttestationAir;
+            type Trace = TraceTable<Self::BaseField>;
+            type HashFn = Blake3_256<Self::BaseField>;
+            type VC = MerkleTree<Self::HashFn>;
+            type RandomCoin = DefaultRandomCoin<Self::HashFn>;
+            type TraceLde<E: FieldElement<BaseField = Self::BaseField>> =
+                DefaultTraceLde<E, Self::HashFn, Self::VC>;
+            type ConstraintEvaluator<'a, E: FieldElement<BaseField = Self::BaseField>> =
+                DefaultConstraintEvaluator<'a, Self::Air, E>;
+            type ConstraintCommitment<E: FieldElement<BaseField = Self::BaseField>> =
+                DefaultConstraintCommitment<E, Self::HashFn, Self::VC>;
+
+            fn get_pub_inputs(&self, _trace: &Self::Trace) -> PublicInputs {
+                self.pub_inputs.clone()
+            }
+            fn options(&self) -> &ProofOptions {
+                &self.options
+            }
+            fn new_trace_lde<E: FieldElement<BaseField = Self::BaseField>>(
+                &self,
+                trace_info: &TraceInfo,
+                main_trace: &ColMatrix<Self::BaseField>,
+                domain: &StarkDomain<Self::BaseField>,
+                partition_options: PartitionOptions,
+            ) -> (Self::TraceLde<E>, winterfell::TracePolyTable<E>) {
+                DefaultTraceLde::new(trace_info, main_trace, domain, partition_options)
+            }
+            fn new_evaluator<'a, E: FieldElement<BaseField = Self::BaseField>>(
+                &self,
+                air: &'a Self::Air,
+                aux_rand_elements: Option<winterfell::AuxRandElements<E>>,
+                composition_coefficients: winterfell::ConstraintCompositionCoefficients<E>,
+            ) -> Self::ConstraintEvaluator<'a, E> {
+                DefaultConstraintEvaluator::new(air, aux_rand_elements, composition_coefficients)
+            }
+            fn build_constraint_commitment<E: FieldElement<BaseField = Self::BaseField>>(
+                &self,
+                composition_poly_trace: winterfell::CompositionPolyTrace<E>,
+                num_constraint_composition_columns: usize,
+                domain: &StarkDomain<Self::BaseField>,
+                partition_options: PartitionOptions,
+            ) -> (
+                Self::ConstraintCommitment<E>,
+                winterfell::CompositionPoly<E>,
+            ) {
+                DefaultConstraintCommitment::new(
+                    composition_poly_trace,
+                    num_constraint_composition_columns,
+                    domain,
+                    partition_options,
+                )
+            }
+        }
+
+        // Generate proof
+        let dep_id = "crate:tokio:1.0";
+        let user_did = "did:mycelix:e2etest";
+        let scale: u8 = 3; // Large
+
+        let (dep_lo, dep_hi) = hash_to_u64_pair(dep_id.as_bytes());
+        let (did_lo, did_hi) = hash_to_u64_pair(user_did.as_bytes());
+        let commitment = compute_witness_commitment(scale, dep_id, user_did, "");
+        let commitment_limbs = commitment_to_limbs(&commitment);
+
+        let pub_inputs = PublicInputs {
+            dep_hash_lo: dep_lo,
+            dep_hash_hi: dep_hi,
+            did_hash_lo: did_lo,
+            did_hash_hi: did_hi,
+            witness_commitment: commitment_limbs,
+        };
+
+        let scale_cycle: [u64; 4] = [1, 2, 3, 4];
+        let mut trace = TraceTable::new(TRACE_WIDTH, TRACE_LENGTH);
+        trace.fill(
+            |state| {
+                state[0] = BaseElement::from(scale as u64);
+                state[1] = BaseElement::from(dep_lo);
+                state[2] = BaseElement::from(dep_hi);
+                state[3] = BaseElement::from(did_lo);
+                state[4] = BaseElement::from(did_hi);
+            },
+            |step, state| {
+                state[0] = BaseElement::from(scale_cycle[step % 4]);
+            },
+        );
+
+        let prover = TestProver {
+            options: default_proof_options(),
+            pub_inputs: pub_inputs.clone(),
+        };
+        let proof = prover.prove(trace).expect("proof generation failed");
+        let proof_bytes = proof.to_bytes();
+
+        // Verify through verifier's verify_proof()
+        let pi_vec: Vec<u64> = vec![
+            pub_inputs.dep_hash_lo,
+            pub_inputs.dep_hash_hi,
+            pub_inputs.did_hash_lo,
+            pub_inputs.did_hash_hi,
+            pub_inputs.witness_commitment[0],
+            pub_inputs.witness_commitment[1],
+            pub_inputs.witness_commitment[2],
+            pub_inputs.witness_commitment[3],
+        ];
+
+        let result = verify_proof(&proof_bytes, Some(&pi_vec));
+        assert!(
+            result.is_ok(),
+            "verify_proof returned error: {:?}",
+            result.err()
+        );
+        assert!(result.unwrap(), "STARK proof should verify successfully");
     }
 }

@@ -57,10 +57,24 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     Ok(InitCallbackResult::Pass)
 }
 
+// ── Constants ───────────────────────────────────────────────────────
+
+const MAX_PAGE_SIZE: u64 = 1000;
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 fn anchor_hash(tag: &str) -> ExternResult<EntryHash> {
     hash_entry(&Anchor(tag.to_string()))
+}
+
+fn validate_pagination(input: &PaginationInput) -> ExternResult<()> {
+    if input.limit > MAX_PAGE_SIZE {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Pagination limit {} exceeds maximum {}",
+            input.limit, MAX_PAGE_SIZE
+        ))));
+    }
+    Ok(())
 }
 
 fn require_author(maintainer_did: &str) -> ExternResult<()> {
@@ -75,15 +89,11 @@ fn require_author(maintainer_did: &str) -> ExternResult<()> {
 }
 
 fn resolve_links(base: EntryHash, link_type: LinkTypes) -> ExternResult<Vec<Record>> {
-    let links = get_links(
-        LinkQuery::try_new(base, link_type)?,
-        GetStrategy::default(),
-    )?;
+    let links = get_links(LinkQuery::try_new(base, link_type)?, GetStrategy::default())?;
     let mut records = Vec::new();
     for link in links {
-        let entry_hash = EntryHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let entry_hash = EntryHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(entry_hash, GetOptions::default())? {
             records.push(record);
         }
@@ -108,8 +118,7 @@ pub fn register_dependency(dep: DependencyIdentity) -> ExternResult<Record> {
         ))));
     }
 
-    let action_hash =
-        create_entry(&EntryTypes::DependencyIdentity(dep.clone()))?;
+    let action_hash = create_entry(&EntryTypes::DependencyIdentity(dep.clone()))?;
     let entry_hash = hash_entry(&dep)?;
 
     // Link: all_deps → dependency
@@ -153,10 +162,9 @@ pub fn register_dependency(dep: DependencyIdentity) -> ExternResult<Record> {
         ecosystem: dep.ecosystem.to_string(),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not fetch newly created dependency".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not fetch newly created dependency".into()
+    )))
 }
 
 #[hdk_extern]
@@ -173,10 +181,9 @@ pub fn update_dependency(input: UpdateDependencyInput) -> ExternResult<Record> {
         dependency_id: input.dependency.id.clone(),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not fetch updated dependency".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not fetch updated dependency".into()
+    )))
 }
 
 #[hdk_extern]
@@ -189,12 +196,8 @@ pub fn get_dependency(id: String) -> ExternResult<Option<Record>> {
 
     match links.first() {
         Some(link) => {
-            let entry_hash =
-                EntryHash::try_from(link.target.clone()).map_err(|_| {
-                    wasm_error!(WasmErrorInner::Guest(
-                        "Invalid link target".into()
-                    ))
-                })?;
+            let entry_hash = EntryHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
             get(entry_hash, GetOptions::default())
         }
         None => Ok(None),
@@ -207,9 +210,7 @@ pub fn get_all_dependencies(_: ()) -> ExternResult<Vec<Record>> {
 }
 
 #[hdk_extern]
-pub fn get_dependencies_by_ecosystem(
-    ecosystem: String,
-) -> ExternResult<Vec<Record>> {
+pub fn get_dependencies_by_ecosystem(ecosystem: String) -> ExternResult<Vec<Record>> {
     let eco_tag = format!("eco:{}", ecosystem);
     resolve_links(anchor_hash(&eco_tag)?, LinkTypes::EcosystemToDependency)
 }
@@ -217,20 +218,15 @@ pub fn get_dependencies_by_ecosystem(
 #[hdk_extern]
 pub fn get_maintainer_dependencies(did: String) -> ExternResult<Vec<Record>> {
     let maint_tag = format!("maint:{}", did);
-    resolve_links(
-        anchor_hash(&maint_tag)?,
-        LinkTypes::MaintainerToDependency,
-    )
+    resolve_links(anchor_hash(&maint_tag)?, LinkTypes::MaintainerToDependency)
 }
 
 #[hdk_extern]
 pub fn verify_dependency(id: String) -> ExternResult<Record> {
-    let record = get_dependency(id.clone())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest(format!(
-            "Dependency '{}' not found",
-            id
-        ))
-    ))?;
+    let record = get_dependency(id.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "Dependency '{}' not found",
+        id
+    ))))?;
 
     let mut dep: DependencyIdentity = record
         .entry()
@@ -255,14 +251,11 @@ pub fn verify_dependency(id: String) -> ExternResult<Record> {
         &EntryTypes::DependencyIdentity(dep),
     )?;
 
-    let _ = emit_signal(&RegistrySignal::DependencyVerified {
-        dependency_id: id,
-    });
+    let _ = emit_signal(&RegistrySignal::DependencyVerified { dependency_id: id });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not fetch verified dependency".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not fetch verified dependency".into()
+    )))
 }
 
 // ── Batch Registration ──────────────────────────────────────────────
@@ -285,8 +278,7 @@ pub fn bulk_register_dependencies(
             continue;
         }
 
-        let action_hash =
-            create_entry(&EntryTypes::DependencyIdentity(dep.clone()))?;
+        let action_hash = create_entry(&EntryTypes::DependencyIdentity(dep.clone()))?;
         let entry_hash = hash_entry(&dep)?;
 
         create_link(
@@ -344,11 +336,9 @@ pub fn bulk_register_dependencies(
 pub fn get_all_dependencies_paginated(
     input: PaginationInput,
 ) -> ExternResult<PaginatedDependencies> {
+    validate_pagination(&input)?;
     let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash("all_deps")?,
-            LinkTypes::AllDependencies,
-        )?,
+        LinkQuery::try_new(anchor_hash("all_deps")?, LinkTypes::AllDependencies)?,
         GetStrategy::default(),
     )?;
     let total = links.len() as u64;
@@ -361,9 +351,8 @@ pub fn get_all_dependencies_paginated(
 
     let mut items = Vec::new();
     for link in page_links {
-        let entry_hash = EntryHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let entry_hash = EntryHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(entry_hash, GetOptions::default())? {
             items.push(record);
         }
@@ -394,24 +383,16 @@ pub struct EcosystemStatistics {
 
 #[hdk_extern]
 pub fn get_ecosystem_statistics(_: ()) -> ExternResult<EcosystemStatistics> {
-    let all_records =
-        resolve_links(anchor_hash("all_deps")?, LinkTypes::AllDependencies)?;
+    let all_records = resolve_links(anchor_hash("all_deps")?, LinkTypes::AllDependencies)?;
     let total = all_records.len() as u64;
 
-    let mut eco_counts: std::collections::BTreeMap<String, u64> =
-        std::collections::BTreeMap::new();
+    let mut eco_counts: std::collections::BTreeMap<String, u64> = std::collections::BTreeMap::new();
     let mut verified = 0u64;
 
     for record in &all_records {
-        let dep: Option<DependencyIdentity> = record
-            .entry()
-            .to_app_option()
-            .ok()
-            .flatten();
+        let dep: Option<DependencyIdentity> = record.entry().to_app_option().ok().flatten();
         if let Some(d) = dep {
-            *eco_counts
-                .entry(d.ecosystem.to_string())
-                .or_insert(0) += 1;
+            *eco_counts.entry(d.ecosystem.to_string()).or_insert(0) += 1;
             if d.verified {
                 verified += 1;
             }

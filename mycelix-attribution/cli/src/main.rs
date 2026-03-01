@@ -20,7 +20,7 @@ mod submit;
 #[command(name = "mycelix-attribution-scan")]
 #[command(about = "Scan lockfiles and generate attribution data for the Mycelix DHT")]
 struct Args {
-    /// Path to lockfile (Cargo.lock, package-lock.json, or flake.lock)
+    /// Path to lockfile (Cargo.lock, package-lock.json, flake.lock, requirements.txt, pyproject.toml, go.sum, Gemfile.lock, pom.xml)
     #[arg(short, long)]
     lockfile: PathBuf,
 
@@ -82,7 +82,6 @@ struct UsageReceiptRecord {
 // ── Batch Output Type ───────────────────────────────────────────────
 
 /// Matches the DependencyIdentity fields expected by bulk_register_dependencies.
-/// Timestamps and booleans are omitted — the zome sets those on create.
 #[derive(Serialize, Debug)]
 struct BatchDependency {
     id: String,
@@ -93,6 +92,8 @@ struct BatchDependency {
     license: Option<String>,
     description: String,
     version: Option<String>,
+    registered_at: i64,
+    verified: bool,
 }
 
 // ── Cargo.lock Parser ────────────────────────────────────────────────
@@ -266,10 +267,7 @@ fn parse_flake_lock(content: &str) -> Vec<(DependencyRecord, UsageReceiptRecord)
             let locked = node.locked.unwrap();
             let owner = locked.owner.unwrap_or_default();
             let repo = locked.repo.unwrap_or_default();
-            let rev = locked
-                .rev
-                .as_ref()
-                .map(|r| r[..8.min(r.len())].to_string());
+            let rev = locked.rev.as_ref().map(|r| r[..8.min(r.len())].to_string());
             let dep_id = format!("nix:{}/{}", owner, repo);
             let dep = DependencyRecord {
                 id: dep_id.clone(),
@@ -289,6 +287,292 @@ fn parse_flake_lock(content: &str) -> Vec<(DependencyRecord, UsageReceiptRecord)
         .collect()
 }
 
+// ── requirements.txt Parser ──────────────────────────────────────────
+
+fn parse_requirements_txt(content: &str) -> Vec<(DependencyRecord, UsageReceiptRecord)> {
+    content
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with('-') {
+                return None;
+            }
+            let (name, version) = if let Some(idx) = line.find("==") {
+                (line[..idx].trim(), Some(line[idx + 2..].trim().to_string()))
+            } else if let Some(idx) = line.find(">=") {
+                (line[..idx].trim(), Some(line[idx + 2..].trim().to_string()))
+            } else if let Some(idx) = line.find("~=") {
+                (line[..idx].trim(), Some(line[idx + 2..].trim().to_string()))
+            } else if let Some(idx) = line.find("<=") {
+                (line[..idx].trim(), Some(line[idx + 2..].trim().to_string()))
+            } else {
+                (line, None)
+            };
+            let name = name.split(';').next()?.trim();
+            let name = name.split('[').next()?.trim();
+            if name.is_empty() {
+                return None;
+            }
+            let dep_id = match &version {
+                Some(v) => format!("pip:{}:{}", name, v),
+                None => format!("pip:{}", name),
+            };
+            Some((
+                DependencyRecord {
+                    id: dep_id.clone(),
+                    name: name.to_string(),
+                    ecosystem: "PythonPackage".into(),
+                    version: version.clone(),
+                },
+                UsageReceiptRecord {
+                    dependency_id: dep_id,
+                    user_did: String::new(),
+                    organization: None,
+                    usage_type: "DirectDependency".into(),
+                    version_range: version.map(|v| format!("={}", v)),
+                },
+            ))
+        })
+        .collect()
+}
+
+// ── pyproject.toml Parser ───────────────────────────────────────────
+
+fn parse_pyproject_toml(content: &str) -> Vec<(DependencyRecord, UsageReceiptRecord)> {
+    let table: toml::Value = match toml::from_str(content) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Failed to parse pyproject.toml: {}", e);
+            return Vec::new();
+        }
+    };
+
+    let deps = table
+        .get("project")
+        .and_then(|p| p.get("dependencies"))
+        .and_then(|d| d.as_array());
+
+    let Some(deps) = deps else {
+        return Vec::new();
+    };
+
+    deps.iter()
+        .filter_map(|dep_val| {
+            let spec = dep_val.as_str()?;
+            let (name, version) = if let Some(idx) = spec.find(">=") {
+                (&spec[..idx], Some(spec[idx + 2..].trim()))
+            } else if let Some(idx) = spec.find("==") {
+                (&spec[..idx], Some(spec[idx + 2..].trim()))
+            } else if let Some(idx) = spec.find("~=") {
+                (&spec[..idx], Some(spec[idx + 2..].trim()))
+            } else {
+                (spec, None)
+            };
+            let name = name.split(';').next()?.trim();
+            let name = name.split('[').next()?.trim();
+            let version = version.map(|v| v.split(',').next().unwrap_or(v).trim().to_string());
+            if name.is_empty() {
+                return None;
+            }
+            let dep_id = match &version {
+                Some(v) => format!("pip:{}:{}", name, v),
+                None => format!("pip:{}", name),
+            };
+            Some((
+                DependencyRecord {
+                    id: dep_id.clone(),
+                    name: name.to_string(),
+                    ecosystem: "PythonPackage".into(),
+                    version: version.clone(),
+                },
+                UsageReceiptRecord {
+                    dependency_id: dep_id,
+                    user_did: String::new(),
+                    organization: None,
+                    usage_type: "DirectDependency".into(),
+                    version_range: version.map(|v| format!("={}", v)),
+                },
+            ))
+        })
+        .collect()
+}
+
+// ── go.sum Parser ───────────────────────────────────────────────────
+
+fn parse_go_sum(content: &str) -> Vec<(DependencyRecord, UsageReceiptRecord)> {
+    let mut seen = std::collections::HashSet::new();
+    content
+        .lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() {
+                return None;
+            }
+            let mut parts = line.split_whitespace();
+            let module = parts.next()?;
+            let version_raw = parts.next()?;
+            let version = version_raw.split('/').next()?;
+            let key = format!("{}@{}", module, version);
+            if !seen.insert(key) {
+                return None;
+            }
+            let dep_id = format!("go:{}:{}", module, version);
+            Some((
+                DependencyRecord {
+                    id: dep_id.clone(),
+                    name: module.to_string(),
+                    ecosystem: "GoModule".into(),
+                    version: Some(version.to_string()),
+                },
+                UsageReceiptRecord {
+                    dependency_id: dep_id,
+                    user_did: String::new(),
+                    organization: None,
+                    usage_type: "DirectDependency".into(),
+                    version_range: Some(format!("={}", version)),
+                },
+            ))
+        })
+        .collect()
+}
+
+// ── Gemfile.lock Parser ─────────────────────────────────────────────
+
+fn parse_gemfile_lock(content: &str) -> Vec<(DependencyRecord, UsageReceiptRecord)> {
+    let mut in_gem_section = false;
+    let mut in_specs = false;
+    let mut results = Vec::new();
+
+    for line in content.lines() {
+        if line.trim() == "GEM" {
+            in_gem_section = true;
+            continue;
+        }
+        if in_gem_section && line.trim() == "specs:" {
+            in_specs = true;
+            continue;
+        }
+        if in_gem_section && in_specs && !line.starts_with(' ') {
+            in_gem_section = false;
+            in_specs = false;
+            continue;
+        }
+        if !in_specs {
+            continue;
+        }
+        // Sub-dependencies are 6+ spaces — skip them
+        if line.starts_with("      ") {
+            continue;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(paren_start) = trimmed.find('(') {
+            if let Some(paren_end) = trimmed.find(')') {
+                let name = trimmed[..paren_start].trim();
+                let version = &trimmed[paren_start + 1..paren_end];
+                if !name.is_empty() {
+                    let dep_id = format!("gem:{}:{}", name, version);
+                    results.push((
+                        DependencyRecord {
+                            id: dep_id.clone(),
+                            name: name.to_string(),
+                            ecosystem: "RubyGem".into(),
+                            version: Some(version.to_string()),
+                        },
+                        UsageReceiptRecord {
+                            dependency_id: dep_id,
+                            user_did: String::new(),
+                            organization: None,
+                            usage_type: "DirectDependency".into(),
+                            version_range: Some(format!("={}", version)),
+                        },
+                    ));
+                }
+            }
+        }
+    }
+
+    results
+}
+
+// ── pom.xml Parser ──────────────────────────────────────────────────
+
+fn parse_pom_xml(content: &str) -> Vec<(DependencyRecord, UsageReceiptRecord)> {
+    let mut results = Vec::new();
+    let mut in_dependency = false;
+    let mut group_id = String::new();
+    let mut artifact_id = String::new();
+    let mut version = String::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed == "<dependency>" {
+            in_dependency = true;
+            group_id.clear();
+            artifact_id.clear();
+            version.clear();
+            continue;
+        }
+        if trimmed == "</dependency>" {
+            if in_dependency && !group_id.is_empty() && !artifact_id.is_empty() {
+                let dep_id = if version.is_empty() {
+                    format!("mvn:{}:{}", group_id, artifact_id)
+                } else {
+                    format!("mvn:{}:{}:{}", group_id, artifact_id, version)
+                };
+                let ver = if version.is_empty() {
+                    None
+                } else {
+                    Some(version.clone())
+                };
+                results.push((
+                    DependencyRecord {
+                        id: dep_id.clone(),
+                        name: format!("{}:{}", group_id, artifact_id),
+                        ecosystem: "MavenPackage".into(),
+                        version: ver.clone(),
+                    },
+                    UsageReceiptRecord {
+                        dependency_id: dep_id,
+                        user_did: String::new(),
+                        organization: None,
+                        usage_type: "DirectDependency".into(),
+                        version_range: ver.map(|v| format!("={}", v)),
+                    },
+                ));
+            }
+            in_dependency = false;
+            continue;
+        }
+        if !in_dependency {
+            continue;
+        }
+        if let Some(val) = extract_xml_value(trimmed, "groupId") {
+            group_id = val;
+        } else if let Some(val) = extract_xml_value(trimmed, "artifactId") {
+            artifact_id = val;
+        } else if let Some(val) = extract_xml_value(trimmed, "version") {
+            version = val;
+        }
+    }
+
+    results
+}
+
+fn extract_xml_value(line: &str, tag: &str) -> Option<String> {
+    let open = format!("<{}>", tag);
+    let close = format!("</{}>", tag);
+    if let Some(start) = line.find(&open) {
+        if let Some(end) = line.find(&close) {
+            let value = &line[start + open.len()..end];
+            return Some(value.trim().to_string());
+        }
+    }
+    None
+}
+
 // ── Main ─────────────────────────────────────────────────────────────
 
 fn main() {
@@ -297,11 +581,7 @@ fn main() {
     let content = match std::fs::read_to_string(&args.lockfile) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!(
-                "Error reading {}: {}",
-                args.lockfile.display(),
-                e
-            );
+            eprintln!("Error reading {}: {}", args.lockfile.display(), e);
             std::process::exit(1);
         }
     };
@@ -316,9 +596,15 @@ fn main() {
         "Cargo.lock" => parse_cargo_lock(&content),
         "package-lock.json" => parse_package_lock(&content),
         "flake.lock" => parse_flake_lock(&content),
+        "requirements.txt" => parse_requirements_txt(&content),
+        "pyproject.toml" => parse_pyproject_toml(&content),
+        "go.sum" => parse_go_sum(&content),
+        "Gemfile.lock" => parse_gemfile_lock(&content),
+        "pom.xml" => parse_pom_xml(&content),
         other => {
             eprintln!(
-                "Unsupported lockfile: {}. Expected Cargo.lock, package-lock.json, or flake.lock",
+                "Unsupported lockfile: {}. Expected Cargo.lock, package-lock.json, flake.lock, \
+                 requirements.txt, pyproject.toml, go.sum, Gemfile.lock, or pom.xml",
                 other
             );
             std::process::exit(1);
@@ -412,51 +698,42 @@ fn main() {
 
     match args.format {
         OutputFormat::Json => {
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&output).unwrap()
-            );
+            println!("{}", serde_json::to_string_pretty(&output).unwrap());
         }
         OutputFormat::Jsonl => {
             for dep in &output.dependencies {
-                println!(
-                    "{}",
-                    serde_json::to_string(dep).unwrap()
-                );
+                println!("{}", serde_json::to_string(dep).unwrap());
             }
             for receipt in &output.usage_receipts {
-                println!(
-                    "{}",
-                    serde_json::to_string(receipt).unwrap()
-                );
+                println!("{}", serde_json::to_string(receipt).unwrap());
             }
         }
         OutputFormat::Batch => {
             // Output array of DependencyIdentity-shaped objects for bulk_register_dependencies
+            let now_micros = chrono::Utc::now().timestamp_micros();
             let batch: Vec<_> = output
                 .dependencies
                 .iter()
                 .zip(output.usage_receipts.iter())
-                .map(|(dep, receipt)| {
-                    BatchDependency {
-                        id: dep.id.clone(),
-                        name: dep.name.clone(),
-                        ecosystem: dep.ecosystem.clone(),
-                        maintainer_did: receipt.user_did.clone(),
-                        repository_url: None,
-                        license: None,
-                        description: format!(
-                            "{} {} ({})",
-                            dep.ecosystem, dep.name, dep.version.as_deref().unwrap_or("*")
-                        ),
-                        version: dep.version.clone(),
-                    }
+                .map(|(dep, receipt)| BatchDependency {
+                    id: dep.id.clone(),
+                    name: dep.name.clone(),
+                    ecosystem: dep.ecosystem.clone(),
+                    maintainer_did: receipt.user_did.clone(),
+                    repository_url: None,
+                    license: None,
+                    description: format!(
+                        "{} {} ({})",
+                        dep.ecosystem,
+                        dep.name,
+                        dep.version.as_deref().unwrap_or("*")
+                    ),
+                    version: dep.version.clone(),
+                    registered_at: now_micros,
+                    verified: false,
                 })
                 .collect();
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&batch).unwrap()
-            );
+            println!("{}", serde_json::to_string_pretty(&batch).unwrap());
         }
     }
 }
@@ -535,5 +812,86 @@ version = "0.1.0"
         let content = "[[package]]\nname = \"root\"\nversion = \"0.0.0\"\n";
         let pairs = parse_cargo_lock(content);
         assert!(pairs.is_empty());
+    }
+
+    #[test]
+    fn test_parse_requirements_txt() {
+        let content = "# comment\nrequests==2.31.0\nflask>=3.0.0\nnumpy\n-e ./local\n";
+        let pairs = parse_requirements_txt(content);
+        assert_eq!(pairs.len(), 3);
+        assert_eq!(pairs[0].0.id, "pip:requests:2.31.0");
+        assert_eq!(pairs[0].0.ecosystem, "PythonPackage");
+        assert_eq!(pairs[1].0.id, "pip:flask:3.0.0");
+        assert_eq!(pairs[2].0.id, "pip:numpy");
+        assert!(pairs[2].0.version.is_none());
+    }
+
+    #[test]
+    fn test_parse_pyproject_toml() {
+        let content = r#"
+[project]
+name = "my-app"
+dependencies = [
+    "requests>=2.31.0",
+    "flask==3.0.0",
+    "numpy",
+    "pandas>=2.0,<3",
+]
+"#;
+        let pairs = parse_pyproject_toml(content);
+        assert_eq!(pairs.len(), 4);
+        assert_eq!(pairs[0].0.id, "pip:requests:2.31.0");
+        assert_eq!(pairs[1].0.id, "pip:flask:3.0.0");
+        assert_eq!(pairs[2].0.id, "pip:numpy");
+        assert_eq!(pairs[3].0.id, "pip:pandas:2.0");
+    }
+
+    #[test]
+    fn test_parse_go_sum() {
+        let content = "\
+golang.org/x/net v0.17.0 h1:abc123\n\
+golang.org/x/net v0.17.0/go.mod h1:def456\n\
+github.com/stretchr/testify v1.8.4 h1:ghi789\n";
+        let pairs = parse_go_sum(content);
+        assert_eq!(pairs.len(), 2); // deduplicated
+        assert_eq!(pairs[0].0.id, "go:golang.org/x/net:v0.17.0");
+        assert_eq!(pairs[0].0.ecosystem, "GoModule");
+        assert_eq!(pairs[1].0.id, "go:github.com/stretchr/testify:v1.8.4");
+    }
+
+    #[test]
+    fn test_parse_gemfile_lock() {
+        let content = "GEM\n  remote: https://rubygems.org/\n  specs:\n    rails (7.1.0)\n      actioncable (= 7.1.0)\n    rack (3.0.8)\n\nPLATFORMS\n  ruby\n";
+        let pairs = parse_gemfile_lock(content);
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].0.id, "gem:rails:7.1.0");
+        assert_eq!(pairs[0].0.ecosystem, "RubyGem");
+        assert_eq!(pairs[1].0.id, "gem:rack:3.0.8");
+    }
+
+    #[test]
+    fn test_parse_pom_xml() {
+        let content = r#"
+<project>
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.14.0</version>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+    </dependency>
+  </dependencies>
+</project>
+"#;
+        let pairs = parse_pom_xml(content);
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0].0.id, "mvn:org.apache.commons:commons-lang3:3.14.0");
+        assert_eq!(pairs[0].0.ecosystem, "MavenPackage");
+        assert_eq!(pairs[0].0.name, "org.apache.commons:commons-lang3");
+        assert_eq!(pairs[1].0.id, "mvn:junit:junit:4.13.2");
     }
 }

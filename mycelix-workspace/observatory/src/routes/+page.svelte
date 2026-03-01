@@ -97,6 +97,9 @@
         <a href="/analytics" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
           📊 Analytics
         </a>
+        <a href="/attribution" class="px-4 py-2 rounded-lg hover:bg-gray-700 text-gray-300 text-sm font-medium transition-colors">
+          🔗 Attribution
+        </a>
       </nav>
     </div>
   </header>

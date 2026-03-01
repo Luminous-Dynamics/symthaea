@@ -60,6 +60,8 @@ pub enum LinkTypes {
     DependencyToPledges,
     ContributorToPledges,
     AllPledges,
+    PledgeRateLimit,
+    PledgeById,
 }
 
 // ── Pure Validation Functions ────────────────────────────────────────
@@ -95,8 +97,7 @@ pub fn validate_create_pledge(
             ));
         }
     }
-    if pledge.pledge_type == PledgeType::Financial && pledge.currency.is_none()
-    {
+    if pledge.pledge_type == PledgeType::Financial && pledge.currency.is_none() {
         return Ok(ValidateCallbackResult::Invalid(
             "Financial pledges must specify a currency".into(),
         ));
@@ -142,8 +143,7 @@ pub fn validate_update_pledge(
             ));
         }
     }
-    if pledge.pledge_type == PledgeType::Financial && pledge.currency.is_none()
-    {
+    if pledge.pledge_type == PledgeType::Financial && pledge.currency.is_none() {
         return Ok(ValidateCallbackResult::Invalid(
             "Financial pledges must specify a currency".into(),
         ));
@@ -164,9 +164,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::ReciprocityPledge(pledge) => {
-                    validate_create_pledge(action, pledge)
-                }
+                EntryTypes::ReciprocityPledge(pledge) => validate_create_pledge(action, pledge),
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -190,7 +188,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         } => match link_type {
             LinkTypes::DependencyToPledges
             | LinkTypes::ContributorToPledges
-            | LinkTypes::AllPledges => Ok(ValidateCallbackResult::Valid),
+            | LinkTypes::AllPledges
+            | LinkTypes::PledgeRateLimit
+            | LinkTypes::PledgeById => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,
@@ -202,7 +202,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         } => match link_type {
             LinkTypes::DependencyToPledges
             | LinkTypes::ContributorToPledges
-            | LinkTypes::AllPledges => Ok(ValidateCallbackResult::Valid),
+            | LinkTypes::AllPledges
+            | LinkTypes::PledgeRateLimit
+            | LinkTypes::PledgeById => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::StoreRecord(_)
         | FlatOp::RegisterAgentActivity(_)
@@ -252,8 +254,7 @@ mod tests {
 
     #[test]
     fn test_valid_pledge() {
-        let result =
-            validate_create_pledge(test_action(), valid_pledge()).unwrap();
+        let result = validate_create_pledge(test_action(), valid_pledge()).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -261,8 +262,7 @@ mod tests {
     fn test_empty_pledge_id_rejected() {
         let mut p = valid_pledge();
         p.id = String::new();
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -270,8 +270,7 @@ mod tests {
     fn test_empty_dependency_id_rejected() {
         let mut p = valid_pledge();
         p.dependency_id = String::new();
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -279,8 +278,7 @@ mod tests {
     fn test_invalid_contributor_did_rejected() {
         let mut p = valid_pledge();
         p.contributor_did = "not-a-did".into();
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -288,8 +286,7 @@ mod tests {
     fn test_negative_amount_rejected() {
         let mut p = valid_pledge();
         p.amount = Some(-100.0);
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -297,8 +294,7 @@ mod tests {
     fn test_infinite_amount_rejected() {
         let mut p = valid_pledge();
         p.amount = Some(f64::INFINITY);
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -306,8 +302,7 @@ mod tests {
     fn test_nan_amount_rejected() {
         let mut p = valid_pledge();
         p.amount = Some(f64::NAN);
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -316,8 +311,7 @@ mod tests {
         let mut p = valid_pledge();
         p.pledge_type = PledgeType::Financial;
         p.currency = None;
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -327,8 +321,7 @@ mod tests {
         p.pledge_type = PledgeType::DeveloperTime;
         p.amount = None;
         p.currency = None;
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -336,8 +329,7 @@ mod tests {
     fn test_description_too_long_rejected() {
         let mut p = valid_pledge();
         p.description = "x".repeat(1001);
-        let result =
-            validate_create_pledge(test_action(), p).unwrap();
+        let result = validate_create_pledge(test_action(), p).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 

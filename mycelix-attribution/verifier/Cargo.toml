@@ -17,5 +17,7 @@ rand = "0.8"
 blake3 = "1"
 hex = "0.4"
 thiserror = "1.0"
-
-# winterfell = "0.10"  # Uncomment when ZK-STARK proof format is finalized
+winterfell = "0.13.1"
+winter-math = "0.13.1"
+winter-crypto = "0.13.1"
+mycelix-attribution-stark-common = { path = "../stark-common" }

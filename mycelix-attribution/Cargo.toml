@@ -8,7 +8,7 @@ members = [
     "zomes/reciprocity/integrity",
     "zomes/reciprocity/coordinator",
 ]
-exclude = ["tests", "cli", "verifier"]
+exclude = ["tests", "cli", "verifier", "prover", "stark-common"]
 
 [workspace.dependencies]
 hdk = "0.6.0"

@@ -1,0 +1,11 @@
+[package]
+name = "mycelix-attribution-stark-common"
+version = "0.1.0"
+edition = "2021"
+description = "Shared AIR definition for Mycelix Attribution ZK-STARK proofs"
+
+[dependencies]
+winterfell = "0.13.1"
+winter-math = "0.13.1"
+winter-crypto = "0.13.1"
+blake3 = "1"

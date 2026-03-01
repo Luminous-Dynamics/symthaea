@@ -11,14 +11,6 @@ struct DependencyIdRef {
 
 holochain_serialized_bytes::holochain_serial!(DependencyIdRef);
 
-/// Mirror type for extracting maintainer_did from registry entries.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct MaintainerRef {
-    maintainer_did: String,
-}
-
-holochain_serialized_bytes::holochain_serial!(MaintainerRef);
-
 // ── Signals ──────────────────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -33,6 +25,10 @@ pub enum UsageSignal {
         user_did: String,
     },
     AttestationVerified {
+        attestation_id: String,
+        dependency_id: String,
+    },
+    AttestationRevoked {
         attestation_id: String,
         dependency_id: String,
     },
@@ -80,22 +76,98 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     Ok(InitCallbackResult::Pass)
 }
 
+// ── Constants ───────────────────────────────────────────────────────
+
+const RATE_LIMIT_WINDOW_SECS: i64 = 60;
+const MAX_PAGE_SIZE: u64 = 1000;
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 fn anchor_hash(tag: &str) -> ExternResult<EntryHash> {
     hash_entry(&Anchor(tag.to_string()))
 }
 
-fn resolve_links(base: EntryHash, link_type: LinkTypes) -> ExternResult<Vec<Record>> {
+/// Validate that a dependency exists in the registry (cross-zome call).
+/// Gracefully allows the operation if the registry is unavailable.
+fn validate_dependency_exists(dep_id: &str) -> ExternResult<()> {
+    let encoded = ExternIO::encode(dep_id.to_string()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to encode dep_id: {}",
+            e
+        )))
+    })?;
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("registry"),
+        FunctionName::from("get_dependency"),
+        None,
+        encoded,
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => {
+            let record: Option<Record> = io.decode().unwrap_or(None);
+            match record {
+                Some(_) => Ok(()),
+                None => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Dependency '{}' not registered",
+                    dep_id
+                )))),
+            }
+        }
+        _ => Ok(()), // Graceful: allow if registry unavailable
+    }
+}
+
+/// Sliding-window rate limiter using links as timestamps.
+fn enforce_rate_limit(limit: u64) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let agent_hash = EntryHash::from(agent);
+    let now = sys_time()?;
+    let now_micros = now.as_micros();
+    let window_micros = RATE_LIMIT_WINDOW_SECS * 1_000_000;
+
+    // Create a rate-limit link (agent → agent, tagged with timestamp)
+    create_link(
+        agent_hash.clone(),
+        agent_hash.clone(),
+        LinkTypes::UsageRateLimit,
+        LinkTag::new(now_micros.to_le_bytes()),
+    )?;
+
+    // Count links within window
     let links = get_links(
-        LinkQuery::try_new(base, link_type)?,
+        LinkQuery::try_new(agent_hash, LinkTypes::UsageRateLimit)?,
         GetStrategy::default(),
     )?;
+
+    let cutoff = now_micros - window_micros;
+    let recent = links
+        .iter()
+        .filter(|l| {
+            if l.tag.0.len() >= 8 {
+                let ts = i64::from_le_bytes(l.tag.0[..8].try_into().unwrap_or([0; 8]));
+                ts > cutoff
+            } else {
+                false
+            }
+        })
+        .count() as u64;
+
+    if recent > limit {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Rate limit exceeded: {} requests in last {} seconds (limit: {})",
+            recent, RATE_LIMIT_WINDOW_SECS, limit
+        ))));
+    }
+
+    Ok(())
+}
+
+fn resolve_links(base: EntryHash, link_type: LinkTypes) -> ExternResult<Vec<Record>> {
+    let links = get_links(LinkQuery::try_new(base, link_type)?, GetStrategy::default())?;
     let mut records = Vec::new();
     for link in links {
-        let entry_hash = EntryHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let entry_hash = EntryHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(entry_hash, GetOptions::default())? {
             records.push(record);
         }
@@ -107,8 +179,10 @@ fn resolve_links(base: EntryHash, link_type: LinkTypes) -> ExternResult<Vec<Reco
 
 #[hdk_extern]
 pub fn record_usage(receipt: UsageReceipt) -> ExternResult<Record> {
-    let action_hash =
-        create_entry(&EntryTypes::UsageReceipt(receipt.clone()))?;
+    validate_dependency_exists(&receipt.dependency_id)?;
+    enforce_rate_limit(50)?;
+
+    let action_hash = create_entry(&EntryTypes::UsageReceipt(receipt.clone()))?;
     let entry_hash = hash_entry(&receipt)?;
 
     // Link: usage:{dep_id} → receipt
@@ -129,41 +203,34 @@ pub fn record_usage(receipt: UsageReceipt) -> ExternResult<Record> {
         (),
     )?;
 
-    // Notify maintainer (best-effort: emits local signal, attempts identity bridge)
-    notify_maintainer(&receipt.dependency_id, &receipt.user_did);
+    // Emit local signal for UI clients
+    let _ = emit_signal(&UsageSignal::UsageRecorded {
+        dependency_id: receipt.dependency_id.clone(),
+        user_did: receipt.user_did.clone(),
+    });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not fetch newly created usage receipt".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not fetch newly created usage receipt".into()
+    )))
 }
 
 #[hdk_extern]
 pub fn get_dependency_usage(dep_id: String) -> ExternResult<Vec<Record>> {
     let dep_tag = format!("usage:{}", dep_id);
-    resolve_links(
-        anchor_hash(&dep_tag)?,
-        LinkTypes::DependencyToUsageReceipts,
-    )
+    resolve_links(anchor_hash(&dep_tag)?, LinkTypes::DependencyToUsageReceipts)
 }
 
 #[hdk_extern]
 pub fn get_user_usage(did: String) -> ExternResult<Vec<Record>> {
     let user_tag = format!("user_usage:{}", did);
-    resolve_links(
-        anchor_hash(&user_tag)?,
-        LinkTypes::UserToUsageReceipts,
-    )
+    resolve_links(anchor_hash(&user_tag)?, LinkTypes::UserToUsageReceipts)
 }
 
 #[hdk_extern]
 pub fn get_usage_count(dep_id: String) -> ExternResult<u64> {
     let dep_tag = format!("usage:{}", dep_id);
     let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&dep_tag)?,
-            LinkTypes::DependencyToUsageReceipts,
-        )?,
+        LinkQuery::try_new(anchor_hash(&dep_tag)?, LinkTypes::DependencyToUsageReceipts)?,
         GetStrategy::default(),
     )?;
     Ok(links.len() as u64)
@@ -172,11 +239,11 @@ pub fn get_usage_count(dep_id: String) -> ExternResult<u64> {
 // ── Usage Attestation Externs ────────────────────────────────────────
 
 #[hdk_extern]
-pub fn submit_usage_attestation(
-    att: UsageAttestation,
-) -> ExternResult<Record> {
-    let action_hash =
-        create_entry(&EntryTypes::UsageAttestation(att.clone()))?;
+pub fn submit_usage_attestation(att: UsageAttestation) -> ExternResult<Record> {
+    validate_dependency_exists(&att.dependency_id)?;
+    enforce_rate_limit(10)?;
+
+    let action_hash = create_entry(&EntryTypes::UsageAttestation(att.clone()))?;
     let entry_hash = hash_entry(&att)?;
 
     // Link: attest:{dep_id} → attestation
@@ -202,23 +269,16 @@ pub fn submit_usage_attestation(
         user_did: att.user_did.clone(),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not fetch newly created attestation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not fetch newly created attestation".into()
+    )))
 }
 
 #[hdk_extern]
-pub fn verify_usage_attestation(
-    input: VerifyAttestationInput,
-) -> ExternResult<Record> {
-    let record = get(
-        input.original_action_hash.clone(),
-        GetOptions::default(),
-    )?
-    .ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Attestation not found".into()
-    )))?;
+pub fn verify_usage_attestation(input: VerifyAttestationInput) -> ExternResult<Record> {
+    let record = get(input.original_action_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Attestation not found".into())),
+    )?;
 
     let mut att: UsageAttestation = record
         .entry()
@@ -247,35 +307,26 @@ pub fn verify_usage_attestation(
         dependency_id: att.dependency_id.clone(),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not fetch verified attestation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not fetch verified attestation".into()
+    )))
 }
 
 #[hdk_extern]
-pub fn get_dependency_attestations(
-    dep_id: String,
-) -> ExternResult<Vec<Record>> {
+pub fn get_dependency_attestations(dep_id: String) -> ExternResult<Vec<Record>> {
     let dep_tag = format!("attest:{}", dep_id);
-    let all = resolve_links(
-        anchor_hash(&dep_tag)?,
-        LinkTypes::DependencyToAttestations,
-    )?;
+    let all = resolve_links(anchor_hash(&dep_tag)?, LinkTypes::DependencyToAttestations)?;
 
     // Filter out expired attestations
     let now = sys_time()?;
     let mut active = Vec::new();
     for record in all {
-        let att: Option<UsageAttestation> = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to deserialize attestation: {}",
-                    e
-                )))
-            })?;
+        let att: Option<UsageAttestation> = record.entry().to_app_option().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize attestation: {}",
+                e
+            )))
+        })?;
         match att {
             Some(a) if a.expires_at.is_some_and(|exp| exp < now) => {
                 // Expired — skip
@@ -286,18 +337,140 @@ pub fn get_dependency_attestations(
     Ok(active)
 }
 
+// ── Attestation Lifecycle ───────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RenewAttestationInput {
+    pub original_action_hash: ActionHash,
+    pub new_proof_bytes: Vec<u8>,
+    pub new_witness_commitment: Vec<u8>,
+}
+
+/// Revoke an attestation (author-only delete).
+#[hdk_extern]
+pub fn revoke_attestation(action_hash: ActionHash) -> ExternResult<ActionHash> {
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Attestation not found".into())
+    ))?;
+
+    // Author-only check
+    let author = record.action().author().clone();
+    let me = agent_info()?.agent_initial_pubkey;
+    if author != me {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the author can revoke an attestation".into()
+        )));
+    }
+
+    let att: UsageAttestation = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize attestation: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Record has no entry".into()
+        )))?;
+
+    let delete_hash = delete_entry(action_hash)?;
+
+    let _ = emit_signal(&UsageSignal::AttestationRevoked {
+        attestation_id: att.id,
+        dependency_id: att.dependency_id,
+    });
+
+    Ok(delete_hash)
+}
+
+/// Renew an attestation: create a new attestation linked to its predecessor.
+#[hdk_extern]
+pub fn renew_attestation(input: RenewAttestationInput) -> ExternResult<Record> {
+    let record =
+        get(input.original_action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Original attestation not found".into())
+        ))?;
+
+    let original: UsageAttestation = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize attestation: {}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Record has no entry".into()
+        )))?;
+
+    // Create renewed attestation (unverified)
+    let renewed = UsageAttestation {
+        id: format!("{}-renewed", original.id),
+        dependency_id: original.dependency_id.clone(),
+        user_did: original.user_did.clone(),
+        witness_commitment: input.new_witness_commitment,
+        proof_bytes: input.new_proof_bytes,
+        verified: false,
+        generated_at: sys_time()?,
+        expires_at: original.expires_at,
+        verifier_pubkey: None,
+        verifier_signature: None,
+    };
+
+    let new_action_hash = create_entry(&EntryTypes::UsageAttestation(renewed.clone()))?;
+    let new_entry_hash = hash_entry(&renewed)?;
+
+    // Link: predecessor → new attestation
+    let predecessor_hash = hash_entry(&original)?;
+    create_link(
+        predecessor_hash,
+        new_entry_hash.clone(),
+        LinkTypes::PredecessorToAttestation,
+        (),
+    )?;
+
+    // Re-create standard links
+    let dep_tag = format!("attest:{}", renewed.dependency_id);
+    create_link(
+        anchor_hash(&dep_tag)?,
+        new_entry_hash.clone(),
+        LinkTypes::DependencyToAttestations,
+        (),
+    )?;
+    let user_tag = format!("user_attest:{}", renewed.user_did);
+    create_link(
+        anchor_hash(&user_tag)?,
+        new_entry_hash,
+        LinkTypes::UserToAttestations,
+        (),
+    )?;
+
+    let _ = emit_signal(&UsageSignal::AttestationSubmitted {
+        dependency_id: renewed.dependency_id,
+        user_did: renewed.user_did,
+    });
+
+    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not fetch renewed attestation".into()
+    )))
+}
+
 // ── Paginated Usage Queries ─────────────────────────────────────────
 
 #[hdk_extern]
-pub fn get_dependency_usage_paginated(
-    input: PaginatedUsageInput,
-) -> ExternResult<PaginatedUsage> {
+pub fn get_dependency_usage_paginated(input: PaginatedUsageInput) -> ExternResult<PaginatedUsage> {
+    if input.pagination.limit > MAX_PAGE_SIZE {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Pagination limit {} exceeds maximum {}",
+            input.pagination.limit, MAX_PAGE_SIZE
+        ))));
+    }
     let dep_tag = format!("usage:{}", input.id);
     let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&dep_tag)?,
-            LinkTypes::DependencyToUsageReceipts,
-        )?,
+        LinkQuery::try_new(anchor_hash(&dep_tag)?, LinkTypes::DependencyToUsageReceipts)?,
         GetStrategy::default(),
     )?;
     let total = links.len() as u64;
@@ -310,9 +483,8 @@ pub fn get_dependency_usage_paginated(
 
     let mut items = Vec::new();
     for link in page_links {
-        let entry_hash = EntryHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let entry_hash = EntryHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(entry_hash, GetOptions::default())? {
             items.push(record);
         }
@@ -330,6 +502,7 @@ pub fn get_dependency_usage_paginated(
 
 #[hdk_extern]
 pub fn get_top_dependencies(limit: u64) -> ExternResult<Vec<TopDependency>> {
+    let limit = limit.min(MAX_PAGE_SIZE);
     // Get all dependencies via cross-zome call to registry
     let encoded = ExternIO::encode(()).map_err(|e| {
         wasm_error!(WasmErrorInner::Guest(format!(
@@ -352,18 +525,11 @@ pub fn get_top_dependencies(limit: u64) -> ExternResult<Vec<TopDependency>> {
     // For each dependency, count usage links
     let mut scored: Vec<TopDependency> = Vec::new();
     for record in dep_records {
-        let dep: Option<DependencyIdRef> = record
-            .entry()
-            .to_app_option()
-            .ok()
-            .flatten();
+        let dep: Option<DependencyIdRef> = record.entry().to_app_option().ok().flatten();
         if let Some(d) = dep {
             let dep_tag = format!("usage:{}", d.id);
             let count = get_links(
-                LinkQuery::try_new(
-                    anchor_hash(&dep_tag)?,
-                    LinkTypes::DependencyToUsageReceipts,
-                )?,
+                LinkQuery::try_new(anchor_hash(&dep_tag)?, LinkTypes::DependencyToUsageReceipts)?,
                 GetStrategy::default(),
             )?
             .len() as u64;
@@ -393,14 +559,13 @@ pub struct BulkUsageResult {
 }
 
 #[hdk_extern]
-pub fn bulk_record_usage(
-    receipts: Vec<UsageReceipt>,
-) -> ExternResult<BulkUsageResult> {
+pub fn bulk_record_usage(receipts: Vec<UsageReceipt>) -> ExternResult<BulkUsageResult> {
+    enforce_rate_limit(5)?;
+
     let mut records = Vec::new();
 
     for receipt in &receipts {
-        let action_hash =
-            create_entry(&EntryTypes::UsageReceipt(receipt.clone()))?;
+        let action_hash = create_entry(&EntryTypes::UsageReceipt(receipt.clone()))?;
         let entry_hash = hash_entry(receipt)?;
 
         let dep_tag = format!("usage:{}", receipt.dependency_id);
@@ -437,79 +602,4 @@ pub fn bulk_record_usage(
     }
 
     Ok(BulkUsageResult { recorded, records })
-}
-
-// ── Maintainer Notification (Identity Bridge) ──────────────────────
-//
-// When running inside the unified hApp (mycelix-unified-happ.yaml),
-// the identity DNA is available via CallTargetCell::OtherRole("identity").
-// This allows DID→AgentPubKey resolution for remote signals.
-//
-// Notification flow:
-//   1. record_usage() emits local UsageRecorded signal (current behavior)
-//   2. notify_maintainer() cross-zome calls registry to get maintainer_did
-//   3. Cross-role calls identity to resolve DID→AgentPubKey
-//   4. remote_signal() to maintainer's agent
-//
-// Steps 2-4 are best-effort and silently fail when:
-//   - Running as standalone hApp (no identity role)
-//   - Maintainer's agent is offline
-//   - DID is not registered in identity hApp
-
-/// Attempt to notify maintainer via remote signal.
-/// Best-effort: silently ignored if identity bridge is unavailable.
-fn notify_maintainer(dependency_id: &str, user_did: &str) {
-    // Step 1: Get maintainer_did from registry
-    let Ok(encoded) = ExternIO::encode(dependency_id.to_string()) else {
-        return;
-    };
-    let maintainer_did = match call(
-        CallTargetCell::Local,
-        ZomeName::from("registry"),
-        FunctionName::from("get_dependency"),
-        None,
-        encoded,
-    ) {
-        Ok(ZomeCallResponse::Ok(io)) => {
-            let record: Option<Record> = io.decode().ok().flatten();
-            record.and_then(|r| {
-                let m: Option<MaintainerRef> =
-                    r.entry().to_app_option().ok().flatten();
-                m.map(|mr| mr.maintainer_did)
-            })
-        }
-        _ => None,
-    };
-
-    let Some(did) = maintainer_did else { return };
-
-    // Step 2: Resolve DID→AgentPubKey via identity bridge
-    // This call goes to OtherRole("identity") in the unified hApp.
-    // If identity role is not present (standalone deployment), this fails silently.
-    let Ok(did_payload) = ExternIO::encode(did) else { return };
-    let _agent_key: Option<AgentPubKey> = match call(
-        CallTargetCell::OtherRole("identity".into()),
-        ZomeName::from("identity"),
-        FunctionName::from("resolve_did_to_agent"),
-        None,
-        did_payload,
-    ) {
-        Ok(ZomeCallResponse::Ok(io)) => io.decode().ok().flatten(),
-        _ => None, // Identity bridge not available — standalone mode
-    };
-
-    // Step 3: Send remote signal (when identity bridge is wired)
-    // if let Some(agent_key) = _agent_key {
-    //     let signal = UsageSignal::UsageRecorded {
-    //         dependency_id: dependency_id.to_string(),
-    //         user_did: user_did.to_string(),
-    //     };
-    //     let _ = remote_signal(ExternIO::encode(signal).unwrap(), vec![agent_key]);
-    // }
-
-    // For now: local signal only (all UI clients filter by dependency_id)
-    let _ = emit_signal(&UsageSignal::UsageRecorded {
-        dependency_id: dependency_id.to_string(),
-        user_did: user_did.to_string(),
-    });
 }

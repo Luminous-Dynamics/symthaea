@@ -52,10 +52,12 @@ pub async fn submit_to_conductor(
     // Bulk register dependencies
     let dep_count = deps.len();
     if !deps.is_empty() {
-        eprintln!("Submitting {} dependencies via bulk_register_dependencies...", dep_count);
+        eprintln!(
+            "Submitting {} dependencies via bulk_register_dependencies...",
+            dep_count
+        );
 
-        let payload = serde_json::to_value(&deps)
-            .context("Failed to serialize dependencies")?;
+        let payload = serde_json::to_value(&deps).context("Failed to serialize dependencies")?;
 
         let _result = app_ws
             .call_zome(
@@ -75,10 +77,13 @@ pub async fn submit_to_conductor(
     // Bulk record usage
     let receipt_count = receipts.len();
     if !receipts.is_empty() {
-        eprintln!("Submitting {} usage receipts via bulk_record_usage...", receipt_count);
+        eprintln!(
+            "Submitting {} usage receipts via bulk_record_usage...",
+            receipt_count
+        );
 
-        let payload = serde_json::to_value(&receipts)
-            .context("Failed to serialize usage receipts")?;
+        let payload =
+            serde_json::to_value(&receipts).context("Failed to serialize usage receipts")?;
 
         let _result = app_ws
             .call_zome(

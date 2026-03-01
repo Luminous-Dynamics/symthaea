@@ -14,6 +14,9 @@ export type DependencyEcosystem =
   | 'NpmPackage'
   | 'PythonPackage'
   | 'NixFlake'
+  | 'GoModule'
+  | 'RubyGem'
+  | 'MavenPackage'
   | 'Other';
 
 export interface DependencyIdentity {
@@ -173,8 +176,14 @@ export interface RegistrySignal {
   };
 }
 
+export interface RenewAttestationInput {
+  original_action_hash: Uint8Array;
+  new_proof_bytes: Uint8Array;
+  new_witness_commitment: Uint8Array;
+}
+
 export interface UsageSignal {
-  type: 'UsageRecorded' | 'AttestationSubmitted' | 'AttestationVerified';
+  type: 'UsageRecorded' | 'AttestationSubmitted' | 'AttestationVerified' | 'AttestationRevoked';
   payload: {
     dependency_id: string;
     user_did?: string;
@@ -412,6 +421,24 @@ export class AttributionClient {
       fn_name: 'get_dependency_attestations',
       payload: depId,
     }) as Promise<Record<string, unknown>[]>;
+  }
+
+  async revokeAttestation(actionHash: Uint8Array): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'usage',
+      fn_name: 'revoke_attestation',
+      payload: actionHash,
+    }) as Promise<Record<string, unknown>>;
+  }
+
+  async renewAttestation(input: RenewAttestationInput): Promise<Record<string, unknown>> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'usage',
+      fn_name: 'renew_attestation',
+      payload: input,
+    }) as Promise<Record<string, unknown>>;
   }
 
   // ── Reciprocity ──────────────────────────────────────────────────

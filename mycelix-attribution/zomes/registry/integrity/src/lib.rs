@@ -13,6 +13,9 @@ pub enum DependencyEcosystem {
     NpmPackage,
     PythonPackage,
     NixFlake,
+    GoModule,
+    RubyGem,
+    MavenPackage,
     Other,
 }
 
@@ -23,6 +26,9 @@ impl std::fmt::Display for DependencyEcosystem {
             Self::NpmPackage => write!(f, "npm_package"),
             Self::PythonPackage => write!(f, "python_package"),
             Self::NixFlake => write!(f, "nix_flake"),
+            Self::GoModule => write!(f, "go_module"),
+            Self::RubyGem => write!(f, "ruby_gem"),
+            Self::MavenPackage => write!(f, "maven_package"),
             Self::Other => write!(f, "other"),
         }
     }
@@ -140,9 +146,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::DependencyIdentity(dep) => {
-                    validate_create_dependency(action, dep)
-                }
+                EntryTypes::DependencyIdentity(dep) => validate_create_dependency(action, dep),
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -228,8 +232,7 @@ mod tests {
 
     #[test]
     fn test_valid_dependency() {
-        let result =
-            validate_create_dependency(test_action(), valid_dep()).unwrap();
+        let result = validate_create_dependency(test_action(), valid_dep()).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -237,8 +240,7 @@ mod tests {
     fn test_empty_id_rejected() {
         let mut dep = valid_dep();
         dep.id = String::new();
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -246,8 +248,7 @@ mod tests {
     fn test_id_too_long_rejected() {
         let mut dep = valid_dep();
         dep.id = "x".repeat(257);
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -255,8 +256,7 @@ mod tests {
     fn test_empty_name_rejected() {
         let mut dep = valid_dep();
         dep.name = String::new();
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -264,8 +264,7 @@ mod tests {
     fn test_name_too_long_rejected() {
         let mut dep = valid_dep();
         dep.name = "x".repeat(129);
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -273,8 +272,7 @@ mod tests {
     fn test_invalid_did_rejected() {
         let mut dep = valid_dep();
         dep.maintainer_did = "not-a-did".into();
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -282,8 +280,7 @@ mod tests {
     fn test_invalid_repo_url_rejected() {
         let mut dep = valid_dep();
         dep.repository_url = Some("ftp://example.com".into());
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -291,8 +288,7 @@ mod tests {
     fn test_none_repo_url_valid() {
         let mut dep = valid_dep();
         dep.repository_url = None;
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -300,8 +296,7 @@ mod tests {
     fn test_description_too_long_rejected() {
         let mut dep = valid_dep();
         dep.description = "x".repeat(501);
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -312,12 +307,14 @@ mod tests {
             DependencyEcosystem::NpmPackage,
             DependencyEcosystem::PythonPackage,
             DependencyEcosystem::NixFlake,
+            DependencyEcosystem::GoModule,
+            DependencyEcosystem::RubyGem,
+            DependencyEcosystem::MavenPackage,
             DependencyEcosystem::Other,
         ];
         for eco in ecosystems {
             let json = serde_json::to_string(&eco).unwrap();
-            let back: DependencyEcosystem =
-                serde_json::from_str(&json).unwrap();
+            let back: DependencyEcosystem = serde_json::from_str(&json).unwrap();
             assert_eq!(eco, back);
         }
     }
@@ -327,14 +324,19 @@ mod tests {
         assert_eq!(DependencyEcosystem::RustCrate.to_string(), "rust_crate");
         assert_eq!(DependencyEcosystem::NpmPackage.to_string(), "npm_package");
         assert_eq!(DependencyEcosystem::NixFlake.to_string(), "nix_flake");
+        assert_eq!(DependencyEcosystem::GoModule.to_string(), "go_module");
+        assert_eq!(DependencyEcosystem::RubyGem.to_string(), "ruby_gem");
+        assert_eq!(
+            DependencyEcosystem::MavenPackage.to_string(),
+            "maven_package"
+        );
     }
 
     #[test]
     fn test_boundary_id_length() {
         let mut dep = valid_dep();
         dep.id = "x".repeat(256);
-        let result =
-            validate_create_dependency(test_action(), dep).unwrap();
+        let result = validate_create_dependency(test_action(), dep).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 }

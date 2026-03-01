@@ -77,6 +77,8 @@ pub enum LinkTypes {
     UserToUsageReceipts,
     DependencyToAttestations,
     UserToAttestations,
+    PredecessorToAttestation,
+    UsageRateLimit,
 }
 
 // ── Pure Validation Functions ────────────────────────────────────────
@@ -170,12 +172,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::UsageReceipt(receipt) => {
-                    validate_create_usage_receipt(action, receipt)
-                }
-                EntryTypes::UsageAttestation(att) => {
-                    validate_create_usage_attestation(action, att)
-                }
+                EntryTypes::UsageReceipt(receipt) => validate_create_usage_receipt(action, receipt),
+                EntryTypes::UsageAttestation(att) => validate_create_usage_attestation(action, att),
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -184,12 +182,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 original_entry_hash: _,
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::UsageReceipt(_) => {
-                    Ok(ValidateCallbackResult::Invalid(
-                        "Usage receipts are immutable and cannot be updated"
-                            .into(),
-                    ))
-                }
+                EntryTypes::UsageReceipt(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Usage receipts are immutable and cannot be updated".into(),
+                )),
                 EntryTypes::UsageAttestation(_att) => {
                     // Allow updates only for verification fields.
                     // Full verification requires host access (must_get_valid_record),
@@ -210,9 +205,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::DependencyToUsageReceipts
             | LinkTypes::UserToUsageReceipts
             | LinkTypes::DependencyToAttestations
-            | LinkTypes::UserToAttestations => {
-                Ok(ValidateCallbackResult::Valid)
-            }
+            | LinkTypes::UserToAttestations
+            | LinkTypes::PredecessorToAttestation
+            | LinkTypes::UsageRateLimit => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,
@@ -225,9 +220,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::DependencyToUsageReceipts
             | LinkTypes::UserToUsageReceipts
             | LinkTypes::DependencyToAttestations
-            | LinkTypes::UserToAttestations => {
-                Ok(ValidateCallbackResult::Valid)
-            }
+            | LinkTypes::UserToAttestations
+            | LinkTypes::PredecessorToAttestation
+            | LinkTypes::UsageRateLimit => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::StoreRecord(_)
         | FlatOp::RegisterAgentActivity(_)
@@ -291,9 +286,7 @@ mod tests {
 
     #[test]
     fn test_valid_receipt() {
-        let result =
-            validate_create_usage_receipt(test_action(), valid_receipt())
-                .unwrap();
+        let result = validate_create_usage_receipt(test_action(), valid_receipt()).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -301,8 +294,7 @@ mod tests {
     fn test_empty_receipt_id_rejected() {
         let mut r = valid_receipt();
         r.id = String::new();
-        let result =
-            validate_create_usage_receipt(test_action(), r).unwrap();
+        let result = validate_create_usage_receipt(test_action(), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -310,8 +302,7 @@ mod tests {
     fn test_invalid_user_did_rejected() {
         let mut r = valid_receipt();
         r.user_did = "not-did".into();
-        let result =
-            validate_create_usage_receipt(test_action(), r).unwrap();
+        let result = validate_create_usage_receipt(test_action(), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -319,8 +310,7 @@ mod tests {
     fn test_context_too_long_rejected() {
         let mut r = valid_receipt();
         r.context = Some("x".repeat(1001));
-        let result =
-            validate_create_usage_receipt(test_action(), r).unwrap();
+        let result = validate_create_usage_receipt(test_action(), r).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -328,11 +318,7 @@ mod tests {
 
     #[test]
     fn test_valid_attestation() {
-        let result = validate_create_usage_attestation(
-            test_action(),
-            valid_attestation(),
-        )
-        .unwrap();
+        let result = validate_create_usage_attestation(test_action(), valid_attestation()).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -340,8 +326,7 @@ mod tests {
     fn test_wrong_commitment_size_rejected() {
         let mut a = valid_attestation();
         a.witness_commitment = vec![0xAB; 16]; // not 32
-        let result =
-            validate_create_usage_attestation(test_action(), a).unwrap();
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -349,8 +334,7 @@ mod tests {
     fn test_empty_proof_rejected() {
         let mut a = valid_attestation();
         a.proof_bytes = vec![];
-        let result =
-            validate_create_usage_attestation(test_action(), a).unwrap();
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -358,8 +342,7 @@ mod tests {
     fn test_oversized_proof_rejected() {
         let mut a = valid_attestation();
         a.proof_bytes = vec![0x01; 500_001];
-        let result =
-            validate_create_usage_attestation(test_action(), a).unwrap();
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -367,8 +350,7 @@ mod tests {
     fn test_invalid_verifier_pubkey_size() {
         let mut a = valid_attestation();
         a.verifier_pubkey = Some(vec![0u8; 33]); // not 32
-        let result =
-            validate_create_usage_attestation(test_action(), a).unwrap();
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -376,8 +358,7 @@ mod tests {
     fn test_invalid_verifier_signature_size() {
         let mut a = valid_attestation();
         a.verifier_signature = Some(vec![0u8; 63]); // not 64
-        let result =
-            validate_create_usage_attestation(test_action(), a).unwrap();
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 

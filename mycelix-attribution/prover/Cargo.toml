@@ -1,0 +1,20 @@
+[package]
+name = "mycelix-attribution-prover"
+version = "0.1.0"
+edition = "2021"
+description = "ZK-STARK proof generator for Mycelix Attribution usage attestations"
+
+[[bin]]
+name = "mycelix-attribution-prover"
+path = "src/main.rs"
+
+[dependencies]
+mycelix-attribution-stark-common = { path = "../stark-common" }
+winterfell = "0.13.1"
+winter-math = "0.13.1"
+winter-crypto = "0.13.1"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+blake3 = "1"
