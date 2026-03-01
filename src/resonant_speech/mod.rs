@@ -169,6 +169,28 @@ impl UserState {
         self.cognitive_load == CognitiveLoad::Overloaded
             || (self.cognitive_load == CognitiveLoad::High && self.frustration > 0.5)
     }
+
+    /// Create from neuromodulator bath signals.
+    ///
+    /// Maps allostatic load and consciousness level (Psi) to cognitive load,
+    /// with an oxytocin-mediated empathic override (Feldman 2012).
+    pub fn from_neuromod(allostatic_load: f32, psi: f64, arousal: f32, oxytocin: f32) -> Self {
+        let load_level = allostatic_load as f64 * 0.6 + (1.0 - psi) * 0.4;
+        // High oxytocin + low psi → empathic override (Feldman 2012)
+        let cognitive_load = if oxytocin > 0.6 && psi < 0.4 {
+            CognitiveLoad::Overloaded
+        } else {
+            CognitiveLoad::from_level(load_level)
+        };
+        Self {
+            cognitive_load,
+            frustration: allostatic_load as f64,
+            confidence: psi,
+            is_rushed: arousal > 0.7,
+            trust_in_sophia: (0.5 + oxytocin as f64 * 0.3).clamp(0.0, 1.0),
+            ..Default::default()
+        }
+    }
 }
 
 /// Profile for response generation
@@ -393,6 +415,36 @@ mod tests {
 
         let response = speech.generate("Content", "context");
         assert!(response.len() > "Content".len()); // Should have prefix
+    }
+
+    #[test]
+    fn from_neuromod_low_load_technical() {
+        let state = UserState::from_neuromod(0.1, 0.8, 0.3, 0.2);
+        // allostatic=0.1, psi=0.8 → load_level = 0.06 + 0.08 = 0.14 → Low
+        assert_eq!(state.cognitive_load, CognitiveLoad::Low);
+        assert!(!state.is_rushed);
+    }
+
+    #[test]
+    fn from_neuromod_high_load_empathic() {
+        let state = UserState::from_neuromod(0.9, 0.2, 0.5, 0.3);
+        // allostatic=0.9, psi=0.2 → load_level = 0.54 + 0.32 = 0.86 → Overloaded
+        assert_eq!(state.cognitive_load, CognitiveLoad::Overloaded);
+    }
+
+    #[test]
+    fn from_neuromod_oxytocin_empathy_override() {
+        let state = UserState::from_neuromod(0.3, 0.3, 0.5, 0.8);
+        // oxy=0.8 > 0.6, psi=0.3 < 0.4 → override to Overloaded
+        assert_eq!(state.cognitive_load, CognitiveLoad::Overloaded);
+    }
+
+    #[test]
+    fn from_neuromod_trust_from_oxytocin() {
+        let state = UserState::from_neuromod(0.3, 0.5, 0.3, 0.5);
+        // trust = (0.5 + 0.5 * 0.3) = 0.65
+        assert!(state.trust_in_sophia > 0.5, "trust={}", state.trust_in_sophia);
+        assert!((state.trust_in_sophia - 0.65).abs() < 0.01);
     }
 
     #[test]

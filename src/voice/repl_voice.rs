@@ -1782,6 +1782,19 @@ impl ReplVoiceOutput {
             } else {
                 let n_frames = (timed_phoneme.duration / dt).max(1.0) as usize;
 
+                // Look ahead: find next non-silence phoneme for anticipatory coarticulation
+                let next_phoneme = phonemes[ph_idx + 1..]
+                    .iter()
+                    .find(|p| p.phoneme != "SIL" && p.phoneme != "SP")
+                    .map(|p| p.phoneme.as_str());
+
+                // Pitch accent: primary-stressed vowels get H* accent
+                let pitch_accent = if timed_phoneme.stress == 1 {
+                    super::vocal_tract_fep::PitchAccent::High
+                } else {
+                    super::vocal_tract_fep::PitchAccent::None
+                };
+
                 for frame_i in 0..n_frames {
                     let phoneme_progress = frame_i as f32 / n_frames as f32;
                     // Phrase-local progress for F0 declination (resets after pauses)
@@ -1798,14 +1811,19 @@ impl ReplVoiceOutput {
                         stress: timed_phoneme.stress,
                         base_f0,
                         arousal,
+                        phrase_progress: utterance_progress,
+                        pitch_accent,
                         ..Default::default()
                     };
 
-                    let frame = pipeline.tick_with_prosody(
+                    let remaining = n_frames - frame_i;
+                    let frame = pipeline.tick_with_anticipation(
                         &cognitive_state,
                         None,
                         dt,
                         Some(&timed_phoneme.phoneme),
+                        next_phoneme,
+                        remaining,
                         &prosody,
                     );
                     all_frames.push(frame);
@@ -2256,6 +2274,7 @@ mod tests {
             stress: 0,
             base_f0,
             arousal: 0.5,
+            ..Default::default()
         };
         ctx_end.apply_prosody(&mut frame_end);
 
@@ -2271,6 +2290,7 @@ mod tests {
             stress: 0,
             base_f0,
             arousal: 0.5,
+            ..Default::default()
         };
         ctx_new.apply_prosody(&mut frame_new);
 

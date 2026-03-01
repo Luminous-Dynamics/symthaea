@@ -52,8 +52,8 @@ impl DemoRunner {
             arousal: m.affective_arousal,
             mood_temperature: m.mood_temperature,
             thermodynamic_load: m.thermodynamic_load,
-            moral_score: m.value_evaluator_score,
-            coherence: m.harmonic_field_coherence,
+            moral_score: m.ethics.value_evaluator_score,
+            coherence: m.harmonics.harmonic_field_coherence,
             flow_state: m.attention.gwt_broadcast,
             cycle_time_us: result.cycle_time_us,
             surprise_triggered: m.surprise_triggered,
@@ -82,13 +82,13 @@ impl DemoRunner {
             active_injection_count: m.neuromod.active_injection_count,
             attractor_detected: m.neuromod.neuromod_attractor_detected,
             // Mesh telemetry
-            mesh_health_score: m.mesh_health_score,
-            mesh_peer_count: m.mesh_peer_count,
-            mesh_bytes_sent: m.mesh_bytes_sent,
-            mesh_bytes_received: m.mesh_bytes_received,
-            mesh_compression_ratio: m.mesh_compression_ratio,
-            mesh_bandwidth_budget: m.mesh_bandwidth_budget,
-            mesh_packets_throttled: m.mesh_packets_throttled,
+            mesh_health_score: m.mesh.mesh_health_score,
+            mesh_peer_count: m.mesh.mesh_peer_count,
+            mesh_bytes_sent: m.mesh.mesh_bytes_sent,
+            mesh_bytes_received: m.mesh.mesh_bytes_received,
+            mesh_compression_ratio: m.mesh.mesh_compression_ratio,
+            mesh_bandwidth_budget: m.mesh.mesh_bandwidth_budget,
+            mesh_packets_throttled: m.mesh.mesh_packets_throttled,
             // Post-Phase 6: phase tracker visualization
             bath_centroid: self.service.bath_phase_tracker().centroid().to_vec(),
             bath_variance: self.service.bath_phase_tracker().variance().to_vec(),
@@ -106,7 +106,7 @@ impl DemoRunner {
             },
             bath_phase_label: self.service.bath_phase_label().to_string(),
             // Moral topology: conscience radar
-            harmony_coordinates: m.harmony_coordinates,
+            harmony_coordinates: m.harmonics.harmony_coordinates,
             harmony_labels: vec![
                 "Resonant Coherence".into(),
                 "Pan-Sentient Flourishing".into(),
@@ -116,17 +116,17 @@ impl DemoRunner {
                 "Sacred Reciprocity".into(),
                 "Evolutionary Progression".into(),
             ],
-            moral_free_energy: m.moral_topo_free_energy,
-            moral_kl_divergence: m.moral_kl_divergence,
-            moral_entropy: m.moral_entropy,
-            moral_surprise: m.moral_surprise,
-            moral_scenario_distribution: m.moral_scenario_distribution,
-            moral_prior_distribution: m.moral_prior_distribution,
-            moral_betti: [m.moral_topo_beta_0, m.moral_topo_beta_1, m.moral_topo_beta_2],
-            moral_unity: m.moral_topo_unity,
-            moral_completeness: m.moral_topo_completeness,
-            moral_circularity: m.moral_topo_circularity,
-            moral_dominant_harmony: m.moral_topo_dominant_harmony,
+            moral_free_energy: m.ethics.moral_topo_free_energy,
+            moral_kl_divergence: m.harmonics.moral_kl_divergence,
+            moral_entropy: m.harmonics.moral_entropy,
+            moral_surprise: m.harmonics.moral_surprise,
+            moral_scenario_distribution: m.harmonics.moral_scenario_distribution,
+            moral_prior_distribution: m.harmonics.moral_prior_distribution,
+            moral_betti: [m.ethics.moral_topo_beta_0, m.ethics.moral_topo_beta_1, m.ethics.moral_topo_beta_2],
+            moral_unity: m.ethics.moral_topo_unity,
+            moral_completeness: m.ethics.moral_topo_completeness,
+            moral_circularity: m.ethics.moral_topo_circularity,
+            moral_dominant_harmony: m.ethics.moral_topo_dominant_harmony,
             moral_persistent_features: self
                 .service
                 .ethics_engine()
@@ -151,6 +151,10 @@ impl DemoRunner {
                 .ethics_engine()
                 .moral_topology()
                 .moral_drift(20),
+            // Moral anomaly detection
+            moral_anomaly_score: m.ethics.moral_anomaly_score,
+            moral_value_inversion: m.ethics.moral_value_inversion,
+            moral_free_energy_spike: m.ethics.moral_free_energy_spike,
         }
     }
 

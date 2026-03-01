@@ -75,7 +75,7 @@ fn primitive_to_intent_index(primitives: &[String]) -> usize {
 /// - **Epistemic status**: Mapped from `prediction_error` (low error = Certain,
 ///   high error = Unknown).
 /// - **Emotion**: Taken from `metadata.affective_valence` and `metadata.affective_arousal`.
-/// - **Consciousness**: Psi from `metadata.psi_attention_avg`, coherence from
+/// - **Consciousness**: Psi from `metadata.attention.psi_attention_avg`, coherence from
 ///   thought vector norm.
 ///
 /// # Arguments
@@ -114,7 +114,7 @@ pub fn cycle_result_to_thought_channels(result: &CycleResult) -> ThoughtChannels
     channels.set_emotion(valence, arousal, warmth);
 
     // Consciousness metrics
-    let psi = result.metadata.psi_attention_avg;
+    let psi = result.metadata.attention.psi_attention_avg;
     // Use thought_vector norm as a proxy for meta-awareness (bounded to [0, 1])
     let meta_awareness = if result.thought_vector.is_empty() {
         0.5

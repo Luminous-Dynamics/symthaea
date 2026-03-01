@@ -136,6 +136,9 @@ pub struct MeshReceiver {
     /// Optional ChaCha20-Poly1305 decryption key for incoming packets.
     #[cfg(feature = "mesh-encryption")]
     encryption_key: Option<[u8; 32]>,
+    /// Whether to decrypt individual LoRa fragments (fragment-level AEAD).
+    #[cfg(feature = "mesh-encryption")]
+    fragment_encryption: bool,
 }
 
 impl MeshReceiver {
@@ -154,16 +157,31 @@ impl MeshReceiver {
             stats: ReceiverStats::default(),
             #[cfg(feature = "mesh-encryption")]
             encryption_key: None,
+            #[cfg(feature = "mesh-encryption")]
+            fragment_encryption: false,
         }
     }
 
     /// Set the ChaCha20-Poly1305 decryption key for incoming packets.
     ///
     /// When set, incoming data is decrypted before decompression.
-    /// If decryption fails, falls back to unencrypted parsing (backward compat).
+    /// If decryption fails, the packet is rejected (no fallback when key is set).
     #[cfg(feature = "mesh-encryption")]
     pub fn with_encryption_key(mut self, key: [u8; 32]) -> Self {
         self.encryption_key = Some(key);
+        self
+    }
+
+    /// Update the encryption key at runtime (for bridge key propagation).
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_encryption_key(&mut self, key: Option<[u8; 32]>) {
+        self.encryption_key = key;
+    }
+
+    /// Enable fragment-level AEAD decryption for LoRa fragments.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn with_fragment_encryption(mut self, enabled: bool) -> Self {
+        self.fragment_encryption = enabled;
         self
     }
 
@@ -195,6 +213,29 @@ impl MeshReceiver {
     /// reassembly. Returns `None` if more fragments are needed, the fragment
     /// was corrupt, or it was a duplicate.
     pub fn receive_fragment(&mut self, source: [u8; 8], raw: &[u8]) -> Option<WisdomPacket> {
+        // Decrypt fragment-level AEAD if enabled
+        #[cfg(feature = "mesh-encryption")]
+        let decrypted_buf;
+        #[cfg(feature = "mesh-encryption")]
+        let raw = if self.fragment_encryption {
+            if let Some(ref key) = self.encryption_key {
+                match super::decrypt_fragment(raw, key) {
+                    Some(plain) => {
+                        decrypted_buf = plain;
+                        decrypted_buf.as_slice()
+                    }
+                    None => {
+                        self.stats.packets_decrypt_failed += 1;
+                        return None;
+                    }
+                }
+            } else {
+                raw
+            }
+        } else {
+            raw
+        };
+
         // Parse and CRC-validate
         let frag = match LoRaFragment::from_bytes(raw) {
             Some(f) => f,
@@ -295,15 +336,20 @@ impl MeshReceiver {
     fn decode_envelope(&mut self, data: &[u8]) -> Option<WisdomPacket> {
         #[cfg(feature = "mesh-encryption")]
         if let Some(ref key) = self.encryption_key {
+            // Try standard ChaCha20-Poly1305 (12-byte nonce)
             if let Some(decrypted) = super::decrypt_packet(data, key) {
                 return super::decompress_packet(&decrypted)
                     .and_then(|raw| WisdomPacket::from_bytes(&raw))
                     .or_else(|| WisdomPacket::from_bytes(&decrypted));
             }
-            // Decryption failed — reject the packet. When an encryption key
-            // is set, only authenticated ciphertext is accepted. Falling back
-            // to unencrypted parsing would allow ciphertext to be misinterpreted
-            // as a (garbled) WisdomPacket, which is a security risk.
+            // Try XChaCha20-Poly1305 (24-byte nonce)
+            if let Some(decrypted) = super::decrypt_packet_xchacha(data, key) {
+                return super::decompress_packet(&decrypted)
+                    .and_then(|raw| WisdomPacket::from_bytes(&raw))
+                    .or_else(|| WisdomPacket::from_bytes(&decrypted));
+            }
+            // Both failed — reject. When key is set, only authenticated
+            // ciphertext is accepted.
             self.stats.packets_decrypt_failed += 1;
             return None;
         }

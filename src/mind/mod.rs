@@ -163,9 +163,16 @@ pub struct ContinuousMind {
     /// Optional BLAKE3 key for packet authentication.
     #[cfg(feature = "mesh")]
     mesh_auth_key: Option<[u8; 32]>,
-    /// Optional ChaCha20-Poly1305 encryption key for mesh packets.
+    /// Optional ChaCha20-Poly1305 encryption key pair with rotation support.
     #[cfg(feature = "mesh-encryption")]
-    pub(crate) mesh_encryption_key: Option<[u8; 32]>,
+    pub(crate) mesh_encryption_key: Option<crate::swarm::mesh::RotatingKeyPair>,
+    /// Random epoch byte for nonce construction — prevents restart nonce reuse.
+    /// Generated once at Mind construction from thread_rng.
+    #[cfg(feature = "mesh-encryption")]
+    pub(crate) mesh_encryption_epoch: u8,
+    /// Per-peer X25519 key store for Diffie-Hellman key agreement.
+    #[cfg(feature = "mesh-key-exchange")]
+    pub(crate) mesh_peer_keys: Option<crate::swarm::mesh::PeerKeyStore>,
     /// Ring buffer of recently-emitted wisdom packets for partition recovery replay.
     #[cfg(feature = "mesh")]
     mesh_replay_buffer: std::collections::VecDeque<crate::swarm::mesh::WisdomPacket>,
@@ -175,6 +182,13 @@ pub struct ContinuousMind {
     /// Whether any emission was throttled within the current bandwidth window.
     #[cfg(feature = "mesh")]
     mesh_bandwidth_throttled_in_window: bool,
+    /// Cached moral topology summary for mesh telemetry gossip.
+    #[cfg(feature = "mesh")]
+    cached_moral_topology: Option<crate::hdc::moral_topology::MoralTopologySummary>,
+    /// Memory coordinator for cross-tier integration (graduation, pruning, retrieval tracking).
+    pub(crate) memory_coordinator: crate::memory::memory_coordinator::MemoryCoordinator,
+    /// Optional episodic memory for dream-state causal pruning.
+    pub(crate) episodic_memory: Option<crate::memory::episodic_replay::EpisodicMemory>,
     /// Dream-level neuromodulator bath for sleep neurochemistry.
     /// Tracks adenosine clearance, allostatic recovery, and 5-HT1A up-regulation
     /// independently from the cognitive loop's bath (which doesn't run during dreams).
@@ -272,6 +286,10 @@ impl ContinuousMind {
             mesh_auth_key: None,
             #[cfg(feature = "mesh-encryption")]
             mesh_encryption_key: None,
+            #[cfg(feature = "mesh-encryption")]
+            mesh_encryption_epoch: rand::Rng::gen::<u8>(&mut rand::thread_rng()),
+            #[cfg(feature = "mesh-key-exchange")]
+            mesh_peer_keys: None,
             #[cfg(feature = "mesh")]
             mesh_replay_buffer: std::collections::VecDeque::with_capacity(
                 mesh::MESH_REPLAY_BUFFER_CAPACITY,
@@ -280,6 +298,10 @@ impl ContinuousMind {
             mesh_bandwidth_budget: mesh::MESH_BANDWIDTH_INITIAL,
             #[cfg(feature = "mesh")]
             mesh_bandwidth_throttled_in_window: false,
+            #[cfg(feature = "mesh")]
+            cached_moral_topology: None,
+            memory_coordinator: crate::memory::memory_coordinator::MemoryCoordinator::default(),
+            episodic_memory: None,
             dream_bath: symthaea_neuromodulators::NeuromodulatorBath::default(),
             cortex: crate::swarm::HolochainCortex::default(),
             #[cfg(feature = "liquid-mamba")]

@@ -939,10 +939,35 @@ pub const AEAD_NONCE_SIZE: usize = 12;
 #[cfg(feature = "mesh-encryption")]
 pub const AEAD_TAG_SIZE: usize = 16;
 
+/// Build a 12-byte ChaCha20-Poly1305 nonce with type separation and epoch.
+///
+/// Layout: `source_id[0..6] | payload_type | epoch | sequence[0..4]`
+///
+/// - **payload_type** prevents nonce collision across wisdom/heartbeat/affective/gradient
+///   sequences (all start at 0 but use different type bytes).
+/// - **epoch** is a random byte generated once at Mind construction, preventing
+///   restart nonce reuse under the same key.
+/// - **sequence** is per-type monotonic (wraps safely at 2^32 ≈ 2.7 years at 50Hz).
+#[cfg(feature = "mesh-encryption")]
+pub fn build_nonce(
+    source_id: &[u8; 8],
+    payload_type: u8,
+    epoch: u8,
+    sequence: u32,
+) -> [u8; 12] {
+    let mut nonce = [0u8; 12];
+    nonce[..6].copy_from_slice(&source_id[..6]);
+    nonce[6] = payload_type;
+    nonce[7] = epoch;
+    nonce[8..12].copy_from_slice(&sequence.to_le_bytes());
+    nonce
+}
+
 /// Encrypt a compressed packet envelope using ChaCha20-Poly1305.
 ///
 /// Returns `[nonce (12 bytes) | ciphertext+tag]`.
-/// The nonce is derived from source_id (8 bytes) + sequence (4 bytes LE).
+/// The nonce includes payload_type and epoch to prevent cross-type
+/// and restart nonce reuse. See [`build_nonce`].
 #[cfg(feature = "mesh-encryption")]
 pub fn encrypt_packet(
     envelope: &[u8],
@@ -950,11 +975,25 @@ pub fn encrypt_packet(
     source_id: &[u8; 8],
     sequence: u32,
 ) -> Vec<u8> {
+    encrypt_packet_typed(envelope, key, source_id, 0, 0, sequence)
+}
+
+/// Encrypt with explicit payload_type and epoch (nonce-safe variant).
+///
+/// Prefer this over [`encrypt_packet`] to prevent nonce reuse across
+/// packet types and across node restarts.
+#[cfg(feature = "mesh-encryption")]
+pub fn encrypt_packet_typed(
+    envelope: &[u8],
+    key: &[u8; 32],
+    source_id: &[u8; 8],
+    payload_type: u8,
+    epoch: u8,
+    sequence: u32,
+) -> Vec<u8> {
     use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
     let cipher = ChaCha20Poly1305::new(key.into());
-    let mut nonce_bytes = [0u8; 12];
-    nonce_bytes[..8].copy_from_slice(source_id);
-    nonce_bytes[8..].copy_from_slice(&sequence.to_le_bytes());
+    let nonce_bytes = build_nonce(source_id, payload_type, epoch, sequence);
     let nonce = Nonce::from(nonce_bytes);
     let ciphertext = cipher
         .encrypt(&nonce, envelope)
@@ -977,6 +1016,52 @@ pub fn decrypt_packet(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
     let (nonce_bytes, ciphertext) = data.split_at(AEAD_NONCE_SIZE);
     let cipher = ChaCha20Poly1305::new(key.into());
     let nonce = Nonce::from_slice(nonce_bytes);
+    cipher.decrypt(nonce, ciphertext).ok()
+}
+
+// ============================================================================
+// XChaCha20-Poly1305 (NONCE-MISUSE RESISTANT)
+// ============================================================================
+
+/// Nonce size for XChaCha20-Poly1305 (192 bits).
+#[cfg(feature = "mesh-encryption")]
+pub const XCHACHA_NONCE_SIZE: usize = 24;
+
+/// Encrypt using XChaCha20-Poly1305 with a random 24-byte nonce.
+///
+/// XChaCha20 uses a 192-bit nonce large enough for random generation
+/// without collision risk (birthday bound ≈ 2^96). This eliminates
+/// nonce-reuse concerns entirely at the cost of 12 extra nonce bytes per packet.
+///
+/// Returns `[nonce (24 bytes) | ciphertext+tag]`.
+#[cfg(feature = "mesh-encryption")]
+pub fn encrypt_packet_xchacha(envelope: &[u8], key: &[u8; 32]) -> Vec<u8> {
+    use chacha20poly1305::{aead::Aead, XChaCha20Poly1305, KeyInit, XNonce};
+    let cipher = XChaCha20Poly1305::new(key.into());
+    let mut nonce_bytes = [0u8; 24];
+    rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce_bytes);
+    let nonce = XNonce::from(nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(&nonce, envelope)
+        .expect("encryption never fails for valid inputs");
+    let mut out = Vec::with_capacity(24 + ciphertext.len());
+    out.extend_from_slice(&nonce_bytes);
+    out.extend_from_slice(&ciphertext);
+    out
+}
+
+/// Decrypt a packet encrypted with [`encrypt_packet_xchacha`].
+///
+/// Returns `None` if decryption/authentication fails.
+#[cfg(feature = "mesh-encryption")]
+pub fn decrypt_packet_xchacha(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
+    use chacha20poly1305::{aead::Aead, XChaCha20Poly1305, KeyInit, XNonce};
+    if data.len() < XCHACHA_NONCE_SIZE + AEAD_TAG_SIZE {
+        return None;
+    }
+    let (nonce_bytes, ciphertext) = data.split_at(XCHACHA_NONCE_SIZE);
+    let cipher = XChaCha20Poly1305::new(key.into());
+    let nonce = XNonce::from_slice(nonce_bytes);
     cipher.decrypt(nonce, ciphertext).ok()
 }
 
@@ -1046,9 +1131,21 @@ impl RotatingKeyPair {
         self.previous.is_some()
     }
 
-    /// Encrypt with the current key.
+    /// Encrypt with the current key (legacy — uses type=0, epoch=0).
     pub fn encrypt(&self, envelope: &[u8], source_id: &[u8; 8], sequence: u32) -> Vec<u8> {
         encrypt_packet(envelope, &self.current, source_id, sequence)
+    }
+
+    /// Encrypt with the current key, using typed nonce for cross-type safety.
+    pub fn encrypt_typed(
+        &self,
+        envelope: &[u8],
+        source_id: &[u8; 8],
+        payload_type: u8,
+        epoch: u8,
+        sequence: u32,
+    ) -> Vec<u8> {
+        encrypt_packet_typed(envelope, &self.current, source_id, payload_type, epoch, sequence)
     }
 
     /// Decrypt trying the current key first, then the previous key during grace.
@@ -2555,6 +2652,121 @@ mod tests {
         // Too short — less than nonce + tag
         let short = vec![0u8; AEAD_NONCE_SIZE + AEAD_TAG_SIZE - 1];
         assert!(decrypt_packet(&short, &key).is_none());
+    }
+
+    // -- Nonce construction tests --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_build_nonce_layout() {
+        let source = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        let nonce = build_nonce(&source, 2, 0xAB, 0x12345678);
+        // source_id[0..6] | type | epoch | sequence LE
+        assert_eq!(&nonce[..6], &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06]);
+        assert_eq!(nonce[6], 2); // payload_type
+        assert_eq!(nonce[7], 0xAB); // epoch
+        assert_eq!(&nonce[8..12], &0x12345678u32.to_le_bytes());
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_typed_nonce_prevents_cross_type_collision() {
+        let key = [0x42u8; 32];
+        let source_id = [0x01u8; 8];
+        let plaintext = b"same sequence, different type";
+
+        // Same key, same sequence — but different payload_type
+        let ct_wisdom = encrypt_packet_typed(plaintext, &key, &source_id, 0, 0, 1);
+        let ct_heartbeat = encrypt_packet_typed(plaintext, &key, &source_id, 2, 0, 1);
+
+        // Ciphertexts must differ (different nonces)
+        assert_ne!(ct_wisdom, ct_heartbeat);
+
+        // Both decrypt successfully
+        assert_eq!(
+            decrypt_packet(&ct_wisdom, &key).unwrap(),
+            plaintext.to_vec()
+        );
+        assert_eq!(
+            decrypt_packet(&ct_heartbeat, &key).unwrap(),
+            plaintext.to_vec()
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_typed_nonce_epoch_prevents_restart_collision() {
+        let key = [0x42u8; 32];
+        let source_id = [0x01u8; 8];
+        let plaintext = b"restart safety";
+
+        // Same key, same type, same sequence — but different epoch
+        let ct_epoch_a = encrypt_packet_typed(plaintext, &key, &source_id, 0, 0x11, 1);
+        let ct_epoch_b = encrypt_packet_typed(plaintext, &key, &source_id, 0, 0x22, 1);
+
+        // Ciphertexts must differ (different nonces)
+        assert_ne!(ct_epoch_a, ct_epoch_b);
+
+        // Both decrypt successfully
+        assert!(decrypt_packet(&ct_epoch_a, &key).is_some());
+        assert!(decrypt_packet(&ct_epoch_b, &key).is_some());
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_encrypt_packet_typed_roundtrip() {
+        let key = [0x42u8; 32];
+        let source_id = [0x01u8; 8];
+        let plaintext = b"typed encryption test";
+
+        let ciphertext = encrypt_packet_typed(plaintext, &key, &source_id, 3, 0xFF, 999);
+        let decrypted = decrypt_packet(&ciphertext, &key).expect("decryption should succeed");
+        assert_eq!(decrypted, plaintext);
+    }
+
+    // -- XChaCha20-Poly1305 tests --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_xchacha_roundtrip() {
+        let key = [0x42u8; 32];
+        let plaintext = b"XChaCha20-Poly1305 nonce-misuse resistant";
+
+        let ciphertext = encrypt_packet_xchacha(plaintext, &key);
+        // First 24 bytes are the random nonce
+        assert!(ciphertext.len() > XCHACHA_NONCE_SIZE + AEAD_TAG_SIZE);
+
+        let decrypted = decrypt_packet_xchacha(&ciphertext, &key).expect("should decrypt");
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_xchacha_wrong_key_fails() {
+        let key_a = [0x42u8; 32];
+        let key_b = [0x99u8; 32];
+        let plaintext = b"key mismatch";
+
+        let ciphertext = encrypt_packet_xchacha(plaintext, &key_a);
+        assert!(decrypt_packet_xchacha(&ciphertext, &key_b).is_none());
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_xchacha_unique_nonces() {
+        let key = [0x42u8; 32];
+        let plaintext = b"nonce uniqueness";
+
+        let ct1 = encrypt_packet_xchacha(plaintext, &key);
+        let ct2 = encrypt_packet_xchacha(plaintext, &key);
+
+        // Random nonces should differ
+        assert_ne!(&ct1[..XCHACHA_NONCE_SIZE], &ct2[..XCHACHA_NONCE_SIZE]);
+        // Both should decrypt to the same plaintext
+        assert_eq!(
+            decrypt_packet_xchacha(&ct1, &key).unwrap(),
+            decrypt_packet_xchacha(&ct2, &key).unwrap()
+        );
     }
 
     // -- Key Rotation tests --

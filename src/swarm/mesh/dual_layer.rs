@@ -106,6 +106,16 @@ pub struct DualLayerMesh {
     /// Optional ChaCha20-Poly1305 encryption key for packet envelopes.
     #[cfg(feature = "mesh-encryption")]
     encryption_key: Option<[u8; 32]>,
+    /// Random epoch byte for nonce construction (prevents restart nonce reuse).
+    #[cfg(feature = "mesh-encryption")]
+    encryption_epoch: u8,
+    /// Whether to encrypt individual LoRa fragments (fragment-level AEAD).
+    ///
+    /// When `true`, each LoRa fragment gets its own ChaCha20-Poly1305 envelope
+    /// so tampering is detected per-fragment, not only after full reassembly.
+    /// Adds 28 bytes overhead per fragment (nonce + tag).
+    #[cfg(feature = "mesh-encryption")]
+    fragment_encryption: bool,
 }
 
 impl DualLayerMesh {
@@ -118,6 +128,10 @@ impl DualLayerMesh {
             yggdrasil: None,
             #[cfg(feature = "mesh-encryption")]
             encryption_key: None,
+            #[cfg(feature = "mesh-encryption")]
+            encryption_epoch: 0,
+            #[cfg(feature = "mesh-encryption")]
+            fragment_encryption: false,
         }
     }
 
@@ -129,6 +143,38 @@ impl DualLayerMesh {
     pub fn with_encryption_key(mut self, key: [u8; 32]) -> Self {
         self.encryption_key = Some(key);
         self
+    }
+
+    /// Set the encryption epoch for nonce construction.
+    ///
+    /// Should be a random byte generated once per Mind/node lifetime.
+    /// Prevents nonce reuse across restarts under the same key.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn with_encryption_epoch(mut self, epoch: u8) -> Self {
+        self.encryption_epoch = epoch;
+        self
+    }
+
+    /// Enable fragment-level AEAD for LoRa transmissions.
+    ///
+    /// When enabled, each LoRa fragment is individually encrypted,
+    /// providing per-fragment tamper detection.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn with_fragment_encryption(mut self, enabled: bool) -> Self {
+        self.fragment_encryption = enabled;
+        self
+    }
+
+    /// Update the encryption key at runtime (for bridge key propagation).
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_encryption_key(&mut self, key: Option<[u8; 32]>) {
+        self.encryption_key = key;
+    }
+
+    /// Update the encryption epoch at runtime.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_encryption_epoch(&mut self, epoch: u8) {
+        self.encryption_epoch = epoch;
     }
 
     /// Attach a LoRa transport (Cruise-mode routing).
@@ -205,9 +251,18 @@ impl DualLayerMesh {
         let compressed = super::compress_packet(&raw);
 
         // Optionally encrypt the compressed envelope (compress → encrypt).
+        // Uses typed nonce: source_id[0..6] | payload_type | epoch | sequence
+        // to prevent cross-type nonce collision and restart reuse.
         #[cfg(feature = "mesh-encryption")]
         let envelope = if let Some(ref key) = self.encryption_key {
-            super::encrypt_packet(&compressed, key, &packet.source_id, packet.sequence)
+            super::encrypt_packet_typed(
+                &compressed,
+                key,
+                &packet.source_id,
+                packet.payload_type as u8,
+                self.encryption_epoch,
+                packet.sequence,
+            )
         } else {
             compressed
         };
@@ -221,6 +276,21 @@ impl DualLayerMesh {
                 let mut buf = [0u8; LORA_MTU];
                 for frag in &frags {
                     let len = frag.to_bytes(&mut buf);
+                    // Optionally encrypt each fragment individually
+                    #[cfg(feature = "mesh-encryption")]
+                    if self.fragment_encryption {
+                        if let Some(ref key) = self.encryption_key {
+                            let encrypted = super::encrypt_fragment(
+                                &buf[..len],
+                                key,
+                                &packet.source_id,
+                                packet.thought_id(),
+                                frag.fragment_index,
+                            );
+                            transport.send_raw(&encrypted)?;
+                            continue;
+                        }
+                    }
                     transport.send_raw(&buf[..len])?;
                 }
             }

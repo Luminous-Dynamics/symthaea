@@ -267,6 +267,9 @@ impl MetricsRegistry {
         // Neuromodulator bath metrics
         register_bath_metrics(&registry);
 
+        // Module timing metrics (microseconds per cycle)
+        register_timing_metrics(&registry);
+
         registry
     }
 
@@ -466,6 +469,140 @@ pub fn update_bath_metrics(
     registry.set_gauge("bath_entropy", 0.0);
 }
 
+/// Register module timing gauge metrics in the given registry.
+pub fn register_timing_metrics(registry: &MetricsRegistry) {
+    registry.register_gauge(
+        "symthaea_timing_core_hdc_encode_us",
+        "HDC encoding time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_core_cfc_step_us",
+        "CfC temporal step time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_core_training_us",
+        "Training step time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_consciousness_engine_us",
+        "Consciousness engine total time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_ethics_engine_us",
+        "Ethics engine total time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_fep_inference_us",
+        "FEP predictive processing time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_resonator_us",
+        "Resonator recall time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_gwt_us",
+        "Global workspace broadcast time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_spectral_mip_us",
+        "Spectral MIP finder time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_moral_topology_us",
+        "Moral topology analysis time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_homeostasis_us",
+        "Homeostasis clamp time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_metadata_assembly_us",
+        "Metadata assembly time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_parallel_postprocess_us",
+        "Parallel post-processing time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_dream_cycle_us",
+        "Dream cycle time (microseconds)",
+    );
+    registry.register_gauge(
+        "symthaea_timing_total_cycle_us",
+        "Total cognitive cycle time (microseconds)",
+    );
+}
+
+/// Update timing gauge values from a completed cycle's `ModuleTimings`.
+pub fn update_timing_metrics(
+    registry: &MetricsRegistry,
+    timings: &crate::cognitive_loop::ModuleTimings,
+    cycle_duration_us: u64,
+) {
+    registry.set_gauge(
+        "symthaea_timing_core_hdc_encode_us",
+        timings.core_hdc_encode as f64,
+    );
+    registry.set_gauge(
+        "symthaea_timing_core_cfc_step_us",
+        timings.core_cfc_step as f64,
+    );
+    registry.set_gauge(
+        "symthaea_timing_core_training_us",
+        timings.core_training as f64,
+    );
+    // Consciousness engine: sum of sub-components if engine total is 0
+    let cons_engine = if timings.consciousness_engine > 0 {
+        timings.consciousness_engine
+    } else {
+        timings.consciousness_engine_equation_v2
+            + timings.consciousness_engine_pipeline
+            + timings.consciousness_engine_multimodal
+    };
+    registry.set_gauge("symthaea_timing_consciousness_engine_us", cons_engine as f64);
+    // Ethics engine: sum of sub-components if engine total is 0
+    let ethics_engine = if timings.ethics_engine > 0 {
+        timings.ethics_engine
+    } else {
+        timings.ethics_engine_moral + timings.ethics_engine_value + timings.ethics_engine_harmonies
+    };
+    registry.set_gauge("symthaea_timing_ethics_engine_us", ethics_engine as f64);
+    registry.set_gauge(
+        "symthaea_timing_fep_inference_us",
+        timings.predictive_processing as f64,
+    );
+    registry.set_gauge(
+        "symthaea_timing_resonator_us",
+        timings.resonator_recall as f64,
+    );
+    registry.set_gauge("symthaea_timing_gwt_us", timings.gwt as f64);
+    registry.set_gauge(
+        "symthaea_timing_spectral_mip_us",
+        timings.spectral_mip as f64,
+    );
+    registry.set_gauge(
+        "symthaea_timing_moral_topology_us",
+        timings.moral_topology as f64,
+    );
+    registry.set_gauge(
+        "symthaea_timing_homeostasis_us",
+        timings.homeostasis as f64,
+    );
+    registry.set_gauge(
+        "symthaea_timing_metadata_assembly_us",
+        timings.metadata_assembly as f64,
+    );
+    registry.set_gauge(
+        "symthaea_timing_parallel_postprocess_us",
+        timings.core_parallel_postprocess as f64,
+    );
+    registry.set_gauge(
+        "symthaea_timing_dream_cycle_us",
+        timings.dream_cycle as f64,
+    );
+    registry.set_gauge("symthaea_timing_total_cycle_us", cycle_duration_us as f64);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -601,5 +738,45 @@ mod tests {
         update_bath_metrics(&registry, &state, 0.1, 1.0, 0.2, 0);
         let snapshot = registry.to_json();
         assert!(snapshot.metrics.iter().any(|m| m.name.starts_with("bath_")));
+    }
+
+    #[test]
+    fn test_timing_metrics_registered_in_standard() {
+        let registry = MetricsRegistry::with_standard_metrics();
+        assert!(registry.get("symthaea_timing_core_hdc_encode_us").is_some());
+        assert!(registry.get("symthaea_timing_core_cfc_step_us").is_some());
+        assert!(registry.get("symthaea_timing_core_training_us").is_some());
+        assert!(registry.get("symthaea_timing_consciousness_engine_us").is_some());
+        assert!(registry.get("symthaea_timing_ethics_engine_us").is_some());
+        assert!(registry.get("symthaea_timing_total_cycle_us").is_some());
+    }
+
+    #[test]
+    fn test_timing_metrics_values_update() {
+        let registry = MetricsRegistry::with_standard_metrics();
+        let mut timings = crate::cognitive_loop::ModuleTimings::default();
+        timings.core_hdc_encode = 150;
+        timings.core_cfc_step = 300;
+        timings.gwt = 50;
+        timings.ethics_engine_moral = 100;
+        timings.ethics_engine_value = 80;
+        timings.ethics_engine_harmonies = 70;
+        update_timing_metrics(&registry, &timings, 5000);
+        assert_eq!(registry.get("symthaea_timing_core_hdc_encode_us"), Some(150.0));
+        assert_eq!(registry.get("symthaea_timing_core_cfc_step_us"), Some(300.0));
+        assert_eq!(registry.get("symthaea_timing_gwt_us"), Some(50.0));
+        // Ethics engine sums sub-components when engine total is 0
+        assert_eq!(registry.get("symthaea_timing_ethics_engine_us"), Some(250.0));
+        assert_eq!(registry.get("symthaea_timing_total_cycle_us"), Some(5000.0));
+    }
+
+    #[test]
+    fn test_timing_metrics_prometheus_output() {
+        let registry = MetricsRegistry::with_standard_metrics();
+        let timings = crate::cognitive_loop::ModuleTimings::default();
+        update_timing_metrics(&registry, &timings, 1000);
+        let output = registry.to_prometheus_text();
+        assert!(output.contains("symthaea_timing_total_cycle_us"));
+        assert!(output.contains("# TYPE symthaea_timing_total_cycle_us gauge"));
     }
 }

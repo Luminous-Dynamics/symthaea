@@ -20,6 +20,17 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+/// Shared encryption key that can be updated at runtime.
+///
+/// The Mind writes to this via the handle; the bridge actor reads it
+/// when constructing / updating DualLayerMesh and MeshReceiver.
+#[cfg(feature = "mesh-encryption")]
+type SharedEncryptionKey = Arc<std::sync::Mutex<Option<[u8; 32]>>>;
+
+/// Shared encryption epoch (random byte, set once).
+#[cfg(feature = "mesh-encryption")]
+type SharedEpoch = Arc<std::sync::atomic::AtomicU8>;
+
 // ============================================================================
 // MeshOutbound — envelope for outgoing mesh packets
 // ============================================================================
@@ -54,6 +65,12 @@ pub struct MeshBridgeHandle {
     inbound_rx: mpsc::Receiver<WisdomPacket>,
     /// Health flag — `false` if the actor task has exited.
     alive: Arc<AtomicBool>,
+    /// Shared encryption key — writable by Mind, readable by actor.
+    #[cfg(feature = "mesh-encryption")]
+    shared_key: SharedEncryptionKey,
+    /// Shared encryption epoch.
+    #[cfg(feature = "mesh-encryption")]
+    shared_epoch: SharedEpoch,
 }
 
 impl MeshBridgeHandle {
@@ -66,16 +83,29 @@ impl MeshBridgeHandle {
         let (inbound_tx, inbound_rx) = mpsc::channel(inbound_capacity);
         let alive = Arc::new(AtomicBool::new(true));
 
+        #[cfg(feature = "mesh-encryption")]
+        let shared_key: SharedEncryptionKey = Arc::new(std::sync::Mutex::new(None));
+        #[cfg(feature = "mesh-encryption")]
+        let shared_epoch: SharedEpoch = Arc::new(std::sync::atomic::AtomicU8::new(0));
+
         let handle = Self {
             outbound_tx,
             inbound_rx,
             alive: alive.clone(),
+            #[cfg(feature = "mesh-encryption")]
+            shared_key: shared_key.clone(),
+            #[cfg(feature = "mesh-encryption")]
+            shared_epoch: shared_epoch.clone(),
         };
 
         let actor = MeshBridgeActor {
             outbound_rx,
             inbound_tx,
             alive,
+            #[cfg(feature = "mesh-encryption")]
+            shared_key,
+            #[cfg(feature = "mesh-encryption")]
+            shared_epoch,
         };
 
         (handle, actor)
@@ -103,6 +133,21 @@ impl MeshBridgeHandle {
     /// Check if the actor task is still alive.
     pub fn is_alive(&self) -> bool {
         self.alive.load(Ordering::Relaxed)
+    }
+
+    /// Set the encryption key for the bridge actor.
+    ///
+    /// The actor will pick up the new key on its next poll cycle.
+    /// Pass `None` to disable encryption.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_encryption_key(&self, key: Option<[u8; 32]>) {
+        *self.shared_key.lock().unwrap() = key;
+    }
+
+    /// Set the encryption epoch byte.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_encryption_epoch(&self, epoch: u8) {
+        self.shared_epoch.store(epoch, Ordering::Relaxed);
     }
 }
 
@@ -140,6 +185,12 @@ pub struct MeshBridgeActor {
     inbound_tx: mpsc::Sender<WisdomPacket>,
     /// Shared health flag.
     alive: Arc<AtomicBool>,
+    /// Shared encryption key — readable by actor, writable by Mind.
+    #[cfg(feature = "mesh-encryption")]
+    shared_key: SharedEncryptionKey,
+    /// Shared encryption epoch.
+    #[cfg(feature = "mesh-encryption")]
+    shared_epoch: SharedEpoch,
 }
 
 impl MeshBridgeActor {
@@ -151,9 +202,22 @@ impl MeshBridgeActor {
     /// 3. Completed WisdomPackets pushed to inbound channel
     ///
     /// The loop exits when the handle is dropped (channel closes).
-    pub async fn run(mut self, mesh: DualLayerMesh, mut receiver: MeshReceiver) {
+    pub async fn run(mut self, mut mesh: DualLayerMesh, mut receiver: MeshReceiver) {
         let mut poll_interval = tokio::time::interval(std::time::Duration::from_millis(50));
         poll_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        // Apply initial encryption key if one was set before run() was called.
+        #[cfg(feature = "mesh-encryption")]
+        {
+            let key = self.shared_key.lock().unwrap().clone();
+            mesh.set_encryption_key(key);
+            receiver.set_encryption_key(key);
+            let epoch = self.shared_epoch.load(Ordering::Relaxed);
+            mesh.set_encryption_epoch(epoch);
+        }
+
+        #[cfg(feature = "mesh-encryption")]
+        let mut last_key: Option<[u8; 32]> = *self.shared_key.lock().unwrap();
 
         tracing::info!("MeshBridgeActor started");
 
@@ -187,8 +251,22 @@ impl MeshBridgeActor {
                         }
                     }
                 }
-                // Branch 2: Poll for incoming radio data
+                // Branch 2: Poll for incoming radio data + key updates
                 _ = poll_interval.tick() => {
+                    // Check for encryption key updates from the Mind
+                    #[cfg(feature = "mesh-encryption")]
+                    {
+                        let current_key = *self.shared_key.lock().unwrap();
+                        if current_key != last_key {
+                            mesh.set_encryption_key(current_key);
+                            receiver.set_encryption_key(current_key);
+                            let epoch = self.shared_epoch.load(Ordering::Relaxed);
+                            mesh.set_encryption_epoch(epoch);
+                            last_key = current_key;
+                            tracing::info!("MeshBridgeActor: encryption key updated");
+                        }
+                    }
+
                     // Expire stale fragment assemblies
                     receiver.expire_stale();
 

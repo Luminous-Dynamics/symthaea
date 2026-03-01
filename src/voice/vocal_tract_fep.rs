@@ -16,7 +16,7 @@ pub use symthaea_vocal_tract::fep::{
 
 #[cfg(feature = "vocal-tract")]
 pub use symthaea_vocal_tract::pipeline::{
-    predict_duration, Intonation, ProsodyContext, VocalTractPipeline,
+    predict_duration, Intonation, PitchAccent, ProsodyContext, VocalTractPipeline,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
