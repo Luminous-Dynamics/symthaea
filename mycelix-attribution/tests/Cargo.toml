@@ -1,0 +1,30 @@
+[package]
+name = "mycelix-attribution-tests"
+version = "0.1.0"
+edition = "2021"
+description = "Integration tests for Mycelix Attribution Registry Holochain zomes"
+autotests = false
+
+[dependencies]
+# Holochain testing (NO zome crate imports — use mirror types to avoid symbol collisions)
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+hdk = "0.6"
+hdi = "0.7"
+
+# Async runtime
+tokio = { version = "1.35", features = ["full", "test-util"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rmp-serde = "1.1"
+
+# Utilities
+chrono = "0.4"
+
+[[test]]
+name = "sweettest_integration"
+path = "sweettest_integration.rs"
+
+[workspace]

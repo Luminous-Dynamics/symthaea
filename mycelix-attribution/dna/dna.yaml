@@ -1,0 +1,29 @@
+---
+manifest_version: "0"
+name: mycelix_attribution_dna
+
+integrity:
+  network_seed: "mycelix-attribution-v1"
+  zomes:
+    - name: registry_integrity
+      path: "../target/wasm32-unknown-unknown/release/registry_integrity.wasm"
+    - name: usage_integrity
+      path: "../target/wasm32-unknown-unknown/release/usage_integrity.wasm"
+    - name: reciprocity_integrity
+      path: "../target/wasm32-unknown-unknown/release/reciprocity_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: registry
+      path: "../target/wasm32-unknown-unknown/release/registry.wasm"
+      dependencies:
+        - name: registry_integrity
+    - name: usage
+      path: "../target/wasm32-unknown-unknown/release/usage.wasm"
+      dependencies:
+        - name: usage_integrity
+    - name: reciprocity
+      path: "../target/wasm32-unknown-unknown/release/reciprocity.wasm"
+      dependencies:
+        - name: reciprocity_integrity
+        - name: usage_integrity
