@@ -2,11 +2,17 @@
 //!
 //! Reads Cargo.lock, package-lock.json, or flake.lock and outputs
 //! DependencyIdentity + UsageReceipt JSON payloads for the Mycelix DHT.
+//!
+//! With the `submit` feature, can connect directly to a Holochain conductor
+//! and submit dependencies + usage receipts via WebSocket.
 
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+
+#[cfg(feature = "submit")]
+mod submit;
 
 // ── CLI Arguments ────────────────────────────────────────────────────
 
@@ -29,6 +35,15 @@ struct Args {
     /// Output format: json (array), jsonl (one per line), or batch (bulk_register payload)
     #[arg(short, long, default_value = "jsonl")]
     format: OutputFormat,
+
+    /// Submit directly to a running Holochain conductor (requires `submit` feature)
+    /// Example: --submit ws://localhost:8888
+    #[arg(long)]
+    submit: Option<String>,
+
+    /// hApp ID for conductor submission (default: "attribution")
+    #[arg(long, default_value = "attribution")]
+    app_id: String,
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -327,6 +342,73 @@ fn main() {
         filename,
         output.dependencies.len()
     );
+
+    // Submit to conductor if --submit is provided
+    #[cfg(feature = "submit")]
+    if let Some(ref ws_url) = args.submit {
+        let now_micros = chrono::Utc::now().timestamp_micros();
+
+        let submit_deps: Vec<submit::SubmitDependency> = output
+            .dependencies
+            .iter()
+            .zip(output.usage_receipts.iter())
+            .map(|(dep, receipt)| submit::SubmitDependency {
+                id: dep.id.clone(),
+                name: dep.name.clone(),
+                ecosystem: dep.ecosystem.clone(),
+                maintainer_did: receipt.user_did.clone(),
+                repository_url: None,
+                license: None,
+                description: format!(
+                    "{} {} ({})",
+                    dep.ecosystem,
+                    dep.name,
+                    dep.version.as_deref().unwrap_or("*")
+                ),
+                version: dep.version.clone(),
+                registered_at: now_micros,
+                verified: false,
+            })
+            .collect();
+
+        let submit_receipts: Vec<submit::SubmitUsageReceipt> = output
+            .usage_receipts
+            .iter()
+            .zip(output.dependencies.iter())
+            .map(|(receipt, dep)| submit::SubmitUsageReceipt {
+                id: format!("scan:{}:{}", dep.id, now_micros),
+                dependency_id: dep.id.clone(),
+                user_did: receipt.user_did.clone(),
+                organization: receipt.organization.clone(),
+                usage_type: "DirectDependency".to_string(),
+                scale: None,
+                version_range: receipt.version_range.clone(),
+                context: Some(format!("Scanned from {}", filename)),
+                attested_at: now_micros,
+            })
+            .collect();
+
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        if let Err(e) = rt.block_on(submit::submit_to_conductor(
+            ws_url,
+            &args.app_id,
+            submit_deps,
+            submit_receipts,
+        )) {
+            eprintln!("Submit failed: {}", e);
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    #[cfg(not(feature = "submit"))]
+    if args.submit.is_some() {
+        eprintln!(
+            "Error: --submit requires the `submit` feature. Rebuild with:\n  \
+             cargo build --release --features submit"
+        );
+        std::process::exit(1);
+    }
 
     match args.format {
         OutputFormat::Json => {

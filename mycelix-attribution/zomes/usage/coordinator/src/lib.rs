@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use usage_integrity::*;
 
 /// Mirror type for deserializing DependencyIdentity from registry zome.
-/// Only the `id` field is needed for top-N queries.
 /// Must implement TryFrom<SerializedBytes> for to_app_option().
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct DependencyIdRef {
@@ -11,6 +10,14 @@ struct DependencyIdRef {
 }
 
 holochain_serialized_bytes::holochain_serial!(DependencyIdRef);
+
+/// Mirror type for extracting maintainer_did from registry entries.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct MaintainerRef {
+    maintainer_did: String,
+}
+
+holochain_serialized_bytes::holochain_serial!(MaintainerRef);
 
 // ── Signals ──────────────────────────────────────────────────────────
 
@@ -122,10 +129,8 @@ pub fn record_usage(receipt: UsageReceipt) -> ExternResult<Record> {
         (),
     )?;
 
-    let _ = emit_signal(&UsageSignal::UsageRecorded {
-        dependency_id: receipt.dependency_id.clone(),
-        user_did: receipt.user_did.clone(),
-    });
+    // Notify maintainer (best-effort: emits local signal, attempts identity bridge)
+    notify_maintainer(&receipt.dependency_id, &receipt.user_did);
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -379,12 +384,132 @@ pub fn get_top_dependencies(limit: u64) -> ExternResult<Vec<TopDependency>> {
     Ok(scored)
 }
 
-// ── Maintainer Notification ─────────────────────────────────────────
+// ── Batch Usage Recording ───────────────────────────────────────────
 
-// ── Maintainer Notification ─────────────────────────────────────────
-// Signals are emitted locally via record_usage's emit_signal(UsageRecorded).
-// All connected UI clients receive signals and can filter by dependency_id
-// to show notifications to the maintainer.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BulkUsageResult {
+    pub recorded: u64,
+    pub records: Vec<Record>,
+}
+
+#[hdk_extern]
+pub fn bulk_record_usage(
+    receipts: Vec<UsageReceipt>,
+) -> ExternResult<BulkUsageResult> {
+    let mut records = Vec::new();
+
+    for receipt in &receipts {
+        let action_hash =
+            create_entry(&EntryTypes::UsageReceipt(receipt.clone()))?;
+        let entry_hash = hash_entry(receipt)?;
+
+        let dep_tag = format!("usage:{}", receipt.dependency_id);
+        create_link(
+            anchor_hash(&dep_tag)?,
+            entry_hash.clone(),
+            LinkTypes::DependencyToUsageReceipts,
+            (),
+        )?;
+
+        let user_tag = format!("user_usage:{}", receipt.user_did);
+        create_link(
+            anchor_hash(&user_tag)?,
+            entry_hash,
+            LinkTypes::UserToUsageReceipts,
+            (),
+        )?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+
+    let recorded = records.len() as u64;
+
+    if recorded > 0 {
+        let _ = emit_signal(&UsageSignal::UsageRecorded {
+            dependency_id: format!("batch:{}", recorded),
+            user_did: receipts
+                .first()
+                .map(|r| r.user_did.clone())
+                .unwrap_or_default(),
+        });
+    }
+
+    Ok(BulkUsageResult { recorded, records })
+}
+
+// ── Maintainer Notification (Identity Bridge) ──────────────────────
 //
-// For remote/push notifications to offline maintainers, a future integration
-// with the identity hApp would resolve DID→AgentPubKey for remote_signal().
+// When running inside the unified hApp (mycelix-unified-happ.yaml),
+// the identity DNA is available via CallTargetCell::OtherRole("identity").
+// This allows DID→AgentPubKey resolution for remote signals.
+//
+// Notification flow:
+//   1. record_usage() emits local UsageRecorded signal (current behavior)
+//   2. notify_maintainer() cross-zome calls registry to get maintainer_did
+//   3. Cross-role calls identity to resolve DID→AgentPubKey
+//   4. remote_signal() to maintainer's agent
+//
+// Steps 2-4 are best-effort and silently fail when:
+//   - Running as standalone hApp (no identity role)
+//   - Maintainer's agent is offline
+//   - DID is not registered in identity hApp
+
+/// Attempt to notify maintainer via remote signal.
+/// Best-effort: silently ignored if identity bridge is unavailable.
+fn notify_maintainer(dependency_id: &str, user_did: &str) {
+    // Step 1: Get maintainer_did from registry
+    let Ok(encoded) = ExternIO::encode(dependency_id.to_string()) else {
+        return;
+    };
+    let maintainer_did = match call(
+        CallTargetCell::Local,
+        ZomeName::from("registry"),
+        FunctionName::from("get_dependency"),
+        None,
+        encoded,
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => {
+            let record: Option<Record> = io.decode().ok().flatten();
+            record.and_then(|r| {
+                let m: Option<MaintainerRef> =
+                    r.entry().to_app_option().ok().flatten();
+                m.map(|mr| mr.maintainer_did)
+            })
+        }
+        _ => None,
+    };
+
+    let Some(did) = maintainer_did else { return };
+
+    // Step 2: Resolve DID→AgentPubKey via identity bridge
+    // This call goes to OtherRole("identity") in the unified hApp.
+    // If identity role is not present (standalone deployment), this fails silently.
+    let Ok(did_payload) = ExternIO::encode(did) else { return };
+    let _agent_key: Option<AgentPubKey> = match call(
+        CallTargetCell::OtherRole("identity".into()),
+        ZomeName::from("identity"),
+        FunctionName::from("resolve_did_to_agent"),
+        None,
+        did_payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => io.decode().ok().flatten(),
+        _ => None, // Identity bridge not available — standalone mode
+    };
+
+    // Step 3: Send remote signal (when identity bridge is wired)
+    // if let Some(agent_key) = _agent_key {
+    //     let signal = UsageSignal::UsageRecorded {
+    //         dependency_id: dependency_id.to_string(),
+    //         user_did: user_did.to_string(),
+    //     };
+    //     let _ = remote_signal(ExternIO::encode(signal).unwrap(), vec![agent_key]);
+    // }
+
+    // For now: local signal only (all UI clients filter by dependency_id)
+    let _ = emit_signal(&UsageSignal::UsageRecorded {
+        dependency_id: dependency_id.to_string(),
+        user_did: user_did.to_string(),
+    });
+}

@@ -1,0 +1,21 @@
+[package]
+name = "mycelix-attribution-verifier"
+version = "0.1.0"
+edition = "2021"
+description = "Off-chain ZK-STARK verifier for Mycelix Attribution usage attestations"
+
+[[bin]]
+name = "mycelix-attribution-verifier"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4", features = ["derive"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.8"
+blake3 = "1"
+hex = "0.4"
+thiserror = "1.0"
+
+# winterfell = "0.10"  # Uncomment when ZK-STARK proof format is finalized

@@ -376,3 +376,56 @@ pub fn get_all_dependencies_paginated(
         limit: input.limit,
     })
 }
+
+// ── Ecosystem Statistics ────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EcosystemStat {
+    pub ecosystem: String,
+    pub count: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EcosystemStatistics {
+    pub total_dependencies: u64,
+    pub ecosystems: Vec<EcosystemStat>,
+    pub verified_count: u64,
+}
+
+#[hdk_extern]
+pub fn get_ecosystem_statistics(_: ()) -> ExternResult<EcosystemStatistics> {
+    let all_records =
+        resolve_links(anchor_hash("all_deps")?, LinkTypes::AllDependencies)?;
+    let total = all_records.len() as u64;
+
+    let mut eco_counts: std::collections::BTreeMap<String, u64> =
+        std::collections::BTreeMap::new();
+    let mut verified = 0u64;
+
+    for record in &all_records {
+        let dep: Option<DependencyIdentity> = record
+            .entry()
+            .to_app_option()
+            .ok()
+            .flatten();
+        if let Some(d) = dep {
+            *eco_counts
+                .entry(d.ecosystem.to_string())
+                .or_insert(0) += 1;
+            if d.verified {
+                verified += 1;
+            }
+        }
+    }
+
+    let ecosystems: Vec<EcosystemStat> = eco_counts
+        .into_iter()
+        .map(|(ecosystem, count)| EcosystemStat { ecosystem, count })
+        .collect();
+
+    Ok(EcosystemStatistics {
+        total_dependencies: total,
+        ecosystems,
+        verified_count: verified,
+    })
+}

@@ -139,6 +139,29 @@ export interface BulkRegisterResult {
   skipped: string[];
 }
 
+export interface BulkUsageResult {
+  recorded: number;
+  records: Record<string, unknown>[];
+}
+
+export interface LeaderboardEntry {
+  dependency_id: string;
+  usage_count: number;
+  pledge_count: number;
+  weighted_score: number;
+}
+
+export interface EcosystemStat {
+  ecosystem: string;
+  count: number;
+}
+
+export interface EcosystemStatistics {
+  total_dependencies: number;
+  ecosystems: EcosystemStat[];
+  verified_count: number;
+}
+
 // ── Signals ──────────────────────────────────────────────────────────
 
 export interface RegistrySignal {
@@ -287,6 +310,15 @@ export class AttributionClient {
     }) as Promise<Record<string, unknown>>;
   }
 
+  async getEcosystemStatistics(): Promise<EcosystemStatistics> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'registry',
+      fn_name: 'get_ecosystem_statistics',
+      payload: null,
+    }) as Promise<EcosystemStatistics>;
+  }
+
   // ── Usage ────────────────────────────────────────────────────────
 
   async recordUsage(receipt: UsageReceipt): Promise<Record<string, unknown>> {
@@ -296,6 +328,15 @@ export class AttributionClient {
       fn_name: 'record_usage',
       payload: receipt,
     }) as Promise<Record<string, unknown>>;
+  }
+
+  async bulkRecordUsage(receipts: UsageReceipt[]): Promise<BulkUsageResult> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'usage',
+      fn_name: 'bulk_record_usage',
+      payload: receipts,
+    }) as Promise<BulkUsageResult>;
   }
 
   async getDependencyUsage(depId: string): Promise<Record<string, unknown>[]> {
@@ -430,6 +471,24 @@ export class AttributionClient {
       fn_name: 'compute_stewardship_score',
       payload: depId,
     }) as Promise<StewardshipScore>;
+  }
+
+  async getStewardshipLeaderboard(limit: number): Promise<LeaderboardEntry[]> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'reciprocity',
+      fn_name: 'get_stewardship_leaderboard',
+      payload: limit,
+    }) as Promise<LeaderboardEntry[]>;
+  }
+
+  async getUnderSupportedDependencies(limit: number): Promise<LeaderboardEntry[]> {
+    return this.client.callZome({
+      role_name: ATTRIBUTION_ROLE,
+      zome_name: 'reciprocity',
+      fn_name: 'get_under_supported_dependencies',
+      payload: limit,
+    }) as Promise<LeaderboardEntry[]>;
   }
 }
 

@@ -8,9 +8,18 @@ description = "Scans lockfiles and generates attribution data for the Mycelix DH
 name = "mycelix-attribution-scan"
 path = "src/main.rs"
 
+[features]
+default = []
+submit = ["holochain_client", "tokio", "anyhow"]
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
+
+# Optional: conductor submission
+holochain_client = { version = "0.7", optional = true }
+tokio = { version = "1", features = ["full"], optional = true }
+anyhow = { version = "1", optional = true }

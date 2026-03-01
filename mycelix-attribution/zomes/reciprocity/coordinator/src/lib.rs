@@ -348,3 +348,131 @@ pub fn get_dependency_pledges_paginated(
         limit: input.pagination.limit,
     })
 }
+
+// ── Leaderboard & Under-Supported Queries ───────────────────────────
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LeaderboardEntry {
+    pub dependency_id: String,
+    pub usage_count: u64,
+    pub pledge_count: u64,
+    pub weighted_score: f64,
+}
+
+#[hdk_extern]
+pub fn get_stewardship_leaderboard(
+    limit: u64,
+) -> ExternResult<Vec<LeaderboardEntry>> {
+    // Get all deps from registry via cross-zome
+    let encoded = ExternIO::encode(()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to encode: {}",
+            e
+        )))
+    })?;
+
+    let dep_records: Vec<Record> = match call(
+        CallTargetCell::Local,
+        ZomeName::from("registry"),
+        FunctionName::from("get_all_dependencies"),
+        None,
+        encoded,
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_default(),
+        _ => return Ok(Vec::new()),
+    };
+
+    // Compute stewardship for each
+    let mut entries: Vec<LeaderboardEntry> = Vec::new();
+
+    for record in dep_records {
+        let dep: Option<DependencyIdMirror> = record
+            .entry()
+            .to_app_option()
+            .ok()
+            .flatten();
+        if let Some(d) = dep {
+            let score = compute_stewardship_score(d.id.clone())?;
+            entries.push(LeaderboardEntry {
+                dependency_id: d.id,
+                usage_count: score.usage_count,
+                pledge_count: score.pledge_count,
+                weighted_score: score.weighted_score,
+            });
+        }
+    }
+
+    // Sort by weighted_score descending
+    entries.sort_by(|a, b| {
+        b.weighted_score
+            .partial_cmp(&a.weighted_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    entries.truncate(limit as usize);
+
+    Ok(entries)
+}
+
+#[hdk_extern]
+pub fn get_under_supported_dependencies(
+    limit: u64,
+) -> ExternResult<Vec<LeaderboardEntry>> {
+    // Same approach: get all deps, compute stewardship, sort by lowest ratio
+    let encoded = ExternIO::encode(()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to encode: {}",
+            e
+        )))
+    })?;
+
+    let dep_records: Vec<Record> = match call(
+        CallTargetCell::Local,
+        ZomeName::from("registry"),
+        FunctionName::from("get_all_dependencies"),
+        None,
+        encoded,
+    ) {
+        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_default(),
+        _ => return Ok(Vec::new()),
+    };
+
+    let mut entries: Vec<LeaderboardEntry> = Vec::new();
+
+    for record in dep_records {
+        let dep: Option<DependencyIdMirror> = record
+            .entry()
+            .to_app_option()
+            .ok()
+            .flatten();
+        if let Some(d) = dep {
+            let score = compute_stewardship_score(d.id.clone())?;
+            // Only include deps with usage but low/zero stewardship
+            if score.usage_count > 0 {
+                entries.push(LeaderboardEntry {
+                    dependency_id: d.id,
+                    usage_count: score.usage_count,
+                    pledge_count: score.pledge_count,
+                    weighted_score: score.weighted_score,
+                });
+            }
+        }
+    }
+
+    // Sort by weighted_score ascending (most under-supported first)
+    entries.sort_by(|a, b| {
+        a.weighted_score
+            .partial_cmp(&b.weighted_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    entries.truncate(limit as usize);
+
+    Ok(entries)
+}
+
+/// Mirror type for deserializing DependencyIdentity from registry zome.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct DependencyIdMirror {
+    id: String,
+}
+
+holochain_serialized_bytes::holochain_serial!(DependencyIdMirror);

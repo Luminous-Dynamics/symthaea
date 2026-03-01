@@ -144,6 +144,91 @@ pub struct StewardshipScore {
     pub usage_count: u64,
     pub pledge_count: u64,
     pub ratio: f64,
+    pub weighted_score: f64,
+    pub pledge_type_counts: Vec<(String, u64)>,
+}
+
+// -- Batch/Pagination/Leaderboard --
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginationInput {
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginatedDependencies {
+    pub items: Vec<Record>,
+    pub total: u64,
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginatedUsageInput {
+    pub id: String,
+    pub pagination: PaginationInput,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginatedUsage {
+    pub items: Vec<Record>,
+    pub total: u64,
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginatedPledgesInput {
+    pub id: String,
+    pub pagination: PaginationInput,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginatedPledges {
+    pub items: Vec<Record>,
+    pub total: u64,
+    pub offset: u64,
+    pub limit: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BulkRegisterResult {
+    pub registered: Vec<Record>,
+    pub skipped: Vec<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BulkUsageResult {
+    pub recorded: u64,
+    pub records: Vec<Record>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TopDependency {
+    pub dependency_id: String,
+    pub usage_count: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct LeaderboardEntry {
+    pub dependency_id: String,
+    pub usage_count: u64,
+    pub pledge_count: u64,
+    pub weighted_score: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct EcosystemStat {
+    pub ecosystem: String,
+    pub count: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct EcosystemStatistics {
+    pub total_dependencies: u64,
+    pub ecosystems: Vec<EcosystemStat>,
+    pub verified_count: u64,
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -683,4 +768,411 @@ async fn test_stewardship_score_zero_usage() {
     assert_eq!(score.usage_count, 0);
     assert_eq!(score.pledge_count, 0);
     assert_eq!(score.ratio, 0.0);
+}
+
+// ── Batch Registration Tests ────────────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_bulk_register_dependencies() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    let deps = vec![
+        make_dependency("crate:bulk1:1.0", DependencyEcosystem::RustCrate),
+        make_dependency("crate:bulk2:2.0", DependencyEcosystem::RustCrate),
+        make_dependency("npm:bulk3:3.0", DependencyEcosystem::NpmPackage),
+    ];
+
+    let result: BulkRegisterResult = conductor
+        .call(&cell.zome("registry"), "bulk_register_dependencies", deps.clone())
+        .await;
+    assert_eq!(result.registered.len(), 3);
+    assert!(result.skipped.is_empty());
+
+    // Duplicates should be skipped
+    let result2: BulkRegisterResult = conductor
+        .call(&cell.zome("registry"), "bulk_register_dependencies", deps)
+        .await;
+    assert!(result2.registered.is_empty());
+    assert_eq!(result2.skipped.len(), 3);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_bulk_record_usage() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    let receipts = vec![
+        make_usage_receipt("bulk-u1", "crate:serde:1.0", "did:mycelix:user001"),
+        make_usage_receipt("bulk-u2", "crate:serde:1.0", "did:mycelix:user002"),
+        make_usage_receipt("bulk-u3", "crate:tokio:1.0", "did:mycelix:user001"),
+    ];
+
+    let result: BulkUsageResult = conductor
+        .call(&cell.zome("usage"), "bulk_record_usage", receipts)
+        .await;
+    assert_eq!(result.recorded, 3);
+    assert_eq!(result.records.len(), 3);
+
+    // Verify counts
+    let count: u64 = conductor
+        .call(&cell.zome("usage"), "get_usage_count", "crate:serde:1.0".to_string())
+        .await;
+    assert_eq!(count, 2);
+}
+
+// ── Pagination Tests ────────────────────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_paginated_dependencies() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Register 5 dependencies
+    for i in 0..5 {
+        let _: Record = conductor
+            .call(
+                &cell.zome("registry"),
+                "register_dependency",
+                make_dependency(&format!("crate:page{}:1.0", i), DependencyEcosystem::RustCrate),
+            )
+            .await;
+    }
+
+    // Page 1: offset=0, limit=2
+    let page1: PaginatedDependencies = conductor
+        .call(
+            &cell.zome("registry"),
+            "get_all_dependencies_paginated",
+            PaginationInput { offset: 0, limit: 2 },
+        )
+        .await;
+    assert_eq!(page1.total, 5);
+    assert_eq!(page1.items.len(), 2);
+    assert_eq!(page1.offset, 0);
+    assert_eq!(page1.limit, 2);
+
+    // Page 3: offset=4, limit=2 — should get 1 item
+    let page3: PaginatedDependencies = conductor
+        .call(
+            &cell.zome("registry"),
+            "get_all_dependencies_paginated",
+            PaginationInput { offset: 4, limit: 2 },
+        )
+        .await;
+    assert_eq!(page3.total, 5);
+    assert_eq!(page3.items.len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_paginated_usage() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Record 4 usage receipts for same dep
+    for i in 0..4 {
+        let _: Record = conductor
+            .call(
+                &cell.zome("usage"),
+                "record_usage",
+                make_usage_receipt(
+                    &format!("page-u{}", i),
+                    "crate:paged:1.0",
+                    &format!("did:mycelix:user{:03}", i),
+                ),
+            )
+            .await;
+    }
+
+    let page: PaginatedUsage = conductor
+        .call(
+            &cell.zome("usage"),
+            "get_dependency_usage_paginated",
+            PaginatedUsageInput {
+                id: "crate:paged:1.0".to_string(),
+                pagination: PaginationInput { offset: 1, limit: 2 },
+            },
+        )
+        .await;
+    assert_eq!(page.total, 4);
+    assert_eq!(page.items.len(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_paginated_pledges() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    for i in 0..3 {
+        let _: Record = conductor
+            .call(
+                &cell.zome("reciprocity"),
+                "record_pledge",
+                make_pledge(
+                    &format!("pledge-page{}", i),
+                    "crate:paged:1.0",
+                    &format!("did:mycelix:corp{:03}", i),
+                ),
+            )
+            .await;
+    }
+
+    let page: PaginatedPledges = conductor
+        .call(
+            &cell.zome("reciprocity"),
+            "get_dependency_pledges_paginated",
+            PaginatedPledgesInput {
+                id: "crate:paged:1.0".to_string(),
+                pagination: PaginationInput { offset: 0, limit: 2 },
+            },
+        )
+        .await;
+    assert_eq!(page.total, 3);
+    assert_eq!(page.items.len(), 2);
+}
+
+// ── Top-N & Leaderboard Tests ───────────────────────────────────────
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_top_dependencies() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Register 3 deps
+    for name in ["alpha", "beta", "gamma"] {
+        let _: Record = conductor
+            .call(
+                &cell.zome("registry"),
+                "register_dependency",
+                make_dependency(&format!("crate:{}:1.0", name), DependencyEcosystem::RustCrate),
+            )
+            .await;
+    }
+
+    // alpha: 3 usages, beta: 1 usage, gamma: 0 usages
+    for i in 0..3 {
+        let _: Record = conductor
+            .call(
+                &cell.zome("usage"),
+                "record_usage",
+                make_usage_receipt(
+                    &format!("top-alpha-{}", i),
+                    "crate:alpha:1.0",
+                    &format!("did:mycelix:u{}", i),
+                ),
+            )
+            .await;
+    }
+    let _: Record = conductor
+        .call(
+            &cell.zome("usage"),
+            "record_usage",
+            make_usage_receipt("top-beta-0", "crate:beta:1.0", "did:mycelix:u0"),
+        )
+        .await;
+
+    let top: Vec<TopDependency> = conductor
+        .call(&cell.zome("usage"), "get_top_dependencies", 10u64)
+        .await;
+
+    assert_eq!(top.len(), 2); // gamma excluded (0 usage)
+    assert_eq!(top[0].dependency_id, "crate:alpha:1.0");
+    assert_eq!(top[0].usage_count, 3);
+    assert_eq!(top[1].dependency_id, "crate:beta:1.0");
+    assert_eq!(top[1].usage_count, 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_weighted_stewardship_score() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    let dep_id = "crate:weighted:1.0";
+
+    // Register dependency
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency(dep_id, DependencyEcosystem::RustCrate),
+        )
+        .await;
+
+    // 2 usage receipts
+    for i in 0..2 {
+        let _: Record = conductor
+            .call(
+                &cell.zome("usage"),
+                "record_usage",
+                make_usage_receipt(
+                    &format!("ws-u{}", i),
+                    dep_id,
+                    &format!("did:mycelix:user{:03}", i),
+                ),
+            )
+            .await;
+    }
+
+    // 1 financial pledge ($5000)
+    let _: Record = conductor
+        .call(
+            &cell.zome("reciprocity"),
+            "record_pledge",
+            make_pledge("ws-pledge-1", dep_id, "did:mycelix:corp001"),
+        )
+        .await;
+
+    let score: StewardshipScore = conductor
+        .call(
+            &cell.zome("reciprocity"),
+            "compute_stewardship_score",
+            dep_id.to_string(),
+        )
+        .await;
+
+    assert_eq!(score.usage_count, 2);
+    assert_eq!(score.pledge_count, 1);
+    assert!((score.ratio - 0.5).abs() < 1e-10);
+    assert!(score.weighted_score > 0.0);
+    assert!(!score.pledge_type_counts.is_empty());
+    // Financial pledge should be in the counts
+    assert!(score.pledge_type_counts.iter().any(|(t, c)| t == "Financial" && *c == 1));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_ecosystem_statistics() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Register deps across ecosystems
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency("crate:eco1:1.0", DependencyEcosystem::RustCrate),
+        )
+        .await;
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency("crate:eco2:1.0", DependencyEcosystem::RustCrate),
+        )
+        .await;
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency("npm:eco3:1.0", DependencyEcosystem::NpmPackage),
+        )
+        .await;
+
+    let stats: EcosystemStatistics = conductor
+        .call(&cell.zome("registry"), "get_ecosystem_statistics", ())
+        .await;
+
+    assert_eq!(stats.total_dependencies, 3);
+    assert_eq!(stats.verified_count, 0);
+    // Should have 2 ecosystems
+    assert_eq!(stats.ecosystems.len(), 2);
+    let rust_count = stats.ecosystems.iter()
+        .find(|e| e.ecosystem.contains("Rust"))
+        .map(|e| e.count)
+        .unwrap_or(0);
+    assert_eq!(rust_count, 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_stewardship_leaderboard() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("attribution", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Register 2 deps
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency("crate:lb1:1.0", DependencyEcosystem::RustCrate),
+        )
+        .await;
+    let _: Record = conductor
+        .call(
+            &cell.zome("registry"),
+            "register_dependency",
+            make_dependency("crate:lb2:1.0", DependencyEcosystem::RustCrate),
+        )
+        .await;
+
+    // lb1: 1 usage + 1 pledge, lb2: 1 usage + 0 pledges
+    let _: Record = conductor
+        .call(
+            &cell.zome("usage"),
+            "record_usage",
+            make_usage_receipt("lb-u1", "crate:lb1:1.0", "did:mycelix:u1"),
+        )
+        .await;
+    let _: Record = conductor
+        .call(
+            &cell.zome("usage"),
+            "record_usage",
+            make_usage_receipt("lb-u2", "crate:lb2:1.0", "did:mycelix:u2"),
+        )
+        .await;
+    let _: Record = conductor
+        .call(
+            &cell.zome("reciprocity"),
+            "record_pledge",
+            make_pledge("lb-p1", "crate:lb1:1.0", "did:mycelix:corp1"),
+        )
+        .await;
+
+    // Leaderboard should have lb1 first (higher weighted_score)
+    let board: Vec<LeaderboardEntry> = conductor
+        .call(
+            &cell.zome("reciprocity"),
+            "get_stewardship_leaderboard",
+            10u64,
+        )
+        .await;
+    assert_eq!(board.len(), 2);
+    assert_eq!(board[0].dependency_id, "crate:lb1:1.0");
+    assert!(board[0].weighted_score > board[1].weighted_score);
+
+    // Under-supported should have lb2 first (lower score)
+    let under: Vec<LeaderboardEntry> = conductor
+        .call(
+            &cell.zome("reciprocity"),
+            "get_under_supported_dependencies",
+            10u64,
+        )
+        .await;
+    assert!(!under.is_empty());
+    assert_eq!(under[0].dependency_id, "crate:lb2:1.0");
 }

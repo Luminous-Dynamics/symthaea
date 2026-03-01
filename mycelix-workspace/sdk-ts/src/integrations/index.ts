@@ -979,6 +979,11 @@ export type {
   PaginatedResult,
   PaginationInput,
   TopDependency,
+  BulkRegisterResult,
+  BulkUsageResult,
+  LeaderboardEntry,
+  EcosystemStat,
+  EcosystemStatistics,
 } from './attribution/index.js';
 
 // ============================================================================
