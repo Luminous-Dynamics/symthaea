@@ -48,6 +48,17 @@ pub const QWEN3_FULL_DIMENSION: usize = 1536;
 /// Standard dimension for Qwen3-0.6B embeddings
 pub const QWEN3_STANDARD_DIMENSION: usize = 1024;
 
+/// Standard Matryoshka (MRL) dimensions for Qwen3-Embedding models.
+///
+/// Qwen3-Embedding models are trained with Matryoshka Representation Learning,
+/// meaning the first N dimensions of the full embedding form a valid embedding
+/// at dimension N. Smaller dimensions trade some quality for faster downstream
+/// similarity search and reduced storage.
+///
+/// These dimensions are validated for Qwen3-Embedding-0.6B (1024D full).
+/// For Qwen3-Embedding-1.5B, dimensions up to 1536 are valid.
+pub const QWEN3_MRL_DIMENSIONS: &[usize] = &[64, 128, 256, 512, 768, 1024];
+
 // ── Burn backend abstraction ──────────────────────────────────────────
 
 #[cfg(feature = "burn")]
@@ -82,7 +93,7 @@ fn forward_and_pool<B: burn::prelude::Backend>(
     let input_tensor = Tensor::<B, 1, Int>::from_data(input_ids, device)
         .unsqueeze_dim(0); // [1, seq_len]
 
-    let hidden = burn_model.forward(input_tensor);
+    let hidden = burn_model.forward(input_tensor, None);
     let [_batch, _seq, hidden_dim] = hidden.dims();
     let out_dim = embedding_dim.min(hidden_dim);
 
@@ -265,70 +276,88 @@ fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
     let input_tensor = Tensor::<B, 1, Int>::from_data(flat_ids.as_slice(), device)
         .reshape([batch_size, max_len]);
 
-    let hidden = burn_model.forward(input_tensor);
+    // Build additive attention mask: 0.0 for real tokens, -1e9 for padding
+    let attn_mask_data: Vec<f32> = flat_masks
+        .iter()
+        .map(|&m| if m == 1 { 0.0f32 } else { -1e9f32 })
+        .collect();
+    let attn_mask = Tensor::<B, 1>::from_data(attn_mask_data.as_slice(), device)
+        .reshape([batch_size, 1, 1, max_len]);
+
+    let hidden = burn_model.forward(input_tensor, Some(attn_mask));
     let [_b, _s, hidden_dim] = hidden.dims();
     let out_dim = embedding_dim.min(hidden_dim);
 
-    // Pool each sequence independently
-    let mut results = Vec::with_capacity(batch_size);
-    for i in 0..batch_size {
-        let seq_len = batch_ids[i].len();
-        let mask_slice = &flat_masks[i * max_len..i * max_len + seq_len];
+    let hidden_sliced = hidden.slice([0..batch_size, 0..max_len, 0..out_dim]);
 
-        let seq_hidden = hidden.clone().slice([i..i + 1, 0..max_len, 0..out_dim]);
+    // Vectorized path for MeanPooling; per-sequence fallback for others
+    let pooled: Tensor<B, 2> = match pooling {
+        PoolingStrategy::MeanPooling => {
+            // Build float mask [batch, max_len, 1] for broadcasting
+            let mask_f32: Vec<f32> = flat_masks.iter().map(|&m| m as f32).collect();
+            let mask_tensor = Tensor::<B, 1>::from_data(mask_f32.as_slice(), device)
+                .reshape([batch_size, max_len, 1]);
 
-        let pooled: Tensor<B, 2> = match pooling {
-            PoolingStrategy::LastTokenPooling => {
-                let last_idx = mask_slice
-                    .iter()
-                    .rposition(|&m| m == 1)
-                    .unwrap_or(seq_len.saturating_sub(1));
-                seq_hidden
-                    .slice([0..1, last_idx..last_idx + 1, 0..out_dim])
-                    .reshape([1, out_dim])
-            }
-            PoolingStrategy::MeanPooling => {
-                let token_count = mask_slice.iter().filter(|&&m| m == 1).count();
-                if token_count > 0 {
-                    let sum = seq_hidden
-                        .slice([0..1, 0..token_count, 0..out_dim])
-                        .sum_dim(1)
-                        .squeeze(1);
-                    sum.div_scalar(token_count as f32)
-                } else {
-                    seq_hidden
-                        .slice([0..1, 0..1, 0..out_dim])
-                        .reshape([1, out_dim])
-                }
-            }
-            PoolingStrategy::ClsToken => {
-                seq_hidden
-                    .slice([0..1, 0..1, 0..out_dim])
-                    .reshape([1, out_dim])
-            }
-            PoolingStrategy::MaxPooling => {
-                seq_hidden
-                    .slice([0..1, 0..seq_len, 0..out_dim])
-                    .max_dim(1)
-                    .squeeze(1)
-            }
-        };
+            // Masked sum: zero out padding positions, then sum over seq dim
+            let masked = hidden_sliced * mask_tensor.clone();
+            let summed = masked.sum_dim(1).squeeze(1); // [B, D]
 
-        let data = pooled.into_data();
-        let mut embedding: Vec<f32> = data.to_vec().unwrap();
-        embedding.truncate(out_dim);
-
-        if normalize {
-            let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if norm > 1e-6 {
-                for x in embedding.iter_mut() {
-                    *x /= norm;
-                }
-            }
+            // Per-sequence token counts for averaging
+            let counts = mask_tensor.sum_dim(1).squeeze(1).clamp_min(1.0); // [B, 1]
+            summed / counts
         }
+        _ => {
+            // LastTokenPooling, ClsToken, MaxPooling — require per-sequence indexing
+            let mut rows: Vec<Tensor<B, 2>> = Vec::with_capacity(batch_size);
+            for i in 0..batch_size {
+                let seq_len = batch_ids[i].len();
+                let mask_slice = &flat_masks[i * max_len..i * max_len + seq_len];
+                let seq_hidden = hidden_sliced.clone().slice([i..i + 1, 0..max_len, 0..out_dim]);
 
-        results.push(embedding);
-    }
+                let row: Tensor<B, 2> = match pooling {
+                    PoolingStrategy::LastTokenPooling => {
+                        let last_idx = mask_slice
+                            .iter()
+                            .rposition(|&m| m == 1)
+                            .unwrap_or(seq_len.saturating_sub(1));
+                        seq_hidden
+                            .slice([0..1, last_idx..last_idx + 1, 0..out_dim])
+                            .reshape([1, out_dim])
+                    }
+                    PoolingStrategy::ClsToken => {
+                        seq_hidden
+                            .slice([0..1, 0..1, 0..out_dim])
+                            .reshape([1, out_dim])
+                    }
+                    PoolingStrategy::MaxPooling => {
+                        seq_hidden
+                            .slice([0..1, 0..seq_len, 0..out_dim])
+                            .max_dim(1)
+                            .squeeze(1)
+                    }
+                    PoolingStrategy::MeanPooling => unreachable!(),
+                };
+                rows.push(row);
+            }
+            Tensor::cat(rows, 0) // [B, D]
+        }
+    };
+
+    // Vectorized normalization
+    let pooled = if normalize {
+        let norms = pooled.clone().powf_scalar(2.0).sum_dim(1).sqrt().clamp_min(1e-6); // [B, 1]
+        pooled / norms
+    } else {
+        pooled
+    };
+
+    // Convert [B, D] tensor to Vec<Vec<f32>>
+    let data = pooled.into_data();
+    let flat: Vec<f32> = data.to_vec().unwrap();
+    let results: Vec<Vec<f32>> = flat
+        .chunks(out_dim)
+        .map(|chunk| chunk.to_vec())
+        .collect();
 
     Ok(results)
 }
@@ -504,6 +533,19 @@ impl Qwen3Config {
     /// Enable half-precision weight loading (f16 storage, faster load)
     pub fn with_half_precision(mut self) -> Self {
         self.half_precision = true;
+        self
+    }
+
+    /// Set Matryoshka (MRL) dimension for quality-preserving dimension reduction.
+    ///
+    /// Qwen3-Embedding models are trained with Matryoshka Representation Learning:
+    /// the first `dim` dimensions of the full output form a valid lower-dimensional
+    /// embedding. The output is automatically L2-renormalized after truncation.
+    ///
+    /// Standard dimensions: 64, 128, 256, 512, 768, 1024 (0.6B) or up to 1536 (1.5B).
+    /// See [`QWEN3_MRL_DIMENSIONS`] for the standard set.
+    pub fn with_matryoshka_dim(mut self, dim: usize) -> Self {
+        self.embedding_dim = dim;
         self
     }
 }
@@ -1244,7 +1286,7 @@ mod burn_tests {
         let model = cfg.init::<B>(&device);
 
         let ids = Tensor::<B, 2, Int>::zeros([1, 8], &device);
-        let out = model.forward(ids);
+        let out = model.forward(ids, None);
         let [b, s, h] = out.dims();
         assert_eq!((b, s, h), (1, 8, 64));
     }
@@ -1279,7 +1321,7 @@ mod burn_tests {
         .init::<B>(&device);
 
         let x = Tensor::<B, 3>::zeros([1, 8, 64], &device);
-        let y = attn.forward(x);
+        let y = attn.forward(x, None);
         assert_eq!(y.dims(), [1, 8, 64]);
     }
 
@@ -1337,6 +1379,127 @@ mod burn_tests {
     }
 
     #[test]
+    fn test_padding_does_not_affect_embedding() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny();
+        let model = cfg.init::<B>(&device);
+
+        let real_ids = vec![1i32, 2, 3, 4];
+        let real_mask = vec![1u32; 4];
+
+        // Unpadded: single sequence via forward_and_pool
+        let unpadded = super::forward_and_pool(
+            &model, &real_ids, &real_mask, 4, &device,
+            super::PoolingStrategy::LastTokenPooling, 64, true,
+        ).unwrap();
+
+        // Padded batch: same sequence twice — once exact, once with 8 pad tokens
+        let padded_ids = vec![
+            vec![1, 2, 3, 4],
+            vec![1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+        let padded_masks = vec![
+            vec![1u32; 4],
+            vec![1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+        let batch = super::forward_and_pool_batch_direct(
+            &model, &padded_ids, &padded_masks, &device,
+            super::PoolingStrategy::LastTokenPooling, 64, true,
+        ).unwrap();
+
+        // The first sequence (no padding) should match single-sequence result
+        let dot0: f32 = batch[0].iter().zip(unpadded.iter()).map(|(a, b)| a * b).sum();
+        assert!(dot0 > 0.999, "Unpadded seq in batch should match single: cosine={dot0:.6}");
+
+        // The second sequence (with padding masked out) should also match
+        let dot1: f32 = batch[1].iter().zip(unpadded.iter()).map(|(a, b)| a * b).sum();
+        assert!(dot1 > 0.999, "Padded seq should match unpadded: cosine={dot1:.6}");
+    }
+
+    #[test]
+    fn test_mask_with_mean_pooling() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny();
+        let model = cfg.init::<B>(&device);
+
+        let real_ids = vec![1i32, 2, 3, 4];
+        let real_mask = vec![1u32; 4];
+
+        // Single sequence mean pooling
+        let single = super::forward_and_pool(
+            &model, &real_ids, &real_mask, 4, &device,
+            super::PoolingStrategy::MeanPooling, 64, true,
+        ).unwrap();
+
+        // Batch: same sequence with padding
+        let padded_ids = vec![
+            vec![1, 2, 3, 4],
+            vec![1, 2, 3, 4, 0, 0, 0, 0],
+        ];
+        let padded_masks = vec![
+            vec![1u32; 4],
+            vec![1, 1, 1, 1, 0, 0, 0, 0],
+        ];
+        let batch = super::forward_and_pool_batch_direct(
+            &model, &padded_ids, &padded_masks, &device,
+            super::PoolingStrategy::MeanPooling, 64, true,
+        ).unwrap();
+
+        // Both batch results should match the single-sequence result
+        let dot0: f32 = batch[0].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
+        assert!(dot0 > 0.999, "Mean-pool unpadded batch should match single: cosine={dot0:.6}");
+
+        let dot1: f32 = batch[1].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
+        assert!(dot1 > 0.999, "Mean-pool padded batch should match single: cosine={dot1:.6}");
+    }
+
+    #[test]
+    fn test_matryoshka_dimension_reduction() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny(); // hidden_size=64
+        let model = cfg.init::<B>(&device);
+
+        let ids_a: Vec<i32> = vec![1, 2, 3, 4];
+        let ids_b: Vec<i32> = vec![1, 2, 3, 5];     // slightly different
+        let ids_c: Vec<i32> = vec![10, 20, 30, 40];  // very different
+        let mask = vec![1u32; 4];
+
+        // Full dimension (64)
+        let full_a = super::forward_and_pool(&model, &ids_a, &mask, 4, &device,
+            super::PoolingStrategy::LastTokenPooling, 64, true).unwrap();
+        let full_b = super::forward_and_pool(&model, &ids_b, &mask, 4, &device,
+            super::PoolingStrategy::LastTokenPooling, 64, true).unwrap();
+        let full_c = super::forward_and_pool(&model, &ids_c, &mask, 4, &device,
+            super::PoolingStrategy::LastTokenPooling, 64, true).unwrap();
+
+        // Reduced dimension (32 = half) — Matryoshka truncation + renormalization
+        let half_a = super::forward_and_pool(&model, &ids_a, &mask, 4, &device,
+            super::PoolingStrategy::LastTokenPooling, 32, true).unwrap();
+        let half_b = super::forward_and_pool(&model, &ids_b, &mask, 4, &device,
+            super::PoolingStrategy::LastTokenPooling, 32, true).unwrap();
+        let half_c = super::forward_and_pool(&model, &ids_c, &mask, 4, &device,
+            super::PoolingStrategy::LastTokenPooling, 32, true).unwrap();
+
+        // Dimension should be correctly truncated
+        assert_eq!(half_a.len(), 32);
+        assert_eq!(half_b.len(), 32);
+        assert_eq!(half_c.len(), 32);
+
+        // Reduced-dim embedding should be re-normalized to unit length
+        let norm: f32 = half_a.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 0.01, "Reduced-dim embedding should be unit norm, got {norm}");
+
+        // Compute similarities at both dimensions for observability
+        let full_ab: f32 = full_a.iter().zip(full_b.iter()).map(|(x, y)| x * y).sum();
+        let full_ac: f32 = full_a.iter().zip(full_c.iter()).map(|(x, y)| x * y).sum();
+        let half_ab: f32 = half_a.iter().zip(half_b.iter()).map(|(x, y)| x * y).sum();
+        let half_ac: f32 = half_a.iter().zip(half_c.iter()).map(|(x, y)| x * y).sum();
+
+        eprintln!("Full-dim(64): sim(a,b)={full_ab:.4}, sim(a,c)={full_ac:.4}");
+        eprintln!("Half-dim(32): sim(a,b)={half_ab:.4}, sim(a,c)={half_ac:.4}");
+    }
+
+    #[test]
     fn test_batch_chunking_matches_sequential() {
         let device = burn::backend::ndarray::NdArrayDevice::Cpu;
         let cfg = Qwen3ModelConfig::tiny();
@@ -1374,7 +1537,7 @@ mod burn_tests {
             // batch vs sequential won't be identical, but should be very close
             let dot: f32 = b.iter().zip(s.iter()).map(|(x, y)| x * y).sum();
             assert!(
-                dot > 0.85,
+                dot > 0.99,
                 "Batch vs sequential mismatch for seq {i}: cosine={dot:.4}"
             );
         }

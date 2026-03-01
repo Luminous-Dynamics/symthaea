@@ -94,7 +94,9 @@ impl VisualSearchBenchmark {
                         ContinuousHV::weighted_bundle(&[&dist, &noise], &[0.85, 0.15])
                     };
 
-                    let sim = item.similarity(&target_template) as f64;
+                    // Encoding noise degrades perceptual discriminability
+                    let noise_degrade = config.effective_noise() as f32 * 0.4;
+                    let sim = item.similarity(&target_template) as f64 * (1.0 - noise_degrade as f64);
                     if sim > max_feat_sim {
                         max_feat_sim = sim;
                     }
@@ -140,7 +142,8 @@ impl VisualSearchBenchmark {
                         ContinuousHV::weighted_bundle(&[&dist, &noise], &[0.85, 0.15])
                     };
 
-                    let sim = item.similarity(&target_template) as f64;
+                    let noise_degrade = config.effective_noise() as f32 * 0.4;
+                    let sim = item.similarity(&target_template) as f64 * (1.0 - noise_degrade as f64);
                     if sim > max_conj_sim {
                         max_conj_sim = sim;
                     }

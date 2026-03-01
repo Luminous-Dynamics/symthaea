@@ -1007,3 +1007,166 @@ fn test_spectral_mip_valid_custom_config() {
     };
     assert!(config.validate().is_ok(), "valid custom config should pass");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STRUCTURAL HIERARCHICAL PHI TESTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_structural_phi_block_diagonal_finds_clusters() {
+    // Two clear blocks → should detect 2+ clusters with high micro, low meso
+    let n = 16;
+    let cov = block_diagonal_cov(8, 8, 0.6, 0.02);
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let mip_result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+    let structural = finder
+        .compute_structural_hierarchy_from_cov(&mip_result, &cov, n)
+        .unwrap();
+
+    assert!(
+        structural.num_clusters >= 2,
+        "Block diagonal should produce at least 2 clusters, got {}",
+        structural.num_clusters
+    );
+    assert!(
+        structural.micro_phi > 0.0,
+        "Micro phi should be positive for correlated blocks"
+    );
+    assert!(
+        structural.macro_phi > 0.0,
+        "Macro phi should be positive"
+    );
+    // All fields should be finite
+    assert!(structural.micro_phi.is_finite());
+    assert!(structural.meso_phi.is_finite());
+    assert!(structural.macro_phi.is_finite());
+    assert!(structural.emergence_ratio.is_finite());
+    assert!(structural.bottleneck_score.is_finite());
+}
+
+#[test]
+fn test_structural_phi_identity_trivial() {
+    // Identity covariance: no integration → everything near zero
+    let n = 8;
+    let cov = identity_cov(n);
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let mip_result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+    let structural = finder
+        .compute_structural_hierarchy_from_cov(&mip_result, &cov, n)
+        .unwrap();
+
+    assert!(
+        structural.macro_phi.abs() < 1e-6,
+        "Identity should give macro phi ≈ 0, got {}",
+        structural.macro_phi
+    );
+}
+
+#[test]
+fn test_structural_phi_three_blocks() {
+    // Three clear blocks with strong intra and near-zero inter correlation
+    // Larger clusters (6 each) give more robust per-cluster Phi
+    let n = 18;
+    let cov = three_block_cov(6, 6, 6, 0.8, 0.01, 0.01, 0.01);
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let mip_result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+    let structural = finder
+        .compute_structural_hierarchy_from_cov(&mip_result, &cov, n)
+        .unwrap();
+
+    assert!(
+        structural.num_clusters >= 2,
+        "Three-block should produce at least 2 clusters, got {}",
+        structural.num_clusters
+    );
+    // With near-zero inter-block coupling, micro >> meso
+    assert!(structural.micro_phi > structural.meso_phi,
+        "Within-cluster integration ({}) should exceed between-cluster ({})",
+        structural.micro_phi, structural.meso_phi
+    );
+}
+
+#[test]
+fn test_structural_phi_uniform_correlation() {
+    // Uniform correlation: one big cluster, no hierarchy
+    let n = 8;
+    let mut cov = vec![0.0; n * n];
+    for i in 0..n {
+        cov[i * n + i] = 1.0 + 1e-6;
+        for j in (i + 1)..n {
+            cov[i * n + j] = 0.5;
+            cov[j * n + i] = 0.5;
+        }
+    }
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let mip_result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+    let structural = finder
+        .compute_structural_hierarchy_from_cov(&mip_result, &cov, n)
+        .unwrap();
+
+    // With uniform correlation, cut_mis should be fairly flat → few/no valleys
+    // This may produce 1 cluster (no hierarchy) or 2+ with balanced sizes
+    assert!(structural.macro_phi.is_finite());
+    assert!(structural.emergence_ratio.is_finite());
+}
+
+#[test]
+fn test_structural_phi_cluster_sizes_sum_to_n() {
+    let n = 16;
+    let cov = block_diagonal_cov(8, 8, 0.6, 0.02);
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let mip_result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+    let structural = finder
+        .compute_structural_hierarchy_from_cov(&mip_result, &cov, n)
+        .unwrap();
+
+    let total_size: usize = structural.cluster_sizes.iter().sum();
+    // Clusters may not cover all n if tiny fragments are filtered
+    assert!(
+        total_size >= n / 2,
+        "Clusters should cover at least half of n={}: got {}",
+        n,
+        total_size
+    );
+    assert_eq!(
+        structural.cluster_phis.len(),
+        structural.cluster_sizes.len(),
+        "cluster_phis and cluster_sizes should have same length"
+    );
+}
+
+#[test]
+fn test_structural_phi_scale_n64() {
+    // Larger scale test: 4 blocks of 16
+    let n = 64;
+    let mut cov = vec![0.0f64; n * n];
+    for i in 0..n {
+        cov[i * n + i] = 1.0 + 1e-6;
+        for j in (i + 1)..n {
+            let same_block = i / 16 == j / 16;
+            let corr = if same_block { 0.5 } else { 0.02 };
+            cov[i * n + j] = corr;
+            cov[j * n + i] = corr;
+        }
+    }
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let mip_result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+    let structural = finder
+        .compute_structural_hierarchy_from_cov(&mip_result, &cov, n)
+        .unwrap();
+
+    assert!(
+        structural.num_clusters >= 2,
+        "4-block structure should produce at least 2 clusters, got {}",
+        structural.num_clusters
+    );
+    assert!(structural.micro_phi.is_finite());
+    assert!(structural.meso_phi.is_finite());
+    assert!(structural.macro_phi > 0.0);
+}

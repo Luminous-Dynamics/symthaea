@@ -121,6 +121,38 @@ pub struct LiquidMambaConfig {
     /// Default false for backwards compatibility.
     #[serde(default)]
     pub temporal_projection: bool,
+    /// Use learned (trainable) positional encoding for temporal projection.
+    /// When false (default), uses fixed sinusoidal encoding.
+    /// Only relevant when `temporal_projection` is true.
+    #[serde(default)]
+    pub learned_pos_enc: bool,
+    /// Chunk stride for temporal projection (0 = use chunk_size, i.e., no overlap).
+    /// When stride < chunk_size (bottleneck_dim), chunks overlap, producing more
+    /// tokens. E.g., stride=128 with chunk_size=256 gives 50% overlap and ~127 tokens.
+    #[serde(default)]
+    pub temporal_stride: usize,
+    /// Use directional cosine loss instead of roundtrip autoencoder loss for temporal.
+    /// Directional loss optimizes angular alignment directly, avoiding the
+    /// information bottleneck of the up→down roundtrip.
+    #[serde(default)]
+    pub temporal_directional_loss: bool,
+    /// Weight for temporal smoothness loss (L2 penalty on consecutive chunk differences).
+    /// 0 = disabled (default). Good starting values: 0.01-0.1.
+    #[serde(default)]
+    pub temporal_smoothness_weight: f32,
+    /// Weight for rank regularization (decorrelation of W_up rows).
+    /// 0 = disabled (default). Good starting values: 0.001-0.01.
+    #[serde(default)]
+    pub temporal_rank_reg_weight: f32,
+    /// Chunk budget for inference-time temporal projection (0 = use all chunks).
+    /// When > 0, only the top-K most informative chunks (by activation magnitude
+    /// and learned attention) are injected, reducing inference latency.
+    #[serde(default)]
+    pub temporal_chunk_budget: usize,
+    /// Enable learned chunk attention weighting for temporal projection.
+    /// Each chunk gets a trainable importance weight (sigmoid-gated).
+    #[serde(default)]
+    pub temporal_learned_attention: bool,
     /// Surprise gradient scaling factor (0 = disabled, 0.5 = default).
     /// Gradients are scaled by `1 + alpha * semantic_pe` before application,
     /// amplifying gradients for surprising/difficult examples.
@@ -210,6 +242,13 @@ impl Default for LiquidMambaConfig {
             ema_decay: 0.999,
             deep_projection: false,
             temporal_projection: false,
+            learned_pos_enc: false,
+            temporal_stride: 0,
+            temporal_directional_loss: false,
+            temporal_smoothness_weight: 0.0,
+            temporal_rank_reg_weight: 0.0,
+            temporal_chunk_budget: 0,
+            temporal_learned_attention: false,
             surprise_gradient_alpha: 0.5,
             grad_clip: 1.0,
             token_pe_sim_threshold: 0.3,
@@ -299,12 +338,23 @@ impl LiquidMambaGenerator {
         };
 
         let temporal_proj = if config.temporal_projection {
-            Some(TemporalProjection::new(
+            let stride = if config.temporal_stride > 0 {
+                config.temporal_stride
+            } else {
+                config.bottleneck_dim // default: no overlap
+            };
+            let mut tp = TemporalProjection::new_full(
                 genesis,
                 config.hdc_dim,
                 config.bottleneck_dim, // chunk_dim = 256
                 config.ssm_dim,
-            ))
+                config.learned_pos_enc,
+                stride,
+            );
+            if config.temporal_learned_attention {
+                tp.set_learned_attention(true);
+            }
+            Some(tp)
         } else {
             None
         };
@@ -424,8 +474,15 @@ impl LiquidMambaGenerator {
         let result = (|| -> Result<GenerationResult> {
             // 2-3. Project thought to SSM space and prime Mamba
             let ssm_context = if let Some(ref tp) = self.temporal_proj {
-                // Temporal: chunk 16384D → 64×768D soft tokens → forward_embeds()
-                let sequence = tp.project_to_ssm_sequence(&thought_hv);
+                // Temporal: chunk 16384D → N×768D soft tokens → forward_embeds()
+                let sequence = if self.config.temporal_chunk_budget > 0 {
+                    tp.project_to_ssm_sequence_topk(
+                        &thought_hv,
+                        self.config.temporal_chunk_budget,
+                    )
+                } else {
+                    tp.project_to_ssm_sequence(&thought_hv)
+                };
                 self.mamba.inject_context_sequence(&sequence)?;
                 // Keep a single-vector summary for veto re-injection
                 sequence.last().cloned().unwrap_or_else(|| vec![0.0; self.config.ssm_dim])
@@ -543,7 +600,14 @@ impl LiquidMambaGenerator {
 
                         // Reset Mamba and re-inject thought context
                         if let Some(ref tp) = self.temporal_proj {
-                            let sequence = tp.project_to_ssm_sequence(&thought_hv);
+                            let sequence = if self.config.temporal_chunk_budget > 0 {
+                                tp.project_to_ssm_sequence_topk(
+                                    &thought_hv,
+                                    self.config.temporal_chunk_budget,
+                                )
+                            } else {
+                                tp.project_to_ssm_sequence(&thought_hv)
+                            };
                             self.mamba.inject_context_sequence(&sequence)?;
                         } else {
                             self.mamba.reset();
@@ -840,39 +904,74 @@ impl LiquidMambaGenerator {
             return;
         }
 
-        let rank = self.projection.effective_rank(recent_hvs);
-        self.last_cached_rank = rank;
-        let threshold = (self.config.bottleneck_dim as f32) / 4.0;
+        if let Some(ref mut tp) = self.temporal_proj {
+            // Temporal path: monitor temporal projection rank
+            let rank = tp.effective_rank(recent_hvs);
+            self.last_cached_rank = rank;
+            let threshold = (tp.chunk_size() as f32) / 4.0;
 
-        if rank < threshold {
-            tracing::warn!(
-                effective_rank = rank,
-                threshold = threshold,
-                bottleneck = self.config.bottleneck_dim,
-                "Projection collapse detected, adding recovery noise"
-            );
+            if rank < threshold {
+                tracing::warn!(
+                    effective_rank = rank,
+                    threshold = threshold,
+                    chunk_size = tp.chunk_size(),
+                    "Temporal projection collapse detected, adding recovery noise"
+                );
 
-            // Get current weights, add scaled noise to restore rank
-            let mut weights = self.projection.flatten_weights();
-            let noise_scale = 0.01 / (self.config.bottleneck_dim as f32).sqrt();
-            let mut rng_state = self.generation_count as u64 ^ 0x9E3779B97F4A7C15;
-            for w in &mut weights {
-                // xorshift64
-                rng_state ^= rng_state << 13;
-                rng_state ^= rng_state >> 7;
-                rng_state ^= rng_state << 17;
-                let noise = ((rng_state as f32) / (u64::MAX as f32) - 0.5) * 2.0 * noise_scale;
-                *w += noise;
+                let mut weights = tp.flatten_weights();
+                let noise_scale = 0.01 / (tp.chunk_size() as f32).sqrt();
+                let mut rng_state = self.generation_count as u64 ^ 0x9E3779B97F4A7C15;
+                for w in &mut weights {
+                    rng_state ^= rng_state << 13;
+                    rng_state ^= rng_state >> 7;
+                    rng_state ^= rng_state << 17;
+                    let noise =
+                        ((rng_state as f32) / (u64::MAX as f32) - 0.5) * 2.0 * noise_scale;
+                    *w += noise;
+                }
+                tp.load_weights(&weights);
+
+                let new_rank = tp.effective_rank(recent_hvs);
+                tracing::info!(
+                    old_rank = rank,
+                    new_rank = new_rank,
+                    "Temporal projection recovery applied"
+                );
             }
-            self.projection.load_weights(&weights);
+        } else {
+            // Spatial path: monitor spatial projection rank
+            let rank = self.projection.effective_rank(recent_hvs);
+            self.last_cached_rank = rank;
+            let threshold = (self.config.bottleneck_dim as f32) / 4.0;
 
-            // Verify recovery
-            let new_rank = self.projection.effective_rank(recent_hvs);
-            tracing::info!(
-                old_rank = rank,
-                new_rank = new_rank,
-                "Projection recovery applied"
-            );
+            if rank < threshold {
+                tracing::warn!(
+                    effective_rank = rank,
+                    threshold = threshold,
+                    bottleneck = self.config.bottleneck_dim,
+                    "Projection collapse detected, adding recovery noise"
+                );
+
+                let mut weights = self.projection.flatten_weights();
+                let noise_scale = 0.01 / (self.config.bottleneck_dim as f32).sqrt();
+                let mut rng_state = self.generation_count as u64 ^ 0x9E3779B97F4A7C15;
+                for w in &mut weights {
+                    rng_state ^= rng_state << 13;
+                    rng_state ^= rng_state >> 7;
+                    rng_state ^= rng_state << 17;
+                    let noise =
+                        ((rng_state as f32) / (u64::MAX as f32) - 0.5) * 2.0 * noise_scale;
+                    *w += noise;
+                }
+                self.projection.load_weights(&weights);
+
+                let new_rank = self.projection.effective_rank(recent_hvs);
+                tracing::info!(
+                    old_rank = rank,
+                    new_rank = new_rank,
+                    "Projection recovery applied"
+                );
+            }
         }
     }
 
@@ -941,15 +1040,16 @@ impl LiquidMambaGenerator {
 
         if self.config.temporal_projection {
             // ─── Temporal projection gradient path ───
-            // Compute bundled HV before taking mutable borrow of temporal_proj
-            let bundled = if use_mamba_signal {
-                Some(self.attention_weighted_bundle(&thought_hv, &result.output_hvs))
-            } else {
-                None
-            };
+            //
+            // Two loss modes:
+            // - Roundtrip (default): autoencoder loss (up → down → compare with original)
+            // - Directional: cosine alignment loss (optimizes angular structure directly)
+            //
+            // When Mamba output is meaningful (PE < 0.5), we boost the gradient
+            // magnitude proportional to output quality.
             let tp = self.temporal_proj.as_mut().unwrap();
-            if let Some(ref bundled) = bundled {
-                tp.compute_gradients(&thought_hv, bundled);
+            if self.config.temporal_directional_loss {
+                tp.compute_directional_gradients(&thought_hv, None);
             } else {
                 tp.compute_roundtrip_gradients(&thought_hv);
             }
@@ -968,13 +1068,34 @@ impl LiquidMambaGenerator {
                 }
             }
 
-            if use_mamba_signal && self.config.surprise_gradient_alpha > 0.0 {
-                let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
-                tp.scale_accumulated_gradients(scale);
+            // Temporal smoothness: penalize large jumps between consecutive SSM vectors
+            if self.config.temporal_smoothness_weight > 0.0 {
+                tp.compute_smoothness_gradients(
+                    &thought_hv,
+                    self.config.temporal_smoothness_weight,
+                );
+            }
+
+            // Rank regularization: decorrelate W_up rows to utilize full SSM space
+            if self.config.temporal_rank_reg_weight > 0.0 {
+                tp.compute_rank_regularization_gradients(
+                    self.config.temporal_rank_reg_weight,
+                    64, // sample 64 random pairs per step
+                );
             }
 
             self.distill_accumulator += 1;
             if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
+                // Apply quality/surprise scaling ONCE as a single product,
+                // after accumulation completes.
+                if use_mamba_signal {
+                    let mut combined_scale = 1.0 + (1.0 - result.semantic_pe).max(0.0);
+                    if self.config.surprise_gradient_alpha > 0.0 {
+                        combined_scale *=
+                            1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
+                    }
+                    tp.scale_accumulated_gradients(combined_scale);
+                }
                 let metrics = tp.apply_gradients(effective_lr, self.config.grad_clip);
                 if let Some(ref mut diag) = self.diagnostics {
                     diag.record_step(&metrics, effective_lr);
@@ -982,6 +1103,28 @@ impl LiquidMambaGenerator {
                     diag.record_bottleneck(&bottleneck);
                 }
                 self.distill_accumulator = 0;
+
+                // Auto-recovery: only during inference (consciousness_gating enabled).
+                if self.config.enable_consciousness_gating {
+                    let collapse_detected = self
+                        .diagnostics
+                        .as_ref()
+                        .map_or(false, |d| d.bottleneck_collapse_detected());
+                    let recovery_gap = self
+                        .generation_count
+                        .saturating_sub(self.last_diag_recovery_gen)
+                        > 10;
+
+                    if collapse_detected && recovery_gap {
+                        tracing::warn!(
+                            gen = self.generation_count,
+                            "diagnostics: temporal bottleneck collapse detected, triggering recovery"
+                        );
+                        let recent: Vec<_> = self.recent_thought_hvs.iter().cloned().collect();
+                        self.check_projection_health(&recent);
+                        self.last_diag_recovery_gen = self.generation_count;
+                    }
+                }
             }
         } else {
             // ─── Spatial projection gradient path (original) ───
@@ -1017,15 +1160,14 @@ impl LiquidMambaGenerator {
                 }
             }
 
-            // Surprise-weighted gradient: only in Phase 2
-            if use_mamba_signal && self.config.surprise_gradient_alpha > 0.0 {
-                let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
-                self.projection.scale_accumulated_gradients(scale);
-            }
-
             // Gradient accumulation: only apply every N steps
             self.distill_accumulator += 1;
             if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
+                // Apply surprise scaling ONCE after accumulation (not per-step)
+                if use_mamba_signal && self.config.surprise_gradient_alpha > 0.0 {
+                    let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
+                    self.projection.scale_accumulated_gradients(scale);
+                }
                 let metrics = self.projection.apply_gradients(effective_lr, self.config.grad_clip);
                 if let Some(ref mut diag) = self.diagnostics {
                     diag.record_step(&metrics, effective_lr);
@@ -1125,9 +1267,21 @@ impl LiquidMambaGenerator {
         if output_hvs.is_empty() {
             return 1.0;
         }
-        let refs: Vec<&ContinuousHV> = output_hvs.iter().collect();
-        let bundled = ContinuousHV::bundle(&refs).normalize();
-        1.0 - thought_hv.similarity(&bundled).clamp(-1.0, 1.0)
+
+        if let Some(ref tp) = self.temporal_proj {
+            // Temporal mode: use roundtrip reconstruction PE.
+            //
+            // The tiled back-projection makes output-based cosine similarity
+            // meaningless (~0.01 always). Instead, measure how well the
+            // temporal projection's up→down roundtrip preserves each chunk.
+            // This directly tracks what the autoencoder loss optimizes.
+            tp.roundtrip_pe(thought_hv)
+        } else {
+            // Spatial mode: full-vector cosine similarity
+            let refs: Vec<&ContinuousHV> = output_hvs.iter().collect();
+            let bundled = ContinuousHV::bundle(&refs).normalize();
+            1.0 - thought_hv.similarity(&bundled).clamp(-1.0, 1.0)
+        }
     }
 }
 

@@ -77,7 +77,9 @@ impl SartBenchmark {
             let stimulus = &digits[digit_idx];
 
             // Similarity to target (inhibition signal)
-            let target_sim = stimulus.similarity(target_hv);
+            // Encoding noise degrades digit discrimination
+            let noise_degrade = config.effective_noise() as f32 * 0.4;
+            let target_sim = stimulus.similarity(target_hv) * (1.0 - noise_degrade);
 
             // Response decision: high response_tendency → likely to respond
             // Must inhibit when target_sim is high

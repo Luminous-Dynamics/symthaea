@@ -67,9 +67,12 @@ impl NBackBenchmark {
 
         let mut perceived_history: Vec<ContinuousHV> = Vec::with_capacity(sequence_len);
 
-        // Difficulty: scale match threshold via temperature multiplier
-        let base_threshold = 0.5 - config.time_pressure * 0.15;
-        let match_threshold = (base_threshold / temp_mult) as f32;
+        // Difficulty: scale match threshold via temperature multiplier.
+        // Time pressure widens the acceptance window (lower threshold → more false alarms).
+        // Encoding noise degrades similarity signal, further reducing discriminability.
+        let noise = config.effective_noise();
+        let base_threshold = 0.5 - config.time_pressure * 0.30 - noise * 0.15;
+        let match_threshold = (base_threshold / temp_mult).max(0.05) as f32;
 
         for (i, &item) in sequence.iter().enumerate() {
             let hv = adapter.encode(&item, dim);
@@ -81,7 +84,8 @@ impl NBackBenchmark {
                 let is_target = sequence[i] == sequence[i - n];
                 let nback_retained = n < config.working_memory_capacity;
                 let nback_hv = &perceived_history[i - n];
-                let match_sim = hv.similarity(nback_hv);
+                // Encoding noise degrades similarity signal (top-down refinement absent)
+                let match_sim = hv.similarity(nback_hv) * (1.0 - noise as f32 * 0.4);
 
                 let mut lure_match = false;
                 if !is_target && nback_retained {
@@ -99,7 +103,9 @@ impl NBackBenchmark {
 
                 let responded_match = nback_retained && (match_sim > match_threshold || lure_match);
                 let margin = (match_sim - match_threshold).abs() as f64;
-                let ticks = 3.0 + (1.0 - margin.min(1.0)) * 5.0;
+                // Time pressure reduces deliberation ticks
+                let rt_scale = 1.0 - config.time_pressure * 0.4;
+                let ticks = (3.0 + (1.0 - margin.min(1.0)) * 5.0) * rt_scale;
                 rt_ticks.push(ticks);
 
                 let correct = match (is_target, responded_match) {

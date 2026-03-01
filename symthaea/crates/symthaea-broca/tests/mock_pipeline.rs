@@ -922,3 +922,57 @@ fn test_temporal_checkpoint_roundtrip() {
 
     let _ = std::fs::remove_file(&path);
 }
+
+/// Temporal projection health check: inject uniform weights to collapse temporal
+/// projection, verify check_projection_health() detects and recovers.
+#[test]
+fn test_temporal_collapse_recovery_health_check() {
+    let config = LiquidMambaConfig {
+        max_tokens: 8,
+        warmup_steps: 0,
+        accumulation_steps: 1,
+        enable_consciousness_gating: false,
+        temporal_projection: true,
+        ..Default::default()
+    };
+    let mut gen = mock_gen(config);
+    let channels = ThoughtChannels::with_intent(1);
+
+    // Phase 1: Train normally to get baseline
+    for _ in 0..5 {
+        let result = gen.generate(&channels);
+        gen.distill_step(&channels, &result);
+    }
+
+    // Phase 2: Inject uniform weights to induce collapse
+    let tp = gen.temporal_proj().unwrap();
+    let original_weights = tp.flatten_weights();
+    let uniform: Vec<f32> = original_weights.iter().map(|_| 0.001).collect();
+    gen.temporal_proj_mut().unwrap().load_weights(&uniform);
+
+    // Phase 3: Trigger health check
+    let sample_hvs: Vec<symthaea_core::hdc::ContinuousHV> = (0..5)
+        .map(|i| {
+            let ch = ThoughtChannels::with_intent(i % 4);
+            gen.encoder().encode(&ch)
+        })
+        .collect();
+    gen.check_projection_health(&sample_hvs);
+
+    // Rank should be finite and positive
+    let rank = gen.last_cached_rank();
+    assert!(rank.is_finite(), "Cached rank should be finite: {rank}");
+    assert!(rank > 0.0, "Cached rank should be positive: {rank}");
+
+    // Weights should have changed from uniform (recovery noise applied)
+    let final_weights = gen.temporal_proj().unwrap().flatten_weights();
+    let changed = uniform
+        .iter()
+        .zip(final_weights.iter())
+        .filter(|(a, b)| (*a - *b).abs() > 1e-6)
+        .count();
+    assert!(
+        changed > 0,
+        "Temporal weights should differ after health check recovery"
+    );
+}

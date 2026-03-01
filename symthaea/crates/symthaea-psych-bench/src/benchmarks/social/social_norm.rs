@@ -100,7 +100,9 @@ impl SocialNormBenchmark {
             };
 
             // Compare stimulus to norm prototype
-            let norm_sim = stimulus.similarity(&norms[scenario_idx]) + social_boost;
+            // Encoding noise degrades norm representation fidelity
+            let noise_degrade = config.effective_noise() as f32 * 0.4;
+            let norm_sim = stimulus.similarity(&norms[scenario_idx]) * (1.0 - noise_degrade) + social_boost;
             xor_shift(&mut rng);
             let noise = (rng % 10000) as f32 / 10000.0 * noise_level;
 

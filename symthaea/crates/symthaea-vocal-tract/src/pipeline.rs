@@ -30,6 +30,23 @@ pub enum Intonation {
     Exclamation,
 }
 
+/// Pitch accent type for stressed syllables (ToBI-lite).
+///
+/// Models the F0 shape within a stressed syllable, not just a flat boost.
+/// Based on simplified ToBI (Tones and Break Indices) conventions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PitchAccent {
+    /// No pitch accent (unstressed syllables).
+    #[default]
+    None,
+    /// H*: High target on stressed syllable (most common in English declaratives).
+    High,
+    /// L+H*: Rise to high target (contrastive focus, emphasis).
+    RiseHigh,
+    /// H+L*: Fall to low target (gentle declination).
+    FallLow,
+}
+
 /// Context for prosody post-processing: F0 intonation, stress boost, energy envelope.
 #[derive(Debug, Clone, Copy)]
 pub struct ProsodyContext {
@@ -45,6 +62,14 @@ pub struct ProsodyContext {
     pub arousal: f32,
     /// Intonation contour type.
     pub intonation: Intonation,
+    /// Phrase index (for declination reset). 0 = first phrase, increments at boundaries.
+    pub phrase_index: u8,
+    /// Progress within current phrase (0.0 → 1.0). Resets at each phrase boundary.
+    pub phrase_progress: f32,
+    /// Focus flag: if true, this phoneme receives emphatic prominence.
+    pub is_focus: bool,
+    /// Pitch accent type for stressed syllables.
+    pub pitch_accent: PitchAccent,
 }
 
 impl Default for ProsodyContext {
@@ -56,6 +81,10 @@ impl Default for ProsodyContext {
             base_f0: 120.0,
             arousal: 0.5,
             intonation: Intonation::Statement,
+            phrase_index: 0,
+            phrase_progress: 0.0,
+            is_focus: false,
+            pitch_accent: PitchAccent::None,
         }
     }
 }
@@ -63,8 +92,9 @@ impl Default for ProsodyContext {
 impl ProsodyContext {
     /// Apply prosody post-processing to a FormantFrame.
     ///
-    /// - **F0**: intonation contour × stress boost × arousal range
-    /// - **Energy**: ASR envelope (10% attack, sustain, 15% release) × stress factor
+    /// - **F0**: intonation contour × declination × pitch accent × stress × arousal × focus
+    /// - **Microprosody**: consonant-type F0 perturbation
+    /// - **Energy**: ASR envelope × stress × focus
     pub fn apply_prosody(&self, frame: &mut FormantFrame) {
         let t = self.utterance_progress;
 
@@ -92,6 +122,33 @@ impl ProsodyContext {
             }
         };
 
+        // Declination: F0 baseline drops 15% within each phrase
+        let declination = 1.0 - 0.15 * self.phrase_progress;
+
+        // Pitch accent shapes (applied within stressed syllables)
+        let accent_contour = match self.pitch_accent {
+            PitchAccent::None => 1.0,
+            PitchAccent::High => {
+                // Rise to peak at 40% of syllable, sustain
+                if self.phoneme_progress < 0.4 {
+                    1.0 + 0.15 * (self.phoneme_progress / 0.4)
+                } else {
+                    1.15
+                }
+            }
+            PitchAccent::RiseHigh => {
+                // Starts low, rises sharply to peak at 60%
+                1.0 + 0.20 * (self.phoneme_progress / 0.6).min(1.0)
+            }
+            PitchAccent::FallLow => {
+                // Starts high, falls to low
+                1.10 - 0.15 * self.phoneme_progress
+            }
+        };
+
+        // Focus: emphatic prominence (larger F0 excursion)
+        let focus_boost = if self.is_focus { 1.20 } else { 1.0 };
+
         // Stress boost: primary=1.10×, secondary=1.05×, none=1.0×
         let stress_f0_boost = match self.stress {
             1 => 1.10,
@@ -102,8 +159,22 @@ impl ProsodyContext {
         // Arousal maps to F0 range (more arousal = wider pitch swings)
         let arousal_factor = 0.9 + 0.2 * self.arousal;
 
-        frame.f0 = self.base_f0 * contour * stress_f0_boost * arousal_factor;
-        frame.f0 = frame.f0.clamp(50.0, 500.0);
+        frame.f0 = self.base_f0
+            * contour
+            * declination
+            * accent_contour
+            * stress_f0_boost
+            * arousal_factor
+            * focus_boost;
+
+        // Microprosody: consonants perturb F0 slightly
+        let microprosody = match frame.source_type {
+            SourceType::Stop => -5.0,
+            SourceType::Fricative => -3.0,
+            SourceType::Nasal => 2.0,
+            _ => 0.0,
+        };
+        frame.f0 = (frame.f0 + microprosody).clamp(50.0, 500.0);
 
         // Energy ASR envelope within the phoneme
         let asr_envelope = if self.phoneme_progress < 0.10 {
@@ -124,7 +195,39 @@ impl ProsodyContext {
             _ => 0.9,
         };
 
-        frame.energy = (frame.energy * asr_envelope * stress_energy).clamp(0.0, 1.0);
+        // Focus also boosts energy
+        let focus_energy = if self.is_focus { 1.3 } else { 1.0 };
+
+        frame.energy = (frame.energy * asr_envelope * stress_energy * focus_energy).clamp(0.0, 1.0);
+
+        // Vowel reduction: unstressed vowels centralize toward schwa.
+        // In natural speech, unstressed vowels are shorter and their formants
+        // drift toward a neutral position (~500, ~1500 Hz).
+        if self.stress == 0
+            && matches!(frame.source_type, SourceType::Vowel | SourceType::Liquid)
+        {
+            const SCHWA_F1: f32 = 500.0;
+            const SCHWA_F2: f32 = 1500.0;
+            const REDUCTION: f32 = 0.3; // 30% toward schwa
+            frame.f1 = frame.f1 * (1.0 - REDUCTION) + SCHWA_F1 * REDUCTION;
+            frame.f2 = frame.f2 * (1.0 - REDUCTION) + SCHWA_F2 * REDUCTION;
+        }
+
+        // Formant bandwidth dynamics: stressed vowels have sharper (narrower)
+        // formants, unstressed vowels have more diffuse (wider) bandwidths.
+        match self.stress {
+            1 => {
+                frame.b1 *= 0.9;
+                frame.b2 *= 0.9;
+                frame.b3 *= 0.9;
+            }
+            0 if matches!(frame.source_type, SourceType::Vowel | SourceType::Liquid) => {
+                frame.b1 *= 1.3;
+                frame.b2 *= 1.3;
+                frame.b3 *= 1.3;
+            }
+            _ => {}
+        }
     }
 }
 
@@ -503,6 +606,151 @@ impl VocalTractPipeline {
         let mut frame = self.tick_phoneme(cognitive_state, metrics, dt, phoneme);
         prosody.apply_prosody(&mut frame);
         frame
+    }
+
+    /// Run one motor frame with anticipatory coarticulation + prosody.
+    ///
+    /// Like `tick_with_prosody()`, but accepts `next_phoneme` and
+    /// `phoneme_remaining_frames` to enable look-ahead blending.
+    /// During the final portion of the current phoneme, the HV starts
+    /// blending toward the next phoneme (max 30% blend).
+    #[allow(clippy::too_many_arguments)]
+    pub fn tick_with_anticipation(
+        &mut self,
+        cognitive_state: &VoiceCognitiveState,
+        metrics: Option<&VocalTractObservation>,
+        dt: f32,
+        phoneme: Option<&str>,
+        next_phoneme: Option<&str>,
+        phoneme_remaining_frames: usize,
+        prosody: &ProsodyContext,
+    ) -> FormantFrame {
+        // Cognitive tick (10Hz)
+        if self.motor_frame_count % self.frames_per_cognitive_tick == 0 {
+            self.cached_hv = self.encoder.encode(cognitive_state);
+            self.cached_cognitive_channels = Some(cognitive_state.to_channels());
+
+            if let Some(m) = metrics {
+                self.fep_agent.learn(m);
+                let fep_result = self.fep_agent.tick(m);
+                self.controller.modulate_tau(fep_result.tau_factor);
+                let current_lr = self.controller.learning_rate();
+                self.controller
+                    .set_learning_rate(current_lr * fep_result.learning_rate_factor);
+            }
+        }
+
+        self.motor_frame_count += 1;
+
+        // Build effective HV with carryover coarticulation (same as tick_phoneme)
+        let effective_hv = if let Some(ph) = phoneme {
+            let is_same = self.prev_phoneme.as_deref() == Some(ph);
+            let is_reencode = (self.motor_frame_count - 1) % self.frames_per_cognitive_tick == 0;
+
+            let new_bound = if is_same
+                && !is_reencode
+                && self.coarticulation_counter >= self.coarticulation_frames
+            {
+                if let Some(ref cached) = self.prev_phoneme_bound_hv {
+                    cached.clone()
+                } else {
+                    let phoneme_hv = self.get_or_create_phoneme_hv(ph);
+                    let bound = self.cached_hv.bind(&phoneme_hv);
+                    self.prev_phoneme_bound_hv = Some(bound.clone());
+                    bound
+                }
+            } else {
+                let phoneme_hv = self.get_or_create_phoneme_hv(ph);
+                let bound = self.cached_hv.bind(&phoneme_hv);
+
+                if !is_same {
+                    if let Some(old_ph) = self.prev_phoneme.take() {
+                        let old_phoneme_hv = self.get_or_create_phoneme_hv(&old_ph);
+                        self.prev_phoneme_bound_hv = Some(self.cached_hv.bind(&old_phoneme_hv));
+                        self.coarticulation_counter = 0;
+                    }
+                } else {
+                    self.prev_phoneme_bound_hv = Some(bound.clone());
+                }
+
+                bound
+            };
+
+            self.prev_phoneme = Some(ph.to_string());
+
+            // Carryover blend (old → new phoneme)
+            let mut hv = if self.coarticulation_counter < self.coarticulation_frames {
+                self.coarticulation_counter += 1;
+                if let Some(ref prev_hv) = self.prev_phoneme_bound_hv {
+                    let t =
+                        self.coarticulation_counter as f32 / self.coarticulation_frames as f32;
+                    prev_hv.scale(1.0 - t).add(&new_bound.scale(t))
+                } else {
+                    new_bound.clone()
+                }
+            } else {
+                new_bound.clone()
+            };
+
+            // Anticipatory coarticulation: during final frames of current phoneme,
+            // start blending toward next phoneme's HV
+            if let Some(next_ph) = next_phoneme {
+                let window = self.anticipation_window(phoneme);
+                if phoneme_remaining_frames <= window && window > 0 {
+                    let next_phoneme_hv = self.get_or_create_phoneme_hv(next_ph);
+                    let next_bound = self.cached_hv.bind(&next_phoneme_hv);
+                    // Blend factor: 0 at start of window, up to 0.3 at phoneme end
+                    let t = 1.0 - (phoneme_remaining_frames as f32 / window as f32);
+                    let anticipation_blend = t * 0.3;
+                    hv = hv.scale(1.0 - anticipation_blend)
+                        .add(&next_bound.scale(anticipation_blend));
+                }
+            }
+
+            hv
+        } else {
+            self.prev_phoneme = None;
+            self.prev_phoneme_bound_hv = None;
+            self.cached_hv.clone()
+        };
+
+        // Adaptive rate limiting
+        if phoneme.is_some() && self.coarticulation_counter < self.coarticulation_frames {
+            self.controller
+                .set_max_formant_delta(self.controller.config().transition_max_delta);
+        } else {
+            self.controller
+                .set_max_formant_delta(self.controller.config().steady_max_delta);
+        }
+
+        // Motor tick
+        let mut frame = self.controller.forward_with_prosody(
+            &effective_hv,
+            dt,
+            self.cached_cognitive_channels.as_ref(),
+        );
+        frame.time = self.cumulative_time;
+        self.cumulative_time += dt;
+
+        // Set source_type from phoneme manner map
+        if let Some(ph) = phoneme {
+            if let Some(&manner) = self.phoneme_manner_map.get(ph) {
+                frame.source_type = manner;
+            }
+        }
+
+        prosody.apply_prosody(&mut frame);
+        frame
+    }
+
+    /// Number of frames for anticipatory blending (manner-dependent).
+    fn anticipation_window(&self, phoneme: Option<&str>) -> usize {
+        match phoneme.map(phoneme_manner_class) {
+            Some(MannerClass::Vowel) => 5,     // 25ms anticipation
+            Some(MannerClass::Fricative) => 4, // 20ms
+            Some(MannerClass::Nasal) => 3,     // 15ms
+            _ => 2,                            // 10ms default
+        }
     }
 
     /// Reset the entire pipeline.
@@ -1366,5 +1614,446 @@ mod tests {
         // With stress digit
         assert_eq!(phoneme_manner_class("AH0"), MannerClass::Vowel);
         assert_eq!(phoneme_manner_class("IY1"), MannerClass::Vowel);
+    }
+
+    #[test]
+    fn test_pitch_accent_shapes() {
+        let base_f0 = 120.0;
+
+        // H*: should raise F0 mid-syllable
+        let mut frame_h = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            stress: 1,
+            base_f0,
+            pitch_accent: PitchAccent::High,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_h);
+
+        let mut frame_none = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            stress: 1,
+            base_f0,
+            pitch_accent: PitchAccent::None,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_none);
+
+        assert!(
+            frame_h.f0 > frame_none.f0,
+            "H* accent should raise F0: H*={:.1}, None={:.1}",
+            frame_h.f0,
+            frame_none.f0
+        );
+
+        // L+H*: should rise across syllable (early < late)
+        let mut frame_lh_early = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.1,
+            stress: 1,
+            base_f0,
+            pitch_accent: PitchAccent::RiseHigh,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_lh_early);
+
+        let mut frame_lh_late = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.8,
+            stress: 1,
+            base_f0,
+            pitch_accent: PitchAccent::RiseHigh,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_lh_late);
+
+        assert!(
+            frame_lh_late.f0 > frame_lh_early.f0,
+            "L+H* should rise: early={:.1}, late={:.1}",
+            frame_lh_early.f0,
+            frame_lh_late.f0
+        );
+    }
+
+    #[test]
+    fn test_declination_within_phrase() {
+        let base_f0 = 120.0;
+
+        // Start of phrase
+        let mut frame_start = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            base_f0,
+            phrase_progress: 0.0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_start);
+
+        // End of phrase
+        let mut frame_end = FormantFrame::silent(0.0);
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            base_f0,
+            phrase_progress: 1.0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_end);
+
+        assert!(
+            frame_start.f0 > frame_end.f0,
+            "F0 should drop within phrase: start={:.1}, end={:.1}",
+            frame_start.f0,
+            frame_end.f0
+        );
+
+        // Declination is 15%: ratio should be ~0.85
+        let ratio = frame_end.f0 / frame_start.f0;
+        assert!(
+            ratio < 0.90 && ratio > 0.75,
+            "Declination ratio should be ~0.85: got {ratio:.3}"
+        );
+    }
+
+    #[test]
+    fn test_focus_boosts_f0_and_energy() {
+        let base_f0 = 120.0;
+
+        let mut frame_focus = FormantFrame {
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            base_f0,
+            is_focus: true,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_focus);
+
+        let mut frame_normal = FormantFrame {
+            energy: 0.5,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            base_f0,
+            is_focus: false,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_normal);
+
+        assert!(
+            frame_focus.f0 > frame_normal.f0,
+            "Focus should boost F0: focus={:.1}, normal={:.1}",
+            frame_focus.f0,
+            frame_normal.f0
+        );
+        assert!(
+            frame_focus.energy > frame_normal.energy,
+            "Focus should boost energy: focus={:.3}, normal={:.3}",
+            frame_focus.energy,
+            frame_normal.energy
+        );
+    }
+
+    #[test]
+    fn test_microprosody_consonant_perturbation() {
+        let base_f0 = 120.0;
+
+        // Vowel (no microprosody)
+        let mut frame_vowel = FormantFrame {
+            source_type: SourceType::Vowel,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            base_f0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_vowel);
+
+        // Stop (should lower F0)
+        let mut frame_stop = FormantFrame {
+            source_type: SourceType::Stop,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            base_f0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_stop);
+
+        assert!(
+            frame_stop.f0 < frame_vowel.f0,
+            "Stop should lower F0 via microprosody: stop={:.1}, vowel={:.1}",
+            frame_stop.f0,
+            frame_vowel.f0
+        );
+
+        // Nasal (should raise F0)
+        let mut frame_nasal = FormantFrame {
+            source_type: SourceType::Nasal,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            base_f0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_nasal);
+
+        assert!(
+            frame_nasal.f0 > frame_vowel.f0,
+            "Nasal should raise F0 via microprosody: nasal={:.1}, vowel={:.1}",
+            frame_nasal.f0,
+            frame_vowel.f0
+        );
+    }
+
+    #[test]
+    fn test_anticipatory_blending() {
+        let genesis = GenesisSeed::from_phrase("test-anticipatory");
+        let mut pipeline = VocalTractPipeline::new(&genesis);
+        let state = VoiceCognitiveState::default();
+        let prosody = ProsodyContext::default();
+
+        // Run 30 frames of /AH/
+        for _ in 0..30 {
+            pipeline.tick_phoneme(&state, None, 0.005, Some("AH"));
+        }
+
+        // Now run /AH/ with anticipation toward /IY/
+        // Final 5 frames should start shifting toward /IY/ formants
+        let total_remaining = 10;
+        let mut anticipatory_frames = Vec::new();
+        for i in 0..total_remaining {
+            let remaining = total_remaining - i;
+            let frame = pipeline.tick_with_anticipation(
+                &state,
+                None,
+                0.005,
+                Some("AH"),
+                Some("IY"),
+                remaining,
+                &prosody,
+            );
+            anticipatory_frames.push(frame);
+        }
+
+        // Run same sequence WITHOUT anticipation (next_phoneme = None)
+        let mut pipeline2 = VocalTractPipeline::new(&genesis);
+        for _ in 0..30 {
+            pipeline2.tick_phoneme(&state, None, 0.005, Some("AH"));
+        }
+        let mut no_antic_frames = Vec::new();
+        for _ in 0..total_remaining {
+            let frame = pipeline2.tick_with_anticipation(
+                &state,
+                None,
+                0.005,
+                Some("AH"),
+                None,
+                0,
+                &prosody,
+            );
+            no_antic_frames.push(frame);
+        }
+
+        // Anticipatory frames (especially late ones) should differ from non-anticipatory
+        let late_diff: f32 = anticipatory_frames[5..]
+            .iter()
+            .zip(no_antic_frames[5..].iter())
+            .map(|(a, b)| (a.f1 - b.f1).abs() + (a.f2 - b.f2).abs())
+            .sum();
+
+        assert!(
+            late_diff > 0.01,
+            "Anticipatory blending should change late frames: diff={late_diff:.4}"
+        );
+    }
+
+    #[test]
+    fn test_no_anticipation_without_next() {
+        let genesis = GenesisSeed::from_phrase("test-no-antic");
+        let mut pipeline1 = VocalTractPipeline::new(&genesis);
+        let mut pipeline2 = VocalTractPipeline::new(&genesis);
+        let state = VoiceCognitiveState::default();
+        let prosody = ProsodyContext::default();
+
+        // Both pipelines produce same output when next_phoneme is None
+        let frame1 = pipeline1.tick_with_anticipation(
+            &state, None, 0.005, Some("AH"), None, 0, &prosody,
+        );
+        let frame2 = pipeline2.tick_with_prosody(
+            &state, None, 0.005, Some("AH"), &prosody,
+        );
+
+        // Should be very close (tick_with_anticipation duplicates the cognitive/motor logic)
+        assert!(
+            (frame1.f1 - frame2.f1).abs() < 1e-3,
+            "No-anticipation should match tick_with_prosody: f1={:.2} vs {:.2}",
+            frame1.f1,
+            frame2.f1
+        );
+    }
+
+    #[test]
+    fn test_anticipation_window_manner_dependent() {
+        let genesis = GenesisSeed::from_phrase("test-antic-window");
+        let pipeline = VocalTractPipeline::new(&genesis);
+
+        // Vowels get largest window
+        let vowel_win = pipeline.anticipation_window(Some("AH"));
+        let stop_win = pipeline.anticipation_window(Some("P"));
+        let fric_win = pipeline.anticipation_window(Some("S"));
+
+        assert!(
+            vowel_win > stop_win,
+            "Vowel window should be larger than stop: vowel={vowel_win}, stop={stop_win}"
+        );
+        assert!(
+            fric_win > stop_win,
+            "Fricative window should be larger than stop: fric={fric_win}, stop={stop_win}"
+        );
+    }
+
+    #[test]
+    fn test_vowel_reduction_centralizes_unstressed() {
+        let base_f0 = 120.0;
+
+        // Stressed vowel: F1/F2 unchanged
+        let mut frame_stressed = FormantFrame {
+            f1: 730.0, // /AE/ target
+            f2: 1090.0,
+            f3: 2440.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            energy: 0.5,
+            source_type: SourceType::Vowel,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            stress: 1,
+            base_f0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_stressed);
+
+        // Unstressed vowel: same starting formants, should centralize
+        let mut frame_unstressed = FormantFrame {
+            f1: 730.0,
+            f2: 1090.0,
+            f3: 2440.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            energy: 0.5,
+            source_type: SourceType::Vowel,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            stress: 0,
+            base_f0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_unstressed);
+
+        // Unstressed F1 should move toward schwa (500 Hz) — i.e., decrease from 730
+        assert!(
+            frame_unstressed.f1 < frame_stressed.f1,
+            "Unstressed F1 should centralize: unstressed={:.0}, stressed={:.0}",
+            frame_unstressed.f1,
+            frame_stressed.f1
+        );
+
+        // F2 should move toward 1500 — i.e., increase from 1090
+        assert!(
+            frame_unstressed.f2 > frame_stressed.f2,
+            "Unstressed F2 should centralize toward 1500: unstressed={:.0}, stressed={:.0}",
+            frame_unstressed.f2,
+            frame_stressed.f2
+        );
+    }
+
+    #[test]
+    fn test_bandwidth_dynamics() {
+        let base_f0 = 120.0;
+
+        // Stressed vowel
+        let mut frame_stressed = FormantFrame {
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            energy: 0.5,
+            source_type: SourceType::Vowel,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            stress: 1,
+            base_f0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_stressed);
+
+        // Unstressed vowel
+        let mut frame_unstressed = FormantFrame {
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            energy: 0.5,
+            source_type: SourceType::Vowel,
+            ..FormantFrame::silent(0.0)
+        };
+        ProsodyContext {
+            utterance_progress: 0.5,
+            phoneme_progress: 0.5,
+            stress: 0,
+            base_f0,
+            ..Default::default()
+        }
+        .apply_prosody(&mut frame_unstressed);
+
+        // Stressed: narrower bandwidths (×0.9)
+        assert!(
+            frame_stressed.b1 < 60.0,
+            "Stressed bandwidth should narrow: b1={:.1}",
+            frame_stressed.b1
+        );
+
+        // Unstressed: wider bandwidths (×1.3)
+        assert!(
+            frame_unstressed.b1 > 60.0,
+            "Unstressed bandwidth should widen: b1={:.1}",
+            frame_unstressed.b1
+        );
+
+        // Stressed < unstressed
+        assert!(
+            frame_stressed.b1 < frame_unstressed.b1,
+            "Stressed bandwidth should be narrower: stressed={:.1}, unstressed={:.1}",
+            frame_stressed.b1,
+            frame_unstressed.b1
+        );
     }
 }

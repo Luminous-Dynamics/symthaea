@@ -1,6 +1,9 @@
 //! BrocaCheckpoint: save/load trained Broca models with integrity verification.
 //!
-//! Uses bincode for efficient serialization and blake3 for checksum integrity.
+//! Uses rmp-serde (MessagePack) for self-describing serialization and blake3
+//! for checksum integrity. Legacy bincode checkpoints are supported for loading
+//! via automatic fallback (new saves always use MessagePack).
+//!
 //! Pattern follows `swarm/checkpoint.rs`.
 
 use std::io::{Read, Write};
@@ -21,8 +24,9 @@ const CHECKPOINT_VERSION: u32 = 2;
 /// Current ProjectionCheckpoint schema version.
 /// v1: 4 weight matrices (w_down, w_up, w_back_down, w_back_up).
 /// v2: v1 + 4 LayerNorm vectors (ln_fwd_gamma, ln_fwd_beta, ln_bwd_gamma, ln_bwd_beta).
+/// v3: v2 + temporal projection fields (temporal, chunk_dim, num_chunks, temporal_weights).
 #[cfg(feature = "mamba")]
-const PROJECTION_CHECKPOINT_VERSION: u32 = 2;
+const PROJECTION_CHECKPOINT_VERSION: u32 = 3;
 
 /// Minimum supported ProjectionCheckpoint version.
 #[cfg(feature = "mamba")]
@@ -139,7 +143,8 @@ impl BrocaCheckpoint {
             checksum: [0u8; 32],
         };
 
-        let bytes = bincode::serialize(&copy).unwrap_or_default();
+        let bytes = rmp_serde::to_vec(&copy)
+            .expect("BrocaCheckpoint serialization must succeed for integrity checking");
         *blake3::hash(&bytes).as_bytes()
     }
 
@@ -149,12 +154,13 @@ impl BrocaCheckpoint {
         self.checksum == expected
     }
 
-    /// Save checkpoint to a file.
+    /// Save checkpoint to a file (MessagePack format).
     pub fn save_to_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         // Compute and set checksum before serialization
         self.checksum = self.compute_checksum();
 
-        let serialized = bincode::serialize(self).context("Failed to serialize BrocaCheckpoint")?;
+        let serialized =
+            rmp_serde::to_vec(self).context("Failed to serialize BrocaCheckpoint")?;
 
         let mut file = std::fs::File::create(path.as_ref())
             .with_context(|| format!("creating checkpoint file: {}", path.as_ref().display()))?;
@@ -173,18 +179,32 @@ impl BrocaCheckpoint {
     }
 
     /// Load checkpoint from a file with integrity verification.
+    ///
+    /// Tries MessagePack (current format) first, then falls back to bincode
+    /// for legacy checkpoints. Legacy bincode checkpoints skip integrity
+    /// verification (the hash was computed from bincode bytes).
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut file = std::fs::File::open(path.as_ref())
             .with_context(|| format!("opening checkpoint file: {}", path.as_ref().display()))?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        let checkpoint: Self =
-            bincode::deserialize(&buffer).context("Failed to deserialize BrocaCheckpoint")?;
-
-        if !checkpoint.verify() {
-            anyhow::bail!("Checkpoint integrity check failed: checksum mismatch");
-        }
+        // Try MessagePack (current format) first
+        let checkpoint: Self = if let Ok(ckpt) = rmp_serde::from_slice::<Self>(&buffer) {
+            // MessagePack checkpoint — verify integrity
+            if !ckpt.verify() {
+                anyhow::bail!("Checkpoint integrity check failed: checksum mismatch");
+            }
+            ckpt
+        } else {
+            // Fall back to bincode (legacy format) — skip verify since hash format changed
+            let ckpt = bincode::deserialize::<Self>(&buffer)
+                .context("Failed to deserialize BrocaCheckpoint (tried msgpack + bincode)")?;
+            tracing::warn!(
+                "Loaded legacy bincode Broca checkpoint — will be re-saved as MessagePack"
+            );
+            ckpt
+        };
 
         if checkpoint.version > CHECKPOINT_VERSION {
             anyhow::bail!(
@@ -276,6 +296,7 @@ impl BrocaGenerator {
     /// ```ignore
     /// let lm_config: LiquidMambaConfig = serde_json::from_str(&json_str)?;
     /// ```
+    #[allow(clippy::type_complexity)]
     pub fn from_checkpoint<P: AsRef<Path>>(
         path: P,
         genesis: &symthaea_core::genesis::GenesisSeed,
@@ -339,6 +360,22 @@ pub struct ProjectionCheckpoint {
     /// Added after v2; backward-compatible via serde(default) = None.
     #[serde(default)]
     pub diagnostics_snapshot: Option<crate::projection::GradientDiagnosticsSnapshot>,
+    /// Whether this checkpoint uses temporal projection (chunk-based continuous latent prompting).
+    /// Added in v3; v1/v2 checkpoints deserialize with `false` via serde(default).
+    #[serde(default)]
+    pub temporal: bool,
+    /// Per-chunk dimension for temporal projection (e.g., 256).
+    /// Added in v3; v1/v2 checkpoints deserialize with `0` via serde(default).
+    #[serde(default)]
+    pub chunk_dim: usize,
+    /// Number of chunks for temporal projection (e.g., 64).
+    /// Added in v3; v1/v2 checkpoints deserialize with `0` via serde(default).
+    #[serde(default)]
+    pub num_chunks: usize,
+    /// Optional temporal projection weights (w_chunk_up + w_chunk_down + LN).
+    /// Added in v3; v1/v2 checkpoints deserialize with `None` via serde(default).
+    #[serde(default)]
+    pub temporal_weights: Option<Vec<f32>>,
     /// Blake3 integrity checksum (zeroed before hashing).
     pub checksum: [u8; 32],
 }
@@ -357,9 +394,14 @@ impl ProjectionCheckpoint {
             deep: self.deep,
             inner_dim: self.inner_dim,
             diagnostics_snapshot: self.diagnostics_snapshot.clone(),
+            temporal: self.temporal,
+            chunk_dim: self.chunk_dim,
+            num_chunks: self.num_chunks,
+            temporal_weights: self.temporal_weights.clone(),
             checksum: [0u8; 32],
         };
-        let bytes = bincode::serialize(&copy).unwrap_or_default();
+        let bytes = rmp_serde::to_vec(&copy)
+            .expect("ProjectionCheckpoint serialization must succeed for integrity checking");
         *blake3::hash(&bytes).as_bytes()
     }
 
@@ -369,11 +411,11 @@ impl ProjectionCheckpoint {
         self.checksum == expected
     }
 
-    /// Save to a file.
+    /// Save to a file (MessagePack format).
     pub fn save_to_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.checksum = self.compute_checksum();
         let serialized =
-            bincode::serialize(self).context("Failed to serialize ProjectionCheckpoint")?;
+            rmp_serde::to_vec(self).context("Failed to serialize ProjectionCheckpoint")?;
         let mut file = std::fs::File::create(path.as_ref()).with_context(|| {
             format!(
                 "creating projection checkpoint: {}",
@@ -411,22 +453,71 @@ impl ProjectionCheckpoint {
             deep,
             inner_dim,
             diagnostics_snapshot: None,
+            temporal: false,
+            chunk_dim: 0,
+            num_chunks: 0,
+            temporal_weights: None,
+            checksum: [0u8; 32],
+        }
+    }
+
+    /// Create a new ProjectionCheckpoint for temporal projection.
+    pub fn new_temporal(
+        spatial_weights: Vec<f32>,
+        temporal_weights: Vec<f32>,
+        hdc_dim: usize,
+        bottleneck_dim: usize,
+        ssm_dim: usize,
+        training_epoch: usize,
+        chunk_dim: usize,
+        num_chunks: usize,
+    ) -> Self {
+        Self {
+            version: PROJECTION_CHECKPOINT_VERSION,
+            projection_weights: spatial_weights,
+            hdc_dim,
+            bottleneck_dim,
+            ssm_dim,
+            training_epoch,
+            deep: false,
+            inner_dim: 0,
+            diagnostics_snapshot: None,
+            temporal: true,
+            chunk_dim,
+            num_chunks,
+            temporal_weights: Some(temporal_weights),
             checksum: [0u8; 32],
         }
     }
 
     /// Load from a file with integrity and version compatibility checks.
+    ///
+    /// Tries MessagePack (current format) first, then falls back to bincode
+    /// for legacy checkpoints. Legacy bincode checkpoints skip integrity
+    /// verification (the hash was computed from bincode bytes).
     pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let mut file = std::fs::File::open(path.as_ref()).with_context(|| {
             format!("opening projection checkpoint: {}", path.as_ref().display())
         })?;
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
-        let checkpoint: Self =
-            bincode::deserialize(&buffer).context("Failed to deserialize ProjectionCheckpoint")?;
-        if !checkpoint.verify() {
-            anyhow::bail!("Projection checkpoint integrity check failed: checksum mismatch");
-        }
+
+        // Try MessagePack (current format) first
+        let checkpoint: Self = if let Ok(ckpt) = rmp_serde::from_slice::<Self>(&buffer) {
+            // MessagePack checkpoint — verify integrity
+            if !ckpt.verify() {
+                anyhow::bail!("Projection checkpoint integrity check failed: checksum mismatch");
+            }
+            ckpt
+        } else {
+            // Fall back to bincode (legacy format) — skip verify since hash format changed
+            let ckpt = bincode::deserialize::<Self>(&buffer)
+                .context("Failed to deserialize ProjectionCheckpoint (tried msgpack + bincode)")?;
+            tracing::warn!(
+                "Loaded legacy bincode projection checkpoint — will be re-saved as MessagePack"
+            );
+            ckpt
+        };
 
         // Version compatibility check
         if checkpoint.version < PROJECTION_MIN_VERSION {
@@ -447,7 +538,7 @@ impl ProjectionCheckpoint {
             tracing::warn!(
                 saved_version = checkpoint.version,
                 current_version = PROJECTION_CHECKPOINT_VERSION,
-                "Loading legacy projection checkpoint (v{} → v{}). LayerNorm params will use defaults.",
+                "Loading legacy projection checkpoint (v{} → v{}). Newer fields will use defaults.",
                 checkpoint.version,
                 PROJECTION_CHECKPOINT_VERSION
             );

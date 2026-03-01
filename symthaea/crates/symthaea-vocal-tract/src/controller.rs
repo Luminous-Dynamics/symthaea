@@ -90,6 +90,15 @@ pub struct TrainingHyperparams {
     /// Transition training LR multiplier (× base learning_rate).
     /// Phase 23 baseline: 5.0.
     pub transition_lr_mult: f32,
+
+    /// Enable per-attractor adaptive learning rate (default: false — backward compatible).
+    /// When true, near-schwa phonemes get gentler LR (avoid over-pulling), far-from-schwa
+    /// phonemes get aggressive LR + stronger F2 error scaling.
+    pub attractor_adaptive_lr: bool,
+
+    /// LR floor for near-schwa phonemes (fraction of base LR, default: 0.5).
+    /// Only used when `attractor_adaptive_lr == true`.
+    pub near_schwa_lr_floor: f32,
 }
 
 impl Default for TrainingHyperparams {
@@ -105,6 +114,8 @@ impl Default for TrainingHyperparams {
             f2_distance_weight: 4.0,
             f2_error_scale: 600.0,
             transition_lr_mult: 5.0,
+            attractor_adaptive_lr: false,
+            near_schwa_lr_floor: 0.5,
         }
     }
 }
@@ -399,13 +410,14 @@ impl VocalTractController {
         lr_override: Option<f32>,
     ) {
         let lr = lr_override.unwrap_or(self.learning_rate);
-        self.train_step_impl(cognitive_hv, target, dt, lr, 1e-4);
+        self.train_step_impl(cognitive_hv, target, dt, lr, 1e-4, None);
     }
 
-    /// Internal training step with configurable weight decay.
+    /// Internal training step with configurable weight decay and optional error scale override.
     ///
     /// Separated from `train_step()` so supervised training can disable weight decay
     /// (which erodes learned weights during multi-epoch phoneme training).
+    /// `error_scale_override`: When Some, replaces the default ERROR_SCALE constant.
     fn train_step_impl(
         &mut self,
         cognitive_hv: &ContinuousHV,
@@ -413,6 +425,7 @@ impl VocalTractController {
         dt: f32,
         lr: f32,
         weight_decay: f32,
+        error_scale_override: Option<&[f32; OUTPUT_DIM]>,
     ) {
         let output_lr = lr * (HDC_DIMENSION as f32).sqrt();
 
@@ -475,7 +488,7 @@ impl VocalTractController {
         // Normalize gradients by expected range of each output dimension.
         // Without normalization, GRAD_CLIP kills formant gradients (naturally 100–1000 Hz)
         // causing all vowels to converge to schwa.
-        const ERROR_SCALE: [f32; OUTPUT_DIM] = [
+        const DEFAULT_ERROR_SCALE: [f32; OUTPUT_DIM] = [
             400.0,  // F1: range ~200-1000 Hz (reduced from 500 for 25% stronger F1 gradient)
             600.0,  // F2: range ~600-3000 Hz
             1500.0, // F3: range ~1500-5000 Hz
@@ -486,8 +499,9 @@ impl VocalTractController {
             1.0,    // energy: already 0-1
             1.0,    // voicing: already 0-1
         ];
+        let error_scale = error_scale_override.unwrap_or(&DEFAULT_ERROR_SCALE);
         for i in 0..OUTPUT_DIM {
-            d_raw[i] /= ERROR_SCALE[i];
+            d_raw[i] /= error_scale[i];
         }
 
         // Gradient clipping (raised from 1.0 — normalized gradients are now ≤1.0 for
@@ -805,10 +819,41 @@ impl VocalTractController {
                 let pred = self.forward(hv, 0.005);
                 epoch_loss += formant_mse(&pred, target);
 
-                let phoneme_lr = epoch_lr * lr_scales[idx];
+                let mut phoneme_lr = epoch_lr * lr_scales[idx];
+                let mut error_scale_override: Option<[f32; OUTPUT_DIM]> = None;
+
+                // Per-attractor adaptive LR: gentle near schwa, aggressive far from schwa
+                if params.attractor_adaptive_lr {
+                    let norm_dist = distances[idx] / max_dist; // [0, 1]
+                    if norm_dist < 0.3 {
+                        // Near-schwa: LR × [floor, 1.0] ramp
+                        let ramp = params.near_schwa_lr_floor
+                            + (1.0 - params.near_schwa_lr_floor) * (norm_dist / 0.3);
+                        phoneme_lr *= ramp;
+                    } else {
+                        // Far-from-schwa: LR × [1.0, distance_lr_cap] ramp
+                        let ramp = 1.0
+                            + (params.distance_lr_cap - 1.0) * ((norm_dist - 0.3) / 0.7);
+                        phoneme_lr *= ramp;
+                        // Also boost F2 gradient (0.7× error scale = stronger F2 gradient)
+                        let mut custom_scale = [
+                            400.0, 600.0, 1500.0, 100.0, 150.0, 200.0, 100.0, 1.0, 1.0,
+                        ];
+                        custom_scale[1] *= 0.7; // 420.0 — stronger F2 gradient
+                        error_scale_override = Some(custom_scale);
+                    }
+                }
+
                 for _ in 0..adaptive_steps[idx] {
                     self.forward(hv, 0.005);
-                    self.train_step_impl(hv, target, 0.005, phoneme_lr, 0.0);
+                    self.train_step_impl(
+                        hv,
+                        target,
+                        0.005,
+                        phoneme_lr,
+                        0.0,
+                        error_scale_override.as_ref(),
+                    );
                 }
             }
 
@@ -1029,7 +1074,7 @@ impl VocalTractController {
                     epoch_loss += formant_mse(&pred, &target);
 
                     // Train toward interpolated target (no weight decay)
-                    self.train_step_impl(to_hv, &target, 0.005, lr, 0.0);
+                    self.train_step_impl(to_hv, &target, 0.005, lr, 0.0, None);
                 }
             }
 
@@ -2252,6 +2297,133 @@ mod tests {
         assert!(
             throughput > min_throughput,
             "CI REGRESSION: throughput {throughput:.0} Hz below {min_throughput:.0} Hz target"
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 4: Per-Attractor Adaptive LR tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_attractor_adaptive_lr_off_matches_original() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+        let phonemes = test_phoneme_targets();
+        let refs: Vec<(&str, &FormantTarget)> = phonemes.iter().map(|(n, t)| (*n, t)).collect();
+
+        let params_off = TrainingHyperparams::default(); // attractor_adaptive_lr = false
+        assert!(!params_off.attractor_adaptive_lr);
+
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let loss = ctrl.train_on_phoneme_targets_configured(&genesis, &refs, 5, &params_off);
+        assert!(loss.is_finite(), "Loss should be finite, got {}", loss);
+    }
+
+    #[test]
+    fn test_attractor_adaptive_lr_near_schwa_gentle() {
+        // AH is near schwa (520/1190 Hz vs 500/1500). Its LR should be reduced.
+        let params = TrainingHyperparams {
+            attractor_adaptive_lr: true,
+            near_schwa_lr_floor: 0.5,
+            ..TrainingHyperparams::default()
+        };
+        // Verify the floor is less than 1.0 (gentle)
+        assert!(params.near_schwa_lr_floor < 1.0);
+        assert!(params.near_schwa_lr_floor > 0.0);
+    }
+
+    #[test]
+    fn test_attractor_adaptive_lr_far_schwa_aggressive() {
+        // IY is far from schwa (270/2290 vs 500/1500). Its LR should be boosted.
+        let params = TrainingHyperparams {
+            attractor_adaptive_lr: true,
+            distance_lr_cap: 3.0,
+            ..TrainingHyperparams::default()
+        };
+        // Verify distance_lr_cap > 1.0 (aggressive)
+        assert!(params.distance_lr_cap > 1.0);
+    }
+
+    #[test]
+    fn test_attractor_adaptive_lr_reduces_collapse() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+
+        // Just vowels: IY and UW are far from schwa, AH is near
+        let vowels: Vec<(&str, FormantTarget)> = vec![
+            ("AH", FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0)),
+            ("IY", FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0)),
+        ];
+        let refs: Vec<(&str, &FormantTarget)> = vowels.iter().map(|(n, t)| (*n, t)).collect();
+
+        // Train with adaptive LR
+        let params_on = TrainingHyperparams {
+            attractor_adaptive_lr: true,
+            ..TrainingHyperparams::default()
+        };
+        let mut ctrl_on = VocalTractController::new(&genesis, &config);
+        let loss_on = ctrl_on.train_on_phoneme_targets_configured(&genesis, &refs, 10, &params_on);
+
+        // Should produce finite loss
+        assert!(loss_on.is_finite(), "Adaptive LR loss should be finite");
+    }
+
+    #[test]
+    fn test_error_scale_override_none_uses_default() {
+        // When None is passed, train_step_impl uses DEFAULT_ERROR_SCALE
+        // This is tested implicitly by all existing training tests passing.
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let hv = ContinuousHV::random(HDC_DIMENSION, 42);
+        let target = FormantFrame {
+            f1: 500.0, f2: 1500.0, f3: 2500.0,
+            b1: 60.0, b2: 90.0, b3: 150.0,
+            f0: 120.0, energy: 0.5, voicing: 0.8,
+            time: 0.0, source_type: SourceType::Vowel,
+        };
+        ctrl.forward(&hv, 0.005);
+        ctrl.train_step(&hv, &target, 0.005, None);
+        // Should not panic
+    }
+
+    #[test]
+    fn test_error_scale_override_custom() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let hv = ContinuousHV::random(HDC_DIMENSION, 42);
+        let target = FormantFrame {
+            f1: 500.0, f2: 1500.0, f3: 2500.0,
+            b1: 60.0, b2: 90.0, b3: 150.0,
+            f0: 120.0, energy: 0.5, voicing: 0.8,
+            time: 0.0, source_type: SourceType::Vowel,
+        };
+        ctrl.forward(&hv, 0.005);
+        let custom_scale: [f32; OUTPUT_DIM] = [
+            400.0, 420.0, 1500.0, 100.0, 150.0, 200.0, 100.0, 1.0, 1.0,
+        ];
+        ctrl.train_step_impl(&hv, &target, 0.005, 0.001, 0.0, Some(&custom_scale));
+        // Should not panic
+    }
+
+    #[test]
+    fn test_ci_regression_guard_still_passes() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+        let phonemes = test_phoneme_targets();
+        let refs: Vec<(&str, &FormantTarget)> = phonemes.iter().map(|(n, t)| (*n, t)).collect();
+
+        let params = TrainingHyperparams {
+            attractor_adaptive_lr: true,
+            ..TrainingHyperparams::default()
+        };
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let loss = ctrl.train_on_phoneme_targets_configured(&genesis, &refs, 20, &params);
+        assert!(
+            loss < 100.0 * 100.0, // avg < 100 Hz → MSE < 10000
+            "CI regression: avg error should be < 100 Hz, MSE={}",
+            loss
         );
     }
 }

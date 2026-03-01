@@ -622,8 +622,8 @@ fn apply_weight_tied_gradient_adam(
             .collect();
 
         // Check if any gradient was actually clipped
-        for j in 0..dim {
-            let raw = error * output_slice[j];
+        for &val in output_slice {
+            let raw = error * val;
             if raw.abs() > grad_clip {
                 was_clipped = true;
                 break;

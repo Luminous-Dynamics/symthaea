@@ -368,6 +368,67 @@ impl ContinuousHV {
         }
     }
 
+    /// Raw dot product (inner product) of two hypervectors.
+    ///
+    /// Unlike `similarity()`, this is NOT normalized by vector norms.
+    /// Useful for Gram-Schmidt orthogonalization and projection computations.
+    #[inline]
+    pub fn dot(&self, other: &Self) -> f32 {
+        assert_eq!(
+            self.values.len(),
+            other.values.len(),
+            "Dimension mismatch in dot(): {} vs {}",
+            self.values.len(),
+            other.values.len()
+        );
+        self.values
+            .iter()
+            .zip(other.values.iter())
+            .map(|(a, b)| a * b)
+            .sum()
+    }
+
+    /// Generate a set of approximately orthogonal unit hypervectors via modified Gram-Schmidt.
+    ///
+    /// For `count` HVs at dimension `dim`, this is O(count² × dim) — negligible for
+    /// typical usage (count=5 at 16,384D ≈ 400K flops).
+    ///
+    /// Each output vector has unit L2 norm and near-zero dot product with all others.
+    /// Deterministic given the same seed.
+    pub fn orthogonal_set(dim: usize, count: usize, seed: u64) -> Vec<Self> {
+        if count == 0 {
+            return Vec::new();
+        }
+
+        let mut result = Vec::with_capacity(count);
+
+        for i in 0..count {
+            // Generate a random HV with offset seed
+            let mut v = Self::random(dim, seed.wrapping_add(i as u64 * 7919));
+
+            // Modified Gram-Schmidt: project out all previous vectors
+            for prev in &result {
+                let proj_coeff = v.dot(prev); // prev is unit norm, so proj = dot * prev
+                // v = v - proj_coeff * prev
+                for (vi, pi) in v.values.iter_mut().zip(prev.values.iter()) {
+                    *vi -= proj_coeff * pi;
+                }
+            }
+
+            // Normalize to unit length
+            let norm = v.norm();
+            if norm > 1e-10 {
+                for vi in v.values.iter_mut() {
+                    *vi /= norm;
+                }
+            }
+
+            result.push(v);
+        }
+
+        result
+    }
+
     /// L2 norm
     ///
     /// # Performance
@@ -1064,6 +1125,99 @@ mod tests {
             "encode_weighted should match manual encode, got similarity {}",
             sim
         );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 2: dot() and orthogonal_set() tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_dot_product_self() {
+        let a = ContinuousHV::random(HDC_DIMENSION, 42);
+        let norm = a.norm();
+        let dot = a.dot(&a);
+        assert!(
+            (dot - norm * norm).abs() < 1e-2,
+            "dot(a, a) should equal norm²: dot={}, norm²={}",
+            dot,
+            norm * norm
+        );
+    }
+
+    #[test]
+    fn test_dot_product_orthogonal() {
+        let ortho = ContinuousHV::orthogonal_set(HDC_DIMENSION, 2, 42);
+        let dot = ortho[0].dot(&ortho[1]);
+        assert!(
+            dot.abs() < 0.01,
+            "Orthogonal vectors should have near-zero dot product, got {}",
+            dot
+        );
+    }
+
+    #[test]
+    fn test_orthogonal_set_empty() {
+        let result = ContinuousHV::orthogonal_set(HDC_DIMENSION, 0, 42);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_orthogonal_set_single() {
+        let result = ContinuousHV::orthogonal_set(HDC_DIMENSION, 1, 42);
+        assert_eq!(result.len(), 1);
+        let norm = result[0].norm();
+        assert!(
+            (norm - 1.0).abs() < 0.01,
+            "Single vector should be unit norm, got {}",
+            norm
+        );
+    }
+
+    #[test]
+    fn test_orthogonal_set_pairwise_orthogonal() {
+        let hvs = ContinuousHV::orthogonal_set(HDC_DIMENSION, 5, 42);
+        assert_eq!(hvs.len(), 5);
+        for i in 0..5 {
+            for j in (i + 1)..5 {
+                let sim = hvs[i].similarity(&hvs[j]);
+                assert!(
+                    sim.abs() < 0.01,
+                    "HVs {} and {} should be orthogonal, got similarity {}",
+                    i,
+                    j,
+                    sim
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_orthogonal_set_unit_norm() {
+        let hvs = ContinuousHV::orthogonal_set(HDC_DIMENSION, 5, 42);
+        for (i, hv) in hvs.iter().enumerate() {
+            let norm = hv.norm();
+            assert!(
+                (norm - 1.0).abs() < 0.01,
+                "HV {} should have unit norm, got {}",
+                i,
+                norm
+            );
+        }
+    }
+
+    #[test]
+    fn test_orthogonal_set_deterministic() {
+        let a = ContinuousHV::orthogonal_set(HDC_DIMENSION, 3, 42);
+        let b = ContinuousHV::orthogonal_set(HDC_DIMENSION, 3, 42);
+        for i in 0..3 {
+            let sim = a[i].similarity(&b[i]);
+            assert!(
+                (sim - 1.0).abs() < 0.001,
+                "Same seed should produce same HVs, got similarity {} for index {}",
+                sim,
+                i
+            );
+        }
     }
 
     #[test]

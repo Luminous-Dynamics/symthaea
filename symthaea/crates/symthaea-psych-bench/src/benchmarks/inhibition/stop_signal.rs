@@ -87,7 +87,9 @@ impl StopSignalBenchmark {
             let stimulus = ContinuousHV::weighted_bundle(&[&go_proto, &noise], &[0.85, 0.15]);
 
             // Go signal evidence: similarity to go prototype
-            let go_sim = stimulus.similarity(&go_proto) as f64;
+            // Encoding noise degrades stimulus detection
+            let noise_degrade = config.effective_noise() as f32 * 0.4;
+            let go_sim = (stimulus.similarity(&go_proto) * (1.0 - noise_degrade)) as f64;
 
             // Deliberation ticks (RT proxy): inverse of evidence strength
             // Base RT ~8 ticks (~400ms), modulated by decision difficulty
@@ -131,7 +133,7 @@ impl StopSignalBenchmark {
                 let stop_noise = ContinuousHV::random(dim, rng);
                 let stop_stimulus =
                     ContinuousHV::weighted_bundle(&[&stop_proto, &stop_noise], &[0.80, 0.20]);
-                let stop_sim = stop_stimulus.similarity(&stop_proto) as f64;
+                let stop_sim = (stop_stimulus.similarity(&stop_proto) * (1.0 - noise_degrade)) as f64;
 
                 // Final inhibition probability: race model + HDC recognition
                 let p_inhibit = (stop_strength * 0.7 + stop_sim * 0.3).clamp(0.0, 1.0);

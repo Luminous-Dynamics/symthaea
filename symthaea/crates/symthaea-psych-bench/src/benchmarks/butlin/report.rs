@@ -2,6 +2,26 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Runtime consciousness data from the structural Phi engine.
+///
+/// When available, blends with static architectural scores to produce
+/// theory-aligned indicator values.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RuntimeConsciousnessData {
+    /// Micro-level Phi (within-cluster integration).
+    pub micro_phi: f64,
+    /// Meso-level Phi (inter-cluster integration).
+    pub meso_phi: f64,
+    /// Macro-level Phi (global integration).
+    pub macro_phi: f64,
+    /// Bottleneck score: gap between global and inter-cluster integration [0, 1].
+    pub bottleneck_score: f64,
+    /// Emergence ratio: macro / (micro + meso). > 1.0 means whole > sum of parts.
+    pub emergence_ratio: f64,
+    /// Number of detected clusters.
+    pub num_clusters: usize,
+}
+
 /// Status of a consciousness indicator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IndicatorStatus {

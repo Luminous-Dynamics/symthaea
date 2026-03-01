@@ -1,5 +1,6 @@
 //! Benchmark and ablation configuration.
 
+use crate::benchmarks::butlin::report::RuntimeConsciousnessData;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for running a benchmark.
@@ -63,6 +64,20 @@ pub struct BenchmarkConfig {
     /// with per-trial outcomes for fine-grained analysis.
     #[serde(default)]
     pub trial_trace: bool,
+    /// Encoding noise level (0.0 = clean, 1.0 = maximum degradation).
+    ///
+    /// Models the degradation of HDC representations when consciousness subsystems
+    /// are ablated. Top-down predictions from FEP/social/WM systems normally refine
+    /// bottom-up encodings; removing them increases noise in the encoding space.
+    /// Used by ablation presets and propagated to benchmark similarity computations.
+    #[serde(default)]
+    pub encoding_noise: f64,
+
+    /// Optional runtime consciousness data from the structural Phi engine.
+    /// When present, Butlin indicators blend static architectural scores with
+    /// live measurements for theory-aligned accuracy.
+    #[serde(default)]
+    pub runtime_consciousness: Option<RuntimeConsciousnessData>,
 }
 
 fn default_min_trials() -> usize {
@@ -95,6 +110,8 @@ impl Default for BenchmarkConfig {
             ssm_backend: false,
             difficulty: 0.0,
             trial_trace: false,
+            encoding_noise: 0.0,
+            runtime_consciousness: None,
         }
     }
 }
@@ -108,6 +125,15 @@ impl BenchmarkConfig {
             h = h.wrapping_mul(0x100000001b3);
         }
         h ^ (trial as u64).wrapping_mul(0x9E3779B97F4A7C15)
+    }
+
+    /// Compute effective encoding noise combining `encoding_noise` and `time_pressure`.
+    ///
+    /// Both ablation (encoding_noise) and speed-accuracy tradeoff (time_pressure)
+    /// degrade HDC representations. Returns a combined noise weight in [0.0, 1.0]
+    /// for use in benchmark similarity computations.
+    pub fn effective_noise(&self) -> f64 {
+        (self.encoding_noise + self.time_pressure * 0.20).clamp(0.0, 1.0)
     }
 }
 
@@ -151,34 +177,48 @@ impl AblationPreset {
     }
 
     /// Convert to an `AblationConfig` with the given base seed.
+    ///
+    /// Each preset sets `encoding_noise` proportional to the subsystems removed.
+    /// Rationale: consciousness subsystems (FEP, social, WM) provide top-down
+    /// predictive refinement of HDC encodings. Removing them degrades the
+    /// signal-to-noise ratio of perceptual representations.
     pub fn to_config(self, seed: u64) -> AblationConfig {
         let mut base = BenchmarkConfig {
             seed,
             ..Default::default()
         };
         let name = match self {
-            AblationPreset::FullConsciousness => "Full Consciousness",
+            AblationPreset::FullConsciousness => {
+                // All systems intact: clean encodings
+                base.encoding_noise = 0.0;
+                "Full Consciousness"
+            }
             AblationPreset::CfcOnly => {
                 base.enable_fep = false;
                 base.enable_social = false;
+                base.encoding_noise = 0.15;
                 "CfC Only"
             }
             AblationPreset::NoFep => {
                 base.enable_fep = false;
+                base.encoding_noise = 0.10;
                 "No FEP"
             }
             AblationPreset::NoSocial => {
                 base.enable_social = false;
+                base.encoding_noise = 0.05;
                 "No Social"
             }
             AblationPreset::ReducedWm => {
                 base.working_memory_capacity = 3;
+                base.encoding_noise = 0.12;
                 "Reduced WM (K=3)"
             }
             AblationPreset::HdcOnly => {
                 base.enable_fep = false;
                 base.enable_social = false;
                 base.working_memory_capacity = 3;
+                base.encoding_noise = 0.25;
                 "HDC Only"
             }
         };

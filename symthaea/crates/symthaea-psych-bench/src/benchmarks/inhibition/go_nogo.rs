@@ -86,8 +86,10 @@ impl GoNoGoBenchmark {
             let proto = if is_go { &go_proto } else { &nogo_proto };
             let stimulus = ContinuousHV::weighted_bundle(&[proto, &noise], &[0.85, 0.15]);
 
-            let go_sim = stimulus.similarity(&go_proto) as f64;
-            let nogo_sim = stimulus.similarity(&nogo_proto) as f64;
+            // Encoding noise degrades stimulus discrimination
+            let noise_degrade = config.effective_noise() as f32 * 0.4;
+            let go_sim = (stimulus.similarity(&go_proto) * (1.0 - noise_degrade)) as f64;
+            let nogo_sim = (stimulus.similarity(&nogo_proto) * (1.0 - noise_degrade)) as f64;
 
             let decision_margin = (go_sim - nogo_sim).abs();
             let deliberation_ticks = 2.0 + (1.0 - decision_margin) * 6.0;

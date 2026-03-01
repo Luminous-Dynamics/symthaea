@@ -19,20 +19,15 @@ use crate::tokenizer::BpeTokenizer;
 use symthaea_core::genesis::GenesisSeed;
 
 /// Sampling strategy for token selection.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum SamplingStrategy {
     /// Always pick the highest-logit token.
+    #[default]
     Greedy,
     /// Sample from top-k tokens with temperature.
     TopK { k: usize, temperature: f32 },
     /// Sample from top-p (nucleus) tokens with temperature.
     TopP { p: f32, temperature: f32 },
-}
-
-impl Default for SamplingStrategy {
-    fn default() -> Self {
-        Self::Greedy
-    }
 }
 
 /// Configuration for the Broca generator.

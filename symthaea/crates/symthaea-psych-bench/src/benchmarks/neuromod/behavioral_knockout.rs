@@ -29,6 +29,8 @@ fn neutral_inputs() -> NeuromodulatorInputs {
         binding_strength: 0.5,
         epistemic_confidence: 0.5,
         flow_active: false,
+        consciousness_level: None,
+        moral_signal: None,
     }
 }
 

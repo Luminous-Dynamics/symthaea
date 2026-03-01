@@ -164,7 +164,9 @@ impl MetacognitiveCalibrationBenchmark {
                 }
 
                 // Compute similarity of query to ALL items in WM
-                let mut sims: Vec<f32> = contents.iter().map(|hv| target.similarity(hv)).collect();
+                // Encoding noise degrades memory retrieval similarity
+                let noise_degrade = config.effective_noise() as f32 * 0.4;
+                let mut sims: Vec<f32> = contents.iter().map(|hv| target.similarity(hv) * (1.0 - noise_degrade)).collect();
                 sims.sort_by(|a, b| b.total_cmp(a));
 
                 let best_sim = sims[0];

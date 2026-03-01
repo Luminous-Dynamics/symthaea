@@ -103,7 +103,7 @@ fn extract_indicator_score(
         "RPT-1" | "GWT-3" => 0.0,
         "HOT-2" => {
             // Metacognitive monitoring: meta_cognitive_accuracy
-            metadata.meta_cognitive_accuracy as f64
+            metadata.quality.meta_cognitive_accuracy as f64
         }
         "PP-1" => {
             // Prediction learning → actual_effective_lr: directly shows whether
@@ -113,7 +113,7 @@ fn extract_indicator_score(
         }
         "AST-1" => {
             // Attention schema: attention_schema_focus with non-zero fallback
-            let focus = metadata.attention_schema_focus as f64;
+            let focus = metadata.attention.attention_schema_focus as f64;
             if focus > 0.0 {
                 focus
             } else {

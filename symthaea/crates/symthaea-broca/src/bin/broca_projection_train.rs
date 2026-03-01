@@ -52,6 +52,13 @@ fn main() {
         accumulation_steps: opts.accumulation_steps,
         cosine_annealing_steps: opts.cosine_annealing_steps,
         deep_projection: opts.deep_projection,
+        temporal_projection: opts.temporal_projection,
+        learned_pos_enc: opts.learned_pos_enc,
+        temporal_stride: opts.temporal_stride,
+        temporal_directional_loss: opts.directional_loss,
+        temporal_smoothness_weight: opts.smoothness_weight,
+        temporal_rank_reg_weight: opts.rank_reg_weight,
+        temporal_learned_attention: opts.learned_attention,
         grad_clip: opts.grad_clip,
         // Disable runtime safety features during batch training:
         // - consciousness_gating: the PE > 0.8 gate in distill_step() blocks all
@@ -79,6 +86,17 @@ fn main() {
         match ProjectionCheckpoint::load_from_file(resume_path) {
             Ok(ckpt) => {
                 gen.projection_mut().load_weights(&ckpt.projection_weights);
+                // Load temporal weights if present
+                if ckpt.temporal {
+                    if let (Some(ref tw), Some(tp)) = (&ckpt.temporal_weights, gen.temporal_proj_mut()) {
+                        tp.load_weights(tw);
+                        tracing::info!(
+                            chunk_dim = ckpt.chunk_dim,
+                            num_chunks = ckpt.num_chunks,
+                            "Temporal projection weights loaded"
+                        );
+                    }
+                }
                 tracing::info!(epoch = ckpt.training_epoch, "Projection weights loaded");
                 // Log diagnostics snapshot if present in the checkpoint
                 if let Some(ref snap) = ckpt.diagnostics_snapshot {
@@ -155,6 +173,14 @@ fn main() {
                 gen.encoder().encode(&channels)
             })
             .collect();
+
+        // Warm-start temporal projection if active
+        if let Some(tp) = gen.temporal_proj_mut() {
+            tracing::info!("Warm-starting temporal projection from training data PCA");
+            tp.warm_start_from_samples(&sample_hvs);
+        }
+
+        // Also warm-start spatial projection
         if opts.warm_start_bidirectional {
             tracing::info!("Bidirectional warm-starting projection from training data");
             gen.projection_mut().warm_start_bidirectional(&sample_hvs);
@@ -201,12 +227,35 @@ fn main() {
         max_gen_tokens = opts.max_gen_tokens,
         warm_start = opts.warm_start,
         diagnostics = opts.diagnostics,
+        temporal = opts.temporal_projection,
+        learned_pos_enc = opts.learned_pos_enc,
+        directional_loss = opts.directional_loss,
         "Starting projection training"
     );
 
     let mut all_epoch_metrics = Vec::new();
 
     for epoch in 0..opts.epochs {
+        // Pos enc curriculum: unfreeze learned pos_enc after N epochs
+        if opts.pos_enc_unfreeze_epoch > 0 && opts.learned_pos_enc {
+            if let Some(tp) = gen.temporal_proj_mut() {
+                if epoch < opts.pos_enc_unfreeze_epoch {
+                    tp.set_learned_pos_enc(false);
+                    if epoch == 0 {
+                        tracing::info!(
+                            unfreeze_at = opts.pos_enc_unfreeze_epoch,
+                            "Pos enc curriculum: frozen for initial epochs"
+                        );
+                    }
+                } else {
+                    if !tp.learned_pos_enc() {
+                        tracing::info!(epoch, "Pos enc curriculum: unfreezing learned pos_enc");
+                    }
+                    tp.set_learned_pos_enc(true);
+                }
+            }
+        }
+
         let mut epoch_semantic_pe = 0.0f32;
         let mut epoch_coherence = 0.0f32;
         let mut epoch_vetos = 0usize;
@@ -231,7 +280,11 @@ fn main() {
 
             // Periodic progress report (rank computed without injecting noise)
             if opts.diagnostics && (i + 1) % 50 == 0 && !result.output_hvs.is_empty() {
-                let rank = gen.projection().effective_rank(&result.output_hvs);
+                let rank = if let Some(tp) = gen.temporal_proj() {
+                    tp.effective_rank(&result.output_hvs)
+                } else {
+                    gen.projection().effective_rank(&result.output_hvs)
+                };
                 tracing::info!(
                     epoch = epoch,
                     sample = i + 1,
@@ -277,7 +330,11 @@ fn main() {
                 })
             })
             .collect();
-        let avg_rank = gen.projection().effective_rank(&rank_samples);
+        let avg_rank = if let Some(tp) = gen.temporal_proj() {
+            tp.effective_rank(&rank_samples)
+        } else {
+            gen.projection().effective_rank(&rank_samples)
+        };
 
         let metrics = ProjectionEpochMetrics {
             epoch,
@@ -295,10 +352,24 @@ fn main() {
             vetos = epoch_vetos,
             "Epoch complete"
         );
-        // Unbuffered epoch summary
+        // Unbuffered epoch summary with gradient norms
+        let grad_info = if let Some(diag) = gen.projection_diagnostics() {
+            let snap = diag.snapshot();
+            let clip_rate = if snap.total_steps > 0 {
+                snap.clip_count as f32 / snap.total_steps as f32 * 100.0
+            } else {
+                0.0
+            };
+            format!(
+                " grad_up={:.1} grad_down={:.1} clip={:.0}%",
+                snap.last_norm_up, snap.last_norm_down, clip_rate,
+            )
+        } else {
+            String::new()
+        };
         let _ = writeln!(
             std::io::stderr(),
-            "[epoch] {epoch}/{} avg_pe={avg_pe:.4} rank={avg_rank:.2} coh={avg_coh:.4} vetos={epoch_vetos}",
+            "[epoch] {epoch}/{} avg_pe={avg_pe:.4} rank={avg_rank:.2} coh={avg_coh:.4} vetos={epoch_vetos}{grad_info}",
             opts.epochs,
         );
         std::io::stderr().flush().ok();
@@ -329,15 +400,28 @@ fn main() {
     let final_epoch = all_epoch_metrics.last().map(|m| m.epoch).unwrap_or(0);
     let weights = gen.projection().flatten_weights();
 
-    let mut checkpoint = ProjectionCheckpoint::new(
-        weights,
-        gen.config().hdc_dim,
-        gen.config().bottleneck_dim,
-        gen.config().ssm_dim,
-        final_epoch,
-        gen.projection().is_deep(),
-        gen.projection().inner_dim(),
-    );
+    let mut checkpoint = if let Some(tp) = gen.temporal_proj() {
+        ProjectionCheckpoint::new_temporal(
+            weights,
+            tp.flatten_weights(),
+            gen.config().hdc_dim,
+            gen.config().bottleneck_dim,
+            gen.config().ssm_dim,
+            final_epoch,
+            tp.chunk_size(),
+            tp.num_chunks(),
+        )
+    } else {
+        ProjectionCheckpoint::new(
+            weights,
+            gen.config().hdc_dim,
+            gen.config().bottleneck_dim,
+            gen.config().ssm_dim,
+            final_epoch,
+            gen.projection().is_deep(),
+            gen.projection().inner_dim(),
+        )
+    };
 
     // Persist gradient diagnostics snapshot if enabled
     if let Some(diag) = gen.projection_diagnostics() {
@@ -417,6 +501,14 @@ struct ProjectionTrainOpts {
     contrastive_pretrain_epochs: usize,
     genesis_phrase: String,
     deep_projection: bool,
+    temporal_projection: bool,
+    learned_pos_enc: bool,
+    temporal_stride: usize,
+    directional_loss: bool,
+    smoothness_weight: f32,
+    rank_reg_weight: f32,
+    pos_enc_unfreeze_epoch: usize,
+    learned_attention: bool,
     max_gen_tokens: usize,
 }
 
@@ -440,6 +532,14 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         contrastive_pretrain_epochs: 0,
         genesis_phrase: "broca-projection-default".to_string(),
         deep_projection: false,
+        temporal_projection: false,
+        learned_pos_enc: false,
+        temporal_stride: 0,
+        directional_loss: false,
+        smoothness_weight: 0.0,
+        rank_reg_weight: 0.0,
+        pos_enc_unfreeze_epoch: 0,
+        learned_attention: false,
         max_gen_tokens: 16,
     };
 
@@ -541,6 +641,50 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             "--deep-projection" => {
                 opts.deep_projection = true;
             }
+            "--temporal" => {
+                opts.temporal_projection = true;
+            }
+            "--learned-pos-enc" => {
+                opts.learned_pos_enc = true;
+            }
+            "--stride" => {
+                i += 1;
+                opts.temporal_stride = args
+                    .get(i)
+                    .ok_or("--stride requires a number")?
+                    .parse()
+                    .map_err(|_| "--stride must be a positive integer")?;
+            }
+            "--directional-loss" => {
+                opts.directional_loss = true;
+            }
+            "--smoothness" => {
+                i += 1;
+                opts.smoothness_weight = args
+                    .get(i)
+                    .ok_or("--smoothness requires a number")?
+                    .parse()
+                    .map_err(|_| "--smoothness must be a float")?;
+            }
+            "--rank-reg" => {
+                i += 1;
+                opts.rank_reg_weight = args
+                    .get(i)
+                    .ok_or("--rank-reg requires a number")?
+                    .parse()
+                    .map_err(|_| "--rank-reg must be a float")?;
+            }
+            "--learned-attention" => {
+                opts.learned_attention = true;
+            }
+            "--pos-enc-unfreeze" => {
+                i += 1;
+                opts.pos_enc_unfreeze_epoch = args
+                    .get(i)
+                    .ok_or("--pos-enc-unfreeze requires a number")?
+                    .parse()
+                    .map_err(|_| "--pos-enc-unfreeze must be a positive integer")?;
+            }
             "--max-gen-tokens" => {
                 i += 1;
                 opts.max_gen_tokens = args
@@ -598,6 +742,14 @@ fn print_usage() {
         "  --genesis PHRASE            Genesis seed phrase (default: broca-projection-default)"
     );
     eprintln!("  --deep-projection           Use deep double-bottleneck projection (256->128->256)");
+    eprintln!("  --temporal                  Use temporal projection (64×256D chunks → continuous latent prompting)");
+    eprintln!("  --learned-pos-enc           Use learned (trainable) positional encoding (requires --temporal)");
+    eprintln!("  --stride N                  Chunk stride for temporal overlap (default: chunk_size=256, no overlap)");
+    eprintln!("  --directional-loss          Use directional cosine loss instead of roundtrip (requires --temporal)");
+    eprintln!("  --smoothness W              Temporal smoothness regularization weight (default: 0, try 0.01-0.1)");
+    eprintln!("  --rank-reg W                Rank regularization weight for W_up decorrelation (default: 0, try 0.001-0.01)");
+    eprintln!("  --learned-attention          Enable learned chunk attention weighting (requires --temporal)");
+    eprintln!("  --pos-enc-unfreeze N        Epoch to unfreeze learned pos_enc (0 = always learned, requires --learned-pos-enc)");
     eprintln!("  --max-gen-tokens N          Max tokens per generation during training (default: 16)");
     eprintln!();
     eprintln!("Evaluation options:");
