@@ -1102,6 +1102,14 @@ impl CognitiveLoopService {
                     / 100.0)
                     .clamp(0.0, 1.0);
                 self.neuromodulator_bath.apply_sleep_recovery(quality);
+
+                // ── Psych-bench calibration: receptor sensitivity tuning ──
+                // Apply any pending calibration during sleep→wake, mirroring
+                // synaptic homeostasis (Tononi & Cirelli 2006): receptor
+                // sensitivities adjust during sleep to correct performance drift.
+                if self.pending_calibration.is_some() {
+                    self.apply_pending_calibration();
+                }
             }
             self.was_sleeping = is_sleep_now;
         }

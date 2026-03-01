@@ -252,6 +252,48 @@ impl NeuromodCalibration {
         }
         lines.join("\n")
     }
+
+    /// Construct from NormativeReport-style z-scores (sign-corrected: positive = better).
+    ///
+    /// NormativeReport negates lower-is-better metrics so positive always means
+    /// "better than human baseline". This constructor un-corrects the sign for
+    /// interference metrics (DA pathway) before delegating to `from_z_scores`.
+    ///
+    /// The `is_lower_better` predicate is applied to each benchmark's key metric
+    /// to determine whether to negate.
+    pub fn from_normative_z_scores(scores: &[(&str, &str, f64)]) -> Self {
+        let raw: Vec<(&str, f64)> = scores
+            .iter()
+            .map(|(bench, metric, z)| {
+                // NormativeReport already negated lower-is-better metrics.
+                // Un-negate so calibration sees raw direction:
+                //   interference: raw positive = worse = attenuate DA
+                let raw_z = if is_lower_better_metric(metric) { -z } else { *z };
+                (*bench, raw_z)
+            })
+            .collect();
+        Self::from_z_scores(&raw)
+    }
+}
+
+/// Check if a metric key represents a lower-is-better measure.
+///
+/// Mirrors the canonical `report::is_lower_better()` from psych-bench
+/// without pulling in the full psych-bench dependency.
+fn is_lower_better_metric(metric: &str) -> bool {
+    matches!(
+        metric,
+        "stroop_effect"
+            | "flanker_effect"
+            | "dual_task_cost"
+            | "calibration_error_ece"
+            | "commission_errors"
+            | "ssrt_ticks"
+            | "coordination_cost"
+            | "vigilance_decrement"
+            | "disambiguation_cost"
+            | "blink_magnitude"
+    )
 }
 
 /// Convert a z-score to a receptor sensitivity multiplier.
@@ -407,5 +449,77 @@ mod tests {
         assert!(summary.contains("DA"));
         assert!(summary.contains("ACh"));
         assert!(summary.contains("Neuromod Calibration"));
+    }
+
+    #[test]
+    fn test_from_normative_z_scores() {
+        // NormativeReport z-scores are sign-corrected: positive = better.
+        // For lower-is-better metrics (stroop_effect), positive z means
+        // "less interference than baseline" = good.
+        // from_normative_z_scores un-corrects the sign for calibration.
+        let scores = vec![
+            // Stroop: positive normative z = less interference = good
+            // Un-corrected: raw z = -1.0 → don't attenuate DA
+            ("Executive::Stroop", "stroop_effect", 1.0),
+            // N-back: positive normative z = better WM = good
+            // Higher-is-better → no sign change
+            ("WorM::N-back", "nback_2::accuracy", -1.0),
+        ];
+
+        let cal = NeuromodCalibration::from_normative_z_scores(&scores);
+
+        // DA: normative z=+1.0 on stroop_effect (lower-is-better, sign-corrected)
+        // Un-corrected: raw z = -1.0 → DA should be BOOSTED (factor > 1.0)
+        let da = cal.adjustments.iter().find(|a| a.transmitter == "DA").unwrap();
+        assert!(
+            da.sensitivity_factor > 1.0,
+            "Good Stroop → boost DA, got {}",
+            da.sensitivity_factor
+        );
+
+        // ACh: normative z=-1.0 on nback accuracy (higher-is-better)
+        // No sign change → raw z = -1.0 → ACh should be BOOSTED
+        let ach = cal.adjustments.iter().find(|a| a.transmitter == "ACh").unwrap();
+        assert!(
+            ach.sensitivity_factor > 1.0,
+            "Poor WM → boost ACh, got {}",
+            ach.sensitivity_factor
+        );
+    }
+
+    #[test]
+    fn test_apply_modifies_bath() {
+        let z_scores = vec![
+            ("Executive::Stroop", 2.0),       // high interference → attenuate DA
+            ("SustainedAttention::CPT", -2.0), // poor attention → boost 5-HT
+        ];
+        let cal = NeuromodCalibration::from_z_scores(&z_scores);
+
+        let mut bath = symthaea_neuromodulators::NeuromodulatorBath::default();
+        let da_before = bath.dopamine.receptor_sensitivity;
+        let sht_before = bath.serotonin.receptor_sensitivity;
+
+        cal.apply(&mut bath);
+
+        assert!(
+            bath.dopamine.receptor_sensitivity < da_before,
+            "DA sensitivity should decrease: {} → {}",
+            da_before, bath.dopamine.receptor_sensitivity
+        );
+        assert!(
+            bath.serotonin.receptor_sensitivity > sht_before,
+            "5-HT sensitivity should increase: {} → {}",
+            sht_before, bath.serotonin.receptor_sensitivity
+        );
+    }
+
+    #[test]
+    fn test_is_lower_better_metric() {
+        assert!(is_lower_better_metric("stroop_effect"));
+        assert!(is_lower_better_metric("flanker_effect"));
+        assert!(is_lower_better_metric("ssrt_ticks"));
+        assert!(!is_lower_better_metric("nback_2::accuracy"));
+        assert!(!is_lower_better_metric("overall_accuracy"));
+        assert!(!is_lower_better_metric("fok_gamma"));
     }
 }
