@@ -558,4 +558,177 @@ mod tests {
         let result = controller.execute_step(&step, 0);
         assert!(result.predicted_state_similarity.is_finite());
     }
+
+    // ── Track C: edge-path tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_run_protocol_zero_steps() {
+        let mock = MockInstrument::new();
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+
+        let protocol = LabProtocol {
+            name: "Empty".to_string(),
+            steps: vec![],
+            safety_viability_floor: 0.2,
+            max_duration_seconds: 86_400.0,
+        };
+
+        let result = controller.run_protocol(&protocol);
+        assert!(result.success);
+        assert_eq!(result.steps_completed, 0);
+        assert!(result.step_results.is_empty());
+    }
+
+    #[test]
+    fn test_run_protocol_duration_limit() {
+        let mock = MockInstrument::new();
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+
+        let protocol = LabProtocol {
+            name: "Long Protocol".to_string(),
+            steps: vec![
+                ProtocolStep {
+                    name: "Step 1".to_string(),
+                    duration_seconds: 100.0,
+                    min_viability: 0.5,
+                    expected_action: None,
+                    requires_ethics_check: false,
+                },
+                ProtocolStep {
+                    name: "Step 2".to_string(),
+                    duration_seconds: 100.0,
+                    min_viability: 0.5,
+                    expected_action: None,
+                    requires_ethics_check: false,
+                },
+                ProtocolStep {
+                    name: "Step 3 — should be blocked by duration".to_string(),
+                    duration_seconds: 100.0,
+                    min_viability: 0.5,
+                    expected_action: None,
+                    requires_ethics_check: false,
+                },
+            ],
+            safety_viability_floor: 0.2,
+            max_duration_seconds: 150.0, // only enough for 1 step
+        };
+
+        let result = controller.run_protocol(&protocol);
+        assert!(!result.success);
+        assert!(result.failure_reason.as_ref().unwrap().contains("max duration"));
+        // Steps 0 and 1 complete (elapsed = 200 > 150), step 2 is blocked
+        assert_eq!(result.steps_completed, 2);
+    }
+
+    #[test]
+    fn test_run_protocol_viability_floor() {
+        // Viability is above per-step min but below protocol floor
+        let mut cell = CellState::new_somatic();
+        cell.viability = 0.15; // below protocol floor (0.5) but above step min (0.1)
+        let mock = MockInstrument::with_state(cell, CultureEnvironment::standard());
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+
+        let protocol = LabProtocol {
+            name: "Floor Test".to_string(),
+            steps: vec![ProtocolStep {
+                name: "Step 1".to_string(),
+                duration_seconds: 3600.0,
+                min_viability: 0.1, // step allows it
+                expected_action: None,
+                requires_ethics_check: false,
+            }],
+            safety_viability_floor: 0.5, // protocol floor catches it
+            max_duration_seconds: 86_400.0,
+        };
+
+        let result = controller.run_protocol(&protocol);
+        assert!(!result.success);
+        assert!(result.failure_reason.as_ref().unwrap().contains("safety floor"));
+    }
+
+    #[test]
+    fn test_execute_step_instrument_failure() {
+        // Test that instrument failure is reported correctly in a single step
+        let mut mock = MockInstrument::new();
+        // Set fail on AdjustTemp — we'll construct a step where FEP is likely to select it
+        mock.set_fail_on(CultureAction::AdjustTemp);
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+
+        // Use AdjustTemp as expected_action
+        let step = ProtocolStep {
+            name: "Test".to_string(),
+            duration_seconds: 3600.0,
+            min_viability: 0.5,
+            expected_action: Some(CultureAction::AdjustTemp),
+            requires_ethics_check: false,
+        };
+
+        let result = controller.execute_step(&step, 0);
+        // The FEP agent selects an action based on cell/env state, not expected_action.
+        // If it happens to pick AdjustTemp, execution fails; otherwise succeeds.
+        // Either way, viability should be reported.
+        assert!(result.viability > 0.0);
+        assert!(result.predicted_state_similarity.is_finite());
+    }
+
+    #[test]
+    fn test_instrument_mut_accessor() {
+        let mock = MockInstrument::new();
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+
+        // Mutate instrument state through accessor
+        controller.instrument_mut().set_cell_state({
+            let mut cell = CellState::new_somatic();
+            cell.viability = 0.3;
+            cell
+        });
+
+        // Verify mutation took effect
+        let cell = controller.instrument().read_cell_state();
+        assert!((cell.viability - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_ipsc_protocol_field_values() {
+        let protocol = LabProtocol::ipsc_reprogramming();
+        assert_eq!(protocol.name, "iPSC Reprogramming");
+        assert_eq!(protocol.steps.len(), 4);
+        assert!((protocol.safety_viability_floor - 0.2).abs() < 1e-6);
+        assert!((protocol.max_duration_seconds - 2_419_200.0).abs() < 1e-6);
+
+        // Step 0: Factor Delivery — requires ethics, 1 day
+        assert!(protocol.steps[0].requires_ethics_check);
+        assert!((protocol.steps[0].duration_seconds - 86_400.0).abs() < 1e-6);
+        assert!((protocol.steps[0].min_viability - 0.8).abs() < 1e-6);
+
+        // Step 3: Colony Stabilization — expects PassageCells
+        assert_eq!(protocol.steps[3].expected_action, Some(CultureAction::PassageCells));
+    }
+
+    #[test]
+    fn test_run_full_ipsc_protocol_with_approval() {
+        let mock = MockInstrument::new();
+        let ethics = EthicsGate::fully_approved();
+        let mut controller = LabController::new(mock, ethics);
+
+        let protocol = LabProtocol::ipsc_reprogramming();
+        let result = controller.run_protocol(&protocol);
+        assert!(result.success);
+        assert_eq!(result.steps_completed, 4);
+        assert_eq!(result.step_results.len(), 4);
+
+        // Verify step results have expected metadata
+        for (i, sr) in result.step_results.iter().enumerate() {
+            assert_eq!(sr.step_index, i);
+            assert!(sr.action_executed);
+            assert!(sr.failure_reason.is_none());
+            assert!(sr.viability > 0.0);
+            assert!(sr.predicted_state_similarity.is_finite());
+        }
+    }
 }

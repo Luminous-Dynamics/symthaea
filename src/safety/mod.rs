@@ -15,9 +15,15 @@ pub mod audit;
 #[cfg(feature = "safety-agents")]
 pub mod gate;
 
-// Cross-domain bridge: Fusion Digital Twin → Safety Agent
+// Cross-domain bridges: domain outputs → Safety Agent
 #[cfg(all(feature = "safety-agents", feature = "fusion-twin"))]
 pub mod fusion_bridge;
+#[cfg(all(feature = "safety-agents", feature = "materials"))]
+pub mod materials_bridge;
+#[cfg(all(feature = "safety-agents", feature = "water-prediction"))]
+pub mod water_bridge;
+#[cfg(all(feature = "safety-agents", feature = "nuclear-forensics"))]
+pub mod nuclear_bridge;
 
 // Re-export key types
 pub use gateway::{SafetyCheck, SafetyDecision, SafetyGateway};
@@ -31,6 +37,12 @@ pub use gate::{consciousness_gate, safety_gate, SafetyGateResult};
 
 #[cfg(all(feature = "safety-agents", feature = "fusion-twin"))]
 pub use fusion_bridge::FusionSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "materials"))]
+pub use materials_bridge::MaterialSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "water-prediction"))]
+pub use water_bridge::WaterSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "nuclear-forensics"))]
+pub use nuclear_bridge::NuclearSafetyAdapter;
 
 /// Categories of forbidden content/actions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -477,6 +477,8 @@ jobs:
             features: water-prediction
           - name: multiscale
             features: physics-unification
+          - name: temporal_unified
+            features: genesis-missions
     steps:
       - uses: actions/checkout@v4
 

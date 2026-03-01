@@ -188,6 +188,14 @@ impl symthaea_core::temporal::TemporalPredictor for PlasmaMultiScalePredictor {
     fn tau_base(&self) -> f32 {
         0.001 // 1 ms (plasma MHD timescale)
     }
+
+    fn default_horizons(&self) -> &'static [f32] {
+        PLASMA_HORIZONS
+    }
+
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        PLASMA_HORIZON_LABELS
+    }
 }
 
 // ── Plasma FEP Agent ───────────────────────────────────────────────────────

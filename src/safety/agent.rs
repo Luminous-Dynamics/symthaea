@@ -437,4 +437,283 @@ mod tests {
         }
         assert!(agent.history().len() <= 1000);
     }
+
+    // ── Track C: edge-path tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_assess_snapshot_healthy() {
+        use crate::cognitive_loop::snapshot::ConsciousnessSnapshot;
+        use crate::cognitive_loop::drives::SelfAssessment;
+        use crate::cognitive_loop::routing::CognitiveDepth;
+        use crate::cognitive_loop::ActionHint;
+        use crate::consciousness::consciousness_unification::{EmotionalPattern, UnifiedEmotion};
+        use crate::dynamics::temporal_signatures::ConsciousnessPattern;
+
+        let mut agent = SafetyAgent::new();
+        let snap = ConsciousnessSnapshot {
+            cycle: 42,
+            consciousness_level: 0.8,
+            prediction_error: 0.1,
+            temporal_coherence: 0.7,
+            pattern: ConsciousnessPattern::Focused,
+            pattern_confidence: 0.8,
+            prediction_confidence: 0.7,
+            predictions_trustworthy: true,
+            effective_learning_rate: 0.01,
+            learning_effectiveness: 0.5,
+            in_flow: false,
+            flow_intensity: 0.0,
+            flow_streak: 0,
+            flow_learning_boost: 1.0,
+            boredom: 0.2,
+            curiosity: 0.5,
+            exploration_urge: 0.3,
+            exploring: false,
+            novelty_bonus: 0.0,
+            emotional_valence: 0.0,
+            emotional_arousal: 0.3,
+            has_emotional_content: false,
+            emotion_nudge: None,
+            self_assessment: SelfAssessment::Learning,
+            reflection_count: 10,
+            adjustments_made: 2,
+            next_reflection_in: 5,
+            action_hint: ActionHint::Continue,
+            speech_rate_multiplier: 1.0,
+            pause_multiplier: 1.0,
+            learning_paused: false,
+            flow_threshold: 0.25,
+            boredom_threshold: 0.7,
+            trust_threshold: 0.5,
+            tau_mean: 0.5,
+            tau_trend: 0.0,
+            cognitive_depth: CognitiveDepth::Cortical,
+            unified_psi: 0.4,
+            unified_valence: 0.0,
+            unified_arousal: 0.3,
+            unified_dominance: 0.0,
+            unified_discrete_emotion: Some(UnifiedEmotion::Neutral),
+            emotional_pattern: EmotionalPattern::Stable,
+            emotional_description: String::new(),
+            snapshot_timestamp_nanos: 0,
+            current_flow_duration_secs: None,
+            total_flow_time_secs: 0.0,
+            flow_periods: 0,
+            avg_flow_duration_secs: 0.0,
+            fep_free_energy: 1.0,
+            fep_precision: 0.5,
+            spectral_mip_phi: None,
+            harmonies_alignment: 0.5,
+            empathic_compassion: 0.5,
+            sigma: None,
+            avg_cycle_time_us: 100.0,
+            cycles_per_second: 50.0,
+        };
+        let a = agent.assess_snapshot(&snap);
+        assert_eq!(a.level, SafetyLevel::Green);
+        assert_eq!(a.cycle, 42);
+    }
+
+    #[test]
+    fn test_assess_snapshot_nan_clamped() {
+        use crate::cognitive_loop::snapshot::ConsciousnessSnapshot;
+        use crate::cognitive_loop::drives::SelfAssessment;
+        use crate::cognitive_loop::routing::CognitiveDepth;
+        use crate::cognitive_loop::ActionHint;
+        use crate::consciousness::consciousness_unification::{EmotionalPattern, UnifiedEmotion};
+        use crate::dynamics::temporal_signatures::ConsciousnessPattern;
+
+        let mut agent = SafetyAgent::new();
+        let snap = ConsciousnessSnapshot {
+            cycle: 0,
+            consciousness_level: f32::NAN,
+            prediction_error: f32::NAN,
+            temporal_coherence: f32::NAN,
+            pattern: ConsciousnessPattern::Focused,
+            pattern_confidence: 0.5,
+            prediction_confidence: 0.5,
+            predictions_trustworthy: true,
+            effective_learning_rate: 0.01,
+            learning_effectiveness: 0.5,
+            in_flow: false,
+            flow_intensity: 0.0,
+            flow_streak: 0,
+            flow_learning_boost: 1.0,
+            boredom: 0.2,
+            curiosity: 0.5,
+            exploration_urge: 0.3,
+            exploring: false,
+            novelty_bonus: 0.0,
+            emotional_valence: 0.0,
+            emotional_arousal: 0.3,
+            has_emotional_content: false,
+            emotion_nudge: None,
+            self_assessment: SelfAssessment::Learning,
+            reflection_count: 0,
+            adjustments_made: 0,
+            next_reflection_in: 5,
+            action_hint: ActionHint::Continue,
+            speech_rate_multiplier: 1.0,
+            pause_multiplier: 1.0,
+            learning_paused: false,
+            flow_threshold: 0.25,
+            boredom_threshold: 0.7,
+            trust_threshold: 0.5,
+            tau_mean: 0.5,
+            tau_trend: 0.0,
+            cognitive_depth: CognitiveDepth::Cortical,
+            unified_psi: 0.4,
+            unified_valence: 0.0,
+            unified_arousal: 0.3,
+            unified_dominance: 0.0,
+            unified_discrete_emotion: Some(UnifiedEmotion::Neutral),
+            emotional_pattern: EmotionalPattern::Stable,
+            emotional_description: String::new(),
+            snapshot_timestamp_nanos: 0,
+            current_flow_duration_secs: None,
+            total_flow_time_secs: 0.0,
+            flow_periods: 0,
+            avg_flow_duration_secs: 0.0,
+            fep_free_energy: 1.0,
+            fep_precision: 0.5,
+            spectral_mip_phi: None,
+            harmonies_alignment: 0.5,
+            empathic_compassion: 0.5,
+            sigma: None,
+            avg_cycle_time_us: 100.0,
+            cycles_per_second: 50.0,
+        };
+        // NaN consciousness → 0.0 → Red, NaN pred_error → 1.0 → escalate,
+        // NaN coherence → 0.0 → escalate (already Red, stays Red)
+        let a = agent.assess_snapshot(&snap);
+        assert_eq!(a.level, SafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_with_config_custom_thresholds() {
+        let config = SafetyAgentConfig {
+            consciousness_yellow: 0.9,
+            consciousness_orange: 0.7,
+            consciousness_red: 0.5,
+            prediction_error_threshold: 0.3,
+            temporal_coherence_threshold: 0.6,
+            escalation_window: 2,
+        };
+        let mut agent = SafetyAgent::with_config(config);
+
+        // 0.8 < 0.9 (yellow) but >= 0.7 (orange) → Yellow
+        let a = agent.assess(metrics(0.8, 0.1, 0.7));
+        assert_eq!(a.level, SafetyLevel::Yellow);
+
+        // 0.6 < 0.7 (orange) but >= 0.5 (red) → Orange
+        let a = agent.assess(metrics(0.6, 0.1, 0.7));
+        assert_eq!(a.level, SafetyLevel::Orange);
+
+        // 0.4 < 0.5 (red) → Red
+        let a = agent.assess(metrics(0.4, 0.1, 0.7));
+        assert_eq!(a.level, SafetyLevel::Red);
+    }
+
+    #[test]
+    fn test_with_config_custom_escalation_window() {
+        let config = SafetyAgentConfig {
+            escalation_window: 2,
+            ..SafetyAgentConfig::default()
+        };
+        let mut agent = SafetyAgent::with_config(config);
+
+        // 2 Yellow assessments fill the window
+        agent.assess(metrics(0.5, 0.1, 0.7));
+        agent.assess(metrics(0.5, 0.1, 0.7));
+
+        // Green should now be escalated to Yellow due to trend
+        let a = agent.assess(metrics(0.8, 0.1, 0.7));
+        assert_eq!(a.level, SafetyLevel::Yellow);
+    }
+
+    #[test]
+    fn test_current_level_empty_history() {
+        let agent = SafetyAgent::new();
+        assert_eq!(agent.current_level(), SafetyLevel::Green);
+    }
+
+    #[test]
+    fn test_current_level_tracks_most_recent() {
+        let mut agent = SafetyAgent::new();
+        agent.assess(metrics(0.8, 0.1, 0.7));
+        assert_eq!(agent.current_level(), SafetyLevel::Green);
+
+        agent.assess(metrics(0.1, 0.1, 0.7));
+        assert_eq!(agent.current_level(), SafetyLevel::Red);
+
+        agent.assess(metrics(0.8, 0.1, 0.7));
+        // No trend escalation yet (only 1 degraded in window of 3)
+        assert_eq!(agent.current_level(), SafetyLevel::Green);
+    }
+
+    #[test]
+    fn test_boundary_thresholds() {
+        let mut agent = SafetyAgent::new();
+
+        // Exactly at yellow threshold (0.6) → Green (uses < not <=)
+        let a = agent.assess(metrics(0.6, 0.1, 0.7));
+        assert_eq!(a.level, SafetyLevel::Green);
+
+        // Just below yellow threshold
+        let a = agent.assess(metrics(0.599, 0.1, 0.7));
+        assert_eq!(a.level, SafetyLevel::Yellow);
+
+        // Exactly at prediction_error threshold (0.7) → no escalation (uses >)
+        let a = agent.assess(metrics(0.8, 0.7, 0.7));
+        assert_eq!(a.level, SafetyLevel::Green);
+
+        // Just above prediction_error threshold
+        let a = agent.assess(metrics(0.8, 0.701, 0.7));
+        assert_eq!(a.level, SafetyLevel::Yellow);
+
+        // Exactly at temporal_coherence threshold (0.3) → no escalation (uses <)
+        let a = agent.assess(metrics(0.8, 0.1, 0.3));
+        assert_eq!(a.level, SafetyLevel::Green);
+
+        // Just below temporal_coherence threshold
+        let a = agent.assess(metrics(0.8, 0.1, 0.299));
+        assert_eq!(a.level, SafetyLevel::Yellow);
+    }
+
+    #[test]
+    fn test_green_reasons_message() {
+        let mut agent = SafetyAgent::new();
+        let a = agent.assess(metrics(0.8, 0.1, 0.7));
+        assert!(a.reasons.iter().any(|r| r.contains("all metrics within normal range")));
+    }
+
+    #[test]
+    fn test_trend_does_not_escalate_already_elevated() {
+        let mut agent = SafetyAgent::new();
+        // Fill window with Yellow
+        for _ in 0..3 {
+            agent.assess(metrics(0.5, 0.1, 0.7));
+        }
+        // An Orange assessment should stay Orange, not be affected by trend
+        let a = agent.assess(metrics(0.25, 0.1, 0.7));
+        assert_eq!(a.level, SafetyLevel::Orange);
+    }
+
+    #[test]
+    fn test_label_all_variants() {
+        assert!(SafetyLevel::Green.label().contains("GREEN"));
+        assert!(SafetyLevel::Yellow.label().contains("YELLOW"));
+        assert!(SafetyLevel::Orange.label().contains("ORANGE"));
+        assert!(SafetyLevel::Red.label().contains("RED"));
+    }
+
+    #[test]
+    fn test_config_accessor() {
+        let config = SafetyAgentConfig {
+            consciousness_yellow: 0.9,
+            ..SafetyAgentConfig::default()
+        };
+        let agent = SafetyAgent::with_config(config);
+        assert_eq!(agent.config().consciousness_yellow, 0.9);
+    }
 }
