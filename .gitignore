@@ -270,3 +270,8 @@ configs/
 
 # === Claude Session Artifacts ===
 .claude-sessions/
+.claude/
+
+# === Build Caches ===
+.sccache/
+.symthaea/
