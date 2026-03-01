@@ -16,7 +16,20 @@ const history = {
     arousal: [],
     coherence: [],
     moral: [],
+    moralFE: [],
+    moralKL: [],
+    moralEntropy: [],
 };
+
+const HARMONY_LABELS = [
+    'Resonant Coherence',
+    'Pan-Sentient Flourishing',
+    'Integral Wisdom',
+    'Infinite Play',
+    'Universal Interconnectedness',
+    'Sacred Reciprocity',
+    'Evolutionary Progression',
+];
 
 // --- Chart Setup ---
 const chartOptions = (yMin, yMax) => ({
@@ -91,6 +104,120 @@ const chartCoherence = new Chart(document.getElementById('chartCoherence'), {
     options: chartOptions(0, 1),
 });
 
+// --- Moral Topology Charts ---
+
+const chartHarmony = new Chart(document.getElementById('chartHarmony'), {
+    type: 'radar',
+    data: {
+        labels: HARMONY_LABELS,
+        datasets: [
+            {
+                label: 'Observed',
+                data: [0, 0, 0, 0, 0, 0, 0],
+                borderColor: '#06b6d4',
+                backgroundColor: 'rgba(6,182,212,0.15)',
+                borderWidth: 2,
+                pointRadius: 3,
+                pointBackgroundColor: '#06b6d4',
+            },
+            {
+                label: 'Prior',
+                data: [0, 0, 0, 0, 0, 0, 0],
+                borderColor: '#a855f7',
+                backgroundColor: 'rgba(168,85,247,0.08)',
+                borderWidth: 1.5,
+                borderDash: [4, 4],
+                pointRadius: 2,
+                pointBackgroundColor: '#a855f7',
+            },
+        ],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 9 } } } },
+        scales: {
+            r: {
+                angleLines: { color: '#1f2937' },
+                grid: { color: '#1f2937' },
+                pointLabels: { color: '#9ca3af', font: { size: 8 } },
+                ticks: { display: false },
+                suggestedMin: 0,
+                suggestedMax: 1,
+            },
+        },
+    },
+});
+
+const chartMoralFE = new Chart(document.getElementById('chartMoralFE'), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            makeDataset('Free Energy', '#06b6d4', history.moralFE),
+            makeDataset('KL Divergence', '#f59e0b', history.moralKL),
+            makeDataset('Entropy', '#22c55e', history.moralEntropy),
+        ],
+    },
+    options: chartOptions(0, undefined),
+});
+
+const chartPersistence = new Chart(document.getElementById('chartPersistence'), {
+    type: 'scatter',
+    data: {
+        datasets: [
+            {
+                label: 'Components (B0)',
+                data: [],
+                backgroundColor: '#06b6d4',
+                pointRadius: 4,
+            },
+            {
+                label: 'Cycles (B1)',
+                data: [],
+                backgroundColor: '#a855f7',
+                pointRadius: 4,
+            },
+            {
+                label: 'Voids (B2)',
+                data: [],
+                backgroundColor: '#22c55e',
+                pointRadius: 4,
+            },
+            {
+                label: 'Diagonal',
+                data: [{ x: 0, y: 0 }, { x: 1, y: 1 }],
+                borderColor: '#374151',
+                borderWidth: 1,
+                pointRadius: 0,
+                showLine: true,
+                type: 'line',
+            },
+        ],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 9 } } } },
+        scales: {
+            x: {
+                title: { display: true, text: 'Birth', color: '#6b7280', font: { size: 9 } },
+                ticks: { color: '#6b7280', font: { size: 9 } },
+                grid: { color: '#1f2937' },
+                min: 0,
+            },
+            y: {
+                title: { display: true, text: 'Death', color: '#6b7280', font: { size: 9 } },
+                ticks: { color: '#6b7280', font: { size: 9 } },
+                grid: { color: '#1f2937' },
+                min: 0,
+            },
+        },
+    },
+});
+
 // --- WebSocket ---
 function connect() {
     ws = new WebSocket(WS_URL);
@@ -128,18 +255,94 @@ function connect() {
         push(history.arousal, data.arousal);
         push(history.coherence, data.coherence);
         push(history.moral, data.moral_score);
+        push(history.moralFE, data.moral_free_energy || 0);
+        push(history.moralKL, data.moral_kl_divergence || 0);
+        push(history.moralEntropy, data.moral_entropy || 0);
 
-        // Update charts
+        // Update line charts
         const labels = history.cycles.map(String);
         chartPsi.data.labels = labels;
         chartError.data.labels = labels;
         chartAffect.data.labels = labels;
         chartCoherence.data.labels = labels;
+        chartMoralFE.data.labels = labels;
 
         chartPsi.update('none');
         chartError.update('none');
         chartAffect.update('none');
         chartCoherence.update('none');
+        chartMoralFE.update('none');
+
+        // Update harmony radar
+        if (data.moral_scenario_distribution) {
+            chartHarmony.data.datasets[0].data = data.moral_scenario_distribution;
+        }
+        if (data.moral_prior_distribution) {
+            chartHarmony.data.datasets[1].data = data.moral_prior_distribution;
+        }
+        chartHarmony.update('none');
+
+        // Update persistence diagram
+        if (data.moral_persistence_diagram) {
+            const pd = data.moral_persistence_diagram;
+            const toPoints = (pairs) => (pairs || []).map(p => ({ x: p[0], y: p[1] }));
+            chartPersistence.data.datasets[0].data = toPoints(pd.components);
+            chartPersistence.data.datasets[1].data = toPoints(pd.cycles);
+            chartPersistence.data.datasets[2].data = toPoints(pd.voids);
+            // Update diagonal to span data range
+            const maxVal = Math.max(
+                pd.bottleneck_distance || 1,
+                ...(pd.components || []).flat(),
+                ...(pd.cycles || []).flat(),
+                ...(pd.voids || []).flat(),
+                1
+            );
+            chartPersistence.data.datasets[3].data = [{ x: 0, y: 0 }, { x: maxVal, y: maxVal }];
+            chartPersistence.update('none');
+        }
+
+        // Update Betti badges
+        if (data.moral_betti) {
+            document.getElementById('bettiBeta0').textContent = data.moral_betti[0];
+            document.getElementById('bettiBeta1').textContent = data.moral_betti[1];
+            document.getElementById('bettiBeta2').textContent = data.moral_betti[2];
+        }
+
+        // Anomaly flags
+        const setFlag = (id, active) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.toggle('active', active);
+        };
+        setFlag('flagSurprise', data.surprise_triggered);
+        setFlag('flagGWT', data.gwt_broadcast);
+        setFlag('flagDream', data.dream_insights > 0);
+        setFlag('flagReasoning', data.reasoning_confidence > 0);
+        setFlag('flagInversion', data.moral_value_inversion);
+        setFlag('flagFESpike', data.moral_free_energy_spike);
+        setFlag('flagDrift', (data.moral_drift || 0) > 0.25);
+
+        // Flash anomaly badges
+        const flashFlag = (id, active) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (active) {
+                el.classList.add('anomaly-flash');
+            } else {
+                el.classList.remove('anomaly-flash');
+            }
+        };
+        flashFlag('flagInversion', data.moral_value_inversion);
+        flashFlag('flagFESpike', data.moral_free_energy_spike);
+
+        // Topology info
+        const harmonyNames = data.harmony_labels || HARMONY_LABELS;
+        const domIdx = data.moral_dominant_harmony || 0;
+        const domEl = document.getElementById('dominantHarmony');
+        if (domEl) domEl.textContent = harmonyNames[domIdx] || '--';
+        const anomEl = document.getElementById('anomalyScore');
+        if (anomEl) anomEl.textContent = (data.moral_anomaly_score || 0).toFixed(2);
+        const driftEl = document.getElementById('driftValue');
+        if (driftEl) driftEl.textContent = (data.moral_drift || 0).toFixed(3);
 
         // Update metrics
         document.getElementById('metricCycle').textContent = data.cycle;
@@ -148,16 +351,6 @@ function connect() {
         document.getElementById('metricMoral').textContent = data.moral_score.toFixed(3);
         document.getElementById('metricTime').textContent = data.cycle_time_us.toLocaleString();
         document.getElementById('metricReasoning').textContent = data.reasoning_confidence.toFixed(2);
-
-        // Update state flags
-        const setFlag = (id, active) => {
-            const el = document.getElementById(id);
-            el.classList.toggle('active', active);
-        };
-        setFlag('flagSurprise', data.surprise_triggered);
-        setFlag('flagGWT', data.gwt_broadcast);
-        setFlag('flagDream', data.dream_insights > 0);
-        setFlag('flagReasoning', data.reasoning_confidence > 0);
 
         // Update cycle info
         document.getElementById('cycleInfo').textContent =

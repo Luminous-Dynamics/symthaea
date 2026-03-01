@@ -150,7 +150,7 @@ fn test_strategy_convergence_over_repeated_inputs() {
         let result = service.cycle("the quick brown fox jumps over the lazy dog");
         strategies.push(result.metadata.selected_strategy.clone());
         errors.push(result.prediction_error);
-        quality_scores.push(result.metadata.unified_quality_score);
+        quality_scores.push(result.metadata.quality.unified_quality_score);
     }
 
     // Strategy should settle in the last 10 cycles (fewer distinct strategies)
@@ -543,7 +543,7 @@ fn test_cross_system_consensus() {
         let result = service.cycle(inputs[i % inputs.len()]);
         pred_confidences.push(service.prediction_confidence());
         consciousness_levels.push(result.metadata.consciousness_level);
-        quality_scores.push(result.metadata.unified_quality_score);
+        quality_scores.push(result.metadata.quality.unified_quality_score);
     }
 
     // No NaN or Inf in any subsystem

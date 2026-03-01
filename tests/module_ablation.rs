@@ -402,10 +402,10 @@ fn test_all_modules_synergy() {
         if result.metadata.prefrontal_veto {
             metadata_populated |= 1;
         }
-        if result.metadata.gwt_broadcast {
+        if result.metadata.attention.gwt_broadcast {
             metadata_populated |= 2;
         }
-        if result.metadata.meta_cognitive_accuracy > 0.0 {
+        if result.metadata.quality.meta_cognitive_accuracy > 0.0 {
             metadata_populated |= 4;
         }
         if result.metadata.narrative_self_psi > 0.0 {
@@ -417,7 +417,7 @@ fn test_all_modules_synergy() {
         if result.metadata.temporal_coherence_score > 0.0 {
             metadata_populated |= 32;
         }
-        if result.metadata.attention_schema_focus > 0.0 {
+        if result.metadata.attention.attention_schema_focus > 0.0 {
             metadata_populated |= 64;
         }
     }

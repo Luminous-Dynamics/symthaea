@@ -226,14 +226,14 @@ fn resonator_codebook_grows() {
 
     let last = results.last().unwrap();
     assert!(
-        last.metadata.resonator_codebook_size > 0,
+        last.metadata.memory.resonator_codebook_size > 0,
         "resonator_codebook_size should be > 0 after {N_CYCLES} cycles: got {}",
-        last.metadata.resonator_codebook_size
+        last.metadata.memory.resonator_codebook_size
     );
     assert!(
-        last.metadata.resonator_episodes > 0,
+        last.metadata.memory.resonator_episodes > 0,
         "resonator_episodes should be > 0 after {N_CYCLES} cycles: got {}",
-        last.metadata.resonator_episodes
+        last.metadata.memory.resonator_episodes
     );
 }
 

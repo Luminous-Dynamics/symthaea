@@ -48,19 +48,19 @@ proptest! {
             let result = service.cycle(input);
             prop_assert!(result.prediction_error.is_finite(),
                 "prediction_error NaN/Inf at cycle {i} with input '{input}'");
-            prop_assert!(result.metadata.fep_accuracy.is_finite(),
+            prop_assert!(result.metadata.fep.fep_accuracy.is_finite(),
                 "fep_accuracy NaN/Inf at cycle {i}");
-            prop_assert!(result.metadata.fep_complexity.is_finite(),
+            prop_assert!(result.metadata.fep.fep_complexity.is_finite(),
                 "fep_complexity NaN/Inf at cycle {i}");
-            prop_assert!(result.metadata.fep_surprise.is_finite(),
+            prop_assert!(result.metadata.fep.fep_surprise.is_finite(),
                 "fep_surprise NaN/Inf at cycle {i}");
-            prop_assert!(result.metadata.fep_td_error.is_finite(),
+            prop_assert!(result.metadata.fep.fep_td_error.is_finite(),
                 "fep_td_error NaN/Inf at cycle {i}");
-            prop_assert!(result.metadata.fep_pragmatic_value.is_finite(),
+            prop_assert!(result.metadata.fep.fep_pragmatic_value.is_finite(),
                 "fep_pragmatic_value NaN/Inf at cycle {i}");
-            prop_assert!(result.metadata.codebook_diversity.is_finite(),
+            prop_assert!(result.metadata.memory.codebook_diversity.is_finite(),
                 "codebook_diversity NaN/Inf at cycle {i}");
-            prop_assert!(result.metadata.resonator_best_sim.is_finite(),
+            prop_assert!(result.metadata.memory.resonator_best_sim.is_finite(),
                 "resonator_best_sim NaN/Inf at cycle {i}");
         }
     }
@@ -122,10 +122,10 @@ proptest! {
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
             // Codebook evictions should be bounded (at most 3 per cycle from top_eps)
-            prop_assert!(result.metadata.codebook_evictions <= 3,
-                "Too many evictions at cycle {i}: {}", result.metadata.codebook_evictions);
-            prop_assert!(result.metadata.resonator_promotions <= 3,
-                "Too many promotions at cycle {i}: {}", result.metadata.resonator_promotions);
+            prop_assert!(result.metadata.memory.codebook_evictions <= 3,
+                "Too many evictions at cycle {i}: {}", result.metadata.memory.codebook_evictions);
+            prop_assert!(result.metadata.memory.resonator_promotions <= 3,
+                "Too many promotions at cycle {i}: {}", result.metadata.memory.resonator_promotions);
         }
     }
 }

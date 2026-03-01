@@ -555,11 +555,11 @@ fn test_predictive_affective_crossmodal_synergy() {
             "Affective arousal must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.predictive_free_energy.is_finite(),
+            result.metadata.fep.predictive_free_energy.is_finite(),
             "Predictive free energy must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.predictive_phi_modulation.is_finite(),
+            result.metadata.fep.predictive_phi_modulation.is_finite(),
             "Predictive phi modulation must be finite at cycle {i}"
         );
         assert!(
@@ -583,9 +583,9 @@ fn test_predictive_affective_crossmodal_synergy() {
             result.metadata.affective_arousal
         );
         assert!(
-            result.metadata.predictive_phi_modulation.is_finite(),
+            result.metadata.fep.predictive_phi_modulation.is_finite(),
             "Phi modulation must be finite at cycle {i}: {}",
-            result.metadata.predictive_phi_modulation
+            result.metadata.fep.predictive_phi_modulation
         );
         assert!(
             result.metadata.cross_modal_psi >= 0.0,
@@ -599,7 +599,7 @@ fn test_predictive_affective_crossmodal_synergy() {
         {
             saw_affective = true;
         }
-        if result.metadata.predictive_free_energy.abs() > 0.001 {
+        if result.metadata.fep.predictive_free_energy.abs() > 0.001 {
             saw_predictive = true;
         }
         if result.metadata.cross_modal_binding_strength > 0.0 {
@@ -651,9 +651,9 @@ fn test_dream_replay_integration() {
     for i in 0..25 {
         let result = service.cycle(inputs[i % inputs.len()]);
         // Dream metadata should be valid (non-negative)
-        assert!(result.metadata.dream_phi_improvement >= 0.0);
-        assert!(result.metadata.dream_insights <= 100); // sanity bound
-        if result.metadata.dream_insights > 0 || result.metadata.dream_wisdom_count > 0 {
+        assert!(result.metadata.memory.dream_phi_improvement >= 0.0);
+        assert!(result.metadata.memory.dream_insights <= 100); // sanity bound
+        if result.metadata.memory.dream_insights > 0 || result.metadata.memory.dream_wisdom_count > 0 {
             saw_dream_metadata = true;
         }
     }
@@ -662,7 +662,7 @@ fn test_dream_replay_integration() {
     // (dream runs during Cruise or periodically)
     println!(
         "Dream metadata populated: {saw_dream_metadata}, last wisdom_count: {}",
-        service.cycle("final").metadata.dream_wisdom_count,
+        service.cycle("final").metadata.memory.dream_wisdom_count,
     );
 }
 
@@ -769,7 +769,7 @@ fn test_value_feedback_learning() {
     let mut trends = Vec::new();
     for i in 0..60 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        trends.push(result.metadata.value_feedback_trend);
+        trends.push(result.metadata.ethics.value_feedback_trend);
     }
 
     // After enough cycles the trend should have moved from its initial 0.0
@@ -841,7 +841,7 @@ fn test_dream_replay_produces_insights() {
     let mut saw_dream = false;
     for i in 0..100 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        if result.metadata.dream_insights > 0 || result.metadata.dream_wisdom_count > 0 {
+        if result.metadata.memory.dream_insights > 0 || result.metadata.memory.dream_wisdom_count > 0 {
             saw_dream = true;
         }
     }
@@ -849,10 +849,10 @@ fn test_dream_replay_produces_insights() {
     // Dream replay is stochastic (depends on Cruise urgency), so just verify no panics
     // and that the metadata fields are always finite
     let final_result = service.cycle("final check");
-    assert!(final_result.metadata.dream_phi_improvement.is_finite());
+    assert!(final_result.metadata.memory.dream_phi_improvement.is_finite());
     println!(
         "Dream observed: {saw_dream}, wisdom_count: {}",
-        final_result.metadata.dream_wisdom_count
+        final_result.metadata.memory.dream_wisdom_count
     );
 }
 
@@ -975,9 +975,9 @@ fn test_compositionality_and_value_evaluator_wired() {
     assert!(service.value_evaluator().is_some());
     // Value score should have been computed at cycle 20
     assert!(
-        last_result.metadata.value_evaluator_score >= 0.0,
+        last_result.metadata.ethics.value_evaluator_score >= 0.0,
         "Value evaluator score should be non-negative, got: {}",
-        last_result.metadata.value_evaluator_score
+        last_result.metadata.ethics.value_evaluator_score
     );
 }
 
@@ -999,7 +999,7 @@ fn test_harmonics_and_consciousness_profile_wired() {
     assert!(service.harmonic_field().is_some());
     // Field coherence should have been computed
     assert!(
-        last_result.metadata.harmonic_field_coherence >= 0.0,
+        last_result.metadata.harmonics.harmonic_field_coherence >= 0.0,
         "Harmonic field coherence should be non-negative"
     );
     // Consciousness profile computed at cycle 10
@@ -1221,12 +1221,12 @@ fn test_dissipative_consciousness_wired() {
     }
 
     assert!(
-        last_result.metadata.dissipative_health >= 0.0,
+        last_result.metadata.quality.dissipative_health >= 0.0,
         "Dissipative health should be non-negative, got: {}",
-        last_result.metadata.dissipative_health,
+        last_result.metadata.quality.dissipative_health,
     );
     assert!(
-        !last_result.metadata.dissipative_regime.is_empty(),
+        !last_result.metadata.quality.dissipative_regime.is_empty(),
         "Dissipative regime should be populated",
     );
     // dissipative_consciousness() is pub(crate) — tested internally
@@ -1247,14 +1247,14 @@ fn test_epistemic_conflict_and_equation_v2_wired() {
     }
 
     assert!(
-        last_result.metadata.epistemic_phi_eff >= 0.0,
+        last_result.metadata.quality.epistemic_phi_eff >= 0.0,
         "Epistemic Φ_eff should be non-negative, got: {}",
-        last_result.metadata.epistemic_phi_eff,
+        last_result.metadata.quality.epistemic_phi_eff,
     );
     assert!(
-        last_result.metadata.equation_v2_consciousness >= 0.0,
+        last_result.metadata.quality.equation_v2_consciousness >= 0.0,
         "Equation v2 consciousness should be non-negative, got: {}",
-        last_result.metadata.equation_v2_consciousness,
+        last_result.metadata.quality.equation_v2_consciousness,
     );
 }
 
@@ -1273,9 +1273,9 @@ fn test_hierarchical_ltc_wired() {
     }
 
     assert!(
-        last_result.metadata.hierarchical_ltc_phi.is_finite(),
+        last_result.metadata.quality.hierarchical_ltc_phi.is_finite(),
         "Hierarchical LTC phi should be finite, got: {}",
-        last_result.metadata.hierarchical_ltc_phi,
+        last_result.metadata.quality.hierarchical_ltc_phi,
     );
     assert!(
         service.hierarchical_ltc().is_some(),
@@ -2403,10 +2403,10 @@ fn test_resonator_wm_priming() {
     let mut any_episodes = false;
     for _ in 0..50 {
         let result = service.cycle("resonator priming test input");
-        if result.metadata.resonator_wm_primed {
+        if result.metadata.memory.resonator_wm_primed {
             any_primed = true;
         }
-        if result.metadata.resonator_episodes > 0 {
+        if result.metadata.memory.resonator_episodes > 0 {
             any_episodes = true;
         }
         assert!(
@@ -2436,14 +2436,14 @@ fn test_resonator_episodic_reconsolidation() {
     let mut max_reconsolidated = 0usize;
     for _ in 0..30 {
         let result = service.cycle("reconsolidation test pattern");
-        if result.metadata.resonator_reconsolidated > max_reconsolidated {
-            max_reconsolidated = result.metadata.resonator_reconsolidated;
+        if result.metadata.memory.resonator_reconsolidated > max_reconsolidated {
+            max_reconsolidated = result.metadata.memory.resonator_reconsolidated;
         }
         // Reconsolidated count should never exceed MEMORY_RECALL_TOP_K (3)
         assert!(
-            result.metadata.resonator_reconsolidated <= 3,
+            result.metadata.memory.resonator_reconsolidated <= 3,
             "Reconsolidated count should be bounded by TOP_K: got {}",
-            result.metadata.resonator_reconsolidated
+            result.metadata.memory.resonator_reconsolidated
         );
     }
 
@@ -2473,8 +2473,8 @@ fn test_high_phi_resonator_promotion() {
             "holographic binding coherence"
         };
         let result = service.cycle(input);
-        total_promotions += result.metadata.resonator_promotions;
-        codebook_sizes.push(result.metadata.resonator_codebook_size);
+        total_promotions += result.metadata.memory.resonator_promotions;
+        codebook_sizes.push(result.metadata.memory.resonator_codebook_size);
     }
 
     // 100 cycles includes cycle 97 which is the promotion cadence.
@@ -2502,19 +2502,19 @@ fn test_fep_component_decomposition() {
     for i in 0..20 {
         let result = service.cycle("free energy decomposition test");
         assert!(
-            result.metadata.fep_accuracy.is_finite(),
+            result.metadata.fep.fep_accuracy.is_finite(),
             "FEP accuracy must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.fep_complexity.is_finite(),
+            result.metadata.fep.fep_complexity.is_finite(),
             "FEP complexity must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.fep_surprise.is_finite(),
+            result.metadata.fep.fep_surprise.is_finite(),
             "FEP surprise must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.fep_td_error.is_finite(),
+            result.metadata.fep.fep_td_error.is_finite(),
             "FEP TD error must be finite at cycle {i}"
         );
     }
@@ -2537,13 +2537,13 @@ fn test_fep_pragmatic_exploration_balance() {
     for i in 0..30 {
         let result = service.cycle("pragmatic value exploration test");
         assert!(
-            result.metadata.fep_pragmatic_value.is_finite(),
+            result.metadata.fep.fep_pragmatic_value.is_finite(),
             "FEP pragmatic value must be finite at cycle {i}"
         );
         assert!(
-            result.metadata.fep_action < 8,
+            result.metadata.fep.fep_action < 8,
             "FEP action should be in valid range at cycle {i}: got {}",
-            result.metadata.fep_action
+            result.metadata.fep.fep_action
         );
     }
 
@@ -2571,7 +2571,7 @@ fn test_fep_td_error_causal_trigger() {
         // Alternate inputs to produce prediction errors
         let result = service.cycle(inputs[i % 2]);
         assert!(
-            result.metadata.fep_td_error.is_finite(),
+            result.metadata.fep.fep_td_error.is_finite(),
             "FEP TD error must be finite at cycle {i}"
         );
         assert!(
@@ -2606,29 +2606,29 @@ fn test_full_resonator_fep_loop_stability() {
 
         // All new metadata fields must be finite
         assert!(
-            result.metadata.fep_accuracy.is_finite(),
+            result.metadata.fep.fep_accuracy.is_finite(),
             "FEP accuracy not finite at cycle {i}"
         );
         assert!(
-            result.metadata.fep_complexity.is_finite(),
+            result.metadata.fep.fep_complexity.is_finite(),
             "FEP complexity not finite at cycle {i}"
         );
         assert!(
-            result.metadata.fep_surprise.is_finite(),
+            result.metadata.fep.fep_surprise.is_finite(),
             "FEP surprise not finite at cycle {i}"
         );
         assert!(
-            result.metadata.fep_td_error.is_finite(),
+            result.metadata.fep.fep_td_error.is_finite(),
             "FEP TD error not finite at cycle {i}"
         );
         assert!(
-            result.metadata.fep_pragmatic_value.is_finite(),
+            result.metadata.fep.fep_pragmatic_value.is_finite(),
             "FEP pragmatic value not finite at cycle {i}"
         );
 
         // Resonator fields should be bounded
         assert!(
-            result.metadata.resonator_reconsolidated <= 3,
+            result.metadata.memory.resonator_reconsolidated <= 3,
             "Reconsolidated exceeds TOP_K at cycle {i}"
         );
         assert!(
@@ -2675,9 +2675,9 @@ fn test_codebook_pruning_at_capacity() {
             "Error not finite at cycle {i}"
         );
         assert!(
-            result.metadata.codebook_evictions <= 3,
+            result.metadata.memory.codebook_evictions <= 3,
             "Too many evictions at cycle {i}: {}",
-            result.metadata.codebook_evictions
+            result.metadata.memory.codebook_evictions
         );
     }
 
@@ -2703,9 +2703,9 @@ fn test_resonator_fep_prior_coupling() {
     }
 
     let result = service.cycle("familiar context pattern");
-    assert!(result.metadata.resonator_best_sim.is_finite());
-    assert!(result.metadata.fep_accuracy.is_finite());
-    assert!(result.metadata.fep_complexity.is_finite());
+    assert!(result.metadata.memory.resonator_best_sim.is_finite());
+    assert!(result.metadata.fep.fep_accuracy.is_finite());
+    assert!(result.metadata.fep.fep_complexity.is_finite());
 }
 
 #[test]
@@ -2726,15 +2726,15 @@ fn test_fep_adaptive_behavior_modulation() {
         };
         let result = service.cycle(input);
         assert!(
-            result.metadata.fep_surprise.is_finite(),
+            result.metadata.fep.fep_surprise.is_finite(),
             "fep_surprise not finite at {i}"
         );
         assert!(
-            result.metadata.fep_td_error.is_finite(),
+            result.metadata.fep.fep_td_error.is_finite(),
             "fep_td_error not finite at {i}"
         );
         assert!(
-            result.metadata.fep_pragmatic_value.is_finite(),
+            result.metadata.fep.fep_pragmatic_value.is_finite(),
             "fep_pragmatic not finite at {i}"
         );
     }
@@ -2788,17 +2788,17 @@ fn test_codebook_diversity_metric() {
         };
         let result = service.cycle(input);
         assert!(
-            result.metadata.codebook_diversity.is_finite(),
+            result.metadata.memory.codebook_diversity.is_finite(),
             "Diversity not finite at {i}"
         );
         assert!(
-            result.metadata.codebook_diversity >= 0.0,
+            result.metadata.memory.codebook_diversity >= 0.0,
             "Diversity negative at {i}"
         );
         assert!(
-            result.metadata.codebook_diversity <= 1.0,
+            result.metadata.memory.codebook_diversity <= 1.0,
             "Diversity > 1.0 at {i}: {}",
-            result.metadata.codebook_diversity
+            result.metadata.memory.codebook_diversity
         );
     }
 }
@@ -2824,7 +2824,7 @@ fn test_coherence_gating_and_tau_modulation() {
         };
         let result = service.cycle(input);
         assert!(
-            result.metadata.resonator_best_sim.is_finite(),
+            result.metadata.memory.resonator_best_sim.is_finite(),
             "best_sim not finite at cycle {i}"
         );
         assert!(
@@ -2930,37 +2930,37 @@ fn test_1000_cycle_all_tracks_stress() {
             "prediction_error NaN at {i}"
         );
         assert!(
-            result.metadata.fep_accuracy.is_finite(),
+            result.metadata.fep.fep_accuracy.is_finite(),
             "fep_accuracy NaN at {i}"
         );
         assert!(
-            result.metadata.fep_complexity.is_finite(),
+            result.metadata.fep.fep_complexity.is_finite(),
             "fep_complexity NaN at {i}"
         );
         assert!(
-            result.metadata.fep_surprise.is_finite(),
+            result.metadata.fep.fep_surprise.is_finite(),
             "fep_surprise NaN at {i}"
         );
         assert!(
-            result.metadata.fep_td_error.is_finite(),
+            result.metadata.fep.fep_td_error.is_finite(),
             "fep_td_error NaN at {i}"
         );
         assert!(
-            result.metadata.fep_pragmatic_value.is_finite(),
+            result.metadata.fep.fep_pragmatic_value.is_finite(),
             "fep_pragmatic NaN at {i}"
         );
         assert!(
-            result.metadata.codebook_diversity.is_finite(),
+            result.metadata.memory.codebook_diversity.is_finite(),
             "diversity NaN at {i}"
         );
         assert!(
-            result.metadata.resonator_best_sim.is_finite(),
+            result.metadata.memory.resonator_best_sim.is_finite(),
             "best_sim NaN at {i}"
         );
         assert!(
-            result.metadata.codebook_diversity >= 0.0 && result.metadata.codebook_diversity <= 1.0
+            result.metadata.memory.codebook_diversity >= 0.0 && result.metadata.memory.codebook_diversity <= 1.0
         );
-        assert!(result.metadata.resonator_reconsolidated <= 3);
+        assert!(result.metadata.memory.resonator_reconsolidated <= 3);
     }
 
     let stats = service.stats();
@@ -3105,7 +3105,7 @@ fn test_fep_surprise_triggers_replay_boosts() {
     for i in 0..30 {
         let result = service.cycle(surprises[i % surprises.len()]);
         assert!(
-            result.metadata.fep_surprise.is_finite(),
+            result.metadata.fep.fep_surprise.is_finite(),
             "fep_surprise NaN at cycle {i}"
         );
     }
@@ -3146,7 +3146,7 @@ fn test_coherence_gate_warmup_bypass() {
             result.prediction_error.is_finite(),
             "NaN post-warmup at cycle {i}"
         );
-        assert!(result.metadata.resonator_best_sim >= -0.01);
+        assert!(result.metadata.memory.resonator_best_sim >= -0.01);
     }
 }
 
@@ -3275,14 +3275,14 @@ fn test_resonator_prediction_error_finite() {
     for i in 0..60 {
         let result = service.cycle(inputs[i % inputs.len()]);
         assert!(
-            result.metadata.resonator_prediction_error.is_finite(),
+            result.metadata.memory.resonator_prediction_error.is_finite(),
             "resonator_prediction_error NaN at cycle {i}"
         );
         assert!(
-            result.metadata.resonator_prediction_error >= 0.0
-                && result.metadata.resonator_prediction_error <= 1.0,
+            result.metadata.memory.resonator_prediction_error >= 0.0
+                && result.metadata.memory.resonator_prediction_error <= 1.0,
             "resonator_prediction_error out of [0,1] at cycle {i}: {}",
-            result.metadata.resonator_prediction_error
+            result.metadata.memory.resonator_prediction_error
         );
     }
 }
@@ -3433,7 +3433,7 @@ fn test_300_cycle_phase13_stress() {
             "prediction_error NaN at {i}"
         );
         assert!(
-            result.metadata.resonator_prediction_error.is_finite(),
+            result.metadata.memory.resonator_prediction_error.is_finite(),
             "resonator_pred_err NaN at {i}"
         );
         assert!(
@@ -3445,11 +3445,11 @@ fn test_300_cycle_phase13_stress() {
             "depth < 0 at {i}"
         );
         assert!(
-            result.metadata.fep_accuracy.is_finite(),
+            result.metadata.fep.fep_accuracy.is_finite(),
             "fep_accuracy NaN at {i}"
         );
         assert!(
-            result.metadata.codebook_diversity.is_finite(),
+            result.metadata.memory.codebook_diversity.is_finite(),
             "diversity NaN at {i}"
         );
     }
@@ -3559,10 +3559,10 @@ fn test_moral_violation_steering() {
             "prediction_error NaN at input {i}"
         );
         // moral_steering_category is a String — just verify no panics
-        if !result.metadata.moral_steering_category.is_empty() {
+        if !result.metadata.ethics.moral_steering_category.is_empty() {
             eprintln!(
                 "Moral steering at input {i}: category={}",
-                result.metadata.moral_steering_category
+                result.metadata.ethics.moral_steering_category
             );
         }
     }
@@ -3582,15 +3582,15 @@ fn test_codebook_utilization_tracking() {
     for i in 0..55 {
         let result = service.cycle("utilization tracking test");
         assert!(
-            result.metadata.codebook_utilization_rate.is_finite(),
+            result.metadata.memory.codebook_utilization_rate.is_finite(),
             "codebook_utilization_rate NaN at cycle {i}"
         );
         assert!(
-            result.metadata.codebook_utilization_rate >= 0.0,
+            result.metadata.memory.codebook_utilization_rate >= 0.0,
             "codebook_utilization_rate < 0 at cycle {i}"
         );
         assert!(
-            result.metadata.codebook_utilization_rate <= 1.0,
+            result.metadata.memory.codebook_utilization_rate <= 1.0,
             "codebook_utilization_rate > 1 at cycle {i}"
         );
     }
@@ -3654,11 +3654,11 @@ fn test_surprise_replay_batch_modulation() {
         };
         let result = service.cycle(input);
         assert!(
-            result.metadata.surprise_replay_batch_size < 100,
+            result.metadata.memory.surprise_replay_batch_size < 100,
             "surprise_replay_batch_size implausibly large at cycle {i}"
         );
-        if result.metadata.surprise_replay_batch_size > max_batch {
-            max_batch = result.metadata.surprise_replay_batch_size;
+        if result.metadata.memory.surprise_replay_batch_size > max_batch {
+            max_batch = result.metadata.memory.surprise_replay_batch_size;
         }
     }
     let stats = service.stats();
@@ -3702,7 +3702,7 @@ fn test_400_cycle_phase14_stress() {
             "mcts_eff NaN at {i}"
         );
         assert!(
-            result.metadata.codebook_utilization_rate.is_finite(),
+            result.metadata.memory.codebook_utilization_rate.is_finite(),
             "util NaN at {i}"
         );
         assert!(
@@ -3710,7 +3710,7 @@ fn test_400_cycle_phase14_stress() {
             "causal edges huge at {i}"
         );
         assert!(
-            result.metadata.surprise_replay_batch_size < 100,
+            result.metadata.memory.surprise_replay_batch_size < 100,
             "batch huge at {i}"
         );
         assert!(
@@ -3758,7 +3758,7 @@ fn test_attention_budget_tracking() {
     for _ in 0..30 {
         let result = service.cycle("attention budget test");
         // Budget elapsed should always be positive (we've done real work)
-        if result.metadata.attention_budget_elapsed_us > 0 {
+        if result.metadata.attention.attention_budget_elapsed_us > 0 {
             budget_recorded = true;
         }
     }
@@ -3898,27 +3898,27 @@ fn test_input_similarity_memoization() {
     // First cycle: no previous state to compare
     let r1 = service.cycle("memoization test input");
     assert_eq!(
-        r1.metadata.input_similarity, 0.0,
+        r1.metadata.attention.input_similarity, 0.0,
         "first cycle should have 0 similarity"
     );
     assert!(
-        !r1.metadata.input_memoized,
+        !r1.metadata.attention.input_memoized,
         "first cycle should not be memoized"
     );
 
     // Second cycle: same input → should have high similarity
     let r2 = service.cycle("memoization test input");
     assert!(
-        r2.metadata.input_similarity > 0.5,
+        r2.metadata.attention.input_similarity > 0.5,
         "same input should have high similarity, got {}",
-        r2.metadata.input_similarity
+        r2.metadata.attention.input_similarity
     );
 
     // After many identical cycles, should eventually trigger memoization
     let mut memoized_count = 0;
     for _ in 0..20 {
         let result = service.cycle("memoization test input");
-        if result.metadata.input_memoized {
+        if result.metadata.attention.input_memoized {
             memoized_count += 1;
         }
     }
@@ -3945,7 +3945,7 @@ fn test_guiding_question_priority() {
         let result = service.cycle("exploring what I can learn from this");
         // Category can be empty if no experience bus or no guiding question
         assert!(
-            result.metadata.guiding_priority_category.len() < 50,
+            result.metadata.harmonics.guiding_priority_category.len() < 50,
             "category too long at {i}"
         );
     }
@@ -3998,11 +3998,11 @@ fn test_300_cycle_phase15_stress() {
             "tau factor NaN at {i}"
         );
         assert!(
-            result.metadata.input_similarity.is_finite(),
+            result.metadata.attention.input_similarity.is_finite(),
             "input similarity NaN at {i}"
         );
         assert!(
-            result.metadata.attention_budget_elapsed_us < 60_000_000,
+            result.metadata.attention.attention_budget_elapsed_us < 60_000_000,
             "budget elapsed unreasonably large at {i}"
         );
     }
@@ -4043,7 +4043,7 @@ fn test_epistemic_coherence_gating() {
         // epistemic_coherence_gated should be a valid boolean
         let _ = result.metadata.epistemic_coherence_gated;
         assert!(
-            result.metadata.unified_quality_score.is_finite(),
+            result.metadata.quality.unified_quality_score.is_finite(),
             "quality NaN at {i}"
         );
     }
@@ -4069,13 +4069,13 @@ fn test_unified_quality_signal() {
     for i in 0..30 {
         let result = service.cycle("unified quality signal test");
         assert!(
-            result.metadata.unified_quality_score >= 0.0,
+            result.metadata.quality.unified_quality_score >= 0.0,
             "quality < 0 at {i}"
         );
         assert!(
-            result.metadata.unified_quality_score <= 1.0,
+            result.metadata.quality.unified_quality_score <= 1.0,
             "quality > 1 at {i}: {}",
-            result.metadata.unified_quality_score
+            result.metadata.quality.unified_quality_score
         );
     }
 
@@ -4100,18 +4100,18 @@ fn test_dissipative_health_gate() {
     for i in 0..60 {
         let result = service.cycle("dissipative health stability test");
         assert!(
-            result.metadata.dissipative_lr_factor.is_finite(),
+            result.metadata.quality.dissipative_lr_factor.is_finite(),
             "dissipative factor NaN at {i}"
         );
         assert!(
-            result.metadata.dissipative_lr_factor >= 0.5,
+            result.metadata.quality.dissipative_lr_factor >= 0.5,
             "dissipative factor too low at {i}: {}",
-            result.metadata.dissipative_lr_factor
+            result.metadata.quality.dissipative_lr_factor
         );
         assert!(
-            result.metadata.dissipative_lr_factor <= 1.0,
+            result.metadata.quality.dissipative_lr_factor <= 1.0,
             "dissipative factor > 1.0 at {i}: {}",
-            result.metadata.dissipative_lr_factor
+            result.metadata.quality.dissipative_lr_factor
         );
     }
 
@@ -4166,13 +4166,13 @@ fn test_coherence_velocity_gating() {
     for i in 0..40 {
         let result = service.cycle("coherence velocity tracking test");
         assert!(
-            result.metadata.coherence_velocity.is_finite(),
+            result.metadata.quality.coherence_velocity.is_finite(),
             "velocity NaN at {i}"
         );
         assert!(
-            result.metadata.coherence_velocity.abs() < 2.0,
+            result.metadata.quality.coherence_velocity.abs() < 2.0,
             "velocity too extreme at {i}: {}",
-            result.metadata.coherence_velocity
+            result.metadata.quality.coherence_velocity
         );
     }
 
@@ -4197,13 +4197,13 @@ fn test_anomaly_recovery_path() {
     for i in 0..50 {
         let result = service.cycle("anomaly recovery test");
         assert!(
-            result.metadata.anomaly_recovery_progress >= 0.0,
+            result.metadata.quality.anomaly_recovery_progress >= 0.0,
             "recovery < 0 at {i}"
         );
         assert!(
-            result.metadata.anomaly_recovery_progress <= 1.0,
+            result.metadata.quality.anomaly_recovery_progress <= 1.0,
             "recovery > 1 at {i}: {}",
-            result.metadata.anomaly_recovery_progress
+            result.metadata.quality.anomaly_recovery_progress
         );
     }
 
@@ -4239,24 +4239,24 @@ fn test_300_cycle_phase16_stress() {
         let result = service.cycle(input);
 
         assert!(
-            result.metadata.unified_quality_score.is_finite(),
+            result.metadata.quality.unified_quality_score.is_finite(),
             "quality NaN at {i}"
         );
         assert!(
-            result.metadata.unified_quality_score >= 0.0
-                && result.metadata.unified_quality_score <= 1.0,
+            result.metadata.quality.unified_quality_score >= 0.0
+                && result.metadata.quality.unified_quality_score <= 1.0,
             "quality out of [0,1] at {i}"
         );
         assert!(
-            result.metadata.dissipative_lr_factor.is_finite(),
+            result.metadata.quality.dissipative_lr_factor.is_finite(),
             "dissipative factor NaN at {i}"
         );
         assert!(
-            result.metadata.coherence_velocity.is_finite(),
+            result.metadata.quality.coherence_velocity.is_finite(),
             "velocity NaN at {i}"
         );
         assert!(
-            result.metadata.anomaly_recovery_progress.is_finite(),
+            result.metadata.quality.anomaly_recovery_progress.is_finite(),
             "recovery NaN at {i}"
         );
         assert!(
@@ -4633,7 +4633,7 @@ fn test_empathic_speech_rate_modulation() {
     for i in 0..30 {
         let result = service.cycle("I'm really frustrated with this!");
         assert!(
-            result.metadata.empathic_speech_rate_mod.is_finite(),
+            result.metadata.ethics.empathic_speech_rate_mod.is_finite(),
             "empathic_speech_rate_mod not finite at cycle {i}"
         );
     }
@@ -4660,13 +4660,13 @@ fn test_value_evaluator_learning_gate() {
     for i in 0..40 {
         let result = service.cycle("test value alignment");
         assert!(
-            result.metadata.value_gate_factor.is_finite(),
+            result.metadata.ethics.value_gate_factor.is_finite(),
             "value_gate_factor not finite at cycle {i}"
         );
         assert!(
-            result.metadata.value_gate_factor >= 0.0 && result.metadata.value_gate_factor <= 2.0,
+            result.metadata.ethics.value_gate_factor >= 0.0 && result.metadata.ethics.value_gate_factor <= 2.0,
             "value_gate_factor out of bounds: {} at cycle {i}",
-            result.metadata.value_gate_factor
+            result.metadata.ethics.value_gate_factor
         );
     }
 
@@ -4812,10 +4812,10 @@ fn test_200_cycle_phase18_stress() {
 
         // All Phase 18 fields must be finite
         assert!(
-            m.empathic_speech_rate_mod.is_finite(),
+            m.ethics.empathic_speech_rate_mod.is_finite(),
             "empathic_speech_rate_mod at {i}"
         );
-        assert!(m.value_gate_factor.is_finite(), "value_gate_factor at {i}");
+        assert!(m.ethics.value_gate_factor.is_finite(), "value_gate_factor at {i}");
         assert!(
             m.evolution_confidence_delta.is_finite(),
             "evolution_confidence_delta at {i}"
@@ -4830,7 +4830,7 @@ fn test_200_cycle_phase18_stress() {
         );
 
         // Bounds checks
-        assert!(m.value_gate_factor >= 0.0 && m.value_gate_factor <= 2.0);
+        assert!(m.ethics.value_gate_factor >= 0.0 && m.ethics.value_gate_factor <= 2.0);
         assert!(m.homeostasis_pull_strength >= 0.5 && m.homeostasis_pull_strength <= 2.0);
     }
 
@@ -4863,7 +4863,7 @@ fn test_attention_budget_gating() {
         let result = service.cycle("attention budget test");
         // attention_budget_gated is bool, always valid
         assert!(
-            result.metadata.attention_shift_applied.is_finite(),
+            result.metadata.attention.attention_shift_applied.is_finite(),
             "attention_shift not finite at cycle {i}"
         );
     }
@@ -4975,7 +4975,7 @@ fn test_attention_shift_motor_command() {
     for i in 0..30 {
         let result = service.cycle("shift attention focus");
         assert!(
-            result.metadata.attention_shift_applied.is_finite(),
+            result.metadata.attention.attention_shift_applied.is_finite(),
             "attention_shift not finite at cycle {i}"
         );
     }
@@ -5003,15 +5003,15 @@ fn test_cosine_helper_consistency() {
     for i in 0..30 {
         let result = service.cycle("cosine similarity test");
         assert!(
-            result.metadata.resonator_prediction_error.is_finite(),
+            result.metadata.memory.resonator_prediction_error.is_finite(),
             "resonator_prediction_error not finite at cycle {i}"
         );
         assert!(
-            result.metadata.codebook_diversity.is_finite(),
+            result.metadata.memory.codebook_diversity.is_finite(),
             "codebook_diversity not finite at cycle {i}"
         );
         assert!(
-            result.metadata.input_similarity.is_finite(),
+            result.metadata.attention.input_similarity.is_finite(),
             "input_similarity not finite at cycle {i}"
         );
     }
@@ -5044,7 +5044,7 @@ fn test_200_cycle_phase19_stress() {
         // All Phase 19 fields must be finite/valid
         assert!(m.love_resonance_boost.is_finite(), "love_resonance at {i}");
         assert!(
-            m.attention_shift_applied.is_finite(),
+            m.attention.attention_shift_applied.is_finite(),
             "attention_shift at {i}"
         );
 
@@ -5118,7 +5118,7 @@ fn test_resonator_prediction_error_exploration() {
             "resonator_error_exploration_mod not finite at cycle {i}"
         );
         assert!(
-            result.metadata.resonator_prediction_error.is_finite(),
+            result.metadata.memory.resonator_prediction_error.is_finite(),
             "resonator_prediction_error not finite at cycle {i}"
         );
     }
@@ -5790,8 +5790,8 @@ fn test_metadata_fields_stable_50_cycles() {
         let r = service.cycle(&format!("stability test cycle {i}"));
         let m = &r.metadata;
         // Core metrics
-        assert!(m.phi_attention_weight.is_finite(), "phi_attention_weight NaN at {i}");
-        assert!(m.soul_alignment.is_finite(), "soul_alignment NaN at {i}");
+        assert!(m.attention.phi_attention_weight.is_finite(), "phi_attention_weight NaN at {i}");
+        assert!(m.ethics.soul_alignment.is_finite(), "soul_alignment NaN at {i}");
         assert!(m.actual_effective_lr.is_finite(), "learning_rate NaN at {i}");
         assert!(r.prediction_error.is_finite(), "prediction_error NaN at {i}");
         // Neuromod
@@ -5812,7 +5812,7 @@ fn test_phi_and_sigma_evolve_over_cycles() {
     let mut sigma_values: Vec<Option<f64>> = Vec::new();
     for i in 0..20 {
         let r = service.cycle(&format!("consciousness test {i}"));
-        phi_values.push(r.metadata.phi_attention_weight);
+        phi_values.push(r.metadata.attention.phi_attention_weight);
         sigma_values.push(r.metadata.sigma);
     }
 

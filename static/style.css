@@ -201,7 +201,104 @@ header h1 {
     margin-top: 0.5rem;
 }
 
+/* --- Moral Topology --- */
+
+.moral-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.betti-row {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+}
+
+.betti-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    justify-content: center;
+}
+
+.betti-badge.cyan { border-color: var(--accent-cyan); }
+.betti-badge.purple { border-color: var(--accent-purple); }
+.betti-badge.green { border-color: var(--accent-green); }
+
+.betti-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.betti-badge.cyan .betti-value { color: var(--accent-cyan); }
+.betti-badge.purple .betti-value { color: var(--accent-purple); }
+.betti-badge.green .betti-value { color: var(--accent-green); }
+
+.betti-label {
+    font-size: 0.5rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.anomaly-row {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.flag.anomaly-flash {
+    animation: anomalyPulse 0.6s ease-in-out 3;
+}
+
+@keyframes anomalyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+/* Anomaly severity colors */
+#flagInversion.active {
+    border-color: var(--accent-rose);
+    color: var(--accent-rose);
+    background: rgba(244, 63, 94, 0.15);
+}
+
+#flagFESpike.active {
+    border-color: var(--accent-amber);
+    color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.15);
+}
+
+#flagDrift.active {
+    border-color: var(--accent-amber);
+    color: var(--accent-amber);
+    background: rgba(245, 158, 11, 0.1);
+}
+
+.topo-info {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.topo-info strong {
+    color: var(--text-primary);
+}
+
 @media (max-width: 768px) {
     .dashboard { grid-template-columns: 1fr; }
     .metrics-grid { grid-template-columns: 1fr 1fr; }
+    .betti-row { gap: 0.5rem; }
+    .betti-badge { width: 60px; height: 60px; }
+    .betti-value { font-size: 1rem; }
 }
