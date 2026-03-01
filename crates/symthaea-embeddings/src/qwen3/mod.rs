@@ -32,11 +32,13 @@ pub mod attention;
 pub mod mlp;
 #[cfg(feature = "burn")]
 pub mod model;
+#[cfg(feature = "burn")]
+pub mod safetensors_loader;
+#[cfg(feature = "burn-hub")]
+pub mod hub;
 
 #[cfg(feature = "burn")]
 use burn::backend::NdArray;
-#[cfg(feature = "burn")]
-use burn::module::Module as _;
 #[cfg(feature = "burn")]
 use std::sync::Arc;
 
@@ -136,8 +138,134 @@ fn forward_and_pool<B: burn::prelude::Backend>(
     Ok(embedding)
 }
 
+/// Batch forward + pool: runs the model on multiple sequences in one forward pass.
+#[cfg(feature = "burn")]
+#[allow(clippy::too_many_arguments)]
+fn forward_and_pool_batch<B: burn::prelude::Backend>(
+    burn_model: &model::Qwen3Model<B>,
+    batch_ids: &[Vec<i32>],
+    batch_masks: &[Vec<u32>],
+    device: &B::Device,
+    pooling: PoolingStrategy,
+    embedding_dim: usize,
+    normalize: bool,
+) -> Result<Vec<Vec<f32>>> {
+    use burn::prelude::*;
+
+    if batch_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let batch_size = batch_ids.len();
+    let max_len = batch_ids.iter().map(|ids| ids.len()).max().unwrap_or(0);
+
+    // Pad all sequences to max_len and flatten into [batch * max_len]
+    let mut flat_ids = Vec::with_capacity(batch_size * max_len);
+    let mut flat_masks = Vec::with_capacity(batch_size * max_len);
+    for i in 0..batch_size {
+        let seq = &batch_ids[i];
+        let mask = &batch_masks[i];
+        flat_ids.extend_from_slice(seq);
+        flat_masks.extend_from_slice(mask);
+        // Pad with zeros
+        for _ in seq.len()..max_len {
+            flat_ids.push(0);
+            flat_masks.push(0);
+        }
+    }
+
+    let input_tensor = Tensor::<B, 1, Int>::from_data(flat_ids.as_slice(), device)
+        .reshape([batch_size, max_len]);
+
+    let hidden = burn_model.forward(input_tensor);
+    let [_b, _s, hidden_dim] = hidden.dims();
+    let out_dim = embedding_dim.min(hidden_dim);
+
+    // Pool each sequence independently
+    let mut results = Vec::with_capacity(batch_size);
+    for i in 0..batch_size {
+        let seq_len = batch_ids[i].len();
+        let mask_slice = &flat_masks[i * max_len..i * max_len + seq_len];
+
+        let seq_hidden = hidden.clone().slice([i..i + 1, 0..max_len, 0..out_dim]);
+
+        let pooled: Tensor<B, 2> = match pooling {
+            PoolingStrategy::LastTokenPooling => {
+                let last_idx = mask_slice
+                    .iter()
+                    .rposition(|&m| m == 1)
+                    .unwrap_or(seq_len.saturating_sub(1));
+                seq_hidden
+                    .slice([0..1, last_idx..last_idx + 1, 0..out_dim])
+                    .reshape([1, out_dim])
+            }
+            PoolingStrategy::MeanPooling => {
+                let token_count = mask_slice.iter().filter(|&&m| m == 1).count();
+                if token_count > 0 {
+                    let sum = seq_hidden
+                        .slice([0..1, 0..token_count, 0..out_dim])
+                        .sum_dim(1)
+                        .squeeze(1);
+                    sum.div_scalar(token_count as f32)
+                } else {
+                    seq_hidden
+                        .slice([0..1, 0..1, 0..out_dim])
+                        .reshape([1, out_dim])
+                }
+            }
+            PoolingStrategy::ClsToken => {
+                seq_hidden
+                    .slice([0..1, 0..1, 0..out_dim])
+                    .reshape([1, out_dim])
+            }
+            PoolingStrategy::MaxPooling => {
+                seq_hidden
+                    .slice([0..1, 0..seq_len, 0..out_dim])
+                    .max_dim(1)
+                    .squeeze(1)
+            }
+        };
+
+        let data = pooled.into_data();
+        let mut embedding: Vec<f32> = data.to_vec().unwrap();
+        embedding.truncate(out_dim);
+
+        if normalize {
+            let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 1e-6 {
+                for x in embedding.iter_mut() {
+                    *x /= norm;
+                }
+            }
+        }
+
+        results.push(embedding);
+    }
+
+    Ok(results)
+}
+
 #[cfg(feature = "burn")]
 impl BurnBackend {
+    fn embed_batch(
+        &self,
+        batch_ids: &[Vec<i32>],
+        batch_masks: &[Vec<u32>],
+        pooling: PoolingStrategy,
+        embedding_dim: usize,
+        normalize: bool,
+    ) -> Result<Vec<Vec<f32>>> {
+        match self {
+            Self::NdArray { model, device } => {
+                forward_and_pool_batch(model, batch_ids, batch_masks, device, pooling, embedding_dim, normalize)
+            }
+            #[cfg(feature = "burn-wgpu")]
+            Self::Wgpu { model, device } => {
+                forward_and_pool_batch(model, batch_ids, batch_masks, device, pooling, embedding_dim, normalize)
+            }
+        }
+    }
+
     fn embed(
         &self,
         input_ids: &[i32],
@@ -245,6 +373,15 @@ impl Qwen3Config {
         Self {
             model_path: Some(model_path.into()),
             embedding_dim: QWEN3_FULL_DIMENSION,
+            use_simulated: false,
+            ..Default::default()
+        }
+    }
+
+    /// Create config for HF Hub model (auto-downloads if `burn-hub` feature enabled)
+    pub fn from_hub(repo_id: impl Into<String>) -> Self {
+        Self {
+            model_path: Some(repo_id.into()),
             use_simulated: false,
             ..Default::default()
         }
@@ -390,14 +527,31 @@ impl Qwen3Embedder {
     /// Falls back to simulation on any load failure.
     /// Uses a process-wide cache so multiple embedders share weights.
     #[cfg(feature = "burn")]
+    #[allow(unused_mut)]
     fn try_load_burn(&mut self) -> Result<()> {
-        let model_dir = match self.config.model_path {
+        let mut model_dir = match self.config.model_path {
             Some(ref p) => p.clone(),
             None => {
                 self.config.use_simulated = true;
                 return Ok(());
             }
         };
+
+        // Auto-download from HF Hub if path looks like a repo ID
+        #[cfg(feature = "burn-hub")]
+        if hub::is_repo_id(&model_dir) {
+            match hub::ensure_model(&model_dir) {
+                Ok(local) => {
+                    tracing::info!("Downloaded model from HF Hub: {model_dir} → {local}");
+                    model_dir = local;
+                }
+                Err(e) => {
+                    tracing::warn!("HF Hub download failed for {model_dir}: {e}, using simulation");
+                    self.config.use_simulated = true;
+                    return Ok(());
+                }
+            }
+        }
 
         // Load tokenizer
         let tokenizer_path = self
@@ -499,11 +653,13 @@ impl Qwen3Embedder {
     fn load_ndarray_model(&self, model_dir: &str) -> Result<BurnBackend> {
         let device = burn::backend::ndarray::NdArrayDevice::Cpu;
         let model_cfg = self.resolve_model_config();
-        let mut burn_model = model_cfg.init::<NdArray>(&device);
+        let burn_model = model_cfg.init::<NdArray>(&device);
 
         let safetensors_path = std::path::Path::new(model_dir).join("model.safetensors");
-        let record = self.load_safetensors_record::<NdArray>(&safetensors_path, &device)?;
-        burn_model = burn_model.load_record(record);
+        let safetensors_data = std::fs::read(&safetensors_path)
+            .map_err(|e| anyhow::anyhow!("Failed to read {}: {e}", safetensors_path.display()))?;
+        let burn_model =
+            safetensors_loader::load_qwen3_weights(burn_model, &safetensors_data, &model_cfg, &device)?;
 
         Ok(BurnBackend::NdArray {
             model: burn_model,
@@ -516,11 +672,17 @@ impl Qwen3Embedder {
     fn load_wgpu_model(&self, model_dir: &str) -> Result<BurnBackend> {
         let device = burn::backend::wgpu::WgpuDevice::DefaultDevice;
         let model_cfg = self.resolve_model_config();
-        let mut burn_model = model_cfg.init::<burn::backend::Wgpu>(&device);
+        let burn_model = model_cfg.init::<burn::backend::Wgpu>(&device);
 
         let safetensors_path = std::path::Path::new(model_dir).join("model.safetensors");
-        let record = self.load_safetensors_record::<burn::backend::Wgpu>(&safetensors_path, &device)?;
-        burn_model = burn_model.load_record(record);
+        let safetensors_data = std::fs::read(&safetensors_path)
+            .map_err(|e| anyhow::anyhow!("Failed to read {}: {e}", safetensors_path.display()))?;
+        let burn_model = safetensors_loader::load_qwen3_weights(
+            burn_model,
+            &safetensors_data,
+            &model_cfg,
+            &device,
+        )?;
 
         Ok(BurnBackend::Wgpu {
             model: burn_model,
@@ -536,24 +698,6 @@ impl Qwen3Embedder {
         } else {
             model::Qwen3ModelConfig::qwen3_06b()
         }
-    }
-
-    /// Load safetensors weights, using full or half precision.
-    ///
-    /// TODO: Implement direct safetensors→Burn tensor loading without burn-import
-    /// (removed burn-import due to liblzma-sys/lzma-sys link conflict with lancedb).
-    /// For now, returns Err to trigger simulation fallback.
-    #[cfg(feature = "burn")]
-    fn load_safetensors_record<B: burn::prelude::Backend>(
-        &self,
-        path: &std::path::Path,
-        _device: &B::Device,
-    ) -> Result<<model::Qwen3Model<B> as burn::module::Module<B>>::Record> {
-        anyhow::bail!(
-            "Safetensors loading not yet implemented (burn-import removed). \
-             Model path: {}. Falling back to simulation.",
-            path.display()
-        )
     }
 
     /// Embed a single text
@@ -600,9 +744,90 @@ impl Qwen3Embedder {
         Ok(result)
     }
 
-    /// Embed multiple texts in batch
+    /// Embed multiple texts in batch.
+    ///
+    /// When a Burn model is loaded, uses true batch inference (single forward pass
+    /// with padding) for better throughput. Falls back to sequential embedding
+    /// in simulation mode or on batch inference failure.
     pub fn embed_batch(&mut self, texts: &[&str]) -> Result<Vec<EmbeddingResult>> {
+        if !self.config.use_simulated {
+            #[cfg(feature = "burn")]
+            if self.inference.is_some() {
+                if let Ok(embeddings) = self.burn_embed_batch(texts) {
+                    let start = Instant::now();
+                    let results: Result<Vec<_>> = embeddings
+                        .into_iter()
+                        .enumerate()
+                        .map(|(i, emb)| {
+                            let text = texts[i];
+                            self.stats.total_embeddings += 1;
+                            self.stats.total_chars += text.len() as u64;
+                            self.cache.insert(text.to_string(), emb.clone());
+                            Ok(EmbeddingResult::new(emb, "qwen3-embedding"))
+                        })
+                        .collect();
+                    let elapsed = start.elapsed().as_secs_f32() * 1000.0;
+                    let n = self.stats.total_embeddings as f32;
+                    self.stats.avg_time_ms =
+                        (self.stats.avg_time_ms * (n - texts.len() as f32) + elapsed) / n;
+                    return results;
+                }
+            }
+        }
+        // Fallback: sequential per-text embedding
         texts.iter().map(|t| self.embed(t)).collect()
+    }
+
+    /// True batch inference through Burn: tokenize all texts, pad, single forward pass.
+    #[cfg(feature = "burn")]
+    fn burn_embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        let inference_arc = self
+            .inference
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Burn model not loaded"))?;
+        let tokenizer = self
+            .tokenizer
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Tokenizer not loaded"))?;
+
+        // Batch tokenize
+        let inputs: Vec<tokenizers::EncodeInput> = texts
+            .iter()
+            .map(|t| tokenizers::EncodeInput::Single((*t).into()))
+            .collect();
+        let encodings = tokenizer
+            .encode_batch(inputs, true)
+            .map_err(|e| anyhow::anyhow!("Batch tokenization failed: {e}"))?;
+
+        let max_seq = self.config.max_seq_length;
+        let batch_ids: Vec<Vec<i32>> = encodings
+            .iter()
+            .map(|e| {
+                let ids = e.get_ids();
+                let len = ids.len().min(max_seq);
+                ids[..len].iter().map(|&x| x as i32).collect()
+            })
+            .collect();
+        let batch_masks: Vec<Vec<u32>> = encodings
+            .iter()
+            .map(|e| {
+                let mask = e.get_attention_mask();
+                let len = mask.len().min(max_seq);
+                mask[..len].to_vec()
+            })
+            .collect();
+
+        let inference = inference_arc
+            .lock()
+            .map_err(|e| anyhow::anyhow!("Model lock poisoned: {e}"))?;
+
+        inference.embed_batch(
+            &batch_ids,
+            &batch_masks,
+            self.config.pooling,
+            self.config.embedding_dim,
+            self.config.normalize_output,
+        )
     }
 
     /// Run Burn inference through the backend-erased model.

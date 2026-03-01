@@ -369,7 +369,7 @@ vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
-embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn"]  # Qwen3/BGE text embeddings via Burn
+embeddings = ["tokenizers", "hf-hub", "symthaea-embeddings/burn-hub"]  # Qwen3/BGE text embeddings via Burn + HF Hub
 embeddings-gpu = ["embeddings", "symthaea-embeddings/burn-wgpu"]  # GPU-accelerated embeddings via WGPU
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
