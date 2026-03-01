@@ -159,7 +159,7 @@ pub(crate) struct EthicsEngine {
     cache: EthicsEngineCache,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct EthicsEngineCache {
     last_moral_score: f64,
     last_value_score: f64,
@@ -167,6 +167,25 @@ struct EthicsEngineCache {
     last_harmonies_approved: bool,
     last_harmony_coordinates: [f64; 7],
     last_moral_free_energy: MoralFreeEnergy,
+    /// Current topology evaluation interval (adaptive).
+    topology_cadence: u64,
+    /// Cycle number of last topology evaluation.
+    last_topology_cycle: u64,
+}
+
+impl Default for EthicsEngineCache {
+    fn default() -> Self {
+        Self {
+            last_moral_score: 0.0,
+            last_value_score: 0.0,
+            last_harmonies_alignment: 0.0,
+            last_harmonies_approved: false,
+            last_harmony_coordinates: [0.0; 7],
+            last_moral_free_energy: MoralFreeEnergy::default(),
+            topology_cadence: 97,
+            last_topology_cycle: 0,
+        }
+    }
 }
 
 impl EthicsEngine {
@@ -437,8 +456,9 @@ impl EthicsEngine {
         // harmony dimensions (close moral blind spots, prevent fixation).
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
+        let cycles_since = input.cycle.saturating_sub(self.cache.last_topology_cycle);
         let (topology_summary, topology_fresh) =
-            if input.cycle % 97 == 0 && self.moral_topology.len() >= 3 {
+            if cycles_since >= self.cache.topology_cadence && self.moral_topology.len() >= 3 {
                 let assessment = self.moral_topology.analyze();
 
                 // Feed topology back into harmonies integrator weights
@@ -450,6 +470,17 @@ impl EthicsEngine {
                         assessment.moral_free_energy.kl_divergence,
                     );
                 }
+
+                // Adapt cadence based on moral drift
+                let drift = self.moral_topology.moral_drift(20);
+                self.cache.topology_cadence = if drift > 0.3 {
+                    30 // fast: moral stance shifting rapidly
+                } else if drift > 0.1 {
+                    60 // moderate
+                } else {
+                    120 // slow: stable moral stance, save compute
+                };
+                self.cache.last_topology_cycle = input.cycle;
 
                 (MoralTopologySummary::from(&assessment), true)
             } else {
@@ -752,5 +783,48 @@ mod tests {
         assert_ne!(EthicalVerdict::Safe, EthicalVerdict::Caution);
         assert_ne!(EthicalVerdict::Caution, EthicalVerdict::Blocked);
         assert_ne!(EthicalVerdict::Safe, EthicalVerdict::Blocked);
+    }
+
+    #[test]
+    fn test_adaptive_topology_cadence() {
+        let mut engine = make_engine();
+
+        // Default cadence should be 97
+        assert_eq!(engine.cache.topology_cadence, 97);
+        assert_eq!(engine.cache.last_topology_cycle, 0);
+
+        // Run cycles at multiples of 7 (moral parser interval) to build scenarios.
+        // Sentences must have clear agent/action/patient structure so moral_parser
+        // produces action HVs (required for topology add_scenario).
+        let sentences = [
+            "the doctor helped the patient recover",
+            "the teacher punished the student unfairly",
+            "she gave food to the hungry children",
+            "he protected the villagers from danger",
+            "the company exploited the workers cruelly",
+        ];
+        for c in 0..200 {
+            let input = EthicsEngineInput {
+                input: sentences[c as usize % sentences.len()],
+                cycle: c,
+                unified_psi: 0.5,
+                compressed_state: &[0.0; 256],
+            };
+            engine.evaluate(&input);
+        }
+
+        // After enough cycles, cadence should have adapted from its initial 97
+        // (topology fires once cycles_since >= cadence, so first fire is at cycle 97)
+        assert!(
+            engine.cache.last_topology_cycle > 0,
+            "Topology should have fired at least once"
+        );
+
+        // With stable benign input, drift should be low → cadence should widen to 120
+        assert!(
+            engine.cache.topology_cadence >= 60,
+            "Stable input should keep cadence at 60+ (got {})",
+            engine.cache.topology_cadence
+        );
     }
 }

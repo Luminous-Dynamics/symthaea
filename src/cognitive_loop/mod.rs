@@ -126,6 +126,7 @@ mod identity_integration;
 // ── Impl-block submodules (split from this file) ────────────────────────────
 mod accessors;
 pub(crate) mod consciousness_engine;
+pub(crate) mod consciousness_monitor_tier;
 mod constructor;
 mod cycle;
 mod cycle_consciousness;
@@ -167,31 +168,25 @@ use crate::causal::CausalLoopEnhancer;
 // AttentionSchema now owned by SelfModelTierManager
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::autopoietic_consciousness::AutopoieticConsciousness;
-use crate::consciousness::consciousness_resonance::ResonanceAnalyzer;
-use crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer;
+// ConsciousnessMonitorTier now owns: ResonanceAnalyzer, ConsciousnessThermodynamicsAnalyzer,
+// EmbodiedConsciousnessAnalyzer, HierarchicalFreeEnergy, QuantumCoherenceAnalyzer,
+// TemporalConsciousnessAnalyzer, TemporalSynchronizationAnalyzer
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::consciousness::cross_modal_binding::CrossModalBinder;
 use crate::consciousness::dream::DreamEngine;
-use crate::consciousness::embodied_cognition::EmbodiedConsciousnessAnalyzer;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::enactive_cognition::EnactiveCognition;
 use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
 use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
-use crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy;
 use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
-// NarrativeSelfModel now owned by SelfModelTierManager
-use crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer;
 use crate::consciousness::predictive_processing::PredictiveMind;
-// PredictiveSelfModel now owned by SelfModelTierManager
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
 use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
-use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 use crate::consciousness::recursive_improvement::DreamFeedbackBridge;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
-use crate::consciousness::temporal_consciousness::TemporalConsciousnessAnalyzer;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::dynamics::cfc_coherence::CfCCoherenceBridge;
@@ -229,6 +224,29 @@ struct Experience {
     error: f32,
     /// Importance weight
     importance: f32,
+}
+
+/// Social/external signal state.
+pub(crate) struct SocialState {
+    /// Relational Psi from dyad computation (15% blend weight into unified_psi).
+    pub relational_psi: f64,
+    /// External reward signal injected by environment (0.0 = none).
+    pub external_reward: f32,
+    /// Social trust level injected by Mind module's SocialCoherence (0.0–1.0).
+    pub social_trust: f32,
+    /// Social cooperation rate injected by Mind module's SocialCoherence (0.0–1.0).
+    pub social_cooperation_rate: f32,
+}
+
+impl Default for SocialState {
+    fn default() -> Self {
+        Self {
+            relational_psi: 0.0,
+            external_reward: 0.0,
+            social_trust: 0.5,
+            social_cooperation_rate: 0.0,
+        }
+    }
 }
 
 // ── Primary service struct ──────────────────────────────────────────────────
@@ -466,23 +484,9 @@ pub struct CognitiveLoopService {
     /// When enabled, submits encodings to workspace for conscious broadcast.
     gwt: Option<UnifiedGlobalWorkspace>,
 
-    /// Consciousness resonance monitor.
-    /// When enabled, extracts harmonic modes from Phi time-series.
-    consciousness_resonance: Option<ResonanceAnalyzer>,
-
-    /// Quantum coherence observer.
-    /// When enabled, monitors CfC hidden states for superposition richness.
-    quantum_coherence: Option<QuantumCoherenceAnalyzer>,
-
-    /// Temporal consciousness analyzer.
-    /// When enabled, tracks Phi trajectory, continuity, Husserlian time,
-    /// and temporal identity coherence across cycles.
-    temporal_consciousness: Option<TemporalConsciousnessAnalyzer>,
-
-    /// Embodied cognition analyzer.
-    /// When enabled, bridges virtual body interoceptive state to body schema,
-    /// sensorimotor engine, and affordance detection.
-    embodied_cognition: Option<EmbodiedConsciousnessAnalyzer>,
+    /// Consciousness monitoring tier: resonance, quantum, temporal, embodied,
+    /// thermodynamics, phenomenal binding, hierarchical free energy.
+    consciousness_monitors: consciousness_monitor_tier::ConsciousnessMonitorTier,
 
     /// Narrative-GWT integration (consciousness governance capstone).
     /// When enabled, provides coherence veto, value checking, goal alignment
@@ -511,21 +515,6 @@ pub struct CognitiveLoopService {
     /// Affective bridge for emotion-cognition coupling.
     /// When enabled, evaluates somatic marker signals from cognitive loop state.
     affective_bridge: Option<AffectiveBridge>,
-
-    /// Consciousness thermodynamics analyzer.
-    /// When enabled, analyzes entropy, free energy, and phase transitions
-    /// from the 7 consciousness dimensions [Φ, B, W, A, R, E, K].
-    consciousness_thermodynamics: Option<ConsciousnessThermodynamicsAnalyzer>,
-
-    /// Phenomenal binding analyzer (temporal synchronization).
-    /// When enabled, tracks phase coherence across consciousness dimensions
-    /// to measure unified experience quality.
-    phenomenal_binding: Option<TemporalSynchronizationAnalyzer>,
-
-    /// Hierarchical free energy engine.
-    /// When enabled, maintains a multi-level variational free energy hierarchy
-    /// with precision-weighted prediction errors at each level.
-    hierarchical_free_energy: Option<HierarchicalFreeEnergy>,
 
     /// Contextual harmony weighting for domain-aware ethical reasoning.
     contextual_weights: Option<crate::consciousness::contextual_weights::ContextualWeights>,
@@ -587,10 +576,8 @@ pub struct CognitiveLoopService {
     /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
     attention_visualizer: Option<crate::visualization::AttentionVisualizer>,
 
-    /// Relational Psi from dyad computation.
-    /// Computed internally via PhiDyadCalculator or set externally via set_relational_psi().
-    /// Blended into unified_psi at 15% weight when > 0.
-    relational_psi: f64,
+    /// Social and external signal state (relational psi, reward, trust, cooperation).
+    pub(crate) social: SocialState,
 
     /// Phi-Dyad calculator for relational consciousness.
     /// Computes Φ_dyad from recent AI + input HVs each cycle.
@@ -604,19 +591,6 @@ pub struct CognitiveLoopService {
 
     /// Ring buffer of recent input HDC states (last 4, as human proxy).
     recent_input_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
-
-    /// External reward signal injected by environment (0.0 = none).
-    /// Blended with internal prediction-error-based reward at 50% weight.
-    /// Resets to 0.0 after consumption.
-    external_reward: f32,
-
-    /// Social trust level injected by Mind module's SocialCoherence (0.0–1.0, default 0.5).
-    /// Fed into AffectiveBridge for social modulation of affect (Decety & Chaminade 2003).
-    social_trust: f32,
-
-    /// Social cooperation rate injected by Mind module's SocialCoherence (0.0–1.0, default 0.0).
-    /// Fed into AffectiveBridge arousal modulation.
-    social_cooperation_rate: f32,
 
     /// User state inference for adaptive response generation.
     /// When enabled, infers user cognitive load, frustration, and engagement from input text.

@@ -571,9 +571,6 @@ impl CognitiveLoopService {
             predictive_mind,
             cross_modal_binder,
             affective_bridge,
-            consciousness_thermodynamics,
-            phenomenal_binding,
-            hierarchical_free_energy,
             contextual_weights,
             phi_attention,
             negation_detector,
@@ -595,17 +592,22 @@ impl CognitiveLoopService {
             prefrontal,
             self_model_tier,
             gwt,
-            consciousness_resonance,
-            quantum_coherence,
-            temporal_consciousness,
-            embodied_cognition,
+            consciousness_monitors: super::consciousness_monitor_tier::ConsciousnessMonitorTier {
+                resonance: consciousness_resonance,
+                quantum_coherence,
+                temporal: temporal_consciousness,
+                embodied: embodied_cognition,
+                thermodynamics: consciousness_thermodynamics,
+                phenomenal_binding,
+                hierarchical_free_energy,
+            },
             narrative_gwt,
             soul: Some(crate::soul::Soul::new(crate::soul::SoulConfig {
                 dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
                 ..Default::default()
             })),
             attention_visualizer: Some(crate::visualization::AttentionVisualizer::new()),
-            relational_psi: 0.0,
+            social: super::SocialState::default(),
             phi_dyad: if enable_primitive_consciousness {
                 Some(crate::partnership::PhiDyadCalculator::new())
             } else {
@@ -618,9 +620,6 @@ impl CognitiveLoopService {
             },
             recent_ai_hvs: Vec::with_capacity(4),
             recent_input_hvs: Vec::with_capacity(4),
-            external_reward: 0.0,
-            social_trust: 0.5,
-            social_cooperation_rate: 0.0,
             user_state: if enable_user_state {
                 Some(crate::user_state_inference::UserStateInference::new())
             } else {
@@ -776,14 +775,14 @@ mod tests {
     fn default_social_signals_are_defaults() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
         // social_trust defaults to 0.5, cooperation_rate defaults to 0.0
-        assert!((service.social_trust - 0.5).abs() < f32::EPSILON);
-        assert!((service.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
+        assert!((service.social.social_trust - 0.5).abs() < f32::EPSILON);
+        assert!((service.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn default_external_reward_is_zero() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-        assert!((service.external_reward - 0.0).abs() < f32::EPSILON);
+        assert!((service.social.external_reward - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -795,7 +794,7 @@ mod tests {
     #[test]
     fn default_relational_psi_is_zero() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-        assert!((service.relational_psi - 0.0).abs() < f64::EPSILON);
+        assert!((service.social.relational_psi - 0.0).abs() < f64::EPSILON);
     }
 
     // ── Backend selection ─────────────────────────────────────────────

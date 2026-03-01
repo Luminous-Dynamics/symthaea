@@ -165,6 +165,21 @@ pub struct PersistenceDiagram {
     pub total_persistence: f64,
 }
 
+/// Report of detected moral trajectory anomalies.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct MoralAnomalyReport {
+    /// Dominant harmony axis flipped since last evaluation.
+    pub value_inversion: bool,
+    /// Free energy jumped >2σ from recent rolling mean.
+    pub free_energy_spike: bool,
+    /// β₀ increased (more disconnected components).
+    pub fragmentation_increase: bool,
+    /// `moral_drift(20) > 0.25`.
+    pub drift_alert: bool,
+    /// Composite anomaly score in \[0.0, 1.0\].
+    pub anomaly_score: f64,
+}
+
 impl MoralTopology {
     /// Create a new analyser with its own `HarmonyBasis`.
     pub fn new(config: MoralTopologyConfig) -> Self {
@@ -281,6 +296,56 @@ impl MoralTopology {
         PersistenceDiagram::from_features(&self.last_persistent_features)
     }
 
+    /// Detect anomalies by comparing `current_summary` against trajectory history.
+    pub fn detect_anomalies(&self, current_summary: &MoralTopologySummary) -> MoralAnomalyReport {
+        let prev = &self.last_summary;
+
+        // Value inversion: dominant harmony axis changed
+        let value_inversion =
+            prev.scenario_count > 0 && current_summary.dominant_harmony != prev.dominant_harmony;
+
+        // Free energy spike: >2σ from rolling mean of recent trajectory
+        let fe_spike = {
+            let points: Vec<_> = self.trajectory.iter().collect();
+            if points.len() >= 4 {
+                let mean_fe =
+                    points.iter().map(|p| p.free_energy).sum::<f64>() / points.len() as f64;
+                let var = points
+                    .iter()
+                    .map(|p| (p.free_energy - mean_fe).powi(2))
+                    .sum::<f64>()
+                    / points.len() as f64;
+                let sigma = var.sqrt().max(1e-9);
+                (current_summary.moral_free_energy - mean_fe).abs() > 2.0 * sigma
+            } else {
+                false
+            }
+        };
+
+        // Fragmentation: β₀ increased (more disconnected components)
+        let fragmentation_increase =
+            prev.scenario_count > 0 && current_summary.beta_0 > prev.beta_0;
+
+        // Drift alert
+        let drift = self.moral_drift(20);
+        let drift_alert = drift > 0.25;
+
+        // Composite score: weighted sum clamped to [0, 1]
+        let raw = (value_inversion as u8 as f64) * 0.3
+            + (fe_spike as u8 as f64) * 0.3
+            + (fragmentation_increase as u8 as f64) * 0.2
+            + (drift_alert as u8 as f64) * 0.2;
+        let anomaly_score = raw.clamp(0.0, 1.0);
+
+        MoralAnomalyReport {
+            value_inversion,
+            free_energy_spike: fe_spike,
+            fragmentation_increase,
+            drift_alert,
+            anomaly_score,
+        }
+    }
+
     /// Perform full topological analysis on the current window.
     ///
     /// Returns `MoralTopologyAssessment` with Betti numbers, persistent
@@ -367,7 +432,7 @@ impl MoralTopology {
             let dir = &pga.principal_directions[0];
             dir.iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.abs().partial_cmp(&b.abs()).unwrap())
+                .max_by(|(_, a), (_, b)| a.abs().total_cmp(&b.abs()))
                 .map(|(i, _)| i as u8)
                 .unwrap_or(0)
         } else {
@@ -375,7 +440,7 @@ impl MoralTopology {
             harmony_variance
                 .iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .map(|(i, _)| i as u8)
                 .unwrap_or(0)
         };
@@ -462,7 +527,7 @@ impl MoralTopology {
         if upper.is_empty() {
             return 0.5;
         }
-        upper.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        upper.sort_by(|a, b| a.total_cmp(b));
         upper[upper.len() / 2]
     }
 
@@ -1187,5 +1252,57 @@ mod tests {
         );
         assert!(assessment.unity <= 1.0);
         assert!(assessment.unity > 0.0);
+    }
+
+    // ── Test 20: Anomaly — value inversion ──────────────────────────
+
+    #[test]
+    fn test_anomaly_value_inversion() {
+        let encoder = TextHdcEncoder::new(TEST_DIM, 3);
+        let mut topo = MoralTopology::new(test_config());
+
+        // Build trajectory and establish a baseline via analyze()
+        for _ in 0..10 {
+            topo.add_scenario(encoder.encode("caring for the sick and elderly"));
+        }
+        let first = topo.analyze();
+        let first_dominant = MoralTopologySummary::from(&first).dominant_harmony;
+
+        // Now last_summary holds the first assessment.
+        // Construct a "new" summary with a different dominant harmony —
+        // simulates what would happen if the topology shifted.
+        let mut shifted_summary = topo.last_summary().clone();
+        shifted_summary.dominant_harmony = (first_dominant + 1) % 7;
+
+        let report = topo.detect_anomalies(&shifted_summary);
+        assert!(
+            report.value_inversion,
+            "Different dominant harmony should trigger value inversion"
+        );
+        assert!(report.anomaly_score > 0.0);
+    }
+
+    // ── Test 21: Anomaly — free energy spike ────────────────────────
+
+    #[test]
+    fn test_anomaly_fe_spike() {
+        let mut topo = MoralTopology::new(test_config());
+
+        // Build stable trajectory with low FE
+        for i in 0..20 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 700 + i));
+        }
+        topo.analyze();
+
+        // Create summary with huge FE spike (way above 2σ of the near-zero trajectory)
+        let mut spiked = topo.last_summary().clone();
+        spiked.moral_free_energy = 100.0;
+
+        let report = topo.detect_anomalies(&spiked);
+        assert!(
+            report.free_energy_spike,
+            "FE=100.0 should spike above 2σ of near-zero trajectory"
+        );
+        assert!(report.anomaly_score >= 0.3);
     }
 }
