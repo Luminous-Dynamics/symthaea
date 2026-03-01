@@ -277,10 +277,10 @@ impl CrossModulationMatrix {
     #[inline]
     pub fn apply(&self, levels: &[f32; 4]) -> [f32; 4] {
         let mut deltas = [0.0_f32; 4];
-        for src in 0..4 {
-            for tgt in 0..4 {
+        for (src, &level) in levels.iter().enumerate() {
+            for (tgt, delta) in deltas.iter_mut().enumerate() {
                 if src != tgt {
-                    deltas[tgt] += self.weights[src][tgt] * levels[src];
+                    *delta += self.weights[src][tgt] * level;
                 }
             }
         }
@@ -854,7 +854,7 @@ impl NeuromodulatorBath {
     }
 
     /// Override all 7 transmitter levels. Extended version with GABA/oxytocin/glutamate.
-    #[allow(dead_code)]
+    #[allow(dead_code, clippy::too_many_arguments)]
     pub fn clamp_all_levels(
         &mut self,
         da: Option<f32>,
@@ -1271,6 +1271,17 @@ impl NeuromodulatorBath {
         self.adenosine.level *= 0.85;
     }
 
+    /// Apply sleep recovery effects on sleep→wake transition.
+    pub fn apply_sleep_recovery(&mut self, sleep_quality: f32) {
+        let q = sleep_quality.clamp(0.0, 1.0);
+        self.adenosine.level *= 1.0 - (0.3 * q);
+        self.allostatic_load = (self.allostatic_load - 0.05 * q).max(0.0);
+        self.sht_subtypes.excitatory = (self.sht_subtypes.excitatory + 0.01 * q).min(2.0);
+        if self.allostatic_load > 0.2 {
+            self.endocannabinoid.produce(0.05 * q);
+        }
+    }
+
     /// Current sleep pressure (adenosine effective level).
     /// Science: Borbely (1982) — Process S of the two-process model.
     #[inline]
@@ -1359,9 +1370,9 @@ impl NeuromodulatorBath {
     pub fn couple_with_peer(&mut self, peer_state: &[f32]) {
         let coupling = self.oxytocin.effective() * 0.05;
         // Blend DA, NE, 5-HT, ACh toward peer (indices 0-3 only — deeper channels are private)
-        for i in 0..4.min(peer_state.len()) {
+        for (i, &peer_val) in peer_state.iter().enumerate().take(4) {
             let local = self.transmitter_by_index(i).effective();
-            let delta = (peer_state[i] - local) * coupling;
+            let delta = (peer_val - local) * coupling;
             self.transmitter_by_index_mut(i).produce(delta);
         }
         // Oxytocin boost from social interaction
@@ -1485,6 +1496,24 @@ impl NeuromodulatorBath {
     /// Clear all active pharmacological injections.
     pub fn clear_injections(&mut self) {
         self.active_injections.clear();
+    }
+
+    /// Inject a D2-selective antagonist.
+    pub fn inject_d2_antagonist(&mut self, potency: f32, half_life: u32) {
+        self.inject("da", -potency, half_life);
+        self.da_subtypes.inhibitory = (self.da_subtypes.inhibitory - 0.1 * potency).max(0.5);
+    }
+
+    /// Inject a GABA-A-selective antagonist.
+    pub fn inject_gaba_a_antagonist(&mut self, potency: f32, half_life: u32) {
+        self.inject("gaba", -potency, half_life);
+        self.gaba_subtypes.excitatory = (self.gaba_subtypes.excitatory - 0.1 * potency).max(0.5);
+    }
+
+    /// Inject a 5-HT2A-selective antagonist.
+    pub fn inject_sht2a_antagonist(&mut self, potency: f32, half_life: u32) {
+        self.inject("sht", -potency, half_life);
+        self.sht_subtypes.inhibitory = (self.sht_subtypes.inhibitory - 0.1 * potency).max(0.5);
     }
 
     /// Apply active injections: agonists produce, antagonists suppress sensitivity.
@@ -1999,6 +2028,8 @@ impl ActiveInjection {
 pub struct BathPhaseTracker {
     history: VecDeque<[f32; 9]>,
     capacity: usize,
+    /// Total number of state vectors recorded (including those evicted from the window).
+    pub total_recorded: usize,
 }
 
 impl Default for BathPhaseTracker {
@@ -2006,6 +2037,7 @@ impl Default for BathPhaseTracker {
         Self {
             history: VecDeque::with_capacity(200),
             capacity: 200,
+            total_recorded: 0,
         }
     }
 }
@@ -2017,6 +2049,7 @@ impl BathPhaseTracker {
             self.history.pop_front();
         }
         self.history.push_back(state);
+        self.total_recorded += 1;
     }
 
     /// Shannon entropy averaged across all 9 dimensions (10-bin histogram per dimension).
@@ -2111,6 +2144,129 @@ impl BathPhaseTracker {
     /// Whether the tracker has no recorded samples.
     pub fn is_empty(&self) -> bool {
         self.history.is_empty()
+    }
+
+    /// Export the full trajectory as a serializable timeline with summary statistics.
+    pub fn to_timeline(&self, phase_label: &str) -> BathTimeline {
+        let entries: Vec<BathTimelineEntry> = self
+            .history
+            .iter()
+            .enumerate()
+            .map(|(i, &state)| {
+                let cycle = self.total_recorded.saturating_sub(self.history.len()) + i;
+                BathTimelineEntry { cycle, state }
+            })
+            .collect();
+        BathTimeline {
+            entries,
+            centroid: self.centroid(),
+            variance: self.variance(),
+            entropy: self.entropy(),
+            phase_label: phase_label.to_string(),
+        }
+    }
+}
+
+/// A single entry in a bath timeline export.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BathTimelineEntry {
+    pub cycle: usize,
+    pub state: [f32; 9],
+}
+
+/// Serializable timeline of full bath trajectory for offline analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BathTimeline {
+    pub entries: Vec<BathTimelineEntry>,
+    pub centroid: [f32; 9],
+    pub variance: [f32; 9],
+    pub entropy: f32,
+    pub phase_label: String,
+}
+
+/// A confirmed phase transition event.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhaseTransition {
+    pub from: String,
+    pub to: String,
+    pub cycle: usize,
+}
+
+/// Hysteresis-based phase transition detector preventing oscillatory flicker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhaseTransitionDetector {
+    current_phase: String,
+    pending_phase: Option<String>,
+    pending_count: u32,
+    hysteresis_threshold: u32,
+    transitions: VecDeque<PhaseTransition>,
+    max_history: usize,
+    cycle_counter: usize,
+}
+
+impl PhaseTransitionDetector {
+    pub fn new(hysteresis_threshold: u32) -> Self {
+        Self {
+            current_phase: "balanced".to_string(),
+            pending_phase: None,
+            pending_count: 0,
+            hysteresis_threshold,
+            transitions: VecDeque::with_capacity(50),
+            max_history: 50,
+            cycle_counter: 0,
+        }
+    }
+
+    pub fn update(&mut self, label: &str) -> Option<PhaseTransition> {
+        self.cycle_counter += 1;
+        if label == self.current_phase {
+            self.pending_phase = None;
+            self.pending_count = 0;
+            return None;
+        }
+        if let Some(ref pending) = self.pending_phase {
+            if pending == label {
+                self.pending_count += 1;
+                if self.pending_count >= self.hysteresis_threshold {
+                    let transition = PhaseTransition {
+                        from: self.current_phase.clone(),
+                        to: label.to_string(),
+                        cycle: self.cycle_counter,
+                    };
+                    self.current_phase = label.to_string();
+                    self.pending_phase = None;
+                    self.pending_count = 0;
+                    if self.transitions.len() >= self.max_history {
+                        self.transitions.pop_front();
+                    }
+                    self.transitions.push_back(transition.clone());
+                    return Some(transition);
+                }
+            } else {
+                self.pending_phase = Some(label.to_string());
+                self.pending_count = 1;
+            }
+        } else {
+            self.pending_phase = Some(label.to_string());
+            self.pending_count = 1;
+        }
+        None
+    }
+
+    pub fn current_phase(&self) -> &str {
+        &self.current_phase
+    }
+
+    pub fn transitions(&self) -> &VecDeque<PhaseTransition> {
+        &self.transitions
+    }
+
+    pub fn reset(&mut self) {
+        self.current_phase = "balanced".to_string();
+        self.pending_phase = None;
+        self.pending_count = 0;
+        self.transitions.clear();
+        self.cycle_counter = 0;
     }
 }
 
@@ -5182,5 +5338,190 @@ mod tests {
         assert!(
             (bath.transmitter_by_index(8).level - bath.endocannabinoid.level).abs() < f32::EPSILON
         );
+    }
+
+    // ── Sleep Recovery Tests ──
+    #[test]
+    fn test_sleep_recovery_reduces_adenosine() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.adenosine.level = 0.6;
+        let before = bath.adenosine.level;
+        bath.apply_sleep_recovery(0.8);
+        assert!(bath.adenosine.level < before);
+    }
+
+    #[test]
+    fn test_sleep_recovery_reduces_allostatic_load() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.allostatic_load = 0.5;
+        let before = bath.allostatic_load;
+        bath.apply_sleep_recovery(1.0);
+        assert!(bath.allostatic_load < before);
+    }
+
+    #[test]
+    fn test_sleep_recovery_boosts_sht1a() {
+        let mut bath = NeuromodulatorBath::default();
+        let before = bath.sht_subtypes.excitatory;
+        bath.apply_sleep_recovery(1.0);
+        assert!(bath.sht_subtypes.excitatory > before);
+    }
+
+    #[test]
+    fn test_sleep_recovery_quality_proportional() {
+        let mut bath_low = NeuromodulatorBath::default();
+        bath_low.adenosine.level = 0.6;
+        bath_low.apply_sleep_recovery(0.2);
+        let mut bath_high = NeuromodulatorBath::default();
+        bath_high.adenosine.level = 0.6;
+        bath_high.apply_sleep_recovery(0.9);
+        assert!(bath_high.adenosine.level < bath_low.adenosine.level);
+    }
+
+    #[test]
+    fn test_sleep_recovery_no_effect_at_zero() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.adenosine.level = 0.6;
+        let before = bath.adenosine.level;
+        bath.apply_sleep_recovery(0.0);
+        assert!((bath.adenosine.level - before).abs() < f32::EPSILON);
+    }
+
+    // ── Antagonist Tests ──
+    #[test]
+    fn test_d2_antagonist_reduces_sensitivity() {
+        let mut bath = NeuromodulatorBath::default();
+        let before = bath.da_subtypes.inhibitory;
+        bath.inject_d2_antagonist(0.5, 50);
+        assert!(bath.da_subtypes.inhibitory < before);
+    }
+
+    #[test]
+    fn test_gaba_a_antagonist_reduces_sensitivity() {
+        let mut bath = NeuromodulatorBath::default();
+        let before = bath.gaba_subtypes.excitatory;
+        bath.inject_gaba_a_antagonist(0.5, 50);
+        assert!(bath.gaba_subtypes.excitatory < before);
+    }
+
+    #[test]
+    fn test_sht2a_antagonist_reduces_sensitivity() {
+        let mut bath = NeuromodulatorBath::default();
+        let before = bath.sht_subtypes.inhibitory;
+        bath.inject_sht2a_antagonist(0.5, 50);
+        assert!(bath.sht_subtypes.inhibitory < before);
+    }
+
+    #[test]
+    fn test_antagonist_creates_injection() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.inject_d2_antagonist(0.3, 50);
+        assert_eq!(bath.active_injections.len(), 1);
+    }
+
+    // ── Phase Transition Detector Tests ──
+    #[test]
+    fn test_phase_transition_hysteresis_prevents_flicker() {
+        let mut detector = PhaseTransitionDetector::new(5);
+        for _ in 0..20 {
+            assert!(detector.update("stressed").is_none());
+            assert!(detector.update("balanced").is_none());
+        }
+        assert_eq!(detector.current_phase(), "balanced");
+    }
+
+    #[test]
+    fn test_phase_transition_fires_after_threshold() {
+        let mut detector = PhaseTransitionDetector::new(3);
+        assert!(detector.update("stressed").is_none());
+        assert!(detector.update("stressed").is_none());
+        let t = detector.update("stressed");
+        assert!(t.is_some());
+        assert_eq!(detector.current_phase(), "stressed");
+    }
+
+    #[test]
+    fn test_phase_transition_history_tracks() {
+        let mut detector = PhaseTransitionDetector::new(2);
+        detector.update("flow");
+        detector.update("flow");
+        detector.update("stressed");
+        detector.update("stressed");
+        assert_eq!(detector.transitions().len(), 2);
+    }
+
+    #[test]
+    fn test_phase_transition_reset_clears() {
+        let mut detector = PhaseTransitionDetector::new(2);
+        detector.update("flow");
+        detector.update("flow");
+        detector.reset();
+        assert!(detector.transitions().is_empty());
+        assert_eq!(detector.current_phase(), "balanced");
+    }
+
+    #[test]
+    fn test_phase_transition_stress_to_flow() {
+        let mut detector = PhaseTransitionDetector::new(3);
+        for _ in 0..3 { detector.update("stressed"); }
+        assert_eq!(detector.current_phase(), "stressed");
+        for _ in 0..3 { detector.update("flow"); }
+        assert_eq!(detector.current_phase(), "flow");
+    }
+
+    #[test]
+    fn test_phase_transition_serde_round_trip() {
+        let mut detector = PhaseTransitionDetector::new(2);
+        detector.update("flow");
+        detector.update("flow");
+        let json = serde_json::to_string(&detector).unwrap();
+        let restored: PhaseTransitionDetector = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.current_phase(), "flow");
+    }
+
+    // ── Timeline Export Tests ──
+    #[test]
+    fn test_timeline_serde_round_trip() {
+        let mut tracker = BathPhaseTracker::default();
+        for i in 0..10 { tracker.record([i as f32 / 10.0; 9]); }
+        let timeline = tracker.to_timeline("balanced");
+        let json = serde_json::to_string(&timeline).unwrap();
+        let restored: BathTimeline = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.entries.len(), 10);
+    }
+
+    #[test]
+    fn test_timeline_entries_match_trajectory() {
+        let mut tracker = BathPhaseTracker::default();
+        let states: Vec<[f32; 9]> = (0..5).map(|i| [i as f32 * 0.1; 9]).collect();
+        for &s in &states { tracker.record(s); }
+        let timeline = tracker.to_timeline("flow");
+        assert_eq!(timeline.entries.len(), 5);
+    }
+
+    #[test]
+    fn test_timeline_centroid_variance_populated() {
+        let mut tracker = BathPhaseTracker::default();
+        for i in 0..50 {
+            let v = i as f32 / 50.0;
+            tracker.record([v, 1.0 - v, v * 0.5, 0.3, 0.7, v, 0.4, 0.6, 0.3]);
+        }
+        let timeline = tracker.to_timeline("varied");
+        assert!(timeline.variance.iter().any(|&v| v > 0.0));
+    }
+
+    #[test]
+    fn test_timeline_empty_valid() {
+        let tracker = BathPhaseTracker::default();
+        let timeline = tracker.to_timeline("empty");
+        assert!(timeline.entries.is_empty());
+    }
+
+    #[test]
+    fn test_tracker_total_recorded() {
+        let mut tracker = BathPhaseTracker::default();
+        for i in 0..250 { tracker.record([i as f32 / 250.0; 9]); }
+        assert_eq!(tracker.total_recorded, 250);
+        assert!(tracker.history.len() <= 200);
     }
 }
