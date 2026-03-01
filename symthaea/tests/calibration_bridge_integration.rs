@@ -180,25 +180,24 @@ fn test_self_assessment_closed_loop_trigger() {
     })
     .expect("CognitiveLoopService::new should succeed");
 
-    // Phase 1: Warmup cycles (200 needed for self-assessment to become eligible).
-    // Use steady input so the temporal network learns a stable prediction,
-    // then the diverse inputs in Phase 2 will spike prediction error.
-    for _ in 0..250 {
-        service.cycle("warmup steady state pattern alpha");
-    }
-
-    // Phase 2: Feed highly variable input to drive prediction error up.
-    // The self-assessment PE_EMA threshold is (pe_ema - 0.1) / 0.05 > 1.0,
-    // meaning pe_ema > 0.15. With alpha=0.02, we need sustained high PE.
+    // Run cycles checking for self-assessment trigger. The trigger becomes
+    // eligible after 200 observations (warmup_threshold). PE will be high
+    // during initial network learning, and the self-assessment should fire
+    // once pe_ema crosses the threshold.
     let mut calibration_fired = false;
     let mut max_pe_ema: f32 = 0.0;
-    for i in 0..400 {
-        // Alternate between very different inputs to maximize prediction error
-        let input = match i % 4 {
-            0 => "unprecedented quantum turbulence anomaly detected in sector seven",
-            1 => "gentle morning sunlight warm peaceful calm stable routine",
-            2 => "CRITICAL EMERGENCY ALERT: catastrophic failure imminent evacuation",
-            _ => "abstract mathematical topology homomorphism integration convergence",
+    let mut fired_at_cycle = 0;
+    for i in 0..600 {
+        // Mix steady and diverse inputs to keep prediction error varying
+        let input = if i < 100 {
+            "warmup steady state alpha"
+        } else {
+            match i % 4 {
+                0 => "unprecedented quantum turbulence anomaly detected in sector seven",
+                1 => "gentle morning sunlight warm peaceful calm stable routine",
+                2 => "CRITICAL EMERGENCY ALERT: catastrophic failure imminent evacuation",
+                _ => "abstract mathematical topology homomorphism integration convergence",
+            }
         };
         let result = service.cycle(input);
         let pe_ema = result.metadata.neuromod.self_assessment_pe_ema;
@@ -208,23 +207,25 @@ fn test_self_assessment_closed_loop_trigger() {
 
         if result.metadata.neuromod.self_assessment_calibration_fired {
             calibration_fired = true;
+            fired_at_cycle = i;
             break;
         }
     }
 
-    // The self-assessment should have fired during the high-PE phase.
-    // If not, report the max PE EMA to help diagnose threshold issues.
+    // The self-assessment should have triggered auto-calibration.
     assert!(
         calibration_fired,
         "Self-assessment should have triggered auto-calibration \
          (max pe_ema reached: {max_pe_ema:.4}, threshold ~0.15)"
     );
 
-    // Verify a calibration summary exists (auto-calibration produces one when
-    // apply_pending_calibration fires during sleep→wake — but in the test the
-    // pending calibration may not have been applied yet since there's no sleep
-    // transition. The key assertion above proves trigger fired.)
-    // Force-apply to verify the summary path works:
+    // Verify it fired after the warmup period
+    assert!(
+        fired_at_cycle >= 200,
+        "Should fire only after warmup threshold: fired at {fired_at_cycle}"
+    );
+
+    // Force-apply the pending calibration and verify summary
     service.apply_pending_calibration();
 
     // Run post-calibration cycles to verify the system is healthy
@@ -238,9 +239,8 @@ fn test_self_assessment_closed_loop_trigger() {
         "DA should be finite after auto-calibration"
     );
 
-    // DA effective may have changed from baseline (self-assessment mapped PE → DA proxy)
+    // DA effective should be in reasonable range
     let post_da = post_result.metadata.neuromod.dopamine_effective;
-    // Not asserting direction since it depends on accumulated EMAs, just that it's reasonable
     assert!(
         post_da > 0.0 && post_da < 5.0,
         "DA effective should be in reasonable range: {post_da}"
