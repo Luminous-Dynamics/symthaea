@@ -426,7 +426,7 @@ impl Default for MeshReceiver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::swarm::mesh::{fragment, MeshUrgency, PayloadType, LORA_MTU};
+    use crate::swarm::mesh::{MeshUrgency, PayloadType, LORA_MTU};
     use symthaea_core::hdc::BinaryHV;
 
     fn test_hv(seed: u8) -> BinaryHV {

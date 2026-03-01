@@ -740,6 +740,10 @@ impl ContinuousMind {
         self.mesh_stats.gradients_received += gradient_count;
         self.mesh_stats.bytes_received +=
             inbox.len() as u64 * crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        #[cfg(feature = "mesh-encryption")]
+        if self.mesh_encryption_key.is_some() {
+            self.mesh_stats.encrypted_packets_received += inbox.len() as u64;
+        }
 
         tracing::debug!(
             target: "symthaea::mind::mesh",
@@ -908,6 +912,10 @@ impl ContinuousMind {
                     self.mesh_gradient_sequence = self.mesh_gradient_sequence.wrapping_add(1);
                     self.mesh_stats.gradients_sent += 1;
                     self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+                    #[cfg(feature = "mesh-encryption")]
+                    if self.mesh_encryption_key.is_some() {
+                        self.mesh_stats.encrypted_packets_sent += 1;
+                    }
                 }
                 None => {
                     tracing::warn!(
@@ -984,6 +992,10 @@ impl ContinuousMind {
         self.mesh_affective_sequence = self.mesh_affective_sequence.wrapping_add(1);
         self.mesh_stats.affective_sent += 1;
         self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        #[cfg(feature = "mesh-encryption")]
+        if self.mesh_encryption_key.is_some() {
+            self.mesh_stats.encrypted_packets_sent += 1;
+        }
 
         tracing::trace!(
             target: "symthaea::mind::mesh",
