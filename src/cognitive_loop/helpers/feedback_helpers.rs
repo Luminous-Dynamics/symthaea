@@ -16,7 +16,7 @@ impl super::super::CognitiveLoopService {
     /// Record and apply an additive delta to prediction_confidence.
     ///
     /// Usage: `self.adjust_confidence("subsystem_name", delta);`
-    /// Equivalent to: `self.prediction_confidence = (self.prediction_confidence + delta).clamp(0.0, 1.0);`
+    /// Equivalent to: `self.prediction_confidence = (self.prediction_confidence + delta).clamp(0.01, 0.99);`
     #[inline]
     pub(in crate::cognitive_loop) fn adjust_confidence(
         &mut self,
@@ -26,13 +26,13 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .confidence
             .propose(source, FeedbackProposal::Add(delta as f64));
-        self.prediction_confidence = (self.prediction_confidence + delta).clamp(0.0, 1.0);
+        self.prediction_confidence = (self.prediction_confidence + delta).clamp(0.01, 0.99);
     }
 
     /// Record and apply a multiplicative scale factor to prediction_confidence.
     ///
     /// Usage: `self.scale_confidence("subsystem_name", 0.98);`
-    /// Equivalent to: `self.prediction_confidence = (self.prediction_confidence * factor).clamp(0.0, 1.0);`
+    /// Equivalent to: `self.prediction_confidence = (self.prediction_confidence * factor).clamp(0.01, 0.99);`
     #[inline]
     pub(in crate::cognitive_loop) fn scale_confidence(
         &mut self,
@@ -42,7 +42,7 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .confidence
             .propose(source, FeedbackProposal::Scale(factor as f64));
-        self.prediction_confidence = (self.prediction_confidence * factor).clamp(0.0, 1.0);
+        self.prediction_confidence = (self.prediction_confidence * factor).clamp(0.01, 0.99);
     }
 
     /// Record and apply a hard set of prediction_confidence.
@@ -53,7 +53,7 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .confidence
             .propose(source, FeedbackProposal::Set(value as f64));
-        self.prediction_confidence = value.clamp(0.0, 1.0);
+        self.prediction_confidence = value.clamp(0.01, 0.99);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -190,7 +190,7 @@ impl CognitiveLoopService {
         // FEEDBACK: Prefrontal veto suppresses exploration (executive control)
         // Science: Miller & Cohen (2001) — PFC inhibits impulsive exploration when WM overloaded
         if prefrontal_veto {
-            self.curiosity_drive.exploration_urge = 0.0;
+            self.set_exploration("prefrontal_veto", 0.0);
 
             // FEEDBACK: WM overload triggers emergency consolidation (Baddeley 2000)
             // Science: Working memory overflow should push items to long-term storage,
@@ -202,7 +202,7 @@ impl CognitiveLoopService {
         // Science: When reasoning gate AND prefrontal veto both fire, system is paralyzed:
         // exploration=0, learning=0. Soften both to allow partial recovery.
         if ctx.reasoning_gate_blocked && prefrontal_veto {
-            self.curiosity_drive.exploration_urge = 0.3;
+            self.set_exploration("dual_veto_freeze", 0.3);
             self.set_lr("dual_veto_freeze", self.fep_lr_boost.max(1.0));
             tracing::debug!(
                 cycle = self.stats.total_cycles,
@@ -326,8 +326,8 @@ impl CognitiveLoopService {
                     ctx.surprise_triggered,
                     ctx.unified_psi,
                     moral_score,
-                    self.social_trust,
-                    self.social_cooperation_rate,
+                    self.social.social_trust,
+                    self.social.social_cooperation_rate,
                     0.0, // peer_valence: future — aggregate from social inbox
                 );
                 (affect.valence, affect.arousal)
@@ -443,7 +443,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let hierarchical_total_free_energy =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut hfe) = self.hierarchical_free_energy {
+                if let Some(ref mut hfe) = self.consciousness_monitors.hierarchical_free_energy {
                     // FEEDBACK: Phi→precision coupling — higher integrated information
                     // sharpens lower-level precision (Feldman & Friston 2010, §7.4).
                     // This creates a causal mechanism: consciousness improves perceptual accuracy.
@@ -682,7 +682,7 @@ impl CognitiveLoopService {
         // Pre-compute to avoid borrow conflict with mutable subsystem references below
         let wm_utilization = self.prefrontal_utilization();
         let resonance_frequency = if ctx.urgency.run_consciousness_monitors() {
-            if let Some(ref mut resonance) = self.consciousness_resonance {
+            if let Some(ref mut resonance) = self.consciousness_monitors.resonance {
                 let dims = [
                     ctx.unified_psi,
                     ctx.coherence as f64,
@@ -710,7 +710,7 @@ impl CognitiveLoopService {
         }
 
         let quantum_coherence_level = if ctx.urgency.run_consciousness_monitors() {
-            if let Some(ref mut qc) = self.quantum_coherence {
+            if let Some(ref mut qc) = self.consciousness_monitors.quantum_coherence {
                 qc.observe(&ctx.hv16_cached, ctx.unified_psi);
                 qc.coherence()
             } else {
@@ -740,7 +740,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (phenomenal_binding_strength, phenomenal_fragmented) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut binding) = self.phenomenal_binding {
+                if let Some(ref mut binding) = self.consciousness_monitors.phenomenal_binding {
                     let dims = [
                         ctx.unified_psi,
                         ctx.coherence as f64,
@@ -793,7 +793,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (temporal_coherence_score, temporal_discontinuity) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut temporal) = self.temporal_consciousness {
+                if let Some(ref mut temporal) = self.consciousness_monitors.temporal {
                     temporal.observe(
                         &ctx.hv16_cached,
                         ctx.unified_psi,
@@ -878,7 +878,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (thermodynamic_entropy, thermodynamic_free_energy) =
             if ctx.urgency.run_consciousness_monitors() {
-                if let Some(ref mut thermo) = self.consciousness_thermodynamics {
+                if let Some(ref mut thermo) = self.consciousness_monitors.thermodynamics {
                     let dims = [
                         ctx.unified_psi,
                         ctx.coherence as f64,
@@ -944,7 +944,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (embodied_psi_modulation, embodied_agency) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
-                if let Some(ref mut embodied) = self.embodied_cognition {
+                if let Some(ref mut embodied) = self.consciousness_monitors.embodied {
                     if let Some(ref body) = self.virtual_body {
                         embodied.update_interoception(body.interoceptive_state().clone());
                     }

@@ -353,6 +353,9 @@ pub struct SelfAssessmentMonitor {
     cooldown: u32,
     /// Cooldown duration after calibration.
     cooldown_duration: u32,
+    /// Whether calibration was triggered on the most recent `check_trigger()` call.
+    /// Reset to false on each `update()`.
+    last_triggered: bool,
 }
 
 impl Default for SelfAssessmentMonitor {
@@ -366,6 +369,7 @@ impl Default for SelfAssessmentMonitor {
             warmup_threshold: 200,    // ~4 seconds at 50Hz
             cooldown: 0,
             cooldown_duration: 500,   // ~10 seconds between calibrations
+            last_triggered: false,
         }
     }
 }
@@ -391,6 +395,7 @@ impl SelfAssessmentMonitor {
     /// Call once per cycle during the neuromod phase.
     pub fn update(&mut self, input: &SelfAssessmentInput) {
         const ALPHA: f64 = 0.02; // ~50 cycle half-life
+        self.last_triggered = false;
 
         self.pe_ema = self.pe_ema * (1.0 - ALPHA) + input.prediction_error as f64 * ALPHA;
         self.coherence_ema =
@@ -412,9 +417,16 @@ impl SelfAssessmentMonitor {
     /// Returns `Some(calibration)` when performance drift exceeds thresholds
     /// and cooldown has elapsed. The calibration is built from internal
     /// performance proxies, not from psych-bench z-scores.
-    pub fn check_trigger(&mut self) -> Option<NeuromodCalibration> {
-        // Gate: warmup, cooldown, and minimum observation count
-        if self.cooldown > 0 || self.observations_since_calibration < self.warmup_threshold {
+    pub fn check_trigger(&mut self, drift_anomalous: bool) -> Option<NeuromodCalibration> {
+        // Gate: warmup and minimum observation count
+        if self.observations_since_calibration < self.warmup_threshold {
+            return None;
+        }
+
+        // Cooldown gate: skip when drift is anomalous AND prediction error is elevated.
+        // Anomalous personality drift (Turrigiano 2008) signals receptor sensitivity
+        // has wandered — urgent recalibration overrides the normal cooldown.
+        if self.cooldown > 0 && !(drift_anomalous && self.pe_ema > 0.15) {
             return None;
         }
 
@@ -463,6 +475,7 @@ impl SelfAssessmentMonitor {
         // Build and return calibration
         self.observations_since_calibration = 0;
         self.cooldown = self.cooldown_duration;
+        self.last_triggered = true;
 
         let cal = NeuromodCalibration::from_z_scores(&z_scores);
         tracing::info!(
@@ -475,6 +488,33 @@ impl SelfAssessmentMonitor {
         );
 
         Some(cal)
+    }
+
+    // ── Telemetry accessors ──────────────────────────────────────────────
+
+    /// Current PE exponential moving average.
+    pub fn pe_ema(&self) -> f64 {
+        self.pe_ema
+    }
+
+    /// Current coherence exponential moving average.
+    pub fn coherence_ema(&self) -> f64 {
+        self.coherence_ema
+    }
+
+    /// Current confidence calibration error EMA.
+    pub fn confidence_error_ema(&self) -> f64 {
+        self.confidence_error_ema
+    }
+
+    /// Current attention utilization EMA.
+    pub fn attention_utilization_ema(&self) -> f64 {
+        self.attention_utilization_ema
+    }
+
+    /// Whether the last `check_trigger()` call fired a calibration.
+    pub fn last_triggered(&self) -> bool {
+        self.last_triggered
     }
 
     /// Reset after external calibration (e.g., from psych-bench).
@@ -708,7 +748,7 @@ mod tests {
         }
         // Should NOT trigger — only 100 observations, warmup is 200
         assert!(
-            monitor.check_trigger().is_none(),
+            monitor.check_trigger(false).is_none(),
             "Should not trigger during warmup"
         );
     }
@@ -734,7 +774,7 @@ mod tests {
             monitor.update(&bad_input);
         }
 
-        let cal = monitor.check_trigger();
+        let cal = monitor.check_trigger(false);
         assert!(cal.is_some(), "High PE should trigger calibration");
         let cal = cal.unwrap();
         // Should have DA adjustment (PE → interference proxy)
@@ -765,7 +805,7 @@ mod tests {
         }
 
         // First trigger should succeed
-        assert!(monitor.check_trigger().is_some());
+        assert!(monitor.check_trigger(false).is_some());
 
         // Feed more bad data
         for _ in 0..20 {
@@ -774,8 +814,50 @@ mod tests {
 
         // Second trigger should fail — cooldown active (100 cycles)
         assert!(
-            monitor.check_trigger().is_none(),
+            monitor.check_trigger(false).is_none(),
             "Should not trigger during cooldown"
+        );
+    }
+
+    #[test]
+    fn test_self_assessment_drift_anomalous_bypasses_cooldown() {
+        let mut monitor = SelfAssessmentMonitor {
+            warmup_threshold: 5,
+            cooldown_duration: 100,
+            ..Default::default()
+        };
+
+        let bad_input = SelfAssessmentInput {
+            prediction_error: 0.5, // high PE → pe_ema will converge above 0.15
+            coherence: 0.7,
+            confidence_calibration_error: 0.0,
+            attention_utilization: 0.5,
+            drift_anomalous: true,
+        };
+
+        for _ in 0..30 {
+            monitor.update(&bad_input);
+        }
+
+        // First trigger should succeed
+        assert!(monitor.check_trigger(true).is_some());
+
+        // Feed more bad data (still in cooldown, only 20 cycles < 100)
+        for _ in 0..20 {
+            monitor.update(&bad_input);
+        }
+
+        // Normal check should fail — cooldown active
+        assert!(
+            monitor.check_trigger(false).is_none(),
+            "Normal check should block during cooldown"
+        );
+
+        // But drift_anomalous=true should bypass cooldown because pe_ema > 0.15
+        // (Turrigiano 2008: anomalous drift warrants urgent recalibration)
+        assert!(
+            monitor.check_trigger(true).is_some(),
+            "Drift anomalous + elevated PE should bypass cooldown"
         );
     }
 
@@ -801,7 +883,7 @@ mod tests {
         }
 
         assert!(
-            monitor.check_trigger().is_none(),
+            monitor.check_trigger(false).is_none(),
             "Normal performance should not trigger calibration"
         );
     }
@@ -825,7 +907,7 @@ mod tests {
         for _ in 0..20 {
             monitor.update(&bad_input);
         }
-        assert!(monitor.check_trigger().is_some());
+        assert!(monitor.check_trigger(false).is_some());
 
         // External calibration resets cooldown
         monitor.reset_after_calibration();

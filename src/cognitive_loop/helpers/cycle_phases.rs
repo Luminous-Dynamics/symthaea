@@ -516,6 +516,16 @@ impl CognitiveLoopService {
                             "Episodic replay session completed"
                         );
 
+                        // Record retrievals for consolidation tracking
+                        // Science: Nader et al. (2000) — retrieval triggers reconsolidation
+                        {
+                            let top_eps_for_tracking = replay.get_top_episodes(result.episodes_replayed.min(10));
+                            for ep in &top_eps_for_tracking {
+                                let hash = crate::memory::memory_coordinator::content_hash(&ep.input);
+                                self.memory_coordinator.record_retrieval(hash);
+                            }
+                        }
+
                         // Track 3g: Dream consolidation — resonator factorization of replayed episodes
                         // Science: Stickgold (2005) — sleep replay extracts gist representations
                         // After episodic replay, factorize top episodes through the resonator to
@@ -1042,7 +1052,7 @@ impl CognitiveLoopService {
             let (consensus_conf, consensus_lr, consensus_explore, consensus_threshold) =
                 self.feedback_state.apply_pending_consensus();
             if let Some(conf) = consensus_conf {
-                self.prediction_confidence = conf as f32;
+                self.prediction_confidence = (conf as f32).clamp(0.01, 0.99);
             }
             if let Some(lr) = consensus_lr {
                 self.fep_lr_boost = lr as f32;
@@ -1205,27 +1215,37 @@ impl CognitiveLoopService {
         // Science: Schmidhuber (2010) — formal theory of intrinsic motivation.
         // ═══════════════════════════════════════════════════════════════════════
         {
+            let drift_anomalous = self.neuromod.drift_tracker.is_anomalous();
+            // Use bath 5-HT effective directly as sustained attention proxy.
+            // Previous approach (attention_sensitivity) was contaminated by ACh
+            // multiplier accumulation across cycles. 5-HT effective is the clean
+            // signal: low 5-HT → poor sustained attention → high "utilization".
+            let sht_eff = self.neuromod.bath.serotonin.effective();
             let sa_input = super::super::calibration::SelfAssessmentInput {
                 prediction_error: self.stats.avg_prediction_error,
                 coherence: self.carryover.history.cached_coherence.unwrap_or(0.5),
                 confidence_calibration_error: (self.prediction_confidence
                     - (1.0 - self.stats.avg_prediction_error.min(1.0)))
                 .abs(),
-                // attention_sensitivity ranges 0.5–1.5; normalize to 0–1 utilization
-                attention_utilization: ((self.adaptive_behavior.attention_sensitivity - 0.5) / 1.0)
-                    .clamp(0.0, 1.0),
-                drift_anomalous: self.neuromod.drift_tracker.is_anomalous(),
+                // Invert 5-HT: low serotonin → high utilization (sustained attn deficit)
+                attention_utilization: (1.0 - sht_eff).clamp(0.0, 1.0),
+                drift_anomalous,
             };
             self.neuromod.self_assessment.update(&sa_input);
 
-            // Check if self-assessment triggers calibration
-            if let Some(cal) = self.neuromod.self_assessment.check_trigger() {
-                tracing::info!(
-                    adjustments = cal.adjustments.len(),
-                    confidence_delta = cal.confidence_delta,
-                    "Self-assessment triggered auto-calibration"
-                );
-                self.neuromod.pending_calibration = Some(cal);
+            // Check if self-assessment triggers calibration.
+            // Guard: don't overwrite pending external (psych-bench) calibration —
+            // external calibrations are higher quality than internal proxy z-scores.
+            if self.neuromod.pending_calibration.is_none() {
+                if let Some(cal) = self.neuromod.self_assessment.check_trigger(drift_anomalous) {
+                    tracing::info!(
+                        adjustments = cal.adjustments.len(),
+                        confidence_delta = cal.confidence_delta,
+                        drift_anomalous,
+                        "Self-assessment triggered auto-calibration"
+                    );
+                    self.neuromod.pending_calibration = Some(cal);
+                }
             }
         }
 

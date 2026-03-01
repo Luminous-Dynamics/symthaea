@@ -605,7 +605,29 @@ impl CognitiveLoopService {
                 };
                 let result = dyad.compute(&input);
                 self.social.relational_psi = result.phi_dyad;
+
+                // Phi divergence → exploration (novel relational territory)
+                // Science: Friston (2010) — high divergence = high epistemic value
+                let phi_divergence = (result.phi_ai - result.phi_human).abs();
+                if phi_divergence > 0.1 {
+                    let boost = (phi_divergence - 0.1).min(0.2) * 0.15;
+                    self.adjust_exploration("phi_divergence", boost as f32);
+                }
+
+                // Phi relational → oxytocin (prosocial bonding)
+                // Science: Feldman (2012) — relational coherence drives oxytocin release
+                if result.phi_relational > 0.3 {
+                    let oxy = (result.phi_relational - 0.3) * 0.05;
+                    self.neuromod.bath.oxytocin.produce(oxy as f32);
+                }
             }
+        }
+
+        // Trust evolution from cycle coherence (Bowlby 1969)
+        // Coherence > 0.5 builds trust, < 0.5 erodes it; slow decay prevents runaway
+        if let Some(ref mut model) = self.partner_model {
+            let signal = (dynamics.coherence as f64 - 0.5) * 0.01;
+            model.trust = ((model.trust as f64 + signal).clamp(0.0, 1.0) * 0.999) as f32;
         }
 
         // ── Track 4b: Cross-module agreement metric ─────────────────────────

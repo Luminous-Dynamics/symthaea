@@ -20,12 +20,19 @@ use crate::cognitive_loop::thresholds::{
     EMBODIED_PSI_WEIGHT,
     // Psi synthesis
     FLOW_PSI_WEIGHT,
+    // FEP / Surprise
+    FEP_LR_DECAY,
+    FEP_SURPRISE_SCALE,
     MEMORY_CONTEXT_BOOST_SCALE,
     MEMORY_RECALL_SIM_THRESHOLD,
     // Memory recall
     MEMORY_RECALL_TOP_K,
-    MORAL_CONCERN_THRESHOLD,
     // Moral evaluation
+    MORAL_BENEFIT_CONFIDENCE_BOOST,
+    MORAL_BENEFIT_THRESHOLD,
+    MORAL_CONCERN_EXPLORATION_DAMPEN,
+    MORAL_CONCERN_PAUSE_BOOST,
+    MORAL_CONCERN_THRESHOLD,
     MORAL_EVAL_INTERVAL,
     NEGATION_DAMPENING,
     NEGATION_POLARITY_THRESHOLD,
@@ -330,7 +337,7 @@ impl CognitiveLoopService {
                 self.curiosity_drive
                     .set_boredom_threshold(current_threshold * SURPRISE_BOREDOM_DAMPEN);
                 let expl_factor = bridge.exploration_factor;
-                deferred_exploration_delta = Some(expl_factor as f32 * 0.3);
+                deferred_exploration_delta = Some(expl_factor * 0.3);
                 exploration_action = action.map(|a| {
                     format!(
                         "perturbation[{}d,scale={:.3}]",
@@ -349,7 +356,7 @@ impl CognitiveLoopService {
         }
         // Apply exploration adjustment after releasing the surprise_bridge borrow
         if let Some(delta) = deferred_exploration_delta {
-            self.curiosity_drive.exploration_urge += delta;
+            self.adjust_exploration("surprise_bridge", delta);
         }
 
         (surprise_triggered, exploration_action)
@@ -372,8 +379,8 @@ impl CognitiveLoopService {
         } else {
             0.0
         };
-        let relational_psi_contrib = if self.relational_psi > 0.0 {
-            self.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
+        let relational_psi_contrib = if self.social.relational_psi > 0.0 {
+            self.social.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
         } else {
             0.0
         };
@@ -431,10 +438,10 @@ impl CognitiveLoopService {
 
         let enriched_reward = internal_reward + fep_bonus;
 
-        let cycle_reward = if self.external_reward.abs() > f32::EPSILON {
+        let cycle_reward = if self.social.external_reward.abs() > f32::EPSILON {
             let blended = enriched_reward * REWARD_EXTERNAL_BLEND
-                + self.external_reward * REWARD_EXTERNAL_BLEND;
-            self.external_reward = 0.0; // consume
+                + self.social.external_reward * REWARD_EXTERNAL_BLEND;
+            self.social.external_reward = 0.0; // consume
             blended
         } else {
             enriched_reward
@@ -562,8 +569,8 @@ impl CognitiveLoopService {
                 // Tighten trust via precision
                 if let Some(ref fe) = self.fep_agent.last_fe_components {
                     let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
-                    self.self_reflection.trust_threshold =
-                        (self.self_reflection.trust_threshold * 0.9 + precision_mod * 0.1)
+                    self.self_model_tier.self_reflection.trust_threshold =
+                        (self.self_model_tier.self_reflection.trust_threshold * 0.9 + precision_mod * 0.1)
                             .clamp(0.1, 0.9);
                 }
             }
@@ -714,9 +721,7 @@ impl CognitiveLoopService {
                 // Gradual LR dampening: attenuated 50% (NE exploration_delta handles arousal)
                 self.scale_lr("arousal_trap_recovery", 1.0 - recovery_intensity * 0.1);
                 // Slight exploration boost: attenuated 50% (NE exploration_delta covers this)
-                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                    + recovery_intensity * 0.025)
-                    .clamp(0.0, 1.0);
+                self.adjust_exploration("arousal_trap_recovery", recovery_intensity * 0.025);
                 self.stats.arousal_recovery_cycles += 1;
                 tracing::debug!(
                     cycle = self.stats.total_cycles,
@@ -727,7 +732,7 @@ impl CognitiveLoopService {
             }
             // Phase 3: Forced escape
             if self.carryover.urgency.arousal_trap_counter > 10 {
-                self.curiosity_drive.exploration_urge = 1.0; // forced escape attempt
+                self.set_exploration("arousal_trap_escape", 1.0); // forced escape attempt
                 self.scale_confidence("arousal_trap_escape", 0.9);
                 self.carryover.urgency.arousal_trap_counter = 0;
                 tracing::debug!(
@@ -744,6 +749,167 @@ impl CognitiveLoopService {
                 // Attenuated 50%: DA handles low-error consolidation boost via the bath
                 let consolidation_boost = ((0.3 - affective_arousal) * 0.3).min(0.05);
                 self.scale_lr("low_arousal_consolidate", 1.0 + consolidation_boost);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 5: Dynamics decomposition helpers
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Apply moral modulation to active inference and surprise-gated learning.
+    ///
+    /// Handles consent/harm/duty steering, surprise LR boost/decay, and
+    /// predictive free energy surprise amplitude scaling.
+    ///
+    /// Returns `(moral_steering_category, pfe_surprise_mod)`.
+    pub(in crate::cognitive_loop) fn apply_moral_modulation(
+        &mut self,
+        moral_concern_detected: bool,
+        moral_judgment: &MoralJudgmentSummary,
+        moral_score: f32,
+        is_surprised: bool,
+    ) -> (&'static str, f32) {
+        let mut moral_steering_category: &str = "";
+        if moral_concern_detected {
+            self.scale_exploration("moral_concern", MORAL_CONCERN_EXPLORATION_DAMPEN);
+
+            self.self_model_tier.self_reflection.trust_threshold =
+                (self.self_model_tier.self_reflection.trust_threshold * 1.2).clamp(0.1, 0.95);
+
+            self.adaptive_behavior.pause_multiplier *= MORAL_CONCERN_PAUSE_BOOST;
+
+            if moral_judgment.consent_violation
+                || moral_judgment
+                    .violations
+                    .iter()
+                    .any(|v| v.contains("perfect") || v.contains("harm"))
+            {
+                self.stats.moral_review_needed = true;
+            }
+
+            if moral_judgment.consent_violation {
+                self.scale_confidence("moral_consent_viol", 0.7);
+                self.carryover.learning.subsystem_lr_factor *= 0.5;
+                moral_steering_category = "consent";
+            } else if moral_judgment
+                .violations
+                .iter()
+                .any(|v| v.contains("harm"))
+            {
+                self.scale_exploration("harm_detected", 0.4);
+                self.scale_confidence("moral_harm_detect", 0.85);
+                moral_steering_category = "harm";
+            } else if moral_judgment
+                .violations
+                .iter()
+                .any(|v| v.contains("perfect") || v.contains("duty"))
+            {
+                self.self_model_tier.self_reflection.force_reflection();
+                self.carryover.learning.subsystem_lr_factor *= 0.8;
+                moral_steering_category = "duty";
+            } else if !moral_judgment.violations.is_empty() {
+                self.carryover.learning.subsystem_lr_factor *= 0.9;
+                moral_steering_category = "other";
+            }
+        } else if moral_score > MORAL_BENEFIT_THRESHOLD {
+            self.scale_confidence("moral_benefit", MORAL_BENEFIT_CONFIDENCE_BOOST);
+        }
+
+        // Surprise-gated learning rate boost
+        if is_surprised {
+            let surprise_boost =
+                (self.fep_agent.current_free_energy() as f32 / FEP_SURPRISE_SCALE).clamp(0.1, 0.5);
+            self.adjust_lr("fep_surprise", surprise_boost);
+        } else {
+            self.scale_lr("fep_decay", FEP_LR_DECAY);
+        }
+
+        // Phase 21: Predictive free energy → surprise amplitude scaling
+        let cached_pfe = self.carryover.consciousness.last_predictive_free_energy;
+        let pfe_surprise_mod = if is_surprised && cached_pfe > 0.5 {
+            let amplification = ((cached_pfe - 0.5) * 0.2).min(0.1) as f32;
+            self.adjust_exploration("pfe_surprise_amplify", amplification);
+            self.stats.pfe_surprise_mod_count += 1;
+            amplification
+        } else if is_surprised && cached_pfe < 0.2 && cached_pfe > 0.0 {
+            let dampening = ((0.2 - cached_pfe) * 0.15).min(0.05) as f32;
+            self.scale_exploration("pfe_surprise_dampen", 1.0 - dampening);
+            self.stats.pfe_surprise_mod_count += 1;
+            -dampening
+        } else {
+            0.0
+        };
+
+        (moral_steering_category, pfe_surprise_mod)
+    }
+
+    /// Update flow state, curiosity drive, and self-reflection.
+    ///
+    /// Applies meta-cognitive recommendations (LR ±10%, exploration ±) when
+    /// self-reflection confidence > 0.5.
+    pub(in crate::cognitive_loop) fn update_drives_and_reflection(
+        &mut self,
+        pattern: crate::dynamics::temporal_signatures::ConsciousnessPattern,
+        prediction_error: f32,
+        coherence: f32,
+    ) {
+        let adapted_thresholds = self.self_model_tier.self_reflection.get_thresholds();
+        self.flow_state.update_with_thresholds(
+            pattern,
+            prediction_error,
+            coherence,
+            self.prediction_confidence,
+            adapted_thresholds.flow_error,
+            adapted_thresholds.flow_coherence,
+        );
+
+        // Curiosity drive — route exploration mutation through feedback system
+        self.curiosity_drive
+            .set_boredom_threshold(adapted_thresholds.boredom);
+        match self.curiosity_drive.update(prediction_error) {
+            super::super::drives::ExplorationUpdate::Set(val) => {
+                self.set_exploration("curiosity_drive_boredom", val);
+            }
+            super::super::drives::ExplorationUpdate::Scale(factor) => {
+                self.scale_exploration("curiosity_drive_decay", factor);
+            }
+        }
+
+        // Self-reflection
+        self.self_model_tier.self_reflection.record_cycle(
+            prediction_error,
+            self.flow_state.in_flow,
+            self.curiosity_drive.should_explore(),
+            self.prediction_confidence,
+        );
+        if self.self_model_tier.self_reflection.should_reflect() {
+            let recommendations = self.self_model_tier.self_reflection.reflect();
+            for rec in &recommendations {
+                if rec.confidence < 0.5 {
+                    continue;
+                }
+                match rec.target {
+                    super::super::RecommendationTarget::LearningRate => match rec.direction {
+                        super::super::AdjustmentDirection::Decrease => {
+                            self.scale_lr("reflection_decrease", 0.9);
+                        }
+                        super::super::AdjustmentDirection::Increase => {
+                            self.scale_lr("reflection_increase", 1.1);
+                        }
+                        _ => {}
+                    },
+                    super::super::RecommendationTarget::ExplorationFactor => match rec.direction {
+                        super::super::AdjustmentDirection::Increase => {
+                            self.adjust_exploration("metacog_explore_increase", 0.12);
+                        }
+                        super::super::AdjustmentDirection::Decrease => {
+                            self.scale_exploration("metacog_explore_decrease", 0.75);
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                }
             }
         }
     }

@@ -17,9 +17,7 @@ use super::helpers;
 use super::training::TrainingSample;
 use super::thresholds::{
     ATTENTION_BUDGET_US, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE,
-    DOMINANCE_FLOW_SCALE, FEP_LR_DECAY, FEP_SURPRISE_SCALE, MEMORY_RECALL_TOP_K,
-    MORAL_BENEFIT_CONFIDENCE_BOOST, MORAL_BENEFIT_THRESHOLD, MORAL_CONCERN_EXPLORATION_DAMPEN,
-    MORAL_CONCERN_PAUSE_BOOST, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW,
+    DOMINANCE_FLOW_SCALE, MEMORY_RECALL_TOP_K, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW,
     POLICY_SOFT_THRESHOLD, POLICY_TEMP_BASE, POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE,
     QUANTUM_COHERENCE_BOOST_SCALE, QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER,
     RESONANCE_TAU_SCALE,
@@ -47,6 +45,9 @@ impl CognitiveLoopService {
         let moral_concern_detected = perception.moral_concern_detected;
         let _input_memoized = perception.input_memoized;
         let selected_strategy = perception.selected_strategy;
+
+        // Cache moral_score for neuromod feedback (consumed in helpers/cycle_phases.rs)
+        self.carryover.quality.last_moral_score = perception.moral_score;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE A: OBSERVE — Build immutable CycleSnapshot (Phase 2.3)
@@ -221,7 +222,7 @@ impl CognitiveLoopService {
         };
 
         // Coherence gate: skip resonator recall during unstable CfC dynamics
-        let reflection_thresholds = self.self_reflection.get_thresholds();
+        let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
         let resonator_coherence_gate = pre_update_coherence > reflection_thresholds.coherence_gate
             || self.stats.total_cycles < 10;
         if resonator_coherence_gate && urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
@@ -745,9 +746,9 @@ impl CognitiveLoopService {
             }
         }
 
-        if self.external_reward.abs() > f32::EPSILON {
+        if self.social.external_reward.abs() > f32::EPSILON {
             let outcome_obs = Observation::from_consciousness_state(
-                self.external_reward as f64,
+                self.social.external_reward as f64,
                 coherence as f64,
                 self.prediction_confidence as f64,
                 effective_lr as f64,
@@ -759,79 +760,12 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.7 Moral Modulation of Active Inference
         // ═══════════════════════════════════════════════════════════════════════
-        let mut moral_steering_category: &str = "";
-        if moral_concern_detected {
-            self.scale_exploration("moral_concern", MORAL_CONCERN_EXPLORATION_DAMPEN);
-
-            self.self_reflection.trust_threshold =
-                (self.self_reflection.trust_threshold * 1.2).clamp(0.1, 0.95);
-
-            self.adaptive_behavior.pause_multiplier *= MORAL_CONCERN_PAUSE_BOOST;
-
-            if perception.moral_judgment.consent_violation
-                || perception
-                    .moral_judgment
-                    .violations
-                    .iter()
-                    .any(|v| v.contains("perfect") || v.contains("harm"))
-            {
-                self.stats.moral_review_needed = true;
-            }
-
-            if perception.moral_judgment.consent_violation {
-                self.scale_confidence("moral_consent_viol", 0.7);
-                self.carryover.learning.subsystem_lr_factor *= 0.5;
-                moral_steering_category = "consent";
-            } else if perception
-                .moral_judgment
-                .violations
-                .iter()
-                .any(|v| v.contains("harm"))
-            {
-                self.scale_exploration("harm_detected", 0.4);
-                self.scale_confidence("moral_harm_detect", 0.85);
-                moral_steering_category = "harm";
-            } else if perception
-                .moral_judgment
-                .violations
-                .iter()
-                .any(|v| v.contains("perfect") || v.contains("duty"))
-            {
-                self.self_reflection.force_reflection();
-                self.carryover.learning.subsystem_lr_factor *= 0.8;
-                moral_steering_category = "duty";
-            } else if !perception.moral_judgment.violations.is_empty() {
-                self.carryover.learning.subsystem_lr_factor *= 0.9;
-                moral_steering_category = "other";
-            }
-        } else if perception.moral_score > MORAL_BENEFIT_THRESHOLD {
-            self.scale_confidence("moral_benefit", MORAL_BENEFIT_CONFIDENCE_BOOST);
-        }
-
-        // Surprise-gated learning rate boost
-        if is_surprised {
-            let surprise_boost =
-                (self.fep_agent.current_free_energy() as f32 / FEP_SURPRISE_SCALE).clamp(0.1, 0.5);
-            self.adjust_lr("fep_surprise", surprise_boost);
-        } else {
-            self.scale_lr("fep_decay", FEP_LR_DECAY);
-        }
-
-        // ── Phase 21: Predictive free energy → surprise amplitude scaling ─
-        let cached_pfe = self.carryover.consciousness.last_predictive_free_energy;
-        let pfe_surprise_mod = if is_surprised && cached_pfe > 0.5 {
-            let amplification = ((cached_pfe - 0.5) * 0.2).min(0.1) as f32;
-            self.adjust_exploration("pfe_surprise_amplify", amplification);
-            self.stats.pfe_surprise_mod_count += 1;
-            amplification
-        } else if is_surprised && cached_pfe < 0.2 && cached_pfe > 0.0 {
-            let dampening = ((0.2 - cached_pfe) * 0.15).min(0.05) as f32;
-            self.scale_exploration("pfe_surprise_dampen", 1.0 - dampening);
-            self.stats.pfe_surprise_mod_count += 1;
-            -dampening
-        } else {
-            0.0
-        };
+        let (moral_steering_category, pfe_surprise_mod) = self.apply_moral_modulation(
+            moral_concern_detected,
+            &perception.moral_judgment,
+            perception.moral_score,
+            is_surprised,
+        );
 
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH + PSI SYNTHESIS (extracted to cycle_neuromod_phase.rs)
@@ -896,7 +830,7 @@ impl CognitiveLoopService {
                 }
                 MotorCommandType::ReflectionInitiate => {
                     if enhanced_result.motor_command.intensity > 0.7 {
-                        self.self_reflection.force_reflection();
+                        self.self_model_tier.self_reflection.force_reflection();
                     }
                 }
                 MotorCommandType::MemoryConsolidate => {
@@ -937,64 +871,14 @@ impl CognitiveLoopService {
                 .cycle(coh_urgency as f64, 0.1, 0.1, effective_lr as f64);
         }
 
-        // 10e. Update flow state
-        let adapted_thresholds = self.self_reflection.get_thresholds();
-        self.flow_state.update_with_thresholds(
-            pattern,
-            prediction_error,
-            coherence,
-            self.prediction_confidence,
-            adapted_thresholds.flow_error,
-            adapted_thresholds.flow_coherence,
-        );
-
-        // 10f. Update curiosity drive
-        self.curiosity_drive
-            .set_boredom_threshold(adapted_thresholds.boredom);
-        self.curiosity_drive.update(prediction_error);
-
-        // 10g. Self-reflection
-        self.self_reflection.record_cycle(
-            prediction_error,
-            self.flow_state.in_flow,
-            self.curiosity_drive.should_explore(),
-            self.prediction_confidence,
-        );
-        if self.self_reflection.should_reflect() {
-            let recommendations = self.self_reflection.reflect();
-            for rec in &recommendations {
-                if rec.confidence < 0.5 {
-                    continue;
-                }
-                match rec.target {
-                    super::RecommendationTarget::LearningRate => match rec.direction {
-                        super::AdjustmentDirection::Decrease => {
-                            self.scale_lr("reflection_decrease", 0.9);
-                        }
-                        super::AdjustmentDirection::Increase => {
-                            self.scale_lr("reflection_increase", 1.1);
-                        }
-                        _ => {}
-                    },
-                    super::RecommendationTarget::ExplorationFactor => match rec.direction {
-                        super::AdjustmentDirection::Increase => {
-                            self.adjust_exploration("metacog_explore_increase", 0.12);
-                        }
-                        super::AdjustmentDirection::Decrease => {
-                            self.scale_exploration("metacog_explore_decrease", 0.75);
-                        }
-                        _ => {}
-                    },
-                    _ => {}
-                }
-            }
-        }
+        // 10e–g. Update flow state, curiosity drive, self-reflection
+        self.update_drives_and_reflection(pattern, prediction_error, coherence);
 
         // Unified Psi + Experience Bus + Guiding Question computed by
         // run_neuromodulator_and_psi_phase() above — values already in neuromod_result.
 
         // ── Phase 15: Attention budget check ─────────────────────────────────
-        let neuromod_attention_alloc = self.neuromodulator_bath.attention_budget_allocation();
+        let neuromod_attention_alloc = self.neuromod.bath.attention_budget_allocation();
         let attention_budget_us = (ATTENTION_BUDGET_US as f32 * neuromod_attention_alloc) as u64;
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
@@ -1082,7 +966,7 @@ impl CognitiveLoopService {
                 tool: None,
                 recent_utility: 0.5,
                 cycle_id: self.stats.total_cycles as u64,
-                neuromod_exploration_mod: self.neuromodulator_bath.mcts_exploration_modulation(),
+                neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
             };
 
             let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
@@ -1204,17 +1088,17 @@ impl CognitiveLoopService {
 
         // Compose effective LR
         let effective_lr = self.compose_effective_lr(semantic_lr_factor, reasoning_lr_factor);
-        let effective_lr = effective_lr * self.neuromodulator_bath.gradient_scale_factor();
-        let effective_lr = effective_lr * self.neuromodulator_bath.plasticity_gate();
-        let effective_lr = if self.neuromodulator_bath.sleep_pressure() > 0.7 {
-            let pressure_factor = 1.0 - (self.neuromodulator_bath.sleep_pressure() - 0.7) * 0.5;
+        let effective_lr = effective_lr * self.neuromod.bath.gradient_scale_factor();
+        let effective_lr = effective_lr * self.neuromod.bath.plasticity_gate();
+        let effective_lr = if self.neuromod.bath.sleep_pressure() > 0.7 {
+            let pressure_factor = 1.0 - (self.neuromod.bath.sleep_pressure() - 0.7) * 0.5;
             effective_lr * pressure_factor.clamp(0.5, 1.0)
         } else {
             effective_lr
         };
 
         let neuromod_threshold =
-            perception.effective_threshold * self.neuromodulator_bath.threshold_gate();
+            perception.effective_threshold * self.neuromod.bath.threshold_gate();
 
         // 11. Learn if error is significant
         let _t_core = Instant::now();
@@ -1316,9 +1200,9 @@ impl CognitiveLoopService {
         // #13: Report learning activity to glutamate channel
         {
             let is_night = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
-            self.neuromodulator_bath
+            self.neuromod.bath
                 .report_learning(effective_lr, prediction_error, is_night);
-            let fatigue = self.neuromodulator_bath.learning_fatigue_factor();
+            let fatigue = self.neuromod.bath.learning_fatigue_factor();
             if fatigue < 1.0 {
                 self.scale_lr("glutamate_fatigue", fatigue);
             }

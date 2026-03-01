@@ -9,6 +9,8 @@
 //! - Feedback clamping (homeostatic guards)
 //! - Carry-over consistency across cycle boundaries
 
+use serial_test::serial;
+
 use super::super::*;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -54,6 +56,7 @@ fn assert_finite_f32(val: f32, name: &str) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
+#[serial]
 fn test_confidence_bounded_after_cycles() {
     let mut service = minimal_service();
     for i in 0..50 {
@@ -131,6 +134,7 @@ fn test_effective_learning_rate_bounded() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
+#[serial]
 fn test_cycle_result_no_nan_inf() {
     let mut service = minimal_service();
     for i in 0..10 {
@@ -171,8 +175,8 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite(m.narrative_self_psi, "narrative_self_psi");
         assert_finite(m.living_mind_vitality, "living_mind_vitality");
         assert_finite(m.living_mind_coherence, "living_mind_coherence");
-        assert_finite(m.predictive_free_energy, "predictive_free_energy");
-        assert_finite(m.predictive_phi_modulation, "predictive_phi_modulation");
+        assert_finite(m.fep.predictive_free_energy, "predictive_free_energy");
+        assert_finite(m.fep.predictive_phi_modulation, "predictive_phi_modulation");
         assert_finite_f32(
             m.cross_modal_binding_strength,
             "cross_modal_binding_strength",
@@ -189,15 +193,15 @@ fn test_cycle_metadata_floats_finite() {
         );
         assert_finite_f32(m.attention.psi_attention_avg, "psi_attention_avg");
         assert_finite(m.primitive_psi, "primitive_psi");
-        assert_finite(m.value_evaluator_score, "value_evaluator_score");
-        assert_finite_f32(m.harmonies_alignment, "harmonies_alignment");
+        assert_finite(m.ethics.value_evaluator_score, "value_evaluator_score");
+        assert_finite_f32(m.harmonics.harmonies_alignment, "harmonies_alignment");
         assert_finite(
             m.consciousness_profile_composite,
             "consciousness_profile_composite",
         );
         assert_finite(m.synergy_enhanced_composite, "synergy_enhanced_composite");
-        assert_finite(m.harmonic_field_coherence, "harmonic_field_coherence");
-        assert_finite(m.harmonic_love_resonance, "harmonic_love_resonance");
+        assert_finite(m.harmonics.harmonic_field_coherence, "harmonic_field_coherence");
+        assert_finite(m.harmonics.harmonic_love_resonance, "harmonic_love_resonance");
         assert_finite_f32(m.reasoning_chain_confidence, "reasoning_chain_confidence");
         assert_finite(m.adaptive_reasoning_phi, "adaptive_reasoning_phi");
         assert_finite(m.causal_avg_confidence, "causal_avg_confidence");
@@ -238,25 +242,25 @@ fn test_cycle_metadata_floats_finite() {
         );
         assert_finite(m.meta_reasoning_confidence, "meta_reasoning_confidence");
         assert_finite_f32(m.negation_polarity, "negation_polarity");
-        assert_finite_f32(m.moral_score, "moral_score");
+        assert_finite_f32(m.ethics.moral_score, "moral_score");
         assert_finite_f32(m.actual_effective_lr, "actual_effective_lr");
         assert_finite_f32(m.cycle_reward, "cycle_reward");
-        assert_finite_f32(m.value_feedback_trend, "value_feedback_trend");
+        assert_finite_f32(m.ethics.value_feedback_trend, "value_feedback_trend");
         assert_finite(m.support_efe, "support_efe");
-        assert_finite_f32(m.soul_alignment, "soul_alignment");
+        assert_finite_f32(m.ethics.soul_alignment, "soul_alignment");
         assert_finite_f32(m.quality.meta_cognitive_accuracy, "meta_cognitive_accuracy");
         assert_finite_f32(m.circadian_plasticity, "circadian_plasticity");
         assert_finite_f32(m.attention.phi_attention_weight, "phi_attention_weight");
-        assert_finite(m.fep_pragmatic_value, "fep_pragmatic_value");
-        assert_finite(m.fep_accuracy, "fep_accuracy");
-        assert_finite(m.fep_complexity, "fep_complexity");
-        assert_finite(m.fep_surprise, "fep_surprise");
-        assert_finite(m.fep_td_error, "fep_td_error");
+        assert_finite(m.fep.fep_pragmatic_value, "fep_pragmatic_value");
+        assert_finite(m.fep.fep_accuracy, "fep_accuracy");
+        assert_finite(m.fep.fep_complexity, "fep_complexity");
+        assert_finite(m.fep.fep_surprise, "fep_surprise");
+        assert_finite(m.fep.fep_td_error, "fep_td_error");
         assert_finite_f32(m.memory.resonator_best_sim, "resonator_best_sim");
         assert_finite_f32(m.memory.codebook_diversity, "codebook_diversity");
         assert_finite(m.context_phi_weight, "context_phi_weight");
-        assert_finite(m.empathic_compassion, "empathic_compassion");
-        assert_finite(m.empathic_tone_adj, "empathic_tone_adj");
+        assert_finite(m.ethics.empathic_compassion, "empathic_compassion");
+        assert_finite(m.ethics.empathic_tone_adj, "empathic_tone_adj");
     }
 }
 
@@ -645,6 +649,7 @@ fn test_psi_attestation_drain() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
+#[serial]
 fn test_100_cycles_stable() {
     let mut service = learning_service();
     for i in 0..100 {
@@ -685,6 +690,7 @@ fn test_100_cycles_stable() {
 }
 
 #[test]
+#[serial]
 fn test_100_cycles_varied_input_stable() {
     let mut service = minimal_service();
     let diverse_inputs = [
@@ -743,6 +749,7 @@ fn test_genesis_determinism_single_cycle() {
 }
 
 #[test]
+#[serial]
 fn test_genesis_determinism_multi_cycle() {
     let phrase = "multi cycle determinism";
     let mut a = seeded_service(phrase);
@@ -902,9 +909,9 @@ fn test_moral_score_in_metadata_bounded() {
     let mut service = minimal_service();
     let result = service.cycle("help others be kind and honest");
     assert!(
-        result.metadata.moral_score >= -1.0 && result.metadata.moral_score <= 1.0,
+        result.metadata.ethics.moral_score >= -1.0 && result.metadata.ethics.moral_score <= 1.0,
         "Moral score out of [-1.0, 1.0]: {}",
-        result.metadata.moral_score
+        result.metadata.ethics.moral_score
     );
 }
 
@@ -941,6 +948,7 @@ fn test_attention_sensitivity_bounded_after_cycles() {
 }
 
 #[test]
+#[serial]
 fn test_consciousness_level_bounded() {
     let mut service = learning_service();
     for i in 0..20 {
