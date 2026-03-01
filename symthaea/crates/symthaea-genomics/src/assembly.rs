@@ -44,7 +44,7 @@ impl HdcAssembler {
 
     /// Encode a k-mer as a hypervector.
     ///
-    /// Uses positional binding: HV = base[0] bind permute(base[1], 1) bind permute(base[2], 2) ...
+    /// Uses positional binding: HV = base\[0\] bind permute(base\[1\], 1) bind permute(base\[2\], 2) ...
     /// This creates a position-sensitive encoding where the same base at different
     /// positions produces distinct (near-orthogonal) contributions.
     pub fn encode_kmer(kmer: &[Base], dimension: usize) -> ContinuousHV {
