@@ -76,12 +76,15 @@ async fn test_verification_submit_and_query() {
         title: "Verification Test Bracket".to_string(),
         description: "For verification workflow testing".to_string(),
         category: "Parts".to_string(),
-        license: "PublicDomain".to_string(),
-        safety_class: "Class2LoadBearing".to_string(),
-        files: vec![],
-        tags: vec!["test".to_string()],
-        material_compatibility: vec![],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("PublicDomain"),
+        safety_class: "Class2LoadBearing".to_string(),
     };
 
     let design_record: Record = conductor
@@ -171,12 +174,15 @@ async fn test_safety_claim_and_epistemic_score() {
         title: "Epistemic Score Test".to_string(),
         description: "For epistemic scoring test".to_string(),
         category: "Parts".to_string(),
-        license: "PublicDomain".to_string(),
-        safety_class: "Class1Functional".to_string(),
-        files: vec![],
-        tags: vec![],
-        material_compatibility: vec![],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("PublicDomain"),
+        safety_class: "Class1Functional".to_string(),
     };
 
     let design_record: Record = conductor
@@ -243,12 +249,15 @@ async fn test_verification_summary_with_multiple_results() {
         title: "Multi-Verification Design".to_string(),
         description: "For multi-verification summary test".to_string(),
         category: "Parts".to_string(),
-        license: "PublicDomain".to_string(),
-        safety_class: "Class3LifeSafety".to_string(),
-        files: vec![],
-        tags: vec![],
-        material_compatibility: vec![],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("PublicDomain"),
+        safety_class: "Class3BodyContact".to_string(),
     };
 
     let design_record: Record = conductor
@@ -285,7 +294,7 @@ async fn test_verification_summary_with_multiple_results() {
         design_hash: design_hash.clone(),
         verification_type: "MaterialCompatibility".to_string(),
         result: serde_json::json!({
-            "Failed": { "reasons": ["Material mismatch"], "notes": "Needs PETG" }
+            "Failed": { "reasons": ["Material mismatch"] }
         }),
         evidence: vec![],
         credentials: vec!["PE #2".to_string()],

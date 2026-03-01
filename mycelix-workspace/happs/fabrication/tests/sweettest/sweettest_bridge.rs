@@ -19,13 +19,14 @@ use fabrication_sweettest::common::*;
 // Mirror types — bridge coordinator
 // ============================================================================
 
+/// Mirror of bridge coordinator's `CreateRepairPredictionInput`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateRepairPredictionInput {
-    pub property_asset_hash: Vec<u8>,
+    pub property_asset_hash: ActionHash,
     pub asset_model: String,
     pub predicted_failure_component: String,
     pub failure_probability: f32,
-    pub estimated_failure_date: i64,
+    pub estimated_failure_date: Timestamp,
     pub confidence_interval_days: u32,
     pub sensor_data_summary: String,
 }
@@ -47,31 +48,35 @@ pub struct EmitEventInput {
     pub payload: String,
 }
 
+/// Mirror of bridge coordinator's `GetRecentEventsInput`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetRecentEventsInput {
-    pub since: Option<i64>,
-    pub pagination: PaginationInput,
+    pub since: Option<Timestamp>,
+    pub pagination: Option<PaginationInput>,
 }
 
+/// Mirror of bridge coordinator's `GetActiveWorkflowsInput`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetActiveWorkflowsInput {
-    pub pagination: PaginationInput,
+    pub pagination: Option<PaginationInput>,
 }
 
+/// Mirror of fabrication_common's `AuditTrailFilter`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct AuditTrailFilter {
     pub domain: Option<String>,
     pub agent: Option<AgentPubKey>,
-    pub after: Option<i64>,
-    pub before: Option<i64>,
-    pub limit: u32,
+    pub after: Option<Timestamp>,
+    pub before: Option<Timestamp>,
+    pub limit: Option<u32>,
     pub pagination: Option<PaginationInput>,
 }
 
+/// Mirror of bridge coordinator's `ListDesignInput`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ListOnMarketplaceInput {
     pub design_hash: ActionHash,
-    pub price: u64,
+    pub price: Option<u64>,
     pub listing_type: String,
 }
 
@@ -94,11 +99,11 @@ async fn test_repair_prediction_and_workflow() {
 
     // Create a repair prediction
     let prediction_input = CreateRepairPredictionInput {
-        property_asset_hash: vec![1u8; 39],
+        property_asset_hash: ActionHash::from_raw_39(vec![132u8; 39]),
         asset_model: "Bosch GSR 18V-60".to_string(),
         predicted_failure_component: "Battery clip".to_string(),
         failure_probability: 0.85,
-        estimated_failure_date: 1740000000000000, // Far future
+        estimated_failure_date: Timestamp::from_micros(1740000000000000), // Far future
         confidence_interval_days: 7,
         sensor_data_summary: r#"{"vibration_increase": 0.15}"#.to_string(),
     };
@@ -152,11 +157,11 @@ async fn test_workflow_update_requires_creator() {
 
     // Alice creates prediction + workflow
     let prediction_input = CreateRepairPredictionInput {
-        property_asset_hash: vec![2u8; 39],
+        property_asset_hash: ActionHash::from_raw_39(vec![132u8; 39]),
         asset_model: "Auth Test Tool".to_string(),
         predicted_failure_component: "motor".to_string(),
         failure_probability: 0.75,
-        estimated_failure_date: 1740000000000000,
+        estimated_failure_date: Timestamp::from_micros(1740000000000000),
         confidence_interval_days: 10,
         sensor_data_summary: "{}".to_string(),
     };
@@ -249,10 +254,10 @@ async fn test_event_emission_and_audit_trail() {
             "get_recent_events",
             GetRecentEventsInput {
                 since: None,
-                pagination: PaginationInput {
+                pagination: Some(PaginationInput {
                     offset: 0,
                     limit: 100,
-                },
+                }),
             },
         )
         .await;
@@ -266,11 +271,11 @@ async fn test_event_emission_and_audit_trail() {
 
     // Query audit trail — prediction creation should be logged
     let prediction_input = CreateRepairPredictionInput {
-        property_asset_hash: vec![10u8; 39],
+        property_asset_hash: ActionHash::from_raw_39(vec![132u8; 39]),
         asset_model: "Audit Test".to_string(),
         predicted_failure_component: "test".to_string(),
         failure_probability: 0.5,
-        estimated_failure_date: 1740000000000000,
+        estimated_failure_date: Timestamp::from_micros(1740000000000000),
         confidence_interval_days: 7,
         sensor_data_summary: "{}".to_string(),
     };
@@ -292,7 +297,7 @@ async fn test_event_emission_and_audit_trail() {
                 agent: None,
                 after: None,
                 before: None,
-                limit: 50,
+                limit: Some(50),
                 pagination: None,
             },
         )
@@ -326,12 +331,15 @@ async fn test_marketplace_listing() {
         title: "Marketplace Widget".to_string(),
         description: "For marketplace listing test".to_string(),
         category: "Parts".to_string(),
-        license: "Proprietary".to_string(),
-        safety_class: "Class1Functional".to_string(),
-        files: vec![],
-        tags: vec![],
-        material_compatibility: vec![],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("Proprietary"),
+        safety_class: "Class1Functional".to_string(),
     };
 
     let design_record: Record = conductor
@@ -347,7 +355,7 @@ async fn test_marketplace_listing() {
     // List on marketplace
     let listing_input = ListOnMarketplaceInput {
         design_hash,
-        price: 500,
+        price: Some(500),
         listing_type: "DesignSale".to_string(),
     };
 

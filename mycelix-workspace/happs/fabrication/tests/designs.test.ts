@@ -140,7 +140,7 @@ describe('Designs Zome', () => {
           circularity_score: 0.5,
           embodied_energy_kwh: 1.0,
           repair_manifest: null,
-          license: 'CreativeCommons',
+          license: { CreativeCommons: 'BY' },
           safety_class: 'Class1Functional',
         },
       });

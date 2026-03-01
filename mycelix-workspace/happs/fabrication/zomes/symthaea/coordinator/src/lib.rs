@@ -33,6 +33,52 @@ fn get_config() -> FabricationConfig {
 }
 
 // =============================================================================
+// RATE LIMITING
+// =============================================================================
+
+fn rate_limit_anchor(agent: &AgentPubKey) -> ExternResult<EntryHash> {
+    let anchor_bytes = SerializedBytes::from(UnsafeBytes::from(
+        format!("rate_limit:{}", agent).into_bytes(),
+    ));
+    hash_entry(Entry::App(AppEntryBytes(anchor_bytes)))
+}
+
+fn enforce_rate_limit(caller: &AgentPubKey) -> ExternResult<()> {
+    let cfg = get_config();
+    let max_ops = cfg.rate_limit_max_ops as usize;
+    let window_micros = cfg.rate_limit_window_secs as i64 * 1_000_000;
+
+    let anchor = rate_limit_anchor(caller)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor.clone(), LinkTypes::RateLimitBucket)?,
+        GetStrategy::default(),
+    )?;
+
+    let now = sys_time()?;
+    let window_start = now.as_micros() - window_micros;
+
+    let recent_count = links
+        .iter()
+        .filter(|l| l.timestamp.as_micros() >= window_start)
+        .count();
+
+    if recent_count >= max_ops {
+        return Err(FabricationError::RateLimited {
+            max_ops: cfg.rate_limit_max_ops,
+            window_secs: cfg.rate_limit_window_secs,
+        }.to_wasm_error());
+    }
+
+    create_link(anchor.clone(), anchor, LinkTypes::RateLimitBucket, ())?;
+    Ok(())
+}
+
+fn rate_limit_caller() -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    enforce_rate_limit(&agent)
+}
+
+// =============================================================================
 // HDC INTENT CREATION
 // =============================================================================
 
@@ -53,6 +99,7 @@ pub struct IntentResult {
 /// e.g., "I need a bracket for a 12mm pipe that's weatherproof"
 #[hdk_extern]
 pub fn generate_intent_vector(input: CreateIntentInput) -> ExternResult<IntentResult> {
+    rate_limit_caller()?;
     let author = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -89,12 +136,12 @@ pub fn generate_intent_vector(input: CreateIntentInput) -> ExternResult<IntentRe
 
     // Link to global anchor for semantic_search
     let anchor = all_intents_anchor()?;
-    create_link(anchor, hash.clone(), LinkTypes::AuthorToIntents, ())?;
+    create_link(anchor, hash.clone(), LinkTypes::AnchorToIntents, ())?;
 
     // Link to category anchor for partitioned search
     let category = extract_primary_category(&bindings);
     let cat_anchor = category_anchor(&category)?;
-    create_link(cat_anchor, hash.clone(), LinkTypes::AuthorToIntents, ())?;
+    create_link(cat_anchor, hash.clone(), LinkTypes::CategoryToIntents, ())?;
 
     let record = get(hash.clone(), GetOptions::default())?
         .ok_or(FabricationError::not_found("Intent", &hash))?;
@@ -227,6 +274,7 @@ pub struct LateralBindInput {
 /// bracket_vector (x) 12mm_vector (x) weatherproof_vector
 #[hdk_extern]
 pub fn lateral_bind(input: LateralBindInput) -> ExternResult<IntentResult> {
+    rate_limit_caller()?;
     // Get base intent
     let base_record = get(input.base_intent_hash.clone(), GetOptions::default())?
         .ok_or(FabricationError::not_found("Intent", &input.base_intent_hash))?;
@@ -304,6 +352,8 @@ pub struct SemanticSearchInput {
     pub intent_hash: ActionHash,
     pub threshold: Option<f32>,
     pub limit: Option<u32>,
+    /// If true, persist each match as a SemanticMatch DHT entry. Default: false.
+    pub record_matches: Option<bool>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -318,6 +368,7 @@ pub struct SearchResult {
 pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchResult>> {
     let threshold = input.threshold.unwrap_or(get_config().similarity_threshold);
     let limit = input.limit.unwrap_or(10) as usize;
+    let should_record = input.record_matches.unwrap_or(false);
 
     // Get query intent
     let query_record = get(input.intent_hash.clone(), GetOptions::default())?
@@ -335,7 +386,7 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
 
     // Get all intents and compute cosine similarity in HDC space
     let anchor = all_intents_anchor()?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AuthorToIntents)?, GetStrategy::default())?;
+    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AnchorToIntents)?, GetStrategy::default())?;
 
     let mut results = Vec::new();
     let now = sys_time()?;
@@ -358,15 +409,17 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
                     );
 
                     if similarity >= threshold {
-                        // Record the match
-                        let match_entry = SemanticMatchEntry {
-                            query_intent_hash: input.intent_hash.clone(),
-                            matched_design_hash: hash.clone(),
-                            similarity_score: similarity,
-                            matched_bindings: matched.clone(),
-                            searched_at: Timestamp::from_micros(now.as_micros() as i64),
-                        };
-                        let _ = create_entry(EntryTypes::SemanticMatch(match_entry));
+                        // Optionally persist the match as a DHT entry
+                        if should_record {
+                            let match_entry = SemanticMatchEntry {
+                                query_intent_hash: input.intent_hash.clone(),
+                                matched_design_hash: hash.clone(),
+                                similarity_score: similarity,
+                                matched_bindings: matched.clone(),
+                                searched_at: Timestamp::from_micros(now.as_micros() as i64),
+                            };
+                            let _ = create_entry(EntryTypes::SemanticMatch(match_entry));
+                        }
 
                         results.push(SearchResult {
                             design_hash: hash,
@@ -391,6 +444,7 @@ pub fn semantic_search(input: SemanticSearchInput) -> ExternResult<Vec<SearchRes
 pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<Vec<SearchResult>> {
     let threshold = input.threshold.unwrap_or(get_config().similarity_threshold);
     let limit = input.limit.unwrap_or(10) as usize;
+    let should_record = input.record_matches.unwrap_or(false);
 
     let query_record = get(input.intent_hash.clone(), GetOptions::default())?
         .ok_or(FabricationError::not_found("Intent", &input.intent_hash))?;
@@ -405,7 +459,7 @@ pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<V
     // Get category anchor for the query's primary category
     let category = extract_primary_category(&query_intent.semantic_bindings);
     let anchor = category_anchor(&category)?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AuthorToIntents)?, GetStrategy::default())?;
+    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::CategoryToIntents)?, GetStrategy::default())?;
 
     let mut results = Vec::new();
     let now = sys_time()?;
@@ -421,14 +475,16 @@ pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<V
                         &query_intent.semantic_bindings, &intent.semantic_bindings,
                     );
                     if similarity >= threshold {
-                        let match_entry = SemanticMatchEntry {
-                            query_intent_hash: input.intent_hash.clone(),
-                            matched_design_hash: hash.clone(),
-                            similarity_score: similarity,
-                            matched_bindings: matched.clone(),
-                            searched_at: Timestamp::from_micros(now.as_micros() as i64),
-                        };
-                        let _ = create_entry(EntryTypes::SemanticMatch(match_entry));
+                        if should_record {
+                            let match_entry = SemanticMatchEntry {
+                                query_intent_hash: input.intent_hash.clone(),
+                                matched_design_hash: hash.clone(),
+                                similarity_score: similarity,
+                                matched_bindings: matched.clone(),
+                                searched_at: Timestamp::from_micros(now.as_micros() as i64),
+                            };
+                            let _ = create_entry(EntryTypes::SemanticMatch(match_entry));
+                        }
                         results.push(SearchResult {
                             design_hash: hash,
                             similarity_score: similarity,
@@ -448,6 +504,11 @@ pub fn semantic_search_by_category(input: SemanticSearchInput) -> ExternResult<V
 /// LSH-accelerated semantic search — builds an in-memory LSH index from all
 /// intents, then uses multi-probe approximate nearest neighbor to find candidates.
 /// Falls back to brute-force when the index is small (<50 intents).
+///
+/// NOTE: The LSH index is rebuilt on each call because Holochain WASM zome calls
+/// do not share state between invocations (thread_local is per-call).
+/// For large datasets, consider using `semantic_search_by_category` instead,
+/// which partitions the search space by category anchor.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LshSearchInput {
     pub query_description: String,
@@ -467,7 +528,7 @@ pub fn semantic_search_lsh(input: LshSearchInput) -> ExternResult<Vec<SearchResu
 
     // Build LSH index from all intents
     let anchor = all_intents_anchor()?;
-    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AuthorToIntents)?, GetStrategy::default())?;
+    let links = get_links(LinkQuery::try_new(anchor, LinkTypes::AnchorToIntents)?, GetStrategy::default())?;
 
     let mut index = LshIndex::new(LSH_NUM_PLANES, FAB_HDC_DIM, 0xFAB0_0DC0);
     let mut intent_map: std::collections::HashMap<String, (ActionHash, HdcIntentEntry)> = std::collections::HashMap::new();
@@ -550,6 +611,7 @@ pub struct GenerateVariantInput {
 /// Generate parametric variant from intent + constraints
 #[hdk_extern]
 pub fn generate_parametric_variant(input: GenerateVariantInput) -> ExternResult<Record> {
+    rate_limit_caller()?;
     let now = sys_time()?;
 
     // First create an intent from the modifiers
@@ -624,6 +686,7 @@ pub struct OptimizeLocalInput {
 /// Optimize design for local conditions
 #[hdk_extern]
 pub fn optimize_for_local(input: OptimizeLocalInput) -> ExternResult<Record> {
+    rate_limit_caller()?;
     let now = sys_time()?;
 
     // Calculate parameter adjustments based on local constraints
@@ -954,13 +1017,15 @@ pub fn predict_repair_needs(input: PredictRepairInput) -> ExternResult<RepairPre
 }
 
 /// Internal: aggregated sensor signal envelope
-#[allow(dead_code)]
 struct SensorSignature {
     vibration_rms: f32,
+    #[allow(dead_code)] // Reserved for trend analysis
     vibration_trend_slope: f32,
     vibration_peak_freq: f32,
+    #[allow(dead_code)] // Reserved for thermal baseline
     temp_mean: f32,
     temp_max: f32,
+    #[allow(dead_code)] // Reserved for trend analysis
     temp_trend_slope: f32,
     torque_variance: f32,
     current_draw_delta: f32,
@@ -1377,6 +1442,7 @@ pub struct ConsciousnessGatedInput {
 pub fn generate_consciousness_gated_variant(
     input: ConsciousnessGatedInput,
 ) -> ExternResult<Record> {
+    rate_limit_caller()?;
     let params = consciousness_gated_params(input.consciousness_score);
 
     // Gate: if confidence would be below tier minimum, fall back to template

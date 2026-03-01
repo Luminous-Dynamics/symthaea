@@ -25,6 +25,7 @@ pub enum LinkTypes {
     VerifierToVerifications,
     OpenRequests,
     ClaimToKnowledge,
+    RateLimitBucket,
 }
 
 #[hdk_entry_helper]

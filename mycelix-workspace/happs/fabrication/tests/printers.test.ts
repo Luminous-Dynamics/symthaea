@@ -93,7 +93,7 @@ describe('Printers Zome', () => {
             max_temp_bed: 150,
             features: [],
           },
-          materials_available: ['PEEK', 'PEI', 'Nylon'],
+          materials_available: ['PEEK', { Custom: 'PEI' }, 'Nylon'],
           rates: null,
         },
       });
@@ -227,11 +227,11 @@ describe('Printers Zome', () => {
           capabilities: {
             build_volume: { x: 120, y: 68, z: 155 },
             layer_heights: [0.025, 0.05, 0.1],
-            nozzle_diameters: [],
+            nozzle_diameters: [0.05],
             heated_bed: false,
             enclosure: true,
             multi_material: null,
-            max_temp_hotend: 0,
+            max_temp_hotend: 40,
             max_temp_bed: 0,
             features: [],
           },

@@ -34,7 +34,7 @@ describe('Multi-Agent Fabrication Workflow', () => {
           circularity_score: 0.5,
           embodied_energy_kwh: 1.0,
           repair_manifest: null,
-          license: 'CreativeCommons',
+          license: { CreativeCommons: 'BY' },
           safety_class: 'Class2LoadBearing',
         },
       });
@@ -103,13 +103,14 @@ describe('Multi-Agent Fabrication Workflow', () => {
             multi_material: null,
             max_temp_hotend: 300,
             max_temp_bed: 110,
-            features: ['auto_bed_leveling'],
+            features: ['AutoLeveling'],
           },
           materials_available: ['PLA', 'PETG', 'ABS'],
           rates: {
-            base_fee: 200,
-            per_hour: 150,
-            per_gram: 5,
+            hourly_rate: 150,
+            material_rate: 5,
+            currency: 'USD',
+            minimum_order: null,
           },
         },
       });
@@ -133,7 +134,7 @@ describe('Multi-Agent Fabrication Workflow', () => {
             temperatures: { hotend: 240, bed: 80, chamber: null },
             custom_gcode: null,
           },
-          energy_source: 'Grid',
+          energy_source: 'GridMix',
           material_passport: null,
         },
       });
@@ -212,7 +213,7 @@ describe('Multi-Agent Fabrication Workflow', () => {
         payload: {
           title: 'Safety Bracket',
           description: 'Critical load path bracket',
-          category: 'Structural',
+          category: 'Parts',
           intent_vector: null,
           parametric_schema: null,
           constraint_graph: null,

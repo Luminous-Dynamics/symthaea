@@ -31,17 +31,22 @@ pub struct AgentPaginationInput {
 // Common design input (used by multiple test files)
 // =============================================================================
 
+/// Mirror of designs coordinator's `CreateDesignInput`.
+/// Enum fields use their serde string representation (e.g. `"Parts"` for DesignCategory::Parts).
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateDesignInput {
     pub title: String,
     pub description: String,
     pub category: String,
-    pub license: String,
+    pub intent_vector: Option<serde_json::Value>,
+    pub parametric_schema: Option<serde_json::Value>,
+    pub constraint_graph: Option<serde_json::Value>,
+    pub material_compatibility: Vec<serde_json::Value>,
+    pub circularity_score: f32,
+    pub embodied_energy_kwh: f32,
+    pub repair_manifest: Option<serde_json::Value>,
+    pub license: serde_json::Value,
     pub safety_class: String,
-    pub files: Vec<String>,
-    pub tags: Vec<String>,
-    pub material_compatibility: Vec<String>,
-    pub parametric_schema: Option<String>,
 }
 
 // =============================================================================

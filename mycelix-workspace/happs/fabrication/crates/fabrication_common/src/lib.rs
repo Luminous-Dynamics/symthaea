@@ -1036,6 +1036,42 @@ pub struct PrinterRates {
     pub minimum_order: Option<f64>,
 }
 
+/// Mirror of the Printer entry type for cross-zome deserialization.
+/// Identical serde shape to `printers_integrity::Printer` but without
+/// `#[hdk_entry_helper]`, so coordinators outside the printers zome can
+/// deserialize printer records without linking to the integrity crate.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct PrinterInfo {
+    pub id: String,
+    pub name: String,
+    pub owner: AgentPubKey,
+    pub location: Option<GeoLocation>,
+    pub printer_type: PrinterType,
+    pub capabilities: PrinterCapabilities,
+    pub materials_available: Vec<MaterialType>,
+    pub availability: AvailabilityStatus,
+    pub rates: Option<PrinterRates>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+impl TryFrom<SerializedBytes> for PrinterInfo {
+    type Error = SerializedBytesError;
+    fn try_from(sb: SerializedBytes) -> Result<Self, Self::Error> {
+        decode(&sb.bytes())
+            .map_err(|e| SerializedBytesError::Deserialize(e.to_string()))
+    }
+}
+
+impl TryFrom<PrinterInfo> for SerializedBytes {
+    type Error = SerializedBytesError;
+    fn try_from(val: PrinterInfo) -> Result<Self, Self::Error> {
+        let bytes = encode(&val)
+            .map_err(|e| SerializedBytesError::Serialize(e.to_string()))?;
+        Ok(SerializedBytes::from(UnsafeBytes::from(bytes)))
+    }
+}
+
 // =============================================================================
 // PRINT JOB TYPES
 // =============================================================================

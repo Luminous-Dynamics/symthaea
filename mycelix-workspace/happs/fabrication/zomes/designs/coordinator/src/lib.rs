@@ -342,6 +342,7 @@ pub fn delete_design(hash: ActionHash) -> ExternResult<ActionHash> {
 /// Add a file to a design (only the design author may add files)
 #[hdk_extern]
 pub fn add_design_file(input: AddFileInput) -> ExternResult<Record> {
+    rate_limit_caller()?;
     let uploader = agent_info()?.agent_initial_pubkey;
 
     // Verify caller is the design author
@@ -412,6 +413,7 @@ pub fn get_design_files(input: HashListInput) -> ExternResult<PaginatedResponse<
 /// Fork a design to create a derivative
 #[hdk_extern]
 pub fn fork_design(input: ForkDesignInput) -> ExternResult<Record> {
+    rate_limit_caller()?;
     let parent_record = get(input.parent_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Parent design not found".to_string()

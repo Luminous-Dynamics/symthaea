@@ -25,7 +25,10 @@ pub enum LinkTypes {
     IntentToDesigns,
     DesignToOptimizations,
     AuthorToIntents,
+    AnchorToIntents,
+    CategoryToIntents,
     SemanticSimilarity,
+    RateLimitBucket,
 }
 
 /// HDC Intent - A semantic query encoded as a hypervector

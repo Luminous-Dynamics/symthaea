@@ -19,20 +19,43 @@ use fabrication_sweettest::common::*;
 // Mirror types — printers coordinator (needed for setup)
 // ============================================================================
 
+/// Mirror of printers coordinator's `RegisterPrinterInput`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterPrinterInput {
     pub name: String,
     pub location: Option<serde_json::Value>,
     pub printer_type: String,
-    pub capabilities: serde_json::Value,
+    pub capabilities: PrinterCapabilities,
     pub materials_available: Vec<String>,
     pub rates: Option<serde_json::Value>,
+}
+
+/// Mirror of fabrication_common's `PrinterCapabilities`.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PrinterCapabilities {
+    pub build_volume: BuildVolume,
+    pub layer_heights: Vec<f32>,
+    pub nozzle_diameters: Vec<f32>,
+    pub heated_bed: bool,
+    pub enclosure: bool,
+    pub multi_material: Option<u8>,
+    pub max_temp_hotend: u16,
+    pub max_temp_bed: u16,
+    pub features: Vec<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BuildVolume {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
 // ============================================================================
 // Mirror types — prints coordinator
 // ============================================================================
 
+/// Mirror of prints coordinator's `CreatePrintJobInput`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreatePrintJobInput {
     pub design_hash: ActionHash,
@@ -42,13 +65,25 @@ pub struct CreatePrintJobInput {
     pub material_passport: Option<serde_json::Value>,
 }
 
+/// Mirror of fabrication_common's `PrintSettings`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PrintSettings {
     pub layer_height: f32,
     pub infill_percent: u8,
     pub material: String,
     pub supports: bool,
-    pub temperatures: Option<serde_json::Value>,
+    pub raft: bool,
+    pub print_speed: Option<u16>,
+    pub temperatures: TemperatureSettings,
+    pub custom_gcode: Option<String>,
+}
+
+/// Mirror of fabrication_common's `TemperatureSettings`.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TemperatureSettings {
+    pub hotend: u16,
+    pub bed: Option<u16>,
+    pub chamber: Option<u16>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -59,6 +94,9 @@ pub struct UpdateProgressInput {
     pub material_used_grams: Option<f32>,
 }
 
+/// Mirror of prints coordinator's `CompletePrintInput`.
+/// `result` is a `PrintResult` enum. Simple variants serialize as strings (e.g. `"Success"`).
+/// Variants with data use tagged form (e.g. `{"Failed": {"Warping": null}}`).
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CompletePrintInput {
     pub job_hash: ActionHash,
@@ -87,12 +125,15 @@ async fn setup_design_and_printer(
         title: "Print Test Part".to_string(),
         description: "A part for print job testing".to_string(),
         category: "Parts".to_string(),
-        license: "PublicDomain".to_string(),
-        safety_class: "Class1Functional".to_string(),
-        files: vec![],
-        tags: vec!["test".to_string()],
-        material_compatibility: vec!["PLA".to_string()],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("PublicDomain"),
+        safety_class: "Class1Functional".to_string(),
     };
 
     let design_record: Record = conductor
@@ -107,13 +148,17 @@ async fn setup_design_and_printer(
         name: "Test Printer".to_string(),
         location: None,
         printer_type: "FDM".to_string(),
-        capabilities: serde_json::json!({
-            "build_volume": { "x": 220.0, "y": 220.0, "z": 250.0 },
-            "max_temp_c": 300,
-            "heated_bed": true,
-            "enclosure": false,
-            "features": ["auto_leveling"]
-        }),
+        capabilities: PrinterCapabilities {
+            build_volume: BuildVolume { x: 220.0, y: 220.0, z: 250.0 },
+            layer_heights: vec![0.1, 0.15, 0.2, 0.3],
+            nozzle_diameters: vec![0.4],
+            heated_bed: true,
+            enclosure: false,
+            multi_material: None,
+            max_temp_hotend: 300,
+            max_temp_bed: 100,
+            features: vec!["AutoLeveling".to_string()],
+        },
         materials_available: vec!["PLA".to_string(), "PETG".to_string()],
         rates: None,
     };
@@ -159,7 +204,14 @@ async fn test_print_job_create_and_accept() {
             infill_percent: 20,
             material: "PLA".to_string(),
             supports: false,
-            temperatures: None,
+            raft: false,
+            print_speed: None,
+            temperatures: TemperatureSettings {
+                hotend: 210,
+                bed: Some(60),
+                chamber: None,
+            },
+            custom_gcode: None,
         },
         energy_source: Some("Solar".to_string()),
         material_passport: None,
@@ -216,7 +268,14 @@ async fn test_print_job_full_lifecycle() {
             infill_percent: 30,
             material: "PETG".to_string(),
             supports: true,
-            temperatures: None,
+            raft: false,
+            print_speed: None,
+            temperatures: TemperatureSettings {
+                hotend: 240,
+                bed: Some(80),
+                chamber: None,
+            },
+            custom_gcode: None,
         },
         energy_source: None,
         material_passport: None,
@@ -268,12 +327,7 @@ async fn test_print_job_full_lifecycle() {
             "complete_print",
             CompletePrintInput {
                 job_hash: job_hash.clone(),
-                result: serde_json::json!({
-                    "Success": {
-                        "quality_score": 0.92,
-                        "notes": "Excellent print"
-                    }
-                }),
+                result: serde_json::json!("Success"),
             },
         )
         .await;
@@ -322,7 +376,14 @@ async fn test_print_job_cancel() {
             infill_percent: 20,
             material: "PLA".to_string(),
             supports: false,
-            temperatures: None,
+            raft: false,
+            print_speed: None,
+            temperatures: TemperatureSettings {
+                hotend: 210,
+                bed: Some(60),
+                chamber: None,
+            },
+            custom_gcode: None,
         },
         energy_source: None,
         material_passport: None,
@@ -381,7 +442,14 @@ async fn test_get_my_print_jobs_paginated() {
                 infill_percent: 20,
                 material: "PLA".to_string(),
                 supports: false,
-                temperatures: None,
+                raft: false,
+                print_speed: None,
+                temperatures: TemperatureSettings {
+                    hotend: 210,
+                    bed: Some(60),
+                    chamber: None,
+                },
+                custom_gcode: None,
             },
             energy_source: None,
             material_passport: None,
@@ -457,7 +525,14 @@ async fn test_cincinnati_monitoring_start() {
             infill_percent: 20,
             material: "PLA".to_string(),
             supports: false,
-            temperatures: None,
+            raft: false,
+            print_speed: None,
+            temperatures: TemperatureSettings {
+                hotend: 210,
+                bed: Some(60),
+                chamber: None,
+            },
+            custom_gcode: None,
         },
         energy_source: None,
         material_passport: None,

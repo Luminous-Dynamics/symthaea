@@ -60,7 +60,7 @@ describe('Prints Zome', () => {
             features: [],
           },
           materials_available: ['PLA', 'PETG'],
-          rates: { base_fee: 5, per_hour: 2, per_gram: 0.05 },
+          rates: { hourly_rate: 2, material_rate: 0.05, currency: 'USD', minimum_order: null },
         },
       });
       const printerHash = printerRecord.signed_action.hashed.hash;
@@ -265,7 +265,7 @@ describe('Prints Zome', () => {
             multi_material: null,
             max_temp_hotend: 280,
             max_temp_bed: 110,
-            features: ['CincinnatiMonitoring'],
+            features: [{ Other: 'CincinnatiMonitoring' }],
           },
           materials_available: ['PETG'],
           rates: null,

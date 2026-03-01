@@ -44,11 +44,13 @@ pub struct MyIntentsInput {
     pub pagination: Option<PaginationInput>,
 }
 
+/// Mirror of symthaea coordinator's `SemanticSearchInput`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SemanticSearchInput {
     pub intent_hash: ActionHash,
     pub threshold: Option<f32>,
     pub limit: Option<u32>,
+    pub record_matches: Option<bool>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -242,6 +244,7 @@ async fn test_semantic_search() {
         intent_hash: target.record.action_address().clone(),
         threshold: Some(0.1),
         limit: Some(10),
+        record_matches: None,
     };
 
     let results: serde_json::Value = conductor
@@ -291,12 +294,15 @@ async fn test_get_design_optimizations() {
                 title: "Pipe Bracket".to_string(),
                 description: "A bracket for pipe mounting".to_string(),
                 category: "Parts".to_string(),
-                license: "PublicDomain".to_string(),
-                safety_class: "Class1Functional".to_string(),
-                files: vec![],
-                tags: vec!["bracket".to_string()],
-                material_compatibility: vec![],
+                intent_vector: None,
                 parametric_schema: None,
+                constraint_graph: None,
+                material_compatibility: vec![],
+                circularity_score: 0.5,
+                embodied_energy_kwh: 1.0,
+                repair_manifest: None,
+                license: serde_json::json!("PublicDomain"),
+                safety_class: "Class1Functional".to_string(),
             },
         )
         .await;
@@ -355,12 +361,15 @@ async fn test_generate_parametric_variant() {
                 title: "Base Bracket".to_string(),
                 description: "A simple bracket".to_string(),
                 category: "Parts".to_string(),
-                license: "PublicDomain".to_string(),
-                safety_class: "Class1Functional".to_string(),
-                files: vec![],
-                tags: vec!["bracket".to_string()],
-                material_compatibility: vec!["PLA".to_string()],
+                intent_vector: None,
                 parametric_schema: None,
+                constraint_graph: None,
+                material_compatibility: vec![],
+                circularity_score: 0.5,
+                embodied_energy_kwh: 1.0,
+                repair_manifest: None,
+                license: serde_json::json!("PublicDomain"),
+                safety_class: "Class1Functional".to_string(),
             },
         )
         .await;

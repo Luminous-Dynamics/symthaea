@@ -11,7 +11,6 @@ thread_local! {
     static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
 }
 
-#[allow(dead_code)]
 fn get_config() -> FabricationConfig {
     CONFIG.with(|c| {
         c.borrow_mut()

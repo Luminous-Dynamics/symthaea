@@ -28,21 +28,29 @@ pub struct CreateMaterialInput {
     pub safety_data_sheet: Option<String>,
 }
 
+/// Mirror of fabrication_common's `MaterialProperties`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MaterialProperties {
+    pub print_temp_min: u16,
+    pub print_temp_max: u16,
+    pub bed_temp_min: Option<u16>,
+    pub bed_temp_max: Option<u16>,
+    pub density_g_cm3: f32,
     pub tensile_strength_mpa: Option<f32>,
-    pub elongation_at_break: Option<f32>,
-    pub heat_deflection_temp_c: Option<f32>,
-    pub density_g_cm3: Option<f32>,
+    pub elongation_percent: Option<f32>,
     pub food_safe: bool,
     pub uv_resistant: bool,
+    pub water_resistant: bool,
+    pub recyclable: bool,
 }
 
+/// Mirror of fabrication_common's `Certification`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Certification {
     pub cert_type: String,
     pub issuer: String,
-    pub valid_until: Option<i64>,
+    pub valid_until: Option<Timestamp>,
+    pub document_cid: Option<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -77,17 +85,23 @@ async fn test_material_create_and_get() {
         name: "Prusament PETG".to_string(),
         material_type: "PETG".to_string(),
         properties: MaterialProperties {
+            print_temp_min: 220,
+            print_temp_max: 250,
+            bed_temp_min: Some(70),
+            bed_temp_max: Some(85),
+            density_g_cm3: 1.27,
             tensile_strength_mpa: Some(50.0),
-            elongation_at_break: Some(7.6),
-            heat_deflection_temp_c: Some(78.0),
-            density_g_cm3: Some(1.27),
+            elongation_percent: Some(7.6),
             food_safe: true,
             uv_resistant: false,
+            water_resistant: true,
+            recyclable: true,
         },
         certifications: vec![Certification {
-            cert_type: "FoodContact".to_string(),
+            cert_type: "FoodSafe".to_string(),
             issuer: "EU Regulation 10/2011".to_string(),
             valid_until: None,
+            document_cid: None,
         }],
         safety_data_sheet: Some("https://example.com/sds/petg.pdf".to_string()),
     };
@@ -137,12 +151,17 @@ async fn test_get_materials_by_type_paginated() {
             name: format!("PLA Brand #{}", i),
             material_type: "PLA".to_string(),
             properties: MaterialProperties {
+                print_temp_min: 190,
+                print_temp_max: 220,
+                bed_temp_min: Some(50),
+                bed_temp_max: Some(70),
+                density_g_cm3: 1.24,
                 tensile_strength_mpa: Some(37.0 + i as f32),
-                elongation_at_break: Some(6.0),
-                heat_deflection_temp_c: Some(56.0),
-                density_g_cm3: Some(1.24),
+                elongation_percent: Some(6.0),
                 food_safe: false,
                 uv_resistant: false,
+                water_resistant: false,
+                recyclable: true,
             },
             certifications: vec![],
             safety_data_sheet: None,
@@ -216,17 +235,23 @@ async fn test_get_food_safe_materials() {
         name: "Food-Safe PETG".to_string(),
         material_type: "PETG".to_string(),
         properties: MaterialProperties {
+            print_temp_min: 220,
+            print_temp_max: 250,
+            bed_temp_min: Some(70),
+            bed_temp_max: Some(85),
+            density_g_cm3: 1.27,
             tensile_strength_mpa: Some(50.0),
-            elongation_at_break: Some(7.6),
-            heat_deflection_temp_c: Some(78.0),
-            density_g_cm3: Some(1.27),
+            elongation_percent: Some(7.6),
             food_safe: true,
             uv_resistant: false,
+            water_resistant: true,
+            recyclable: true,
         },
         certifications: vec![Certification {
-            cert_type: "FoodContact".to_string(),
+            cert_type: "FoodSafe".to_string(),
             issuer: "FDA".to_string(),
             valid_until: None,
+            document_cid: None,
         }],
         safety_data_sheet: None,
     };
@@ -244,12 +269,17 @@ async fn test_get_food_safe_materials() {
         name: "Regular ABS".to_string(),
         material_type: "ABS".to_string(),
         properties: MaterialProperties {
+            print_temp_min: 230,
+            print_temp_max: 260,
+            bed_temp_min: Some(90),
+            bed_temp_max: Some(110),
+            density_g_cm3: 1.04,
             tensile_strength_mpa: Some(40.0),
-            elongation_at_break: Some(3.5),
-            heat_deflection_temp_c: Some(98.0),
-            density_g_cm3: Some(1.04),
+            elongation_percent: Some(3.5),
             food_safe: false,
             uv_resistant: false,
+            water_resistant: false,
+            recyclable: false,
         },
         certifications: vec![],
         safety_data_sheet: None,
@@ -282,6 +312,150 @@ async fn test_get_food_safe_materials() {
         "Should have at least 1 food-safe material, got {}",
         items
     );
+
+    drop(conductor);
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+}
+
+// ============================================================================
+// Update + Delete Tests
+// ============================================================================
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UpdateMaterialInput {
+    pub original_action_hash: ActionHash,
+    pub name: Option<String>,
+    pub material_type: Option<String>,
+    pub properties: Option<MaterialProperties>,
+    pub certifications: Option<Vec<Certification>>,
+    pub safety_data_sheet: Option<String>,
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_material_update() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&fabrication_dna_path())
+        .await
+        .unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    // Create
+    let input = CreateMaterialInput {
+        name: "Original Name".to_string(),
+        material_type: "PLA".to_string(),
+        properties: MaterialProperties {
+            print_temp_min: 190,
+            print_temp_max: 220,
+            bed_temp_min: Some(50),
+            bed_temp_max: Some(70),
+            density_g_cm3: 1.24,
+            tensile_strength_mpa: None,
+            elongation_percent: None,
+            food_safe: false,
+            uv_resistant: false,
+            water_resistant: false,
+            recyclable: true,
+        },
+        certifications: vec![],
+        safety_data_sheet: None,
+    };
+
+    let record: Record = conductor
+        .call(
+            &alice.zome("materials_coordinator"),
+            "create_material",
+            input,
+        )
+        .await;
+
+    let original_hash = record.action_address().clone();
+
+    // Update name only
+    let update_input = UpdateMaterialInput {
+        original_action_hash: original_hash.clone(),
+        name: Some("Updated Name".to_string()),
+        material_type: None,
+        properties: None,
+        certifications: None,
+        safety_data_sheet: None,
+    };
+
+    let updated: Record = conductor
+        .call(
+            &alice.zome("materials_coordinator"),
+            "update_material",
+            update_input,
+        )
+        .await;
+
+    // Updated record should have a different action hash
+    assert_ne!(updated.action_address(), &original_hash);
+    assert_eq!(updated.action().author(), alice.agent_pubkey());
+
+    drop(conductor);
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_material_delete() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&fabrication_dna_path())
+        .await
+        .unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    // Create
+    let input = CreateMaterialInput {
+        name: "To Be Deleted".to_string(),
+        material_type: "ABS".to_string(),
+        properties: MaterialProperties {
+            print_temp_min: 230,
+            print_temp_max: 260,
+            bed_temp_min: Some(90),
+            bed_temp_max: Some(110),
+            density_g_cm3: 1.04,
+            tensile_strength_mpa: None,
+            elongation_percent: None,
+            food_safe: false,
+            uv_resistant: false,
+            water_resistant: false,
+            recyclable: false,
+        },
+        certifications: vec![],
+        safety_data_sheet: None,
+    };
+
+    let record: Record = conductor
+        .call(
+            &alice.zome("materials_coordinator"),
+            "create_material",
+            input,
+        )
+        .await;
+
+    let material_hash = record.action_address().clone();
+
+    // Delete
+    let delete_hash: ActionHash = conductor
+        .call(
+            &alice.zome("materials_coordinator"),
+            "delete_material",
+            material_hash,
+        )
+        .await;
+
+    // Delete should return an action hash
+    assert_ne!(delete_hash, ActionHash::from_raw_36(vec![0u8; 36]));
 
     drop(conductor);
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;

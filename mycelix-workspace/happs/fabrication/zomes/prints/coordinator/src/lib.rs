@@ -30,22 +30,9 @@ fn get_config() -> FabricationConfig {
     })
 }
 
-// Local Printer type for cross-zome data deserialization
+// Use PrinterInfo from fabrication_common for cross-zome deserialization
 // (importing printers_integrity causes duplicate symbol errors)
-#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes, PartialEq)]
-pub struct Printer {
-    pub id: String,
-    pub name: String,
-    pub owner: AgentPubKey,
-    pub location: Option<GeoLocation>,
-    pub printer_type: PrinterType,
-    pub capabilities: PrinterCapabilities,
-    pub materials_available: Vec<MaterialType>,
-    pub availability: AvailabilityStatus,
-    pub rates: Option<PrinterRates>,
-    pub created_at: Timestamp,
-    pub updated_at: Timestamp,
-}
+use fabrication_common::PrinterInfo as Printer;
 
 // =============================================================================
 // PROOF OF GROUNDED FABRICATION (PoGF)

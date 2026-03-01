@@ -29,19 +29,28 @@ pub struct RegisterPrinterInput {
     pub rates: Option<serde_json::Value>,
 }
 
+/// Mirror of fabrication_common's `GeoLocation`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GeoLocation {
     pub geohash: String,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
+    pub city: Option<String>,
+    pub region: Option<String>,
+    pub country: String,
 }
 
+/// Mirror of fabrication_common's `PrinterCapabilities`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PrinterCapabilities {
     pub build_volume: BuildVolume,
-    pub max_temp_c: u32,
+    pub layer_heights: Vec<f32>,
+    pub nozzle_diameters: Vec<f32>,
     pub heated_bed: bool,
     pub enclosure: bool,
+    pub multi_material: Option<u8>,
+    pub max_temp_hotend: u16,
+    pub max_temp_bed: u16,
     pub features: Vec<String>,
 }
 
@@ -92,10 +101,14 @@ fn test_capabilities() -> PrinterCapabilities {
             y: 220.0,
             z: 250.0,
         },
-        max_temp_c: 300,
+        layer_heights: vec![0.1, 0.15, 0.2, 0.3],
+        nozzle_diameters: vec![0.4],
         heated_bed: true,
         enclosure: false,
-        features: vec!["auto_leveling".to_string()],
+        multi_material: None,
+        max_temp_hotend: 300,
+        max_temp_bed: 100,
+        features: vec!["AutoLeveling".to_string()],
     }
 }
 
@@ -122,6 +135,9 @@ async fn test_printer_register_and_get() {
             geohash: "9vg4p8".to_string(),
             lat: Some(32.948),
             lon: Some(-96.730),
+            city: Some("Richardson".to_string()),
+            region: Some("TX".to_string()),
+            country: "US".to_string(),
         }),
         printer_type: "FDM".to_string(),
         capabilities: test_capabilities(),

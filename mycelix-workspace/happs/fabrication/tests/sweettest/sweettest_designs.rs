@@ -17,24 +17,41 @@ use std::path::PathBuf;
 // Mirror types — designs coordinator
 // ============================================================================
 
+/// Mirror of designs coordinator's `CreateDesignInput`.
+/// Enum fields use their serde string representation.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateDesignInput {
     pub title: String,
     pub description: String,
     pub category: String,
-    pub license: String,
+    pub intent_vector: Option<serde_json::Value>,
+    pub parametric_schema: Option<serde_json::Value>,
+    pub constraint_graph: Option<serde_json::Value>,
+    pub material_compatibility: Vec<serde_json::Value>,
+    pub circularity_score: f32,
+    pub embodied_energy_kwh: f32,
+    pub repair_manifest: Option<serde_json::Value>,
+    pub license: serde_json::Value,
     pub safety_class: String,
-    pub files: Vec<String>,
-    pub tags: Vec<String>,
-    pub material_compatibility: Vec<String>,
-    pub parametric_schema: Option<String>,
 }
 
+/// Mirror of designs coordinator's `UpdateDesignInput`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct UpdateDesignInput {
     pub original_action_hash: ActionHash,
     pub title: Option<String>,
     pub description: Option<String>,
+    pub category: Option<String>,
+    pub intent_vector: Option<serde_json::Value>,
+    pub parametric_schema: Option<serde_json::Value>,
+    pub constraint_graph: Option<serde_json::Value>,
+    pub material_compatibility: Option<Vec<serde_json::Value>>,
+    pub circularity_score: Option<f32>,
+    pub embodied_energy_kwh: Option<f32>,
+    pub repair_manifest: Option<serde_json::Value>,
+    pub license: Option<serde_json::Value>,
+    pub safety_class: Option<String>,
+    pub epistemic: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -43,10 +60,11 @@ pub struct AddFileInput {
     pub file: DesignFile,
 }
 
+/// Mirror of fabrication_common's `DesignFile`.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct DesignFile {
     pub filename: String,
-    pub file_type: String,
+    pub format: String,
     pub ipfs_cid: String,
     pub size_bytes: u64,
     pub checksum_sha256: String,
@@ -86,12 +104,15 @@ async fn test_design_create_and_get() {
         title: "Test Bracket".to_string(),
         description: "A structural bracket for testing".to_string(),
         category: "Parts".to_string(),
-        license: "PublicDomain".to_string(),
-        safety_class: "Class1Functional".to_string(),
-        files: vec![],
-        tags: vec!["test".to_string()],
-        material_compatibility: vec![],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("PublicDomain"),
+        safety_class: "Class1Functional".to_string(),
     };
 
     let record: Record = conductor
@@ -143,12 +164,15 @@ async fn test_design_update_requires_author() {
         title: "Alice's Design".to_string(),
         description: "Only Alice should update this".to_string(),
         category: "Parts".to_string(),
-        license: "PublicDomain".to_string(),
-        safety_class: "Class0Decorative".to_string(),
-        files: vec![],
-        tags: vec![],
-        material_compatibility: vec![],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("PublicDomain"),
+        safety_class: "Class0Decorative".to_string(),
     };
 
     let record: Record = alice_conductor
@@ -165,6 +189,17 @@ async fn test_design_update_requires_author() {
         original_action_hash: design_hash.clone(),
         title: Some("Bob's Hostile Update".to_string()),
         description: None,
+        category: None,
+        intent_vector: None,
+        parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: None,
+        circularity_score: None,
+        embodied_energy_kwh: None,
+        repair_manifest: None,
+        license: None,
+        safety_class: None,
+        epistemic: None,
     };
 
     let bob_result: Result<Record, _> = bob_conductor
@@ -212,12 +247,15 @@ async fn test_design_delete_requires_author() {
         title: "Delete Auth Test".to_string(),
         description: "Only author can delete".to_string(),
         category: "Parts".to_string(),
-        license: "PublicDomain".to_string(),
-        safety_class: "Class0Decorative".to_string(),
-        files: vec![],
-        tags: vec![],
-        material_compatibility: vec![],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("PublicDomain"),
+        safety_class: "Class0Decorative".to_string(),
     };
 
     let record: Record = alice_conductor
@@ -275,12 +313,15 @@ async fn test_add_file_requires_design_author() {
         title: "File Auth Test".to_string(),
         description: "Only author can add files".to_string(),
         category: "Parts".to_string(),
-        license: "PublicDomain".to_string(),
-        safety_class: "Class0Decorative".to_string(),
-        files: vec![],
-        tags: vec![],
-        material_compatibility: vec![],
+        intent_vector: None,
         parametric_schema: None,
+        constraint_graph: None,
+        material_compatibility: vec![],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: None,
+        license: serde_json::json!("PublicDomain"),
+        safety_class: "Class0Decorative".to_string(),
     };
 
     let record: Record = alice_conductor
@@ -297,7 +338,7 @@ async fn test_add_file_requires_design_author() {
         design_hash,
         file: DesignFile {
             filename: "malicious.stl".to_string(),
-            file_type: "STL".to_string(),
+            format: "STL".to_string(),
             ipfs_cid: "QmFakeHash".to_string(),
             size_bytes: 1024,
             checksum_sha256: "abc123".to_string(),
