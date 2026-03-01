@@ -947,16 +947,27 @@ mod tests {
             "Step 0 should be 10% of base: {lr0}"
         );
 
-        // At step 10 (end of warmup), should be full base
-        let lr10 = warmup_lr(base_lr, 10, 100, 0.1);
+        // At step 9 (last warmup step), should be near full base
+        let lr9 = warmup_lr(base_lr, 9, 100, 0.1);
         assert!(
-            (lr10 - base_lr).abs() < 1e-5,
-            "After warmup should be full base: {lr10}"
+            (lr9 - base_lr * (0.1 + 0.9 * 0.9)).abs() < 1e-5,
+            "Last warmup step should be 91% of base: {lr9}"
         );
 
-        // At step 50, should be full base
+        // At step 10 (first decay step), should be full base (cosine at t=0)
+        let lr10 = warmup_lr(base_lr, 10, 100, 0.1);
+        assert!(
+            (lr10 - base_lr).abs() < 1e-4,
+            "Start of decay should be ~base_lr: {lr10}"
+        );
+
+        // At step 50, cosine decay should be below base but above min
         let lr50 = warmup_lr(base_lr, 50, 100, 0.1);
-        assert!((lr50 - base_lr).abs() < 1e-5);
+        let min_lr = base_lr * 0.01;
+        assert!(
+            lr50 < base_lr && lr50 > min_lr,
+            "Mid-decay should be between min and base: {lr50}"
+        );
     }
 
     #[test]
