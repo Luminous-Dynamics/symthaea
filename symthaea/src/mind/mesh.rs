@@ -96,7 +96,7 @@ impl ContinuousMind {
         metadata.mesh_bytes_sent = self.mesh_stats.bytes_sent;
         metadata.mesh_bytes_received = self.mesh_stats.bytes_received;
         metadata.mesh_compression_ratio = self.mesh_stats.compression_ratio();
-        metadata.mesh_bandwidth_budget = self.mesh_stats.bandwidth_budget_current;
+        metadata.mesh_bandwidth_budget = self.mesh_bandwidth_budget;
         metadata.mesh_packets_throttled = self.mesh_stats.bandwidth_throttled;
     }
 
