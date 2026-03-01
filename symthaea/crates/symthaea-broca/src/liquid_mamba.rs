@@ -41,6 +41,7 @@ use crate::gating::{
 use crate::generator::GenerationResult;
 use crate::mamba::{MambaBackend, MambaWrapper};
 use crate::projection::{HdcSsmProjection, ProjectionGradientDiagnostics};
+use crate::temporal_projection::TemporalProjection;
 use crate::tokenizer::BpeTokenizer;
 
 /// Configuration for the Liquid-Mamba generator.
@@ -113,6 +114,13 @@ pub struct LiquidMambaConfig {
     /// When true, `new()` creates `HdcSsmProjection::new_deep()` instead of `new()`.
     /// Default false for backwards compatibility.
     pub deep_projection: bool,
+    /// Use temporal projection (chunk-based continuous latent prompting).
+    /// When true, the 16384D thought is chunked into 64×256D tokens,
+    /// up-projected to 768D each, and fed as continuous embeddings into Mamba.
+    /// Mutually exclusive with `deep_projection` (temporal takes precedence).
+    /// Default false for backwards compatibility.
+    #[serde(default)]
+    pub temporal_projection: bool,
     /// Surprise gradient scaling factor (0 = disabled, 0.5 = default).
     /// Gradients are scaled by `1 + alpha * semantic_pe` before application,
     /// amplifying gradients for surprising/difficult examples.
@@ -201,6 +209,7 @@ impl Default for LiquidMambaConfig {
             enable_ema: false,
             ema_decay: 0.999,
             deep_projection: false,
+            temporal_projection: false,
             surprise_gradient_alpha: 0.5,
             grad_clip: 1.0,
             token_pe_sim_threshold: 0.3,
@@ -218,6 +227,7 @@ impl Default for LiquidMambaConfig {
 pub struct LiquidMambaGenerator {
     mamba: Box<dyn MambaBackend>,
     projection: HdcSsmProjection,
+    temporal_proj: Option<TemporalProjection>,
     encoder: ThoughtLanguageEncoder,
     epistemic_gate: EpistemicGate,
     emotional_modulator: EmotionalModulator,
@@ -288,6 +298,17 @@ impl LiquidMambaGenerator {
             )
         };
 
+        let temporal_proj = if config.temporal_projection {
+            Some(TemporalProjection::new(
+                genesis,
+                config.hdc_dim,
+                config.bottleneck_dim, // chunk_dim = 256
+                config.ssm_dim,
+            ))
+        } else {
+            None
+        };
+
         let encoder = ThoughtLanguageEncoder::new(genesis);
 
         // Create gating modules using a minimal tokenizer for classification
@@ -303,6 +324,7 @@ impl LiquidMambaGenerator {
         let mut gen = Self {
             mamba,
             projection,
+            temporal_proj,
             encoder,
             epistemic_gate,
             emotional_modulator,
@@ -400,11 +422,19 @@ impl LiquidMambaGenerator {
         // Closure-based scope guard: ensures EMA live weights are unconditionally
         // restored even if any fallible operation inside returns Err.
         let result = (|| -> Result<GenerationResult> {
-            // 2. Project to SSM space (768D)
-            let ssm_context = self.projection.project_to_ssm(&thought_hv);
-
-            // 3. Prime Mamba's hidden state with the thought projection
-            self.mamba.inject_initial_context(&ssm_context)?;
+            // 2-3. Project thought to SSM space and prime Mamba
+            let ssm_context = if let Some(ref tp) = self.temporal_proj {
+                // Temporal: chunk 16384D → 64×768D soft tokens → forward_embeds()
+                let sequence = tp.project_to_ssm_sequence(&thought_hv);
+                self.mamba.inject_context_sequence(&sequence)?;
+                // Keep a single-vector summary for veto re-injection
+                sequence.last().cloned().unwrap_or_else(|| vec![0.0; self.config.ssm_dim])
+            } else {
+                // Spatial: 16384D → 256D → 768D → inject_initial_context()
+                let ctx = self.projection.project_to_ssm(&thought_hv);
+                self.mamba.inject_initial_context(&ctx)?;
+                ctx
+            };
 
             // 4. Compute max tokens (consciousness-gated)
             let max_tokens = if self.config.enable_consciousness_gating {
@@ -476,7 +506,11 @@ impl LiquidMambaGenerator {
 
                 // 7f. Back-project token to HDC (unconditional — for distillation + veto)
                 let token_emb = self.mamba.embedding_vector(next_token)?;
-                let token_hdc = self.projection.project_to_hdc(&token_emb);
+                let token_hdc = if let Some(ref tp) = self.temporal_proj {
+                    tp.project_to_hdc(&token_emb)
+                } else {
+                    self.projection.project_to_hdc(&token_emb)
+                };
                 output_hvs.push(token_hdc.clone());
 
                 // 7f2. Per-token PE feedback: compute token-level coherence with thought
@@ -508,8 +542,13 @@ impl LiquidMambaGenerator {
                         }
 
                         // Reset Mamba and re-inject thought context
-                        self.mamba.reset();
-                        self.mamba.inject_initial_context(&ssm_context)?;
+                        if let Some(ref tp) = self.temporal_proj {
+                            let sequence = tp.project_to_ssm_sequence(&thought_hv);
+                            self.mamba.inject_context_sequence(&sequence)?;
+                        } else {
+                            self.mamba.reset();
+                            self.mamba.inject_initial_context(&ssm_context)?;
+                        }
                         coherence_monitor.reset();
 
                         // Continue from current position (don't restart text)
@@ -652,6 +691,16 @@ impl LiquidMambaGenerator {
     /// Get mutable reference to the Mamba backend.
     pub fn mamba_mut(&mut self) -> &mut dyn MambaBackend {
         &mut *self.mamba
+    }
+
+    /// Get reference to the temporal projection (if enabled).
+    pub fn temporal_proj(&self) -> Option<&TemporalProjection> {
+        self.temporal_proj.as_ref()
+    }
+
+    /// Get mutable reference to the temporal projection (if enabled).
+    pub fn temporal_proj_mut(&mut self) -> Option<&mut TemporalProjection> {
+        self.temporal_proj.as_mut()
     }
 
     /// Get reference to the config.
@@ -890,80 +939,124 @@ impl LiquidMambaGenerator {
         // Mamba-output-based loss for fine-tuning.
         let use_mamba_signal = result.semantic_pe < 0.5;
 
-        if use_mamba_signal {
-            // Phase 2: Mamba output is meaningful — use it as target
-            let bundled = self.attention_weighted_bundle(&thought_hv, &result.output_hvs);
-            self.projection.compute_gradients(&thought_hv, &bundled);
-
-            // Prefix token loss (only useful when Mamba output is meaningful)
-            if self.config.prefix_loss_weight > 0.0 && result.output_hvs.len() >= 4 {
-                let prefix_len = (result.output_hvs.len() / 4).max(1);
-                let prefix_bundle =
-                    self.attention_weighted_bundle(&thought_hv, &result.output_hvs[..prefix_len]);
-                self.projection
-                    .compute_gradients(&thought_hv, &prefix_bundle);
+        if self.config.temporal_projection {
+            // ─── Temporal projection gradient path ───
+            // Compute bundled HV before taking mutable borrow of temporal_proj
+            let bundled = if use_mamba_signal {
+                Some(self.attention_weighted_bundle(&thought_hv, &result.output_hvs))
+            } else {
+                None
+            };
+            let tp = self.temporal_proj.as_mut().unwrap();
+            if let Some(ref bundled) = bundled {
+                tp.compute_gradients(&thought_hv, bundled);
+            } else {
+                tp.compute_roundtrip_gradients(&thought_hv);
             }
-        } else {
-            // Phase 1: Pure roundtrip autoencoder (no Mamba dependency)
-            self.projection.compute_roundtrip_gradients(&thought_hv);
-        }
 
-        // Contrastive term: push away from recent different thoughts
-        // (useful in both phases — prevents bottleneck collapse)
-        if self.config.contrastive_weight > 0.0 {
-            for neg_hv in &self.recent_thought_hvs {
-                let sim = thought_hv.similarity(neg_hv);
-                if sim < 0.8 {
-                    self.projection.compute_contrastive_gradients(
-                        &thought_hv,
-                        neg_hv,
-                        self.config.contrastive_weight,
-                    );
+            // Contrastive term through temporal projection
+            if self.config.contrastive_weight > 0.0 {
+                for neg_hv in &self.recent_thought_hvs {
+                    let sim = thought_hv.similarity(neg_hv);
+                    if sim < 0.8 {
+                        tp.compute_contrastive_gradients(
+                            &thought_hv,
+                            neg_hv,
+                            self.config.contrastive_weight,
+                        );
+                    }
                 }
             }
-        }
 
-        // Surprise-weighted gradient: only in Phase 2 (high PE is expected in Phase 1)
-        if use_mamba_signal && self.config.surprise_gradient_alpha > 0.0 {
-            let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
-            self.projection.scale_accumulated_gradients(scale);
-        }
-
-        // Gradient accumulation: only apply every N steps
-        self.distill_accumulator += 1;
-        if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
-            let metrics = self.projection.apply_gradients(effective_lr, self.config.grad_clip);
-            // Record diagnostics if enabled
-            if let Some(ref mut diag) = self.diagnostics {
-                diag.record_step(&metrics, effective_lr);
-                // Record bottleneck activation from the thought HV
-                let bottleneck = self.projection.bottleneck_activation(&thought_hv);
-                diag.record_bottleneck(&bottleneck);
+            if use_mamba_signal && self.config.surprise_gradient_alpha > 0.0 {
+                let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
+                tp.scale_accumulated_gradients(scale);
             }
-            // EMA teacher update after gradient application
-            self.projection.update_ema();
-            self.distill_accumulator = 0;
 
-            // Auto-recovery: only during inference (consciousness_gating enabled).
-            // During batch training, recovery noise fights gradient updates.
-            if self.config.enable_consciousness_gating {
-                let collapse_detected = self
-                    .diagnostics
-                    .as_ref()
-                    .map_or(false, |d| d.bottleneck_collapse_detected());
-                let recovery_gap = self
-                    .generation_count
-                    .saturating_sub(self.last_diag_recovery_gen)
-                    > 10;
+            self.distill_accumulator += 1;
+            if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
+                let metrics = tp.apply_gradients(effective_lr, self.config.grad_clip);
+                if let Some(ref mut diag) = self.diagnostics {
+                    diag.record_step(&metrics, effective_lr);
+                    let bottleneck = tp.bottleneck_activation(&thought_hv);
+                    diag.record_bottleneck(&bottleneck);
+                }
+                self.distill_accumulator = 0;
+            }
+        } else {
+            // ─── Spatial projection gradient path (original) ───
+            if use_mamba_signal {
+                // Phase 2: Mamba output is meaningful — use it as target
+                let bundled = self.attention_weighted_bundle(&thought_hv, &result.output_hvs);
+                self.projection.compute_gradients(&thought_hv, &bundled);
 
-                if collapse_detected && recovery_gap {
-                    tracing::warn!(
-                        gen = self.generation_count,
-                        "diagnostics: bottleneck collapse detected, triggering recovery"
-                    );
-                    let recent: Vec<_> = self.recent_thought_hvs.iter().cloned().collect();
-                    self.check_projection_health(&recent);
-                    self.last_diag_recovery_gen = self.generation_count;
+                // Prefix token loss (only useful when Mamba output is meaningful)
+                if self.config.prefix_loss_weight > 0.0 && result.output_hvs.len() >= 4 {
+                    let prefix_len = (result.output_hvs.len() / 4).max(1);
+                    let prefix_bundle =
+                        self.attention_weighted_bundle(&thought_hv, &result.output_hvs[..prefix_len]);
+                    self.projection
+                        .compute_gradients(&thought_hv, &prefix_bundle);
+                }
+            } else {
+                // Phase 1: Pure roundtrip autoencoder (no Mamba dependency)
+                self.projection.compute_roundtrip_gradients(&thought_hv);
+            }
+
+            // Contrastive term: push away from recent different thoughts
+            if self.config.contrastive_weight > 0.0 {
+                for neg_hv in &self.recent_thought_hvs {
+                    let sim = thought_hv.similarity(neg_hv);
+                    if sim < 0.8 {
+                        self.projection.compute_contrastive_gradients(
+                            &thought_hv,
+                            neg_hv,
+                            self.config.contrastive_weight,
+                        );
+                    }
+                }
+            }
+
+            // Surprise-weighted gradient: only in Phase 2
+            if use_mamba_signal && self.config.surprise_gradient_alpha > 0.0 {
+                let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
+                self.projection.scale_accumulated_gradients(scale);
+            }
+
+            // Gradient accumulation: only apply every N steps
+            self.distill_accumulator += 1;
+            if self.distill_accumulator >= self.config.accumulation_steps.max(1) {
+                let metrics = self.projection.apply_gradients(effective_lr, self.config.grad_clip);
+                if let Some(ref mut diag) = self.diagnostics {
+                    diag.record_step(&metrics, effective_lr);
+                    let bottleneck = self.projection.bottleneck_activation(&thought_hv);
+                    diag.record_bottleneck(&bottleneck);
+                }
+                // EMA teacher update after gradient application
+                self.projection.update_ema();
+                self.distill_accumulator = 0;
+
+                // Auto-recovery: only during inference (consciousness_gating enabled).
+                // During batch training, recovery noise fights gradient updates.
+                if self.config.enable_consciousness_gating {
+                    let collapse_detected = self
+                        .diagnostics
+                        .as_ref()
+                        .map_or(false, |d| d.bottleneck_collapse_detected());
+                    let recovery_gap = self
+                        .generation_count
+                        .saturating_sub(self.last_diag_recovery_gen)
+                        > 10;
+
+                    if collapse_detected && recovery_gap {
+                        tracing::warn!(
+                            gen = self.generation_count,
+                            "diagnostics: bottleneck collapse detected, triggering recovery"
+                        );
+                        let recent: Vec<_> = self.recent_thought_hvs.iter().cloned().collect();
+                        self.check_projection_health(&recent);
+                        self.last_diag_recovery_gen = self.generation_count;
+                    }
                 }
             }
         }

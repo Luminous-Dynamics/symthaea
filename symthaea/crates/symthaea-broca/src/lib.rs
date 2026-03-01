@@ -51,7 +51,11 @@ pub mod liquid_mamba;
 #[cfg(feature = "mamba")]
 pub mod mamba;
 #[cfg(feature = "mamba")]
+pub mod mamba_model;
+#[cfg(feature = "mamba")]
 pub mod projection;
+#[cfg(feature = "mamba")]
+pub mod temporal_projection;
 
 pub use checkpoint::{AdamState, BrocaCheckpoint};
 pub use controller::{LanguageController, LanguageControllerConfig};
@@ -77,3 +81,5 @@ pub use projection::{
     GradientDiagnosticsSnapshot, GradientStepMetrics, HdcSsmProjection,
     ProjectionGradientDiagnostics,
 };
+#[cfg(feature = "mamba")]
+pub use temporal_projection::TemporalProjection;
