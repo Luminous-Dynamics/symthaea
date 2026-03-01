@@ -83,11 +83,7 @@ impl MockSequencer {
 
         for _ in 0..num_reads {
             // Random start position
-            let max_start = if genome_len > effective_read_len {
-                genome_len - effective_read_len
-            } else {
-                0
-            };
+            let max_start = genome_len.saturating_sub(effective_read_len);
             let start = if max_start > 0 {
                 rng.gen_range(0..=max_start)
             } else {

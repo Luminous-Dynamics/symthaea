@@ -81,6 +81,7 @@ impl DnaSequence {
     }
 
     /// Create from a string of ATGCN characters.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         Self {
             bases: s.chars().map(Base::from_char).collect(),

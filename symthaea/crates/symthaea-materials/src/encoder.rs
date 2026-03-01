@@ -8,26 +8,35 @@ const SEEDS: [u64; 8] = [
     0xCA7_A005, 0xCA7_A006, 0xCA7_A007, 0xCA7_A008,
 ];
 
+/// Encodes material properties into 16,384D continuous hypervectors.
+///
+/// Uses 8 orthogonal basis vectors (one per property dimension) with
+/// weighted superposition. Materials with similar properties produce
+/// similar hypervectors, enabling HDC similarity search.
 pub struct MaterialHdcEncoder {
     bases: [ContinuousHV; 8],
 }
 
 impl MaterialHdcEncoder {
+    /// Create a new encoder with deterministic basis vectors.
     pub fn new() -> Self {
         Self {
             bases: std::array::from_fn(|i| ContinuousHV::random(HDC_DIMENSION, SEEDS[i])),
         }
     }
 
+    /// Encode a material's 8 normalized properties into a 16,384D hypervector.
     pub fn encode(&self, material: &MaterialProperty) -> ContinuousHV {
         let weights = material.normalized_values();
         ContinuousHV::encode_weighted(&self.bases, &weights)
     }
 
+    /// Cosine similarity between two materials in HDC space.
     pub fn similarity(&self, a: &MaterialProperty, b: &MaterialProperty) -> f32 {
         self.encode(a).similarity(&self.encode(b))
     }
 
+    /// Compute pairwise similarity matrix for a set of materials.
     pub fn similarity_matrix(&self, materials: &[MaterialProperty]) -> Vec<Vec<f32>> {
         let hvs: Vec<ContinuousHV> = materials.iter().map(|m| self.encode(m)).collect();
         hvs.iter().map(|a| hvs.iter().map(|b| a.similarity(b)).collect()).collect()

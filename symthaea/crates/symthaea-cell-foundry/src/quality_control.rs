@@ -92,7 +92,7 @@ fn check_contamination(cell: &CellState) -> bool {
         let mean: f64 =
             cell.gene_expression.iter().sum::<f64>() / cell.gene_expression.len() as f64;
         // If all genes are at extreme values, something is wrong
-        let all_extreme = cell.gene_expression.iter().all(|&x| x > 0.95 || x < 0.05);
+        let all_extreme = cell.gene_expression.iter().all(|&x| !(0.05..=0.95).contains(&x));
         if all_extreme && cell.gene_expression.len() > 5 {
             return false;
         }

@@ -50,53 +50,47 @@ pub struct DevelopmentalMilestoneDb;
 impl DevelopmentalMilestoneDb {
     /// Return all milestones in the database (30+ entries across 5 categories).
     pub fn all_milestones() -> Vec<Milestone> {
-        let mut milestones = Vec::new();
-
-        // === Gross Motor ===
-        milestones.push(Milestone::new(MilestoneCategory::GrossMotor, "Head lift", 2.0, 1.0, 3.0));
-        milestones.push(Milestone::new(MilestoneCategory::GrossMotor, "Roll over", 4.0, 3.0, 6.0));
-        milestones.push(Milestone::new(MilestoneCategory::GrossMotor, "Sitting unsupported", 6.0, 5.0, 8.0));
-        milestones.push(Milestone::new(MilestoneCategory::GrossMotor, "Crawling", 9.0, 6.0, 11.0));
-        milestones.push(Milestone::new(MilestoneCategory::GrossMotor, "Pull to stand", 10.0, 8.0, 12.0));
-        milestones.push(Milestone::new(MilestoneCategory::GrossMotor, "First steps", 12.0, 9.0, 16.0));
-        milestones.push(Milestone::new(MilestoneCategory::GrossMotor, "Walking well", 15.0, 12.0, 18.0));
-        milestones.push(Milestone::new(MilestoneCategory::GrossMotor, "Running", 24.0, 18.0, 30.0));
-
-        // === Fine Motor ===
-        milestones.push(Milestone::new(MilestoneCategory::FineMotor, "Reaching", 4.0, 3.0, 5.0));
-        milestones.push(Milestone::new(MilestoneCategory::FineMotor, "Palmar grasp", 5.0, 4.0, 6.0));
-        milestones.push(Milestone::new(MilestoneCategory::FineMotor, "Transfer objects", 7.0, 5.0, 9.0));
-        milestones.push(Milestone::new(MilestoneCategory::FineMotor, "Pincer grasp", 9.0, 7.0, 12.0));
-        milestones.push(Milestone::new(MilestoneCategory::FineMotor, "Stacking blocks", 15.0, 12.0, 18.0));
-        milestones.push(Milestone::new(MilestoneCategory::FineMotor, "Scribbling", 18.0, 14.0, 22.0));
-        milestones.push(Milestone::new(MilestoneCategory::FineMotor, "Drawing circle", 36.0, 30.0, 42.0));
-
-        // === Language ===
-        milestones.push(Milestone::new(MilestoneCategory::Language, "Cooing", 2.0, 1.0, 4.0));
-        milestones.push(Milestone::new(MilestoneCategory::Language, "Babbling", 6.0, 4.0, 8.0));
-        milestones.push(Milestone::new(MilestoneCategory::Language, "First words", 10.0, 8.0, 14.0));
-        milestones.push(Milestone::new(MilestoneCategory::Language, "Two-word phrases", 18.0, 14.0, 24.0));
-        milestones.push(Milestone::new(MilestoneCategory::Language, "50+ words", 24.0, 18.0, 30.0));
-        milestones.push(Milestone::new(MilestoneCategory::Language, "Simple sentences", 36.0, 30.0, 42.0));
-        milestones.push(Milestone::new(MilestoneCategory::Language, "Complex sentences", 48.0, 36.0, 60.0));
-
-        // === Social ===
-        milestones.push(Milestone::new(MilestoneCategory::Social, "Social smile", 2.0, 1.0, 3.0));
-        milestones.push(Milestone::new(MilestoneCategory::Social, "Stranger anxiety", 8.0, 6.0, 10.0));
-        milestones.push(Milestone::new(MilestoneCategory::Social, "Separation anxiety", 9.0, 6.0, 12.0));
-        milestones.push(Milestone::new(MilestoneCategory::Social, "Parallel play", 24.0, 18.0, 30.0));
-        milestones.push(Milestone::new(MilestoneCategory::Social, "Cooperative play", 36.0, 30.0, 48.0));
-        milestones.push(Milestone::new(MilestoneCategory::Social, "Theory of mind", 48.0, 36.0, 60.0));
-
-        // === Cognitive ===
-        milestones.push(Milestone::new(MilestoneCategory::Cognitive, "Object permanence", 8.0, 6.0, 10.0));
-        milestones.push(Milestone::new(MilestoneCategory::Cognitive, "Means-end reasoning", 10.0, 8.0, 12.0));
-        milestones.push(Milestone::new(MilestoneCategory::Cognitive, "Symbolic play", 18.0, 14.0, 24.0));
-        milestones.push(Milestone::new(MilestoneCategory::Cognitive, "Sorting by category", 24.0, 20.0, 30.0));
-        milestones.push(Milestone::new(MilestoneCategory::Cognitive, "Counting to 10", 36.0, 30.0, 48.0));
-        milestones.push(Milestone::new(MilestoneCategory::Cognitive, "Conservation", 60.0, 48.0, 72.0));
-
-        milestones
+        vec![
+            // === Gross Motor ===
+            Milestone::new(MilestoneCategory::GrossMotor, "Head lift", 2.0, 1.0, 3.0),
+            Milestone::new(MilestoneCategory::GrossMotor, "Roll over", 4.0, 3.0, 6.0),
+            Milestone::new(MilestoneCategory::GrossMotor, "Sitting unsupported", 6.0, 5.0, 8.0),
+            Milestone::new(MilestoneCategory::GrossMotor, "Crawling", 9.0, 6.0, 11.0),
+            Milestone::new(MilestoneCategory::GrossMotor, "Pull to stand", 10.0, 8.0, 12.0),
+            Milestone::new(MilestoneCategory::GrossMotor, "First steps", 12.0, 9.0, 16.0),
+            Milestone::new(MilestoneCategory::GrossMotor, "Walking well", 15.0, 12.0, 18.0),
+            Milestone::new(MilestoneCategory::GrossMotor, "Running", 24.0, 18.0, 30.0),
+            // === Fine Motor ===
+            Milestone::new(MilestoneCategory::FineMotor, "Reaching", 4.0, 3.0, 5.0),
+            Milestone::new(MilestoneCategory::FineMotor, "Palmar grasp", 5.0, 4.0, 6.0),
+            Milestone::new(MilestoneCategory::FineMotor, "Transfer objects", 7.0, 5.0, 9.0),
+            Milestone::new(MilestoneCategory::FineMotor, "Pincer grasp", 9.0, 7.0, 12.0),
+            Milestone::new(MilestoneCategory::FineMotor, "Stacking blocks", 15.0, 12.0, 18.0),
+            Milestone::new(MilestoneCategory::FineMotor, "Scribbling", 18.0, 14.0, 22.0),
+            Milestone::new(MilestoneCategory::FineMotor, "Drawing circle", 36.0, 30.0, 42.0),
+            // === Language ===
+            Milestone::new(MilestoneCategory::Language, "Cooing", 2.0, 1.0, 4.0),
+            Milestone::new(MilestoneCategory::Language, "Babbling", 6.0, 4.0, 8.0),
+            Milestone::new(MilestoneCategory::Language, "First words", 10.0, 8.0, 14.0),
+            Milestone::new(MilestoneCategory::Language, "Two-word phrases", 18.0, 14.0, 24.0),
+            Milestone::new(MilestoneCategory::Language, "50+ words", 24.0, 18.0, 30.0),
+            Milestone::new(MilestoneCategory::Language, "Simple sentences", 36.0, 30.0, 42.0),
+            Milestone::new(MilestoneCategory::Language, "Complex sentences", 48.0, 36.0, 60.0),
+            // === Social ===
+            Milestone::new(MilestoneCategory::Social, "Social smile", 2.0, 1.0, 3.0),
+            Milestone::new(MilestoneCategory::Social, "Stranger anxiety", 8.0, 6.0, 10.0),
+            Milestone::new(MilestoneCategory::Social, "Separation anxiety", 9.0, 6.0, 12.0),
+            Milestone::new(MilestoneCategory::Social, "Parallel play", 24.0, 18.0, 30.0),
+            Milestone::new(MilestoneCategory::Social, "Cooperative play", 36.0, 30.0, 48.0),
+            Milestone::new(MilestoneCategory::Social, "Theory of mind", 48.0, 36.0, 60.0),
+            // === Cognitive ===
+            Milestone::new(MilestoneCategory::Cognitive, "Object permanence", 8.0, 6.0, 10.0),
+            Milestone::new(MilestoneCategory::Cognitive, "Means-end reasoning", 10.0, 8.0, 12.0),
+            Milestone::new(MilestoneCategory::Cognitive, "Symbolic play", 18.0, 14.0, 24.0),
+            Milestone::new(MilestoneCategory::Cognitive, "Sorting by category", 24.0, 20.0, 30.0),
+            Milestone::new(MilestoneCategory::Cognitive, "Counting to 10", 36.0, 30.0, 48.0),
+            Milestone::new(MilestoneCategory::Cognitive, "Conservation", 60.0, 48.0, 72.0),
+        ]
     }
 
     /// Return milestones expected by a given age (expected_months <= age).
