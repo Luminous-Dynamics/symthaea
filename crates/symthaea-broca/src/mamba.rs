@@ -18,7 +18,7 @@
 use anyhow::{Context, Result};
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
-use candle_transformers::models::mamba::{Config, Model, State};
+use crate::mamba_model::{Config, Model, State};
 
 /// Select the best available compute device.
 ///
@@ -84,6 +84,13 @@ pub trait MambaBackend: Send {
 
     /// Get the EOS token ID.
     fn eos_token_id(&self) -> u32;
+
+    /// Feed a sequence of continuous embedding vectors through Mamba's layers.
+    ///
+    /// Each vector is processed as a soft token (bypasses token embedding lookup).
+    /// SSM state accumulates across the sequence, integrating all context.
+    /// The sequence is typically 64 chunks of 768D from temporal projection.
+    fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()>;
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
@@ -342,6 +349,27 @@ impl MambaWrapper {
     pub fn device(&self) -> &Device {
         &self.device
     }
+
+    /// Feed a sequence of continuous embedding vectors through Mamba's layers.
+    ///
+    /// Resets state, then processes each vector as a soft token via `forward_embeds()`,
+    /// bypassing the token embedding lookup. SSM state accumulates across the sequence.
+    pub fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()> {
+        self.reset();
+        let d_model = self.config.d_model;
+        for chunk in sequence {
+            assert_eq!(
+                chunk.len(),
+                d_model,
+                "Each chunk must be d_model={d_model} dimensions"
+            );
+            let embeds = Tensor::from_vec(chunk.clone(), (1, d_model), &self.device)?;
+            // Forward through all 24 layers as continuous embedding — no token lookup
+            let _ = self.model.forward_embeds(&embeds, &mut self.state)?;
+        }
+        // SSM state now contains the temporally-integrated thought representation
+        Ok(())
+    }
 }
 
 impl std::fmt::Debug for MambaWrapper {
@@ -401,6 +429,10 @@ impl MambaBackend for MambaWrapper {
 
     fn eos_token_id(&self) -> u32 {
         MambaWrapper::eos_token_id(self)
+    }
+
+    fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()> {
+        MambaWrapper::inject_context_sequence(self, sequence)
     }
 }
 
@@ -552,6 +584,18 @@ pub(crate) mod tests {
 
         fn eos_token_id(&self) -> u32 {
             0 // Same convention as MambaWrapper (fallback when <|endoftext|> not found)
+        }
+
+        fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()> {
+            self.injection_count += 1;
+            // Record average L2 magnitude across chunks for diagnostics
+            let avg_mag: f32 = sequence
+                .iter()
+                .map(|c| c.iter().map(|x| x * x).sum::<f32>().sqrt())
+                .sum::<f32>()
+                / sequence.len().max(1) as f32;
+            self.last_context_magnitude = avg_mag;
+            Ok(())
         }
     }
 
@@ -747,7 +791,7 @@ pub(crate) mod tests {
         let thought_hv = encoder.encode(&channels);
 
         // Project HDC → SSM space
-        let mut projection = HdcSsmProjection::new(&genesis, 16384, 256, 768);
+        let projection = HdcSsmProjection::new(&genesis, 16384, 256, 768);
         let ssm_context = projection.project_to_ssm(&thought_hv);
 
         // Inject context into Mamba
@@ -1031,5 +1075,34 @@ pub(crate) mod tests {
         assert_eq!(ids.len(), 4);
         let text = backend.decode(&ids).expect("Decode failed");
         assert_eq!(text, "test");
+    }
+
+    #[test]
+    fn test_mock_inject_context_sequence() {
+        let mut mock = MockMamba::new();
+
+        // 64 chunks of 768D (simulating temporal projection output)
+        let sequence: Vec<Vec<f32>> = (0..64).map(|i| vec![0.1 * (i as f32 + 1.0); 768]).collect();
+
+        mock.inject_context_sequence(&sequence)
+            .expect("inject_context_sequence failed");
+
+        assert_eq!(mock.injection_count, 1);
+        assert!(mock.last_context_magnitude > 0.0, "Should record magnitude");
+    }
+
+    #[test]
+    fn test_mock_context_sequence_then_generate() {
+        let mut mock = MockMamba::new();
+
+        // Inject 64 chunks as soft tokens
+        let sequence: Vec<Vec<f32>> = (0..64).map(|_| vec![0.5; 768]).collect();
+        mock.inject_context_sequence(&sequence)
+            .expect("inject failed");
+
+        // Should still be able to do normal forward passes after
+        let logits = mock.forward_one_token(42).expect("Forward failed");
+        assert_eq!(logits.len(), 50280);
+        assert!(logits.iter().all(|x| x.is_finite()));
     }
 }
