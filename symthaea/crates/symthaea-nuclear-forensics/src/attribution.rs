@@ -6,14 +6,24 @@ use crate::decay_model::IsotopeDecayModel;
 use crate::encoder::IsotopicHdcEncoder;
 use crate::isotope::{IsotopicSignature, NuclearSource};
 
+/// Result of attributing an unknown isotopic sample to a reference source.
 #[derive(Debug, Clone)]
 pub struct AttributionResult {
+    /// The best-matching reference source category.
     pub matched_source: NuclearSource,
+    /// Name of the best-matching reference signature.
     pub matched_name: String,
+    /// Attribution confidence (0.0–1.0), combining similarity and margin.
     pub confidence: f32,
+    /// All reference similarities, sorted descending.
     pub all_similarities: Vec<(String, f32)>,
 }
 
+/// Nuclear attribution agent that matches unknown isotopic samples against
+/// a reference database using HDC cosine similarity.
+///
+/// Pre-encodes all reference signatures at construction time so that
+/// attribution calls are O(n) in the number of references, not O(n × d).
 pub struct NuclearAttributionAgent {
     references: Vec<IsotopicSignature>,
     /// Pre-computed reference HVs — avoids re-encoding on every attribution call.
@@ -23,6 +33,7 @@ pub struct NuclearAttributionAgent {
 }
 
 impl NuclearAttributionAgent {
+    /// Create an agent with the 5 built-in reference signatures.
     pub fn new() -> Self {
         Self::with_references(IsotopicSignature::references())
     }

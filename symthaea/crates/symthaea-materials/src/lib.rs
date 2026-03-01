@@ -6,6 +6,7 @@
 //! provides constraint-filtered HDC similarity search.
 
 #![deny(unsafe_code)]
+#![warn(missing_docs)]
 
 pub mod aging;
 pub mod database;
