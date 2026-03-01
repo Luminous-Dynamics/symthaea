@@ -88,6 +88,14 @@ impl symthaea_core::temporal::TemporalPredictor for MaterialAgingModel {
     fn tau_base(&self) -> f32 {
         86_400.0 // 1 day (materials aging timescale)
     }
+
+    fn default_horizons(&self) -> &'static [f32] {
+        AGING_HORIZONS
+    }
+
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        AGING_HORIZON_LABELS
+    }
 }
 
 #[cfg(test)]
@@ -146,5 +154,28 @@ mod tests {
                 assert!(p.remaining_strength.is_finite(), "NaN remaining_strength for {}", mat.name);
             }
         }
+    }
+
+    // ── Track C: trait coverage ───────────────────────────────────────────
+
+    #[test]
+    fn test_observe_changes_prediction() {
+        use symthaea_core::temporal::TemporalPredictor;
+        let mut m = MaterialAgingModel::new();
+        let seed = ContinuousHV::random(HDC_DIMENSION, 0xBEEF);
+        let before = m.predict_at(&seed, 86_400.0);
+        m.observe(&seed, 86_400.0);
+        let after = m.predict_at(&seed, 86_400.0);
+        let sim = before.similarity(&after);
+        assert!(sim < 1.0, "observe() should change predictions, sim={}", sim);
+    }
+
+    #[test]
+    fn test_default_horizons_and_labels() {
+        use symthaea_core::temporal::TemporalPredictor;
+        let m = MaterialAgingModel::new();
+        assert_eq!(m.default_horizons(), AGING_HORIZONS);
+        assert_eq!(m.horizon_labels(), AGING_HORIZON_LABELS);
+        assert_eq!(m.default_horizons().len(), m.horizon_labels().len());
     }
 }

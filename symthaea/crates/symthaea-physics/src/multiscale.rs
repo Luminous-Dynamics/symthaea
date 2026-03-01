@@ -157,16 +157,24 @@ impl ScalePredictor {
     ///
     /// # Panics
     ///
-    /// Panics if `dt_seconds` is not finite or is non-positive.
-    pub fn predict(&self, current_state: &ContinuousHV, dt_seconds: f32) -> ContinuousHV {
+    /// Panics if `horizon_seconds` is not finite or is non-positive.
+    pub fn predict(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
         assert!(
-            dt_seconds.is_finite() && dt_seconds > 0.0,
-            "dt_seconds must be finite and positive, got {}",
-            dt_seconds
+            horizon_seconds.is_finite() && horizon_seconds > 0.0,
+            "horizon_seconds must be finite and positive, got {}",
+            horizon_seconds
         );
         let mut neuron_copy = self.neuron.clone();
-        neuron_copy.evolve_closed_form(dt_seconds, current_state);
+        neuron_copy.evolve_closed_form(horizon_seconds, current_state);
         neuron_copy.state().clone()
+    }
+
+    /// Predict state at the given time horizon — alias for [`Self::predict`].
+    ///
+    /// This name aligns with the cross-domain [`TemporalPredictor`] convention
+    /// used by materials, hydrology, and fusion predictors.
+    pub fn predict_at_horizon(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+        self.predict(current_state, horizon_seconds)
     }
 
     /// Feed an observation.
@@ -174,6 +182,7 @@ impl ScalePredictor {
         self.neuron.evolve_closed_form(dt, state);
     }
 
+    /// Which physical scale this predictor is tuned for.
     pub fn scale(&self) -> PhysicalScale {
         self.scale
     }
@@ -482,7 +491,7 @@ mod tests {
     // ── Track B: failure-path tests ──────────────────────────────────────
 
     #[test]
-    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
     fn test_scale_predictor_rejects_nan() {
         let predictor = ScalePredictor::new(PhysicalScale::Atomic);
         let input = ContinuousHV::random(HDC_DIMENSION, 42);
@@ -490,7 +499,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
     fn test_scale_predictor_rejects_zero() {
         let predictor = ScalePredictor::new(PhysicalScale::Atomic);
         let input = ContinuousHV::random(HDC_DIMENSION, 42);
@@ -498,7 +507,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
     fn test_scale_predictor_rejects_negative() {
         let predictor = ScalePredictor::new(PhysicalScale::Atomic);
         let input = ContinuousHV::random(HDC_DIMENSION, 42);
@@ -517,5 +526,101 @@ mod tests {
         let encoder = ScaleEncoder::new(PhysicalScale::Cellular); // 6 observables
         let hv = encoder.encode(&[0.5; 3]); // 3 < 6, should work
         assert_eq!(hv.dim(), HDC_DIMENSION);
+    }
+
+    // ── Track C: edge-path tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_observe_changes_prediction() {
+        let mut predictor = ScalePredictor::new(PhysicalScale::Cellular);
+        let state_a = ContinuousHV::random(HDC_DIMENSION, 100);
+        let state_b = ContinuousHV::random(HDC_DIMENSION, 200);
+
+        // Predict before any observation
+        let pred_before = predictor.predict(&state_a, 1.0);
+
+        // Feed an observation
+        predictor.observe(&state_b, 1.0);
+
+        // Predict again — internal neuron state has changed, so prediction differs
+        let pred_after = predictor.predict(&state_a, 1.0);
+
+        let sim = pred_before.similarity(&pred_after);
+        assert!(
+            sim < 0.999,
+            "Prediction should change after observe(), similarity={}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_unifier_observe_routes_to_correct_scale() {
+        let mut unifier = MultiScaleUnifier::new();
+        let state = ContinuousHV::random(HDC_DIMENSION, 42);
+
+        // Predict before observe
+        let pred_before = unifier.predict(PhysicalScale::Molecular, &state, 1e-6);
+
+        // Observe at Molecular scale
+        let obs = ContinuousHV::random(HDC_DIMENSION, 999);
+        unifier.observe(PhysicalScale::Molecular, &obs, 1e-6);
+
+        // Prediction at Molecular should have changed
+        let pred_after = unifier.predict(PhysicalScale::Molecular, &state, 1e-6);
+        let sim_molecular = pred_before.similarity(&pred_after);
+        assert!(
+            sim_molecular < 0.999,
+            "Molecular prediction should change after observe, sim={}",
+            sim_molecular
+        );
+    }
+
+    #[test]
+    fn test_predict_at_horizon_alias() {
+        let predictor = ScalePredictor::new(PhysicalScale::Atomic);
+        let input = ContinuousHV::random(HDC_DIMENSION, 42);
+        let tau = PhysicalScale::Atomic.tau_seconds();
+
+        let from_predict = predictor.predict(&input, tau);
+        let from_alias = predictor.predict_at_horizon(&input, tau);
+
+        // Both should return identical results
+        assert_eq!(
+            from_predict.similarity(&from_alias),
+            1.0,
+            "predict_at_horizon should be an exact alias for predict"
+        );
+    }
+
+    #[test]
+    fn test_temporal_predictor_trait_impl() {
+        use symthaea_core::temporal::TemporalPredictor;
+
+        let predictor = ScalePredictor::new(PhysicalScale::Organism);
+        assert_eq!(predictor.domain(), "multiscale");
+        assert_eq!(predictor.tau_base(), PhysicalScale::Organism.tau_seconds());
+    }
+
+    #[test]
+    fn test_unifier_default() {
+        let unifier = MultiScaleUnifier::default();
+        assert_eq!(unifier.encoders().len(), 6);
+        assert_eq!(unifier.predictors().len(), 6);
+    }
+
+    #[test]
+    fn test_cross_scale_coherence_single_state() {
+        let unifier = MultiScaleUnifier::new();
+        let state = ContinuousHV::random(HDC_DIMENSION, 42);
+        // Single state → 0 pairs
+        let coherence = unifier.cross_scale_coherence(&[(PhysicalScale::Particle, state)]);
+        assert!(coherence.is_empty());
+    }
+
+    #[test]
+    fn test_cross_scale_coherence_empty() {
+        let unifier = MultiScaleUnifier::new();
+        let coherence = unifier.cross_scale_coherence(&[]);
+        assert!(coherence.is_empty());
     }
 }

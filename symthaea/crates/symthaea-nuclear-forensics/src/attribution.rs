@@ -178,4 +178,32 @@ mod tests {
                 "Confidence out of [0,1] for {}: {}", sig.name, r.confidence);
         }
     }
+
+    // ── Track C: attribute_with_age edge cases ────────────────────────────
+
+    #[test]
+    fn test_attribute_with_age_all_references() {
+        let agent = NuclearAttributionAgent::new();
+        for sig in &IsotopicSignature::references() {
+            let (attr, age) = agent.attribute_with_age(sig);
+            assert_eq!(attr.matched_source, sig.source,
+                "attribute_with_age source mismatch for {}", sig.name);
+            assert!(age.estimated_age_seconds.is_finite(),
+                "NaN age for {}", sig.name);
+            assert!(age.confidence >= 0.0 && age.confidence <= 1.0,
+                "confidence out of [0,1] for {}", sig.name);
+        }
+    }
+
+    #[test]
+    fn test_attribute_with_age_zero_ratios() {
+        let agent = NuclearAttributionAgent::new();
+        let mut sig = IsotopicSignature::natural_uranium();
+        sig.pu241_pu239 = 0.0;
+        sig.cs137_activity = 0.0;
+        sig.sr90_activity = 0.0;
+        let (attr, age) = agent.attribute_with_age(&sig);
+        assert_eq!(attr.matched_source, NuclearSource::NaturalUranium);
+        assert_eq!(age.confidence, 0.0, "no usable decay ratios → zero confidence");
+    }
 }

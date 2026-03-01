@@ -170,6 +170,14 @@ impl symthaea_core::temporal::TemporalPredictor for IsotopeDecayModel {
     fn tau_base(&self) -> f32 {
         31_536_000.0 // 1 year (isotope decay timescale)
     }
+
+    fn default_horizons(&self) -> &'static [f32] {
+        DECAY_HORIZONS
+    }
+
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        DECAY_HORIZON_LABELS
+    }
 }
 
 #[cfg(test)]
@@ -255,5 +263,52 @@ mod tests {
             assert!(age.confidence.is_finite(), "NaN confidence for {}", sig.name);
             assert!(age.confidence >= 0.0 && age.confidence <= 1.0);
         }
+    }
+
+    // ── Track C: alias and trait coverage ─────────────────────────────────
+
+    #[test]
+    fn test_predict_at_horizon_matches_backdate() {
+        let m = IsotopeDecayModel::new();
+        let sig = IsotopicSignature::spent_fuel();
+        let a = m.backdate(&sig, 86_400.0);
+        let b = m.predict_at_horizon(&sig, 86_400.0);
+        assert_eq!(a.horizon_seconds, b.horizon_seconds);
+        assert_eq!(a.horizon_label, b.horizon_label);
+        assert!((a.state_drift - b.state_drift).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_predict_all_horizons_matches_backdate_all() {
+        let m = IsotopeDecayModel::new();
+        let sig = IsotopicSignature::highly_enriched_uranium();
+        let a = m.backdate_all_horizons(&sig);
+        let b = m.predict_all_horizons(&sig);
+        assert_eq!(a.len(), b.len());
+        for (ra, rb) in a.iter().zip(b.iter()) {
+            assert_eq!(ra.horizon_seconds, rb.horizon_seconds);
+        }
+    }
+
+    #[test]
+    fn test_observe_changes_prediction() {
+        use symthaea_core::temporal::TemporalPredictor;
+        let mut m = IsotopeDecayModel::new();
+        let seed = ContinuousHV::random(HDC_DIMENSION, 0xFACE);
+        let before = m.predict_at(&seed, 86_400.0);
+        m.observe(&seed, 86_400.0);
+        let after = m.predict_at(&seed, 86_400.0);
+        // After observing, internal state changed → different prediction
+        let sim = before.similarity(&after);
+        assert!(sim < 1.0, "observe() should change predictions, sim={}", sim);
+    }
+
+    #[test]
+    fn test_default_horizons_and_labels() {
+        use symthaea_core::temporal::TemporalPredictor;
+        let m = IsotopeDecayModel::new();
+        assert_eq!(m.default_horizons(), DECAY_HORIZONS);
+        assert_eq!(m.horizon_labels(), DECAY_HORIZON_LABELS);
+        assert_eq!(m.default_horizons().len(), m.horizon_labels().len());
     }
 }

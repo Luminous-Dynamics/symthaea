@@ -120,7 +120,21 @@ fn main() {
     }
     println!();
 
-    // ── 4. Timescale span summary ─────────────────────────────────────────
+    // ── 4. Domain-specific horizons via trait methods ────────────────────
+
+    println!("\n--- Domain Horizon Metadata (via trait) ---");
+    for p in &predictors {
+        let horizons = p.default_horizons();
+        let labels = p.horizon_labels();
+        if horizons.is_empty() {
+            println!("  {:>20}: no fixed horizons (uses tau={:.6}s)", p.domain(), p.tau_base());
+        } else {
+            let label_str: Vec<&str> = labels.iter().copied().collect();
+            println!("  {:>20}: {} horizons — {}", p.domain(), horizons.len(), label_str.join(", "));
+        }
+    }
+
+    // ── 5. Timescale span summary ─────────────────────────────────────────
 
     let tau_min = predictors
         .iter()

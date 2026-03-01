@@ -29,6 +29,22 @@ pub trait TemporalPredictor {
 
     /// Characteristic timescale (tau_base) in seconds.
     fn tau_base(&self) -> f32;
+
+    /// Standard prediction horizons for this domain (seconds).
+    ///
+    /// Returns the domain-specific horizon array (e.g., `PLASMA_HORIZONS`,
+    /// `AGING_HORIZONS`). Defaults to empty for predictors without fixed horizons.
+    fn default_horizons(&self) -> &'static [f32] {
+        &[]
+    }
+
+    /// Human-readable labels for [`Self::default_horizons`], in matching order.
+    ///
+    /// Returns labels like `["1 ms", "10 ms", "100 ms", "1 s", "10 s"]`.
+    /// Defaults to empty.
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        &[]
+    }
 }
 
 #[cfg(test)]

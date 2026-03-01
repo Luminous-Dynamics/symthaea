@@ -237,6 +237,14 @@ impl symthaea_core::temporal::TemporalPredictor for HydrologicalPredictor {
     fn tau_base(&self) -> f32 {
         3600.0 // 1 hour (hydrological timescale)
     }
+
+    fn default_horizons(&self) -> &'static [f32] {
+        WATER_HORIZONS
+    }
+
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        WATER_HORIZON_LABELS
+    }
 }
 
 // ── Water FEP Agent ────────────────────────────────────────────────────────
