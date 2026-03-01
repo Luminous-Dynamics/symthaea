@@ -305,9 +305,7 @@ pub struct CognitiveLoopService {
     /// Triggers exploration when predictions are too accurate
     curiosity_drive: CuriosityDrive,
 
-    /// Self-reflection for meta-learning
-    /// Periodically analyzes and adjusts internal thresholds
-    self_reflection: SelfReflection,
+    // NOTE: self_reflection moved to self_model_tier.self_reflection (Phase 3, Step 5)
 
     // ═══════════════════════════════════════════════════════════════════════
     // MEGA-UNIFIED ARCHITECTURE: Consciousness Unification Engine
@@ -703,6 +701,14 @@ pub struct CognitiveLoopService {
 
     /// Whether the system was in sleep phase on the previous cycle (for sleep→wake transition).
     pub(crate) was_sleeping: bool,
+
+    /// Pending neuromodulator calibration from psych-bench normative z-scores.
+    /// Ingested via `ingest_calibration()`, applied on sleep→wake transition.
+    /// Science: Doya (2002) — receptor sensitivity tunes metalearning parameters.
+    pending_calibration: Option<calibration::NeuromodCalibration>,
+
+    /// Last applied calibration summary (for telemetry/diagnostics).
+    pub(crate) last_calibration_summary: Option<String>,
 
     /// Hysteresis-based phase transition detector (prevents flicker between labels).
     pub(crate) bath_phase_detector: neuromodulators::PhaseTransitionDetector,

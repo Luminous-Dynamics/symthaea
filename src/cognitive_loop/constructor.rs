@@ -56,7 +56,7 @@ use super::training::AsyncTrainerHandle;
 use super::{
     ActiveInferenceBridge, AdaptiveBehavior, ClosedLearningLoop, CognitiveDepth,
     CognitiveLoopConfig, CognitiveLoopService, CuriosityDrive, EmotionContagion,
-    EpisodicMemoryBridge, FlowState, GoalSystemBridge, LoopStats, SelfReflection, TemporalBackend,
+    EpisodicMemoryBridge, FlowState, GoalSystemBridge, LoopStats, TemporalBackend,
     ThalamicRouter, WorldModelBridge,
 };
 
@@ -406,7 +406,7 @@ impl CognitiveLoopService {
             flow_state: FlowState::default(),
             emotion_contagion: EmotionContagion::default(),
             curiosity_drive: CuriosityDrive::default(),
-            self_reflection: SelfReflection::default(),
+            // NOTE: self_reflection is now in self_model_tier
             // Mega-unified architecture components
             thalamic_router: ThalamicRouter::default(),
             unification_engine: ConsciousnessUnificationEngine::new(),
@@ -646,6 +646,8 @@ impl CognitiveLoopService {
             personality_drift_tracker: super::neuromodulators::PersonalityDriftTracker::default(),
             bath_phase_tracker: super::neuromodulators::BathPhaseTracker::default(),
             was_sleeping: false,
+            pending_calibration: None,
+            last_calibration_summary: None,
             bath_phase_detector: super::neuromodulators::PhaseTransitionDetector::new(5),
             somatic_bridge: somatic_bridge_instance,
             pain_tx: Some(pain_sender),
