@@ -207,13 +207,16 @@ impl MeshBridgeActor {
         poll_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
         // Apply initial encryption key if one was set before run() was called.
+        // Only overwrite if shared state has a key — preserve builder-set keys otherwise.
         #[cfg(feature = "mesh-encryption")]
         {
-            let key = self.shared_key.lock().unwrap().clone();
-            mesh.set_encryption_key(key);
-            receiver.set_encryption_key(key);
-            let epoch = self.shared_epoch.load(Ordering::Relaxed);
-            mesh.set_encryption_epoch(epoch);
+            let key = *self.shared_key.lock().unwrap();
+            if key.is_some() {
+                mesh.set_encryption_key(key);
+                receiver.set_encryption_key(key);
+                let epoch = self.shared_epoch.load(Ordering::Relaxed);
+                mesh.set_encryption_epoch(epoch);
+            }
         }
 
         #[cfg(feature = "mesh-encryption")]
