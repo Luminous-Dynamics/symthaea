@@ -188,7 +188,6 @@ struct App {
 
     // === B8: Error Explanation ===
     /// Error explainer for inline diagnosis (used by process_output_for_errors)
-    #[allow(dead_code)]
     error_explainer: ErrorExplainer,
     /// Last error explanation (for /explain command)
     last_error: Option<ErrorExplanation>,

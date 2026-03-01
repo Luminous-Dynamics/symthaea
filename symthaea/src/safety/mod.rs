@@ -87,13 +87,14 @@ impl AmygdalaActor {
     /// Create a new AmygdalaActor with default dangerous patterns
     pub fn new() -> Self {
         let patterns = vec![
-            // Destructive commands
-            r"rm\s+-rf\s+/",
-            r"dd\s+if=.*of=/dev/",
-            r"mkfs\.",
-            r":\(\)\{\s*:\|:&\s*\};:", // Fork bomb (escaped for regex)
-            r"chmod\s+-R\s+777\s+/",
-            r">\s*/dev/sd",
+            // Destructive commands — hardened to catch flag-interleaved variants
+            // Each pattern handles arbitrary flags (e.g. --no-preserve-root) between command and target
+            r"rm\s+(-\S+\s+)*/",                     // rm with any flags before path /
+            r"dd\s+(\S+=\S+\s+)*if=.*of=/dev/",     // dd with any key=value params
+            r"mkfs\.",                                // mkfs.* (always dangerous)
+            r":\(\)\{\s*:\|:&\s*\};:",               // Fork bomb
+            r"chmod\s+(-\S+\s+)*777\s+/",            // chmod 777 with any flags
+            r">\s*/dev/sd",                           // redirect to raw device
         ];
 
         let mut compile_failures = 0;
@@ -132,6 +133,11 @@ impl AmygdalaActor {
     /// Number of regex patterns that failed to compile
     pub fn compile_failures(&self) -> usize {
         self.compile_failures
+    }
+
+    /// Number of active dangerous patterns
+    pub fn pattern_count(&self) -> usize {
+        self.dangerous_patterns.len()
     }
 }
 
@@ -405,5 +411,67 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_amygdala_rm_with_flags() {
+        let amygdala = AmygdalaActor::new();
+        assert!(
+            amygdala.scan("rm -rf --no-preserve-root /").is_some(),
+            "Should block rm with interleaved flags"
+        );
+    }
+
+    #[test]
+    fn test_amygdala_rm_flags_interleaved() {
+        let amygdala = AmygdalaActor::new();
+        assert!(
+            amygdala.scan("rm --force -r /").is_some(),
+            "Should block rm with long flags before -r"
+        );
+    }
+
+    #[test]
+    fn test_amygdala_case_sensitivity() {
+        let amygdala = AmygdalaActor::new();
+        // Unix commands are case-sensitive — uppercase variants are not real commands
+        assert!(
+            amygdala.scan("RM -RF /").is_none(),
+            "Uppercase RM is not a real command on Unix"
+        );
+    }
+
+    #[test]
+    fn test_amygdala_partial_match_safe() {
+        let amygdala = AmygdalaActor::new();
+        // Substring match: "rm -rf /" appears inside the larger command
+        assert!(
+            amygdala.scan("cargo rm -rf /tmp/test").is_some(),
+            "Should still block when rm -rf / appears as substring"
+        );
+    }
+
+    #[test]
+    fn test_amygdala_dd_with_flags() {
+        let amygdala = AmygdalaActor::new();
+        assert!(
+            amygdala.scan("dd if=/dev/zero of=/dev/sda bs=4M").is_some(),
+            "Should block dd writing to raw device"
+        );
+    }
+
+    #[test]
+    fn test_guardrails_large_dimension() {
+        let guardrails = SafetyGuardrails::with_dimension(2048);
+        assert_eq!(guardrails.dimension(), 2048);
+        // Prototype self-match should still work at higher dimensions
+        let proto = guardrails
+            .prototype(ForbiddenCategory::HarmfulContent)
+            .unwrap()
+            .to_vec();
+        assert_eq!(
+            guardrails.check(&proto),
+            Some(ForbiddenCategory::HarmfulContent)
+        );
     }
 }
