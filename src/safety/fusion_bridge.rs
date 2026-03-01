@@ -199,4 +199,55 @@ mod tests {
         let metrics = adapter.to_safety_metrics(&output);
         assert_eq!(metrics.temporal_coherence, 0.0);
     }
+
+    #[test]
+    fn test_end_to_end_escalation_sequence() {
+        // Simulate a fusion disruption event: Green → Yellow → Red
+        let mut adapter = FusionSafetyAdapter::new();
+
+        // Healthy plasma
+        let a1 = adapter.assess(&mock_output(0.05, DisruptionRisk::Green, PlasmaFepAction::MaintainState));
+        assert_eq!(a1.level, SafetyLevel::Green);
+
+        // Degrading plasma
+        let a2 = adapter.assess(&mock_output(0.5, DisruptionRisk::Yellow, PlasmaFepAction::InjectGas));
+        assert!(a2.level >= SafetyLevel::Yellow);
+
+        // Emergency
+        let a3 = adapter.assess(&mock_output(0.95, DisruptionRisk::Red, PlasmaFepAction::EmergencyShutdown));
+        assert!(a3.level >= SafetyLevel::Orange);
+
+        // Verify cycle counter
+        assert_eq!(adapter.agent().history().len(), 3);
+    }
+
+    #[test]
+    fn test_metrics_consciousness_clamped() {
+        let adapter = FusionSafetyAdapter::new();
+        // free_energy > 1.0 should clamp consciousness_level to 0.0
+        let output = mock_output(1.5, DisruptionRisk::Red, PlasmaFepAction::EmergencyShutdown);
+        let metrics = adapter.to_safety_metrics(&output);
+        assert_eq!(metrics.consciousness_level, 0.0);
+        assert!(metrics.prediction_error.is_finite());
+    }
+
+    #[test]
+    fn test_gate_allows_green_risky() {
+        let adapter = FusionSafetyAdapter::new();
+        let output = mock_output(0.05, DisruptionRisk::Green, PlasmaFepAction::MaintainState);
+        assert!(adapter.gate_operation(&output, true).is_ok());
+    }
+
+    #[test]
+    fn test_all_disruption_risks_map_correctly() {
+        let pairs = [
+            (DisruptionRisk::Green, SafetyLevel::Green),
+            (DisruptionRisk::Yellow, SafetyLevel::Yellow),
+            (DisruptionRisk::Orange, SafetyLevel::Orange),
+            (DisruptionRisk::Red, SafetyLevel::Red),
+        ];
+        for (risk, expected) in pairs {
+            assert_eq!(disruption_risk_to_safety_level(risk), expected);
+        }
+    }
 }
