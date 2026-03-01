@@ -165,19 +165,24 @@ async fn test_repair_prediction_and_workflow() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_workflow_update_requires_creator() {
-    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&fabrication_dna_path())
         .await
         .unwrap();
-    let ((alice,), (bob,)) = conductor
-        .setup_app_for_zipped_agents(
-            "test-app",
-            &[dna_file.clone()],
-            &[2],
-        )
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
-        .into_tuples();
+        .into_tuple();
+    let (bob,) = bob_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
 
     // Alice creates prediction + workflow
     let prediction_input = CreateRepairPredictionInput {
@@ -190,7 +195,7 @@ async fn test_workflow_update_requires_creator() {
         sensor_data_summary: "{}".to_string(),
     };
 
-    let prediction_record: Record = conductor
+    let prediction_record: Record = alice_conductor
         .call(
             &alice.zome("bridge_coordinator"),
             "create_repair_prediction",
@@ -200,7 +205,7 @@ async fn test_workflow_update_requires_creator() {
 
     let prediction_hash = prediction_record.action_address().clone();
 
-    let workflow_record: Record = conductor
+    let workflow_record: Record = alice_conductor
         .call(
             &alice.zome("bridge_coordinator"),
             "create_repair_workflow",
@@ -209,6 +214,9 @@ async fn test_workflow_update_requires_creator() {
         .await;
 
     let workflow_hash = workflow_record.action_address().clone();
+
+    // Wait for gossip propagation so Bob can see Alice's entries
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Bob tries to update Alice's workflow — should fail
     let update_input = UpdateWorkflowInput {
@@ -220,7 +228,7 @@ async fn test_workflow_update_requires_creator() {
         print_job_hash: None,
     };
 
-    let bob_result: Result<Record, _> = conductor
+    let bob_result: Result<Record, _> = bob_conductor
         .call_fallible(
             &bob.zome("bridge_coordinator"),
             "update_repair_workflow",
@@ -233,7 +241,8 @@ async fn test_workflow_update_requires_creator() {
         "Bob should not be able to update Alice's workflow"
     );
 
-    drop(conductor);
+    drop(alice_conductor);
+    drop(bob_conductor);
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 }
 

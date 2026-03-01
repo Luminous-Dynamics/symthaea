@@ -119,19 +119,24 @@ async fn test_design_create_and_get() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_design_update_requires_author() {
-    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&fabrication_dna_path())
         .await
         .unwrap();
-    let ((alice,), (bob,)) = conductor
-        .setup_app_for_zipped_agents(
-            "test-app",
-            &[dna_file.clone()],
-            &[2],
-        )
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
-        .into_tuples();
+        .into_tuple();
+    let (bob,) = bob_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
 
     // Alice creates a design
     let input = CreateDesignInput {
@@ -146,11 +151,14 @@ async fn test_design_update_requires_author() {
         parametric_schema: None,
     };
 
-    let record: Record = conductor
+    let record: Record = alice_conductor
         .call(&alice.zome("designs_coordinator"), "create_design", input)
         .await;
 
     let design_hash = record.action_address().clone();
+
+    // Wait for gossip propagation so Bob can see Alice's entry
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Bob tries to update — should fail
     let update_input = UpdateDesignInput {
@@ -159,7 +167,7 @@ async fn test_design_update_requires_author() {
         description: None,
     };
 
-    let bob_result: Result<Record, _> = conductor
+    let bob_result: Result<Record, _> = bob_conductor
         .call_fallible(
             &bob.zome("designs_coordinator"),
             "update_design",
@@ -172,26 +180,32 @@ async fn test_design_update_requires_author() {
         "Bob should not be able to update Alice's design"
     );
 
-    drop(conductor);
+    drop(alice_conductor);
+    drop(bob_conductor);
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_design_delete_requires_author() {
-    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&fabrication_dna_path())
         .await
         .unwrap();
-    let ((alice,), (bob,)) = conductor
-        .setup_app_for_zipped_agents(
-            "test-app",
-            &[dna_file.clone()],
-            &[2],
-        )
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
-        .into_tuples();
+        .into_tuple();
+    let (bob,) = bob_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
 
     // Alice creates a design
     let input = CreateDesignInput {
@@ -206,14 +220,17 @@ async fn test_design_delete_requires_author() {
         parametric_schema: None,
     };
 
-    let record: Record = conductor
+    let record: Record = alice_conductor
         .call(&alice.zome("designs_coordinator"), "create_design", input)
         .await;
 
     let design_hash = record.action_address().clone();
 
+    // Wait for gossip propagation so Bob can see Alice's entry
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
     // Bob tries to delete — should fail
-    let bob_result: Result<ActionHash, _> = conductor
+    let bob_result: Result<ActionHash, _> = bob_conductor
         .call_fallible(
             &bob.zome("designs_coordinator"),
             "delete_design",
@@ -226,26 +243,32 @@ async fn test_design_delete_requires_author() {
         "Bob should not be able to delete Alice's design"
     );
 
-    drop(conductor);
+    drop(alice_conductor);
+    drop(bob_conductor);
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_add_file_requires_design_author() {
-    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&fabrication_dna_path())
         .await
         .unwrap();
-    let ((alice,), (bob,)) = conductor
-        .setup_app_for_zipped_agents(
-            "test-app",
-            &[dna_file.clone()],
-            &[2],
-        )
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
-        .into_tuples();
+        .into_tuple();
+    let (bob,) = bob_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
 
     // Alice creates a design
     let input = CreateDesignInput {
@@ -260,11 +283,14 @@ async fn test_add_file_requires_design_author() {
         parametric_schema: None,
     };
 
-    let record: Record = conductor
+    let record: Record = alice_conductor
         .call(&alice.zome("designs_coordinator"), "create_design", input)
         .await;
 
     let design_hash = record.action_address().clone();
+
+    // Wait for gossip propagation so Bob can see Alice's entry
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Bob tries to add a file — should fail
     let file_input = AddFileInput {
@@ -278,7 +304,7 @@ async fn test_add_file_requires_design_author() {
         },
     };
 
-    let bob_result: Result<Record, _> = conductor
+    let bob_result: Result<Record, _> = bob_conductor
         .call_fallible(
             &bob.zome("designs_coordinator"),
             "add_design_file",
@@ -291,6 +317,7 @@ async fn test_add_file_requires_design_author() {
         "Bob should not be able to add files to Alice's design"
     );
 
-    drop(conductor);
+    drop(alice_conductor);
+    drop(bob_conductor);
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 }
