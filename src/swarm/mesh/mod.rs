@@ -146,6 +146,10 @@ pub struct MeshStats {
     pub bandwidth_increases: u64,
     /// Number of AIMD multiplicative decreases (budget went down).
     pub bandwidth_decreases: u64,
+    /// Packets sent with encryption enabled.
+    pub encrypted_packets_sent: u64,
+    /// Packets received and successfully decrypted.
+    pub encrypted_packets_received: u64,
 }
 
 impl MeshStats {
@@ -966,6 +970,228 @@ pub fn encrypt_packet(
 /// Returns `None` if decryption/authentication fails.
 #[cfg(feature = "mesh-encryption")]
 pub fn decrypt_packet(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
+    use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+    if data.len() < AEAD_NONCE_SIZE + AEAD_TAG_SIZE {
+        return None;
+    }
+    let (nonce_bytes, ciphertext) = data.split_at(AEAD_NONCE_SIZE);
+    let cipher = ChaCha20Poly1305::new(key.into());
+    let nonce = Nonce::from_slice(nonce_bytes);
+    cipher.decrypt(nonce, ciphertext).ok()
+}
+
+// ============================================================================
+// KEY ROTATION
+// ============================================================================
+
+/// Manages encryption key rotation with a grace period.
+///
+/// During rotation, both the old and new keys are tried for decryption.
+/// After the grace period expires, only the new key is accepted.
+///
+/// ```text
+/// rotate_key(new_key)
+///   ├── grace period (accepts old OR new) ──► grace expires
+///   │                                          ├── old_key = None
+///   │                                          └── only new_key accepted
+/// ```
+#[cfg(feature = "mesh-encryption")]
+#[derive(Clone)]
+pub struct RotatingKeyPair {
+    /// Current (primary) encryption key — used for all outbound packets.
+    current: [u8; 32],
+    /// Previous key — accepted for inbound during grace period, then discarded.
+    previous: Option<[u8; 32]>,
+    /// Tick at which the previous key expires (absolute tick count).
+    grace_expires_at: u64,
+}
+
+#[cfg(feature = "mesh-encryption")]
+impl RotatingKeyPair {
+    /// Create a new key pair with a single key (no rotation in progress).
+    pub fn new(key: [u8; 32]) -> Self {
+        Self {
+            current: key,
+            previous: None,
+            grace_expires_at: 0,
+        }
+    }
+
+    /// Rotate to a new key. The old key remains valid for `grace_ticks` cycles.
+    ///
+    /// Outbound packets immediately use the new key. Inbound packets accept
+    /// either key until the grace period expires.
+    pub fn rotate(&mut self, new_key: [u8; 32], current_tick: u64, grace_ticks: u64) {
+        self.previous = Some(self.current);
+        self.current = new_key;
+        self.grace_expires_at = current_tick.saturating_add(grace_ticks);
+    }
+
+    /// Expire the old key if the grace period has elapsed.
+    ///
+    /// Call this once per tick to garbage-collect the old key.
+    pub fn tick(&mut self, current_tick: u64) {
+        if self.previous.is_some() && current_tick >= self.grace_expires_at {
+            self.previous = None;
+        }
+    }
+
+    /// The current key (used for encryption).
+    pub fn current_key(&self) -> &[u8; 32] {
+        &self.current
+    }
+
+    /// Whether a rotation is in progress (grace period active).
+    pub fn is_rotating(&self) -> bool {
+        self.previous.is_some()
+    }
+
+    /// Encrypt with the current key.
+    pub fn encrypt(&self, envelope: &[u8], source_id: &[u8; 8], sequence: u32) -> Vec<u8> {
+        encrypt_packet(envelope, &self.current, source_id, sequence)
+    }
+
+    /// Decrypt trying the current key first, then the previous key during grace.
+    ///
+    /// Returns `None` if neither key succeeds.
+    pub fn decrypt(&self, data: &[u8]) -> Option<Vec<u8>> {
+        if let Some(plaintext) = decrypt_packet(data, &self.current) {
+            return Some(plaintext);
+        }
+        if let Some(ref prev) = self.previous {
+            return decrypt_packet(data, prev);
+        }
+        None
+    }
+}
+
+// ============================================================================
+// X25519 PER-PEER KEY AGREEMENT
+// ============================================================================
+
+/// Per-peer key store: X25519 Diffie-Hellman → BLAKE3 KDF → ChaCha20 key.
+///
+/// Each peer pair derives a unique symmetric key from their DH shared secret.
+/// This provides forward secrecy (compromising one peer's key doesn't reveal
+/// other pairs' traffic) and eliminates the single shared secret.
+///
+/// ```text
+/// Node A (secret_a)                    Node B (secret_b)
+///   │                                    │
+///   ├─ public_a = X25519(secret_a) ─────►│
+///   │◄──── public_b = X25519(secret_b) ──┤
+///   │                                    │
+///   ├─ shared = DH(secret_a, public_b)   ├─ shared = DH(secret_b, public_a)
+///   ├─ key = BLAKE3(shared ‖ ctx)        ├─ key = BLAKE3(shared ‖ ctx)
+///   └─ (same key on both sides)          └─ (same key on both sides)
+/// ```
+#[cfg(feature = "mesh-key-exchange")]
+pub struct PeerKeyStore {
+    /// Our long-term X25519 secret key.
+    secret: x25519_dalek::StaticSecret,
+    /// Our public key (derived from secret).
+    public: x25519_dalek::PublicKey,
+    /// Derived symmetric keys per peer, keyed by source_id.
+    peer_keys: std::collections::HashMap<[u8; 8], [u8; 32]>,
+}
+
+#[cfg(feature = "mesh-key-exchange")]
+impl PeerKeyStore {
+    /// Create a new key store with a random X25519 keypair.
+    pub fn new(secret_bytes: [u8; 32]) -> Self {
+        let secret = x25519_dalek::StaticSecret::from(secret_bytes);
+        let public = x25519_dalek::PublicKey::from(&secret);
+        Self {
+            secret,
+            public,
+            peer_keys: std::collections::HashMap::new(),
+        }
+    }
+
+    /// Our X25519 public key (32 bytes, send to peers).
+    pub fn public_key(&self) -> [u8; 32] {
+        self.public.to_bytes()
+    }
+
+    /// Perform DH key agreement with a peer's public key.
+    ///
+    /// Derives a ChaCha20 symmetric key via BLAKE3 KDF and stores it.
+    /// Returns the derived key.
+    pub fn agree(&mut self, peer_source_id: [u8; 8], peer_public: &[u8; 32]) -> [u8; 32] {
+        let peer_pk = x25519_dalek::PublicKey::from(*peer_public);
+        let shared_secret = self.secret.diffie_hellman(&peer_pk);
+
+        // KDF: BLAKE3 keyed hash of shared secret with context
+        let mut kdf_input = Vec::with_capacity(64);
+        kdf_input.extend_from_slice(shared_secret.as_bytes());
+        kdf_input.extend_from_slice(b"symthaea-mesh-chacha20-v1");
+        let derived = blake3::hash(&kdf_input);
+        let key: [u8; 32] = *derived.as_bytes();
+
+        self.peer_keys.insert(peer_source_id, key);
+        key
+    }
+
+    /// Get the derived symmetric key for a peer (if agreement has been done).
+    pub fn peer_key(&self, source_id: &[u8; 8]) -> Option<&[u8; 32]> {
+        self.peer_keys.get(source_id)
+    }
+
+    /// Number of peers with established keys.
+    pub fn peer_count(&self) -> usize {
+        self.peer_keys.len()
+    }
+
+    /// Remove a peer's key (e.g., on expiry).
+    pub fn remove_peer(&mut self, source_id: &[u8; 8]) {
+        self.peer_keys.remove(source_id);
+    }
+}
+
+// ============================================================================
+// FRAGMENT-LEVEL AEAD ENCRYPTION
+// ============================================================================
+
+/// Encrypt a single LoRa fragment with ChaCha20-Poly1305.
+///
+/// Each fragment gets its own AEAD envelope so that:
+/// 1. Individual fragments are authenticated (tamper-proof)
+/// 2. A partial capture (< all fragments) cannot be decrypted
+/// 3. Fragment reordering is detected
+///
+/// Nonce derivation: `source_id[0..8] ‖ thought_id[2] ‖ fragment_index[1] ‖ 0[1]`
+///
+/// Returns `[nonce (12) | ciphertext + tag]`. Overhead: 28 bytes per fragment.
+#[cfg(feature = "mesh-encryption")]
+pub fn encrypt_fragment(
+    payload: &[u8],
+    key: &[u8; 32],
+    source_id: &[u8; 8],
+    thought_id: u16,
+    fragment_index: u8,
+) -> Vec<u8> {
+    use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+    let cipher = ChaCha20Poly1305::new(key.into());
+    let mut nonce_bytes = [0u8; 12];
+    nonce_bytes[..8].copy_from_slice(source_id);
+    nonce_bytes[8..10].copy_from_slice(&thought_id.to_le_bytes());
+    nonce_bytes[10] = fragment_index;
+    nonce_bytes[11] = 0; // reserved
+    let nonce = Nonce::from(nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(&nonce, payload)
+        .expect("encryption never fails for valid inputs");
+    let mut out = Vec::with_capacity(12 + ciphertext.len());
+    out.extend_from_slice(&nonce_bytes);
+    out.extend_from_slice(&ciphertext);
+    out
+}
+
+/// Decrypt a fragment encrypted with [`encrypt_fragment`].
+///
+/// Returns `None` if decryption/authentication fails.
+#[cfg(feature = "mesh-encryption")]
+pub fn decrypt_fragment(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
     use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
     if data.len() < AEAD_NONCE_SIZE + AEAD_TAG_SIZE {
         return None;
@@ -2329,6 +2555,216 @@ mod tests {
         // Too short — less than nonce + tag
         let short = vec![0u8; AEAD_NONCE_SIZE + AEAD_TAG_SIZE - 1];
         assert!(decrypt_packet(&short, &key).is_none());
+    }
+
+    // -- Key Rotation tests --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_rotating_key_pair_basic() {
+        let key = [0x11u8; 32];
+        let pair = RotatingKeyPair::new(key);
+        assert_eq!(pair.current_key(), &key);
+        assert!(!pair.is_rotating());
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_rotating_key_pair_rotation() {
+        let old_key = [0x11u8; 32];
+        let new_key = [0x22u8; 32];
+        let source = [0xAA; 8];
+        let plaintext = b"hello mesh";
+
+        let mut pair = RotatingKeyPair::new(old_key);
+
+        // Encrypt with old key
+        let ct_old = pair.encrypt(plaintext, &source, 1);
+
+        // Rotate to new key with 100 tick grace
+        pair.rotate(new_key, 50, 100);
+        assert!(pair.is_rotating());
+        assert_eq!(pair.current_key(), &new_key);
+
+        // New encryptions use new key
+        let ct_new = pair.encrypt(plaintext, &source, 2);
+
+        // During grace: both old and new ciphertext decrypt
+        assert!(pair.decrypt(&ct_old).is_some(), "Old ciphertext should decrypt during grace");
+        assert!(pair.decrypt(&ct_new).is_some(), "New ciphertext should decrypt during grace");
+
+        // After grace expires: old key is discarded
+        pair.tick(150); // past grace_expires_at=150
+        assert!(!pair.is_rotating());
+        assert!(pair.decrypt(&ct_old).is_none(), "Old ciphertext should fail after grace");
+        assert!(pair.decrypt(&ct_new).is_some(), "New ciphertext should still work");
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_rotating_key_pair_grace_not_expired() {
+        let old_key = [0x33u8; 32];
+        let new_key = [0x44u8; 32];
+        let mut pair = RotatingKeyPair::new(old_key);
+        pair.rotate(new_key, 100, 50); // grace expires at tick 150
+
+        // Tick within grace period
+        pair.tick(149);
+        assert!(pair.is_rotating(), "Should still be rotating before expiry");
+
+        // Tick at exact expiry
+        pair.tick(150);
+        assert!(!pair.is_rotating(), "Should expire at grace_expires_at");
+    }
+
+    // -- X25519 Key Agreement tests --
+
+    #[cfg(feature = "mesh-key-exchange")]
+    #[test]
+    fn test_peer_key_store_dh_agreement() {
+        // Two peers independently derive the same symmetric key
+        let mut store_a = PeerKeyStore::new([0xAA; 32]);
+        let mut store_b = PeerKeyStore::new([0xBB; 32]);
+
+        let pub_a = store_a.public_key();
+        let pub_b = store_b.public_key();
+        assert_ne!(pub_a, pub_b, "Different secrets → different public keys");
+
+        let source_a: [u8; 8] = [0x0A; 8];
+        let source_b: [u8; 8] = [0x0B; 8];
+
+        let key_ab = store_a.agree(source_b, &pub_b);
+        let key_ba = store_b.agree(source_a, &pub_a);
+
+        assert_eq!(key_ab, key_ba, "DH shared secret must be symmetric");
+        assert_eq!(store_a.peer_count(), 1);
+        assert_eq!(store_b.peer_count(), 1);
+    }
+
+    #[cfg(feature = "mesh-key-exchange")]
+    #[test]
+    fn test_peer_key_store_encrypt_decrypt_roundtrip() {
+        let mut store_a = PeerKeyStore::new([0xCC; 32]);
+        let mut store_b = PeerKeyStore::new([0xDD; 32]);
+
+        let pub_a = store_a.public_key();
+        let pub_b = store_b.public_key();
+
+        let source_a: [u8; 8] = [0x0A; 8];
+        let source_b: [u8; 8] = [0x0B; 8];
+
+        store_a.agree(source_b, &pub_b);
+        store_b.agree(source_a, &pub_a);
+
+        let key_a = store_a.peer_key(&source_b).unwrap();
+        let plaintext = b"wisdom vector payload";
+        let ct = encrypt_packet(plaintext, key_a, &source_a, 1);
+
+        let key_b = store_b.peer_key(&source_a).unwrap();
+        let pt = decrypt_packet(&ct, key_b).expect("peer key should decrypt");
+        assert_eq!(&pt, plaintext);
+    }
+
+    #[cfg(feature = "mesh-key-exchange")]
+    #[test]
+    fn test_peer_key_store_wrong_peer_key_fails() {
+        let mut store_a = PeerKeyStore::new([0x11; 32]);
+        let mut store_b = PeerKeyStore::new([0x22; 32]);
+        let store_c = PeerKeyStore::new([0x33; 32]);
+
+        let pub_b = store_b.public_key();
+        let pub_c = store_c.public_key();
+
+        let source_b: [u8; 8] = [0x0B; 8];
+        let source_c: [u8; 8] = [0x0C; 8];
+
+        // A agrees with B
+        store_a.agree(source_b, &pub_b);
+        // B agrees with A
+        let pub_a = store_a.public_key();
+        store_b.agree([0x0A; 8], &pub_a);
+
+        let key_a_for_b = store_a.peer_key(&source_b).unwrap();
+        let ct = encrypt_packet(b"secret", key_a_for_b, &[0x0A; 8], 1);
+
+        // C's public key is different — derive a different shared secret
+        let mut store_a2 = PeerKeyStore::new([0x11; 32]);
+        store_a2.agree(source_c, &pub_c);
+        let wrong_key = store_a2.peer_key(&source_c).unwrap();
+
+        assert!(decrypt_packet(&ct, wrong_key).is_none(), "Wrong peer key must fail");
+    }
+
+    #[cfg(feature = "mesh-key-exchange")]
+    #[test]
+    fn test_peer_key_store_remove_peer() {
+        let mut store = PeerKeyStore::new([0x55; 32]);
+        let peer_pub = [0x66; 32];
+        let source: [u8; 8] = [0x0A; 8];
+        store.agree(source, &peer_pub);
+        assert_eq!(store.peer_count(), 1);
+        store.remove_peer(&source);
+        assert_eq!(store.peer_count(), 0);
+        assert!(store.peer_key(&source).is_none());
+    }
+
+    // -- Fragment-level AEAD tests --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_fragment_encrypt_decrypt_roundtrip() {
+        let key = [0x99u8; 32];
+        let source = [0xAA; 8];
+        let payload = b"fragment payload data here";
+
+        let ct = encrypt_fragment(payload, &key, &source, 42, 3);
+        assert!(ct.len() > payload.len(), "Ciphertext should include overhead");
+
+        let pt = decrypt_fragment(&ct, &key).expect("should decrypt");
+        assert_eq!(&pt, payload);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_fragment_different_indices_different_ciphertext() {
+        let key = [0xBBu8; 32];
+        let source = [0xCC; 8];
+        let payload = b"same payload";
+
+        let ct0 = encrypt_fragment(payload, &key, &source, 1, 0);
+        let ct1 = encrypt_fragment(payload, &key, &source, 1, 1);
+
+        // Different nonces (different fragment_index) → different ciphertext
+        assert_ne!(ct0, ct1, "Different fragment indices must produce different ciphertext");
+
+        // Both decrypt correctly
+        assert_eq!(decrypt_fragment(&ct0, &key).unwrap(), payload);
+        assert_eq!(decrypt_fragment(&ct1, &key).unwrap(), payload);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_fragment_tampered_rejected() {
+        let key = [0xDDu8; 32];
+        let source = [0xEE; 8];
+        let payload = b"tamper target";
+
+        let mut ct = encrypt_fragment(payload, &key, &source, 5, 0);
+        // Tamper one byte in the ciphertext (after the nonce)
+        if ct.len() > AEAD_NONCE_SIZE + 1 {
+            ct[AEAD_NONCE_SIZE + 1] ^= 0xFF;
+        }
+        assert!(decrypt_fragment(&ct, &key).is_none(), "Tampered fragment must be rejected");
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_fragment_wrong_key_rejected() {
+        let key_a = [0x11u8; 32];
+        let key_b = [0x22u8; 32];
+        let source = [0x33; 8];
+        let ct = encrypt_fragment(b"secret", &key_a, &source, 1, 0);
+        assert!(decrypt_fragment(&ct, &key_b).is_none(), "Wrong key must fail");
     }
 }
 

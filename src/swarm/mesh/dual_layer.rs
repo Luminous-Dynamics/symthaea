@@ -881,4 +881,29 @@ mod tests {
             "Should record one decryption failure"
         );
     }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_encrypted_lora_fragment_roundtrip() {
+        // Full encrypt → fragment → reassemble → decrypt over LoRa path.
+        let key = [0xCD; 32];
+        let (a, b) = BiLoopbackTransport::pair("A-lora-enc", "B-lora-enc", LORA_MTU);
+
+        let mesh_a = DualLayerMesh::new([1; 32])
+            .with_lora(Box::new(a))
+            .with_encryption_key(key);
+
+        let original = test_packet(MeshUrgency::Cruise);
+        mesh_a.send(&original).unwrap();
+
+        // Receive fragmented encrypted data and reassemble
+        let mut receiver = super::super::MeshReceiver::new().with_encryption_key(key);
+        let mesh_b = DualLayerMesh::new([2; 32]).with_lora(Box::new(b));
+        let completed = mesh_b.poll_incoming(&mut receiver);
+
+        assert_eq!(completed.len(), 1, "Should reassemble and decrypt one packet");
+        assert_eq!(completed[0].sequence, original.sequence);
+        assert_eq!(completed[0].source_id, original.source_id);
+        assert_eq!(completed[0].wisdom.0, original.wisdom.0);
+    }
 }

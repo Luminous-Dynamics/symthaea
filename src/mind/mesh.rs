@@ -72,8 +72,16 @@ impl ContinuousMind {
             peer_count,
             avg_phi,
             health_score,
-            moral_topology: None,
+            moral_topology: self.cached_moral_topology.clone(),
         }
+    }
+
+    /// Cache a moral topology summary for inclusion in mesh telemetry gossip.
+    pub fn set_cached_moral_topology(
+        &mut self,
+        summary: crate::hdc::moral_topology::MoralTopologySummary,
+    ) {
+        self.cached_moral_topology = Some(summary);
     }
 
     /// Attach a Hyperfeel engine for affective mesh payload processing.
@@ -92,13 +100,14 @@ impl ContinuousMind {
         metadata: &mut crate::cognitive_loop::types::CycleMetadata,
     ) {
         let peer_count = self.mesh_peers.peer_count();
-        metadata.mesh_health_score = self.mesh_stats.health_score(peer_count);
-        metadata.mesh_peer_count = peer_count as u32;
-        metadata.mesh_bytes_sent = self.mesh_stats.bytes_sent;
-        metadata.mesh_bytes_received = self.mesh_stats.bytes_received;
-        metadata.mesh_compression_ratio = self.mesh_stats.compression_ratio();
-        metadata.mesh_bandwidth_budget = self.mesh_bandwidth_budget;
-        metadata.mesh_packets_throttled = self.mesh_stats.bandwidth_throttled;
+        metadata.mesh.mesh_health_score = self.mesh_stats.health_score(peer_count);
+        metadata.mesh.mesh_peer_count = peer_count as u32;
+        metadata.mesh.mesh_bytes_sent = self.mesh_stats.bytes_sent;
+        metadata.mesh.mesh_bytes_received = self.mesh_stats.bytes_received;
+        metadata.mesh.mesh_compression_ratio = self.mesh_stats.compression_ratio();
+        metadata.mesh.mesh_bandwidth_budget = self.mesh_bandwidth_budget;
+        metadata.mesh.mesh_packets_throttled = self.mesh_stats.bandwidth_throttled;
+        metadata.mesh.mesh_packets_decrypt_failed = self.mesh_stats.packets_decrypt_failed;
     }
 
     /// Check if the bandwidth budget allows sending `packet_bytes`.
@@ -131,7 +140,9 @@ impl ContinuousMind {
                 self.config.dimension,
             ));
         }
-        self.sensor_registry.as_mut().unwrap().register(sensor);
+        if let Some(reg) = self.sensor_registry.as_mut() {
+            reg.register(sensor);
+        }
     }
 
     /// Emit a wisdom vector over the mesh network, gated by urgency.
@@ -210,6 +221,10 @@ impl ContinuousMind {
         self.mesh_outbox.push(MeshOutbound { packet });
         self.mesh_stats.wisdom_sent += 1;
         self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        #[cfg(feature = "mesh-encryption")]
+        if self.mesh_encryption_key.is_some() {
+            self.mesh_stats.encrypted_packets_sent += 1;
+        }
 
         tracing::trace!(
             target: "symthaea::mind::mesh",
@@ -332,6 +347,10 @@ impl ContinuousMind {
         self.mesh_heartbeat_sequence = self.mesh_heartbeat_sequence.wrapping_add(1);
         self.mesh_stats.heartbeats_sent += 1;
         self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        #[cfg(feature = "mesh-encryption")]
+        if self.mesh_encryption_key.is_some() {
+            self.mesh_stats.encrypted_packets_sent += 1;
+        }
 
         tracing::trace!(
             target: "symthaea::mind::mesh",

@@ -47,6 +47,7 @@ members = [
     "crates/symthaea-nuclear-forensics",
     "crates/symthaea-memory",
     "crates/symthaea-fabrication-kernel",
+    "crates/symthaea-vision-manifold",
 ]
 
 
@@ -186,6 +187,9 @@ symthaea-nurture = { path = "crates/symthaea-nurture", optional = true }
 symthaea-population = { path = "crates/symthaea-population", optional = true }
 symthaea-materials = { path = "crates/symthaea-materials", optional = true }
 symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
+
+# Symthaea Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
+symthaea-vision-manifold = { path = "crates/symthaea-vision-manifold", optional = true }
 
 
 # HDC / Vector Symbolic Architectures
@@ -376,6 +380,7 @@ embeddings-gpu = ["embeddings", "symthaea-embeddings/burn-wgpu"]  # GPU-accelera
 vision = ["ort", "hf-hub"]                            # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
+vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
