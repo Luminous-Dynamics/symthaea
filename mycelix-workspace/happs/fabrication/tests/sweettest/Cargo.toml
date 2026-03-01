@@ -30,3 +30,15 @@ path = "sweettest_verification.rs"
 [[test]]
 name = "sweettest_bridge"
 path = "sweettest_bridge.rs"
+
+[[test]]
+name = "sweettest_printers"
+path = "sweettest_printers.rs"
+
+[[test]]
+name = "sweettest_prints"
+path = "sweettest_prints.rs"
+
+[[test]]
+name = "sweettest_materials"
+path = "sweettest_materials.rs"
