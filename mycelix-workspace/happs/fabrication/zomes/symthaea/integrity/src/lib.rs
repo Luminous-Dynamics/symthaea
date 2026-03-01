@@ -128,6 +128,31 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             Ok(ValidateCallbackResult::Valid)
         }
+        FlatOp::RegisterUpdate(op_update) => {
+            let update_action = match op_update {
+                OpUpdate::Entry { action, .. }
+                | OpUpdate::PrivateEntry { action, .. }
+                | OpUpdate::Agent { action, .. }
+                | OpUpdate::CapClaim { action, .. }
+                | OpUpdate::CapGrant { action, .. } => action,
+            };
+            let original = must_get_action(update_action.original_action_address.clone())?;
+            if update_action.author != *original.hashed.author() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can update this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDelete(op_delete) => {
+            let original = must_get_action(op_delete.action.deletes_address.clone())?;
+            if op_delete.action.author != *original.hashed.author() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

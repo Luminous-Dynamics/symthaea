@@ -23,6 +23,8 @@ describe('Printers Zome', () => {
         name: 'Prusa MK3S+',
         location: {
           geohash: '9q8yyk',
+          lat: 37.7749,
+          lon: -122.4194,
           city: 'San Francisco',
           region: 'CA',
           country: 'USA',
@@ -97,25 +99,26 @@ describe('Printers Zome', () => {
       });
 
       // Find printers that can handle PEEK (high temp)
-      const requirements = {
-        min_build_volume: null,
-        material: 'PEEK',
-        printer_type: 'FDM',
-        min_layer_height: null,
-        max_layer_height: null,
-        heated_bed_required: true,
-        enclosure_required: true,
-        min_hotend_temp: 400,
-      };
-
       const matches = await alice.cells[0].callZome({
         zome_name: 'printers',
         fn_name: 'find_printers_by_capability',
-        payload: requirements,
+        payload: {
+          requirements: {
+            min_build_volume: null,
+            material: 'PEEK',
+            printer_type: 'FDM',
+            min_layer_height: null,
+            max_layer_height: null,
+            heated_bed_required: true,
+            enclosure_required: true,
+            min_hotend_temp: 400,
+          },
+          pagination: null,
+        },
       });
 
-      expect(matches.length).toBeGreaterThanOrEqual(1);
-      expect(matches[0].compatibility_score).toBeGreaterThan(0);
+      expect(matches.items.length).toBeGreaterThanOrEqual(1);
+      expect(matches.items[0].compatibility_score).toBeGreaterThan(0);
     });
   });
 
@@ -169,14 +172,14 @@ describe('Printers Zome', () => {
       expect(statusRecord).toBeDefined();
 
       // Check available printers list
-      const available: Record[] = await alice.cells[0].callZome({
+      const available = await alice.cells[0].callZome({
         zome_name: 'printers',
         fn_name: 'get_available_printers',
-        payload: null,
+        payload: { pagination: null },
       });
 
       // The printer should not be in available list
-      const hashes = available.map(r => r.signed_action.hashed.hash);
+      const hashes = available.items.map((r: Record) => r.signed_action.hashed.hash);
       expect(hashes).not.toContain(printerHash);
     });
   });
@@ -262,22 +265,22 @@ describe('Printers Zome', () => {
       });
 
       // Alice should see 2 printers
-      const alicePrinters: Record[] = await alice.cells[0].callZome({
+      const alicePrinters = await alice.cells[0].callZome({
         zome_name: 'printers',
         fn_name: 'get_my_printers',
-        payload: null,
+        payload: { pagination: null },
       });
 
-      expect(alicePrinters.length).toBe(2);
+      expect(alicePrinters.items.length).toBe(2);
 
       // Bob should see 1 printer
-      const bobPrinters: Record[] = await bob.cells[0].callZome({
+      const bobPrinters = await bob.cells[0].callZome({
         zome_name: 'printers',
         fn_name: 'get_my_printers',
-        payload: null,
+        payload: { pagination: null },
       });
 
-      expect(bobPrinters.length).toBe(1);
+      expect(bobPrinters.items.length).toBe(1);
     });
   });
 });

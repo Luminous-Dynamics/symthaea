@@ -25,8 +25,13 @@ describe('Designs Zome', () => {
         title: 'Test Bracket',
         description: 'A simple bracket for testing',
         category: 'Parts',
-        files: [],
+        intent_vector: null,
         parametric_schema: null,
+        constraint_graph: null,
+        material_compatibility: [],
+        circularity_score: 0.5,
+        embodied_energy_kwh: 1.0,
+        repair_manifest: null,
         license: 'PublicDomain',
         safety_class: 'Class1Functional',
       };
@@ -69,8 +74,13 @@ describe('Designs Zome', () => {
           title: 'Wrench Holder',
           description: 'Tool organizer',
           category: 'Tools',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class0Decorative',
         },
@@ -83,21 +93,26 @@ describe('Designs Zome', () => {
           title: 'Gear',
           description: 'Replacement gear',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class1Functional',
         },
       });
 
       // Query by category
-      const toolDesigns: Record[] = await alice.cells[0].callZome({
+      const toolDesigns = await alice.cells[0].callZome({
         zome_name: 'designs',
         fn_name: 'get_designs_by_category',
-        payload: 'Tools',
+        payload: { category: 'Tools', pagination: null },
       });
 
-      expect(toolDesigns.length).toBeGreaterThanOrEqual(1);
+      expect(toolDesigns.items.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -118,8 +133,13 @@ describe('Designs Zome', () => {
           title: 'Original Design',
           description: 'The original',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'CreativeCommons',
           safety_class: 'Class1Functional',
         },
@@ -133,21 +153,23 @@ describe('Designs Zome', () => {
         fn_name: 'fork_design',
         payload: {
           parent_hash: originalHash,
+          modification_notes: 'Improved version with better tolerances',
           title: 'Forked Design',
           description: 'My improved version',
+          intent_modifications: null,
         },
       });
 
       expect(forkedDesign).toBeDefined();
 
       // Check fork lineage
-      const forks: Record[] = await alice.cells[0].callZome({
+      const forks = await alice.cells[0].callZome({
         zome_name: 'designs',
         fn_name: 'get_design_forks',
-        payload: originalHash,
+        payload: { hash: originalHash, pagination: null },
       });
 
-      expect(forks.length).toBeGreaterThanOrEqual(1);
+      expect(forks.items.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -167,26 +189,34 @@ describe('Designs Zome', () => {
           title: 'Raspberry Pi Case',
           description: 'A protective case for Raspberry Pi 4',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class0Decorative',
         },
       });
 
       // Search for it
-      const results: Record[] = await alice.cells[0].callZome({
+      const results = await alice.cells[0].callZome({
         zome_name: 'designs',
         fn_name: 'search_designs',
         payload: {
           query: 'raspberry',
           category: null,
           safety_class: null,
+          min_circularity: null,
+          license: null,
           limit: 10,
+          pagination: null,
         },
       });
 
-      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(results.items.length).toBeGreaterThanOrEqual(1);
     });
   });
 });

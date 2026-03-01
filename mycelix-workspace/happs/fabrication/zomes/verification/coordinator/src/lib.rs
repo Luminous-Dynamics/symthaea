@@ -115,13 +115,6 @@ pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<Recor
     get(hash.clone(), GetOptions::default())?.ok_or(FabricationError::not_found("Verification", &hash))
 }
 
-/// Input for paginated hash-based list queries
-#[derive(Serialize, Deserialize, Debug)]
-pub struct HashPaginationInput {
-    pub hash: ActionHash,
-    pub pagination: Option<PaginationInput>,
-}
-
 /// Internal: get all verifications for a design (used by summary/score functions)
 fn get_design_verifications_all(design_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let links = get_links(LinkQuery::try_new(design_hash, LinkTypes::DesignToVerifications)?, GetStrategy::default())?;

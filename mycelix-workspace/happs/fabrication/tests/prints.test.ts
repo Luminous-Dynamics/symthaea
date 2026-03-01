@@ -27,8 +27,13 @@ describe('Prints Zome', () => {
           title: 'Widget',
           description: 'A useful widget',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class1Functional',
         },
@@ -77,10 +82,12 @@ describe('Prints Zome', () => {
             temperatures: {
               hotend: 210,
               bed: 60,
+              chamber: null,
             },
             custom_gcode: null,
           },
-          grounding_request: null,
+          energy_source: null,
+          material_passport: null,
         },
       });
 
@@ -112,14 +119,6 @@ describe('Prints Zome', () => {
         payload: {
           job_hash: jobHash,
           result: 'Success',
-          quality_assessment: {
-            dimensional_accuracy: 0.95,
-            surface_quality: 0.85,
-            structural_integrity: 0.9,
-          },
-          material_used_grams: 45.5,
-          photos: [],
-          notes: 'Clean print, no issues',
         },
       });
 
@@ -143,8 +142,13 @@ describe('Prints Zome', () => {
           title: 'Eco Part',
           description: 'Sustainable part',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.8,
+          embodied_energy_kwh: 0.5,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class1Functional',
         },
@@ -173,7 +177,7 @@ describe('Prints Zome', () => {
         },
       });
 
-      // Create job with grounding request (renewable energy)
+      // Create job with renewable energy source
       const jobRecord: Record = await alice.cells[0].callZome({
         zome_name: 'prints',
         fn_name: 'create_print_job',
@@ -187,14 +191,11 @@ describe('Prints Zome', () => {
             supports: false,
             raft: false,
             print_speed: null,
-            temperatures: { hotend: 200, bed: 55 },
+            temperatures: { hotend: 200, bed: 55, chamber: null },
             custom_gcode: null,
           },
-          grounding_request: {
-            require_renewable: true,
-            require_recycled_material: true,
-            target_pog_score: 0.8,
-          },
+          energy_source: 'Solar',
+          material_passport: null,
         },
       });
 
@@ -207,15 +208,12 @@ describe('Prints Zome', () => {
         payload: {
           job_hash: jobRecord.signed_action.hashed.hash,
           result: 'Success',
-          quality_score: 0.92,
-          pog_score: 0.85,
           energy_used_kwh: 0.15,
-          carbon_offset_kg: 0.05,
-          material_circularity: 0.7,
-          mycelium_earned: 150,
           photos: [],
           notes: 'Solar powered, recycled PLA',
           issues: [],
+          dimensional_measurements: null,
+          attestations: null,
         },
       });
 
@@ -239,8 +237,13 @@ describe('Prints Zome', () => {
           title: 'Precision Part',
           description: 'Requires quality monitoring',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class2LoadBearing',
         },
@@ -282,10 +285,11 @@ describe('Prints Zome', () => {
             supports: true,
             raft: false,
             print_speed: 40,
-            temperatures: { hotend: 240, bed: 80 },
+            temperatures: { hotend: 240, bed: 80, chamber: null },
             custom_gcode: null,
           },
-          grounding_request: null,
+          energy_source: null,
+          material_passport: null,
         },
       });
 
@@ -294,57 +298,36 @@ describe('Prints Zome', () => {
       // Start Cincinnati monitoring session
       const sessionRecord: Record = await alice.cells[0].callZome({
         zome_name: 'prints',
-        fn_name: 'start_cincinnati_session',
+        fn_name: 'start_cincinnati_monitoring',
         payload: {
           job_hash: jobHash,
+          total_layers: 200,
           sampling_rate_hz: 100,
         },
       });
 
       expect(sessionRecord).toBeDefined();
 
-      // Submit sensor readings (simulated)
+      // Update Cincinnati session with monitoring data
+      const sessionHash = sessionRecord.signed_action.hashed.hash;
       await alice.cells[0].callZome({
         zome_name: 'prints',
-        fn_name: 'submit_sensor_reading',
+        fn_name: 'update_cincinnati_session',
         payload: {
-          job_hash: jobHash,
-          readings: [
-            {
-              timestamp_ms: 1000,
-              layer_number: 1,
-              hotend_temp: 240.2,
-              bed_temp: 80.1,
-              stepper_currents: [0.5, 0.5, 0.3, 0.6],
-              vibration_rms: 0.02,
-              filament_tension: 1.2,
-              ambient_temp: 25.0,
-              humidity: 45.0,
-            },
-          ],
+          session_hash: sessionHash,
+          current_layer: 50,
+          health_score: 0.97,
+          anomaly_count: 0,
         },
       });
 
-      // Complete with Cincinnati report
+      // Complete the print
       const completedRecord: Record = await alice.cells[0].callZome({
         zome_name: 'prints',
         fn_name: 'complete_print',
         payload: {
           job_hash: jobHash,
           result: 'Success',
-          quality_assessment: {
-            dimensional_accuracy: 0.98,
-            surface_quality: 0.95,
-            structural_integrity: 0.97,
-          },
-          material_used_grams: 120.5,
-          photos: [],
-          notes: 'Cincinnati monitoring verified quality',
-          cincinnati_report: {
-            overall_health_score: 0.96,
-            anomalies_detected: 0,
-            layer_by_layer_scores: [0.98, 0.97, 0.96, 0.95],
-          },
         },
       });
 
@@ -367,8 +350,13 @@ describe('Prints Zome', () => {
           title: 'Popular Widget',
           description: 'Gets printed a lot',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class1Functional',
         },

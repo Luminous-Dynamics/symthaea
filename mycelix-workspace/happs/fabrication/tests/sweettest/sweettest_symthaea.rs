@@ -13,6 +13,8 @@ use holochain::prelude::*;
 use holochain::sweettest::*;
 use std::path::PathBuf;
 
+use fabrication_sweettest::common::*;
+
 // ============================================================================
 // Mirror types — symthaea coordinator
 // ============================================================================
@@ -38,12 +40,6 @@ pub struct IntentResult {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct PaginationInput {
-    pub offset: u32,
-    pub limit: u32,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MyIntentsInput {
     pub pagination: Option<PaginationInput>,
 }
@@ -56,45 +52,11 @@ pub struct SemanticSearchInput {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct HashPaginationInput {
-    pub hash: ActionHash,
-    pub pagination: Option<PaginationInput>,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GenerateVariantInput {
     pub base_design_hash: ActionHash,
     pub intent_modifiers: Vec<SerializedBinding>,
     pub material_constraints: Vec<String>,
     pub printer_constraints: Option<String>,
-}
-
-// Mirror types — designs coordinator (needed to create a design for cross-zome tests)
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CreateDesignInput {
-    pub title: String,
-    pub description: String,
-    pub category: String,
-    pub license: String,
-    pub safety_class: String,
-    pub files: Vec<String>,
-    pub tags: Vec<String>,
-    pub material_compatibility: Vec<String>,
-    pub parametric_schema: Option<String>,
-}
-
-// ============================================================================
-// DNA setup helper
-// ============================================================================
-
-fn fabrication_dna_path() -> PathBuf {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.pop(); // sweettest/ -> tests/
-    path.pop(); // tests/ -> fabrication/
-    path.push("workdir");
-    path.push("fabrication.dna");
-    path
 }
 
 // ============================================================================

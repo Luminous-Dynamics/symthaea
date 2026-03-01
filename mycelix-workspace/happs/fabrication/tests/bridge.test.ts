@@ -69,13 +69,13 @@ describe('Bridge Zome - Anticipatory Repair', () => {
       const predictionHash = predictionRecord.signed_action.hashed.hash;
 
       // Get active workflows - should include auto-created one
-      const workflows: Record[] = await alice.cells[0].callZome({
+      const workflows = await alice.cells[0].callZome({
         zome_name: 'bridge',
         fn_name: 'get_active_workflows',
         payload: { pagination: { offset: 0, limit: 100 } },
       });
 
-      expect(workflows.length).toBeGreaterThanOrEqual(1);
+      expect(workflows.items.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -121,8 +121,13 @@ describe('Bridge Zome - Anticipatory Repair', () => {
           title: 'Makita Trigger Switch Replacement',
           description: 'Replacement trigger mechanism',
           category: 'Repair',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class1Functional',
         },
@@ -201,13 +206,13 @@ describe('Bridge Zome - Anticipatory Repair', () => {
       expect(completedWorkflow).toBeDefined();
 
       // Verify it's no longer in active workflows
-      const activeWorkflows: Record[] = await alice.cells[0].callZome({
+      const activeWorkflows = await alice.cells[0].callZome({
         zome_name: 'bridge',
         fn_name: 'get_active_workflows',
         payload: { pagination: { offset: 0, limit: 100 } },
       });
 
-      const activeHashes = activeWorkflows.map(r => r.signed_action.hashed.hash);
+      const activeHashes = activeWorkflows.items.map((r: Record) => r.signed_action.hashed.hash);
       expect(activeHashes).not.toContain(workflowHash);
     });
   });
@@ -237,13 +242,13 @@ describe('Bridge Zome - Anticipatory Repair', () => {
       expect(eventRecord).toBeDefined();
 
       // Get recent events
-      const events: Record[] = await alice.cells[0].callZome({
+      const events = await alice.cells[0].callZome({
         zome_name: 'bridge',
         fn_name: 'get_recent_events',
         payload: { since: null, pagination: { offset: 0, limit: 100 } },
       });
 
-      expect(events.length).toBeGreaterThanOrEqual(1);
+      expect(events.items.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -263,8 +268,13 @@ describe('Bridge Zome - Anticipatory Repair', () => {
           title: 'Premium Widget',
           description: 'High quality widget for sale',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'Proprietary',
           safety_class: 'Class1Functional',
         },
@@ -308,14 +318,15 @@ describe('Bridge Zome - Anticipatory Repair', () => {
             bed_temp_min: 70,
             bed_temp_max: 85,
             density_g_cm3: 1.27,
-            tensile_strength_mpa: 50,
-            elongation_percent: 23,
+            tensile_strength_mpa: 50.0,
+            elongation_percent: 23.0,
             food_safe: false,
             uv_resistant: true,
             water_resistant: true,
             recyclable: true,
           },
           certifications: [],
+          safety_data_sheet: null,
         },
       });
 
@@ -360,7 +371,7 @@ describe('Bridge Zome - Anticipatory Repair', () => {
       });
 
       // Query audit trail — should have at least 1 entry
-      const auditTrail: Record[] = await alice.cells[0].callZome({
+      const auditTrail = await alice.cells[0].callZome({
         zome_name: 'bridge',
         fn_name: 'get_audit_trail',
         payload: {
@@ -369,11 +380,12 @@ describe('Bridge Zome - Anticipatory Repair', () => {
           after: null,
           before: null,
           limit: 50,
+          pagination: null,
         },
       });
 
       expect(auditTrail).toBeDefined();
-      expect(auditTrail.length).toBeGreaterThanOrEqual(1);
+      expect(auditTrail.items.length).toBeGreaterThanOrEqual(1);
     });
   });
 });

@@ -1169,13 +1169,6 @@ pub struct MyIntentsInput {
     pub pagination: Option<PaginationInput>,
 }
 
-/// Input for paginated hash-based queries
-#[derive(Serialize, Deserialize, Debug)]
-pub struct HashPaginationInput {
-    pub hash: ActionHash,
-    pub pagination: Option<PaginationInput>,
-}
-
 #[hdk_extern]
 pub fn get_my_intents(input: MyIntentsInput) -> ExternResult<PaginatedResponse<Record>> {
     let author = agent_info()?.agent_initial_pubkey;

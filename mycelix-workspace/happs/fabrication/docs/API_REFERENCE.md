@@ -1,6 +1,6 @@
 # Fabrication hApp API Reference
 
-> Generated from source on 2026-03-01 | **74 `#[hdk_extern]` functions** across 7 coordinator zomes
+> Generated from source on 2026-03-01 | **76 `#[hdk_extern]` functions** across 7 coordinator zomes
 
 This document is auto-extracted from the actual Rust coordinator source files. Every function listed below has a corresponding `#[hdk_extern]` attribute in the codebase.
 
@@ -13,12 +13,12 @@ This document is auto-extracted from the actual Rust coordinator source files. E
 | [designs](#designs-zome) | 15 | Design CRUD, versioning, forking, discovery, parametric generation |
 | [printers](#printers-zome) | 12 | Printer registration, matching, availability, compatibility |
 | [prints](#prints-zome) | 16 | Print job lifecycle, PoGF scoring, Cincinnati monitoring, statistics |
-| [materials](#materials-zome) | 4 | Material CRUD and discovery |
+| [materials](#materials-zome) | 6 | Material CRUD and discovery |
 | [verification](#verification-zome) | 6 | Safety verification, epistemic scoring, claims |
 | [bridge](#bridge-zome) | 9 | Anticipatory repair, marketplace, supply chain, audit trail |
 | [symthaea](#symthaea-zome) | 12 | HDC encoding, semantic search, parametric generation, consciousness gating |
 
-Pagination note: Functions marked with (paginated) accept an optional `PaginationInput { offset: usize, limit: usize }` field and return `PaginatedResponse<T> { items, total, offset, limit }`. Limit is clamped to max 100.
+Pagination note: Functions marked with (paginated) accept an optional `PaginationInput { offset: u32, limit: u32 }` field and return `PaginatedResponse<T> { items, total, offset, limit }`. Limit is clamped to max 100.
 
 ---
 
@@ -153,6 +153,8 @@ Implements print job lifecycle, Proof of Grounded Fabrication (PoGF) scoring, Ci
 |----------|-------|--------|-------------|
 | `create_material` | `CreateMaterialInput { name: String, material_type: MaterialType, properties: MaterialProperties, certifications: Vec<Certification>, safety_data_sheet?: String }` | `Record` | Create a new material specification. MaterialProperties includes print temps, density, tensile strength, food_safe, uv/water resistant, recyclable flags. |
 | `get_material` | `ActionHash` | `Option<Record>` | Retrieve a material by its action hash. |
+| `update_material` | `UpdateMaterialInput { original_action_hash: ActionHash, name?: String, material_type?: MaterialType, properties?: MaterialProperties, certifications?: Vec<Certification>, safety_data_sheet?: String }` | `Record` | Update an existing material. All fields optional except `original_action_hash`. |
+| `delete_material` | `ActionHash` | `ActionHash` | Delete a material. Returns deletion action hash. |
 | `get_materials_by_type` | `GetMaterialsByTypeInput { material_type: MaterialType, pagination? }` | `PaginatedResponse<Record>` | Get all materials of a specific type (PLA, PETG, ABS, ASA, TPU, Nylon, PC, PEEK, PVA, HIPS, resins, powders, Custom). (paginated) |
 | `get_food_safe_materials` | `GetFoodSafeMaterialsInput { pagination? }` | `PaginatedResponse<Record>` | Get all materials where `properties.food_safe == true`. (paginated) |
 
@@ -268,10 +270,10 @@ These types are used across multiple zomes (defined in `fabrication_common`):
 
 | Type | Description |
 |------|-------------|
-| `PaginationInput { offset: usize, limit: usize }` | Pagination request. Limit clamped to [1, 100]. |
-| `PaginatedResponse<T> { items: Vec<T>, total: usize, offset: usize, limit: usize }` | Paginated response wrapper. |
+| `PaginationInput { offset: u32, limit: u32 }` | Pagination request. Limit clamped to [1, 100]. |
+| `PaginatedResponse<T> { items: Vec<T>, total: u32, offset: u32, limit: u32 }` | Paginated response wrapper. |
 | `FabricationConfig` | DNA properties: rate limits, PoGF weights, HDC dimensions, similarity threshold. |
-| `SafetyClass` | Class1Functional, Class2Structural, Class3LifeSafety, Class4Medical. Class3+ requires verification before printing. |
+| `SafetyClass` | Class0Decorative, Class1Functional, Class2LoadBearing, Class3BodyContact, Class4Medical, Class5Critical. Class3+ requires verification before printing. |
 | `DesignCategory` | Design classification enum. |
 | `MaterialType` | PLA, PETG, ABS, ASA, TPU, Nylon, PC, PEEK, PVA, HIPS, StandardResin, ToughResin, FlexibleResin, CastableResin, DentalResin, NylonPowder, MetalPowder, Custom(String). |
 | `License` | OpenHardware, CreativeCommons(CCVariant), Proprietary, Custom(String). ND variants block forking. |

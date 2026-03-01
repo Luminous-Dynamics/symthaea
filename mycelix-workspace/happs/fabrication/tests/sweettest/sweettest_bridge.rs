@@ -13,22 +13,7 @@ use holochain::prelude::*;
 use holochain::sweettest::*;
 use std::path::PathBuf;
 
-// ============================================================================
-// Mirror types — designs coordinator
-// ============================================================================
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CreateDesignInput {
-    pub title: String,
-    pub description: String,
-    pub category: String,
-    pub license: String,
-    pub safety_class: String,
-    pub files: Vec<String>,
-    pub tags: Vec<String>,
-    pub material_compatibility: Vec<String>,
-    pub parametric_schema: Option<String>,
-}
+use fabrication_sweettest::common::*;
 
 // ============================================================================
 // Mirror types — bridge coordinator
@@ -69,12 +54,6 @@ pub struct GetRecentEventsInput {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct PaginationInput {
-    pub offset: u32,
-    pub limit: u32,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GetActiveWorkflowsInput {
     pub pagination: PaginationInput,
 }
@@ -94,19 +73,6 @@ pub struct ListOnMarketplaceInput {
     pub design_hash: ActionHash,
     pub price: u64,
     pub listing_type: String,
-}
-
-// ============================================================================
-// DNA setup helper
-// ============================================================================
-
-fn fabrication_dna_path() -> PathBuf {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.pop(); // sweettest/ -> tests/
-    path.pop(); // tests/ -> fabrication/
-    path.push("workdir");
-    path.push("fabrication.dna");
-    path
 }
 
 // ============================================================================

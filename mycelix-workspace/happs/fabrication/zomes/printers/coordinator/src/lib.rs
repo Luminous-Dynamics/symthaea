@@ -7,6 +7,24 @@
 use hdk::prelude::*;
 use printers_integrity::*;
 use fabrication_common::*;
+use std::cell::RefCell;
+
+thread_local! {
+    static CONFIG: RefCell<Option<FabricationConfig>> = const { RefCell::new(None) };
+}
+
+#[allow(dead_code)]
+fn get_config() -> FabricationConfig {
+    CONFIG.with(|c| {
+        c.borrow_mut()
+            .get_or_insert_with(|| {
+                dna_info()
+                    .map(|info| FabricationConfig::from_properties_or_default(info.modifiers.properties.bytes()))
+                    .unwrap_or_default()
+            })
+            .clone()
+    })
+}
 
 /// Input for registering a printer
 #[derive(Serialize, Deserialize, Debug)]
@@ -76,9 +94,60 @@ pub struct FindByCapabilityInput {
 // CRUD OPERATIONS
 // =============================================================================
 
+// =============================================================================
+// RATE LIMITING
+// =============================================================================
+
+fn rate_limit_anchor(agent: &AgentPubKey) -> ExternResult<EntryHash> {
+    let anchor_bytes = SerializedBytes::from(UnsafeBytes::from(
+        format!("rate_limit:{}", agent).into_bytes(),
+    ));
+    hash_entry(Entry::App(AppEntryBytes(anchor_bytes)))
+}
+
+fn enforce_rate_limit(caller: &AgentPubKey) -> ExternResult<()> {
+    let cfg = get_config();
+    let max_ops = cfg.rate_limit_max_ops as usize;
+    let window_micros = cfg.rate_limit_window_secs as i64 * 1_000_000;
+
+    let anchor = rate_limit_anchor(caller)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor.clone(), LinkTypes::RateLimitBucket)?,
+        GetStrategy::default(),
+    )?;
+
+    let now = sys_time()?;
+    let window_start = now.as_micros() - window_micros;
+
+    let recent_count = links
+        .iter()
+        .filter(|l| l.timestamp.as_micros() >= window_start)
+        .count();
+
+    if recent_count >= max_ops {
+        return Err(FabricationError::RateLimited {
+            max_ops: cfg.rate_limit_max_ops,
+            window_secs: cfg.rate_limit_window_secs,
+        }.to_wasm_error());
+    }
+
+    create_link(anchor.clone(), anchor, LinkTypes::RateLimitBucket, ())?;
+    Ok(())
+}
+
+fn rate_limit_caller() -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    enforce_rate_limit(&agent)
+}
+
+// =============================================================================
+// REGISTRATION
+// =============================================================================
+
 /// Register a new printer
 #[hdk_extern]
 pub fn register_printer(input: RegisterPrinterInput) -> ExternResult<Record> {
+    rate_limit_caller()?;
     let owner = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 

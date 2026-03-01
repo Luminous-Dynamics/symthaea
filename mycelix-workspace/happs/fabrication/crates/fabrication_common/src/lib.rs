@@ -394,6 +394,20 @@ pub fn paginate<T: Serialize>(items: Vec<T>, pagination: Option<&PaginationInput
     }
 }
 
+/// Common input: ActionHash + optional pagination.
+/// Used by endpoints that paginate results for a specific entity.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HashPaginationInput {
+    pub hash: ActionHash,
+    pub pagination: Option<PaginationInput>,
+}
+
+/// Common input: optional pagination only (agent inferred from agent_info()).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AgentPaginationInput {
+    pub pagination: Option<PaginationInput>,
+}
+
 // =============================================================================
 // HDC (HYPERDIMENSIONAL COMPUTING) TYPES
 // =============================================================================

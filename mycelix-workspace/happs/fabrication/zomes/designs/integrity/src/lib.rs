@@ -41,6 +41,8 @@ pub enum LinkTypes {
     AllDesigns,
     /// Link for featured designs
     FeaturedDesigns,
+    /// Per-agent rate limiting bucket
+    RateLimitBucket,
 }
 
 /// A 3D printable design with HDC parametric intelligence
@@ -153,6 +155,31 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             Ok(ValidateCallbackResult::Valid)
         }
+        FlatOp::RegisterUpdate(op_update) => {
+            let update_action = match op_update {
+                OpUpdate::Entry { action, .. }
+                | OpUpdate::PrivateEntry { action, .. }
+                | OpUpdate::Agent { action, .. }
+                | OpUpdate::CapClaim { action, .. }
+                | OpUpdate::CapGrant { action, .. } => action,
+            };
+            let original = must_get_action(update_action.original_action_address.clone())?;
+            if update_action.author != *original.hashed.author() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can update this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDelete(op_delete) => {
+            let original = must_get_action(op_delete.action.deletes_address.clone())?;
+            if op_delete.action.author != *original.hashed.author() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original author can delete this entry".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
@@ -178,9 +205,13 @@ fn validate_design(design: Design) -> ExternResult<ValidateCallbackResult> {
     check!(validation::require_max_len(&design.description, 4096, "Design description"));
 
     // --- HDC hypervector validation ---
-    if design.intent_vector.dimensions != 4096 && design.intent_vector.dimensions != 10000 {
+    // Must be a power of 2 in [4096, 16384], matching symthaea integrity
+    if !design.intent_vector.dimensions.is_power_of_two()
+        || design.intent_vector.dimensions < 4096
+        || design.intent_vector.dimensions > 16384
+    {
         return Ok(ValidateCallbackResult::Invalid(
-            "HDC hypervector must have 4096 or 10000 dimensions".to_string(),
+            "HDC hypervector dimensions must be a power of 2 between 4096 and 16384".to_string(),
         ));
     }
 
@@ -291,6 +322,7 @@ fn validate_create_link(
         LinkTypes::DesignToVerifications => 256,
         LinkTypes::AllDesigns => 256,
         LinkTypes::FeaturedDesigns => 256,
+        LinkTypes::RateLimitBucket => 256,
     };
     check!(validation::require_max_tag_len(&tag, max_len, &format!("{:?}", link_type)));
 
@@ -323,6 +355,7 @@ fn validate_create_link(
             // Featured designs link
             Ok(ValidateCallbackResult::Valid)
         }
+        LinkTypes::RateLimitBucket => Ok(ValidateCallbackResult::Valid),
     }
 }
 
@@ -330,7 +363,7 @@ fn validate_create_link(
 mod tests {
     use super::*;
 
-    /// Helper: build a valid Design with 10000-dim vector for tests.
+    /// Helper: build a valid Design with 8192-dim vector for tests.
     fn valid_design() -> Design {
         Design {
             id: "test-design-001".to_string(),
@@ -338,8 +371,8 @@ mod tests {
             description: "A simple test bracket for unit tests".to_string(),
             category: DesignCategory::Parts,
             intent_vector: HdcHypervector {
-                dimensions: 10000,
-                vector: vec![1i8; 10000],
+                dimensions: 8192,
+                vector: vec![1i8; 8192],
                 semantic_bindings: vec![],
                 generation_method: HdcMethod::ManualEncoding,
             },
@@ -463,8 +496,8 @@ mod tests {
     #[test]
     fn test_vector_dimension_mismatch_rejected() {
         let mut d = valid_design();
-        // Set dimensions to 10000 but only provide 100 values
-        d.intent_vector.dimensions = 10000;
+        // Set dimensions to 8192 but only provide 100 values
+        d.intent_vector.dimensions = 8192;
         d.intent_vector.vector = vec![1i8; 100];
         let result = validate_design(d).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("vector length must match")));
@@ -510,6 +543,53 @@ mod tests {
         m.child_hash = same_hash;
         let result = validate_modification(m).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("Parent and child")));
+    }
+
+    // ---- HDC dimension validation tests ----
+
+    #[test]
+    fn test_hdc_dim_16384_passes() {
+        let mut d = valid_design();
+        d.intent_vector.dimensions = 16384;
+        d.intent_vector.vector = vec![1i8; 16384];
+        let result = validate_design(d).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_hdc_dim_4096_passes() {
+        let mut d = valid_design();
+        d.intent_vector.dimensions = 4096;
+        d.intent_vector.vector = vec![1i8; 4096];
+        let result = validate_design(d).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_hdc_dim_non_power_of_2_rejected() {
+        let mut d = valid_design();
+        d.intent_vector.dimensions = 10000;
+        d.intent_vector.vector = vec![1i8; 10000];
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("power of 2")));
+    }
+
+    #[test]
+    fn test_hdc_dim_too_small_rejected() {
+        let mut d = valid_design();
+        d.intent_vector.dimensions = 2048;
+        d.intent_vector.vector = vec![1i8; 2048];
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("4096 and 16384")));
+    }
+
+    #[test]
+    fn test_hdc_dim_too_large_rejected() {
+        let mut d = valid_design();
+        d.intent_vector.dimensions = 32768;
+        d.intent_vector.vector = vec![1i8; 32768];
+        let result = validate_design(d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(msg) if msg.contains("4096 and 16384")));
     }
 
     // ---- Link tag validation tests ----

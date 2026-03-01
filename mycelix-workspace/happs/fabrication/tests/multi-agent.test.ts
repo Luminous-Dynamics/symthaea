@@ -27,8 +27,13 @@ describe('Multi-Agent Fabrication Workflow', () => {
           title: 'Replacement Bracket',
           description: 'Load-bearing bracket for shelf mount',
           category: 'Parts',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'CreativeCommons',
           safety_class: 'Class2LoadBearing',
         },
@@ -67,8 +72,13 @@ describe('Multi-Agent Fabrication Workflow', () => {
           title: 'Trigger Switch Housing',
           description: 'Replacement housing for Makita LXT trigger mechanism',
           category: 'Repair',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
           safety_class: 'Class1Functional',
         },
@@ -118,8 +128,10 @@ describe('Multi-Agent Fabrication Workflow', () => {
             infill_percent: 60,
             material: 'PETG',
             supports: true,
-            estimated_time_minutes: 180,
-            estimated_material_grams: 45,
+            raft: false,
+            print_speed: null,
+            temperatures: { hotend: 240, bed: 80, chamber: null },
+            custom_gcode: null,
           },
           energy_source: 'Grid',
           material_passport: null,
@@ -130,13 +142,13 @@ describe('Multi-Agent Fabrication Workflow', () => {
       const jobHash = jobRecord.signed_action.hashed.hash;
 
       // 4. Printer operator can see their jobs
-      const myJobs: Record[] = await printerOp.cells[0].callZome({
+      const myJobs = await printerOp.cells[0].callZome({
         zome_name: 'prints',
         fn_name: 'get_printer_jobs',
-        payload: printerHash,
+        payload: { hash: printerHash, pagination: null },
       });
 
-      expect(myJobs.length).toBeGreaterThanOrEqual(1);
+      expect(myJobs.items.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -173,14 +185,14 @@ describe('Multi-Agent Fabrication Workflow', () => {
       expect(predictionRecord).toBeDefined();
 
       // Repair coordinator can see active workflows created from high-prob prediction
-      const workflows: Record[] = await repairCoord.cells[0].callZome({
+      const workflows = await repairCoord.cells[0].callZome({
         zome_name: 'bridge',
         fn_name: 'get_active_workflows',
         payload: { pagination: { offset: 0, limit: 100 } },
       });
 
       // Auto-created workflow from prediction > 0.7
-      expect(workflows.length).toBeGreaterThanOrEqual(1);
+      expect(workflows.items.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -201,10 +213,15 @@ describe('Multi-Agent Fabrication Workflow', () => {
           title: 'Safety Bracket',
           description: 'Critical load path bracket',
           category: 'Structural',
-          files: [],
+          intent_vector: null,
           parametric_schema: null,
+          constraint_graph: null,
+          material_compatibility: [],
+          circularity_score: 0.5,
+          embodied_energy_kwh: 1.0,
+          repair_manifest: null,
           license: 'PublicDomain',
-          safety_class: 'Class3Critical',
+          safety_class: 'Class5Critical',
         },
       });
 
@@ -219,12 +236,12 @@ describe('Multi-Agent Fabrication Workflow', () => {
           verification_type: 'StructuralAnalysis',
           result: {
             Passed: {
-              notes: 'FEA analysis confirms safety factor > 2.5',
               confidence: 0.92,
+              notes: 'FEA analysis confirms safety factor > 2.5',
             },
           },
-          evidence_hashes: [],
-          verifier_credentials: ['PE_Mechanical', 'ASTM_F2792'],
+          evidence: [],
+          credentials: ['PE_Mechanical', 'ASTM_F2792'],
         },
       });
 
@@ -254,14 +271,15 @@ describe('Multi-Agent Fabrication Workflow', () => {
             bed_temp_min: 70,
             bed_temp_max: 85,
             density_g_cm3: 1.27,
-            tensile_strength_mpa: 48,
-            elongation_percent: 20,
+            tensile_strength_mpa: 48.0,
+            elongation_percent: 20.0,
             food_safe: false,
             uv_resistant: true,
             water_resistant: true,
             recyclable: true,
           },
-          certifications: ['ISO14001', 'OceanBound'],
+          certifications: [],
+          safety_data_sheet: null,
         },
       });
 
