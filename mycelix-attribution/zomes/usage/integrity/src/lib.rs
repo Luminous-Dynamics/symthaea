@@ -78,6 +78,7 @@ pub enum LinkTypes {
     DependencyToAttestations,
     UserToAttestations,
     PredecessorToAttestation,
+    AllAttestations,
     UsageRateLimit,
 }
 
@@ -207,6 +208,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             | LinkTypes::DependencyToAttestations
             | LinkTypes::UserToAttestations
             | LinkTypes::PredecessorToAttestation
+            | LinkTypes::AllAttestations
             | LinkTypes::UsageRateLimit => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
@@ -222,6 +224,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             | LinkTypes::DependencyToAttestations
             | LinkTypes::UserToAttestations
             | LinkTypes::PredecessorToAttestation
+            | LinkTypes::AllAttestations
             | LinkTypes::UsageRateLimit => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::StoreRecord(_)

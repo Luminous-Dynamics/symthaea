@@ -107,6 +107,22 @@ enum VerifierError {
 
 // ── Verification Logic ──────────────────────────────────────────────
 
+/// Verify that commitment bytes match the commitment limbs in public inputs.
+/// Returns false if they don't match, true if they match or can't be checked.
+fn cross_validate_commitment(commitment_bytes: &[u8], public_inputs: Option<&[u64]>) -> bool {
+    let Some(pi) = public_inputs else {
+        return true; // Can't check without public inputs
+    };
+    if pi.len() != 8 || commitment_bytes.len() != 32 {
+        return true; // Let other checks handle these errors
+    }
+
+    let commitment_arr: [u8; 32] = commitment_bytes.try_into().unwrap();
+    let expected = mycelix_attribution_stark_common::commitment_to_limbs(&commitment_arr);
+    let actual = [pi[4], pi[5], pi[6], pi[7]];
+    expected == actual
+}
+
 fn verify_commitment(commitment_bytes: &[u8]) -> Result<bool, VerifierError> {
     if commitment_bytes.len() != 32 {
         return Err(VerifierError::InvalidCommitment(commitment_bytes.len()));
@@ -184,15 +200,18 @@ fn verify_proof(
     }
 }
 
+/// Sign a verification result. The signed message includes the original_action_hash
+/// to prevent replay attacks across different attestations.
 fn sign_verification(
     signing_key: &SigningKey,
     attestation_id: &str,
     dependency_id: &str,
+    original_action_hash: &str,
     verdict: bool,
 ) -> (Vec<u8>, Vec<u8>) {
     let message = format!(
-        "mycelix-attribution:verify:{}:{}:{}",
-        attestation_id, dependency_id, verdict
+        "mycelix-attribution:verify:{}:{}:{}:{}",
+        attestation_id, dependency_id, original_action_hash, verdict
     );
     let signature = signing_key.sign(message.as_bytes());
 
@@ -291,6 +310,13 @@ fn main() {
         }
     };
 
+    // Cross-validate: commitment bytes must match commitment limbs in public_inputs
+    let commitment_matches =
+        cross_validate_commitment(&commitment_bytes, att.public_inputs.as_deref());
+    if !commitment_matches {
+        eprintln!("  REJECTED: witness_commitment hex does not match public_inputs[4..8]");
+    }
+
     let proof_valid = match verify_proof(&proof_bytes, att.public_inputs.as_deref()) {
         Ok(v) => v,
         Err(e) => {
@@ -299,10 +325,16 @@ fn main() {
         }
     };
 
-    let verdict = commitment_valid && proof_valid;
+    let verdict = commitment_valid && commitment_matches && proof_valid;
 
     // Sign
-    let (pubkey, signature) = sign_verification(&signing_key, &att.id, &att.dependency_id, verdict);
+    let (pubkey, signature) = sign_verification(
+        &signing_key,
+        &att.id,
+        &att.dependency_id,
+        &att.original_action_hash,
+        verdict,
+    );
 
     eprintln!(
         "  Verdict: {} (commitment={}, proof={})",
@@ -386,7 +418,8 @@ mod tests {
     #[test]
     fn test_sign_verification() {
         let key = SigningKey::from_bytes(&[42u8; 32]);
-        let (pubkey, sig) = sign_verification(&key, "attest-001", "crate:serde:1.0", true);
+        let (pubkey, sig) =
+            sign_verification(&key, "attest-001", "crate:serde:1.0", "abc123", true);
         assert_eq!(pubkey.len(), 32);
         assert_eq!(sig.len(), 64);
     }
@@ -394,9 +427,48 @@ mod tests {
     #[test]
     fn test_sign_verification_deterministic() {
         let key = SigningKey::from_bytes(&[42u8; 32]);
-        let (_, sig1) = sign_verification(&key, "a", "b", true);
-        let (_, sig2) = sign_verification(&key, "a", "b", true);
+        let (_, sig1) = sign_verification(&key, "a", "b", "hash1", true);
+        let (_, sig2) = sign_verification(&key, "a", "b", "hash1", true);
         assert_eq!(sig1, sig2);
+    }
+
+    #[test]
+    fn test_sign_verification_replay_protection() {
+        let key = SigningKey::from_bytes(&[42u8; 32]);
+        // Same attestation ID & dep, different action hash → different signature
+        let (_, sig1) = sign_verification(&key, "a", "b", "hash1", true);
+        let (_, sig2) = sign_verification(&key, "a", "b", "hash2", true);
+        assert_ne!(sig1, sig2);
+    }
+
+    #[test]
+    fn test_sign_verification_crypto_valid() {
+        use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+        let key = SigningKey::from_bytes(&[42u8; 32]);
+        let (pubkey_bytes, sig_bytes) =
+            sign_verification(&key, "attest-001", "crate:serde:1.0", "action-hash", true);
+        let vk = VerifyingKey::from_bytes(&pubkey_bytes.try_into().unwrap()).unwrap();
+        let sig = Signature::from_bytes(&sig_bytes.try_into().unwrap());
+        let msg = "mycelix-attribution:verify:attest-001:crate:serde:1.0:action-hash:true";
+        assert!(vk.verify(msg.as_bytes(), &sig).is_ok());
+    }
+
+    #[test]
+    fn test_cross_validate_commitment_match() {
+        use mycelix_attribution_stark_common::{commitment_to_limbs, compute_witness_commitment};
+        let commitment = compute_witness_commitment(2, "crate:serde:1.0", "did:abc", "Org");
+        let limbs = commitment_to_limbs(&commitment);
+        let pi = vec![0, 0, 0, 0, limbs[0], limbs[1], limbs[2], limbs[3]];
+        assert!(cross_validate_commitment(&commitment, Some(&pi)));
+    }
+
+    #[test]
+    fn test_cross_validate_commitment_mismatch() {
+        use mycelix_attribution_stark_common::compute_witness_commitment;
+        let commitment = compute_witness_commitment(2, "crate:serde:1.0", "did:abc", "Org");
+        // Different limbs in public inputs
+        let pi = vec![0, 0, 0, 0, 999, 888, 777, 666];
+        assert!(!cross_validate_commitment(&commitment, Some(&pi)));
     }
 
     /// End-to-end: generate a real STARK proof via Winterfell, then verify it
@@ -505,6 +577,10 @@ mod tests {
                 state[2] = BaseElement::from(dep_hi);
                 state[3] = BaseElement::from(did_lo);
                 state[4] = BaseElement::from(did_hi);
+                state[5] = BaseElement::from(commitment_limbs[0]);
+                state[6] = BaseElement::from(commitment_limbs[1]);
+                state[7] = BaseElement::from(commitment_limbs[2]);
+                state[8] = BaseElement::from(commitment_limbs[3]);
             },
             |step, state| {
                 state[0] = BaseElement::from(scale_cycle[step % 4]);

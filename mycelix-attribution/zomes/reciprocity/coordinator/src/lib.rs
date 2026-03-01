@@ -104,6 +104,7 @@ fn validate_dependency_exists(dep_id: &str) -> ExternResult<()> {
 }
 
 /// Sliding-window rate limiter using links as timestamps.
+/// Sliding-window rate limiter. Checks count BEFORE creating the link.
 fn enforce_rate_limit(limit: u64) -> ExternResult<()> {
     let agent = agent_info()?.agent_initial_pubkey;
     let agent_hash = EntryHash::from(agent);
@@ -111,15 +112,9 @@ fn enforce_rate_limit(limit: u64) -> ExternResult<()> {
     let now_micros = now.as_micros();
     let window_micros = RATE_LIMIT_WINDOW_SECS * 1_000_000;
 
-    create_link(
-        agent_hash.clone(),
-        agent_hash.clone(),
-        LinkTypes::PledgeRateLimit,
-        LinkTag::new(now_micros.to_le_bytes()),
-    )?;
-
+    // Count links within window FIRST
     let links = get_links(
-        LinkQuery::try_new(agent_hash, LinkTypes::PledgeRateLimit)?,
+        LinkQuery::try_new(agent_hash.clone(), LinkTypes::PledgeRateLimit)?,
         GetStrategy::default(),
     )?;
 
@@ -136,12 +131,20 @@ fn enforce_rate_limit(limit: u64) -> ExternResult<()> {
         })
         .count() as u64;
 
-    if recent > limit {
+    if recent >= limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Rate limit exceeded: {} requests in last {} seconds (limit: {})",
             recent, RATE_LIMIT_WINDOW_SECS, limit
         ))));
     }
+
+    // Create rate-limit link AFTER passing the check
+    create_link(
+        agent_hash.clone(),
+        agent_hash.clone(),
+        LinkTypes::PledgeRateLimit,
+        LinkTag::new(now_micros.to_le_bytes()),
+    )?;
 
     Ok(())
 }
@@ -268,6 +271,16 @@ pub fn acknowledge_pledge(id: String) -> ExternResult<Record> {
 pub fn get_dependency_pledges(dep_id: String) -> ExternResult<Vec<Record>> {
     let dep_tag = format!("pledges:{}", dep_id);
     resolve_links(anchor_hash(&dep_tag)?, LinkTypes::DependencyToPledges)
+}
+
+/// Count all pledges across all dependencies.
+#[hdk_extern]
+pub fn get_pledge_count(_: ()) -> ExternResult<u64> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_pledges")?, LinkTypes::AllPledges)?,
+        GetStrategy::default(),
+    )?;
+    Ok(links.len() as u64)
 }
 
 #[hdk_extern]
@@ -425,7 +438,10 @@ pub fn get_stewardship_leaderboard(limit: u64) -> ExternResult<Vec<LeaderboardEn
         None,
         encoded,
     ) {
-        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_default(),
+        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_else(|e| {
+            debug!("Failed to decode registry response: {:?}", e);
+            Vec::new()
+        }),
         _ => return Ok(Vec::new()),
     };
 
@@ -470,7 +486,10 @@ pub fn get_under_supported_dependencies(limit: u64) -> ExternResult<Vec<Leaderbo
         None,
         encoded,
     ) {
-        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_default(),
+        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_else(|e| {
+            debug!("Failed to decode registry response: {:?}", e);
+            Vec::new()
+        }),
         _ => return Ok(Vec::new()),
     };
 

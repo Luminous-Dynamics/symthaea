@@ -115,13 +115,15 @@ export async function fetchStats(): Promise<AttributionStats> {
   if (eco) {
     const usageCount = await tryCallZome<TopDependency[]>('usage', 'get_top_dependencies', 1000) ?? [];
     const totalUsage = usageCount.reduce((sum, d) => sum + d.usage_count, 0);
+    const activeAttestations = await tryCallZome<number>('usage', 'get_attestation_count', null) ?? 0;
+    const totalPledges = await tryCallZome<number>('reciprocity', 'get_pledge_count', null) ?? 0;
     return {
       totalDependencies: eco.total_dependencies,
       totalEcosystems: eco.ecosystems.length,
       verifiedCount: eco.verified_count,
       totalUsage,
-      activeAttestations: 0, // Would need a dedicated extern
-      totalPledges: 0,
+      activeAttestations,
+      totalPledges,
     };
   }
   return { ...MOCK_STATS };

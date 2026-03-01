@@ -1,6 +1,6 @@
 //! mycelix-attribution-prover — Generates ZK-STARK proofs for usage attestations.
 //!
-//! Builds a 5-column × 8-row trace and generates a Winterfell STARK proof
+//! Builds a 9-column × 16-row trace and generates a Winterfell STARK proof
 //! proving knowledge of a valid usage scale without revealing it.
 
 use clap::Parser;
@@ -140,37 +140,44 @@ impl Prover for AttestationProver {
     }
 }
 
-/// Build a 5-column × 8-row trace.
+/// Build a 9-column × 16-row trace.
 ///
 /// Column 0 (scale) varies across rows with valid values [1-4] to create
 /// a non-trivial polynomial, ensuring the degree-4 range check constraint
 /// produces a non-zero polynomial on the extended evaluation domain.
 /// Row 0 holds the prover's actual scale; remaining rows cycle through 1-4.
 /// Columns 1-4 are constant (hash values), bound by boundary assertions.
+/// Columns 5-8 are constant (witness commitment limbs), bound by boundary assertions.
 fn build_trace(
     scale: u8,
     dep_hash_lo: u64,
     dep_hash_hi: u64,
     did_hash_lo: u64,
     did_hash_hi: u64,
+    commitment_limbs: &[u64; 4],
 ) -> TraceTable<BaseElement> {
     // Valid scale values for padding rows (cycle through 1,2,3,4)
     let scale_cycle: [u64; 4] = [1, 2, 3, 4];
 
+    let cl = *commitment_limbs;
     let mut trace = TraceTable::new(TRACE_WIDTH, TRACE_LENGTH);
     trace.fill(
         |state| {
-            // Row 0: actual scale + hash values
+            // Row 0: actual scale + hash values + commitment limbs
             state[0] = BaseElement::from(scale as u64);
             state[1] = BaseElement::from(dep_hash_lo);
             state[2] = BaseElement::from(dep_hash_hi);
             state[3] = BaseElement::from(did_hash_lo);
             state[4] = BaseElement::from(did_hash_hi);
+            state[5] = BaseElement::from(cl[0]);
+            state[6] = BaseElement::from(cl[1]);
+            state[7] = BaseElement::from(cl[2]);
+            state[8] = BaseElement::from(cl[3]);
         },
         |step, state| {
-            // Rows 1-7: cycle scale through valid values, keep hash columns constant
+            // Rows 1-7: cycle scale through valid values, keep other columns constant
             state[0] = BaseElement::from(scale_cycle[step % 4]);
-            // Columns 1-4 retain previous values (constant)
+            // Columns 1-8 retain previous values (constant)
         },
     );
     trace
@@ -196,7 +203,7 @@ fn generate_proof(
         witness_commitment: commitment_limbs,
     };
 
-    let trace = build_trace(scale, dep_lo, dep_hi, did_lo, did_hi);
+    let trace = build_trace(scale, dep_lo, dep_hi, did_lo, did_hi, &commitment_limbs);
 
     let prover = AttestationProver::new(pub_inputs.clone());
     let proof = prover

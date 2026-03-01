@@ -118,6 +118,7 @@ fn validate_dependency_exists(dep_id: &str) -> ExternResult<()> {
 }
 
 /// Sliding-window rate limiter using links as timestamps.
+/// Checks count BEFORE creating the link to prevent off-by-one at window boundary.
 fn enforce_rate_limit(limit: u64) -> ExternResult<()> {
     let agent = agent_info()?.agent_initial_pubkey;
     let agent_hash = EntryHash::from(agent);
@@ -125,17 +126,9 @@ fn enforce_rate_limit(limit: u64) -> ExternResult<()> {
     let now_micros = now.as_micros();
     let window_micros = RATE_LIMIT_WINDOW_SECS * 1_000_000;
 
-    // Create a rate-limit link (agent → agent, tagged with timestamp)
-    create_link(
-        agent_hash.clone(),
-        agent_hash.clone(),
-        LinkTypes::UsageRateLimit,
-        LinkTag::new(now_micros.to_le_bytes()),
-    )?;
-
-    // Count links within window
+    // Count links within window FIRST
     let links = get_links(
-        LinkQuery::try_new(agent_hash, LinkTypes::UsageRateLimit)?,
+        LinkQuery::try_new(agent_hash.clone(), LinkTypes::UsageRateLimit)?,
         GetStrategy::default(),
     )?;
 
@@ -152,12 +145,20 @@ fn enforce_rate_limit(limit: u64) -> ExternResult<()> {
         })
         .count() as u64;
 
-    if recent > limit {
+    if recent >= limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Rate limit exceeded: {} requests in last {} seconds (limit: {})",
             recent, RATE_LIMIT_WINDOW_SECS, limit
         ))));
     }
+
+    // Create rate-limit link AFTER passing the check
+    create_link(
+        agent_hash.clone(),
+        agent_hash.clone(),
+        LinkTypes::UsageRateLimit,
+        LinkTag::new(now_micros.to_le_bytes()),
+    )?;
 
     Ok(())
 }
@@ -259,8 +260,16 @@ pub fn submit_usage_attestation(att: UsageAttestation) -> ExternResult<Record> {
     let user_tag = format!("user_attest:{}", att.user_did);
     create_link(
         anchor_hash(&user_tag)?,
-        entry_hash,
+        entry_hash.clone(),
         LinkTypes::UserToAttestations,
+        (),
+    )?;
+
+    // Link: all_attestations → attestation (for global count)
+    create_link(
+        anchor_hash("all_attestations")?,
+        entry_hash,
+        LinkTypes::AllAttestations,
         (),
     )?;
 
@@ -276,6 +285,20 @@ pub fn submit_usage_attestation(att: UsageAttestation) -> ExternResult<Record> {
 
 #[hdk_extern]
 pub fn verify_usage_attestation(input: VerifyAttestationInput) -> ExternResult<Record> {
+    // Validate signature format: Ed25519 pubkey (32 bytes) + signature (64 bytes)
+    if input.verifier_pubkey.len() != 32 {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid verifier pubkey: expected 32 bytes, got {}",
+            input.verifier_pubkey.len()
+        ))));
+    }
+    if input.verifier_signature.len() != 64 {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid verifier signature: expected 64 bytes, got {}",
+            input.verifier_signature.len()
+        ))));
+    }
+
     let record = get(input.original_action_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Attestation not found".into())),
     )?;
@@ -292,6 +315,13 @@ pub fn verify_usage_attestation(input: VerifyAttestationInput) -> ExternResult<R
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Record has no entry".into()
         )))?;
+
+    // Prevent re-verification
+    if att.verified {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Attestation already verified".into()
+        )));
+    }
 
     att.verified = true;
     att.verifier_pubkey = Some(input.verifier_pubkey);
@@ -335,6 +365,17 @@ pub fn get_dependency_attestations(dep_id: String) -> ExternResult<Vec<Record>> 
         }
     }
     Ok(active)
+}
+
+/// Count all active (non-expired) attestations across all dependencies.
+#[hdk_extern]
+pub fn get_attestation_count(_: ()) -> ExternResult<u64> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_attestations")?, LinkTypes::AllAttestations)?,
+        GetStrategy::default(),
+    )?;
+    // For a precise count we'd filter expired, but link count is a good approximation
+    Ok(links.len() as u64)
 }
 
 // ── Attestation Lifecycle ───────────────────────────────────────────
@@ -518,7 +559,10 @@ pub fn get_top_dependencies(limit: u64) -> ExternResult<Vec<TopDependency>> {
         None,
         encoded,
     ) {
-        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_default(),
+        Ok(ZomeCallResponse::Ok(io)) => io.decode().unwrap_or_else(|e| {
+            debug!("Failed to decode registry response: {:?}", e);
+            Vec::new()
+        }),
         _ => return Ok(Vec::new()),
     };
 

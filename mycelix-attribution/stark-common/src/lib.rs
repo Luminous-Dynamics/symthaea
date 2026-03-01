@@ -5,17 +5,18 @@
 //!
 //! ## Trace Layout
 //!
-//! 5 columns × 8 rows (minimum for Winterfell 0.13.1 FRI):
+//! 9 columns × 16 rows (sized for S128 FRI domain requirements):
 //! - Column 0: `scale` — usage scale (1=Small, 2=Medium, 3=Large, 4=Enterprise)
 //! - Column 1: `dep_hash_lo` — lower 64 bits of Blake3(dependency_id)
 //! - Column 2: `dep_hash_hi` — upper 64 bits of Blake3(dependency_id)
 //! - Column 3: `did_hash_lo` — lower 64 bits of Blake3(user_did)
 //! - Column 4: `did_hash_hi` — upper 64 bits of Blake3(user_did)
+//! - Columns 5–8: `witness_commitment[0..3]` — 4 u64 LE limbs of Blake3 commitment
 //!
 //! ## Constraints
 //!
 //! - C0: `(scale-1)(scale-2)(scale-3)(scale-4) == 0` — range check (degree 4)
-//! - C1–C4: `col[next] - col[curr] == 0` — constant columns
+//! - C1–C8: `col[next] - col[curr] == 0` — constant columns
 //!
 //! ## Public Inputs
 //!
@@ -28,8 +29,8 @@ use winterfell::{
     TransitionConstraintDegree,
 };
 
-pub const TRACE_WIDTH: usize = 5;
-pub const TRACE_LENGTH: usize = 8;
+pub const TRACE_WIDTH: usize = 9;
+pub const TRACE_LENGTH: usize = 16;
 
 // ── Public Inputs ───────────────────────────────────────────────────
 
@@ -131,18 +132,22 @@ impl Air for UsageAttestationAir {
     type PublicInputs = PublicInputs;
 
     fn new(trace_info: TraceInfo, pub_inputs: PublicInputs, options: ProofOptions) -> Self {
-        // 5 transition constraints:
+        // 9 transition constraints:
         // C0: degree 4 (range check on scale)
-        // C1-C4: degree 1 (constant columns)
+        // C1-C8: degree 1 (constant columns: hashes + commitment)
         let degrees = vec![
             TransitionConstraintDegree::new(4), // (scale-1)(scale-2)(scale-3)(scale-4)
             TransitionConstraintDegree::new(1), // dep_hash_lo constant
             TransitionConstraintDegree::new(1), // dep_hash_hi constant
             TransitionConstraintDegree::new(1), // did_hash_lo constant
             TransitionConstraintDegree::new(1), // did_hash_hi constant
+            TransitionConstraintDegree::new(1), // witness_commitment[0] constant
+            TransitionConstraintDegree::new(1), // witness_commitment[1] constant
+            TransitionConstraintDegree::new(1), // witness_commitment[2] constant
+            TransitionConstraintDegree::new(1), // witness_commitment[3] constant
         ];
 
-        let num_assertions = 4; // boundary assertions at row 0 (columns 1-4)
+        let num_assertions = 8; // boundary assertions at row 0 (columns 1-8)
 
         UsageAttestationAir {
             context: AirContext::new(trace_info, degrees, num_assertions, options),
@@ -173,35 +178,45 @@ impl Air for UsageAttestationAir {
         // C0: (scale-1)(scale-2)(scale-3)(scale-4) == 0
         result[0] = (scale - one) * (scale - two) * (scale - three) * (scale - four);
 
-        // C1-C4: columns are constant across rows
+        // C1-C8: columns are constant across rows
         result[1] = next[1] - current[1]; // dep_hash_lo
         result[2] = next[2] - current[2]; // dep_hash_hi
         result[3] = next[3] - current[3]; // did_hash_lo
         result[4] = next[4] - current[4]; // did_hash_hi
+        result[5] = next[5] - current[5]; // witness_commitment[0]
+        result[6] = next[6] - current[6]; // witness_commitment[1]
+        result[7] = next[7] - current[7]; // witness_commitment[2]
+        result[8] = next[8] - current[8]; // witness_commitment[3]
     }
 
     fn get_assertions(&self) -> Vec<Assertion<BaseElement>> {
         let pi = &self.pub_inputs;
         vec![
-            // Boundary assertions at row 0: columns 1-4 match public inputs.
+            // Boundary assertions at row 0: columns 1-8 match public inputs.
             // Column 0 (scale) has NO boundary assertion — it is a private witness
             // proven valid by the degree-4 range check constraint C0.
-            // The witness_commitment (which includes the scale in its preimage)
-            // binds the proof to a specific scale value; verification is off-chain.
+            // Columns 5-8 bind the witness_commitment (which includes the scale
+            // in its blake3 preimage) to the proof, preventing commitment swaps.
             Assertion::single(1, 0, BaseElement::from(pi.dep_hash_lo)),
             Assertion::single(2, 0, BaseElement::from(pi.dep_hash_hi)),
             Assertion::single(3, 0, BaseElement::from(pi.did_hash_lo)),
             Assertion::single(4, 0, BaseElement::from(pi.did_hash_hi)),
+            Assertion::single(5, 0, BaseElement::from(pi.witness_commitment[0])),
+            Assertion::single(6, 0, BaseElement::from(pi.witness_commitment[1])),
+            Assertion::single(7, 0, BaseElement::from(pi.witness_commitment[2])),
+            Assertion::single(8, 0, BaseElement::from(pi.witness_commitment[3])),
         ]
     }
 }
 
 /// Create standard proof options for S128 security.
+///
+/// 128 queries + grinding_factor=20 + blowup=16 provides ≥128-bit security.
 pub fn default_proof_options() -> ProofOptions {
     ProofOptions::new(
-        80, // num_queries
-        16, // blowup_factor
-        16, // grinding_factor
+        128, // num_queries (S128)
+        16,  // blowup_factor
+        20,  // grinding_factor (2^20 PoW)
         winterfell::FieldExtension::None,
         8,                                  // fri_folding_factor
         31,                                 // fri_max_remainder_poly_degree
