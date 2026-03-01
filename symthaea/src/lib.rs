@@ -395,6 +395,10 @@ pub mod gui_bridge;
 #[cfg(feature = "physics")]
 pub use symthaea_physics as physics;
 
+// Cell Foundry: iPSC, IVG, SCNT, multi-scale prediction, lab controller, hydrology
+#[cfg(feature = "cell-foundry")]
+pub use symthaea_cell_foundry;
+
 // Flight: HDC-LTC + FEP Active Inference quadrotor flight control
 #[cfg(feature = "flight")]
 pub use symthaea_flight as flight;

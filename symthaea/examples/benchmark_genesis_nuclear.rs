@@ -34,10 +34,10 @@ fn main() {
     // 2. Attribution of perturbed HEU sample
     println!("\n--- Attribution: Perturbed HEU Sample ---");
     let agent = NuclearAttributionAgent::new();
-    let perturbed_heu = IsotopicSignature::heu().perturbed(0.01, 42);
+    let perturbed_heu = IsotopicSignature::highly_enriched_uranium().perturbed(0.01, 42);
     let result = agent.attribute(&perturbed_heu);
-    println!("  Source: {:?}", result.source);
-    println!("  Reference: {}", result.reference_name);
+    println!("  Source: {:?}", result.matched_source);
+    println!("  Reference: {}", result.matched_name);
     println!("  Confidence: {:.3}", result.confidence);
     println!("  All matches:");
     for (name, sim) in &result.all_similarities {
@@ -48,7 +48,7 @@ fn main() {
     println!("\n--- Self-Match Verification ---");
     for sig in IsotopicSignature::references() {
         let r = agent.attribute(&sig);
-        println!("  {} → {:?} (confidence={:.3})", sig.name, r.source, r.confidence);
+        println!("  {} → {:?} (confidence={:.3})", sig.name, r.matched_source, r.confidence);
     }
 
     // 4. O(1) decay backdating proof
@@ -72,18 +72,16 @@ fn main() {
         );
     }
 
-    // 5. Classical decay corrections
-    println!("\n--- Classical Decay Corrections ---");
-    println!(
-        "  Pu-241 after 14.3y (1 half-life): {:.3} → {:.3}",
-        0.5,
-        IsotopeDecayModel::correct_pu241_decay(0.5, 14.3)
-    );
-    println!(
-        "  Cs-137 after 30.2y (1 half-life): {:.3} → {:.3}",
-        0.5,
-        IsotopeDecayModel::correct_cs137_decay(0.5, 30.17)
-    );
+    // 5. Age estimation from decay ratios
+    println!("\n--- Age Estimation ---");
+    for sig in IsotopicSignature::references() {
+        let age = decay_model.estimate_age(&sig);
+        let years = age.estimated_age_seconds / 31_536_000.0;
+        println!(
+            "  {}: estimated age {:.1} years (confidence={:.3})",
+            sig.name, years, age.confidence
+        );
+    }
 
     println!("\nPASS: Nuclear Attribution operational");
 }
