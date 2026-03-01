@@ -42,7 +42,7 @@ impl MaterialDatabase {
         let mut results: Vec<MaterialSearchResult> = self.materials.iter().zip(self.hvs.iter())
             .map(|(m, hv)| MaterialSearchResult { material: m.clone(), similarity: query_hv.similarity(hv) })
             .collect();
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| nan_safe_cmp_desc(a.similarity, b.similarity));
         results.truncate(top_k);
         results
     }
@@ -54,13 +54,23 @@ impl MaterialDatabase {
             .filter(|(m, _)| constraint(m))
             .map(|(m, hv)| MaterialSearchResult { material: m.clone(), similarity: query_hv.similarity(hv) })
             .collect();
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| nan_safe_cmp_desc(a.similarity, b.similarity));
         results.truncate(top_k);
         results
     }
 }
 
 impl Default for MaterialDatabase { fn default() -> Self { Self::new() } }
+
+/// NaN-safe descending comparison: NaN sorts last (below all finite values).
+fn nan_safe_cmp_desc(a: f32, b: f32) -> std::cmp::Ordering {
+    match (a.is_nan(), b.is_nan()) {
+        (true, true) => std::cmp::Ordering::Equal,
+        (true, false) => std::cmp::Ordering::Greater,  // NaN sorts after finite
+        (false, true) => std::cmp::Ordering::Less,
+        (false, false) => b.partial_cmp(&a).unwrap_or(std::cmp::Ordering::Equal),
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -100,4 +110,33 @@ mod tests {
 
     #[test] fn test_empty_database() { let db = MaterialDatabase::new(); assert!(db.is_empty()); assert_eq!(db.len(), 0); }
     #[test] fn test_add_material() { let mut db = MaterialDatabase::new(); db.add(MaterialProperty::steel_a36()); assert_eq!(db.len(), 1); }
+
+    // ── Track B: failure-path tests ──────────────────────────────────────
+
+    #[test]
+    fn test_search_results_sorted_descending() {
+        let db = MaterialDatabase::with_presets();
+        let results = db.search_similar(&MaterialProperty::steel_a36(), 5);
+        for i in 1..results.len() {
+            assert!(
+                results[i - 1].similarity >= results[i].similarity,
+                "Results not sorted: {} < {} at position {}",
+                results[i - 1].similarity, results[i].similarity, i
+            );
+        }
+    }
+
+    #[test]
+    fn test_search_top_k_zero() {
+        let db = MaterialDatabase::with_presets();
+        let results = db.search_similar(&MaterialProperty::steel_a36(), 0);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_top_k_exceeds_database() {
+        let db = MaterialDatabase::with_presets();
+        let results = db.search_similar(&MaterialProperty::steel_a36(), 100);
+        assert_eq!(results.len(), 5); // only 5 presets
+    }
 }

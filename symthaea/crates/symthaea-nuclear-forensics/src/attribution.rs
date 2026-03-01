@@ -27,7 +27,11 @@ impl NuclearAttributionAgent {
         Self::with_references(IsotopicSignature::references())
     }
 
+    /// # Panics
+    ///
+    /// Panics if `refs` is empty — at least one reference signature is required.
     pub fn with_references(refs: Vec<IsotopicSignature>) -> Self {
+        assert!(!refs.is_empty(), "NuclearAttributionAgent requires at least one reference signature");
         let encoder = IsotopicHdcEncoder::new();
         let reference_hvs = refs.iter().map(|r| encoder.encode(r)).collect();
         Self {
@@ -47,7 +51,14 @@ impl NuclearAttributionAgent {
                 (r.name.clone(), r.source, unknown_hv.similarity(ref_hv))
             })
             .collect();
-        similarities.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+        similarities.sort_by(|a, b| {
+            match (a.2.is_nan(), b.2.is_nan()) {
+                (true, true) => std::cmp::Ordering::Equal,
+                (true, false) => std::cmp::Ordering::Greater,  // NaN sorts last
+                (false, true) => std::cmp::Ordering::Less,
+                (false, false) => b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal),
+            }
+        });
 
         let best = &similarities[0];
         let second = if similarities.len() > 1 { similarities[1].2 } else { 0.0 };
@@ -126,6 +137,34 @@ mod tests {
                 "Self-attribution failed for {}",
                 sig.name
             );
+        }
+    }
+
+    // ── Track B: failure-path tests ──────────────────────────────────────
+
+    #[test]
+    #[should_panic(expected = "at least one reference signature")]
+    fn test_empty_references_panics() {
+        NuclearAttributionAgent::with_references(vec![]);
+    }
+
+    #[test]
+    fn test_single_reference_attribution() {
+        let agent = NuclearAttributionAgent::with_references(vec![
+            IsotopicSignature::highly_enriched_uranium(),
+        ]);
+        let r = agent.attribute(&IsotopicSignature::highly_enriched_uranium());
+        assert_eq!(r.matched_source, NuclearSource::HighlyEnrichedUranium);
+        assert_eq!(r.all_similarities.len(), 1);
+    }
+
+    #[test]
+    fn test_attribution_confidence_bounded() {
+        let agent = NuclearAttributionAgent::new();
+        for sig in &IsotopicSignature::references() {
+            let r = agent.attribute(sig);
+            assert!(r.confidence >= 0.0 && r.confidence <= 1.0,
+                "Confidence out of [0,1] for {}: {}", sig.name, r.confidence);
         }
     }
 }

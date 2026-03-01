@@ -73,6 +73,9 @@ impl FusionHdcEncoder {
         let mut sums = [0.0f64; 4];
         let mut counts = [0u32; 4];
         for r in readings {
+            if !r.value.is_finite() {
+                continue;
+            }
             let idx = match r.sensor {
                 PlasmaSensorType::ElectronDensity => 0,
                 PlasmaSensorType::ElectronTemperature => 1,
@@ -84,12 +87,12 @@ impl FusionHdcEncoder {
             counts[idx] += 1;
         }
 
-        // Normalize to [0, 1] range
+        // Normalize to [0, 1] range (NaN-safe: division only when count > 0)
         let norms = [
-            if counts[0] > 0 { (sums[0] / counts[0] as f64 / 2.0).min(1.0) } else { 0.0 },
-            if counts[1] > 0 { (sums[1] / counts[1] as f64 / 10.0).min(1.0) } else { 0.0 },
-            if counts[2] > 0 { (sums[2] / counts[2] as f64 / 15.0).min(1.0) } else { 0.0 },
-            if counts[3] > 0 { (sums[3] / counts[3] as f64 / 5.0).min(1.0) } else { 0.0 },
+            if counts[0] > 0 { (sums[0] / counts[0] as f64 / 2.0).clamp(0.0, 1.0) } else { 0.0 },
+            if counts[1] > 0 { (sums[1] / counts[1] as f64 / 10.0).clamp(0.0, 1.0) } else { 0.0 },
+            if counts[2] > 0 { (sums[2] / counts[2] as f64 / 15.0).clamp(0.0, 1.0) } else { 0.0 },
+            if counts[3] > 0 { (sums[3] / counts[3] as f64 / 5.0).clamp(0.0, 1.0) } else { 0.0 },
         ];
 
         let weights: Vec<f32> = norms.iter().map(|&v| v as f32).collect();
@@ -122,11 +125,20 @@ impl PlasmaMultiScalePredictor {
     }
 
     /// Predict plasma state at a specific time horizon (seconds). O(1) cost.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `horizon_seconds` is not finite or is non-positive.
     pub fn predict_at_horizon(
         &self,
         current_state: &ContinuousHV,
         horizon_seconds: f32,
     ) -> ContinuousHV {
+        assert!(
+            horizon_seconds.is_finite() && horizon_seconds > 0.0,
+            "horizon_seconds must be finite and positive, got {}",
+            horizon_seconds
+        );
         let mut neuron_copy = self.neuron.clone();
         neuron_copy.evolve_closed_form(horizon_seconds, current_state);
         neuron_copy.state().clone()
@@ -157,6 +169,24 @@ impl PlasmaMultiScalePredictor {
 impl Default for PlasmaMultiScalePredictor {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl symthaea_core::temporal::TemporalPredictor for PlasmaMultiScalePredictor {
+    fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+        self.predict_at_horizon(current_state, horizon_seconds)
+    }
+
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.observe(state, dt_seconds);
+    }
+
+    fn domain(&self) -> &'static str {
+        "plasma"
+    }
+
+    fn tau_base(&self) -> f32 {
+        0.001 // 1 ms (plasma MHD timescale)
     }
 }
 
@@ -201,7 +231,10 @@ impl PlasmaFepAction {
     }
 
     pub fn from_index(idx: usize) -> Self {
-        PlasmaFepAction::ALL[idx.min(5)]
+        match PlasmaFepAction::ALL.get(idx) {
+            Some(&action) => action,
+            None => PlasmaFepAction::EmergencyShutdown, // out-of-bounds → safest action
+        }
     }
 }
 
@@ -230,8 +263,13 @@ impl PlasmaFepAgent {
     }
 
     /// Compute free energy (prediction error) between observed and reference state.
+    ///
+    /// Returns 1.0 (maximum surprise) if similarity is NaN.
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
         let similarity = observed.similarity(&self.reference_state) as f64;
+        if !similarity.is_finite() {
+            return 1.0; // maximum surprise for degenerate states
+        }
         (1.0 - similarity).max(0.0)
     }
 
@@ -357,7 +395,16 @@ impl FusionDigitalTwin {
     ///
     /// Returns a `FusionTwinOutput` containing predictions at all plasma horizons,
     /// the current disruption risk level, and a recommended action.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `dt_seconds` is not finite or is non-positive.
     pub fn step(&mut self, readings: &[PlasmaReading], dt_seconds: f32) -> FusionTwinOutput {
+        assert!(
+            dt_seconds.is_finite() && dt_seconds > 0.0,
+            "dt_seconds must be finite and positive, got {}",
+            dt_seconds
+        );
         self.cycle_count += 1;
 
         // 1. Encode current state
@@ -611,5 +658,110 @@ mod tests {
         let output = twin.step(&scenario[0], 0.001);
         assert_eq!(output.predictions.len(), PLASMA_HORIZONS.len());
         assert_eq!(output.prediction_similarities.len(), PLASMA_HORIZONS.len());
+    }
+
+    // ── Track B: failure-path tests ──────────────────────────────────────
+
+    #[test]
+    fn test_encode_window_nan_readings_skipped() {
+        let encoder = FusionHdcEncoder::new();
+        let readings = vec![
+            PlasmaReading::new(PlasmaSensorType::ElectronDensity, f64::NAN, 0.0),
+            PlasmaReading::new(PlasmaSensorType::ElectronDensity, 0.8, 0.001),
+        ];
+        let hv = encoder.encode_window(&readings);
+        assert_eq!(hv.dim(), HDC_DIMENSION);
+        // Should produce a valid HV (NaN reading was skipped)
+        assert!(hv.values.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn test_encode_window_all_nan_produces_zero_weights() {
+        let encoder = FusionHdcEncoder::new();
+        let readings = vec![
+            PlasmaReading::new(PlasmaSensorType::ElectronDensity, f64::NAN, 0.0),
+            PlasmaReading::new(PlasmaSensorType::ElectronTemperature, f64::INFINITY, 0.001),
+        ];
+        let hv = encoder.encode_window(&readings);
+        assert_eq!(hv.dim(), HDC_DIMENSION);
+    }
+
+    #[test]
+    fn test_encode_window_empty() {
+        let encoder = FusionHdcEncoder::new();
+        let hv = encoder.encode_window(&[]);
+        assert_eq!(hv.dim(), HDC_DIMENSION);
+        // Zero HV
+        assert!(hv.values.iter().all(|&v| v == 0.0));
+    }
+
+    #[test]
+    fn test_free_energy_nan_observed_returns_max_surprise() {
+        let agent = PlasmaFepAgent::new();
+        // Zero HV will have zero norm → similarity may be NaN
+        let zero_hv = ContinuousHV::zero(HDC_DIMENSION);
+        let fe = agent.compute_free_energy(&zero_hv);
+        assert!(fe.is_finite(), "Free energy should be finite even for zero HV");
+    }
+
+    #[test]
+    fn test_from_index_out_of_bounds_returns_emergency() {
+        assert_eq!(PlasmaFepAction::from_index(6), PlasmaFepAction::EmergencyShutdown);
+        assert_eq!(PlasmaFepAction::from_index(100), PlasmaFepAction::EmergencyShutdown);
+        assert_eq!(PlasmaFepAction::from_index(usize::MAX), PlasmaFepAction::EmergencyShutdown);
+    }
+
+    #[test]
+    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    fn test_step_rejects_nan_dt() {
+        let mut twin = FusionDigitalTwin::new();
+        twin.step(&[], f32::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    fn test_step_rejects_zero_dt() {
+        let mut twin = FusionDigitalTwin::new();
+        twin.step(&[], 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    fn test_step_rejects_negative_dt() {
+        let mut twin = FusionDigitalTwin::new();
+        twin.step(&[], -1.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "dt_seconds must be finite and positive")]
+    fn test_step_rejects_infinity_dt() {
+        let mut twin = FusionDigitalTwin::new();
+        twin.step(&[], f32::INFINITY);
+    }
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_predict_at_horizon_rejects_nan() {
+        let predictor = PlasmaMultiScalePredictor::new();
+        let input = ContinuousHV::random(HDC_DIMENSION, 42);
+        predictor.predict_at_horizon(&input, f32::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_predict_at_horizon_rejects_zero() {
+        let predictor = PlasmaMultiScalePredictor::new();
+        let input = ContinuousHV::random(HDC_DIMENSION, 42);
+        predictor.predict_at_horizon(&input, 0.0);
+    }
+
+    #[test]
+    fn test_encode_window_negative_values_clamped() {
+        let encoder = FusionHdcEncoder::new();
+        let readings = vec![
+            PlasmaReading::new(PlasmaSensorType::ElectronDensity, -5.0, 0.0),
+        ];
+        let hv = encoder.encode_window(&readings);
+        assert!(hv.values.iter().all(|v| v.is_finite()));
     }
 }

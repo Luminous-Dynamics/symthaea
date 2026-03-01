@@ -48,7 +48,16 @@ impl IsotopeDecayModel {
     }
 
     /// O(1) backdate: evolve CfC neuron backwards in time.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `horizon_seconds` is not finite or is non-positive.
     pub fn backdate(&self, sig: &IsotopicSignature, horizon_seconds: f32) -> BackdatedResult {
+        assert!(
+            horizon_seconds.is_finite() && horizon_seconds > 0.0,
+            "horizon_seconds must be finite and positive, got {}",
+            horizon_seconds
+        );
         let current_hv = self.encoder.encode(sig);
         let mut neuron_copy = self.neuron.clone();
         // Evolve with negative time for backdating
@@ -70,20 +79,29 @@ impl IsotopeDecayModel {
     pub fn estimate_age(&self, sig: &IsotopicSignature) -> AgeEstimate {
         let mut estimates = Vec::new();
 
-        // Pu-241 decay (if Pu present)
+        // Pu-241 decay (if Pu present and ratio is valid for ln())
         if sig.pu241_pu239 > 0.01 {
             let ratio = sig.pu241_pu239 as f64;
-            let age = -PU241_HALF_LIFE * (ratio / 0.25).ln() / std::f64::consts::LN_2;
-            if age > 0.0 && age < 1e10 { estimates.push(age); }
+            let ln_arg = ratio / 0.25;
+            if ln_arg > 0.0 {
+                let age = -PU241_HALF_LIFE * ln_arg.ln() / std::f64::consts::LN_2;
+                if age.is_finite() && age > 0.0 && age < 1e10 {
+                    estimates.push(age);
+                }
+            }
         }
 
-        // Cs-137/Sr-90 ratio (if both present)
+        // Cs-137/Sr-90 ratio (if both present and ratio is valid for ln())
         if sig.cs137_activity > 0.01 && sig.sr90_activity > 0.01 {
             let ratio = (sig.cs137_activity / sig.sr90_activity) as f64;
-            let half_life_diff = 1.0 / CS137_HALF_LIFE - 1.0 / SR90_HALF_LIFE;
-            if half_life_diff.abs() > 1e-20 {
-                let age = (ratio.ln() / half_life_diff / std::f64::consts::LN_2).abs();
-                if age < 1e10 { estimates.push(age); }
+            if ratio > 0.0 {
+                let half_life_diff = 1.0 / CS137_HALF_LIFE - 1.0 / SR90_HALF_LIFE;
+                if half_life_diff.abs() > 1e-20 {
+                    let age = (ratio.ln() / half_life_diff / std::f64::consts::LN_2).abs();
+                    if age.is_finite() && age < 1e10 {
+                        estimates.push(age);
+                    }
+                }
             }
         }
 
@@ -103,6 +121,26 @@ impl IsotopeDecayModel {
 }
 
 impl Default for IsotopeDecayModel { fn default() -> Self { Self::new() } }
+
+impl symthaea_core::temporal::TemporalPredictor for IsotopeDecayModel {
+    fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+        let mut neuron_copy = self.neuron.clone();
+        neuron_copy.evolve_closed_form(horizon_seconds, current_state);
+        neuron_copy.state().clone()
+    }
+
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.neuron.evolve_closed_form(dt_seconds, state);
+    }
+
+    fn domain(&self) -> &'static str {
+        "nuclear-forensics"
+    }
+
+    fn tau_base(&self) -> f32 {
+        31_536_000.0 // 1 year (isotope decay timescale)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -144,5 +182,48 @@ mod tests {
         let d2 = t2.elapsed();
         let ratio = d2.as_nanos() as f64 / d1.as_nanos().max(1) as f64;
         assert!(ratio < 5.0 && ratio > 0.2, "O(1): 1d={:?}, 50y={:?}, ratio={}", d1, d2, ratio);
+    }
+
+    // ── Track B: failure-path tests ──────────────────────────────────────
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_backdate_rejects_nan() {
+        IsotopeDecayModel::new().backdate(&IsotopicSignature::spent_fuel(), f32::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_backdate_rejects_zero() {
+        IsotopeDecayModel::new().backdate(&IsotopicSignature::spent_fuel(), 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_backdate_rejects_negative() {
+        IsotopeDecayModel::new().backdate(&IsotopicSignature::spent_fuel(), -1.0);
+    }
+
+    #[test]
+    fn test_estimate_age_zero_ratios() {
+        // All isotope ratios near zero → should return age 0 with confidence 0
+        let mut sig = IsotopicSignature::natural_uranium();
+        sig.pu241_pu239 = 0.0;
+        sig.cs137_activity = 0.0;
+        sig.sr90_activity = 0.0;
+        let age = IsotopeDecayModel::new().estimate_age(&sig);
+        assert_eq!(age.estimated_age_seconds, 0.0);
+        assert_eq!(age.confidence, 0.0);
+    }
+
+    #[test]
+    fn test_estimate_age_all_references_finite() {
+        let model = IsotopeDecayModel::new();
+        for sig in &IsotopicSignature::references() {
+            let age = model.estimate_age(sig);
+            assert!(age.estimated_age_seconds.is_finite(), "NaN age for {}", sig.name);
+            assert!(age.confidence.is_finite(), "NaN confidence for {}", sig.name);
+            assert!(age.confidence >= 0.0 && age.confidence <= 1.0);
+        }
     }
 }

@@ -179,7 +179,16 @@ impl HydrologicalPredictor {
     }
 
     /// Predict water state at a specific time horizon. O(1) cost.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `horizon_seconds` is not finite or is non-positive.
     pub fn predict_at_horizon(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+        assert!(
+            horizon_seconds.is_finite() && horizon_seconds > 0.0,
+            "horizon_seconds must be finite and positive, got {}",
+            horizon_seconds
+        );
         let mut neuron_copy = self.neuron.clone();
         neuron_copy.evolve_closed_form(horizon_seconds, current_state);
         neuron_copy.state().clone()
@@ -207,6 +216,24 @@ impl HydrologicalPredictor {
 impl Default for HydrologicalPredictor {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl symthaea_core::temporal::TemporalPredictor for HydrologicalPredictor {
+    fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+        self.predict_at_horizon(current_state, horizon_seconds)
+    }
+
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.observe(state, dt_seconds);
+    }
+
+    fn domain(&self) -> &'static str {
+        "hydrology"
+    }
+
+    fn tau_base(&self) -> f32 {
+        3600.0 // 1 hour (hydrological timescale)
     }
 }
 
@@ -251,7 +278,10 @@ impl WaterFepAction {
     }
 
     pub fn from_index(idx: usize) -> Self {
-        WaterFepAction::ALL[idx.min(5)]
+        match WaterFepAction::ALL.get(idx) {
+            Some(&action) => action,
+            None => WaterFepAction::EmergencyShutoff, // out-of-bounds → safest action
+        }
     }
 }
 
@@ -279,9 +309,14 @@ impl WaterFepAgent {
     }
 
     /// Compute free energy between observed and reference state.
+    ///
+    /// Returns 1.0 (maximum surprise) if similarity is NaN.
     pub fn compute_free_energy(&self, reading: &WaterQualityReading) -> f64 {
         let observed = self.encoder.encode(reading);
         let similarity = observed.similarity(&self.reference_state) as f64;
+        if !similarity.is_finite() {
+            return 1.0; // maximum surprise for degenerate states
+        }
         (1.0 - similarity).max(0.0)
     }
 
@@ -537,5 +572,55 @@ mod tests {
         assert!(scenario[50].coliform_per_100ml > 10.0);
         assert!(scenario[50].potability < 0.2);
         assert!(scenario[0].coliform_per_100ml < 5.0);
+    }
+
+    // ── Track B: failure-path tests ──────────────────────────────────────
+
+    #[test]
+    fn test_from_index_out_of_bounds_returns_shutoff() {
+        assert_eq!(WaterFepAction::from_index(6), WaterFepAction::EmergencyShutoff);
+        assert_eq!(WaterFepAction::from_index(100), WaterFepAction::EmergencyShutoff);
+    }
+
+    #[test]
+    fn test_free_energy_finite_for_zero_hv() {
+        let agent = WaterFepAgent::new();
+        // Even an extreme reading should produce finite free energy
+        let mut extreme = WaterQualityReading::clean();
+        extreme.ph = 0.0;
+        extreme.tds_mg_l = 0.0;
+        extreme.dissolved_oxygen_mg_l = 0.0;
+        let fe = agent.compute_free_energy(&extreme);
+        assert!(fe.is_finite(), "Free energy should be finite, got {}", fe);
+    }
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_predictor_rejects_nan_horizon() {
+        let predictor = HydrologicalPredictor::new();
+        let input = ContinuousHV::random(HDC_DIMENSION, 42);
+        predictor.predict_at_horizon(&input, f32::NAN);
+    }
+
+    #[test]
+    #[should_panic(expected = "horizon_seconds must be finite and positive")]
+    fn test_predictor_rejects_zero_horizon() {
+        let predictor = HydrologicalPredictor::new();
+        let input = ContinuousHV::random(HDC_DIMENSION, 42);
+        predictor.predict_at_horizon(&input, 0.0);
+    }
+
+    #[test]
+    fn test_deviation_is_zero_for_clean() {
+        let reading = WaterQualityReading::clean();
+        assert!(reading.deviation_from_potable() < 1e-10);
+    }
+
+    #[test]
+    fn test_encode_window_empty_returns_zero() {
+        let encoder = WaterHdcEncoder::new();
+        let hv = encoder.encode_window(&[]);
+        assert_eq!(hv.dim(), HDC_DIMENSION);
+        assert!(hv.values.iter().all(|&v| v == 0.0));
     }
 }
