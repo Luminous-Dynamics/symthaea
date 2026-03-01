@@ -26,12 +26,14 @@ use crate::consciousness::harmonies_integration::{HarmoniesIntegrator, ValuedAct
 use crate::consciousness::unified_value_evaluator::{
     Decision, EvaluationContext, UnifiedValueEvaluator,
 };
+use crate::hdc::harmony_basis::MoralFreeEnergy;
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
 use crate::hdc::moral_topology::{MoralTopology, MoralTopologyConfig, MoralTopologySummary};
 
 /// Unified output from the ethics engine.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields flow through EthicsEngineCache; read via cache, not struct
 pub(crate) struct EthicsEngineOutput {
     // ── Stage 1: Moral Algebra ─────────────────────────────────────────
     // Flows through EthicsEngine cache; cycle reads via moral_topology() accessor
@@ -85,6 +87,14 @@ pub(crate) struct EthicsEngineOutput {
     /// Whether topology analysis was freshly computed this cycle.
     #[allow(dead_code)] // Constructed by engine; read via ethics_engine.moral_topology() accessor
     pub topology_fresh: bool,
+
+    // ── Stage 3b: Moral Geometry (FEP) ─────────────────────────────────
+    /// 7D harmony coordinates for this cycle's action
+    #[allow(dead_code)] // Computed by harmonies integrator; read via engine cache
+    pub harmony_coordinates: [f64; 7],
+    /// Moral free energy decomposition (FEP on harmony manifold)
+    #[allow(dead_code)] // Computed by harmonies integrator; read via engine cache
+    pub moral_free_energy: MoralFreeEnergy,
 
     // ── Timing ─────────────────────────────────────────────────────────
     pub moral_us: u64,
@@ -330,9 +340,12 @@ impl EthicsEngine {
         // ═══════════════════════════════════════════════════════════════════
         // STAGE 3: Harmonies Integrator — Seven Harmonies alignment
         // Every 19 cycles (co-prime with value evaluator — same cadence)
+        //
+        // Now uses semantically grounded basis vectors (not random) and
+        // computes moral free energy (FEP) on the 7D harmony manifold.
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
-        let (harmonies_alignment, harmonies_approved) =
+        let (harmonies_alignment, harmonies_approved, harmony_coordinates, moral_free_energy) =
             if let Some(ref mut integrator) = self.harmonies_integrator {
                 if input.cycle % 19 == 0 && input.cycle > 0 {
                     let embedding = ContinuousHV::from_slice(input.compressed_state);
@@ -341,21 +354,33 @@ impl EthicsEngine {
                     let eval = integrator.evaluate(&action);
                     self.cache.last_harmonies_alignment = eval.overall_alignment;
                     self.cache.last_harmonies_approved = eval.approved;
-                    (eval.overall_alignment, eval.approved)
+                    (
+                        eval.overall_alignment,
+                        eval.approved,
+                        eval.harmony_coordinates,
+                        eval.moral_free_energy,
+                    )
                 } else {
                     (
                         self.cache.last_harmonies_alignment,
                         self.cache.last_harmonies_approved,
+                        [0.0; 7],
+                        MoralFreeEnergy::default(),
                     )
                 }
             } else {
-                (0.0, true)
+                (0.0, true, [0.0; 7], MoralFreeEnergy::default())
             };
         let harmonies_us = t.elapsed().as_micros() as u64;
 
         // Harmonies feedback: low alignment → confidence reduction
         if harmonies_alignment > 0.0 && !harmonies_approved {
             confidence_delta -= 0.02;
+        }
+
+        // High moral free energy → moral surprise → slight confidence reduction
+        if moral_free_energy.free_energy > 2.0 {
+            confidence_delta -= 0.01;
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -378,11 +403,25 @@ impl EthicsEngine {
 
         // ═══════════════════════════════════════════════════════════════════
         // STAGE 4: Moral Topology — persistent homology (every 97 cycles)
+        //
+        // When fresh topology analysis is available, feed harmony variance
+        // and dominant axis back into Stage 3 to adaptively reweight the
+        // harmony dimensions (close moral blind spots, prevent fixation).
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
         let (topology_summary, topology_fresh) =
             if input.cycle % 97 == 0 && self.moral_topology.len() >= 3 {
                 let assessment = self.moral_topology.analyze();
+
+                // Feed topology back into harmonies integrator weights
+                if let Some(ref mut integrator) = self.harmonies_integrator {
+                    integrator.apply_topology_feedback(
+                        &assessment.harmony_variance,
+                        assessment.dominant_harmony_idx,
+                        assessment.completeness,
+                    );
+                }
+
                 (MoralTopologySummary::from(&assessment), true)
             } else {
                 (self.moral_topology.last_summary().clone(), false)
@@ -411,6 +450,8 @@ impl EthicsEngine {
             unified_confidence,
             confidence_delta,
             lr_factor,
+            harmony_coordinates,
+            moral_free_energy,
             topology_summary,
             topology_us,
             topology_fresh,

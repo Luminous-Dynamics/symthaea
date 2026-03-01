@@ -1226,8 +1226,8 @@ impl CognitiveLoopService {
         sht_crash_dip: f32,
         exploration_sht_drain: f32,
     ) {
-        // Apply neuromodulator telemetry via helper (replaces 36 inline fields)
-        metadata.apply_neuromod(self.collect_neuromod_telemetry(neuromod_attention_alloc));
+        // Apply neuromodulator telemetry (replaces flat fields with nested struct)
+        metadata.neuromod = self.collect_neuromod_telemetry(neuromod_attention_alloc);
 
         // Phase 4: local-variable telemetry fields (not bath-derived)
         metadata.neuromod_phasic_replay_boost = phasic_da_replay_boost;

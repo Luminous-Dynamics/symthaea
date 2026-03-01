@@ -607,7 +607,7 @@ impl CognitiveLoopService {
         };
         if phi_suppress {
             // Attenuated: 5-HT confidence_delta implicitly reduces exploration
-            self.scale_exploration("phi_gate_suppress", 0.85);
+            self.curiosity_drive.exploration_urge *= 0.85;
         }
 
         // Attention visualization: record snapshot for debugging/introspection

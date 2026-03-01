@@ -284,7 +284,7 @@ proptest! {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             service.cycle(input);
-            let snap = service.neuromod_snapshot();
+            let snap = service.neuromod.neuromod_snapshot();
 
             // All effective levels: [0.0, 2.0] (level * receptor_sensitivity)
             assert_finite_f32(snap.da_effective, &format!("da_effective@cycle{i}"))?;
@@ -587,7 +587,7 @@ proptest! {
 
             // Check neuromodulator levels every 10 cycles to reduce overhead
             if i % 10 == 0 {
-                let snap = service.neuromod_snapshot();
+                let snap = service.neuromod.neuromod_snapshot();
                 prop_assert!(snap.da_effective.is_finite() && snap.da_effective >= 0.0,
                     "DA diverged at cycle {i}: {}", snap.da_effective);
                 prop_assert!(snap.ne_effective.is_finite() && snap.ne_effective >= 0.0,
@@ -723,61 +723,61 @@ proptest! {
             let m = &result.metadata;
 
             // DA D1/D2 subtype signals: [0.0, 2.0]
-            assert_finite_f32(m.neuromod_da_d1, &format!("neuromod_da_d1@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_da_d1, 0.0, 2.0,
+            assert_finite_f32(m.neuromod.neuromod_da_d1, &format!("neuromod_da_d1@cycle{i}"))?;
+            assert_bounded_f32(m.neuromod.neuromod_da_d1, 0.0, 2.0,
                 &format!("neuromod_da_d1@cycle{i}"))?;
 
-            assert_finite_f32(m.neuromod_da_d2, &format!("neuromod_da_d2@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_da_d2, 0.0, 2.0,
+            assert_finite_f32(m.neuromod.neuromod_da_d2, &format!("neuromod_da_d2@cycle{i}"))?;
+            assert_bounded_f32(m.neuromod.neuromod_da_d2, 0.0, 2.0,
                 &format!("neuromod_da_d2@cycle{i}"))?;
 
             // NE alpha/beta: [0.0, 2.0]
-            assert_finite_f32(m.neuromod_ne_alpha, &format!("neuromod_ne_alpha@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_ne_alpha, 0.0, 2.0,
+            assert_finite_f32(m.neuromod.neuromod_ne_alpha, &format!("neuromod_ne_alpha@cycle{i}"))?;
+            assert_bounded_f32(m.neuromod.neuromod_ne_alpha, 0.0, 2.0,
                 &format!("neuromod_ne_alpha@cycle{i}"))?;
 
-            assert_finite_f32(m.neuromod_ne_beta, &format!("neuromod_ne_beta@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_ne_beta, 0.0, 2.0,
+            assert_finite_f32(m.neuromod.neuromod_ne_beta, &format!("neuromod_ne_beta@cycle{i}"))?;
+            assert_bounded_f32(m.neuromod.neuromod_ne_beta, 0.0, 2.0,
                 &format!("neuromod_ne_beta@cycle{i}"))?;
 
             // Behavioral flexibility: [0.7, 1.5]
-            assert_finite_f32(m.neuromod_behavioral_flexibility,
+            assert_finite_f32(m.neuromod.neuromod_behavioral_flexibility,
                 &format!("neuromod_behavioral_flexibility@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_behavioral_flexibility, 0.7, 1.5,
+            assert_bounded_f32(m.neuromod.neuromod_behavioral_flexibility, 0.7, 1.5,
                 &format!("neuromod_behavioral_flexibility@cycle{i}"))?;
 
             // Consciousness modulation: [0.6, 1.2]
-            assert_finite_f32(m.neuromod_consciousness_mod,
+            assert_finite_f32(m.neuromod.neuromod_consciousness_mod,
                 &format!("neuromod_consciousness_mod@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_consciousness_mod, 0.6, 1.2,
+            assert_bounded_f32(m.neuromod.neuromod_consciousness_mod, 0.6, 1.2,
                 &format!("neuromod_consciousness_mod@cycle{i}"))?;
 
             // Plasticity gate: [0.2, 1.0]
-            assert_finite_f32(m.neuromod_plasticity_gate,
+            assert_finite_f32(m.neuromod.neuromod_plasticity_gate,
                 &format!("neuromod_plasticity_gate@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_plasticity_gate, 0.2, 1.0,
+            assert_bounded_f32(m.neuromod.neuromod_plasticity_gate, 0.2, 1.0,
                 &format!("neuromod_plasticity_gate@cycle{i}"))?;
 
             // Gradient scale: [0.5, 2.0]
-            assert_finite_f32(m.neuromod_gradient_scale,
+            assert_finite_f32(m.neuromod.neuromod_gradient_scale,
                 &format!("neuromod_gradient_scale@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_gradient_scale, 0.5, 2.0,
+            assert_bounded_f32(m.neuromod.neuromod_gradient_scale, 0.5, 2.0,
                 &format!("neuromod_gradient_scale@cycle{i}"))?;
 
             // Threshold gate: [0.5, 1.5]
-            assert_finite_f32(m.neuromod_threshold_gate,
+            assert_finite_f32(m.neuromod.neuromod_threshold_gate,
                 &format!("neuromod_threshold_gate@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_threshold_gate, 0.5, 1.5,
+            assert_bounded_f32(m.neuromod.neuromod_threshold_gate, 0.5, 1.5,
                 &format!("neuromod_threshold_gate@cycle{i}"))?;
 
             // MCTS exploration modulation (cast from f64): finite
-            prop_assert!(m.neuromod_mcts_exploration_mod.is_finite(),
+            prop_assert!(m.neuromod.neuromod_mcts_exploration_mod.is_finite(),
                 "neuromod_mcts_exploration_mod NaN/Inf at cycle {i}");
 
             // Phasic bursts: [0.0, 1.0]
-            assert_bounded_f32(m.neuromod_da_phasic, 0.0, 1.0,
+            assert_bounded_f32(m.neuromod.neuromod_da_phasic, 0.0, 1.0,
                 &format!("neuromod_da_phasic@cycle{i}"))?;
-            assert_bounded_f32(m.neuromod_ne_phasic, 0.0, 1.0,
+            assert_bounded_f32(m.neuromod.neuromod_ne_phasic, 0.0, 1.0,
                 &format!("neuromod_ne_phasic@cycle{i}"))?;
         }
     }

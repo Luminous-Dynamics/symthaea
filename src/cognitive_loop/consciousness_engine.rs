@@ -39,23 +39,20 @@ use super::types::ConsciousnessCache;
 /// Contains all measurement results plus proposed feedback deltas.
 /// The caller applies deltas to prediction_confidence, fep_lr_boost, etc.
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Fields flow through ConsciousnessCache; read via cache, not struct
 pub(crate) struct ConsciousnessEngineOutput {
     // ── Raw measurements ───────────────────────────────────────────────
     /// Spectral MIP Phi — integrated information via Fiedler ordering [0, ∞)
     pub spectral_mip_phi: Option<f64>,
     /// Hierarchical MIP Phi — multi-scale (32→64→128) [0, ∞)
-    /// Flows through ConsciousnessCache; see consciousness_engine.update_cache()
     pub hierarchical_mip_phi: Option<f64>,
     /// Multi-modal integrated Phi — cross-modal binding [0, 1]
-    /// Flows through ConsciousnessCache; see consciousness_engine.update_cache()
     pub multimodal_phi: f64,
     /// Consciousness Equation V2 — 7-theory unified C(t) [0, 1]
-    /// Flows through ConsciousnessCache; see consciousness_engine.update_cache()
     pub equation_v2_consciousness: f64,
     /// Pipeline consciousness — end-to-end sensory→consciousness [0, 1]
     pub pipeline_consciousness: f64,
     /// Limiting component from equation v2
-    /// Flows through ConsciousnessCache; see consciousness_engine.update_cache()
     pub limiting_component: Option<CoreComponent>,
 
     // ── Unified consciousness level ────────────────────────────────────
