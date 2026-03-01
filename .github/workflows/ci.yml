@@ -199,6 +199,7 @@ jobs:
           - "identity"
           - "all_benchmarks"
           - "genesis-missions"
+          - "genesis"
     steps:
       - uses: actions/checkout@v4
 
@@ -325,6 +326,7 @@ jobs:
           - "full_perception,reasoning_engine"
           - "consciousness_full,school_learning"
           - "all_benchmarks,reasoning_engine"
+          - "genesis,reasoning_engine"
     steps:
       - uses: actions/checkout@v4
 
@@ -422,6 +424,10 @@ jobs:
           - symthaea-broca
           - symthaea-physics
           - symthaea-cell-foundry
+          - symthaea-genomics
+          - symthaea-population
+          - symthaea-ectogenesis
+          - symthaea-nurture
           - symthaea-materials
           - symthaea-nuclear-forensics
     steps:
@@ -448,3 +454,53 @@ jobs:
 
       - name: Test ${{ matrix.crate }}
         run: cargo test -p ${{ matrix.crate }}
+
+  genesis-benchmarks:
+    name: Genesis Mission Benchmarks
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fusion
+            features: fusion-twin
+          - name: safety
+            features: safety-agents
+          - name: lab
+            features: lab-controller
+          - name: materials
+            features: materials
+          - name: nuclear
+            features: nuclear-forensics
+          - name: water
+            features: water-prediction
+          - name: multiscale
+            features: physics-unification
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-genesis-${{ matrix.name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-genesis-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Run genesis ${{ matrix.name }} benchmark
+        run: |
+          output=$(cargo run --example benchmark_genesis_${{ matrix.name }} --features "${{ matrix.features }}" --release 2>&1)
+          echo "$output"
+          echo "$output" | grep -q "PASS" || { echo "::error::Benchmark did not print PASS"; exit 1; }
