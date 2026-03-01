@@ -4,12 +4,20 @@ use crate::encoder::MaterialHdcEncoder;
 use crate::properties::MaterialProperty;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
+/// A single result from an HDC similarity search.
 #[derive(Debug, Clone)]
 pub struct MaterialSearchResult {
+    /// The matched material.
     pub material: MaterialProperty,
+    /// Cosine similarity to the query (higher = more similar).
     pub similarity: f32,
 }
 
+/// In-memory material database with HDC similarity search.
+///
+/// Materials are encoded into 16,384D hypervectors on insertion.
+/// Queries find the most similar materials by cosine similarity,
+/// optionally filtered by property constraints.
 pub struct MaterialDatabase {
     materials: Vec<MaterialProperty>,
     encoder: MaterialHdcEncoder,
@@ -17,27 +25,34 @@ pub struct MaterialDatabase {
 }
 
 impl MaterialDatabase {
+    /// Create an empty database.
     pub fn new() -> Self { Self { materials: Vec::new(), encoder: MaterialHdcEncoder::new(), hvs: Vec::new() } }
 
+    /// Create a database pre-loaded with the 5 preset reference materials.
     pub fn with_presets() -> Self {
         let mut db = Self::new();
         for m in MaterialProperty::presets() { db.add(m); }
         db
     }
 
+    /// Add a material to the database (encodes its HV on insertion).
     pub fn add(&mut self, material: MaterialProperty) {
         let hv = self.encoder.encode(&material);
         self.hvs.push(hv);
         self.materials.push(material);
     }
 
+    /// Number of materials in the database.
     pub fn len(&self) -> usize { self.materials.len() }
+    /// Whether the database is empty.
     pub fn is_empty(&self) -> bool { self.materials.is_empty() }
 
+    /// Find the `top_k` most similar materials to a query material.
     pub fn search_similar(&self, query: &MaterialProperty, top_k: usize) -> Vec<MaterialSearchResult> {
         self.search_by_hv(&self.encoder.encode(query), top_k)
     }
 
+    /// Find the `top_k` most similar materials to a raw hypervector query.
     pub fn search_by_hv(&self, query_hv: &ContinuousHV, top_k: usize) -> Vec<MaterialSearchResult> {
         let mut results: Vec<MaterialSearchResult> = self.materials.iter().zip(self.hvs.iter())
             .map(|(m, hv)| MaterialSearchResult { material: m.clone(), similarity: query_hv.similarity(hv) })
@@ -47,6 +62,7 @@ impl MaterialDatabase {
         results
     }
 
+    /// Find the `top_k` most similar materials matching a constraint predicate.
     pub fn constrained_search<F>(&self, query: &MaterialProperty, constraint: F, top_k: usize) -> Vec<MaterialSearchResult>
     where F: Fn(&MaterialProperty) -> bool {
         let query_hv = self.encoder.encode(query);

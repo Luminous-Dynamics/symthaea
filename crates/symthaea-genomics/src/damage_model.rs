@@ -175,7 +175,7 @@ impl DamageModel {
             }
 
             // Check 3' end for G->A substitutions (complementary deamination)
-            let start = if len > end_window { len - end_window } else { 0 };
+            let start = len.saturating_sub(end_window);
             for pos in start..len {
                 if read.bases[pos] == Base::A {
                     let distance_from_end = (len - 1 - pos) as f64;

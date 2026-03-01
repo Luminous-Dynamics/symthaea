@@ -8,21 +8,34 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 pub const AGING_HORIZONS: &[f32] = &[86_400.0, 2_592_000.0, 31_536_000.0, 315_360_000.0, 1_576_800_000.0];
 pub const AGING_HORIZON_LABELS: &[&str] = &["1 day", "1 month", "1 year", "10 years", "50 years"];
 
+/// Result of an O(1) aging prediction at a single time horizon.
 #[derive(Debug, Clone)]
 pub struct AgingPrediction {
+    /// Prediction horizon in seconds.
     pub horizon_seconds: f32,
+    /// Human-readable horizon label (e.g., "1 year").
     pub horizon_label: String,
+    /// CfC-predicted material state at the target horizon.
     pub predicted_state: ContinuousHV,
+    /// Cosine similarity between current and predicted state (1.0 = unchanged).
     pub state_similarity: f32,
+    /// Estimated remaining structural integrity (clamped to [0, 1]).
     pub remaining_strength: f32,
 }
 
+/// O(1) material aging predictor using CfC closed-form temporal evolution.
+///
+/// Encodes a material's current properties into a 16,384D hypervector,
+/// then uses [`HdcLtcUnifiedNeuron::evolve_closed_form`] to jump to any
+/// future time in constant time. Prediction cost is identical for 1 day
+/// and 50 years.
 pub struct MaterialAgingModel {
     neuron: HdcLtcUnifiedNeuron,
     encoder: MaterialHdcEncoder,
 }
 
 impl MaterialAgingModel {
+    /// Create a new aging model with a 1-day base timescale.
     pub fn new() -> Self {
         let config = UnifiedConfig { tau_base: 86_400.0, backbone_tau: 0.1, dimension: HDC_DIMENSION, ..UnifiedConfig::default() };
         Self { neuron: HdcLtcUnifiedNeuron::new(config, 0xA61_0E00), encoder: MaterialHdcEncoder::new() }
@@ -47,6 +60,7 @@ impl MaterialAgingModel {
         AgingPrediction { horizon_seconds, horizon_label: label, predicted_state: predicted, state_similarity, remaining_strength: state_similarity.max(0.0) }
     }
 
+    /// Predict aging at all 5 standard horizons (1 day to 50 years).
     pub fn predict_all_horizons(&self, material: &MaterialProperty) -> Vec<AgingPrediction> {
         AGING_HORIZONS.iter().map(|&h| self.predict_at_horizon(material, h)).collect()
     }

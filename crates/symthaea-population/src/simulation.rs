@@ -319,7 +319,7 @@ impl PopulationSimulator {
                     population.individuals.iter().all(|ind| {
                         ind.genotypes
                             .get(locus_idx)
-                            .map_or(false, |g| g.is_homozygous_deleterious())
+                            .is_some_and(|g| g.is_homozygous_deleterious())
                     })
                 })
                 .count()

@@ -8,26 +8,35 @@ const SEEDS: [u64; 9] = [
     0xACE_0006, 0xACE_0007, 0xACE_0008, 0xACE_0009,
 ];
 
+/// Encodes isotopic signatures into 16,384D continuous hypervectors.
+///
+/// Uses 9 orthogonal basis vectors (one per isotope ratio) with
+/// weighted superposition. Signatures from similar nuclear sources
+/// produce similar hypervectors, enabling HDC attribution.
 pub struct IsotopicHdcEncoder {
     bases: [ContinuousHV; 9],
 }
 
 impl IsotopicHdcEncoder {
+    /// Create a new encoder with deterministic basis vectors.
     pub fn new() -> Self {
         Self {
             bases: std::array::from_fn(|i| ContinuousHV::random(HDC_DIMENSION, SEEDS[i])),
         }
     }
 
+    /// Encode a signature's 9 normalized isotope ratios into a 16,384D hypervector.
     pub fn encode(&self, sig: &IsotopicSignature) -> ContinuousHV {
         let weights = sig.normalized_values();
         ContinuousHV::encode_weighted(&self.bases, &weights)
     }
 
+    /// Cosine similarity between two isotopic signatures in HDC space.
     pub fn similarity(&self, a: &IsotopicSignature, b: &IsotopicSignature) -> f32 {
         self.encode(a).similarity(&self.encode(b))
     }
 
+    /// Compute pairwise similarity matrix for a set of signatures.
     pub fn similarity_matrix(&self, signatures: &[IsotopicSignature]) -> Vec<Vec<f32>> {
         let hvs: Vec<ContinuousHV> = signatures.iter().map(|s| self.encode(s)).collect();
         hvs.iter().map(|a| hvs.iter().map(|b| a.similarity(b)).collect()).collect()
