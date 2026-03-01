@@ -545,9 +545,9 @@ pub struct NeuromodTelemetry {
 ///
 /// # Domain Groups
 ///
-/// Fields are organized by domain (see section comments). For construction,
-/// use [`CycleMetadata::apply_neuromod`] to populate neuromod fields from
-/// a [`NeuromodTelemetry`] snapshot instead of inlining 26 fields.
+/// Fields are organized by domain (see section comments). Neuromod fields
+/// are nested via `#[serde(flatten)] pub neuromod: NeuromodTelemetry`; assign
+/// the snapshot directly to `metadata.neuromod`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CycleMetadata {
     /// Whether the surprise exploration bridge triggered exploration this cycle
@@ -1123,72 +1123,18 @@ pub struct CycleMetadata {
     pub grid_spatial_complexity: f32,
 
     // ── Neuromodulator Bath ────────────────────────────────────────────
-    /// Whether the neuromodulator bath suggests querying the exocortex (swarm).
-    /// Triggered by: high NE (uncertainty) + low DA (no reward) + low 5-HT.
-    pub exocortex_query_suggested: bool,
-    /// Neurochemical personality description (e.g., "novelty-seeking, cautious").
-    /// Updated every 97 cycles alongside circadian refresh.
-    pub neuromod_personality: String,
-    /// Effective dopamine signal (reward/learning drive, 0.0–2.0).
-    pub dopamine_effective: f32,
-    /// Effective noradrenaline signal (arousal/exploration, 0.0–2.0).
-    pub noradrenaline_effective: f32,
-    /// Effective serotonin signal (satisfaction/confidence, 0.0–2.0).
-    pub serotonin_effective: f32,
-    /// Effective acetylcholine signal (attention/precision, 0.0–2.0).
-    pub acetylcholine_effective: f32,
-    /// Personality drift rate (max trait delta per snapshot, 0.0 = stable).
-    pub neuromod_personality_drift: f32,
-    /// Whether personality drift exceeds the anomaly threshold (>0.005/snapshot).
-    pub neuromod_personality_drift_anomalous: bool,
-    /// DA gradient scaling factor applied to training LR (0.5–2.0).
-    pub neuromod_gradient_scale: f32,
-    /// ACh threshold gate factor applied to learning threshold (0.5–1.5).
-    pub neuromod_threshold_gate: f32,
-    /// Cumulative exocortex trigger count since startup.
-    pub exocortex_trigger_count: u64,
-    /// DA phasic burst magnitude (fast-decaying RPE signal, 0.0–1.0).
-    pub neuromod_da_phasic: f32,
-    /// NE phasic burst magnitude (fast-decaying surprise signal, 0.0–1.0).
-    pub neuromod_ne_phasic: f32,
-    /// Neurochemical consciousness modulation factor (0.6–1.2).
-    /// ACh/NE-driven scaling of unified Ψ.
-    pub neuromod_consciousness_mod: f32,
-    /// Sleep consolidation boost (1.0–3.0). DA-tagged replay amplification during Night.
-    pub neuromod_sleep_consolidation_boost: f32,
-    /// Neuromod-driven attention budget multiplier (0.8–1.5). NE phasic + ACh tonic.
-    pub neuromod_attention_allocation: f32,
-    /// ACh plasticity gate (0.2–1.0). High ACh = learning mode, low = performance mode.
-    pub neuromod_plasticity_gate: f32,
-    /// 5-HT/NE MCTS exploration modulation (0.6–1.8). Low 5-HT → explore, high → exploit.
-    pub neuromod_mcts_exploration_mod: f32,
-    /// Average DA tag on replayed episodes this cycle (0.0–1.0).
-    pub replay_da_tag_avg: f32,
-    /// Circadian hour used for continuous waveform modulation (0.0–24.0).
-    pub circadian_hour: f32,
-    /// DA D1 (Go pathway) effective signal (0.0–2.0).
-    pub neuromod_da_d1: f32,
-    /// DA D2 (NoGo pathway) effective signal (0.0–2.0).
-    pub neuromod_da_d2: f32,
-    /// NE alpha (tonic precision) effective signal (0.0–2.0).
-    pub neuromod_ne_alpha: f32,
-    /// NE beta (phasic reactivity) effective signal (0.0–2.0).
-    pub neuromod_ne_beta: f32,
-    /// D2-mediated behavioral flexibility factor (0.7–1.5).
-    pub neuromod_behavioral_flexibility: f32,
-    /// Full neurochemical state snapshot (sampled every 10 cycles, None otherwise).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub neuromod_snapshot: Option<super::neuromodulators::NeuromodSnapshot>,
+    /// Complete neuromodulator telemetry snapshot.
+    /// Populated via `collect_neuromod_telemetry()` and assigned to `metadata.neuromod`.
+    #[serde(flatten)]
+    pub neuromod: NeuromodTelemetry,
 
-    // ── Phase 4: Neuroendocrine Control ───────────────────────────────
+    // ── Phase 4: Neuroendocrine Control (CycleMetadata-specific) ─────
     /// Phasic DA replay amplification boost (extra episodes, 0 when below threshold).
     pub neuromod_phasic_replay_boost: usize,
     /// NE phasic reorienting boost applied to attention_sensitivity.
     pub neuromod_ne_reorienting_boost: f32,
     /// Remaining cycles of anomaly drift recovery (0 = not active).
     pub neuromod_drift_recovery_remaining: u32,
-    /// Derived cortisol from NE/5-HT (0.0–1.0).
-    pub neuromod_derived_cortisol: f32,
     /// NE→arousal EMA feedback applied this cycle.
     pub ne_arousal_feedback: f32,
     /// Confidence velocity (rate of change for crash detection).
@@ -1197,60 +1143,6 @@ pub struct CycleMetadata {
     pub sht_crash_dip: bool,
     /// Exploration-driven 5-HT drain this cycle.
     pub exploration_sht_drain: f32,
-    /// ACh suppression from NE phasic burst.
-    pub ne_ach_suppression: f32,
-    /// NE suppression from high ACh.
-    pub ach_ne_suppression: f32,
-    /// GABA effective level (0.0–2.0).
-    pub neuromod_gaba_effective: f32,
-    /// GABA global inhibition factor (0.7–1.0).
-    pub neuromod_global_inhibition: f32,
-    /// Oxytocin effective level (0.0–2.0).
-    pub neuromod_oxytocin_effective: f32,
-    /// Oxytocin social coherence factor (0.8–1.3).
-    pub neuromod_social_coherence: f32,
-    /// Oxytocin trust factor (0.8–1.2).
-    pub neuromod_trust_factor: f32,
-    /// Glutamate effective level (0.0–2.0).
-    pub neuromod_glutamate_effective: f32,
-    /// Glutamate excitotoxicity risk (0.0–1.0).
-    pub neuromod_excitotoxicity_risk: f32,
-    /// Glutamate learning fatigue factor (0.5–1.0).
-    pub neuromod_learning_fatigue: f32,
-    /// Circadian phase offset in hours (for jet lag modeling).
-    pub circadian_phase_offset: f32,
-    /// Circadian effective hour after phase offset (0.0–24.0).
-    pub circadian_effective_hour: f32,
-
-    // ── Phase 5: Advanced Neuroendocrine Telemetry ────────────────────────
-    /// Adenosine effective level (sleep pressure signal, 0.0–2.0).
-    pub neuromod_adenosine_effective: f32,
-    /// Sleep pressure from adenosine accumulation (0.0–2.0).
-    pub neuromod_sleep_pressure: f32,
-    /// Allostatic load (cumulative stress, 0.0–1.0).
-    pub neuromod_allostatic_load: f32,
-    /// Glutamate/GABA excitatory/inhibitory ratio.
-    pub neuromod_ei_ratio: f32,
-    /// Cumulative seizure-like E/I imbalance events.
-    pub neuromod_ei_seizure_events: u32,
-    /// Shannon entropy of bath phase space (averaged across 8 dimensions).
-    pub neuromod_bath_entropy: f32,
-    /// Whether an attractor has been detected in the bath phase space.
-    pub neuromod_attractor_detected: bool,
-    /// Number of active pharmacological injections (0–4).
-    pub active_injection_count: u8,
-
-    // ── Phase 6: Endocannabinoid + Receptor Subtype Telemetry ───────────
-    /// Endocannabinoid effective level (0.0–2.0).
-    pub neuromod_endocannabinoid_effective: f32,
-    /// 5-HT1A signal: anxiolytic/inhibitory.
-    pub neuromod_sht_1a_signal: f32,
-    /// 5-HT2A signal: perceptual richness/consciousness.
-    pub neuromod_sht_2a_signal: f32,
-    /// GABA-A signal: fast ionotropic/sedation.
-    pub neuromod_gaba_a_signal: f32,
-    /// GABA-B signal: slow metabotropic.
-    pub neuromod_gaba_b_signal: f32,
 
     // ── Liquid-Mamba Fusion Telemetry ────────────────────────────────
     /// Semantic prediction error from Liquid-Mamba round-trip (0.0–1.0, 0.0 when off).
@@ -1328,70 +1220,6 @@ pub struct CycleMetadata {
     pub moral_topo_dominant_harmony: u8,
     /// Number of scenarios in the moral topology sliding window.
     pub moral_topo_scenario_count: usize,
-}
-
-impl CycleMetadata {
-    /// Apply neuromodulator telemetry snapshot to this metadata.
-    ///
-    /// Populates 26 neuromod-related fields from a [`NeuromodTelemetry`] struct,
-    /// avoiding the need to inline them in the cycle.rs struct literal.
-    pub fn apply_neuromod(&mut self, n: NeuromodTelemetry) {
-        self.exocortex_query_suggested = n.exocortex_query_suggested;
-        self.neuromod_personality = n.neuromod_personality;
-        self.dopamine_effective = n.dopamine_effective;
-        self.noradrenaline_effective = n.noradrenaline_effective;
-        self.serotonin_effective = n.serotonin_effective;
-        self.acetylcholine_effective = n.acetylcholine_effective;
-        self.neuromod_personality_drift = n.neuromod_personality_drift;
-        self.neuromod_personality_drift_anomalous = n.neuromod_personality_drift_anomalous;
-        self.neuromod_gradient_scale = n.neuromod_gradient_scale;
-        self.neuromod_threshold_gate = n.neuromod_threshold_gate;
-        self.exocortex_trigger_count = n.exocortex_trigger_count;
-        self.neuromod_da_phasic = n.neuromod_da_phasic;
-        self.neuromod_ne_phasic = n.neuromod_ne_phasic;
-        self.neuromod_consciousness_mod = n.neuromod_consciousness_mod;
-        self.neuromod_sleep_consolidation_boost = n.neuromod_sleep_consolidation_boost;
-        self.neuromod_attention_allocation = n.neuromod_attention_allocation;
-        self.neuromod_plasticity_gate = n.neuromod_plasticity_gate;
-        self.neuromod_mcts_exploration_mod = n.neuromod_mcts_exploration_mod;
-        self.replay_da_tag_avg = n.replay_da_tag_avg;
-        self.circadian_hour = n.circadian_hour;
-        self.neuromod_da_d1 = n.neuromod_da_d1;
-        self.neuromod_da_d2 = n.neuromod_da_d2;
-        self.neuromod_ne_alpha = n.neuromod_ne_alpha;
-        self.neuromod_ne_beta = n.neuromod_ne_beta;
-        self.neuromod_behavioral_flexibility = n.neuromod_behavioral_flexibility;
-        self.neuromod_snapshot = n.neuromod_snapshot;
-        // Phase 4: neuroendocrine control
-        self.neuromod_derived_cortisol = n.neuromod_derived_cortisol;
-        self.ne_ach_suppression = n.ne_ach_suppression;
-        self.ach_ne_suppression = n.ach_ne_suppression;
-        self.neuromod_gaba_effective = n.neuromod_gaba_effective;
-        self.neuromod_global_inhibition = n.neuromod_global_inhibition;
-        self.neuromod_oxytocin_effective = n.neuromod_oxytocin_effective;
-        self.neuromod_social_coherence = n.neuromod_social_coherence;
-        self.neuromod_trust_factor = n.neuromod_trust_factor;
-        self.neuromod_glutamate_effective = n.neuromod_glutamate_effective;
-        self.neuromod_excitotoxicity_risk = n.neuromod_excitotoxicity_risk;
-        self.neuromod_learning_fatigue = n.neuromod_learning_fatigue;
-        self.circadian_phase_offset = n.circadian_phase_offset;
-        self.circadian_effective_hour = n.circadian_effective_hour;
-        // Phase 5: advanced neuroendocrine
-        self.neuromod_adenosine_effective = n.neuromod_adenosine_effective;
-        self.neuromod_sleep_pressure = n.neuromod_sleep_pressure;
-        self.neuromod_allostatic_load = n.neuromod_allostatic_load;
-        self.neuromod_ei_ratio = n.neuromod_ei_ratio;
-        self.neuromod_ei_seizure_events = n.neuromod_ei_seizure_events;
-        self.neuromod_bath_entropy = n.neuromod_bath_entropy;
-        self.neuromod_attractor_detected = n.neuromod_attractor_detected;
-        self.active_injection_count = n.active_injection_count;
-        // Phase 6: endocannabinoid + subtypes
-        self.neuromod_endocannabinoid_effective = n.neuromod_endocannabinoid_effective;
-        self.neuromod_sht_1a_signal = n.neuromod_sht_1a_signal;
-        self.neuromod_sht_2a_signal = n.neuromod_sht_2a_signal;
-        self.neuromod_gaba_a_signal = n.neuromod_gaba_a_signal;
-        self.neuromod_gaba_b_signal = n.neuromod_gaba_b_signal;
-    }
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.

@@ -73,13 +73,13 @@ fn run_live_cycles(
         }
         if i >= warmup {
             let m = &result.metadata;
-            sum_grad += m.neuromod_gradient_scale as f64;
+            sum_grad += m.neuromod.neuromod_gradient_scale as f64;
             // Exploration: NE effective as proxy (higher NE = more exploration)
-            sum_expl += m.noradrenaline_effective as f64;
+            sum_expl += m.neuromod.noradrenaline_effective as f64;
             // Confidence: 5-HT effective as proxy
-            sum_conf += m.serotonin_effective as f64;
+            sum_conf += m.neuromod.serotonin_effective as f64;
             // Attention: ACh effective as proxy
-            sum_attn += m.acetylcholine_effective as f64;
+            sum_attn += m.neuromod.acetylcholine_effective as f64;
             count += 1;
         }
     }

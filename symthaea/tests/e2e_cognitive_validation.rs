@@ -796,10 +796,10 @@ fn test_neuromodulator_trajectory() {
 
     for i in 0..50 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        dopamine.push(result.metadata.dopamine_effective);
-        noradrenaline.push(result.metadata.noradrenaline_effective);
-        serotonin.push(result.metadata.serotonin_effective);
-        acetylcholine.push(result.metadata.acetylcholine_effective);
+        dopamine.push(result.metadata.neuromod.dopamine_effective);
+        noradrenaline.push(result.metadata.neuromod.noradrenaline_effective);
+        serotonin.push(result.metadata.neuromod.serotonin_effective);
+        acetylcholine.push(result.metadata.neuromod.acetylcholine_effective);
     }
 
     // All neuromodulators should stay in [0.0, 2.0] (effective range per metadata docs)

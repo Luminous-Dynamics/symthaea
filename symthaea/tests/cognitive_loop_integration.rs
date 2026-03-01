@@ -5532,15 +5532,15 @@ fn test_neuromodulator_baseline_levels() {
     for _ in 0..20 {
         let result = service.cycle("baseline test input");
         let m = &result.metadata;
-        assert!(m.dopamine_effective.is_finite(), "DA not finite");
-        assert!(m.noradrenaline_effective.is_finite(), "NE not finite");
-        assert!(m.serotonin_effective.is_finite(), "5-HT not finite");
-        assert!(m.acetylcholine_effective.is_finite(), "ACh not finite");
+        assert!(m.neuromod.dopamine_effective.is_finite(), "DA not finite");
+        assert!(m.neuromod.noradrenaline_effective.is_finite(), "NE not finite");
+        assert!(m.neuromod.serotonin_effective.is_finite(), "5-HT not finite");
+        assert!(m.neuromod.acetylcholine_effective.is_finite(), "ACh not finite");
         // Effective range: [0.0, 2.0] (level * receptor_sensitivity)
-        assert!(m.dopamine_effective >= 0.0 && m.dopamine_effective <= 2.0);
-        assert!(m.noradrenaline_effective >= 0.0 && m.noradrenaline_effective <= 2.0);
-        assert!(m.serotonin_effective >= 0.0 && m.serotonin_effective <= 2.0);
-        assert!(m.acetylcholine_effective >= 0.0 && m.acetylcholine_effective <= 2.0);
+        assert!(m.neuromod.dopamine_effective >= 0.0 && m.neuromod.dopamine_effective <= 2.0);
+        assert!(m.neuromod.noradrenaline_effective >= 0.0 && m.neuromod.noradrenaline_effective <= 2.0);
+        assert!(m.neuromod.serotonin_effective >= 0.0 && m.neuromod.serotonin_effective <= 2.0);
+        assert!(m.neuromod.acetylcholine_effective >= 0.0 && m.neuromod.acetylcholine_effective <= 2.0);
     }
 
     let stats = service.stats();
@@ -5564,7 +5564,7 @@ fn test_dopamine_reward_response() {
     let mut da_sum = 0.0_f32;
     for _ in 0..50 {
         let result = service.cycle("dopamine reward test pattern");
-        da_sum += result.metadata.dopamine_effective;
+        da_sum += result.metadata.neuromod.dopamine_effective;
     }
     // Average DA should be positive (system gets some reward from learning)
     assert!(
@@ -5590,11 +5590,11 @@ fn test_noradrenaline_surprise_spike() {
     // Inject novel input → NE should increase
     let result_novel = service.cycle("completely unexpected novel stimulus");
     assert!(
-        result_novel.metadata.noradrenaline_effective.is_finite(),
+        result_novel.metadata.neuromod.noradrenaline_effective.is_finite(),
         "NE should be finite after novel input"
     );
     assert!(
-        result_novel.metadata.noradrenaline_effective >= 0.0,
+        result_novel.metadata.neuromod.noradrenaline_effective >= 0.0,
         "NE should be non-negative"
     );
 }
@@ -5611,7 +5611,7 @@ fn test_serotonin_coherence_satisfaction() {
     let mut sht_values = Vec::new();
     for _ in 0..100 {
         let result = service.cycle("coherence satisfaction signal");
-        sht_values.push(result.metadata.serotonin_effective);
+        sht_values.push(result.metadata.neuromod.serotonin_effective);
     }
 
     // All values should be finite and in range
@@ -5640,13 +5640,13 @@ fn test_acetylcholine_attention_modulation() {
         let result = service.cycle("attention precision focus");
         let m = &result.metadata;
         assert!(
-            m.acetylcholine_effective.is_finite(),
+            m.neuromod.acetylcholine_effective.is_finite(),
             "ACh not finite at {i}"
         );
         assert!(
-            m.acetylcholine_effective >= 0.0 && m.acetylcholine_effective <= 2.0,
+            m.neuromod.acetylcholine_effective >= 0.0 && m.neuromod.acetylcholine_effective <= 2.0,
             "ACh out of range at {i}: {}",
-            m.acetylcholine_effective
+            m.neuromod.acetylcholine_effective
         );
     }
 }
@@ -5676,14 +5676,14 @@ fn test_neuromodulator_300_cycle_stress() {
         let m = &result.metadata;
 
         // All 4 transmitters finite and in range
-        assert!(m.dopamine_effective.is_finite(), "DA NaN/Inf at {i}");
-        assert!(m.noradrenaline_effective.is_finite(), "NE NaN/Inf at {i}");
-        assert!(m.serotonin_effective.is_finite(), "5-HT NaN/Inf at {i}");
-        assert!(m.acetylcholine_effective.is_finite(), "ACh NaN/Inf at {i}");
-        assert!(m.dopamine_effective >= 0.0 && m.dopamine_effective <= 2.0);
-        assert!(m.noradrenaline_effective >= 0.0 && m.noradrenaline_effective <= 2.0);
-        assert!(m.serotonin_effective >= 0.0 && m.serotonin_effective <= 2.0);
-        assert!(m.acetylcholine_effective >= 0.0 && m.acetylcholine_effective <= 2.0);
+        assert!(m.neuromod.dopamine_effective.is_finite(), "DA NaN/Inf at {i}");
+        assert!(m.neuromod.noradrenaline_effective.is_finite(), "NE NaN/Inf at {i}");
+        assert!(m.neuromod.serotonin_effective.is_finite(), "5-HT NaN/Inf at {i}");
+        assert!(m.neuromod.acetylcholine_effective.is_finite(), "ACh NaN/Inf at {i}");
+        assert!(m.neuromod.dopamine_effective >= 0.0 && m.neuromod.dopamine_effective <= 2.0);
+        assert!(m.neuromod.noradrenaline_effective >= 0.0 && m.neuromod.noradrenaline_effective <= 2.0);
+        assert!(m.neuromod.serotonin_effective >= 0.0 && m.neuromod.serotonin_effective <= 2.0);
+        assert!(m.neuromod.acetylcholine_effective >= 0.0 && m.neuromod.acetylcholine_effective <= 2.0);
     }
 
     let stats = service.stats();

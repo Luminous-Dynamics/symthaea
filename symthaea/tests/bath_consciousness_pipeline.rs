@@ -42,8 +42,8 @@ fn test_bath_consciousness_pipeline() {
     for _ in 0..50 {
         let result = service.cycle("consciousness integration test");
         let m = &result.metadata;
-        assert!(m.serotonin_effective.is_finite());
-        assert!(m.neuromod_consciousness_mod.is_finite());
+        assert!(m.neuromod.serotonin_effective.is_finite());
+        assert!(m.neuromod.neuromod_consciousness_mod.is_finite());
         post_inject_consciousness.push(m.consciousness_level);
     }
 
@@ -53,30 +53,30 @@ fn test_bath_consciousness_pipeline() {
     for _ in 0..50 {
         let result = service.cycle("consciousness integration test");
         let m = &result.metadata;
-        assert!(m.neuromod_gaba_effective.is_finite());
-        assert!(m.neuromod_global_inhibition.is_finite());
+        assert!(m.neuromod.neuromod_gaba_effective.is_finite());
+        assert!(m.neuromod.neuromod_global_inhibition.is_finite());
     }
 
     // Phase 5: Clear + stress period → 50 cycles
     service.clear_pharmacological();
     for _ in 0..50 {
         let result = service.cycle("high stress emergency urgent danger");
-        assert!(result.metadata.neuromod_allostatic_load.is_finite());
+        assert!(result.metadata.neuromod.neuromod_allostatic_load.is_finite());
     }
 
     // Phase 6: Recovery → 50 cycles
     for _ in 0..50 {
         let result = service.cycle("calm peace tranquil serene");
         let m = &result.metadata;
-        assert!(m.dopamine_effective.is_finite());
-        assert!(m.noradrenaline_effective.is_finite());
-        assert!(m.serotonin_effective.is_finite());
-        assert!(m.acetylcholine_effective.is_finite());
-        assert!(m.neuromod_gaba_effective.is_finite());
-        assert!(m.neuromod_oxytocin_effective.is_finite());
-        assert!(m.neuromod_glutamate_effective.is_finite());
-        assert!(m.neuromod_adenosine_effective.is_finite());
-        assert!(m.neuromod_endocannabinoid_effective.is_finite());
+        assert!(m.neuromod.dopamine_effective.is_finite());
+        assert!(m.neuromod.noradrenaline_effective.is_finite());
+        assert!(m.neuromod.serotonin_effective.is_finite());
+        assert!(m.neuromod.acetylcholine_effective.is_finite());
+        assert!(m.neuromod.neuromod_gaba_effective.is_finite());
+        assert!(m.neuromod.neuromod_oxytocin_effective.is_finite());
+        assert!(m.neuromod.neuromod_glutamate_effective.is_finite());
+        assert!(m.neuromod.neuromod_adenosine_effective.is_finite());
+        assert!(m.neuromod.neuromod_endocannabinoid_effective.is_finite());
     }
 
     // Verify consciousness varied (not stuck at constant)
@@ -96,7 +96,7 @@ fn test_inject_api_accessible() {
     service.inject_pharmacological("sht", 0.1, 40);
     service.inject_pharmacological("ach", 0.4, 50);
     let result = service.cycle("injection test");
-    assert!(result.metadata.active_injection_count > 0);
+    assert!(result.metadata.neuromod.active_injection_count > 0);
 }
 
 // ── Clear Works ────────────────────────────────────────────────────
@@ -106,10 +106,10 @@ fn test_clear_injections_works() {
     let mut service = make_service();
     service.inject_pharmacological("da", 0.5, 100);
     service.cycle("test");
-    assert!(service.neuromod_snapshot().active_injection_count > 0);
+    assert!(service.neuromod.neuromod_snapshot().neuromod.active_injection_count > 0);
     service.clear_pharmacological();
     let result = service.cycle("test after clear");
-    assert_eq!(result.metadata.active_injection_count, 0);
+    assert_eq!(result.metadata.neuromod.active_injection_count, 0);
 }
 
 // ── All Telemetry Finite ───────────────────────────────────────────
@@ -124,43 +124,43 @@ fn test_all_telemetry_finite() {
     let m = &result.metadata;
 
     // Core transmitter levels
-    assert!(m.dopamine_effective.is_finite(), "dopamine_effective");
-    assert!(m.noradrenaline_effective.is_finite(), "noradrenaline_effective");
-    assert!(m.serotonin_effective.is_finite(), "serotonin_effective");
-    assert!(m.acetylcholine_effective.is_finite(), "acetylcholine_effective");
-    assert!(m.neuromod_gaba_effective.is_finite(), "neuromod_gaba_effective");
-    assert!(m.neuromod_oxytocin_effective.is_finite(), "neuromod_oxytocin_effective");
-    assert!(m.neuromod_glutamate_effective.is_finite(), "neuromod_glutamate_effective");
-    assert!(m.neuromod_adenosine_effective.is_finite(), "neuromod_adenosine_effective");
-    assert!(m.neuromod_endocannabinoid_effective.is_finite(), "neuromod_endocannabinoid_effective");
+    assert!(m.neuromod.dopamine_effective.is_finite(), "dopamine_effective");
+    assert!(m.neuromod.noradrenaline_effective.is_finite(), "noradrenaline_effective");
+    assert!(m.neuromod.serotonin_effective.is_finite(), "serotonin_effective");
+    assert!(m.neuromod.acetylcholine_effective.is_finite(), "acetylcholine_effective");
+    assert!(m.neuromod.neuromod_gaba_effective.is_finite(), "neuromod_gaba_effective");
+    assert!(m.neuromod.neuromod_oxytocin_effective.is_finite(), "neuromod_oxytocin_effective");
+    assert!(m.neuromod.neuromod_glutamate_effective.is_finite(), "neuromod_glutamate_effective");
+    assert!(m.neuromod.neuromod_adenosine_effective.is_finite(), "neuromod_adenosine_effective");
+    assert!(m.neuromod.neuromod_endocannabinoid_effective.is_finite(), "neuromod_endocannabinoid_effective");
 
     // Derived signals
-    assert!(m.neuromod_consciousness_mod.is_finite(), "consciousness_mod");
-    assert!(m.neuromod_gradient_scale.is_finite(), "gradient_scale");
-    assert!(m.neuromod_threshold_gate.is_finite(), "threshold_gate");
-    assert!(m.neuromod_plasticity_gate.is_finite(), "plasticity_gate");
-    assert!(m.neuromod_behavioral_flexibility.is_finite(), "behavioral_flexibility");
-    assert!(m.neuromod_global_inhibition.is_finite(), "global_inhibition");
-    assert!(m.neuromod_social_coherence.is_finite(), "social_coherence");
-    assert!(m.neuromod_trust_factor.is_finite(), "trust_factor");
-    assert!(m.neuromod_learning_fatigue.is_finite(), "learning_fatigue");
-    assert!(m.neuromod_excitotoxicity_risk.is_finite(), "excitotoxicity_risk");
+    assert!(m.neuromod.neuromod_consciousness_mod.is_finite(), "consciousness_mod");
+    assert!(m.neuromod.neuromod_gradient_scale.is_finite(), "gradient_scale");
+    assert!(m.neuromod.neuromod_threshold_gate.is_finite(), "threshold_gate");
+    assert!(m.neuromod.neuromod_plasticity_gate.is_finite(), "plasticity_gate");
+    assert!(m.neuromod.neuromod_behavioral_flexibility.is_finite(), "behavioral_flexibility");
+    assert!(m.neuromod.neuromod_global_inhibition.is_finite(), "global_inhibition");
+    assert!(m.neuromod.neuromod_social_coherence.is_finite(), "social_coherence");
+    assert!(m.neuromod.neuromod_trust_factor.is_finite(), "trust_factor");
+    assert!(m.neuromod.neuromod_learning_fatigue.is_finite(), "learning_fatigue");
+    assert!(m.neuromod.neuromod_excitotoxicity_risk.is_finite(), "excitotoxicity_risk");
 
     // Advanced neuroendocrine
-    assert!(m.neuromod_allostatic_load.is_finite(), "allostatic_load");
-    assert!(m.neuromod_ei_ratio.is_finite(), "ei_ratio");
-    assert!(m.neuromod_sleep_pressure.is_finite(), "sleep_pressure");
-    assert!(m.neuromod_bath_entropy.is_finite(), "bath_entropy");
+    assert!(m.neuromod.neuromod_allostatic_load.is_finite(), "allostatic_load");
+    assert!(m.neuromod.neuromod_ei_ratio.is_finite(), "ei_ratio");
+    assert!(m.neuromod.neuromod_sleep_pressure.is_finite(), "sleep_pressure");
+    assert!(m.neuromod.neuromod_bath_entropy.is_finite(), "bath_entropy");
 
     // Receptor subtypes
-    assert!(m.neuromod_da_d1.is_finite(), "da_d1");
-    assert!(m.neuromod_da_d2.is_finite(), "da_d2");
-    assert!(m.neuromod_ne_alpha.is_finite(), "ne_alpha");
-    assert!(m.neuromod_ne_beta.is_finite(), "ne_beta");
-    assert!(m.neuromod_sht_1a_signal.is_finite(), "sht_1a_signal");
-    assert!(m.neuromod_sht_2a_signal.is_finite(), "sht_2a_signal");
-    assert!(m.neuromod_gaba_a_signal.is_finite(), "gaba_a_signal");
-    assert!(m.neuromod_gaba_b_signal.is_finite(), "gaba_b_signal");
+    assert!(m.neuromod.neuromod_da_d1.is_finite(), "da_d1");
+    assert!(m.neuromod.neuromod_da_d2.is_finite(), "da_d2");
+    assert!(m.neuromod.neuromod_ne_alpha.is_finite(), "ne_alpha");
+    assert!(m.neuromod.neuromod_ne_beta.is_finite(), "ne_beta");
+    assert!(m.neuromod.neuromod_sht_1a_signal.is_finite(), "sht_1a_signal");
+    assert!(m.neuromod.neuromod_sht_2a_signal.is_finite(), "sht_2a_signal");
+    assert!(m.neuromod.neuromod_gaba_a_signal.is_finite(), "gaba_a_signal");
+    assert!(m.neuromod.neuromod_gaba_b_signal.is_finite(), "gaba_b_signal");
 }
 
 // ── Consciousness Varies ───────────────────────────────────────────
@@ -200,13 +200,13 @@ fn test_entropy_varies_with_injection() {
     for _ in 0..30 {
         service.cycle("entropy test");
     }
-    let baseline_entropy = service.cycle("entropy test").metadata.neuromod_bath_entropy;
+    let baseline_entropy = service.cycle("entropy test").metadata.neuromod.neuromod_bath_entropy;
 
     service.inject_pharmacological("da", 0.5, 20);
     for _ in 0..20 {
         service.cycle("entropy test post-injection");
     }
-    let post_entropy = service.cycle("entropy test post-injection").metadata.neuromod_bath_entropy;
+    let post_entropy = service.cycle("entropy test post-injection").metadata.neuromod.neuromod_bath_entropy;
 
     assert!(baseline_entropy.is_finite());
     assert!(post_entropy.is_finite());
@@ -219,7 +219,7 @@ fn test_ei_ratio_bounded() {
     let mut service = make_service();
     for _ in 0..20 {
         let result = service.cycle("excitation inhibition balance");
-        let ei = result.metadata.neuromod_ei_ratio;
+        let ei = result.metadata.neuromod.neuromod_ei_ratio;
         assert!(ei.is_finite(), "E/I ratio should be finite: {ei}");
         assert!(ei >= 0.0, "E/I ratio should be non-negative: {ei}");
     }
@@ -236,10 +236,10 @@ fn test_concurrent_injections() {
 
     let result = service.cycle("concurrent injection test");
     let m = &result.metadata;
-    assert!(m.active_injection_count >= 3, "Should have 3+ active injections");
+    assert!(m.neuromod.active_injection_count >= 3, "Should have 3+ active injections");
 
-    assert!(m.dopamine_effective.is_finite());
-    assert!(m.serotonin_effective.is_finite());
-    assert!(m.neuromod_gaba_effective.is_finite());
-    assert!(m.neuromod_consciousness_mod.is_finite());
+    assert!(m.neuromod.dopamine_effective.is_finite());
+    assert!(m.neuromod.serotonin_effective.is_finite());
+    assert!(m.neuromod.neuromod_gaba_effective.is_finite());
+    assert!(m.neuromod.neuromod_consciousness_mod.is_finite());
 }
