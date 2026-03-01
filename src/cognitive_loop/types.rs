@@ -669,11 +669,9 @@ pub struct CycleMetadata {
     #[serde(flatten)]
     pub memory: MemoryResonatorMetrics,
 
-    /// Predictive processing free energy (0.0 when off).
-    pub predictive_free_energy: f64,
-
-    /// Predictive processing phi modulation (1.0 when off — neutral).
-    pub predictive_phi_modulation: f64,
+    /// Free energy principle (FEP) and predictive processing telemetry.
+    #[serde(flatten)]
+    pub fep: FepTelemetry,
 
     /// Cross-modal binding strength (0.0 when off).
     pub cross_modal_binding_strength: f32,
@@ -723,22 +721,17 @@ pub struct CycleMetadata {
     // ── Session 1: Compositionality + Value Evaluator ──────────────────────
     /// Total compositions registered in the compositionality engine (0 when off).
     pub compositionality_total: usize,
-    /// Unified value evaluator overall score (0.0–1.0, 0.0 when off).
-    pub value_evaluator_score: f64,
-    /// Value evaluator decision this cycle ("" when off).
-    pub value_evaluator_decision: String,
 
     /// Composition rule engine: name of the rule applied this cycle (empty when off).
     pub composition_rule_applied: String,
-    /// Harmonies integrator: overall value alignment score (0.0–1.0, 0.0 when off).
-    pub harmonies_alignment: f32,
-    /// Harmonies integrator: whether the current action was approved.
-    pub harmonies_approved: bool,
 
-    /// Empathic unification: compassion level for current input (0.0–1.0, 0.0 when off).
-    pub empathic_compassion: f64,
-    /// Empathic unification: patience adjustment (-1.0 to 1.0, 0.0 = neutral).
-    pub empathic_tone_adj: f64,
+    /// Harmonic and moral geometry telemetry (harmonies, guiding question, moral FEP).
+    #[serde(flatten)]
+    pub harmonics: HarmonicMetrics,
+
+    /// Ethical and moral topology telemetry (moral score, value evaluator, topology).
+    #[serde(flatten)]
+    pub ethics: EthicalTelemetry,
     /// Multi-objective evolution: Pareto frontier size (0 when not run this cycle).
     pub multi_obj_frontier_size: usize,
 
@@ -753,12 +746,6 @@ pub struct CycleMetadata {
     pub reasoning_context: String,
     /// Context-aware Phi weight for current context (0.0 when off).
     pub context_phi_weight: f64,
-    /// Harmonic field coherence — geometric mean of all 7 harmonics (0.0 when off).
-    pub harmonic_field_coherence: f64,
-    /// Infinite Love resonance — emergent unity measure (0.0 when off).
-    pub harmonic_love_resonance: f64,
-    /// Number of harmonic interference patterns detected (0 when off).
-    pub harmonic_interferences: usize,
 
     // ── Session 3: Primitive Reasoning + Adaptive Reasoning ────────────────
     /// Primitive reasoner confidence (0.0–1.0, 0.0 when off).
@@ -845,9 +832,6 @@ pub struct CycleMetadata {
     /// Negation polarity detected in input text (0.0 = no negation, >0.5 = negated).
     pub negation_polarity: f32,
 
-    /// Moral judgment score for this cycle (-1.0 to 1.0). 0.0 when moral evaluation was skipped.
-    pub moral_score: f32,
-
     /// Selected response strategy for this cycle (e.g., "Exploratory", "Supportive").
     pub selected_strategy: String,
 
@@ -857,12 +841,6 @@ pub struct CycleMetadata {
 
     /// Cycle reward signal (internal + external blend, -1.0 to 1.0).
     pub cycle_reward: f32,
-
-    /// FEP action index selected this cycle (0=exploit, 1=consolidate, 2=explore, 3=tighten).
-    pub fep_action: usize,
-
-    /// Learned value feedback trend (moving avg of recent moral assessments, -1.0 to 1.0).
-    pub value_feedback_trend: f32,
 
     /// Number of support triage classifications this cycle (0 when support disabled).
     pub support_triage_count: u32,
@@ -875,11 +853,6 @@ pub struct CycleMetadata {
 
     /// Support subsystem expected free energy (0.0 when not computed).
     pub support_efe: f64,
-
-    /// Soul value alignment score (-1.0 to 1.0). Weighted cosine similarity
-    /// of current encoding against Seven Harmonies core values. Modulates
-    /// learning rate: >0.3 boosts, <-0.3 dampens. 0.0 when soul disabled.
-    pub soul_alignment: f32,
 
     /// Σ (Sigma) — Synergistic integration via covariance-based Phi* (Layer 2).
     /// `None` when not computed this cycle (only computed every N cycles).
@@ -907,24 +880,6 @@ pub struct CycleMetadata {
     /// Circadian plasticity modifier (0.0–1.0) applied to learning rate.
     pub circadian_plasticity: f32,
 
-    /// Current guiding question from wisdom system (e.g., "What don't I know?").
-    pub guiding_question: String,
-
-    /// Dominant harmonic mode (e.g., "Wisdom", "Play", "Coherence").
-    pub dominant_harmonic: String,
-
-    // ── Phase 9: FEP Deepening ──────────────
-    /// FEP pragmatic value for selected action (0.0 when not computed).
-    pub fep_pragmatic_value: f64,
-    /// FEP accuracy component (expected log likelihood, 0.0 when not computed).
-    pub fep_accuracy: f64,
-    /// FEP complexity component (KL from prior, 0.0 when not computed).
-    pub fep_complexity: f64,
-    /// FEP surprise component (negative log evidence, 0.0 when not computed).
-    pub fep_surprise: f64,
-    /// FEP TD error magnitude (0.0 when not computed).
-    pub fep_td_error: f64,
-
     // ── Phase 13: Cross-Module Coherence ──────
     /// Cross-module agreement score (0.0–1.0): alignment between FEP, MCTS,
     /// resonator confidence, and moral judgment.
@@ -939,8 +894,6 @@ pub struct CycleMetadata {
     pub causal_attention_edges: usize,
     /// MCTS plan effectiveness score from post-hoc evaluation (0.0 when not evaluated).
     pub mcts_plan_effectiveness: f32,
-    /// Moral violation category that triggered specific steering (empty when none).
-    pub moral_steering_category: String,
 
     // ── Phase 15: Adaptive Architecture + Emotional Homeostasis ──────
     /// Multi-horizon prediction coherence (0.0 = divergent, 1.0 = identical).
@@ -953,8 +906,6 @@ pub struct CycleMetadata {
     pub arousal_recovery_active: bool,
     /// CfC tau factor from arousal recovery (1.0 = no change, <1.0 = slowdown).
     pub arousal_recovery_tau_factor: f32,
-    /// Guiding question subsystem priority category (empty when no question active).
-    pub guiding_priority_category: String,
     /// Total cycle wall-clock time in microseconds (same as CycleResult.cycle_time_us
     /// but included in metadata for unified telemetry access).
     pub cycle_duration_us: u64,
@@ -988,10 +939,6 @@ pub struct CycleMetadata {
     // ── Phase 18: Closing Feedback Loops ─────────────────────────────
     /// Whether context_phi_weight was applied to modulate unified Psi this cycle.
     pub context_phi_applied: bool,
-    /// Empathic tone adjustment applied to speech rate (-1.0 to 1.0, 0.0 = no change).
-    pub empathic_speech_rate_mod: f32,
-    /// Value evaluator gate factor applied to learning rate (1.0 = no change).
-    pub value_gate_factor: f32,
     /// Evolution phi delta feedback: confidence change applied this cycle.
     pub evolution_confidence_delta: f32,
     /// Homeostasis pull strength multiplier (urgency-adaptive, 1.0 = baseline).
@@ -1078,21 +1025,9 @@ pub struct CycleMetadata {
     #[cfg(feature = "liquid-mamba")]
     pub liquid_mamba_generation_count: u32,
 
-    // ── Mesh Network Telemetry ────────────────────────────────────────
-    /// Mesh network composite health score (0.0–1.0, 0.0 when mesh disabled).
-    pub mesh_health_score: f32,
-    /// Number of active mesh peers (0 when mesh disabled).
-    pub mesh_peer_count: u32,
-    /// Total bytes sent over mesh since startup.
-    pub mesh_bytes_sent: u64,
-    /// Total bytes received from mesh since startup.
-    pub mesh_bytes_received: u64,
-    /// Mesh compression ratio (0.0–1.0, lower is better).
-    pub mesh_compression_ratio: f64,
-    /// Current AIMD bandwidth budget in bytes.
-    pub mesh_bandwidth_budget: u64,
-    /// Cumulative bandwidth throttle events.
-    pub mesh_packets_throttled: u64,
+    /// Mesh network telemetry (health, peers, bandwidth, encryption).
+    #[serde(flatten)]
+    pub mesh: MeshTelemetry,
 
     // ── Feedback State Telemetry (Phase 2.2) ────────────────────────────
     /// Number of confidence proposals collected this cycle.
@@ -1123,41 +1058,6 @@ pub struct CycleMetadata {
     pub attachment_style: Option<String>,
     /// Current attachment security score (0.0–1.0). None when nurture disabled.
     pub attachment_security: Option<f64>,
-
-    // ── Moral Topology (Persistent Homology) ────────────────────────────
-    /// β₀: connected components in moral space (1 = unified).
-    pub moral_topo_beta_0: usize,
-    /// β₁: 1-cycles (circular reasoning patterns).
-    pub moral_topo_beta_1: usize,
-    /// β₂: 2-voids in moral space.
-    pub moral_topo_beta_2: usize,
-    /// Unity score (1.0 = fully connected, < 1.0 = fragmented).
-    pub moral_topo_unity: f64,
-    /// Completeness: fraction of harmonies with non-trivial variance.
-    pub moral_topo_completeness: f64,
-    /// Circularity: proportion of cycles among persistent features.
-    pub moral_topo_circularity: f64,
-    /// Moral free energy (FEP surprise on harmony manifold, 0.0 when not computed).
-    pub moral_topo_free_energy: f64,
-    /// Dominant harmony axis index (0–6, maps to Harmony::all()).
-    pub moral_topo_dominant_harmony: u8,
-    /// Number of scenarios in the moral topology sliding window.
-    pub moral_topo_scenario_count: usize,
-
-    // ── Moral Geometry (per-cycle harmony projection) ──────────────────
-    /// 7D harmony coordinates: cosine similarity to each Harmony basis.
-    /// Indexed by Harmony::all() order: [RC, PSF, IW, IP, UI, SR, EP].
-    pub harmony_coordinates: [f64; 7],
-    /// Softmax distribution over harmonies for the current scenario.
-    pub moral_scenario_distribution: [f64; 7],
-    /// Softmax distribution over harmonies for the EMA prior.
-    pub moral_prior_distribution: [f64; 7],
-    /// KL divergence from moral prior to observed.
-    pub moral_kl_divergence: f64,
-    /// Entropy of observed harmony distribution.
-    pub moral_entropy: f64,
-    /// Moral surprise: -log p(dominant harmony).
-    pub moral_surprise: f64,
 
     // ── Partnership / Phi-Dyad Telemetry ──────────────────────────────
     /// Relational Phi (Φ_dyad) — consciousness OF the relationship.
@@ -1281,6 +1181,142 @@ pub struct AttentionMetrics {
     pub attention_budget_gated: bool,
     /// AttentionShift motor command intensity applied to attention_sensitivity.
     pub attention_shift_applied: f32,
+}
+
+/// Harmonic and moral geometry telemetry.
+///
+/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
+/// the original JSON format for backwards compatibility.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HarmonicMetrics {
+    /// Harmonies integrator: overall value alignment score (0.0–1.0, 0.0 when off).
+    pub harmonies_alignment: f32,
+    /// Harmonies integrator: whether the current action was approved.
+    pub harmonies_approved: bool,
+    /// Harmonic field coherence — geometric mean of all 7 harmonics (0.0 when off).
+    pub harmonic_field_coherence: f64,
+    /// Infinite Love resonance — emergent unity measure (0.0 when off).
+    pub harmonic_love_resonance: f64,
+    /// Number of harmonic interference patterns detected (0 when off).
+    pub harmonic_interferences: usize,
+    /// 7D harmony coordinates: cosine similarity to each Harmony basis.
+    pub harmony_coordinates: [f64; 7],
+    /// Softmax distribution over harmonies for the current scenario.
+    pub moral_scenario_distribution: [f64; 7],
+    /// Softmax distribution over harmonies for the EMA prior.
+    pub moral_prior_distribution: [f64; 7],
+    /// KL divergence from moral prior to observed.
+    pub moral_kl_divergence: f64,
+    /// Entropy of observed harmony distribution.
+    pub moral_entropy: f64,
+    /// Moral surprise: -log p(dominant harmony).
+    pub moral_surprise: f64,
+    /// Dominant harmonic mode (e.g., "Wisdom", "Play", "Coherence").
+    pub dominant_harmonic: String,
+    /// Current guiding question from wisdom system (e.g., "What don't I know?").
+    pub guiding_question: String,
+    /// Guiding question subsystem priority category (empty when no question active).
+    pub guiding_priority_category: String,
+}
+
+/// Ethical and moral topology telemetry.
+///
+/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
+/// the original JSON format for backwards compatibility.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EthicalTelemetry {
+    /// Moral judgment score for this cycle (-1.0 to 1.0). 0.0 when skipped.
+    pub moral_score: f32,
+    /// Moral violation category that triggered specific steering (empty when none).
+    pub moral_steering_category: String,
+    /// Unified value evaluator overall score (0.0–1.0, 0.0 when off).
+    pub value_evaluator_score: f64,
+    /// Value evaluator decision this cycle ("" when off).
+    pub value_evaluator_decision: String,
+    /// Learned value feedback trend (moving avg of recent moral assessments, -1.0 to 1.0).
+    pub value_feedback_trend: f32,
+    /// Value evaluator gate factor applied to learning rate (1.0 = no change).
+    pub value_gate_factor: f32,
+    /// Soul value alignment score (-1.0 to 1.0). 0.0 when soul disabled.
+    pub soul_alignment: f32,
+    /// Empathic unification: compassion level for current input (0.0–1.0, 0.0 when off).
+    pub empathic_compassion: f64,
+    /// Empathic unification: patience adjustment (-1.0 to 1.0, 0.0 = neutral).
+    pub empathic_tone_adj: f64,
+    /// Empathic tone adjustment applied to speech rate (-1.0 to 1.0, 0.0 = no change).
+    pub empathic_speech_rate_mod: f32,
+    /// β₀: connected components in moral space (1 = unified).
+    pub moral_topo_beta_0: usize,
+    /// β₁: 1-cycles (circular reasoning patterns).
+    pub moral_topo_beta_1: usize,
+    /// β₂: 2-voids in moral space.
+    pub moral_topo_beta_2: usize,
+    /// Unity score (1.0 = fully connected, < 1.0 = fragmented).
+    pub moral_topo_unity: f64,
+    /// Completeness: fraction of harmonies with non-trivial variance.
+    pub moral_topo_completeness: f64,
+    /// Circularity: proportion of cycles among persistent features.
+    pub moral_topo_circularity: f64,
+    /// Moral free energy (FEP surprise on harmony manifold, 0.0 when not computed).
+    pub moral_topo_free_energy: f64,
+    /// Dominant harmony axis index (0–6, maps to Harmony::all()).
+    pub moral_topo_dominant_harmony: u8,
+    /// Number of scenarios in the moral topology sliding window.
+    pub moral_topo_scenario_count: usize,
+    /// Composite anomaly score (0.0–1.0). 0.0 = nominal.
+    pub moral_anomaly_score: f64,
+    /// True when the dominant harmony axis flipped since last evaluation.
+    pub moral_value_inversion: bool,
+    /// True when free energy exceeds 2σ of rolling trajectory mean.
+    pub moral_free_energy_spike: bool,
+}
+
+/// Free energy principle (FEP) and predictive processing telemetry.
+///
+/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
+/// the original JSON format for backwards compatibility.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FepTelemetry {
+    /// FEP action index selected this cycle (0=exploit, 1=consolidate, 2=explore, 3=tighten).
+    pub fep_action: usize,
+    /// FEP pragmatic value for selected action (0.0 when not computed).
+    pub fep_pragmatic_value: f64,
+    /// FEP accuracy component (expected log likelihood, 0.0 when not computed).
+    pub fep_accuracy: f64,
+    /// FEP complexity component (KL from prior, 0.0 when not computed).
+    pub fep_complexity: f64,
+    /// FEP surprise component (negative log evidence, 0.0 when not computed).
+    pub fep_surprise: f64,
+    /// FEP TD error magnitude (0.0 when not computed).
+    pub fep_td_error: f64,
+    /// Predictive processing free energy (0.0 when off).
+    pub predictive_free_energy: f64,
+    /// Predictive processing phi modulation (1.0 when off — neutral).
+    pub predictive_phi_modulation: f64,
+}
+
+/// Mesh network telemetry.
+///
+/// Grouped from CycleMetadata flat fields. `#[serde(flatten)]` preserves
+/// the original JSON format for backwards compatibility.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MeshTelemetry {
+    /// Mesh network composite health score (0.0–1.0, 0.0 when mesh disabled).
+    pub mesh_health_score: f32,
+    /// Number of active mesh peers (0 when mesh disabled).
+    pub mesh_peer_count: u32,
+    /// Total bytes sent over mesh since startup.
+    pub mesh_bytes_sent: u64,
+    /// Total bytes received from mesh since startup.
+    pub mesh_bytes_received: u64,
+    /// Mesh compression ratio (0.0–1.0, lower is better).
+    pub mesh_compression_ratio: f64,
+    /// Current AIMD bandwidth budget in bytes.
+    pub mesh_bandwidth_budget: u64,
+    /// Cumulative bandwidth throttle events.
+    pub mesh_packets_throttled: u64,
+    /// Cumulative packets that failed decryption (wrong key or corrupted).
+    pub mesh_packets_decrypt_failed: u64,
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.

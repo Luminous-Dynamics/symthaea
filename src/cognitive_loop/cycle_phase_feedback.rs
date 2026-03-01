@@ -268,7 +268,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH
         // ═══════════════════════════════════════════════════════════════════════
-        let reflection_thresholds = self.self_reflection.get_thresholds();
+        let reflection_thresholds = self.self_model_tier.self_reflection.get_thresholds();
         let ResonatorCodebookResult {
             resonator_promotions,
             codebook_evictions,
@@ -508,10 +508,10 @@ impl CognitiveLoopService {
                 epistemic_quality: self.carryover.quality.last_epistemic_quality,
                 phi_validation_correlation: self.carryover.quality.phi_validation_correlation,
                 // Phase 6: bath → consciousness coupling
-                bath_entropy: self.bath_phase_tracker.entropy(),
-                attractor_detected: self.bath_phase_tracker.detect_attractor().is_some(),
-                sht_2a_signal: self.neuromodulator_bath.sht_2a_signal(),
-                gaba_a_signal: self.neuromodulator_bath.gaba_a_signal(),
+                bath_entropy: self.neuromod.phase_tracker.entropy(),
+                attractor_detected: self.neuromod.phase_tracker.detect_attractor().is_some(),
+                sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
+                gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
             },
         );
         self.consciousness_engine
@@ -569,6 +569,44 @@ impl CognitiveLoopService {
             soul.integrate_experience(experience);
         }
         module_timings.soul_experience = _t.elapsed().as_micros() as u64;
+
+        // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
+        // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
+        if self.recent_ai_hvs.len() >= 2 {
+            if let (Some(ref dyad), Some(ref model)) =
+                (&self.phi_dyad, &self.partner_model)
+            {
+                use symthaea_core::hdc::relational_consciousness::{
+                    RelationMode, RelationalAssessment,
+                };
+                let relational = RelationalAssessment {
+                    agent_a: "symthaea".to_string(),
+                    agent_b: model.partner_id.clone(),
+                    phi_relation: model.phi_relational,
+                    stage: model.stage,
+                    synchrony: model.trust as f64,
+                    turn_taking_quality: 0.7,
+                    mutual_information: model.reciprocity as f64,
+                    mode: if model.trust > 0.3 {
+                        RelationMode::IThou
+                    } else {
+                        RelationMode::IIt
+                    },
+                    num_interactions: model.interactions_count as usize,
+                    relationship_age: 0.0,
+                    explanation: String::new(),
+                };
+                let input = crate::partnership::DyadInput {
+                    ai_states: &self.recent_ai_hvs,
+                    human_states: &self.recent_input_hvs,
+                    relational: &relational,
+                    human_model: model,
+                    weights: crate::partnership::DyadWeights::default(),
+                };
+                let result = dyad.compute(&input);
+                self.social.relational_psi = result.phi_dyad;
+            }
+        }
 
         // ── Track 4b: Cross-module agreement metric ─────────────────────────
         let fep_confidence = (1.0 - dynamics.fep_surprise.min(1.0)).max(0.0) as f32;

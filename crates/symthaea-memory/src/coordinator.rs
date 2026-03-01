@@ -485,4 +485,181 @@ mod tests {
         let h2 = content_hash(&hv2);
         assert_ne!(h1, h2, "Different vectors should produce different hashes");
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Phase 6: Cross-Tier Coordinator Integration Tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    fn make_graduation(seed: u64, steps: u64, psi: f64, verified: bool) -> GraduationEvent {
+        GraduationEvent {
+            content: ContinuousHV::random(256, seed),
+            label: format!("grad-{seed}"),
+            steps_survived: steps,
+            final_activation: 0.4,
+            psi_at_graduation: psi,
+            coherence_at_graduation: 0.6,
+            source: MemorySource::Internal,
+            is_verified: verified,
+        }
+    }
+
+    #[test]
+    fn test_coordinator_store_and_retrieve_via_graduation() {
+        let mut coord = MemoryCoordinator::default();
+        coord.update_signals(0.7, 0.8);
+
+        let config = crate::episodic_replay::EpisodicReplayConfig {
+            psi_threshold: 0.1,
+            ..Default::default()
+        };
+        let mut episodic = EpisodicMemory::new(config);
+
+        // Queue and process a graduation
+        coord.queue_graduation(make_graduation(42, 5, 0.6, false));
+        let stored = coord.process_graduations(&mut episodic);
+        assert_eq!(stored, 1, "Should store one episode");
+
+        // Verify the episode is in episodic memory
+        assert_eq!(episodic.len(), 1);
+        let top = episodic.get_top_episodes(1);
+        assert!(!top.is_empty());
+        assert!(top[0].psi > 0.5, "Episode should have adjusted Phi");
+
+        // Record retrieval and check enrichment
+        let hash = content_hash(&top[0].input);
+        coord.record_retrieval(hash);
+        let base = top[0].priority_score(10, 0.2);
+        let enriched = coord.enriched_priority(base, hash);
+        assert!(
+            enriched > base,
+            "Enriched priority should exceed base: {enriched} vs {base}"
+        );
+    }
+
+    #[test]
+    fn test_coordinator_working_to_episodic_consolidation() {
+        let mut coord = MemoryCoordinator::new(CoordinatorConfig {
+            min_wm_steps_for_graduation: 3,
+            ..CoordinatorConfig::default()
+        });
+        coord.update_signals(0.5, 0.7);
+
+        let config = crate::episodic_replay::EpisodicReplayConfig {
+            psi_threshold: 0.1,
+            ..Default::default()
+        };
+        let mut episodic = EpisodicMemory::new(config);
+
+        // Simulate multiple WM items graduating at different times
+        coord.queue_graduation(make_graduation(1, 5, 0.4, false));
+        coord.queue_graduation(make_graduation(2, 8, 0.7, true)); // Verified = higher adjusted Phi
+        coord.queue_graduation(make_graduation(3, 2, 0.6, false)); // Below min steps
+
+        let stored = coord.process_graduations(&mut episodic);
+        assert_eq!(stored, 2, "Two of three should pass graduation filter");
+        assert_eq!(coord.stats.graduations_rejected, 1);
+        assert_eq!(coord.stats.graduations_processed, 2);
+        assert_eq!(episodic.len(), 2);
+
+        // Verified item should have higher Phi than unverified (due to verification bonus)
+        let top = episodic.get_top_episodes(2);
+        assert!(
+            top[0].psi > top[1].psi,
+            "Verified item should have higher adjusted Phi: {} vs {}",
+            top[0].psi,
+            top[1].psi
+        );
+    }
+
+    #[test]
+    fn test_coordinator_retrieval_boosts_consolidation() {
+        let mut coord = MemoryCoordinator::default();
+        coord.update_signals(0.6, 0.7);
+
+        let hv = ContinuousHV::random(256, 99);
+        let hash = content_hash(&hv);
+
+        // No retrievals → no consolidation boost
+        assert_eq!(coord.consolidation_boost(hash), 0.0);
+
+        // Repeated retrievals → growing boost (logarithmic)
+        for _ in 0..5 {
+            coord.record_retrieval(hash);
+        }
+        let boost5 = coord.consolidation_boost(hash);
+        assert!(boost5 > 0.0, "5 retrievals should give positive boost");
+
+        for _ in 0..10 {
+            coord.record_retrieval(hash);
+        }
+        let boost15 = coord.consolidation_boost(hash);
+        assert!(
+            boost15 > boost5,
+            "15 retrievals should give more boost than 5: {boost15} vs {boost5}"
+        );
+
+        // Logarithmic growth: boost15 should be less than 3× boost5
+        assert!(
+            boost15 < boost5 * 3.0,
+            "Boost should grow sublinearly: {boost15} vs {boost5}"
+        );
+    }
+
+    #[test]
+    fn test_coordinator_prune_lifecycle() {
+        let mut coord = MemoryCoordinator::default();
+        coord.update_signals(0.5, 0.6);
+
+        let config = crate::episodic_replay::EpisodicReplayConfig {
+            psi_threshold: 0.0,
+            capacity: 200,
+            ..Default::default()
+        };
+        let mut episodic = EpisodicMemory::new(config);
+
+        // Store episodes directly with varying Phi at timestamp 0
+        // (Episode::new gives consolidation_strength=1.0, no prediction_error/valence)
+        for i in 0..8 {
+            let psi = i as f64 * 0.1; // 0.0, 0.1, ..., 0.7
+            let input = ContinuousHV::random(256, i + 100);
+            let output = ContinuousHV::random(256, i + 200);
+            let ep = Episode::new(input, output, psi, 0);
+            episodic.store_if_significant(ep);
+        }
+
+        // Advance the clock far into the future so recency bonus decays to ~0
+        // (store a high-timestamp episode to advance current_cycle)
+        let future_ep = Episode::new(
+            ContinuousHV::random(256, 999),
+            ContinuousHV::random(256, 1000),
+            0.9,
+            100_000,
+        );
+        episodic.store_if_significant(future_ep);
+        let initial_count = episodic.len();
+        assert_eq!(initial_count, 9);
+
+        // Prune with high metabolic load → threshold = 0.2 + 0.9*0.2 = 0.38
+        // Episodes with psi*0.5 + consolidation(0.1) + replay_penalty(0.05) < 0.38
+        // → psi < 0.46 should be pruned (those aged out with 0 recency bonus)
+        let pruned = coord.prune_memories(&mut episodic, 0.9);
+        assert!(
+            pruned > 0,
+            "High metabolic load should prune some low-quality episodes"
+        );
+        assert!(
+            episodic.len() < initial_count,
+            "Episodic count should decrease: {} should be < {}",
+            episodic.len(),
+            initial_count
+        );
+
+        // The recent high-psi episode (0.9) should survive
+        let remaining = episodic.get_top_episodes(1);
+        assert!(
+            remaining[0].psi >= 0.7,
+            "High-Phi episode should survive: {}",
+            remaining[0].psi
+        );
+    }
 }

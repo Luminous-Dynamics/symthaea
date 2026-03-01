@@ -123,7 +123,7 @@ fn test_gwt_broadcast_boosts_confidence() {
     for _ in 0..20 {
         let result = service.cycle("gwt broadcast confidence boost test");
         assert!(result.prediction_error.is_finite());
-        if result.metadata.gwt_broadcast {
+        if result.metadata.attention.gwt_broadcast {
             any_broadcast = true;
         }
     }
@@ -388,7 +388,7 @@ fn test_dream_replay_records_and_dreams() {
     for i in 0..30 {
         let result = service.cycle(inputs[i % inputs.len()]);
         // Dream metadata fields should be populated
-        assert!(result.metadata.dream_phi_improvement >= 0.0);
+        assert!(result.metadata.memory.dream_phi_improvement >= 0.0);
     }
 
     // After 30 cycles with surprise, the dream engine should have recorded events
@@ -466,14 +466,14 @@ fn test_cycle_with_predictive_processing() {
     let result = service.cycle("predictive check");
     // Free energy should be finite
     assert!(
-        result.metadata.predictive_free_energy.is_finite(),
+        result.metadata.fep.predictive_free_energy.is_finite(),
         "Predictive free energy should be finite"
     );
     // Phi modulation should be finite (may be zero early in learning)
     assert!(
-        result.metadata.predictive_phi_modulation.is_finite(),
+        result.metadata.fep.predictive_phi_modulation.is_finite(),
         "Predictive phi modulation should be finite: {}",
-        result.metadata.predictive_phi_modulation
+        result.metadata.fep.predictive_phi_modulation
     );
 }
 
@@ -524,8 +524,8 @@ fn test_predictive_affective_crossmodal_synergy() {
 
     let result = service.cycle("final synergy check");
     // All 6 new metadata fields should be populated with valid values
-    assert!(result.metadata.predictive_free_energy.is_finite());
-    assert!(result.metadata.predictive_phi_modulation.is_finite());
+    assert!(result.metadata.fep.predictive_free_energy.is_finite());
+    assert!(result.metadata.fep.predictive_phi_modulation.is_finite());
     assert!(result.metadata.cross_modal_binding_strength.is_finite());
     assert!(result.metadata.cross_modal_psi.is_finite());
     assert!(result.metadata.affective_valence >= -1.0 && result.metadata.affective_valence <= 1.0);
@@ -635,7 +635,7 @@ fn test_predictive_crossmodal_bidirectional_feedback() {
     }
 
     assert!(
-        result.metadata.predictive_free_energy >= 0.0,
+        result.metadata.fep.predictive_free_energy >= 0.0,
         "Predictive free energy should be non-negative"
     );
     assert!(
@@ -1183,4 +1183,116 @@ fn test_thermodynamics_binding_hfe_synergy() {
             "hierarchical FE timing exceeded 100ms"
         );
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Consensus Feedback Stress Tests (Phase 4, Step 5)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_consensus_1000_cycles_stable() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        consensus_feedback: true,
+        trace_feedback: true,
+        enable_surprise_exploration: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..1000 {
+        let input = format!("consensus soak cycle {i}");
+        let result = service.cycle(&input);
+
+        let conf = service.prediction_confidence();
+        assert!(
+            (0.01..=0.99).contains(&conf),
+            "prediction_confidence out of [0.01, 0.99] at cycle {i}: {conf}"
+        );
+
+        let lr = service.stats().adaptive_learning_rate;
+        assert!(
+            lr.is_finite() && lr >= 1e-6 && lr <= 0.1,
+            "learning_rate out of [1e-6, 0.1] at cycle {i}: {lr}"
+        );
+
+        assert!(
+            result.prediction_error.is_finite() && result.prediction_error >= 0.0,
+            "prediction_error invalid at cycle {i}: {}",
+            result.prediction_error
+        );
+    }
+
+    assert_eq!(service.stats().total_cycles, 1000);
+}
+
+#[test]
+fn test_consensus_adversarial_inputs() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        consensus_feedback: true,
+        enable_surprise_exploration: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let long_input = "a very long input string that repeats ".repeat(50);
+    let adversarial_inputs: Vec<&str> = vec![
+        "",
+        "a",
+        &long_input,
+        "!@#$%^&*()_+=-[]{}|;':\",./<>?`~",
+        "danger warning alert critical threat unsafe",
+        "predictable stable calm normal routine",
+        "explore novel creative diverge dream chaos",
+        "",
+    ];
+
+    for i in 0..200 {
+        let input = &adversarial_inputs[i % adversarial_inputs.len()];
+        let result = service.cycle(input);
+
+        let conf = service.prediction_confidence();
+        assert!(
+            conf.is_finite() && conf >= 0.0 && conf <= 1.0,
+            "confidence out of bounds at adversarial cycle {i}: {conf}"
+        );
+
+        assert!(
+            result.prediction_error.is_finite(),
+            "prediction_error not finite at adversarial cycle {i}"
+        );
+    }
+}
+
+#[test]
+fn test_consensus_divergence_bounded() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        consensus_feedback: true,
+        trace_feedback: true,
+        enable_surprise_exploration: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 100 cycles with trace_feedback to populate divergence traces
+    for i in 0..100 {
+        let _result = service.cycle(&format!("divergence test {i}"));
+    }
+
+    // Check that consensus confidence deltas are reasonable:
+    // prediction_confidence stays in valid range throughout
+    let conf = service.prediction_confidence();
+    assert!(
+        conf.is_finite() && conf > 0.0 && conf < 1.0,
+        "final prediction_confidence out of (0.0, 1.0): {conf}"
+    );
+
+    // Learning rate should have settled into a reasonable range
+    let lr = service.stats().adaptive_learning_rate;
+    assert!(
+        lr.is_finite() && lr > 0.0,
+        "learning rate should be finite and positive: {lr}"
+    );
 }

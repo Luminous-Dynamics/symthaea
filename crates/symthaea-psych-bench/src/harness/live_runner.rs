@@ -53,6 +53,24 @@ pub struct LoopTrialResult {
     /// Reward signal delivered to neuromodulator bath.
     #[serde(default)]
     pub reward: f32,
+    /// Oxytocin effective level.
+    #[serde(default)]
+    pub oxytocin: f32,
+    /// Moral/value evaluator score from ethics engine.
+    #[serde(default)]
+    pub moral_score: f32,
+    /// Bath entropy (neuromod system diversity measure).
+    #[serde(default)]
+    pub bath_entropy: f32,
+    /// Allostatic load (cumulative stress measure, 0.0–1.0).
+    #[serde(default)]
+    pub allostatic_load: f32,
+    /// Consciousness modulation factor from neuromod bath (0.6–1.2).
+    #[serde(default)]
+    pub consciousness_mod: f32,
+    /// Social coherence factor from oxytocin/trust (0.8–1.3).
+    #[serde(default)]
+    pub social_coherence: f32,
 }
 
 /// Aggregate result from running a benchmark through the loop.
@@ -77,6 +95,24 @@ pub struct LoopBenchmarkResult {
     /// Mean reward signal across trials.
     #[serde(default)]
     pub mean_reward: f64,
+    /// Mean oxytocin level across trials.
+    #[serde(default)]
+    pub mean_oxytocin: f64,
+    /// Mean moral score across trials.
+    #[serde(default)]
+    pub mean_moral_score: f64,
+    /// Mean bath entropy across trials.
+    #[serde(default)]
+    pub mean_bath_entropy: f64,
+    /// Mean allostatic load across trials.
+    #[serde(default)]
+    pub mean_allostatic_load: f64,
+    /// Mean consciousness modulation factor.
+    #[serde(default)]
+    pub mean_consciousness_mod: f64,
+    /// Mean social coherence factor.
+    #[serde(default)]
+    pub mean_social_coherence: f64,
     /// Total wall-clock time in milliseconds.
     pub elapsed_ms: u64,
 }
@@ -185,6 +221,12 @@ impl CognitiveLoopBenchmarkRunner {
                 cycle_time_us: result.cycle_time_us,
                 learning_occurred: result.learning_occurred,
                 reward: trial_reward,
+                oxytocin: result.metadata.neuromod.neuromod_oxytocin_effective,
+                moral_score: result.metadata.ethics.value_evaluator_score as f32,
+                bath_entropy: result.metadata.neuromod.neuromod_bath_entropy,
+                allostatic_load: result.metadata.neuromod.neuromod_allostatic_load,
+                consciousness_mod: result.metadata.neuromod.neuromod_consciousness_mod,
+                social_coherence: result.metadata.neuromod.neuromod_social_coherence,
             });
         }
 
@@ -204,6 +246,17 @@ impl CognitiveLoopBenchmarkRunner {
         let mean_sht = trials.iter().map(|t| t.sht as f64).sum::<f64>() / n.max(1.0);
         let mean_ach = trials.iter().map(|t| t.ach as f64).sum::<f64>() / n.max(1.0);
         let mean_reward = trials.iter().map(|t| t.reward as f64).sum::<f64>() / n.max(1.0);
+        let mean_oxytocin = trials.iter().map(|t| t.oxytocin as f64).sum::<f64>() / n.max(1.0);
+        let mean_moral_score =
+            trials.iter().map(|t| t.moral_score as f64).sum::<f64>() / n.max(1.0);
+        let mean_bath_entropy =
+            trials.iter().map(|t| t.bath_entropy as f64).sum::<f64>() / n.max(1.0);
+        let mean_allostatic_load =
+            trials.iter().map(|t| t.allostatic_load as f64).sum::<f64>() / n.max(1.0);
+        let mean_consciousness_mod =
+            trials.iter().map(|t| t.consciousness_mod as f64).sum::<f64>() / n.max(1.0);
+        let mean_social_coherence =
+            trials.iter().map(|t| t.social_coherence as f64).sum::<f64>() / n.max(1.0);
 
         LoopBenchmarkResult {
             benchmark: bench.loop_name().to_string(),
@@ -215,6 +268,12 @@ impl CognitiveLoopBenchmarkRunner {
             mean_sht,
             mean_ach,
             mean_reward,
+            mean_oxytocin,
+            mean_moral_score,
+            mean_bath_entropy,
+            mean_allostatic_load,
+            mean_consciousness_mod,
+            mean_social_coherence,
             elapsed_ms: start.elapsed().as_millis() as u64,
         }
     }
@@ -599,6 +658,12 @@ mod tests {
             cycle_time_us: 1000,
             learning_occurred: false,
             reward: 0.8,
+            oxytocin: 0.3,
+            moral_score: 0.0,
+            bath_entropy: 0.5,
+            allostatic_load: 0.1,
+            consciousness_mod: 1.0,
+            social_coherence: 1.0,
         };
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("\"correct\":true"));
@@ -616,6 +681,12 @@ mod tests {
             mean_sht: 0.5,
             mean_ach: 0.5,
             mean_reward: 0.5,
+            mean_oxytocin: 0.3,
+            mean_moral_score: 0.0,
+            mean_bath_entropy: 0.5,
+            mean_allostatic_load: 0.1,
+            mean_consciousness_mod: 1.0,
+            mean_social_coherence: 1.0,
             elapsed_ms: 100,
         };
         assert!((result.accuracy - 0.85).abs() < 1e-10);
@@ -635,9 +706,44 @@ mod tests {
             mean_sht: 0.5,
             mean_ach: 0.5,
             mean_reward: 0.0,
+            mean_oxytocin: 0.0,
+            mean_moral_score: 0.0,
+            mean_bath_entropy: 0.0,
+            mean_allostatic_load: 0.0,
+            mean_consciousness_mod: 0.0,
+            mean_social_coherence: 0.0,
             elapsed_ms: 0,
         };
         assert_eq!(result.benchmark, "cosine_test");
+    }
+
+    #[test]
+    fn test_extended_trial_result_defaults() {
+        let result = LoopTrialResult {
+            response_idx: 0,
+            correct: false,
+            prediction_error: 0.0,
+            da: 0.0,
+            ne: 0.0,
+            sht: 0.0,
+            ach: 0.0,
+            psi: 0.0,
+            cycle_time_us: 0,
+            learning_occurred: false,
+            reward: 0.0,
+            oxytocin: 0.0,
+            moral_score: 0.0,
+            bath_entropy: 0.0,
+            allostatic_load: 0.0,
+            consciousness_mod: 0.0,
+            social_coherence: 0.0,
+        };
+        assert_eq!(result.oxytocin, 0.0);
+        assert_eq!(result.moral_score, 0.0);
+        assert_eq!(result.bath_entropy, 0.0);
+        assert_eq!(result.allostatic_load, 0.0);
+        assert_eq!(result.consciousness_mod, 0.0);
+        assert_eq!(result.social_coherence, 0.0);
     }
 
     #[test]
