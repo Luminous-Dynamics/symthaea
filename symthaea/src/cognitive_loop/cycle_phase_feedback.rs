@@ -547,6 +547,9 @@ impl CognitiveLoopService {
             consciousness_output.pipeline_consciousness;
         module_timings.spectral_mip = consciousness_output.spectral_mip_us;
         module_timings.consciousness_engine = consciousness_output.total_us;
+        module_timings.consciousness_engine_equation_v2 = consciousness_output.equation_v2_us;
+        module_timings.consciousness_engine_pipeline = consciousness_output.pipeline_us;
+        module_timings.consciousness_engine_multimodal = consciousness_output.multimodal_us;
 
         // Soul experience integration
         let _t = Instant::now();
