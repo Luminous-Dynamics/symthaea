@@ -390,12 +390,25 @@ impl HarmoniesIntegrator {
     /// When `MoralTopology::analyze()` reveals that certain harmony dimensions
     /// have low variance (moral blind spots), increase their weight to encourage
     /// broader moral exploration. When a harmony is dominant, slightly reduce
-    /// its weight to prevent moral fixation.
+    /// its weight to prevent moral fixation. High KL divergence indicates the
+    /// system's moral stance is drifting from its prior — boost the dominant
+    /// harmony to stabilize.
     pub fn apply_topology_feedback(
         &mut self,
         harmony_variance: &[f64; 7],
         dominant_harmony_idx: u8,
         completeness: f64,
+    ) {
+        self.apply_topology_feedback_with_kl(harmony_variance, dominant_harmony_idx, completeness, 0.0);
+    }
+
+    /// Extended topology feedback that also considers KL divergence.
+    pub fn apply_topology_feedback_with_kl(
+        &mut self,
+        harmony_variance: &[f64; 7],
+        dominant_harmony_idx: u8,
+        completeness: f64,
+        kl_divergence: f64,
     ) {
         let all = Harmony::all();
 
@@ -413,9 +426,13 @@ impl HarmoniesIntegrator {
             let adjusted = if variance < 1e-4 {
                 // Blind spot: boost weight to encourage exploration
                 (weight * 1.15).min(2.0)
-            } else if i == dominant_harmony_idx as usize && completeness < 0.8 {
-                // Dominant axis with poor completeness: slight attenuation
+            } else if i == dominant_harmony_idx as usize && completeness < 0.8 && kl_divergence <= 0.5 {
+                // Dominant axis with poor completeness and low KL: slight attenuation
                 (weight * 0.95).max(0.5)
+            } else if i == dominant_harmony_idx as usize && kl_divergence > 0.5 {
+                // High KL divergence: moral stance is drifting from prior.
+                // Boost the dominant harmony to anchor/stabilize.
+                (weight * 1.1).min(2.0)
             } else {
                 weight
             };

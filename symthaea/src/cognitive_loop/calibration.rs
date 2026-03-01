@@ -320,6 +320,171 @@ fn z_to_sensitivity_factor(z: f64, invert: bool) -> f32 {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Autonomous Self-Assessment
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Metacognitive performance monitor that tracks cognitive loop metrics
+/// and triggers self-calibration when performance drifts.
+///
+/// Uses internal cognitive loop signals as proxy z-scores:
+/// - **DA proxy**: prediction error trend (rising PE → interference-like → attenuate DA)
+/// - **ACh proxy**: coherence stability (dropping coherence → WM-like deficit → boost ACh)
+/// - **NE proxy**: error rate on safety checks (high → inhibition deficit → boost NE)
+/// - **5-HT proxy**: attention budget utilization (consistently maxed → sustained attn deficit)
+/// - **Confidence**: prediction confidence calibration vs actual error
+///
+/// Science: Schmidhuber (2010) — "Formal Theory of Creativity, Fun, and Intrinsic
+/// Motivation" — metacognitive monitoring drives self-improvement cycles.
+#[derive(Debug, Clone)]
+pub struct SelfAssessmentMonitor {
+    /// Exponential moving average of prediction error (proxy for DA/interference).
+    pe_ema: f64,
+    /// EMA of coherence (proxy for ACh/working memory).
+    coherence_ema: f64,
+    /// EMA of confidence calibration error (|predicted - actual|).
+    confidence_error_ema: f64,
+    /// EMA of attention budget utilization.
+    attention_utilization_ema: f64,
+    /// Number of observations since last calibration.
+    observations_since_calibration: u32,
+    /// Minimum observations before triggering (avoids premature calibration).
+    warmup_threshold: u32,
+    /// Cooldown cycles remaining (prevents rapid re-calibration).
+    cooldown: u32,
+    /// Cooldown duration after calibration.
+    cooldown_duration: u32,
+}
+
+impl Default for SelfAssessmentMonitor {
+    fn default() -> Self {
+        Self {
+            pe_ema: 0.0,
+            coherence_ema: 0.7,
+            confidence_error_ema: 0.0,
+            attention_utilization_ema: 0.5,
+            observations_since_calibration: 0,
+            warmup_threshold: 200,    // ~4 seconds at 50Hz
+            cooldown: 0,
+            cooldown_duration: 500,   // ~10 seconds between calibrations
+        }
+    }
+}
+
+/// Signals from the cognitive loop that feed the self-assessment monitor.
+pub struct SelfAssessmentInput {
+    /// Current prediction error (0.0 = perfect, higher = worse).
+    pub prediction_error: f32,
+    /// Current coherence score (0.0–1.0, higher = better).
+    pub coherence: f32,
+    /// Whether prediction confidence was well-calibrated this cycle.
+    /// Computed as |confidence - (1.0 - normalized_error)|.
+    pub confidence_calibration_error: f32,
+    /// Current attention budget utilization (0.0–1.0).
+    pub attention_utilization: f32,
+    /// Whether personality drift is flagged as anomalous.
+    pub drift_anomalous: bool,
+}
+
+impl SelfAssessmentMonitor {
+    /// Update the monitor with this cycle's signals.
+    ///
+    /// Call once per cycle during the neuromod phase.
+    pub fn update(&mut self, input: &SelfAssessmentInput) {
+        const ALPHA: f64 = 0.02; // ~50 cycle half-life
+
+        self.pe_ema = self.pe_ema * (1.0 - ALPHA) + input.prediction_error as f64 * ALPHA;
+        self.coherence_ema =
+            self.coherence_ema * (1.0 - ALPHA) + input.coherence as f64 * ALPHA;
+        self.confidence_error_ema =
+            self.confidence_error_ema * (1.0 - ALPHA) + input.confidence_calibration_error as f64 * ALPHA;
+        self.attention_utilization_ema =
+            self.attention_utilization_ema * (1.0 - ALPHA) + input.attention_utilization as f64 * ALPHA;
+
+        self.observations_since_calibration += 1;
+
+        if self.cooldown > 0 {
+            self.cooldown -= 1;
+        }
+    }
+
+    /// Check if calibration should be triggered.
+    ///
+    /// Returns `Some(calibration)` when performance drift exceeds thresholds
+    /// and cooldown has elapsed. The calibration is built from internal
+    /// performance proxies, not from psych-bench z-scores.
+    pub fn check_trigger(&mut self) -> Option<NeuromodCalibration> {
+        // Gate: warmup, cooldown, and minimum observation count
+        if self.cooldown > 0 || self.observations_since_calibration < self.warmup_threshold {
+            return None;
+        }
+
+        // Compute proxy z-scores from EMA deviations.
+        // These are unitless deviations from "expected good performance".
+        let mut z_scores: Vec<(&str, f64)> = Vec::new();
+        let mut needs_calibration = false;
+
+        // DA proxy: prediction error trend
+        // Baseline PE ~0.1; if EMA > 0.2, interference-like → positive z
+        let pe_z = (self.pe_ema - 0.1) / 0.05; // ~2σ at PE=0.2
+        if pe_z.abs() > 1.0 {
+            z_scores.push(("Executive::Stroop", pe_z));
+            needs_calibration = true;
+        }
+
+        // ACh proxy: coherence
+        // Baseline ~0.7; if EMA < 0.5, WM-like deficit → negative z
+        let coherence_z = (self.coherence_ema - 0.7) / 0.1; // ~2σ at coherence=0.5
+        if coherence_z < -1.0 {
+            z_scores.push(("WorM::N-back", coherence_z));
+            needs_calibration = true;
+        }
+
+        // 5-HT proxy: attention utilization
+        // Baseline ~0.6; if consistently >0.9, sustained attention deficit
+        let attn_z = -(self.attention_utilization_ema - 0.6) / 0.15; // negative z when high
+        if attn_z < -1.0 {
+            z_scores.push(("SustainedAttention::CPT", attn_z));
+            needs_calibration = true;
+        }
+
+        // Confidence proxy: calibration error
+        // Baseline ~0.05; if > 0.15, metacognitive miscalibration
+        if self.confidence_error_ema > 0.1 {
+            // Positive z = overconfident (high error despite high confidence)
+            let fok_z = (self.confidence_error_ema - 0.05) / 0.05;
+            z_scores.push(("Metacognition::FeelingOfKnowing", fok_z));
+            needs_calibration = true;
+        }
+
+        if !needs_calibration {
+            return None;
+        }
+
+        // Build and return calibration
+        self.observations_since_calibration = 0;
+        self.cooldown = self.cooldown_duration;
+
+        let cal = NeuromodCalibration::from_z_scores(&z_scores);
+        tracing::info!(
+            pe_ema = %format!("{:.3}", self.pe_ema),
+            coherence_ema = %format!("{:.3}", self.coherence_ema),
+            confidence_error = %format!("{:.3}", self.confidence_error_ema),
+            attention_util = %format!("{:.3}", self.attention_utilization_ema),
+            adjustments = cal.adjustments.len(),
+            "Self-assessment triggered calibration"
+        );
+
+        Some(cal)
+    }
+
+    /// Reset after external calibration (e.g., from psych-bench).
+    pub fn reset_after_calibration(&mut self) {
+        self.observations_since_calibration = 0;
+        self.cooldown = self.cooldown_duration;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Tests
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -521,5 +686,150 @@ mod tests {
         assert!(!is_lower_better_metric("nback_2::accuracy"));
         assert!(!is_lower_better_metric("overall_accuracy"));
         assert!(!is_lower_better_metric("fok_gamma"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Self-Assessment Monitor tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_self_assessment_no_trigger_during_warmup() {
+        let mut monitor = SelfAssessmentMonitor::default();
+        // Feed bad signals but within warmup period (200 cycles)
+        let bad_input = SelfAssessmentInput {
+            prediction_error: 0.5,
+            coherence: 0.2,
+            confidence_calibration_error: 0.3,
+            attention_utilization: 0.95,
+            drift_anomalous: false,
+        };
+        for _ in 0..100 {
+            monitor.update(&bad_input);
+        }
+        // Should NOT trigger — only 100 observations, warmup is 200
+        assert!(
+            monitor.check_trigger().is_none(),
+            "Should not trigger during warmup"
+        );
+    }
+
+    #[test]
+    fn test_self_assessment_triggers_on_high_pe() {
+        let mut monitor = SelfAssessmentMonitor {
+            warmup_threshold: 10, // low warmup for testing
+            cooldown_duration: 5,
+            ..Default::default()
+        };
+
+        let bad_input = SelfAssessmentInput {
+            prediction_error: 0.5, // well above 0.1 baseline
+            coherence: 0.7,
+            confidence_calibration_error: 0.0,
+            attention_utilization: 0.5,
+            drift_anomalous: false,
+        };
+
+        // Feed enough cycles past warmup
+        for _ in 0..50 {
+            monitor.update(&bad_input);
+        }
+
+        let cal = monitor.check_trigger();
+        assert!(cal.is_some(), "High PE should trigger calibration");
+        let cal = cal.unwrap();
+        // Should have DA adjustment (PE → interference proxy)
+        assert!(
+            cal.adjustments.iter().any(|a| a.transmitter == "DA"),
+            "PE proxy should map to DA adjustment"
+        );
+    }
+
+    #[test]
+    fn test_self_assessment_cooldown() {
+        let mut monitor = SelfAssessmentMonitor {
+            warmup_threshold: 5,
+            cooldown_duration: 100,
+            ..Default::default()
+        };
+
+        let bad_input = SelfAssessmentInput {
+            prediction_error: 0.5,
+            coherence: 0.7,
+            confidence_calibration_error: 0.0,
+            attention_utilization: 0.5,
+            drift_anomalous: false,
+        };
+
+        for _ in 0..30 {
+            monitor.update(&bad_input);
+        }
+
+        // First trigger should succeed
+        assert!(monitor.check_trigger().is_some());
+
+        // Feed more bad data
+        for _ in 0..20 {
+            monitor.update(&bad_input);
+        }
+
+        // Second trigger should fail — cooldown active (100 cycles)
+        assert!(
+            monitor.check_trigger().is_none(),
+            "Should not trigger during cooldown"
+        );
+    }
+
+    #[test]
+    fn test_self_assessment_no_trigger_normal_performance() {
+        let mut monitor = SelfAssessmentMonitor {
+            warmup_threshold: 5,
+            cooldown_duration: 5,
+            ..Default::default()
+        };
+
+        // Normal, healthy signals
+        let good_input = SelfAssessmentInput {
+            prediction_error: 0.08,
+            coherence: 0.75,
+            confidence_calibration_error: 0.03,
+            attention_utilization: 0.5,
+            drift_anomalous: false,
+        };
+
+        for _ in 0..100 {
+            monitor.update(&good_input);
+        }
+
+        assert!(
+            monitor.check_trigger().is_none(),
+            "Normal performance should not trigger calibration"
+        );
+    }
+
+    #[test]
+    fn test_self_assessment_reset_after_calibration() {
+        let mut monitor = SelfAssessmentMonitor {
+            warmup_threshold: 5,
+            cooldown_duration: 50,
+            ..Default::default()
+        };
+
+        let bad_input = SelfAssessmentInput {
+            prediction_error: 0.5,
+            coherence: 0.7,
+            confidence_calibration_error: 0.0,
+            attention_utilization: 0.5,
+            drift_anomalous: false,
+        };
+
+        for _ in 0..20 {
+            monitor.update(&bad_input);
+        }
+        assert!(monitor.check_trigger().is_some());
+
+        // External calibration resets cooldown
+        monitor.reset_after_calibration();
+        assert_eq!(monitor.observations_since_calibration, 0);
+        assert_eq!(monitor.cooldown, 50);
     }
 }

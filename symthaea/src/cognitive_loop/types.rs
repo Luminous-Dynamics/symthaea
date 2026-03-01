@@ -1143,6 +1143,37 @@ pub struct CycleMetadata {
     pub moral_topo_dominant_harmony: u8,
     /// Number of scenarios in the moral topology sliding window.
     pub moral_topo_scenario_count: usize,
+
+    // ── Moral Geometry (per-cycle harmony projection) ──────────────────
+    /// 7D harmony coordinates: cosine similarity to each Harmony basis.
+    /// Indexed by Harmony::all() order: [RC, PSF, IW, IP, UI, SR, EP].
+    pub harmony_coordinates: [f64; 7],
+    /// Softmax distribution over harmonies for the current scenario.
+    pub moral_scenario_distribution: [f64; 7],
+    /// Softmax distribution over harmonies for the EMA prior.
+    pub moral_prior_distribution: [f64; 7],
+    /// KL divergence from moral prior to observed.
+    pub moral_kl_divergence: f64,
+    /// Entropy of observed harmony distribution.
+    pub moral_entropy: f64,
+    /// Moral surprise: -log p(dominant harmony).
+    pub moral_surprise: f64,
+
+    // ── Partnership / Phi-Dyad Telemetry ──────────────────────────────
+    /// Relational Phi (Φ_dyad) — consciousness OF the relationship.
+    /// Computed from recent AI + input HVs via PhiDyadCalculator.
+    /// 0.0 when partnership module inactive.
+    pub relational_psi: f64,
+
+    // ── Resonant Speech Output ────────────────────────────────────────
+    /// Response profile label derived from cognitive load + consciousness level.
+    /// One of "technical", "balanced", "simplified", "empathic".
+    #[serde(default = "default_response_profile")]
+    pub response_profile: String,
+}
+
+fn default_response_profile() -> String {
+    "balanced".to_string()
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

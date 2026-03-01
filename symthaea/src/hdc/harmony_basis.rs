@@ -10,6 +10,7 @@
 //! consequences accumulates surprise and destabilizes. Moral free energy
 //! quantifies the divergence between expected and observed harmony coordinates.
 
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_types::Harmony;
 
@@ -150,7 +151,7 @@ impl HarmonyBasis {
 }
 
 /// Moral free energy decomposition.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MoralFreeEnergy {
     /// Total moral free energy F = D_KL + H.
     pub free_energy: f64,

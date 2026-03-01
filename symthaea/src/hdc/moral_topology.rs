@@ -14,11 +14,13 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
+use serde::Serialize;
 use symthaea_core::hdc::consciousness_topology::{BettiNumbers, PersistentFeature, TopologicalFeature};
 use symthaea_core::hdc::ContinuousHV;
 
 use super::geometric_ops::{HypersphereOps, PGAResult};
 use super::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
+use symthaea_hodge::{HodgeLaplacian, SimplicialComplex};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -37,6 +39,9 @@ pub struct MoralTopologyConfig {
     pub pga_components: usize,
     /// HDC dimension (must match MoralAlgebra).
     pub dim: usize,
+    /// Use exact Betti computation via Hodge Laplacian (slower, more accurate).
+    /// When false (default), uses fast triangle/tetrahedra counting approximation.
+    pub exact_betti: bool,
 }
 
 impl Default for MoralTopologyConfig {
@@ -47,6 +52,7 @@ impl Default for MoralTopologyConfig {
             min_persistence: 0.1,
             pga_components: 3,
             dim: 16384,
+            exact_betti: false,
         }
     }
 }
@@ -83,7 +89,7 @@ pub struct MoralTopologyAssessment {
 }
 
 /// Compact topology summary for CycleMetadata telemetry.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct MoralTopologySummary {
     pub beta_0: usize,
     pub beta_1: usize,
@@ -129,6 +135,34 @@ pub struct MoralTopology {
     harmony_prior: [f64; 7],
     /// Number of updates to the prior (0 = uninitialised).
     prior_count: usize,
+    /// Cached persistent features from last `analyze()` call.
+    last_persistent_features: Vec<PersistentFeature>,
+    /// Ring buffer of recent moral trajectory points for drift detection.
+    trajectory: VecDeque<MoralTrajectoryPoint>,
+}
+
+/// A single point on the moral manifold trajectory.
+#[derive(Debug, Clone, Serialize)]
+pub struct MoralTrajectoryPoint {
+    /// 7D harmony coordinates at this point.
+    pub coordinates: [f64; 7],
+    /// Moral free energy at this point.
+    pub free_energy: f64,
+}
+
+/// Persistence diagram summary for visualization.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct PersistenceDiagram {
+    /// (birth, death) pairs for β₀ features (connected components).
+    pub components: Vec<[f64; 2]>,
+    /// (birth, death) pairs for β₁ features (cycles).
+    pub cycles: Vec<[f64; 2]>,
+    /// (birth, death) pairs for β₂ features (voids).
+    pub voids: Vec<[f64; 2]>,
+    /// Max persistence across all features.
+    pub bottleneck_distance: f64,
+    /// Sum of all persistence values.
+    pub total_persistence: f64,
 }
 
 impl MoralTopology {
@@ -147,13 +181,15 @@ impl MoralTopology {
             last_summary: MoralTopologySummary::default(),
             harmony_prior: [0.0; 7],
             prior_count: 0,
+            last_persistent_features: Vec::new(),
+            trajectory: VecDeque::new(),
         }
     }
 
     /// Push a scenario hypervector into the sliding window.
     ///
     /// Also updates the running EMA prior of harmony coordinates for
-    /// moral free energy computation.
+    /// moral free energy computation and records a trajectory point.
     pub fn add_scenario(&mut self, hv: ContinuousHV) {
         // Update harmony prior via EMA before evicting the oldest entry
         let coords = self.basis.project(&hv);
@@ -162,6 +198,16 @@ impl MoralTopology {
             self.harmony_prior[i] = alpha * coords[i] + (1.0 - alpha) * self.harmony_prior[i];
         }
         self.prior_count += 1;
+
+        // Record trajectory point
+        let free_energy = self.last_summary.moral_free_energy;
+        if self.trajectory.len() >= self.config.window_size {
+            self.trajectory.pop_front();
+        }
+        self.trajectory.push_back(MoralTrajectoryPoint {
+            coordinates: coords,
+            free_energy,
+        });
 
         if self.window.len() >= self.config.window_size {
             self.window.pop_front();
@@ -187,6 +233,52 @@ impl MoralTopology {
     /// Access the shared harmony basis.
     pub fn basis(&self) -> &Arc<HarmonyBasis> {
         &self.basis
+    }
+
+    /// Access cached persistent features from last `analyze()` call.
+    pub fn last_persistent_features(&self) -> &[PersistentFeature] {
+        &self.last_persistent_features
+    }
+
+    /// Recent trajectory points (up to `last_n`).
+    pub fn trajectory(&self, last_n: usize) -> Vec<&MoralTrajectoryPoint> {
+        self.trajectory.iter().rev().take(last_n).collect()
+    }
+
+    /// Moral drift: L2 distance between mean of first half and second half
+    /// of the last `lookback` trajectory points. Higher → greater drift.
+    pub fn moral_drift(&self, lookback: usize) -> f64 {
+        let points: Vec<_> = self.trajectory.iter().rev().take(lookback).collect();
+        if points.len() < 4 {
+            return 0.0;
+        }
+        let mid = points.len() / 2;
+        let mean_half = |slice: &[&MoralTrajectoryPoint]| -> [f64; 7] {
+            let mut m = [0.0; 7];
+            for p in slice {
+                for i in 0..7 {
+                    m[i] += p.coordinates[i];
+                }
+            }
+            let n = slice.len() as f64;
+            for v in &mut m {
+                *v /= n;
+            }
+            m
+        };
+        let first_half = mean_half(&points[mid..]);
+        let second_half = mean_half(&points[..mid]);
+        let mut dist_sq = 0.0;
+        for i in 0..7 {
+            let d = first_half[i] - second_half[i];
+            dist_sq += d * d;
+        }
+        dist_sq.sqrt()
+    }
+
+    /// Build a persistence diagram summary from cached features.
+    pub fn persistence_diagram(&self) -> PersistenceDiagram {
+        PersistenceDiagram::from_features(&self.last_persistent_features)
     }
 
     /// Perform full topological analysis on the current window.
@@ -225,7 +317,11 @@ impl MoralTopology {
         let char_scale = Self::characteristic_scale(&similarities, n);
 
         // ── Step 3: Betti numbers at characteristic scale ───────────────
-        let betti = Self::compute_betti(&similarities, n, char_scale);
+        let betti = if self.config.exact_betti {
+            Self::compute_betti_exact(&similarities, n, char_scale)
+        } else {
+            Self::compute_betti(&similarities, n, char_scale)
+        };
 
         // ── Step 4: Multi-scale persistent features ─────────────────────
         let persistent_features =
@@ -334,6 +430,7 @@ impl MoralTopology {
             moral_free_energy,
         };
         self.last_summary = MoralTopologySummary::from(&assessment);
+        self.last_persistent_features = assessment.persistent_features.clone();
         assessment
     }
 
@@ -387,6 +484,48 @@ impl MoralTopology {
         let beta_2 = Self::count_tetrahedra(&adj, n) / 4;
 
         BettiNumbers::new(beta_0, beta_1, beta_2)
+    }
+
+    /// Exact Betti computation via Hodge Laplacian on the Rips complex.
+    ///
+    /// More accurate than triangle/tetrahedra counting but O(n³) for
+    /// boundary matrix operations. Use for small windows (n ≤ 32).
+    fn compute_betti_exact(sim: &[f64], n: usize, scale: f64) -> BettiNumbers {
+        let mut complex = SimplicialComplex::new();
+        // Add vertices
+        for i in 0..n {
+            complex.add_simplex(vec![i]);
+        }
+        // Add edges (1-simplices) where similarity ≥ scale
+        for i in 0..n {
+            for j in (i + 1)..n {
+                if sim[i * n + j] >= scale {
+                    complex.add_simplex(vec![i, j]);
+                    // Add triangles (2-simplices)
+                    for k in (j + 1)..n {
+                        if sim[i * n + k] >= scale && sim[j * n + k] >= scale {
+                            complex.add_simplex(vec![i, j, k]);
+                            // Add tetrahedra (3-simplices)
+                            for l in (k + 1)..n {
+                                if sim[i * n + l] >= scale
+                                    && sim[j * n + l] >= scale
+                                    && sim[k * n + l] >= scale
+                                {
+                                    complex.add_simplex(vec![i, j, k, l]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let laplacian = HodgeLaplacian::new(complex);
+        let hodge_betti = laplacian.betti_numbers();
+        BettiNumbers::new(
+            hodge_betti.get(0),
+            hodge_betti.get(1),
+            hodge_betti.get(2),
+        )
     }
 
     /// DFS-based connected component counting (β₀).
@@ -575,6 +714,38 @@ impl MoralTopology {
     }
 }
 
+impl PersistenceDiagram {
+    /// Build from a slice of persistent features.
+    pub fn from_features(features: &[PersistentFeature]) -> Self {
+        let mut components = Vec::new();
+        let mut cycles = Vec::new();
+        let mut voids = Vec::new();
+        let mut bottleneck_distance: f64 = 0.0;
+        let mut total_persistence: f64 = 0.0;
+
+        for f in features {
+            let pair = [f.birth, f.death];
+            total_persistence += f.persistence;
+            if f.persistence > bottleneck_distance {
+                bottleneck_distance = f.persistence;
+            }
+            match f.feature_type {
+                TopologicalFeature::Component => components.push(pair),
+                TopologicalFeature::Cycle => cycles.push(pair),
+                TopologicalFeature::Void => voids.push(pair),
+            }
+        }
+
+        Self {
+            components,
+            cycles,
+            voids,
+            bottleneck_distance,
+            total_persistence,
+        }
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -589,11 +760,8 @@ mod tests {
 
     fn test_config() -> MoralTopologyConfig {
         MoralTopologyConfig {
-            window_size: 64,
-            num_scales: 10,
-            min_persistence: 0.1,
-            pga_components: 3,
             dim: TEST_DIM,
+            ..Default::default()
         }
     }
 
@@ -938,5 +1106,86 @@ mod tests {
         assert_eq!(assessment.scenario_count, 64);
         assert!(assessment.moral_free_energy.free_energy.is_finite());
         eprintln!("MoralTopology::analyze() n=64, dim={dim}: {elapsed:?}");
+    }
+
+    // ── Test 15: Trajectory memory ───────────────────────────────────
+
+    #[test]
+    fn test_trajectory_records_points() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..5 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 200 + i));
+        }
+        let traj = topo.trajectory(10);
+        assert_eq!(traj.len(), 5);
+        // Each point should have finite coordinates
+        for p in &traj {
+            for &c in &p.coordinates {
+                assert!(c.is_finite(), "trajectory coordinate should be finite");
+            }
+            assert!(p.free_energy.is_finite());
+        }
+    }
+
+    // ── Test 16: Trajectory caps at window_size ──────────────────────
+
+    #[test]
+    fn test_trajectory_window_cap() {
+        let mut cfg = test_config();
+        cfg.window_size = 4;
+        let mut topo = MoralTopology::new(cfg);
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 300 + i));
+        }
+        // Should be capped at 4
+        assert_eq!(topo.trajectory(100).len(), 4);
+    }
+
+    // ── Test 17: Moral drift ─────────────────────────────────────────
+
+    #[test]
+    fn test_moral_drift_zero_when_few_points() {
+        let mut topo = MoralTopology::new(test_config());
+        topo.add_scenario(ContinuousHV::random(TEST_DIM, 400));
+        assert!((topo.moral_drift(10) - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ── Test 18: Persistence diagram ────────────────────────────────
+
+    #[test]
+    fn test_persistence_diagram_from_features() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 500 + i));
+        }
+        let _assessment = topo.analyze();
+        let diagram = topo.persistence_diagram();
+        assert!(diagram.bottleneck_distance >= 0.0);
+        assert!(diagram.total_persistence >= 0.0);
+        // Component + cycle + void counts should match cached features
+        let total = diagram.components.len() + diagram.cycles.len() + diagram.voids.len();
+        assert_eq!(total, topo.last_persistent_features().len());
+    }
+
+    // ── Test 19: Exact Betti via Hodge Laplacian ─────────────────────
+
+    #[test]
+    fn test_exact_betti_small_window() {
+        let mut cfg = test_config();
+        cfg.exact_betti = true;
+        cfg.window_size = 8;
+        let mut topo = MoralTopology::new(cfg);
+        for i in 0..8 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 600 + i));
+        }
+        let assessment = topo.analyze();
+        // β₀ should be at least 1 (connected components)
+        assert!(
+            assessment.betti.beta_0 >= 1,
+            "Exact Betti β₀ must be ≥ 1, got {}",
+            assessment.betti.beta_0,
+        );
+        assert!(assessment.unity <= 1.0);
+        assert!(assessment.unity > 0.0);
     }
 }

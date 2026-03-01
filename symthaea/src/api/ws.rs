@@ -15,7 +15,10 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use symthaea_core::hdc::consciousness_topology::PersistentFeature;
 use tokio::sync::Mutex;
+
+use crate::hdc::moral_topology::PersistenceDiagram;
 
 use super::demo_runner::DemoRunner;
 
@@ -100,6 +103,58 @@ pub struct DemoCycleData {
     /// Human-readable phase label (stressed/flow/drowsy/alert/relaxed/recovering/balanced)
     #[serde(default)]
     pub bath_phase_label: String,
+
+    // ── Moral Topology: Conscience Radar ──
+    /// 7D harmony coordinates: [RC, PSF, IW, IP, UI, SR, EP].
+    #[serde(default)]
+    pub harmony_coordinates: [f64; 7],
+    /// Harmony axis labels (static, included for self-describing payloads).
+    #[serde(default)]
+    pub harmony_labels: Vec<String>,
+    /// Moral free energy (FEP surprise on harmony manifold).
+    #[serde(default)]
+    pub moral_free_energy: f64,
+    /// KL divergence from moral prior.
+    #[serde(default)]
+    pub moral_kl_divergence: f64,
+    /// Entropy of observed harmony distribution.
+    #[serde(default)]
+    pub moral_entropy: f64,
+    /// Moral surprise: -log p(dominant harmony).
+    #[serde(default)]
+    pub moral_surprise: f64,
+    /// Softmax distribution over harmonies (observed).
+    #[serde(default)]
+    pub moral_scenario_distribution: [f64; 7],
+    /// Softmax distribution over harmonies (EMA prior).
+    #[serde(default)]
+    pub moral_prior_distribution: [f64; 7],
+    /// Betti numbers [β₀, β₁, β₂] — components, cycles, voids.
+    #[serde(default)]
+    pub moral_betti: [usize; 3],
+    /// Topology unity score (1.0 = fully connected).
+    #[serde(default)]
+    pub moral_unity: f64,
+    /// Topology completeness (fraction of active harmony axes).
+    #[serde(default)]
+    pub moral_completeness: f64,
+    /// Topology circularity (proportion of cycles in persistent features).
+    #[serde(default)]
+    pub moral_circularity: f64,
+    /// Dominant harmony axis index (0–6).
+    #[serde(default)]
+    pub moral_dominant_harmony: u8,
+    /// Persistence diagram: birth/death pairs of topological features.
+    #[serde(default)]
+    pub moral_persistent_features: Vec<PersistentFeature>,
+    /// Persistence diagram summary (components, cycles, voids with statistics).
+    pub moral_persistence_diagram: PersistenceDiagram,
+    /// Moral trajectory: last 20 harmony coordinate snapshots.
+    #[serde(default)]
+    pub moral_trajectory: Vec<[f64; 7]>,
+    /// Moral drift (L2 distance between first/second half of trajectory).
+    #[serde(default)]
+    pub moral_drift: f64,
 }
 
 /// Client message format.
