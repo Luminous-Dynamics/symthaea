@@ -68,6 +68,22 @@ pub struct DemoCycleData {
     #[serde(default)]
     pub attractor_detected: bool,
 
+    // ── Mesh Network Telemetry ──
+    #[serde(default)]
+    pub mesh_health_score: f32,
+    #[serde(default)]
+    pub mesh_peer_count: u32,
+    #[serde(default)]
+    pub mesh_bytes_sent: u64,
+    #[serde(default)]
+    pub mesh_bytes_received: u64,
+    #[serde(default)]
+    pub mesh_compression_ratio: f64,
+    #[serde(default)]
+    pub mesh_bandwidth_budget: u64,
+    #[serde(default)]
+    pub mesh_packets_throttled: u64,
+
     // ── Post-Phase 6: Phase tracker visualization ──
     /// Bath centroid (9D mean of recent state vectors)
     #[serde(default)]

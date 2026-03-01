@@ -140,6 +140,10 @@ pub struct MeshStats {
     pub bytes_after_compression: u64,
     /// Current dynamic bandwidth budget (AIMD-adjusted).
     pub bandwidth_budget_current: u64,
+    /// Number of AIMD additive increases (budget went up).
+    pub bandwidth_increases: u64,
+    /// Number of AIMD multiplicative decreases (budget went down).
+    pub bandwidth_decreases: u64,
 }
 
 impl MeshStats {
@@ -798,6 +802,24 @@ impl MeshPeerRegistry {
     pub fn has_peer(&self, source_id: &[u8; 8]) -> bool {
         self.peers.contains_key(source_id)
     }
+
+    /// Detect if the mesh appears partitioned.
+    ///
+    /// Returns `true` if we previously had peers but now have zero
+    /// (all expired), suggesting a network partition rather than normal
+    /// peer departure. Returns `false` if we never had peers or still have some.
+    pub fn is_partitioned(&self, stats: &MeshStats) -> bool {
+        self.peer_count() == 0 && stats.peers_expired > 0 && stats.wisdom_received > 0
+    }
+
+    /// Count peers that haven't been seen within the given duration.
+    pub fn stale_peer_count(&self, timeout: std::time::Duration) -> usize {
+        let now = std::time::Instant::now();
+        self.peers
+            .values()
+            .filter(|p| now.duration_since(p.last_seen) > timeout)
+            .count()
+    }
 }
 
 impl Default for MeshPeerRegistry {
@@ -895,6 +917,59 @@ pub fn decompress_packet(data: &[u8]) -> Option<Vec<u8>> {
         }
         _ => None,
     }
+}
+
+// ============================================================================
+// ENCRYPTION (ChaCha20-Poly1305)
+// ============================================================================
+
+/// Nonce size for ChaCha20-Poly1305 (96 bits).
+#[cfg(feature = "mesh-encryption")]
+pub const AEAD_NONCE_SIZE: usize = 12;
+
+/// Authentication tag size (128 bits).
+#[cfg(feature = "mesh-encryption")]
+pub const AEAD_TAG_SIZE: usize = 16;
+
+/// Encrypt a compressed packet envelope using ChaCha20-Poly1305.
+///
+/// Returns `[nonce (12 bytes) | ciphertext+tag]`.
+/// The nonce is derived from source_id (8 bytes) + sequence (4 bytes LE).
+#[cfg(feature = "mesh-encryption")]
+pub fn encrypt_packet(
+    envelope: &[u8],
+    key: &[u8; 32],
+    source_id: &[u8; 8],
+    sequence: u32,
+) -> Vec<u8> {
+    use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+    let cipher = ChaCha20Poly1305::new(key.into());
+    let mut nonce_bytes = [0u8; 12];
+    nonce_bytes[..8].copy_from_slice(source_id);
+    nonce_bytes[8..].copy_from_slice(&sequence.to_le_bytes());
+    let nonce = Nonce::from(nonce_bytes);
+    let ciphertext = cipher
+        .encrypt(&nonce, envelope)
+        .expect("encryption never fails for valid inputs");
+    let mut out = Vec::with_capacity(12 + ciphertext.len());
+    out.extend_from_slice(&nonce_bytes);
+    out.extend_from_slice(&ciphertext);
+    out
+}
+
+/// Decrypt a packet encrypted with `encrypt_packet`.
+///
+/// Returns `None` if decryption/authentication fails.
+#[cfg(feature = "mesh-encryption")]
+pub fn decrypt_packet(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
+    use chacha20poly1305::{aead::Aead, ChaCha20Poly1305, KeyInit, Nonce};
+    if data.len() < AEAD_NONCE_SIZE + AEAD_TAG_SIZE {
+        return None;
+    }
+    let (nonce_bytes, ciphertext) = data.split_at(AEAD_NONCE_SIZE);
+    let cipher = ChaCha20Poly1305::new(key.into());
+    let nonce = Nonce::from_slice(nonce_bytes);
+    cipher.decrypt(nonce, ciphertext).ok()
 }
 
 // ============================================================================
@@ -1983,5 +2058,374 @@ mod tests {
             decompress_packet(&data).is_none(),
             "Unknown header 0xFF should return None"
         );
+    }
+
+    // ====================================================================
+    // Round 7, Item 6: AIMD bandwidth observability counters
+    // ====================================================================
+
+    #[test]
+    fn test_mesh_stats_default_aimd_counters() {
+        let stats = MeshStats::default();
+        assert_eq!(stats.bandwidth_increases, 0);
+        assert_eq!(stats.bandwidth_decreases, 0);
+    }
+
+    // ====================================================================
+    // Round 7, Item 1: End-to-End Compression Validation Tests
+    // ====================================================================
+
+    #[test]
+    fn test_compress_fragment_reassemble_roundtrip() {
+        use super::lora_fragment::{fragment, FragmentAssembler, LoRaFragment};
+
+        let packet = WisdomPacket {
+            source_id: [0xAA; 8],
+            sequence: 99,
+            phi: 0.42,
+            urgency: MeshUrgency::Critical,
+            timestamp_s: 1_700_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 3,
+            wisdom: test_hv(0xBB),
+        };
+        let original_bytes = packet.to_bytes();
+
+        // Compress
+        let envelope = compress_packet(&original_bytes);
+
+        // Fragment the compressed envelope (low-level API)
+        let thought_id = packet.thought_id();
+        let frags = fragment(thought_id, &envelope);
+        assert!(!frags.is_empty());
+
+        // Reassemble
+        let mut assembler =
+            FragmentAssembler::new(thought_id, frags.len() as u8, envelope.len());
+        let mut buf = [0u8; LORA_MTU];
+        for frag in &frags {
+            let len = frag.to_bytes(&mut buf);
+            let decoded = LoRaFragment::from_bytes(&buf[..len]).unwrap();
+            assembler.feed(&decoded);
+        }
+        assert!(assembler.is_complete());
+        let reassembled_envelope = assembler.assemble().expect("assembly should succeed");
+
+        // Decompress
+        let decompressed = decompress_packet(&reassembled_envelope)
+            .expect("decompression should succeed");
+
+        assert_eq!(
+            decompressed, original_bytes,
+            "Full pipeline roundtrip: compress → fragment → reassemble → decompress should recover original"
+        );
+    }
+
+    #[test]
+    fn test_compress_fragment_reassemble_with_fec_loss() {
+        use super::lora_fragment::{fragment, FragmentAssembler, LoRaFragment};
+
+        let packet = WisdomPacket {
+            source_id: [0xCC; 8],
+            sequence: 200,
+            phi: 0.95,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 2_000_000,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 2,
+            wisdom: test_hv(0xDD),
+        };
+        let original_bytes = packet.to_bytes();
+        let envelope = compress_packet(&original_bytes);
+        let thought_id = packet.thought_id();
+        let frags = fragment(thought_id, &envelope);
+        let total = frags.len();
+        assert!(total >= 2, "Need at least 2 fragments for FEC test");
+
+        // Drop the 2nd data fragment (index 1) — FEC should recover
+        let mut assembler =
+            FragmentAssembler::new(thought_id, total as u8, envelope.len());
+        let mut buf = [0u8; LORA_MTU];
+        for (i, frag) in frags.iter().enumerate() {
+            if i == 1 {
+                continue; // simulate single loss
+            }
+            let len = frag.to_bytes(&mut buf);
+            let decoded = LoRaFragment::from_bytes(&buf[..len]).unwrap();
+            assembler.feed(&decoded);
+        }
+
+        assert!(assembler.is_complete(), "FEC should recover 1 lost fragment");
+        assert!(assembler.used_fec_recovery(), "Should have used FEC recovery");
+        let reassembled_envelope = assembler.assemble().expect("assembly should succeed");
+        let decompressed = decompress_packet(&reassembled_envelope)
+            .expect("decompression should succeed");
+        assert_eq!(decompressed, original_bytes, "FEC-recovered roundtrip should match original");
+    }
+
+    #[test]
+    fn test_compress_fragment_reassemble_heartbeat() {
+        use super::lora_fragment::{fragment, FragmentAssembler, LoRaFragment};
+
+        let packet = WisdomPacket {
+            source_id: [0xEE; 8],
+            sequence: 500,
+            phi: 0.3,
+            urgency: MeshUrgency::Cruise,
+            timestamp_s: 3_000_000,
+            payload_type: PayloadType::Heartbeat,
+            auth_mac: 0,
+            ttl: 1,
+            wisdom: BinaryHV::zero(), // heartbeat has zero BinaryHV
+        };
+        let original_bytes = packet.to_bytes();
+        let envelope = compress_packet(&original_bytes);
+        let thought_id = packet.thought_id();
+        let frags = fragment(thought_id, &envelope);
+
+        let mut assembler =
+            FragmentAssembler::new(thought_id, frags.len() as u8, envelope.len());
+        let mut buf = [0u8; LORA_MTU];
+        for frag in &frags {
+            let len = frag.to_bytes(&mut buf);
+            let decoded = LoRaFragment::from_bytes(&buf[..len]).unwrap();
+            assembler.feed(&decoded);
+        }
+        assert!(assembler.is_complete());
+        let reassembled_envelope = assembler.assemble().expect("heartbeat assembly should succeed");
+        let decompressed = decompress_packet(&reassembled_envelope)
+            .expect("heartbeat decompression should succeed");
+        assert_eq!(decompressed, original_bytes, "Heartbeat roundtrip should match");
+    }
+
+    // ====================================================================
+    // Round 7, Item 2: Partition Detection Tests
+    // ====================================================================
+
+    #[test]
+    fn test_is_partitioned_true() {
+        let registry = MeshPeerRegistry::new();
+        let stats = MeshStats {
+            peers_expired: 2,
+            wisdom_received: 5,
+            ..Default::default()
+        };
+        assert!(registry.is_partitioned(&stats));
+    }
+
+    #[test]
+    fn test_is_partitioned_false_with_peers() {
+        let mut registry = MeshPeerRegistry::new();
+        let packet = WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV::zero(),
+        };
+        registry.update(&packet);
+        let stats = MeshStats {
+            peers_expired: 1,
+            wisdom_received: 5,
+            ..Default::default()
+        };
+        assert!(!registry.is_partitioned(&stats));
+    }
+
+    #[test]
+    fn test_is_partitioned_false_never_had_peers() {
+        let registry = MeshPeerRegistry::new();
+        let stats = MeshStats::default();
+        assert!(!registry.is_partitioned(&stats));
+    }
+
+    #[test]
+    fn test_stale_peer_count() {
+        let mut registry = MeshPeerRegistry::new();
+        let packet = WisdomPacket {
+            source_id: [0x01; 8],
+            sequence: 1,
+            phi: 0.5,
+            urgency: MeshUrgency::Normal,
+            timestamp_s: 0,
+            payload_type: PayloadType::WisdomVector,
+            auth_mac: 0,
+            ttl: 0,
+            wisdom: BinaryHV::zero(),
+        };
+        registry.update(&packet);
+        // With a very short timeout, the peer we just added should be fresh
+        assert_eq!(
+            registry.stale_peer_count(std::time::Duration::from_secs(60)),
+            0
+        );
+        // With zero timeout, everything is stale
+        assert_eq!(
+            registry.stale_peer_count(std::time::Duration::ZERO),
+            1
+        );
+    }
+
+    // ====================================================================
+    // Round 7, Item 5: Encryption Tests (feature-gated)
+    // ====================================================================
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let key = [0x42u8; 32];
+        let source_id = [0x01u8; 8];
+        let sequence = 12345u32;
+        let plaintext = b"Hello mesh encryption!";
+
+        let ciphertext = encrypt_packet(plaintext, &key, &source_id, sequence);
+        assert_ne!(&ciphertext[AEAD_NONCE_SIZE..], plaintext);
+
+        let decrypted = decrypt_packet(&ciphertext, &key).expect("decryption should succeed");
+        assert_eq!(decrypted, plaintext);
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_decrypt_wrong_key_fails() {
+        let key_a = [0x42u8; 32];
+        let key_b = [0x99u8; 32];
+        let source_id = [0x01u8; 8];
+        let plaintext = b"secret data";
+
+        let ciphertext = encrypt_packet(plaintext, &key_a, &source_id, 1);
+        assert!(decrypt_packet(&ciphertext, &key_b).is_none());
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_decrypt_tampered_ciphertext_fails() {
+        let key = [0x42u8; 32];
+        let source_id = [0x01u8; 8];
+        let plaintext = b"tamper test";
+
+        let mut ciphertext = encrypt_packet(plaintext, &key, &source_id, 1);
+        // Flip a byte in the ciphertext portion (after the nonce)
+        if ciphertext.len() > AEAD_NONCE_SIZE + 1 {
+            ciphertext[AEAD_NONCE_SIZE + 1] ^= 0xFF;
+        }
+        assert!(decrypt_packet(&ciphertext, &key).is_none());
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_decrypt_truncated_fails() {
+        let key = [0x42u8; 32];
+        // Too short — less than nonce + tag
+        let short = vec![0u8; AEAD_NONCE_SIZE + AEAD_TAG_SIZE - 1];
+        assert!(decrypt_packet(&short, &key).is_none());
+    }
+}
+
+// ============================================================================
+// PROPERTY-BASED TESTS (proptest)
+// ============================================================================
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_urgency() -> impl Strategy<Value = MeshUrgency> {
+        (0u8..=2).prop_map(|b| MeshUrgency::from_byte(b))
+    }
+
+    fn arb_payload_type() -> impl Strategy<Value = PayloadType> {
+        (0u8..=3).prop_map(|b| PayloadType::from_byte(b))
+    }
+
+    fn arb_wisdom_packet() -> impl Strategy<Value = WisdomPacket> {
+        (
+            any::<[u8; 8]>(),   // source_id
+            any::<u32>(),       // sequence
+            any::<f32>(),       // phi
+            arb_urgency(),
+            any::<u32>(),       // timestamp_s
+            arb_payload_type(),
+            any::<u8>(),        // auth_mac
+            1u8..=10,           // ttl
+        )
+            .prop_map(|(sid, seq, phi, urg, ts, pt, mac, ttl)| {
+                let phi = if phi.is_nan() || phi.is_infinite() {
+                    0.0
+                } else {
+                    phi
+                };
+                WisdomPacket {
+                    source_id: sid,
+                    sequence: seq,
+                    phi,
+                    urgency: urg,
+                    timestamp_s: ts,
+                    payload_type: pt,
+                    auth_mac: mac,
+                    ttl,
+                    wisdom: BinaryHV([seq as u8; 2048]),
+                }
+            })
+    }
+
+    proptest! {
+        #[test]
+        fn proptest_serialization_roundtrip(packet in arb_wisdom_packet()) {
+            let bytes = packet.to_bytes();
+            let decoded = WisdomPacket::from_bytes(&bytes).expect("deserialization should succeed");
+            prop_assert_eq!(decoded.source_id, packet.source_id);
+            prop_assert_eq!(decoded.sequence, packet.sequence);
+            prop_assert_eq!(decoded.urgency, packet.urgency);
+            prop_assert_eq!(decoded.timestamp_s, packet.timestamp_s);
+            prop_assert_eq!(decoded.payload_type, packet.payload_type);
+            prop_assert_eq!(decoded.auth_mac, packet.auth_mac);
+            prop_assert_eq!(decoded.ttl, packet.ttl);
+            prop_assert_eq!(decoded.wisdom.0, packet.wisdom.0);
+            // Handle NaN: both should be normalized to 0.0
+            if packet.phi.is_nan() {
+                prop_assert!(decoded.phi.is_nan() || decoded.phi == 0.0);
+            } else {
+                prop_assert!((decoded.phi - packet.phi).abs() < f32::EPSILON);
+            }
+        }
+
+        #[test]
+        fn proptest_compress_decompress_roundtrip(packet in arb_wisdom_packet()) {
+            let bytes = packet.to_bytes();
+            let compressed = compress_packet(&bytes);
+            let decompressed = decompress_packet(&compressed).expect("decompression should succeed");
+            prop_assert_eq!(decompressed, bytes);
+        }
+
+        #[test]
+        fn proptest_fragment_reassemble_roundtrip(packet in arb_wisdom_packet()) {
+            use super::lora_fragment::{fragment, FragmentAssembler, LoRaFragment};
+
+            let original_bytes = packet.to_bytes();
+            let envelope = compress_packet(&original_bytes);
+            let thought_id = packet.thought_id();
+            let frags = fragment(thought_id, &envelope);
+            let total = frags.len();
+
+            let mut assembler = FragmentAssembler::new(thought_id, total as u8, envelope.len());
+            let mut buf = [0u8; LORA_MTU];
+            for frag in &frags {
+                let len = frag.to_bytes(&mut buf);
+                let decoded = LoRaFragment::from_bytes(&buf[..len]).unwrap();
+                assembler.feed(&decoded);
+            }
+            prop_assert!(assembler.is_complete());
+            let reassembled = assembler.assemble().expect("assembly should succeed");
+            let decompressed = decompress_packet(&reassembled).expect("decompression should succeed");
+            prop_assert_eq!(decompressed, original_bytes);
+        }
     }
 }

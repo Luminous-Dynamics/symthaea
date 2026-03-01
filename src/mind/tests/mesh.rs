@@ -1138,7 +1138,7 @@ async fn test_mind_to_mind_affective_roundtrip() {
 #[test]
 fn test_lora_double_loss_graceful() {
     use crate::swarm::mesh::{
-        FragmentAssembler, MeshUrgency, PayloadType, WisdomPacket, LORA_MTU, WISDOM_PACKET_SIZE,
+        MeshUrgency, PayloadType, WisdomPacket, LORA_MTU,
     };
     use symthaea_core::hdc::BinaryHV;
 
@@ -1196,7 +1196,6 @@ fn test_lora_double_loss_graceful() {
 #[test]
 fn test_four_minds_mesh_stress() {
     use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
-    use symthaea_core::hdc::BinaryHV;
 
     // Create 4 minds with social coherence
     let mut minds: Vec<ContinuousMind> = (0..4)
@@ -2515,5 +2514,186 @@ fn test_compression_stats_heartbeat() {
         "Compression overhead should be bounded: before={}, after={}",
         mind.mesh_stats.bytes_before_compression,
         mind.mesh_stats.bytes_after_compression
+    );
+}
+
+// ====================================================================
+// Round 7, Item 6: AIMD Bandwidth Observability Tests
+// ====================================================================
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_aimd_increase_counter() {
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+    let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+    mind.set_mesh_bridge(handle);
+
+    // Simulate healthy mesh: add a peer so health > 0.5
+    let pkt = crate::swarm::mesh::WisdomPacket {
+        source_id: [0x01; 8],
+        sequence: 1,
+        phi: 0.8,
+        urgency: crate::swarm::mesh::MeshUrgency::Normal,
+        timestamp_s: 0,
+        payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 0,
+        wisdom: symthaea_core::hdc::BinaryHV::zero(),
+    };
+    mind.mesh_peers.update(&pkt);
+    mind.mesh_stats.wisdom_sent = 5;
+    mind.mesh_stats.wisdom_received = 5;
+
+    mind.adjust_bandwidth_budget();
+    assert_eq!(mind.mesh_stats.bandwidth_increases, 1);
+    assert_eq!(mind.mesh_stats.bandwidth_decreases, 0);
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_aimd_decrease_counter() {
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+
+    // Trigger decrease: set throttled flag
+    mind.mesh_bandwidth_throttled_in_window = true;
+
+    mind.adjust_bandwidth_budget();
+    assert_eq!(mind.mesh_stats.bandwidth_decreases, 1);
+    assert_eq!(mind.mesh_stats.bandwidth_increases, 0);
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_aimd_hold_steady_no_counters() {
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+
+    // Health = 0.0 (idle, no bridge, no peers, no activity) → hold steady
+    mind.adjust_bandwidth_budget();
+    assert_eq!(mind.mesh_stats.bandwidth_increases, 0);
+    assert_eq!(mind.mesh_stats.bandwidth_decreases, 0);
+}
+
+// ====================================================================
+// Round 7, Item 2: Partition Detection Tests
+// ====================================================================
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_partition_detected_after_all_peers_expire() {
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+
+    // Set up partition condition
+    mind.mesh_stats.peers_expired = 3;
+    mind.mesh_stats.wisdom_received = 10;
+    assert_eq!(mind.mesh_peers.peer_count(), 0);
+    assert!(mind.mesh_peers.is_partitioned(&mind.mesh_stats));
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_not_partitioned_with_active_peers() {
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+
+    let pkt = crate::swarm::mesh::WisdomPacket {
+        source_id: [0x01; 8],
+        sequence: 1,
+        phi: 0.5,
+        urgency: crate::swarm::mesh::MeshUrgency::Normal,
+        timestamp_s: 0,
+        payload_type: crate::swarm::mesh::PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 0,
+        wisdom: symthaea_core::hdc::BinaryHV::zero(),
+    };
+    mind.mesh_peers.update(&pkt);
+    mind.mesh_stats.peers_expired = 1;
+    mind.mesh_stats.wisdom_received = 5;
+    assert!(!mind.mesh_peers.is_partitioned(&mind.mesh_stats));
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_partition_triggers_replay_flush() {
+    use crate::cognitive_loop::types::CycleUrgency;
+    use symthaea_core::hdc::BinaryHV;
+
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+
+    // Emit packets to fill replay buffer
+    for i in 0..3u64 {
+        mind.state.tick = i;
+        mind.emit_wisdom(BinaryHV([i as u8; 2048]), CycleUrgency::Critical, 0.5);
+    }
+    mind.mesh_outbox.clear();
+    assert_eq!(mind.mesh_replay_buffer.len(), 3);
+
+    // Set up partition condition: peers expired, wisdom received, but no peers left
+    mind.mesh_stats.peers_expired = 2;
+    mind.mesh_stats.wisdom_received = 5;
+    assert_eq!(mind.mesh_peers.peer_count(), 0);
+    assert!(mind.mesh_peers.is_partitioned(&mind.mesh_stats));
+
+    // Run tick — process_mesh runs within tick and should flush replay buffer
+    mind.tick();
+
+    assert!(
+        mind.mesh_replay_buffer.is_empty(),
+        "Replay buffer should be drained on partition"
+    );
+    assert_eq!(
+        mind.mesh_stats.packets_replayed, 3,
+        "packets_replayed should be 3 after partition flush"
+    );
+    assert!(
+        mind.mesh_outbox.len() >= 3,
+        "At least 3 replayed packets should be in outbox"
+    );
+}
+
+// ====================================================================
+// Round 7, Item 3: Mesh Metadata Compression Fields Test
+// ====================================================================
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_populate_mesh_metadata_compression_fields() {
+    use crate::cognitive_loop::types::CycleUrgency;
+    use symthaea_core::hdc::BinaryHV;
+
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+    let (handle, _actor) = crate::swarm::mesh::MeshBridgeHandle::new(64, 128);
+    mind.set_mesh_bridge(handle);
+
+    // Emit a few wisdom packets to populate compression stats
+    for i in 1..=3u64 {
+        mind.state.tick = i;
+        mind.emit_wisdom(BinaryHV([i as u8; 2048]), CycleUrgency::Critical, 0.5);
+    }
+
+    // Throttle once to populate bandwidth_throttled
+    mind.mesh_stats.bandwidth_throttled = 2;
+
+    let mut metadata = crate::cognitive_loop::types::CycleMetadata::default();
+    mind.populate_mesh_metadata(&mut metadata);
+
+    assert!(
+        metadata.mesh_compression_ratio > 0.0 && metadata.mesh_compression_ratio <= 2.0,
+        "compression_ratio should be > 0 after emissions, got {}",
+        metadata.mesh_compression_ratio
+    );
+    assert!(
+        metadata.mesh_bandwidth_budget > 0,
+        "bandwidth_budget should be > 0"
+    );
+    assert_eq!(
+        metadata.mesh_packets_throttled, 2,
+        "packets_throttled should reflect stats"
     );
 }
