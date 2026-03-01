@@ -11,13 +11,21 @@ use crate::types::{CellState, CultureEnvironment};
 /// Discrete actions the culture FEP agent can take.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CultureAction {
+    /// Correct incubator temperature toward setpoint.
     AdjustTemp,
+    /// Correct CO₂ level toward setpoint.
     AdjustCo2,
+    /// Correct media pH toward setpoint.
     AdjustPh,
+    /// Replenish culture media volume.
     AddMedia,
+    /// Continue incubation without intervention.
     ExtendIncubation,
+    /// Subculture (passage) cells to maintain healthy density.
     PassageCells,
+    /// Initiate in vitro gametogenesis on the current iPSC population.
     InitiateIvg,
+    /// Abort the protocol due to unrecoverable conditions.
     AbortProtocol,
 }
 
@@ -59,7 +67,9 @@ impl CultureAction {
 /// Selects actions that minimize the discrepancy between observed cell state
 /// and expected (desired) cell state, using HDC-encoded state representations.
 pub struct CultureFepAgent {
+    /// Complete action repertoire available to the agent.
     pub actions: [CultureAction; 8],
+    /// Free energy (prediction error) above which the agent considers the state surprising.
     pub surprise_threshold: f64,
 }
 

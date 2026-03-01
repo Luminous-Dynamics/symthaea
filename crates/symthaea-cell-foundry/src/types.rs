@@ -15,37 +15,62 @@ pub const BIO_HORIZONS: &[f32] = &[
 /// Default gene expression profile length
 pub const DEFAULT_GENE_EXPR_LEN: usize = 32;
 
+/// Broad categories of cell identity used throughout the foundry pipeline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CellType {
+    /// Adult somatic (differentiated) cell, suitable as iPSC or SCNT donor.
     Somatic,
+    /// Induced pluripotent stem cell (iPSC) — fully reprogrammed.
     Pluripotent,     // iPSC
+    /// Primordial germ cell-like cell (PGC-LC) — output of PGC induction.
     PrimordialGerm,  // PGC-LC
+    /// Oogonium stage in the female germline.
     Oogonium,
+    /// Mature oocyte — used as SCNT recipient or IVG endpoint.
     Oocyte,
+    /// Spermatogonial stem cell stage in the male germline.
     Spermatogonium,
+    /// Primary spermatocyte — entering meiosis.
     Spermatocyte,
+    /// Early embryonic cell (e.g., post-SCNT blastocyst).
     Embryonic,
+    /// Terminally differentiated cell of a specific tissue lineage.
     Differentiated(DifferentiatedType),
 }
 
+/// Specific tissue lineage for a fully differentiated cell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DifferentiatedType {
+    /// Neural lineage (neurons, glia).
     Neural,
+    /// Cardiac muscle lineage.
     Cardiac,
+    /// Hepatocyte / liver cell lineage.
     Hepatic,
+    /// Renal tubular or podocyte lineage.
     Renal,
+    /// Epithelial (surface barrier) lineage.
     Epithelial,
+    /// Mesenchymal stromal lineage.
     Mesenchymal,
 }
 
+/// Snapshot of a single cell's biological state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CellState {
+    /// Identity / lineage of the cell.
     pub cell_type: CellType,
+    /// Proportion of living, intact cells (0–1).
     pub viability: f64,           // 0-1
+    /// Degree of pluripotency; 1.0 = fully pluripotent iPSC.
     pub pluripotency_score: f64,  // 0-1 (1 = fully pluripotent)
+    /// Number of cell divisions accumulated since culture start.
     pub division_count: u32,
+    /// Time in culture since seeding (hours).
     pub age_hours: f64,
+    /// Global DNA methylation level (0 = fully demethylated, 1 = fully methylated).
     pub methylation_score: f64,   // Global methylation level 0-1
+    /// Simplified per-gene expression profile (each value 0–1).
     pub gene_expression: Vec<f64>, // Simplified expression profile
 }
 
@@ -90,14 +115,22 @@ impl CellState {
     }
 }
 
+/// Physical parameters of a cell culture incubation environment.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CultureEnvironment {
+    /// Incubator temperature in °C (target ≈ 37.0).
     pub temperature_celsius: f64, // target ~37.0
+    /// CO₂ concentration in percent (target ≈ 5.0).
     pub co2_percent: f64,         // target ~5.0
+    /// O₂ concentration in percent (target ≈ 20.0, or 5.0 for hypoxic culture).
     pub o2_percent: f64,          // target ~20.0 (or 5.0 for hypoxic)
+    /// Media pH (target ≈ 7.4).
     pub ph: f64,                  // target ~7.4
+    /// Relative humidity in percent (target ≈ 95.0).
     pub humidity_percent: f64,    // target ~95.0
+    /// Volume of culture media in the vessel (mL).
     pub media_volume_ml: f64,
+    /// Number of times the culture has been passaged (subcultured).
     pub passage_number: u32,
 }
 
@@ -139,53 +172,88 @@ impl CultureEnvironment {
     }
 }
 
+/// Stage of a Yamanaka factor iPSC reprogramming protocol (28-day timeline).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReprogrammingStage {
+    /// Day 0: Yamanaka factor delivery initiated.
     Initial,          // Day 0: factor delivery
+    /// Days 1–3: Mesenchymal-to-Epithelial Transition (MET) begins.
     EarlyResponse,    // Day 1-3: MET begins
+    /// Days 4–10: Epigenetic remodeling and chromatin opening.
     MidReprogramming, // Day 4-10: epigenetic remodeling
+    /// Days 11–20: Pluripotency gene network activation.
     LateReprogramming, // Day 11-20: pluripotency activation
+    /// Days 21–28: Stable iPSC colony formation and expansion.
     Stabilization,    // Day 21-28: stable iPSC colonies
+    /// Protocol finished; iPSC identity validated.
     Complete,         // Validated iPSC
+    /// Protocol terminated due to cell death or quality failure.
     Failed,
 }
 
+/// Developmental stage during in vitro gametogenesis (IVG): iPSC → gamete.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GermCellStage {
+    /// Starting iPSC that feeds into the IVG pipeline.
     Ipsc,
+    /// Primordial germ cell-like (PGC-LC) induction phase.
     PgcInduction,   // PGC-like cell induction
+    /// Early germ cell after PGC induction.
     EarlyGerm,      // Early germ cell
+    /// Cell is transitioning into meiotic prophase I.
     MeioticEntry,   // Entering meiosis
+    /// Meiosis I (reductional division) in progress.
     MeiosisI,
+    /// Meiosis II (equational division) in progress.
     MeiosisII,
+    /// IVG complete; mature haploid gamete produced.
     MatureGamete,
+    /// Protocol terminated due to checkpoint failure or low viability.
     Failed,
 }
 
+/// Quality control checkpoints verified during meiosis.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MeiosisCheckpoint {
+    /// Homologous chromosome synapsis (pairing) in prophase I.
     Synapsis,       // Homolog pairing
+    /// Crossover / recombination event count verification.
     Crossover,      // Recombination
+    /// Chromosome segregation quality after meiosis I.
     SegregationI,   // First division
+    /// Chromatid segregation quality after meiosis II.
     SegregationII,  // Second division
 }
 
+/// Stage of a Somatic Cell Nuclear Transfer (SCNT) protocol.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ScntStage {
+    /// Removal of the oocyte's own nucleus.
     Enucleation,
+    /// Injection of the donor somatic nucleus into the enucleated oocyte.
     NuclearInjection,
+    /// Oocyte activation to initiate nuclear reprogramming.
     Activation,
+    /// First mitotic division of the reconstructed embryo.
     FirstDivision,
+    /// Development to blastocyst stage (inner cell mass + trophoblast).
     BlastocystFormation,
+    /// SCNT successfully completed; embryo is viable.
     Complete,
+    /// Protocol terminated due to failed stage transition.
     Failed,
 }
 
+/// Expression levels of the four canonical Yamanaka reprogramming factors (each 0–1).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YamanakaFactors {
+    /// OCT4 (POU5F1) expression level (master pluripotency regulator).
     pub oct4: f64, // 0-1 expression level
+    /// SOX2 expression level (pluripotency co-factor with OCT4).
     pub sox2: f64,
+    /// KLF4 expression level (anti-apoptotic reprogramming factor).
     pub klf4: f64,
+    /// c-MYC expression level (proliferation booster; reduced late to limit oncogenesis risk).
     pub c_myc: f64,
 }
 
@@ -211,12 +279,18 @@ impl YamanakaFactors {
     }
 }
 
+/// Epigenetic state of a cell relevant to reprogramming quality and imprinting.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpigeneticProfile {
+    /// Genome-wide CpG methylation fraction (0 = fully demethylated, 1 = fully methylated).
     pub global_methylation: f64,
+    /// H19/IGF2 imprinting completeness (0 = erased, 1 = fully imprinted).
     pub h19_igf2_imprinting: f64, // 0 = no imprint, 1 = full imprint
+    /// SNRPN locus imprinting completeness (0 = erased, 1 = fully imprinted).
     pub snrpn_imprinting: f64,
+    /// Whether X-chromosome inactivation has been re-established.
     pub x_inactivation_status: bool,
+    /// Telomere length relative to a healthy newborn baseline (1.0).
     pub telomere_length: f64, // Relative to newborn (1.0)
 }
 
@@ -244,13 +318,20 @@ impl EpigeneticProfile {
     }
 }
 
+/// Comprehensive quality control report for a cell product.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QualityReport {
+    /// Whether karyotype analysis found a normal chromosome complement.
     pub karyotype_normal: bool,
+    /// Measured expression levels of key pluripotency markers (name, score).
     pub pluripotency_markers: Vec<(String, f64)>,
+    /// Cell viability at the time of assessment (0–1).
     pub viability: f64,
+    /// Whether the culture passed contamination screening.
     pub contamination_free: bool,
+    /// Overall epigenetic quality score (0–1; see `epigenetic_quality_score`).
     pub epigenetic_score: f64,
+    /// True when all critical checks pass and the product is release-eligible.
     pub overall_pass: bool,
 }
 

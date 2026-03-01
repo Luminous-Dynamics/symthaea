@@ -109,6 +109,7 @@ pub struct WaterHdcEncoder {
 }
 
 impl WaterHdcEncoder {
+    /// Create a new encoder with deterministic per-parameter base vectors.
     pub fn new() -> Self {
         let seeds: [u64; 8] = [
             0xDA7_E001, // pH
@@ -166,6 +167,7 @@ pub struct HydrologicalPredictor {
 }
 
 impl HydrologicalPredictor {
+    /// Create a predictor with a 1-hour base time constant suitable for hydrological data.
     pub fn new() -> Self {
         let config = UnifiedConfig {
             tau_base: 3600.0, // 1 hour base (hydrological timescale)
@@ -241,6 +243,7 @@ impl symthaea_core::temporal::TemporalPredictor for HydrologicalPredictor {
 
 /// Discrete actions for water quality management.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Discrete interventions the water FEP agent can recommend.
 pub enum WaterFepAction {
     /// Water quality within tolerance.
     Maintain,
@@ -257,6 +260,7 @@ pub enum WaterFepAction {
 }
 
 impl WaterFepAction {
+    /// All available water management actions in a fixed-size array.
     pub const ALL: [WaterFepAction; 6] = [
         WaterFepAction::Maintain,
         WaterFepAction::Chlorinate,
@@ -266,6 +270,7 @@ impl WaterFepAction {
         WaterFepAction::EmergencyShutoff,
     ];
 
+    /// Convert this action to its canonical integer index.
     pub fn to_index(self) -> usize {
         match self {
             WaterFepAction::Maintain => 0,
@@ -277,6 +282,7 @@ impl WaterFepAction {
         }
     }
 
+    /// Convert an integer index back to an action; out-of-bounds returns `EmergencyShutoff`.
     pub fn from_index(idx: usize) -> Self {
         match WaterFepAction::ALL.get(idx) {
             Some(&action) => action,
@@ -287,12 +293,14 @@ impl WaterFepAction {
 
 /// FEP-based agent for water quality management.
 pub struct WaterFepAgent {
+    /// Free energy above which a reading is considered surprising (triggers intervention).
     pub surprise_threshold: f64,
     encoder: WaterHdcEncoder,
     reference_state: ContinuousHV,
 }
 
 impl WaterFepAgent {
+    /// Create a new agent with a clean-water reference state and default surprise threshold.
     pub fn new() -> Self {
         let encoder = WaterHdcEncoder::new();
         let reference_state = encoder.encode(&WaterQualityReading::clean());

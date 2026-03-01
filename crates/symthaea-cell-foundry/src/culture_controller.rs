@@ -17,9 +17,13 @@ use crate::types::CultureEnvironment;
 /// Adjustments to apply to the culture environment.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CultureAdjustment {
+    /// Temperature correction to apply (°C; positive = heat, negative = cool).
     pub delta_temp: f64,
+    /// CO₂ concentration correction (%; positive = add, negative = reduce).
     pub delta_co2: f64,
+    /// pH correction (positive = alkalinise, negative = acidify).
     pub delta_ph: f64,
+    /// True when culture media should be exchanged at the next opportunity.
     pub media_change_needed: bool,
 }
 

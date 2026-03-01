@@ -12,9 +12,13 @@ use crate::types::{CellState, CellType, CultureEnvironment, GermCellStage, Meios
 /// IVG protocol: iPSC to mature gamete with checkpoint gating.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IvgProtocol {
+    /// Current IVG developmental stage (iPSC → mature gamete).
     pub stage: GermCellStage,
+    /// Days elapsed since IVG protocol initiation.
     pub day: u32,
+    /// Cell progressing through gametogenesis.
     pub cell_state: CellState,
+    /// Meiotic checkpoints that have been successfully verified.
     pub checkpoints_passed: Vec<MeiosisCheckpoint>,
     /// Quality scores at each checkpoint (checkpoint, pass, score).
     checkpoint_history: Vec<(MeiosisCheckpoint, bool, f64)>,

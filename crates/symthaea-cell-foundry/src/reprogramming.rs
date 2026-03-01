@@ -16,9 +16,13 @@ use crate::types::{
 /// conditions and cell viability.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReprogrammingProtocol {
+    /// Current stage of the 28-day reprogramming timeline.
     pub stage: ReprogrammingStage,
+    /// Number of days elapsed since protocol initiation.
     pub day: u32,
+    /// Current Yamanaka factor expression levels (adjusted per stage).
     pub factors: YamanakaFactors,
+    /// Cell being reprogrammed; updated each day with pluripotency gains.
     pub cell_state: CellState,
     /// Cumulative stress from suboptimal conditions (reduces success probability).
     stress_accumulator: f64,

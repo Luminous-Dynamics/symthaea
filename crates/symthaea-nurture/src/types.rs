@@ -10,28 +10,34 @@ use symthaea_neuromodulators::NeuromodulatorBath;
 /// by months, following WHO convention.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DevelopmentalAge {
+    /// Age in months (non-negative).
     pub months: f64,
 }
 
 impl DevelopmentalAge {
+    /// Create a new developmental age, clamping negative values to zero.
     pub fn new(months: f64) -> Self {
         Self {
             months: months.max(0.0),
         }
     }
 
+    /// Convert to years.
     pub fn years(&self) -> f64 {
         self.months / 12.0
     }
 
+    /// Convert to weeks (using 4.33 weeks/month).
     pub fn weeks(&self) -> f64 {
         self.months * 4.33
     }
 
+    /// Convert to days (using 30.44 days/month).
     pub fn days(&self) -> f64 {
         self.months * 30.44
     }
 
+    /// Convert to seconds.
     pub fn seconds(&self) -> f64 {
         self.months * 30.44 * 86400.0
     }
@@ -94,10 +100,15 @@ impl SeparationStage {
 /// Developmental milestone categories (WHO classification).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MilestoneCategory {
+    /// Large muscle movement: rolling, crawling, walking.
     GrossMotor,
+    /// Hand and finger dexterity: grasping, pincer grip, drawing.
     FineMotor,
+    /// Speech and language development from cooing to complex sentences.
     Language,
+    /// Social-emotional development: attachment, play, theory of mind.
     Social,
+    /// Cognitive development: object permanence, symbolic play, reasoning.
     Cognitive,
 }
 
@@ -199,10 +210,15 @@ pub struct InternalWorkingModel {
 /// - Co-regulation: oxytocin-mediated calming
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttachmentNeuromodulation {
+    /// Oxytocin surge from contact/reunion (0-1).
     pub oxytocin_burst: f32,
+    /// Noradrenaline change: positive = arousal during separation, negative = calming.
     pub noradrenaline_separation: f32,
+    /// Serotonin change: negative = depletion in despair, positive = restoration.
     pub serotonin_despair: f32,
+    /// Dopamine reward signal on reunion (0-1).
     pub dopamine_reunion: f32,
+    /// Adenosine stress accumulation: positive = increase, negative = clearance.
     pub adenosine_stress: f32,
 }
 

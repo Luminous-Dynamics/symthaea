@@ -6,6 +6,8 @@
 use crate::types::{AssemblyContig, GenomeQuality};
 
 /// Quality assessment for genome assemblies.
+///
+/// Computes N50, coverage statistics, completeness, and Phred error estimates from assembled contigs.
 pub struct QualityAssessor;
 
 impl QualityAssessor {

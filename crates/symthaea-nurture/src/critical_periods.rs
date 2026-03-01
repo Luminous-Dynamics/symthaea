@@ -38,7 +38,7 @@ pub enum CriticalPeriodDomain {
 /// computing plasticity at any age in O(1).
 #[derive(Debug, Clone)]
 pub struct CriticalPeriodModel {
-    /// CfC neuron for temporal plasticity modeling.
+    // Private: CfC neuron whose state tracks the developmental trajectory.
     neuron: HdcLtcUnifiedNeuron,
 }
 

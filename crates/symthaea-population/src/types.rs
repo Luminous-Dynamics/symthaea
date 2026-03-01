@@ -9,7 +9,9 @@ use symthaea_core::hdc::unified_hv::ContinuousHV;
 /// Biological sex for breeding pair selection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum BiologicalSex {
+    /// Female sex, typically the egg-producing parent.
     Female,
+    /// Male sex, typically the sperm-producing parent.
     Male,
 }
 

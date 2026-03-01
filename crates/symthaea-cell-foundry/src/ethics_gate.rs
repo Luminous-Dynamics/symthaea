@@ -11,7 +11,9 @@ use serde::{Deserialize, Serialize};
 /// this gate. IVG protocols have additional requirements.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EthicsGate {
+    /// True when informed consent from the donor / participants has been documented.
     pub consent_obtained: bool,
+    /// True when the protocol has received Institutional Review Board (IRB) approval.
     pub irb_approved: bool,
     /// Optional additional requirements for specific protocol types.
     pub additional_approvals: Vec<String>,
