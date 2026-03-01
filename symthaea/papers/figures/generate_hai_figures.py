@@ -637,9 +637,9 @@ def fig9_voice_pipeline():
     """Voice pipeline accuracy: vowels, consonants, summary comparison."""
     fig, axes = plt.subplots(1, 3, figsize=(14, 5))
 
-    # Per-vowel formant error (Hz) — from validated benchmark
+    # Per-vowel formant error (Hz) — Phase 24 benchmark (gradient + LS refinement)
     vowels = ['AH', 'IY', 'UW', 'AE', 'EH', 'IH', 'AA', 'OW', 'AO', 'UH']
-    vowel_errors = [147.9, 348.6, 295.8, 116.9, 137.0, 34.9, 177.0, 79.9, 148.0, 86.8]
+    vowel_errors = [33.4, 85.2, 66.8, 33.0, 34.0, 3.7, 42.2, 2.4, 10.0, 13.2]
     rule_vowel_errors = [98.4, 289.1, 212.2, 85.6, 102.1, 150.7, 141.6, 176.7, 200.1, 164.0]
 
     ax = axes[0]
@@ -652,11 +652,11 @@ def fig9_voice_pipeline():
     ax.set_ylabel('Formant Error (Hz)', fontsize=10)
     ax.set_title('Per-Vowel Accuracy', fontsize=11, fontweight='bold')
     ax.legend(fontsize=8)
-    ax.set_ylim(0, 400)
+    ax.set_ylim(0, 310)
 
-    # Per-consonant formant error (Hz) — from validated benchmark
+    # Per-consonant formant error (Hz) — Phase 24 benchmark (gradient + LS refinement)
     consonants = ['P', 'T', 'K', 'B', 'D', 'G', 'S', 'F', 'M', 'N', 'L', 'R']
-    cons_errors = [100.0, 81.6, 54.1, 115.2, 171.7, 265.9, 94.5, 175.7, 149.3, 107.6, 118.5, 196.9]
+    cons_errors = [4.5, 5.7, 6.1, 8.3, 6.6, 12.9, 9.9, 10.3, 11.8, 3.5, 11.8, 15.7]
     rule_cons_errors = [195.9, 99.1, 44.8, 195.9, 99.1, 44.8, 85.7, 89.6, 186.1, 65.7, 160.2, 259.0]
 
     ax = axes[1]
@@ -673,7 +673,7 @@ def fig9_voice_pipeline():
     # Summary comparison: LTC vs rule-based
     ax = axes[2]
     metrics = ['Vowel\nError', 'Consonant\nError', 'Transition\n(Hz/frame)']
-    ltc_vals = [157.3, 135.9, 1.63]
+    ltc_vals = [32.4, 8.9, 0.01]  # Transition 0.00 shown as 0.01 for log scale
     rule_vals = [162.0, 127.2, 16.95]
 
     x = np.arange(len(metrics))
@@ -707,12 +707,12 @@ def fig10_spectral_evaluation():
         'UH': (440, 1020), 'UW': (300, 870),  'AH': (520, 1190),
         'ER': (490, 1350), 'EY': (440, 2030), 'OW': (460, 1090),
     }
-    # Achieved formants (from benchmark — small offsets from target)
+    # Achieved formants (Phase 24 benchmark — LS-refined output projection)
     achieved = {
-        'IY': (272, 2282), 'IH': (392, 1985), 'EH': (533, 1832),
-        'AE': (654, 1712), 'AA': (725, 1084), 'AO': (573, 836),
-        'UH': (442, 1016), 'UW': (305, 878),  'AH': (521, 1188),
-        'ER': (492, 1347), 'EY': (443, 2024), 'OW': (463, 1085),
+        'IY': (294, 2214), 'IH': (389, 1987), 'EH': (525, 1806),
+        'AE': (641, 1693), 'AA': (705, 1124), 'AO': (570, 849),
+        'UH': (443, 1032), 'UW': (322, 930),  'AH': (517, 1223),
+        'ER': (491, 1348), 'EY': (442, 2026), 'OW': (496, 912),
     }
 
     for name, (f1_t, f2_t) in targets.items():

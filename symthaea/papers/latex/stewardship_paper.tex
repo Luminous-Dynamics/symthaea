@@ -106,8 +106,9 @@ processing with embodied moral reasoning, is isomorphic to alignment: an AI
 system conscious enough to steward a species is, by construction, aligned with
 human values. This alignment-through-consciousness thesis provides a novel
 framework for evaluating AI safety that complements reward-based and
-constitutional approaches. Code and five new sub-crates (totaling $\sim$20,000
-lines with $\sim$330 tests) are open-source at \url{https://github.com/Luminous-Dynamics/symthaea}.
+constitutional approaches. Code and five new sub-crates (totaling $\sim$22,000
+lines with 767 tests, validated by 35 cross-crate integration tests)
+are open-source at \url{https://github.com/Luminous-Dynamics/symthaea}.
 \end{abstract}
 
 \textbf{Keywords:} consciousness, alignment, stewardship, hyperdimensional
@@ -1528,6 +1529,20 @@ functioning community that can vote. In the early phases of species recovery,
 there is no community---the AI must make unilateral decisions. The transition
 from AI stewardship to self-governance is a critical gap our framework identifies
 but does not resolve.
+
+\paragraph{Reproducibility.} All simulation data presented in this paper
+(Figures~\ref{fig:het_decay}, \ref{fig:attachment}, \ref{fig:cfc_vs_sim})
+are generated deterministically from source code via:
+\begin{verbatim}
+cargo run --example genesis_paper_data \
+    --features population,nurture --release
+\end{verbatim}
+Figures load output CSV files directly using \texttt{pgfplotstable}, ensuring
+single-source-of-truth between simulation and publication. The full genesis
+pipeline (${\sim}22{,}000$ lines across five sub-crates) compiles and passes
+767 unit tests plus 35 cross-crate integration tests under
+\texttt{cargo test --features genesis}. Source code, data, and \LaTeX{} sources
+are available in the project repository.
 
 
 % ============================================================================

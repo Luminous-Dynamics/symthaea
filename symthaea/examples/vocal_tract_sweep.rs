@@ -1,7 +1,7 @@
 //! Parameter sweep for vocal tract LTC controller.
 //!
-//! Tests one parameter at a time while holding others at Phase 23 baseline,
-//! then tests the combined best configuration.
+//! Tests one parameter at a time while holding others at Phase 24 baseline
+//! (gradient training + LS refinement). Includes blend, lambda, and neurons sweeps.
 //!
 //! Run with: cargo run --example vocal_tract_sweep --features vocal-tract --release
 
@@ -27,7 +27,7 @@ fn main() {
     let test_vowels = ["AH", "IY", "UW", "AE", "EH", "IH", "AA", "OW", "AO", "UH"];
     let epochs = 100;
 
-    /// Train + evaluate a single configuration. Returns (avg_vowel_err, per_vowel_errs, loss).
+    /// Train + LS refine + evaluate. Returns (avg_vowel_err, per_vowel_errs, loss).
     fn evaluate(
         genesis: &GenesisSeed,
         db: &FormantDatabase,
@@ -35,6 +35,8 @@ fn main() {
         params: &TrainingHyperparams,
         epochs: usize,
         test_vowels: &[&str],
+        ls_blend: f32,
+        ls_lambda: f32,
     ) -> (f32, Vec<(String, f32)>, f32) {
         let mut ltc = VocalTractController::new_with_weight_init(
             genesis,
@@ -49,8 +51,13 @@ fn main() {
             .collect();
         let loss = ltc.train_on_phoneme_targets_configured(genesis, &targets, epochs, params);
 
-        // Transition training (always 10 epochs with default transition LR)
+        // Transition training (always 10 epochs)
         symthaea::voice::train_controller_transitions(&mut ltc, genesis, db, 10);
+
+        // LS refinement
+        if ls_blend > 0.0 {
+            ltc.refine_output_projection_ls_configured(genesis, &targets, ls_blend, ls_lambda);
+        }
 
         // Evaluate vowels
         let mut total_err = 0.0f32;
@@ -86,189 +93,191 @@ fn main() {
         (avg_err, per_vowel, loss)
     }
 
-    println!("=== Vocal Tract Parameter Sweep ===\n");
+    println!("=== Vocal Tract Parameter Sweep (Phase 24 + LS) ===\n");
     println!("Epochs: {}, Phonemes: {}\n", epochs, db.all_phonemes().len());
 
-    // ── Baseline ──────────────────────────────────────────────────
     let baseline_params = TrainingHyperparams::default();
     let baseline_config = VocalTractConfig::default();
+    let baseline_blend = 0.7f32;
+    let baseline_lambda = 0.01f32;
 
-    print!("Baseline (Phase 23 defaults)... ");
+    // ── Baseline (Phase 24: gradient + LS) ──────────────────────────
+    print!("Baseline (Phase 24, blend=0.7, lambda=0.01)... ");
     let start = Instant::now();
-    let (baseline_avg, baseline_per, baseline_loss) =
-        evaluate(&genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels);
+    let (baseline_avg, baseline_per, baseline_loss) = evaluate(
+        &genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels,
+        baseline_blend, baseline_lambda,
+    );
     println!("done in {:.0}s", start.elapsed().as_secs_f32());
-    print_result("BASELINE", baseline_avg, baseline_loss, &baseline_per);
+    print_result("BASELINE+LS", baseline_avg, baseline_loss, &baseline_per);
+
+    // Also show gradient-only baseline for reference
+    print!("Gradient-only (no LS)... ");
+    let start = Instant::now();
+    let (grad_avg, grad_per, grad_loss) = evaluate(
+        &genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels,
+        0.0, baseline_lambda,
+    );
+    println!("done in {:.0}s", start.elapsed().as_secs_f32());
+    print_result("GRADIENT-ONLY", grad_avg, grad_loss, &grad_per);
     println!();
 
-    // ── Sweep definitions ─────────────────────────────────────────
-    // Each sweep: (label, parameter name, values to test)
-    // We test one param at a time, keeping all others at default.
+    let mut best_avg = baseline_avg;
+    let mut best_label = "BASELINE+LS".to_string();
 
-    let mut best_overall_avg = baseline_avg;
-    let mut best_overall_label = "BASELINE".to_string();
-    let mut best_params = baseline_params.clone();
-    let mut best_config = baseline_config.clone();
-
-    // 1. LR annealing floor
-    println!("── Sweep: lr_min_mult ──");
-    for &val in &[3.0f32, 5.0, 7.0, 15.0] {
-        let mut p = baseline_params.clone();
-        p.lr_min_mult = val;
-        let label = format!("lr_min={}", val);
+    // ── 1. LS Blend sweep ───────────────────────────────────────────
+    println!("── Sweep: LS blend ──");
+    for &val in &[0.5f32, 0.6, 0.8, 0.9, 1.0] {
+        let label = format!("blend={:.1}", val);
         print!("  {}... ", label);
         let start = Instant::now();
-        let (avg, per, loss) = evaluate(&genesis, &db, &baseline_config, &p, epochs, &test_vowels);
+        let (avg, per, loss) = evaluate(
+            &genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels,
+            val, baseline_lambda,
+        );
         println!("done in {:.0}s", start.elapsed().as_secs_f32());
         print_result(&label, avg, loss, &per);
-        if avg < best_overall_avg {
-            best_overall_avg = avg;
-            best_overall_label = label;
-            best_params = p;
+        if avg < best_avg {
+            best_avg = avg;
+            best_label = label;
         }
     }
     println!();
 
-    // 2. LR peak
-    println!("── Sweep: lr_peak_mult ──");
-    for &val in &[20.0f32, 25.0, 40.0] {
-        let mut p = baseline_params.clone();
-        p.lr_peak_mult = val;
-        let label = format!("lr_peak={}", val);
+    // ── 2. LS Lambda sweep ──────────────────────────────────────────
+    println!("── Sweep: LS lambda ──");
+    for &val in &[0.001f32, 0.005, 0.05, 0.1] {
+        let label = format!("lambda={}", val);
         print!("  {}... ", label);
         let start = Instant::now();
-        let (avg, per, loss) = evaluate(&genesis, &db, &baseline_config, &p, epochs, &test_vowels);
+        let (avg, per, loss) = evaluate(
+            &genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels,
+            baseline_blend, val,
+        );
         println!("done in {:.0}s", start.elapsed().as_secs_f32());
         print_result(&label, avg, loss, &per);
-        if avg < best_overall_avg {
-            best_overall_avg = avg;
-            best_overall_label = label;
-            best_params = p;
+        if avg < best_avg {
+            best_avg = avg;
+            best_label = label;
         }
     }
     println!();
 
-    // 3. Weight init scale
-    println!("── Sweep: weight_init_scale ──");
-    for &val in &[0.10f32, 0.20, 0.25] {
-        let mut p = baseline_params.clone();
-        p.weight_init_scale = val;
-        let label = format!("w_init={}", val);
-        print!("  {}... ", label);
-        let start = Instant::now();
-        let (avg, per, loss) = evaluate(&genesis, &db, &baseline_config, &p, epochs, &test_vowels);
-        println!("done in {:.0}s", start.elapsed().as_secs_f32());
-        print_result(&label, avg, loss, &per);
-        if avg < best_overall_avg {
-            best_overall_avg = avg;
-            best_overall_label = label;
-            best_params = p;
-        }
-    }
-    println!();
-
-    // 4. Distance LR cap
-    println!("── Sweep: distance_lr_cap ──");
-    for &val in &[2.0f32, 2.5, 4.0] {
-        let mut p = baseline_params.clone();
-        p.distance_lr_cap = val;
-        let label = format!("dist_cap={}", val);
-        print!("  {}... ", label);
-        let start = Instant::now();
-        let (avg, per, loss) = evaluate(&genesis, &db, &baseline_config, &p, epochs, &test_vowels);
-        println!("done in {:.0}s", start.elapsed().as_secs_f32());
-        print_result(&label, avg, loss, &per);
-        if avg < best_overall_avg {
-            best_overall_avg = avg;
-            best_overall_label = label;
-            best_params = p;
-        }
-    }
-    println!();
-
-    // 5. Outlier steps
-    println!("── Sweep: outlier_steps ──");
-    for &val in &[15usize, 25, 30] {
-        let mut p = baseline_params.clone();
-        p.outlier_steps = val;
-        let label = format!("out_steps={}", val);
-        print!("  {}... ", label);
-        let start = Instant::now();
-        let (avg, per, loss) = evaluate(&genesis, &db, &baseline_config, &p, epochs, &test_vowels);
-        println!("done in {:.0}s", start.elapsed().as_secs_f32());
-        print_result(&label, avg, loss, &per);
-        if avg < best_overall_avg {
-            best_overall_avg = avg;
-            best_overall_label = label;
-            best_params = p;
-        }
-    }
-    println!();
-
-    // 6. Warmup steps
-    println!("── Sweep: warmup_steps ──");
-    for &val in &[10usize, 15, 30] {
-        let mut p = baseline_params.clone();
-        p.warmup_steps = val;
-        let label = format!("warmup={}", val);
-        print!("  {}... ", label);
-        let start = Instant::now();
-        let (avg, per, loss) = evaluate(&genesis, &db, &baseline_config, &p, epochs, &test_vowels);
-        println!("done in {:.0}s", start.elapsed().as_secs_f32());
-        print_result(&label, avg, loss, &per);
-        if avg < best_overall_avg {
-            best_overall_avg = avg;
-            best_overall_label = label;
-            best_params = p;
-        }
-    }
-    println!();
-
-    // 7. Neurons per layer (requires new config)
-    println!("── Sweep: neurons_per_layer ──");
-    for &val in &[3usize, 5] {
+    // ── 3. Neurons per layer + LS ───────────────────────────────────
+    println!("── Sweep: neurons_per_layer (with LS) ──");
+    for &val in &[3usize, 5, 6, 8] {
         let mut c = baseline_config.clone();
         c.neurons_per_layer = val;
         let label = format!("neurons={}", val);
         print!("  {}... ", label);
         let start = Instant::now();
-        let (avg, per, loss) = evaluate(&genesis, &db, &c, &baseline_params, epochs, &test_vowels);
+        let (avg, per, loss) = evaluate(
+            &genesis, &db, &c, &baseline_params, epochs, &test_vowels,
+            baseline_blend, baseline_lambda,
+        );
         println!("done in {:.0}s", start.elapsed().as_secs_f32());
         print_result(&label, avg, loss, &per);
-        if avg < best_overall_avg {
-            best_overall_avg = avg;
-            best_overall_label = label;
-            best_params = baseline_params.clone();
-            best_config = c;
+        if avg < best_avg {
+            best_avg = avg;
+            best_label = label;
         }
     }
     println!();
 
-    // 8. F2 distance weight
-    println!("── Sweep: f2_distance_weight ──");
-    for &val in &[1.0f32, 2.0, 6.0] {
-        let mut p = baseline_params.clone();
-        p.f2_distance_weight = val;
-        let label = format!("f2_wt={}", val);
+    // ── 4. Iterative LS (apply LS twice) ────────────────────────────
+    println!("── Sweep: iterative LS ──");
+    {
+        let label = "LS×2 (iterative)";
         print!("  {}... ", label);
         let start = Instant::now();
-        let (avg, per, loss) = evaluate(&genesis, &db, &baseline_config, &p, epochs, &test_vowels);
+
+        let mut ltc = VocalTractController::new_with_weight_init(
+            &genesis,
+            &baseline_config,
+            baseline_params.weight_init_scale,
+        );
+        let phonemes = db.all_phonemes();
+        let targets: Vec<(&str, &symthaea::voice::formant_targets::FormantTarget)> = phonemes
+            .iter()
+            .filter_map(|name| db.lookup(name).map(|t| (name.as_str(), t)))
+            .collect();
+        let loss = ltc.train_on_phoneme_targets_configured(
+            &genesis, &targets, epochs, &baseline_params,
+        );
+        symthaea::voice::train_controller_transitions(&mut ltc, &genesis, &db, 10);
+
+        // First LS pass
+        ltc.refine_output_projection_ls_configured(
+            &genesis, &targets, baseline_blend, baseline_lambda,
+        );
+        // Second LS pass (re-collects HVs with updated weights)
+        ltc.refine_output_projection_ls_configured(
+            &genesis, &targets, baseline_blend, baseline_lambda,
+        );
+
+        // Evaluate
+        let mut total_err = 0.0f32;
+        let mut per_vowel = Vec::new();
+        for vowel in &test_vowels {
+            if let Some(target) = db.lookup(vowel) {
+                ltc.reset();
+                let phoneme_hv = genesis.hv(&format!("phoneme::{}", vowel), HDC_DIMENSION);
+                for _ in 0..20 {
+                    ltc.forward(&phoneme_hv, 0.005);
+                }
+                let mut f1_sum = 0.0f32;
+                let mut f2_sum = 0.0f32;
+                let mut f3_sum = 0.0f32;
+                for _ in 0..10 {
+                    let frame = ltc.forward(&phoneme_hv, 0.005);
+                    f1_sum += frame.f1;
+                    f2_sum += frame.f2;
+                    f3_sum += frame.f3;
+                }
+                let err = ((f1_sum / 10.0 - target.f1).powi(2)
+                    + (f2_sum / 10.0 - target.f2).powi(2)
+                    + (f3_sum / 10.0 - target.f3).powi(2))
+                .sqrt();
+                total_err += err;
+                per_vowel.push((vowel.to_string(), err));
+            }
+        }
+        let avg = total_err / per_vowel.len().max(1) as f32;
+
         println!("done in {:.0}s", start.elapsed().as_secs_f32());
-        print_result(&label, avg, loss, &per);
-        if avg < best_overall_avg {
-            best_overall_avg = avg;
-            best_overall_label = label;
-            best_params = p;
+        print_result(label, avg, loss, &per_vowel);
+        if avg < best_avg {
+            best_avg = avg;
+            best_label = label.to_string();
         }
     }
     println!();
 
-    // ── Summary ───────────────────────────────────────────────────
+    // ── 5. Gradient training epochs sweep (with LS) ─────────────────
+    println!("── Sweep: gradient epochs (with LS) ──");
+    for &val in &[50usize, 150, 200] {
+        let label = format!("epochs={}", val);
+        print!("  {}... ", label);
+        let start = Instant::now();
+        let (avg, per, loss) = evaluate(
+            &genesis, &db, &baseline_config, &baseline_params, val, &test_vowels,
+            baseline_blend, baseline_lambda,
+        );
+        println!("done in {:.0}s", start.elapsed().as_secs_f32());
+        print_result(&label, avg, loss, &per);
+        if avg < best_avg {
+            best_avg = avg;
+            best_label = label;
+        }
+    }
+    println!();
+
+    // ── Summary ─────────────────────────────────────────────────────
     println!("═══════════════════════════════════════════════════");
-    println!("  BEST SINGLE-PARAM: {} → avg {:.1} Hz (baseline {:.1} Hz)",
-        best_overall_label, best_overall_avg, baseline_avg);
-    println!("  Best params: {:?}", best_params);
-    println!("  Best config neurons: {}", best_config.neurons_per_layer);
+    println!(
+        "  BEST: {} → avg {:.1} Hz (baseline {:.1} Hz, grad-only {:.1} Hz)",
+        best_label, best_avg, baseline_avg, grad_avg
+    );
     println!("═══════════════════════════════════════════════════");
 }
 
