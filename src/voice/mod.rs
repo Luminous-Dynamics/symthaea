@@ -113,7 +113,9 @@ pub use orchestrator::VoiceOrchestrator;
 pub use synthesis_bridge::cycle_result_to_thought_channels;
 
 // Re-export vocal tract types (Phase 17)
-pub use vocal_tract_controller::{train_controller_on_phoneme_db, train_controller_transitions};
+pub use vocal_tract_controller::{
+    refine_controller_ls, train_controller_on_phoneme_db, train_controller_transitions,
+};
 pub use vocal_tract_controller::{
     ProsodyCorrection, ProsodyHead, SpeakerProfile, TrainingHyperparams, VocalTractConfig,
     VocalTractController,

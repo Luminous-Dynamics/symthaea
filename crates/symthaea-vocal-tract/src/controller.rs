@@ -114,7 +114,7 @@ impl Default for VocalTractConfig {
         Self {
             network_layers: 2,
             neurons_per_layer: 4,
-            // 8 total neurons — 4 per layer. 6-neuron causes attractor collapse.
+            // 8 total neurons — 4 per layer. 5 gives same accuracy, 6 collapsed.
             learning_rate: 0.001,
             base_f0: 120.0,
             f0_range: 200.0,
@@ -711,7 +711,7 @@ impl VocalTractController {
             .map(|(name, target)| {
                 let hv = genesis.hv(&format!("phoneme::{}", name), HDC_DIMENSION);
                 // Manner-aware energy/voicing targets
-                let (energy, voicing) = match target.manner {
+                let (energy, voicing): (f32, f32) = match target.manner {
                     SourceType::Vowel => (0.8, 0.95),
                     SourceType::Liquid => (0.6, 0.90),
                     SourceType::Nasal => (0.5, 0.95),
@@ -816,6 +816,138 @@ impl VocalTractController {
         }
 
         last_epoch_loss
+    }
+
+    /// Refine the output projection using least-squares (analytical solution).
+    ///
+    /// After gradient training has settled the LTC network weights, this method
+    /// computes the OPTIMAL output weights + biases that minimize the squared error
+    /// across all phonemes. Since the number of phonemes (N~44) is much less than
+    /// the HDC dimension (D=16384), the system is underdetermined and can be solved
+    /// exactly via the dual form: `w = X^T (X X^T + λI)^{-1} y`.
+    ///
+    /// This eliminates gradient-based interference between competing phonemes
+    /// (e.g., IY wants F2 high while UW wants F2 low on shared weights).
+    ///
+    /// `blend` controls interpolation with existing weights: 0.0 = keep gradient weights,
+    /// 1.0 = fully replace with LS solution. Recommended: 0.5-0.8.
+    pub fn refine_output_projection_ls(
+        &mut self,
+        genesis: &GenesisSeed,
+        phoneme_targets: &[(&str, &crate::types::FormantTarget)],
+        blend: f32,
+    ) {
+        if phoneme_targets.is_empty() {
+            return;
+        }
+        let blend = blend.clamp(0.0, 1.0);
+
+        // 1. Collect network output HVs after warmup for each phoneme
+        let mut hvs: Vec<Vec<f32>> = Vec::with_capacity(phoneme_targets.len());
+        let mut targets: Vec<[f32; OUTPUT_DIM]> = Vec::with_capacity(phoneme_targets.len());
+
+        for (name, target) in phoneme_targets {
+            let hv = genesis.hv(&format!("phoneme::{}", name), HDC_DIMENSION);
+            self.reset();
+            for _ in 0..20 {
+                self.forward(&hv, 0.005);
+            }
+            // Take the steady-state network output (without output projection)
+            let output_hv = self.network.output().normalize();
+            hvs.push(output_hv.as_slice().to_vec());
+
+            // Target raw values (pre-activation — invert softplus for formants)
+            let (energy, voicing): (f32, f32) = match target.manner {
+                SourceType::Vowel => (0.8, 0.95),
+                SourceType::Liquid => (0.6, 0.90),
+                SourceType::Nasal => (0.5, 0.95),
+                SourceType::Stop => {
+                    if target.is_voiced { (0.4, 0.7) } else { (0.2, 0.05) }
+                }
+                SourceType::Fricative => {
+                    if target.is_voiced { (0.5, 0.6) } else { (0.4, 0.05) }
+                }
+                SourceType::Affricate => (0.3, 0.1),
+                SourceType::Silent => (0.0, 0.0),
+            };
+
+            // For formants (softplus activation): raw ≈ target for large values
+            // For sigmoid outputs (energy/voicing): raw = logit(target)
+            let raw_target = [
+                target.f1,
+                target.f2,
+                target.f3,
+                target.b1,
+                target.b2,
+                target.b3,
+                self.config.base_f0,
+                logit(energy.clamp(0.01, 0.99)),
+                logit(voicing.clamp(0.01, 0.99)),
+            ];
+            targets.push(raw_target);
+        }
+
+        let n = hvs.len(); // Number of phonemes
+        let d = HDC_DIMENSION;
+
+        // 2. For each output dimension, solve the least-squares problem
+        // G = X X^T (n×n Gram matrix), y = targets - bias
+        // alpha = (G + λI)^{-1} y
+        // w_new = X^T alpha
+        let lambda = 0.01; // Tikhonov regularization to prevent huge weights
+
+        // Pre-compute Gram matrix G (n×n)
+        let mut gram = vec![0.0f32; n * n];
+        for i in 0..n {
+            for j in i..n {
+                let mut dot = 0.0f32;
+                for k in 0..d {
+                    dot += hvs[i][k] * hvs[j][k];
+                }
+                gram[i * n + j] = dot;
+                gram[j * n + i] = dot;
+            }
+        }
+
+        // Add regularization
+        for i in 0..n {
+            gram[i * n + i] += lambda;
+        }
+
+        for dim in 0..OUTPUT_DIM {
+            // Construct RHS: y_i = target_raw[i] - bias[i] (what the weights need to produce)
+            let y: Vec<f32> = targets.iter().map(|t| t[dim] - self.output_bias[dim]).collect();
+
+            // Solve G * alpha = y using Gaussian elimination (n is small, ~44)
+            let alpha = solve_linear_system(&gram, &y, n);
+            if alpha.is_none() {
+                continue; // Singular matrix, skip this dim
+            }
+            let alpha = alpha.unwrap();
+
+            // Compute new weights: w_new = X^T * alpha
+            let row_offset = dim * d;
+            for j in 0..d {
+                let mut w_new = 0.0f32;
+                for i in 0..n {
+                    w_new += alpha[i] * hvs[i][j];
+                }
+                // Blend: w_final = (1-blend)*w_old + blend*w_new
+                self.output_weights[row_offset + j] =
+                    (1.0 - blend) * self.output_weights[row_offset + j] + blend * w_new;
+            }
+
+            // Also update bias using the mean residual
+            let mut mean_residual = 0.0f32;
+            for i in 0..n {
+                let mut pred = self.output_bias[dim];
+                for j in 0..d {
+                    pred += self.output_weights[row_offset + j] * hvs[i][j];
+                }
+                mean_residual += targets[i][dim] - pred;
+            }
+            self.output_bias[dim] += blend * mean_residual / n as f32;
+        }
     }
 
     /// Train on phoneme transitions (BPTT sequence training).
@@ -952,6 +1084,60 @@ fn sigmoid(x: f32) -> f32 {
 fn logit(p: f32) -> f32 {
     let p = p.clamp(1e-6, 1.0 - 1e-6);
     (p / (1.0 - p)).ln()
+}
+
+/// Solve Ax = b via Gaussian elimination with partial pivoting.
+/// Returns None if the matrix is singular. `a` is n×n in row-major order.
+fn solve_linear_system(a: &[f32], b: &[f32], n: usize) -> Option<Vec<f32>> {
+    let mut aug = vec![0.0f32; n * (n + 1)];
+    for i in 0..n {
+        for j in 0..n {
+            aug[i * (n + 1) + j] = a[i * n + j];
+        }
+        aug[i * (n + 1) + n] = b[i];
+    }
+
+    // Forward elimination with partial pivoting
+    for col in 0..n {
+        // Find pivot
+        let mut max_row = col;
+        let mut max_val = aug[col * (n + 1) + col].abs();
+        for row in (col + 1)..n {
+            let val = aug[row * (n + 1) + col].abs();
+            if val > max_val {
+                max_val = val;
+                max_row = row;
+            }
+        }
+        if max_val < 1e-10 {
+            return None; // Singular
+        }
+        // Swap rows
+        if max_row != col {
+            for j in 0..=n {
+                aug.swap(col * (n + 1) + j, max_row * (n + 1) + j);
+            }
+        }
+        // Eliminate below
+        let pivot = aug[col * (n + 1) + col];
+        for row in (col + 1)..n {
+            let factor = aug[row * (n + 1) + col] / pivot;
+            for j in col..=n {
+                aug[row * (n + 1) + j] -= factor * aug[col * (n + 1) + j];
+            }
+        }
+    }
+
+    // Back substitution
+    let mut x = vec![0.0f32; n];
+    for i in (0..n).rev() {
+        let mut sum = aug[i * (n + 1) + n];
+        for j in (i + 1)..n {
+            sum -= aug[i * (n + 1) + j] * x[j];
+        }
+        x[i] = sum / aug[i * (n + 1) + i];
+    }
+    Some(x)
 }
 
 /// Additive prosody corrections from the learned prosody head.
