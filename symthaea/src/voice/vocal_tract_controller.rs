@@ -72,3 +72,22 @@ pub fn train_controller_transitions(
 
     controller.train_on_transitions(genesis, &pair_refs, epochs)
 }
+
+/// Refine the controller's output projection using least-squares optimization.
+///
+/// Call AFTER gradient-based training. Computes the analytical optimal output weights
+/// that minimize squared formant error across all phonemes simultaneously. `blend`
+/// controls interpolation: 0.0 = keep gradient weights, 1.0 = full LS replacement.
+pub fn refine_controller_ls(
+    controller: &mut VocalTractController,
+    genesis: &GenesisSeed,
+    db: &FormantDatabase,
+    blend: f32,
+) {
+    let phonemes = db.all_phonemes();
+    let targets: Vec<(&str, &super::formant_targets::FormantTarget)> = phonemes
+        .iter()
+        .filter_map(|name| db.lookup(name).map(|t| (name.as_str(), t)))
+        .collect();
+    controller.refine_output_projection_ls(genesis, &targets, blend);
+}
