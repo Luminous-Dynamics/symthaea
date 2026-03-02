@@ -147,7 +147,9 @@ impl SemanticPrimingBenchmark {
                 let mut sim = target.similarity(candidate);
                 // Priming boost for same-cluster items
                 if *ci == prime_cluster {
-                    sim += priming_boost * 0.3;
+                    // FEP enables predictive priming; without it, reduced boost
+                    let fep_scale = if config.enable_fep { 0.3 } else { 0.1 };
+                    sim += priming_boost * fep_scale;
                 }
                 xor_shift(&mut rng);
                 let noise = (rng % 10000) as f32 / 10000.0 * noise_level;

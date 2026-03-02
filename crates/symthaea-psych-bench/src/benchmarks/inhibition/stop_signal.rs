@@ -135,8 +135,13 @@ impl StopSignalBenchmark {
                     ContinuousHV::weighted_bundle(&[&stop_proto, &stop_noise], &[0.80, 0.20]);
                 let stop_sim = (stop_stimulus.similarity(&stop_proto) * (1.0 - noise_degrade)) as f64;
 
-                // Final inhibition probability: race model + HDC recognition
-                let p_inhibit = (stop_strength * 0.7 + stop_sim * 0.3).clamp(0.0, 1.0);
+                // NE phasic burst amplifies stop effectiveness (Aron 2007):
+                // Norepinephrine phasic signal strengthens the hyperdirect STN pathway.
+                let ne_phasic_boost = config.neuromod_ne_phasic;
+                let boosted_stop = stop_strength + ne_phasic_boost * (1.0 - stop_strength);
+
+                // Final inhibition probability: race model (boosted) + HDC recognition
+                let p_inhibit = (boosted_stop * 0.7 + stop_sim * 0.3).clamp(0.0, 1.0);
 
                 xor_shift(&mut rng);
                 let r = (rng % 10000) as f64 / 10000.0;
@@ -306,6 +311,32 @@ mod tests {
             assert!(val.mean.is_finite(), "metric {} is not finite", key);
             assert!(val.std_dev.is_finite(), "metric {} std_dev not finite", key);
         }
+    }
+
+    #[test]
+    fn test_ne_phasic_improves_stop_accuracy() {
+        let no_ne = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 10,
+            neuromod_ne_phasic: 0.0,
+            ..Default::default()
+        };
+        let high_ne = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 10,
+            neuromod_ne_phasic: 0.5,
+            ..Default::default()
+        };
+        let r_no = StopSignalBenchmark.run(&no_ne);
+        let r_high = StopSignalBenchmark.run(&high_ne);
+        let stop_no = r_no.metrics["sst_stop_accuracy"].mean;
+        let stop_high = r_high.metrics["sst_stop_accuracy"].mean;
+        assert!(
+            stop_high >= stop_no - 0.05,
+            "NE phasic boost should improve stop accuracy: none={:.3}, high={:.3}",
+            stop_no,
+            stop_high
+        );
     }
 
     #[test]

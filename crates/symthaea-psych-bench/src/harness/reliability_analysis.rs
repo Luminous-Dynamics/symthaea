@@ -271,9 +271,13 @@ impl ReliabilityBattery {
 
             for k in 0..n_subjects {
                 let family_base = base_config.seed + k as u64 * 1000;
+                // Per-subject ability variation via encoding_noise
+                let subject_noise =
+                    base_config.encoding_noise + (k as f64 / n_subjects as f64) * 0.15;
                 for s in 0..n_sessions {
                     let config = BenchmarkConfig {
                         seed: family_base + s as u64 * 100,
+                        encoding_noise: subject_noise,
                         ..base_config.clone()
                     };
                     let result = bench.run(&config);

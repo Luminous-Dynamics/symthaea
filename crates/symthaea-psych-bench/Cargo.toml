@@ -31,6 +31,10 @@ rayon = { workspace = true }
 [dev-dependencies]
 criterion = "0.5"
 
+[[bin]]
+name = "calibration_battery"
+path = "src/bin/calibration_battery.rs"
+
 [[bench]]
 name = "psych_bench_overhead"
 harness = false

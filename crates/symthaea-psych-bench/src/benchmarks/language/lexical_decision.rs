@@ -87,7 +87,11 @@ impl LexicalDecisionBenchmark {
                 let is_high_freq = word_idx < high_freq_count;
 
                 // High-frequency words: stronger prototype signal
-                let signal_strength: f32 = if is_high_freq { 0.75 } else { 0.55 };
+                // FEP provides top-down predictive refinement; without it, weaker signal
+                let fep_penalty: f32 = if config.enable_fep { 0.0 } else { 0.10 };
+                let noise_degrade = config.effective_noise() as f32 * 0.4;
+                let signal_strength: f32 =
+                    (if is_high_freq { 0.75 } else { 0.55 }) - fep_penalty - noise_degrade;
                 xor_shift(&mut rng);
                 let noise_hv = ContinuousHV::random(dim, rng);
                 let stimulus = ContinuousHV::weighted_bundle(

@@ -41,16 +41,16 @@ impl YerkesDodsonBenchmark {
             let distractor = ContinuousHV::random(dim, next_seed(&mut rng));
 
             for _ in 0..simple_trials {
-                let stimulus = ContinuousHV::random(dim, next_seed(&mut rng));
                 // NE modulates signal-to-noise: inverted-U
                 // Moderate NE: best focus. Low NE: sluggish. High NE: jittery.
                 let noise_scale = 1.0 - (1.0 - (ne - 0.6).powi(2) * 4.0).max(0.0);
-                let noise_weight = (noise_scale * 0.3) as f32;
+                let noise_weight = (noise_scale * 0.8) as f32;
+                let signal_weight = (1.0 - noise_weight).max(0.05);
                 let noise_hv = ContinuousHV::random(dim, next_seed(&mut rng));
 
                 let noisy_stim = ContinuousHV::weighted_bundle(
-                    &[&stimulus, &target, &noise_hv],
-                    &[0.3, (0.7 - noise_weight).max(0.1), noise_weight],
+                    &[&target, &noise_hv],
+                    &[signal_weight, noise_weight],
                 );
 
                 let sim_target = noisy_stim.similarity(&target);
@@ -69,16 +69,16 @@ impl YerkesDodsonBenchmark {
 
             for _ in 0..complex_trials {
                 let correct_idx = (next_seed(&mut rng) % 4) as usize;
-                let stimulus = ContinuousHV::random(dim, next_seed(&mut rng));
 
                 // Higher noise at extreme NE levels; complex tasks more sensitive
                 let noise_scale = 1.0 - (1.0 - (ne - 0.45).powi(2) * 5.0).max(0.0);
-                let noise_weight = (noise_scale * 0.4) as f32;
+                let noise_weight = (noise_scale * 0.9) as f32;
+                let signal_weight = (1.0 - noise_weight).max(0.05);
                 let noise_hv = ContinuousHV::random(dim, next_seed(&mut rng));
 
                 let noisy_stim = ContinuousHV::weighted_bundle(
-                    &[&stimulus, &protos[correct_idx], &noise_hv],
-                    &[0.3, (0.7 - noise_weight).max(0.1), noise_weight],
+                    &[&protos[correct_idx], &noise_hv],
+                    &[signal_weight, noise_weight],
                 );
 
                 let best_idx = protos
