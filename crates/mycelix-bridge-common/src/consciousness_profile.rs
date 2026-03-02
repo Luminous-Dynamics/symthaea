@@ -86,6 +86,37 @@ impl ConsciousnessProfile {
             engagement: self.engagement.clamp(0.0, 1.0),
         }
     }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // MINIMAL VIABLE BRIDGE: Symthaea → Mycelix mapping
+    // ════════════════════════════════════════════════════════════════════════
+
+    /// Create a profile from a Symthaea unified consciousness score.
+    ///
+    /// This is the **Minimal Viable Bridge**: one Symthaea metric (C_unified)
+    /// maps 1:1 to the engagement dimension. Other dimensions come from their
+    /// respective sources (identity bridge, reputation history, peer attestations).
+    ///
+    /// # Arguments
+    /// * `unified_consciousness` — C_unified from `ConsciousnessEngineOutput` \[0, 1\]
+    /// * `identity` — from identity bridge (MFA assurance level) \[0, 1\]
+    /// * `reputation` — from reputation bridge (30-day decayed history) \[0, 1\]
+    /// * `community` — from community attestations (peer trust) \[0, 1\]
+    ///
+    /// All values are clamped to \[0, 1\].
+    pub fn from_unified_consciousness(
+        unified_consciousness: f64,
+        identity: f64,
+        reputation: f64,
+        community: f64,
+    ) -> Self {
+        Self {
+            identity: identity.clamp(0.0, 1.0),
+            reputation: reputation.clamp(0.0, 1.0),
+            community: community.clamp(0.0, 1.0),
+            engagement: unified_consciousness.clamp(0.0, 1.0),
+        }
+    }
 }
 
 impl Default for ConsciousnessProfile {
@@ -122,6 +153,43 @@ impl ConsciousnessCredential {
     /// Check if the credential has expired relative to the given timestamp.
     pub fn is_expired(&self, now_us: u64) -> bool {
         now_us >= self.expires_at
+    }
+
+    /// Issue a credential from a unified consciousness score (Minimal Viable Bridge).
+    ///
+    /// Creates a `ConsciousnessProfile` using [`ConsciousnessProfile::from_unified_consciousness`],
+    /// derives the tier, and wraps it in a 24h credential.
+    ///
+    /// # Arguments
+    /// * `did` — Agent's DID string
+    /// * `unified_consciousness` — C_unified from Symthaea's consciousness engine \[0, 1\]
+    /// * `identity` / `reputation` / `community` — other profile dimensions \[0, 1\]
+    /// * `issuer` — DID of the issuing bridge zome
+    /// * `now_us` — current time in microseconds since epoch
+    pub fn from_unified_consciousness(
+        did: String,
+        unified_consciousness: f64,
+        identity: f64,
+        reputation: f64,
+        community: f64,
+        issuer: String,
+        now_us: u64,
+    ) -> Self {
+        let profile = ConsciousnessProfile::from_unified_consciousness(
+            unified_consciousness,
+            identity,
+            reputation,
+            community,
+        );
+        let tier = profile.clamped().tier();
+        Self {
+            did,
+            profile,
+            tier,
+            issued_at: now_us,
+            expires_at: now_us + Self::DEFAULT_TTL_US,
+            issuer,
+        }
     }
 }
 
@@ -1645,5 +1713,149 @@ mod tests {
         let json = r#"{"action_name":"test","zome_name":"z","eligible":true,"actual_tier":"Citizen","required_tier":"Participant","weight_bp":7500}"#;
         let audit: GateAuditInput = serde_json::from_str(json).unwrap();
         assert_eq!(audit.correlation_id, None);
+    }
+
+    // ════════════════════════════════════════════════════════════════════════
+    // MINIMAL VIABLE BRIDGE: End-to-end tests
+    // ════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn mvb_profile_from_unified_consciousness() {
+        let profile = ConsciousnessProfile::from_unified_consciousness(
+            0.65, // C_unified from Symthaea
+            0.80, // identity (verified MFA)
+            0.50, // reputation (moderate history)
+            0.40, // community (some attestations)
+        );
+        assert_eq!(profile.engagement, 0.65);
+        assert_eq!(profile.identity, 0.80);
+        assert_eq!(profile.reputation, 0.50);
+        assert_eq!(profile.community, 0.40);
+        // combined = 0.80*0.25 + 0.50*0.25 + 0.40*0.30 + 0.65*0.20
+        //         = 0.20 + 0.125 + 0.12 + 0.13 = 0.575
+        let expected = 0.80 * 0.25 + 0.50 * 0.25 + 0.40 * 0.30 + 0.65 * 0.20;
+        assert!((profile.combined_score() - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn mvb_profile_clamps_out_of_range() {
+        let profile = ConsciousnessProfile::from_unified_consciousness(
+            1.5, -0.2, 0.5, 0.5,
+        );
+        assert_eq!(profile.engagement, 1.0);
+        assert_eq!(profile.identity, 0.0);
+    }
+
+    #[test]
+    fn mvb_credential_from_unified_consciousness() {
+        let cred = ConsciousnessCredential::from_unified_consciousness(
+            "did:mycelix:agent123".into(),
+            0.65, // C_unified
+            0.80, 0.50, 0.40,
+            "did:mycelix:bridge".into(),
+            NOW,
+        );
+        assert_eq!(cred.did, "did:mycelix:agent123");
+        assert_eq!(cred.profile.engagement, 0.65);
+        assert_eq!(cred.issued_at, NOW);
+        assert_eq!(cred.expires_at, NOW + ConsciousnessCredential::DEFAULT_TTL_US);
+        assert!(!cred.is_expired(NOW));
+        // Tier should be Citizen (combined ≈ 0.575 → >= 0.4)
+        assert!(cred.tier >= ConsciousnessTier::Citizen);
+    }
+
+    #[test]
+    fn mvb_end_to_end_high_consciousness_proposal_eligible() {
+        // Scenario: Agent with high C_unified submits a proposal
+        // Expected: Eligible (Citizen tier, proposal requires Participant)
+
+        // Step 1: Map C_unified → profile
+        let cred = ConsciousnessCredential::from_unified_consciousness(
+            "did:mycelix:agent_high".into(),
+            0.70, // high consciousness
+            0.80, // verified identity
+            0.60, // good reputation
+            0.50, // moderate community
+            "did:mycelix:bridge".into(),
+            NOW,
+        );
+
+        // Step 2: Evaluate against proposal requirement
+        let result = evaluate_governance(
+            &cred,
+            &requirement_for_proposal(),
+            NOW,
+        );
+
+        // Step 3: Verify decision
+        assert!(result.eligible, "High-consciousness agent should be proposal-eligible");
+        assert!(result.tier >= ConsciousnessTier::Participant);
+        assert!(result.weight_bp > 0);
+
+        // Step 4: Audit logging (verify audit input can be constructed)
+        let should_log = should_audit(&requirement_for_proposal(), result.eligible, b"agent_high");
+        // 100% of basic approvals sampled at 10%, but we just verify the function works
+        let _audit = GateAuditInput {
+            action_name: "submit_proposal".into(),
+            zome_name: "commons_bridge".into(),
+            eligible: result.eligible,
+            actual_tier: format!("{:?}", result.tier),
+            required_tier: format!("{:?}", ConsciousnessTier::Participant),
+            weight_bp: result.weight_bp,
+            correlation_id: Some(format!("mvb:{}", NOW)),
+        };
+        // Verify it serializes (real bridge would store on source chain)
+        let json = serde_json::to_string(&_audit).unwrap();
+        assert!(json.contains("submit_proposal"));
+        let _ = should_log; // used
+    }
+
+    #[test]
+    fn mvb_end_to_end_low_consciousness_proposal_rejected() {
+        // Scenario: Agent with low C_unified attempts a proposal
+        // Expected: Rejected (Observer tier, proposal requires Participant)
+
+        let cred = ConsciousnessCredential::from_unified_consciousness(
+            "did:mycelix:agent_low".into(),
+            0.10, // low consciousness
+            0.20, // minimal identity
+            0.10, // low reputation
+            0.15, // minimal community
+            "did:mycelix:bridge".into(),
+            NOW,
+        );
+
+        let result = evaluate_governance(
+            &cred,
+            &requirement_for_proposal(),
+            NOW,
+        );
+
+        assert!(!result.eligible, "Low-consciousness agent should NOT be proposal-eligible");
+        assert_eq!(result.tier, ConsciousnessTier::Observer);
+        assert_eq!(result.weight_bp, 0);
+
+        // Rejections are always logged (100% audit rate)
+        assert!(should_audit(&requirement_for_proposal(), false, b"agent_low"));
+    }
+
+    #[test]
+    fn mvb_end_to_end_read_always_allowed() {
+        // Scenario: Any agent can read, regardless of consciousness level
+        // The governance system gates blast radius, not voice.
+
+        let cred = ConsciousnessCredential::from_unified_consciousness(
+            "did:mycelix:agent_zero".into(),
+            0.0, // zero consciousness
+            0.0, 0.0, 0.0,
+            "did:mycelix:bridge".into(),
+            NOW,
+        );
+
+        // basic requirement is Participant (0.3), but read ops are UNGATED
+        // In production, read ops don't call gate_consciousness at all.
+        // This test verifies the profile correctly reflects zero state.
+        assert_eq!(cred.tier, ConsciousnessTier::Observer);
+        assert_eq!(cred.profile.combined_score(), 0.0);
     }
 }
