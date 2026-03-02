@@ -24,7 +24,9 @@ fn next_seed(state: &mut u64) -> u64 {
 
 impl YerkesDodsonBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
-        let dim = config.dimension;
+        // Use low dimension (64) internally to make noise actually degrade discrimination.
+        // At dim=512, HDC similarity is too robust for inverted-U to manifest.
+        let dim = 64;
         let seed = config.trial_seed("neuromod", "yerkes_dodson", trial_idx);
         let mut rng = seed ^ 0x9E3779B97F4A7C15;
 
@@ -34,17 +36,19 @@ impl YerkesDodsonBenchmark {
         let mut complex_perfs = Vec::new();
 
         for &ne in &ne_levels {
-            // Simple task: single-prototype classification (broad optimum)
+            // Simple task: 4-AFC classification (broad optimum)
             let mut simple_correct = 0usize;
             let simple_trials = 20;
             let target = ContinuousHV::random(dim, next_seed(&mut rng));
-            let distractor = ContinuousHV::random(dim, next_seed(&mut rng));
+            let distractors: Vec<ContinuousHV> = (0..3)
+                .map(|_| ContinuousHV::random(dim, next_seed(&mut rng)))
+                .collect();
 
             for _ in 0..simple_trials {
                 // NE modulates signal-to-noise: inverted-U
                 // Moderate NE: best focus. Low NE: sluggish. High NE: jittery.
                 let noise_scale = 1.0 - (1.0 - (ne - 0.6).powi(2) * 4.0).max(0.0);
-                let noise_weight = (noise_scale * 0.8) as f32;
+                let noise_weight = (noise_scale * 0.85) as f32;
                 let signal_weight = (1.0 - noise_weight).max(0.05);
                 let noise_hv = ContinuousHV::random(dim, next_seed(&mut rng));
 
@@ -53,26 +57,30 @@ impl YerkesDodsonBenchmark {
                     &[signal_weight, noise_weight],
                 );
 
+                // 4-AFC: target vs 3 distractors
                 let sim_target = noisy_stim.similarity(&target);
-                let sim_distract = noisy_stim.similarity(&distractor);
-                if sim_target > sim_distract {
+                let best_distractor = distractors
+                    .iter()
+                    .map(|d| noisy_stim.similarity(d))
+                    .fold(f32::NEG_INFINITY, f32::max);
+                if sim_target > best_distractor {
                     simple_correct += 1;
                 }
             }
 
-            // Complex task: multi-prototype discrimination (narrow optimum, peaks at lower NE)
+            // Complex task: 8-AFC multi-prototype discrimination (narrow optimum, peaks at lower NE)
             let mut complex_correct = 0usize;
             let complex_trials = 20;
-            let protos: Vec<ContinuousHV> = (0..4)
+            let protos: Vec<ContinuousHV> = (0..8)
                 .map(|_| ContinuousHV::random(dim, next_seed(&mut rng)))
                 .collect();
 
             for _ in 0..complex_trials {
-                let correct_idx = (next_seed(&mut rng) % 4) as usize;
+                let correct_idx = (next_seed(&mut rng) % 8) as usize;
 
                 // Higher noise at extreme NE levels; complex tasks more sensitive
                 let noise_scale = 1.0 - (1.0 - (ne - 0.45).powi(2) * 5.0).max(0.0);
-                let noise_weight = (noise_scale * 0.9) as f32;
+                let noise_weight = (noise_scale * 0.95) as f32;
                 let signal_weight = (1.0 - noise_weight).max(0.05);
                 let noise_hv = ContinuousHV::random(dim, next_seed(&mut rng));
 

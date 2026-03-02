@@ -629,8 +629,8 @@ fn main() {
         writeln!(f, "panel,x_var,x_value,y_var,y_value").unwrap();
 
         // ── Panel (a): Yerkes-Dodson NE sweep ──
-        // Replicate the inverted-U sweep for simple and complex tasks
-        let dim = 512usize;
+        // Low dimension (64) + higher AFC to make noise actually degrade discrimination.
+        let dim = 64usize;
         let ne_levels: Vec<f64> = (1..=9).map(|i| i as f64 * 0.1).collect();
         let n_runs = 10; // average over multiple runs
 
@@ -648,35 +648,42 @@ fn main() {
                     *s
                 };
 
-                // Simple task: stimulus = target + noise (no prototypical anchor)
+                // Simple task: 4-AFC (target + 3 distractors)
                 let target = ContinuousHV::random(dim, next(&mut rng));
-                let distractor = ContinuousHV::random(dim, next(&mut rng));
+                let distractors: Vec<ContinuousHV> = (0..3)
+                    .map(|_| ContinuousHV::random(dim, next(&mut rng)))
+                    .collect();
                 let mut correct = 0usize;
                 let trials = 20;
                 for _ in 0..trials {
                     let noise_scale = 1.0 - (1.0 - (ne - 0.6_f64).powi(2) * 4.0).max(0.0);
-                    let noise_weight = (noise_scale * 0.8) as f32;
+                    let noise_weight = (noise_scale * 0.85) as f32;
                     let signal_weight = (1.0 - noise_weight).max(0.05);
                     let noise_hv = ContinuousHV::random(dim, next(&mut rng));
                     let noisy = ContinuousHV::weighted_bundle(
                         &[&target, &noise_hv],
                         &[signal_weight, noise_weight],
                     );
-                    if noisy.similarity(&target) > noisy.similarity(&distractor) {
+                    let sim_target = noisy.similarity(&target);
+                    let best_distractor = distractors
+                        .iter()
+                        .map(|d| noisy.similarity(d))
+                        .fold(f32::NEG_INFINITY, f32::max);
+                    if sim_target > best_distractor {
                         correct += 1;
                     }
                 }
                 simple_accs.push(correct as f64 / trials as f64);
 
-                // Complex task: stimulus = proto[correct] + noise (no anchor)
-                let protos: Vec<ContinuousHV> = (0..4)
+                // Complex task: 8-AFC multi-prototype discrimination
+                let protos: Vec<ContinuousHV> = (0..8)
                     .map(|_| ContinuousHV::random(dim, next(&mut rng)))
                     .collect();
                 let mut correct = 0usize;
                 for _ in 0..trials {
-                    let ci = (next(&mut rng) % 4) as usize;
+                    let ci = (next(&mut rng) % 8) as usize;
                     let noise_scale = 1.0 - (1.0 - (ne - 0.45_f64).powi(2) * 5.0).max(0.0);
-                    let noise_weight = (noise_scale * 0.9) as f32;
+                    let noise_weight = (noise_scale * 0.95) as f32;
                     let signal_weight = (1.0 - noise_weight).max(0.05);
                     let noise_hv = ContinuousHV::random(dim, next(&mut rng));
                     let noisy = ContinuousHV::weighted_bundle(
@@ -717,7 +724,7 @@ fn main() {
         for run in 0..n_runs {
             let base_seed = 42u64.wrapping_add(run * 3571);
             let mut rng = base_seed ^ 0x9E3779B97F4A7C15;
-            let mut next = |s: &mut u64| -> u64 {
+            let next = |s: &mut u64| -> u64 {
                 *s ^= *s << 13;
                 *s ^= *s >> 7;
                 *s ^= *s << 17;

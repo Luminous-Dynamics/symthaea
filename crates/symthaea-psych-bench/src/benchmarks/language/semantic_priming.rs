@@ -119,14 +119,24 @@ impl SemanticPrimingBenchmark {
             };
             let target = &clusters[target_cluster][target_word_idx];
 
-            // SOA processing: SSM accumulates prime→target activation
+            // SOA processing: prime activation decays exponentially over SOA steps.
+            // Science: Neely (1977) — automatic priming decays with SOA;
+            // McNamara (2005) — spreading activation with temporal decay.
             let soa_steps = if is_short_soa { 1 } else { 3 };
+            let decay = config.language_priming_decay;
+            let mut activation = prime.similarity(target).max(0.0) as f64;
+            for _ in 0..soa_steps {
+                activation *= decay; // Exponential decay per SOA step
+            }
+            // Also run through SSM for backward compatibility with ssm_backend
             let mut ssm = SsmTemporalBackend::new(-0.10, 4);
             let prime_activation = prime.similarity(target);
             for _ in 0..soa_steps {
                 ssm.step(prime_activation.max(0.0));
             }
-            let priming_boost = ssm.step(0.0);
+            let ssm_boost = ssm.step(0.0);
+            // Blend: temporal decay + SSM (decay dominates for better SOA modulation)
+            let priming_boost = (activation as f32 * 0.7 + ssm_boost * 0.3).max(0.0);
 
             // 4-AFC: match target against candidates from different clusters
             let mut candidates = vec![(target_cluster, target_word_idx)];

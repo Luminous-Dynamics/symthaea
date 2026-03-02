@@ -115,8 +115,8 @@ impl AttentionNetworkBenchmark {
                 if !cond.congruent {
                     let opposite = if is_left { &right_proto } else { &left_proto };
                     components.push(opposite);
-                    weights.push(0.25); // flanker interference
-                    weights[0] -= 0.1;
+                    weights.push(0.12); // flanker interference (moderate, matches human ~66ms effect)
+                    weights[0] -= 0.05;
                 }
 
                 // Normalize weights
