@@ -202,6 +202,7 @@ impl MeshBridgeActor {
     /// 3. Completed WisdomPackets pushed to inbound channel
     ///
     /// The loop exits when the handle is dropped (channel closes).
+    #[allow(unused_mut)] // mut needed only with mesh-encryption feature
     pub async fn run(mut self, mut mesh: DualLayerMesh, mut receiver: MeshReceiver) {
         let mut poll_interval = tokio::time::interval(std::time::Duration::from_millis(50));
         poll_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
