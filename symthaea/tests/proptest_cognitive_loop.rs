@@ -75,12 +75,12 @@ proptest! {
 
             prop_assert!(result.prediction_error >= 0.0 && result.prediction_error <= 1.0,
                 "prediction_error out of [0,1] at cycle {i}: {}", result.prediction_error);
-            prop_assert!(m.codebook_diversity >= 0.0 && m.codebook_diversity <= 1.0,
-                "codebook_diversity out of [0,1] at cycle {i}: {}", m.codebook_diversity);
-            prop_assert!(m.resonator_best_sim >= -0.01 && m.resonator_best_sim <= 1.01,
-                "resonator_best_sim out of bounds at cycle {i}: {}", m.resonator_best_sim);
-            prop_assert!(m.resonator_reconsolidated <= 3,
-                "reconsolidated exceeds TOP_K at cycle {i}: {}", m.resonator_reconsolidated);
+            prop_assert!(m.memory.codebook_diversity >= 0.0 && m.memory.codebook_diversity <= 1.0,
+                "codebook_diversity out of [0,1] at cycle {i}: {}", m.memory.codebook_diversity);
+            prop_assert!(m.memory.resonator_best_sim >= -0.01 && m.memory.resonator_best_sim <= 1.01,
+                "resonator_best_sim out of bounds at cycle {i}: {}", m.memory.resonator_best_sim);
+            prop_assert!(m.memory.resonator_reconsolidated <= 3,
+                "reconsolidated exceeds TOP_K at cycle {i}: {}", m.memory.resonator_reconsolidated);
         }
     }
 

@@ -123,12 +123,14 @@ fn main() {
                 behavior: context.clone(),
                 context: context.clone(),
                 interaction_outcome: Some(0.8),
+                bath_state: None,
             });
             mind_a.receive_social(SocialMessage {
                 agent_id: "homesteader".to_string(),
                 behavior: context.clone(),
                 context,
                 interaction_outcome: Some(0.8),
+                bath_state: None,
             });
         }
 
@@ -159,12 +161,14 @@ fn main() {
                 behavior: context.clone(),
                 context: context.clone(),
                 interaction_outcome: Some(outcome),
+                bath_state: None,
             });
             mind_a.receive_social(SocialMessage {
                 agent_id: "homesteader".to_string(),
                 behavior: context.clone(),
                 context,
                 interaction_outcome: Some(outcome),
+                bath_state: None,
             });
         }
     }
@@ -238,6 +242,7 @@ fn relay_messages(
             behavior: msg.behavior,
             context: msg.context,
             interaction_outcome: None, // observations only
+            bath_state: None,
         });
     }
 }
