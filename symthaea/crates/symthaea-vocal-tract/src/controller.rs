@@ -2407,6 +2407,7 @@ mod tests {
             b1: 60.0, b2: 90.0, b3: 150.0,
             f0: 120.0, energy: 0.5, voicing: 0.8,
             time: 0.0, source_type: SourceType::Vowel,
+            ..Default::default()
         };
         ctrl.forward(&hv, 0.005);
         ctrl.train_step(&hv, &target, 0.005, None);
@@ -2424,6 +2425,7 @@ mod tests {
             b1: 60.0, b2: 90.0, b3: 150.0,
             f0: 120.0, energy: 0.5, voicing: 0.8,
             time: 0.0, source_type: SourceType::Vowel,
+            ..Default::default()
         };
         ctrl.forward(&hv, 0.005);
         let custom_scale: [f32; OUTPUT_DIM] = [

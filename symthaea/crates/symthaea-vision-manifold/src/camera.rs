@@ -1,11 +1,24 @@
 //! Camera input source for live video processing.
 //!
 //! When the `camera` feature is enabled, provides `CameraSource` backed by
-//! the `nokhwa` crate for real webcam capture. Without the feature, provides
-//! a `MockCameraSource` for testing.
+//! the `v4l` crate for real webcam capture via Video4Linux2. Without the
+//! feature, provides a `MockCameraSource` for testing.
 //!
 //! `CameraManifold` combines a camera source with a `VisionManifold` for
 //! convenient tick-based processing.
+//!
+//! ## NixOS requirements for `camera` feature
+//!
+//! Add to your `flake.nix` `buildInputs`:
+//! ```nix
+//! libclang.lib    # bindgen needs libclang
+//! linuxHeaders    # v4l2-sys-mit needs linux/videodev2.h
+//! ```
+//! And to `shellHook`:
+//! ```bash
+//! export LIBCLANG_PATH="${pkgs.libclang.lib}/lib"
+//! export BINDGEN_EXTRA_CLANG_ARGS="-I${pkgs.linuxHeaders}/include"
+//! ```
 
 use crate::manifold::VisionManifold;
 use crate::types::{VisionConfig, VisionTelemetry};
@@ -19,55 +32,70 @@ pub struct CapturedFrame {
     pub timestamp_us: u64,
 }
 
-// ── Real camera (nokhwa) ──────────────────────────────────────────────
+// ── Real camera (v4l) ──────────────────────────────────────────────
 
 #[cfg(feature = "camera")]
 mod real_camera {
     use super::CapturedFrame;
-    use nokhwa::pixel_format::RgbFormat;
-    use nokhwa::utils::{CameraIndex, RequestedFormat, RequestedFormatType};
-    use nokhwa::Camera;
+    use v4l::buffer::Type;
+    use v4l::io::mmap::Stream;
+    use v4l::io::traits::CaptureStream;
+    use v4l::video::Capture;
+    use v4l::Device;
+    use v4l::FourCC;
 
-    /// Live camera source backed by nokhwa.
+    /// Live camera source backed by V4L2 (Video4Linux2).
     pub struct CameraSource {
-        camera: Camera,
+        stream: Stream,
         width: u32,
         height: u32,
         frame_count: u64,
     }
 
     impl CameraSource {
-        /// Open camera at the given index with requested resolution.
-        pub fn new(camera_index: u32, width: u32, height: u32) -> Result<Self, String> {
-            let index = CameraIndex::Index(camera_index);
-            let requested = RequestedFormat::new::<RgbFormat>(
-                RequestedFormatType::AbsoluteHighestResolution,
-            );
+        /// Open camera at the given device path (e.g., `/dev/video0`).
+        pub fn new(device_index: u32, width: u32, height: u32) -> Result<Self, String> {
+            let path = format!("/dev/video{device_index}");
+            let dev = Device::with_path(&path)
+                .map_err(|e| format!("Failed to open {path}: {e}"))?;
 
-            let camera = Camera::new(index, requested)
-                .map_err(|e| format!("Failed to open camera: {e}"))?;
+            // Request YUYV format (widely supported), we'll convert to grayscale
+            let mut fmt = dev.format().map_err(|e| format!("Failed to get format: {e}"))?;
+            fmt.width = width;
+            fmt.height = height;
+            fmt.fourcc = FourCC::new(b"YUYV");
+            dev.set_format(&fmt)
+                .map_err(|e| format!("Failed to set format: {e}"))?;
+
+            let actual = dev.format().map_err(|e| format!("Failed to read format: {e}"))?;
+
+            let stream = Stream::with_buffers(&dev, Type::VideoCapture, 4)
+                .map_err(|e| format!("Failed to create stream: {e}"))?;
 
             Ok(Self {
-                camera,
-                width,
-                height,
+                stream,
+                width: actual.width,
+                height: actual.height,
                 frame_count: 0,
             })
         }
 
-        /// Capture the next frame as RGB pixels.
+        /// Capture the next frame as grayscale pixels (Y channel from YUYV).
         pub fn next_frame(&mut self) -> Result<CapturedFrame, String> {
-            let frame = self
-                .camera
-                .frame()
+            let (buf, _meta) = self.stream.next()
                 .map_err(|e| format!("Failed to capture frame: {e}"))?;
 
-            let decoded = frame
-                .decode_image::<RgbFormat>()
-                .map_err(|e| format!("Failed to decode frame: {e}"))?;
-
-            let (w, h) = (decoded.width(), decoded.height());
-            let pixels = decoded.into_raw();
+            // YUYV: every 2 bytes = [Y, U/V], extract Y channel for grayscale
+            let num_pixels = (self.width * self.height) as usize;
+            let mut pixels = Vec::with_capacity(num_pixels);
+            for i in 0..num_pixels {
+                let byte_idx = i * 2; // Y is at even indices in YUYV
+                if byte_idx < buf.len() {
+                    pixels.push(buf[byte_idx]);
+                } else {
+                    pixels.push(0);
+                }
+            }
 
             self.frame_count += 1;
             let timestamp_us = std::time::SystemTime::now()
@@ -77,9 +105,9 @@ mod real_camera {
 
             Ok(CapturedFrame {
                 pixels,
-                width: w,
-                height: h,
-                channels: 3,
+                width: self.width,
+                height: self.height,
+                channels: 1,
                 timestamp_us,
             })
         }
@@ -138,10 +166,9 @@ impl MockCameraSource {
 /// Convenience wrapper combining a camera source with a `VisionManifold`.
 ///
 /// Provides a simple `tick()` interface for frame-by-frame processing.
+/// Always uses `MockCameraSource` — use `CameraSource` directly with
+/// `VisionManifold` for real camera input.
 pub struct CameraManifold {
-    #[cfg(feature = "camera")]
-    source: CameraSource,
-    #[cfg(not(feature = "camera"))]
     source: MockCameraSource,
     manifold: VisionManifold,
     last_timestamp_us: u64,
@@ -156,23 +183,6 @@ impl CameraManifold {
             manifold,
             last_timestamp_us: 0,
         }
-    }
-
-    /// Create with a real camera (requires `camera` feature).
-    #[cfg(feature = "camera")]
-    pub fn with_camera(
-        config: VisionConfig,
-        camera_index: u32,
-        width: u32,
-        height: u32,
-    ) -> Result<Self, String> {
-        let source = CameraSource::new(camera_index, width, height)?;
-        let manifold = VisionManifold::new(config, width, height);
-        Ok(Self {
-            source,
-            manifold,
-            last_timestamp_us: 0,
-        })
     }
 
     /// Grab one frame, feed it to the manifold, return telemetry.
