@@ -150,8 +150,14 @@ impl CognitiveLoopService {
                 harmonic_love_resonance: feedback.harmonic_love_resonance,
                 harmonic_interferences: feedback.harmonic_interferences,
                 harmony_coordinates: *self.ethics_engine.last_harmony_coordinates(),
-                moral_scenario_distribution: self.ethics_engine.last_moral_free_energy().scenario_distribution,
-                moral_prior_distribution: self.ethics_engine.last_moral_free_energy().prior_distribution,
+                moral_scenario_distribution: self
+                    .ethics_engine
+                    .last_moral_free_energy()
+                    .scenario_distribution,
+                moral_prior_distribution: self
+                    .ethics_engine
+                    .last_moral_free_energy()
+                    .prior_distribution,
                 moral_kl_divergence: self.ethics_engine.last_moral_free_energy().kl_divergence,
                 moral_entropy: self.ethics_engine.last_moral_free_energy().entropy,
                 moral_surprise: self.ethics_engine.last_moral_free_energy().surprise,
@@ -174,11 +180,31 @@ impl CognitiveLoopService {
                 moral_topo_beta_1: self.ethics_engine.moral_topology().last_summary().beta_1,
                 moral_topo_beta_2: self.ethics_engine.moral_topology().last_summary().beta_2,
                 moral_topo_unity: self.ethics_engine.moral_topology().last_summary().unity,
-                moral_topo_completeness: self.ethics_engine.moral_topology().last_summary().completeness,
-                moral_topo_circularity: self.ethics_engine.moral_topology().last_summary().circularity,
-                moral_topo_free_energy: self.ethics_engine.moral_topology().last_summary().moral_free_energy,
-                moral_topo_dominant_harmony: self.ethics_engine.moral_topology().last_summary().dominant_harmony,
-                moral_topo_scenario_count: self.ethics_engine.moral_topology().last_summary().scenario_count,
+                moral_topo_completeness: self
+                    .ethics_engine
+                    .moral_topology()
+                    .last_summary()
+                    .completeness,
+                moral_topo_circularity: self
+                    .ethics_engine
+                    .moral_topology()
+                    .last_summary()
+                    .circularity,
+                moral_topo_free_energy: self
+                    .ethics_engine
+                    .moral_topology()
+                    .last_summary()
+                    .moral_free_energy,
+                moral_topo_dominant_harmony: self
+                    .ethics_engine
+                    .moral_topology()
+                    .last_summary()
+                    .dominant_harmony,
+                moral_topo_scenario_count: self
+                    .ethics_engine
+                    .moral_topology()
+                    .last_summary()
+                    .scenario_count,
                 moral_anomaly_score: moral_anomaly_report.anomaly_score,
                 moral_value_inversion: moral_anomaly_report.value_inversion,
                 moral_free_energy_spike: moral_anomaly_report.free_energy_spike,
@@ -334,6 +360,7 @@ impl CognitiveLoopService {
                 }
                 .to_string()
             },
+            is_consolidating: self.is_consolidating,
             ..Default::default()
         };
 
@@ -370,7 +397,10 @@ impl CognitiveLoopService {
             feedback.codebook_evictions,
             feedback.codebook_diversity,
             dynamics.fep_surprise,
-            self.self_model_tier.self_reflection.get_thresholds().surprise as f64,
+            self.self_model_tier
+                .self_reflection
+                .get_thresholds()
+                .surprise as f64,
             dynamics.neuromod_attention_alloc,
             dynamics.phasic_da_replay_boost,
             dynamics.ne_reorienting_boost,
@@ -443,19 +473,13 @@ impl CognitiveLoopService {
             metadata.subsystem_integration_contributors = integrated.n_contributors as u32;
 
             if integrated.confidence_delta != 0.0 {
-                self.adjust_confidence(
-                    "subsystem_managers",
-                    integrated.confidence_delta as f32,
-                );
+                self.adjust_confidence("subsystem_managers", integrated.confidence_delta as f32);
             }
             if integrated.lr_modulation != 1.0 {
                 self.scale_lr("subsystem_managers", integrated.lr_modulation as f32);
             }
             if integrated.exploration_delta != 0.0 {
-                self.adjust_exploration(
-                    "subsystem_managers",
-                    integrated.exploration_delta as f32,
-                );
+                self.adjust_exploration("subsystem_managers", integrated.exploration_delta as f32);
             }
             if integrated.arousal_delta != 0.0 {
                 self.emotion_contagion.arousal =

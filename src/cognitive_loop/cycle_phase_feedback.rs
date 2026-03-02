@@ -11,12 +11,12 @@ use super::cycle::{DynamicsPhaseResult, FeedbackPhaseResult, PerceptionPhaseResu
 use super::helpers::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 use super::thresholds::{
     EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD, EPISTEMIC_CAUTION_SCALE,
-    EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE, EPISTEMIC_REJECTION_LR_SCALE,
-    EPISTEMIC_TRUST_SCALE, EPISTEMIC_TRUST_THRESHOLD, EVOLUTION_NEGATIVE_EXPLORATION_MAX,
-    EVOLUTION_NEGATIVE_EXPLORATION_SCALE, EVOLUTION_PHI_THRESHOLD,
-    EVOLUTION_POSITIVE_CONFIDENCE_MAX, EVOLUTION_POSITIVE_CONFIDENCE_SCALE,
-    HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN, HARMONIC_INTERFERENCE_MAX_COUNT,
-    HARMONIC_INTERFERENCE_MAX_DAMPEN,
+    EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
+    EPISTEMIC_REJECTION_LR_SCALE, EPISTEMIC_TRUST_SCALE, EPISTEMIC_TRUST_THRESHOLD,
+    EVOLUTION_NEGATIVE_EXPLORATION_MAX, EVOLUTION_NEGATIVE_EXPLORATION_SCALE,
+    EVOLUTION_PHI_THRESHOLD, EVOLUTION_POSITIVE_CONFIDENCE_MAX,
+    EVOLUTION_POSITIVE_CONFIDENCE_SCALE, HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN,
+    HARMONIC_INTERFERENCE_MAX_COUNT, HARMONIC_INTERFERENCE_MAX_DAMPEN,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -105,7 +105,11 @@ impl CognitiveLoopService {
         let epistemic_quality = consciousness_metrics.epistemic_quality;
         let phi_validation_correlation = consciousness_metrics.phi_validation_correlation;
         let dissipative_health = consciousness_metrics.dissipative_health
-            * (1.0 - self.somatic_bridge.to_interoceptive_signals().dissipative_health_penalty);
+            * (1.0
+                - self
+                    .somatic_bridge
+                    .to_interoceptive_signals()
+                    .dissipative_health_penalty);
         let dissipative_regime = consciousness_metrics.dissipative_regime;
         let dissipative_entropy_rate = consciousness_metrics.dissipative_entropy_rate;
         let epistemic_phi_eff = consciousness_metrics.epistemic_phi_eff;
@@ -115,11 +119,8 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // ADVANCED SUBSYSTEMS (extracted to cycle_subsystems.rs)
         // ═══════════════════════════════════════════════════════════════════════
-        let subsystem_metrics = self.run_advanced_subsystems(
-            &cycle_state,
-            &active_primitive_names,
-            module_timings,
-        );
+        let subsystem_metrics =
+            self.run_advanced_subsystems(&cycle_state, &active_primitive_names, module_timings);
 
         let hierarchical_ltc_phi = subsystem_metrics.hierarchical_ltc_phi;
         let evolution_generation = subsystem_metrics.evolution_generation;
@@ -266,8 +267,8 @@ impl CognitiveLoopService {
                 1.0 - rejection_strength * EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
             );
         } else if epistemic_gate_confidence > EPISTEMIC_APPROVAL_THRESHOLD {
-            let approval_boost =
-                (epistemic_gate_confidence - EPISTEMIC_APPROVAL_THRESHOLD) * EPISTEMIC_APPROVAL_LR_SCALE;
+            let approval_boost = (epistemic_gate_confidence - EPISTEMIC_APPROVAL_THRESHOLD)
+                * EPISTEMIC_APPROVAL_LR_SCALE;
             self.carryover.learning.subsystem_lr_factor *= 1.0 + approval_boost;
             self.carryover.learning.subsystem_lr_factor =
                 self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
@@ -648,9 +649,7 @@ impl CognitiveLoopService {
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
         if self.recent_ai_hvs.len() >= 2 {
-            if let (Some(ref dyad), Some(ref model)) =
-                (&self.phi_dyad, &self.partner_model)
-            {
+            if let (Some(ref dyad), Some(ref model)) = (&self.phi_dyad, &self.partner_model) {
                 use symthaea_core::hdc::relational_consciousness::{
                     RelationMode, RelationalAssessment,
                 };
