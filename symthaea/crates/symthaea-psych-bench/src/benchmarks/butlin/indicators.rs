@@ -394,7 +394,7 @@ mod tests {
     // Phase 5: Butlin Indicator Wiring tests
     // ═══════════════════════════════════════════════════════════════════
 
-    use super::report::RuntimeConsciousnessData;
+    use crate::benchmarks::butlin::report::RuntimeConsciousnessData;
 
     #[test]
     fn test_butlin_no_runtime_data_matches_static() {
