@@ -1163,9 +1163,10 @@ mod tests {
         let start = std::time::Instant::now();
         let assessment = topo.analyze();
         let elapsed = start.elapsed();
-        // At dim=512, should be well under 100ms
+        // At dim=512, should be well under 500ms (relaxed from 100ms to avoid
+        // flaky failures under load; typical is 10-30ms on unloaded machine)
         assert!(
-            elapsed.as_millis() < 100,
+            elapsed.as_millis() < 500,
             "analyze() took {elapsed:?} at n=64, dim={dim}"
         );
         assert_eq!(assessment.scenario_count, 64);

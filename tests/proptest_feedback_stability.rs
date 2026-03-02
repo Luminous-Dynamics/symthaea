@@ -284,7 +284,7 @@ proptest! {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             service.cycle(input);
-            let snap = service.neuromod.neuromod_snapshot();
+            let snap = service.neuromod_snapshot();
 
             // All effective levels: [0.0, 2.0] (level * receptor_sensitivity)
             assert_finite_f32(snap.da_effective, &format!("da_effective@cycle{i}"))?;
@@ -587,7 +587,7 @@ proptest! {
 
             // Check neuromodulator levels every 10 cycles to reduce overhead
             if i % 10 == 0 {
-                let snap = service.neuromod.neuromod_snapshot();
+                let snap = service.neuromod_snapshot();
                 prop_assert!(snap.da_effective.is_finite() && snap.da_effective >= 0.0,
                     "DA diverged at cycle {i}: {}", snap.da_effective);
                 prop_assert!(snap.ne_effective.is_finite() && snap.ne_effective >= 0.0,
@@ -864,11 +864,11 @@ proptest! {
             assert_finite_f32(m.value_cache_hit_rate, &format!("value_cache_hit_rate@{i}"))?;
             assert_finite_f64(m.epistemic_quality, &format!("epistemic_quality@{i}"))?;
             assert_finite_f64(m.phi_validation_correlation, &format!("phi_validation_correlation@{i}"))?;
-            assert_finite_f64(m.dissipative_health, &format!("dissipative_health@{i}"))?;
-            assert_finite_f64(m.dissipative_entropy_rate, &format!("dissipative_entropy_rate@{i}"))?;
-            assert_finite_f64(m.epistemic_phi_eff, &format!("epistemic_phi_eff@{i}"))?;
-            assert_finite_f64(m.equation_v2_consciousness, &format!("equation_v2_consciousness@{i}"))?;
-            assert_finite_f32(m.hierarchical_ltc_phi, &format!("hierarchical_ltc_phi@{i}"))?;
+            assert_finite_f64(m.quality.dissipative_health, &format!("dissipative_health@{i}"))?;
+            assert_finite_f64(m.quality.dissipative_entropy_rate, &format!("dissipative_entropy_rate@{i}"))?;
+            assert_finite_f64(m.quality.epistemic_phi_eff, &format!("epistemic_phi_eff@{i}"))?;
+            assert_finite_f64(m.quality.equation_v2_consciousness, &format!("equation_v2_consciousness@{i}"))?;
+            assert_finite_f32(m.quality.hierarchical_ltc_phi, &format!("hierarchical_ltc_phi@{i}"))?;
             assert_finite_f64(m.holographic_unity, &format!("holographic_unity@{i}"))?;
             assert_finite_f64(m.holographic_binding, &format!("holographic_binding@{i}"))?;
             assert_finite_f64(m.consciousness_gradient_magnitude, &format!("consciousness_gradient_magnitude@{i}"))?;
@@ -888,14 +888,14 @@ proptest! {
             assert_finite_f32(m.ethics.value_feedback_trend, &format!("value_feedback_trend@{i}"))?;
             assert_finite_f64(m.support_efe, &format!("support_efe@{i}"))?;
             assert_finite_f32(m.ethics.soul_alignment, &format!("soul_alignment@{i}"))?;
-            assert_finite_f32(m.meta_cognitive_accuracy, &format!("meta_cognitive_accuracy@{i}"))?;
+            assert_finite_f32(m.quality.meta_cognitive_accuracy, &format!("meta_cognitive_accuracy@{i}"))?;
             assert_finite_f32(m.circadian_plasticity, &format!("circadian_plasticity@{i}"))?;
             assert_finite_f32(m.attention.phi_attention_weight, &format!("phi_attention_weight@{i}"))?;
             assert_finite_f64(m.context_phi_weight, &format!("context_phi_weight@{i}"))?;
             assert_finite_f64(m.ethics.empathic_compassion, &format!("empathic_compassion@{i}"))?;
             assert_finite_f64(m.ethics.empathic_tone_adj, &format!("empathic_tone_adj@{i}"))?;
-            assert_finite_f32(m.codebook_diversity, &format!("codebook_diversity@{i}"))?;
-            assert_finite_f32(m.resonator_best_sim, &format!("resonator_best_sim@{i}"))?;
+            assert_finite_f32(m.memory.codebook_diversity, &format!("codebook_diversity@{i}"))?;
+            assert_finite_f32(m.memory.resonator_best_sim, &format!("resonator_best_sim@{i}"))?;
         }
     }
 }

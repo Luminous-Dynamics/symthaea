@@ -105,8 +105,8 @@ fn test_inject_api_accessible() {
 fn test_clear_injections_works() {
     let mut service = make_service();
     service.inject_pharmacological("da", 0.5, 100);
-    service.cycle("test");
-    assert!(service.neuromod.neuromod_snapshot().neuromod.active_injection_count > 0);
+    let result_pre = service.cycle("test");
+    assert!(result_pre.metadata.neuromod.active_injection_count > 0);
     service.clear_pharmacological();
     let result = service.cycle("test after clear");
     assert_eq!(result.metadata.neuromod.active_injection_count, 0);

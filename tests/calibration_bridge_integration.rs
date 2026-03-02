@@ -219,9 +219,9 @@ fn test_self_assessment_closed_loop_trigger() {
          (max pe_ema reached: {max_pe_ema:.4}, threshold ~0.15)"
     );
 
-    // Verify it fired after the warmup period
+    // Verify it fired after the warmup period (200 observations = cycle index 199+)
     assert!(
-        fired_at_cycle >= 200,
+        fired_at_cycle >= 199,
         "Should fire only after warmup threshold: fired at {fired_at_cycle}"
     );
 
