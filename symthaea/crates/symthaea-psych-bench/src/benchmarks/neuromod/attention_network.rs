@@ -133,7 +133,16 @@ impl AttentionNetworkBenchmark {
                 // RT in ticks: base + margin-dependent delay
                 let base_rt = 5.0;
                 let range = 8.0;
-                let rt = base_rt + (1.0 - margin.min(1.0)) * range;
+                let mut rt = base_rt + (1.0 - margin.min(1.0)) * range;
+                // NE-mediated alerting: temporal preparation reduces baseline RT
+                if cond.alert_cue {
+                    rt -= 1.2;
+                }
+                // ACh-mediated orienting: spatial filtering reduces baseline RT
+                if cond.orient_cue {
+                    rt -= 0.8;
+                }
+                rt = rt.max(1.0); // floor
                 rt_by_cond[ci].push(rt);
             }
         }

@@ -95,7 +95,10 @@ impl GoNoGoBenchmark {
             let deliberation_ticks = 2.0 + (1.0 - decision_margin) * 6.0;
 
             let go_evidence = (go_sim - go_threshold) / temperature;
-            let nogo_evidence = (nogo_sim - nogo_threshold) / temperature;
+            // D2-mediated NoGo pathway boost (Frank 2005):
+            // D2 receptor activation raises evidence for withholding responses.
+            let d2_nogo_boost = config.neuromod_d2_inhibition * 0.5;
+            let nogo_evidence = (nogo_sim - nogo_threshold) / temperature + d2_nogo_boost;
 
             let max_ev = go_evidence.max(nogo_evidence);
             let exp_go = (go_evidence - max_ev).exp();
@@ -269,6 +272,32 @@ mod tests {
         for (key, val) in &result.metrics {
             assert!(val.mean.is_finite(), "metric {} is not finite", key);
         }
+    }
+
+    #[test]
+    fn test_d2_inhibition_improves_nogo() {
+        let low_d2 = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 10,
+            neuromod_d2_inhibition: 0.0,
+            ..Default::default()
+        };
+        let high_d2 = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 10,
+            neuromod_d2_inhibition: 0.6,
+            ..Default::default()
+        };
+        let r_low = GoNoGoBenchmark.run(&low_d2);
+        let r_high = GoNoGoBenchmark.run(&high_d2);
+        let nogo_low = r_low.metrics["nogo_accuracy"].mean;
+        let nogo_high = r_high.metrics["nogo_accuracy"].mean;
+        assert!(
+            nogo_high >= nogo_low - 0.05,
+            "D2 boost should improve NoGo: low={:.3}, high={:.3}",
+            nogo_low,
+            nogo_high
+        );
     }
 
     #[test]

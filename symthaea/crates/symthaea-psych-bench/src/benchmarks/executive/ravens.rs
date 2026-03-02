@@ -368,10 +368,11 @@ impl RavensProgressiveMatricesBenchmark {
                 // Time pressure: +0.15/unit adds perceptual noise, modeling reduced encoding fidelity
                 // under speed emphasis (Carpenter et al., 1990; Wickelgren, 1977 SAT: ~25ms RT cost/unit).
                 let tp_noise = config.time_pressure as f32 * 0.15;
+                let ablation_noise = config.effective_noise() as f32 * 0.4;
                 let noise_frac = match difficulty {
-                    0 => 0.20f32 + tp_noise,
-                    1 => 0.40 + tp_noise,
-                    _ => 0.55 + tp_noise,
+                    0 => 0.20f32 + tp_noise + ablation_noise,
+                    1 => 0.40 + tp_noise + ablation_noise,
+                    _ => 0.55 + tp_noise + ablation_noise,
                 };
                 let pred_shape = {
                     let n = ContinuousHV::random(dim, item_seed.wrapping_add(8001));

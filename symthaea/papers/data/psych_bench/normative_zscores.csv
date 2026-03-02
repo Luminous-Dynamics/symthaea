@@ -15,13 +15,13 @@ CogBench::BART,average_pumps,30.172412,30.000000,12.000000,0.014368,0.014368,50.
 CogBench::ReversalLearning,win_stay_rate,0.998846,0.850000,0.080000,1.860569,1.860569,96.859752,Above average
 Executive::WCST,categories_completed,6.000000,5.620000,1.130000,0.336283,0.336283,63.167127,Average
 Executive::Ravens,overall_accuracy,0.678333,0.780000,0.120000,-0.847222,-0.847222,19.843558,Average
-Executive::Stroop,stroop_effect,0.105000,0.880000,0.060000,12.916667,3.000000,100.000000,Superior
-Executive::Flanker,flanker_effect,0.073750,0.900000,0.060000,13.770833,3.000000,100.000000,Superior
+Executive::Stroop,stroop_effect,0.105000,0.100000,0.050000,-0.100000,-0.100000,46.017210,Average
+Executive::Flanker,flanker_effect,0.073750,0.070000,0.040000,-0.093750,-0.093750,46.265381,Average
 Executive::TowerOfLondon,overall_optimal_rate,0.637650,0.630000,0.150000,0.050999,0.050999,52.033691,Average
 Executive::DualTask,dual_task_cost,0.200000,0.100000,0.050000,-2.000000,-2.000000,2.275006,Below average
 Metacognition::Calibration,calibration_error_ece,0.165356,0.150000,0.050000,-0.307129,-0.307129,37.937260,Average
 Metacognition::FeelingOfKnowing,fok_gamma,0.640247,0.650000,0.100000,-0.097532,-0.097532,46.115204,Average
-Butlin::ConsciousnessIndicators,present_count,12.000000,1.000000,0.140000,78.571429,3.000000,100.000000,Superior
+Butlin::ConsciousnessIndicators,present_count,12.000000,14.000000,2.000000,-1.000000,-1.000000,15.865526,Average
 ToMBench::FalseBelief,false_belief_accuracy,1.000000,0.900000,0.100000,1.000000,1.000000,84.134474,Average
 ToMBench::FauxPas,faux_pas_accuracy,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
 ToMBench::Persuasion,persuasion_detection,1.000000,0.850000,0.120000,1.250000,1.250000,89.435016,Above average
@@ -37,10 +37,10 @@ Affect::MoodCongruentRecall,congruence_ratio,0.600000,0.600000,0.100000,-0.00000
 Affect::EmotionalStroop,emotional_interference,0.058750,0.070000,0.040000,-0.281250,-0.281250,38.925939,Average
 Creativity::RemoteAssociates,overall_accuracy,0.600000,0.500000,0.150000,0.666667,0.666667,74.750753,Average
 Creativity::AlternateUses,fluency,8.100000,8.000000,3.000000,0.033333,0.033333,51.329567,Average
-Inhibition::GoNoGo,nogo_accuracy,0.817467,0.980000,0.020000,-8.126663,-3.000000,0.000000,Impaired
-Inhibition::StopSignal,ssrt_ticks,1.130621,0.500000,0.100000,-6.306212,-3.000000,0.000000,Impaired
-Attention::AttentionalBlink,blink_magnitude,0.264000,0.920000,0.050000,13.120000,3.000000,100.000000,Superior
-Attention::VisualSearch,search_asymmetry,0.243475,0.980000,0.020000,-36.826237,-3.000000,0.000000,Impaired
+Inhibition::GoNoGo,nogo_accuracy,0.837387,0.820000,0.100000,0.173874,0.173874,56.901762,Average
+Inhibition::StopSignal,ssrt_ticks,0.088355,4.000000,1.000000,3.911645,3.000000,99.995415,Superior
+Attention::AttentionalBlink,blink_magnitude,0.264000,0.300000,0.120000,0.300000,0.300000,61.791136,Average
+Attention::VisualSearch,search_asymmetry,0.243475,2.000000,0.500000,-3.513049,-3.000000,0.022154,Impaired
 Reasoning::ArcFluid,transfer_accuracy,0.537500,0.800000,0.120000,-2.187500,-2.187500,1.435297,Impaired
 Reasoning::ArcCompositional,compositional_accuracy,0.583333,0.650000,0.150000,-0.444444,-0.444444,32.836067,Average
 Reasoning::ArcAnalogy,analogy_accuracy,0.550000,0.750000,0.120000,-1.666667,-1.666667,4.779033,Below average
@@ -54,7 +54,7 @@ Reasoning::ArcAlgebra,algebra_score,0.824726,0.500000,0.150000,2.164839,2.164839
 Reasoning::ArcStaircase,capacity_threshold,20.000000,10.000000,4.000000,2.500000,2.500000,99.379032,Superior
 SustainedAttention::SART,commission_errors,0.652520,2.500000,0.600000,3.079134,3.000000,99.896191,Superior
 SustainedAttention::PVT,vigilance_decrement,0.150264,5.000000,1.000000,4.849736,3.000000,99.999938,Superior
-SustainedAttention::CPT,d_prime,4.653571,0.850000,0.080000,47.544633,3.000000,100.000000,Superior
+SustainedAttention::CPT,d_prime,4.653571,2.800000,0.600000,3.089284,3.000000,99.899674,Superior
 Motor::SRTT,learning_effect,0.019057,5.000000,1.000000,-4.980943,-3.000000,0.000032,Impaired
 Motor::FittsLaw,fitts_r_squared,0.998750,0.950000,0.030000,1.624984,1.624984,94.791706,Above average
 Motor::Bimanual,coordination_cost,0.000000,0.150000,0.060000,2.500000,2.500000,99.379032,Superior

@@ -1423,6 +1423,7 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "trials_to_first_category"
             | "trials_to_criterion"
             | "restless_bandit_regret"
+            | "lapse_rate"
     )
 }
 

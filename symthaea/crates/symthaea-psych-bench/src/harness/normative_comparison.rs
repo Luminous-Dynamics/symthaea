@@ -91,12 +91,12 @@ fn baseline_for_benchmark<'a>(
     match benchmark {
         // Executive domain
         name if name.contains("Stroop") && !name.contains("Emotional") => {
-            Some(("stroop_incongruent_accuracy", &bl.executive))
+            Some(("stroop_effect", &bl.executive))
         }
         name if name.contains("WCST") || name.contains("Wisconsin") => {
             Some(("wcst_categories_completed", &bl.executive))
         }
-        name if name.contains("Flanker") => Some(("flanker_incongruent_accuracy", &bl.executive)),
+        name if name.contains("Flanker") => Some(("flanker_effect", &bl.executive)),
         name if name.contains("TowerOfLondon") => Some(("tol_overall_optimal_rate", &bl.executive)),
         name if name.contains("DualTask") => Some(("dual_task_cost", &bl.executive)),
         name if name.contains("Ravens") => Some(("ravens_overall_accuracy", &bl.executive)),
@@ -113,7 +113,7 @@ fn baseline_for_benchmark<'a>(
         // Sustained Attention
         name if name.contains("PVT") => Some(("pvt_mean_rt", &bl.sustained_attention)),
         name if name.contains("SART") => Some(("sart_d_prime", &bl.sustained_attention)),
-        name if name.contains("CPT") => Some(("cpt_hit_rate", &bl.sustained_attention)),
+        name if name.contains("CPT") => Some(("cpt_d_prime", &bl.sustained_attention)),
 
         // Metacognition
         name if name.contains("Calibration") => Some(("calibration_error_ece", &bl.metacognition)),
@@ -136,12 +136,12 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("ValenceClassification") => Some(("valence_accuracy", &bl.affect)),
 
         // Inhibition
-        name if name.contains("GoNoGo") => Some(("go_accuracy", &bl.inhibition)),
-        name if name.contains("StopSignal") => Some(("sst_stop_accuracy", &bl.inhibition)),
+        name if name.contains("GoNoGo") => Some(("nogo_accuracy", &bl.inhibition)),
+        name if name.contains("StopSignal") => Some(("ssrt_ticks", &bl.inhibition)),
 
         // Attention
-        name if name.contains("VisualSearch") => Some(("feature_search_accuracy", &bl.attention)),
-        name if name.contains("AttentionalBlink") => Some(("t1_accuracy", &bl.attention)),
+        name if name.contains("VisualSearch") => Some(("search_asymmetry", &bl.attention)),
+        name if name.contains("AttentionalBlink") => Some(("blink_magnitude", &bl.attention)),
 
         // Motor
         name if name.contains("FittsLaw") => Some(("fitts_r_squared", &bl.motor)),
@@ -206,7 +206,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("RemoteAssociates") => Some(("rat_overall_accuracy", &bl.creativity)),
 
         // Butlin
-        name if name.contains("Butlin") => Some(("presence_ratio", &bl.butlin)),
+        name if name.contains("Butlin") => Some(("present_count", &bl.butlin)),
 
         // Neuromod
         name if name.contains("RewardLearning") => {

@@ -195,6 +195,11 @@ impl RegressionSnapshot {
         }
     }
 
+    /// Return the default snapshots directory for this crate.
+    pub fn snapshot_path() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("snapshots")
+    }
+
     /// Migrate a JSON string to the current schema version.
     ///
     /// Handles version-aware deserialization: v1.0 snapshots (no `schema_version`

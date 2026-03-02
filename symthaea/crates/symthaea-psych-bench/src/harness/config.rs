@@ -78,6 +78,36 @@ pub struct BenchmarkConfig {
     /// live measurements for theory-aligned accuracy.
     #[serde(default)]
     pub runtime_consciousness: Option<RuntimeConsciousnessData>,
+
+    /// D2 NoGo pathway inhibition strength [0.0, 1.0] (default 0.3).
+    /// Models dopamine D2-mediated response suppression (Frank 2005).
+    #[serde(default = "default_neuromod_d2_inhibition")]
+    pub neuromod_d2_inhibition: f64,
+
+    /// NE phasic brake boost [0.0, 1.0] (default 0.25).
+    /// Models norepinephrine phasic emergency stop signal (Aron 2007).
+    #[serde(default = "default_neuromod_ne_phasic")]
+    pub neuromod_ne_phasic: f64,
+
+    /// Language reparse cost scale (default 0.8).
+    /// Controls the effort of syntactic reanalysis in garden-path sentences.
+    #[serde(default = "default_language_reparse_cost_scale")]
+    pub language_reparse_cost_scale: f64,
+
+    /// Language priming decay per SOA step (default 0.85).
+    /// Exponential activation retention for semantic priming.
+    #[serde(default = "default_language_priming_decay")]
+    pub language_priming_decay: f64,
+
+    /// Language coherence EMA alpha (default 0.15).
+    /// Smoothing factor for topic drift monitoring.
+    #[serde(default = "default_language_coherence_alpha")]
+    pub language_coherence_alpha: f64,
+
+    /// Language frequency boost for high-frequency words (default 0.15).
+    /// Advantage for recognizing common words in lexical decision.
+    #[serde(default = "default_language_frequency_boost")]
+    pub language_frequency_boost: f64,
 }
 
 fn default_min_trials() -> usize {
@@ -88,6 +118,24 @@ fn default_max_trials() -> usize {
 }
 fn default_precision_target() -> f64 {
     0.05
+}
+fn default_neuromod_d2_inhibition() -> f64 {
+    0.3
+}
+fn default_neuromod_ne_phasic() -> f64 {
+    0.25
+}
+fn default_language_reparse_cost_scale() -> f64 {
+    0.8
+}
+fn default_language_priming_decay() -> f64 {
+    0.85
+}
+fn default_language_coherence_alpha() -> f64 {
+    0.15
+}
+fn default_language_frequency_boost() -> f64 {
+    0.15
 }
 
 impl Default for BenchmarkConfig {
@@ -112,6 +160,12 @@ impl Default for BenchmarkConfig {
             trial_trace: false,
             encoding_noise: 0.0,
             runtime_consciousness: None,
+            neuromod_d2_inhibition: default_neuromod_d2_inhibition(),
+            neuromod_ne_phasic: default_neuromod_ne_phasic(),
+            language_reparse_cost_scale: default_language_reparse_cost_scale(),
+            language_priming_decay: default_language_priming_decay(),
+            language_coherence_alpha: default_language_coherence_alpha(),
+            language_frequency_boost: default_language_frequency_boost(),
         }
     }
 }
@@ -139,7 +193,7 @@ impl BenchmarkConfig {
     /// degrade HDC representations. Returns a combined noise weight in [0.0, 1.0]
     /// for use in benchmark similarity computations.
     pub fn effective_noise(&self) -> f64 {
-        (self.encoding_noise + self.time_pressure * 0.20).clamp(0.0, 1.0)
+        (self.encoding_noise * 1.75 + self.time_pressure * 0.20).clamp(0.0, 1.0)
     }
 }
 
