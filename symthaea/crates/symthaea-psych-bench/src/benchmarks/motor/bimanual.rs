@@ -59,7 +59,8 @@ impl BimanualBenchmark {
         let mut ssm_right = SsmTemporalBackend::new(-0.10, 2);
 
         // Time pressure and noise
-        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15)
+        let ablation_noise = config.effective_noise() as f32 * 0.4;
+        let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15 + ablation_noise)
             * diff_model.interference_multiplier(config.difficulty) as f32;
         let crosstalk_noise: f32 =
             0.25 * diff_model.interference_multiplier(config.difficulty) as f32; // cross-hand interference

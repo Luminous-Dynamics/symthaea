@@ -134,14 +134,16 @@ impl SemanticCoherenceBenchmark {
 
                 // Bind word with position and bundle into context
                 let bound = word.bind(&positions[pos]);
-                // Running average context (EMA-like)
-                let alpha = 0.3;
+                // Running average context (EMA-like) with configurable alpha
+                // Science: Graesser et al. (2004) — topic coherence tracked via
+                // exponential moving average mirrors human reading comprehension.
+                let alpha = config.language_coherence_alpha as f32;
                 context = ContinuousHV::weighted_bundle(&[&context, &bound], &[1.0 - alpha, alpha])
                     .normalize();
 
-                // Measure coherence with topic
-                let coh = effective_topic.similarity(&context).clamp(-1.0, 1.0) as f64;
-                token_coherences.push(coh);
+                // Measure coherence with topic via EMA tracking
+                let raw_coh = effective_topic.similarity(&context).clamp(-1.0, 1.0) as f64;
+                token_coherences.push(raw_coh);
             }
 
             // Metrics from this sequence

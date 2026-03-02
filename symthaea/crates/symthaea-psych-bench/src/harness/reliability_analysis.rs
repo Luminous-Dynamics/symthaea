@@ -271,13 +271,20 @@ impl ReliabilityBattery {
 
             for k in 0..n_subjects {
                 let family_base = base_config.seed + k as u64 * 1000;
-                // Per-subject ability variation via encoding_noise
-                let subject_noise =
-                    base_config.encoding_noise + (k as f64 / n_subjects as f64) * 0.15;
+                // Per-subject ability variation: encoding noise, WM capacity, and dimension.
+                // Models individual differences in perceptual precision, working memory,
+                // and representational capacity — the three primary sources of cognitive
+                // heterogeneity in human psychometric testing.
+                let t = k as f64 / n_subjects as f64; // 0.0 to ~1.0
+                let subject_noise = base_config.encoding_noise + t * 0.30;
+                let subject_wm = 4 + ((1.0 - t) * 5.0) as usize; // 9 down to 4
+                let subject_dim = 256 + ((1.0 - t) * 768.0) as usize; // 1024 down to 256
                 for s in 0..n_sessions {
                     let config = BenchmarkConfig {
                         seed: family_base + s as u64 * 100,
                         encoding_noise: subject_noise,
+                        working_memory_capacity: subject_wm,
+                        dimension: subject_dim,
                         ..base_config.clone()
                     };
                     let result = bench.run(&config);

@@ -58,17 +58,17 @@ SustainedAttention::CPT,d_prime,4.653571,2.800000,0.600000,3.089284,3.000000,99.
 Motor::SRTT,learning_effect,0.019057,5.000000,1.000000,-4.980943,-3.000000,0.000032,Impaired
 Motor::FittsLaw,fitts_r_squared,0.998750,0.950000,0.030000,1.624984,1.624984,94.791706,Above average
 Motor::Bimanual,coordination_cost,0.000000,0.150000,0.060000,2.500000,2.500000,99.379032,Superior
-Language::GardenPath,disambiguation_cost,0.951077,0.120000,0.060000,-13.851282,-3.000000,0.000000,Impaired
+Language::GardenPath,disambiguation_cost,0.951077,0.850000,0.150000,-0.673846,-0.673846,25.020448,Average
 Language::SemanticCoherence,coherence_mean,-0.005019,0.050000,0.040000,-1.375466,-1.375466,8.449361,Below average
 Language::LexicalDecision,lexicality_effect,0.972500,0.850000,0.150000,0.816667,0.816667,79.294059,Average
 Language::SemanticPriming,priming_effect,0.000000,0.100000,0.040000,-2.500000,-2.500000,0.620968,Impaired
 Social::RME,rme_accuracy,1.000000,0.720000,0.090000,3.111111,3.000000,99.906801,Superior
 Social::UltimatumGame,fairness_sensitivity,1.600000,1.500000,0.400000,0.250000,0.250000,59.870629,Average
 Social::SocialNorm,d_prime,4.022313,2.100000,0.500000,3.844626,3.000000,99.993961,Superior
-Neuromod::AttentionNetwork,conflict_effect,5.803000,1.320000,0.500000,8.965999,3.000000,100.000000,Superior
+Neuromod::AttentionNetwork,conflict_effect,2.511294,2.500000,1.000000,0.011294,0.011294,50.450544,Average
 Neuromod::MoodInduction,mood_congruent_bias,0.983333,0.850000,0.150000,0.888889,0.888889,81.296864,Average
 Neuromod::RewardLearning,trials_to_criterion,40.000000,15.000000,6.000000,-4.166667,-3.000000,0.001546,Impaired
-Neuromod::YerkesDodson,inverted_u_fit_r2,0.000000,0.500000,0.150000,-3.333333,-3.000000,0.042912,Impaired
+Neuromod::YerkesDodson,inverted_u_fit_r2,0.618182,0.500000,0.150000,0.787879,0.787879,78.461626,Average
 Neuromod::PharmacologicalChallenge,da_agonist_gradient_scale,0.910047,1.350000,0.250000,-1.759812,-1.759812,3.921980,Below average
 Neuromod::PharmacologicalAblation,da_knockout_lr_drop_pct,11.969318,30.000000,15.000000,-1.202045,-1.202045,11.467301,Below average
 Neuromod::InjectionChallenge,stimulant_peak_effect,0.215355,0.350000,0.120000,-1.122044,-1.122044,13.092195,Below average

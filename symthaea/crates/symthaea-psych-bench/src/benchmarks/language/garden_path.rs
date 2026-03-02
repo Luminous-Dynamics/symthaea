@@ -104,9 +104,12 @@ impl GardenPathBenchmark {
                     &[0.35, 0.30, 0.35],
                 );
 
-                // Disambiguation cost: how different are the two parses?
-                let parse_sim = initial_parse.similarity(&revised_parse);
-                let cost = (1.0 - parse_sim as f64).max(0.0);
+                // Disambiguation cost via bind-unbind effort (Frazier & Rayner 1982):
+                // Reparse cost = effort of unbinding incorrect parse + rebinding correct one.
+                // The more dissimilar the two parses, the higher the reparse effort.
+                let unbind_cost = initial_parse.bind(&revised_parse).similarity(&initial_parse);
+                let reparse_effort = (1.0 - unbind_cost.abs()) as f64;
+                let cost = reparse_effort * config.language_reparse_cost_scale;
                 cost_sum += cost;
                 cost_count += 1;
 
@@ -118,7 +121,8 @@ impl GardenPathBenchmark {
                 let reanalysis_score = revised_parse.similarity(&role_verb) * (1.0 - noise_degrade) + reanalysis_noise_val;
 
                 // Higher cost → harder to reanalyze correctly
-                let threshold = 0.15 + cost as f32 * 0.30;
+                // Scale threshold by reparse cost (higher effort = higher bar)
+                let threshold = 0.15 + cost as f32 * 0.25;
                 if reanalysis_score > threshold {
                     gp_correct += 1;
                 }

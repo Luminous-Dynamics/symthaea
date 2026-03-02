@@ -51,7 +51,8 @@ impl FittsLawBenchmark {
 
         // Time pressure noise, scaled by difficulty temperature model
         let diff_model = difficulty_model_for(self.name());
-        let base_noise: f32 = (0.15 + config.time_pressure as f32 * 0.20)
+        let ablation_noise = config.effective_noise() as f32 * 0.4;
+        let base_noise: f32 = (0.15 + config.time_pressure as f32 * 0.20 + ablation_noise)
             * diff_model.temperature_multiplier(config.difficulty) as f32;
 
         // 5 difficulty levels: ID = 1.0, 2.0, 3.0, 4.0, 5.0

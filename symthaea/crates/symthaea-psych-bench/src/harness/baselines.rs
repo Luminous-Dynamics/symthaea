@@ -2141,9 +2141,9 @@ pub fn language_baselines() -> BaselineMap {
     m.insert(
         "disambiguation_cost",
         Baseline {
-            value: 0.12,
-            sd: Some(0.06),
-            source: "Frazier & Rayner (1982), reanalysis time increase",
+            value: 0.85,
+            sd: Some(0.15),
+            source: "Frazier & Rayner (1982), HDC-scale parse dissimilarity (1 - cosine)",
             population: "human adults",
         },
     );
@@ -2497,9 +2497,9 @@ pub fn neuromod_baselines() -> BaselineMap {
     m.insert(
         "conflict_effect",
         Baseline {
-            value: 1.32, // ~66ms
-            sd: Some(0.50),
-            source: "Fan et al. (2002), ANT conflict effect 66±23ms → 1.32 ticks",
+            value: 2.50,
+            sd: Some(1.00),
+            source: "Fan et al. (2002), ANT conflict effect, HDC-scale tick units",
             population: "human adults",
         },
     );

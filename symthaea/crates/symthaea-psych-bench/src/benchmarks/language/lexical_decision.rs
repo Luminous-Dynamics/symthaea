@@ -99,11 +99,18 @@ impl LexicalDecisionBenchmark {
                     &[signal_strength, 1.0 - signal_strength],
                 );
 
-                // Match against codebook: find best match
+                // Match against codebook with frequency weighting:
+                // High-frequency words get a recognition boost (Balota & Chumbley 1984).
+                // This models the word frequency effect in lexical access.
+                let freq_boost = config.language_frequency_boost as f32;
                 let mut best_sim = f32::NEG_INFINITY;
                 let mut best_idx = 0;
                 for (i, w) in words.iter().enumerate() {
                     let mut sim = stimulus.similarity(w);
+                    // High-frequency words (first half) are easier to recognize
+                    if i < high_freq_count {
+                        sim += freq_boost;
+                    }
                     xor_shift(&mut rng);
                     let noise = (rng % 10000) as f32 / 10000.0 * noise_level;
                     sim += noise;
