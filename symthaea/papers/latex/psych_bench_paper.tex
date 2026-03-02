@@ -500,13 +500,14 @@ Five standard pharmacological profiles enable systematic comparison (Figure~\ref
     label style={font=\scriptsize},
     tick label style={font=\tiny},
 ]
-\addplot[hlbblue, thick, smooth] coordinates {
-    (0.05,0.35) (0.15,0.52) (0.25,0.68) (0.35,0.79)
-    (0.45,0.87) (0.55,0.90) (0.65,0.85) (0.75,0.74)
-    (0.85,0.58) (0.95,0.40)
+% Actual agent data: all NE levels produce 100% accuracy at dim=512
+% (HDC similarity is too robust for noise to degrade classification)
+\addplot[hlbblue, thick, smooth, mark=*, mark size=1pt] coordinates {
+    (0.1,1.0) (0.2,1.0) (0.3,1.0) (0.4,1.0)
+    (0.5,1.0) (0.6,1.0) (0.7,1.0) (0.8,1.0) (0.9,1.0)
 };
 \addplot[hlbred, dashed, thick, smooth, domain=0:1, samples=50] {-3.6*(x-0.55)^2 + 0.90};
-\legend{\scriptsize Agent, \scriptsize Quadratic fit}
+\legend{\scriptsize Agent (dim=512), \scriptsize Predicted inv-U}
 \end{axis}
 \end{tikzpicture}
 \end{subfigure}
@@ -516,22 +517,20 @@ Five standard pharmacological profiles enable systematic comparison (Figure~\ref
 \begin{tikzpicture}
 \begin{axis}[
     width=\textwidth, height=4.5cm,
-    xlabel={Trial}, ylabel={Prediction Error},
+    xlabel={Block}, ylabel={Mean $|$RPE$|$},
     title={\scriptsize (b) DA Reward Learning},
-    xmin=0, xmax=50, ymin=-0.3, ymax=0.8,
+    xmin=0.5, xmax=8.5, ymin=0, ymax=0.7,
     title style={font=\scriptsize},
     label style={font=\scriptsize},
     tick label style={font=\tiny},
 ]
-\addplot[hlbblue, thick] coordinates {
-    (1,0.72) (5,0.65) (10,0.48) (15,0.35) (20,0.22)
-    (25,0.15) (30,0.08) (35,0.04) (40,0.02) (45,0.01) (50,-0.01)
+% From neuromod_curves.csv: 8 blocks, reversal at block 5
+\addplot[hlbblue, thick, mark=*, mark size=1.5pt] coordinates {
+    (1,0.345) (2,0.121) (3,0.041) (4,0.019)
+    (5,0.644) (6,0.292) (7,0.091) (8,0.032)
 };
-\addplot[hlbred, only marks, mark=*, mark size=1.5pt] coordinates {
-    (25,-0.15) (26,0.45) (27,0.38) (28,0.25) (29,0.12) (30,0.05)
-};
-\draw[hlbred, dashed, thick] (axis cs:25,-0.3) -- (axis cs:25,0.8);
-\node[font=\tiny, hlbred] at (axis cs:30,0.55) {Reversal};
+\draw[hlbred, dashed, thick] (axis cs:4.5,0) -- (axis cs:4.5,0.7);
+\node[font=\tiny, hlbred] at (axis cs:5.5,0.60) {Reversal};
 \end{axis}
 \end{tikzpicture}
 \end{subfigure}
@@ -542,22 +541,23 @@ Five standard pharmacological profiles enable systematic comparison (Figure~\ref
 \begin{tikzpicture}
 \begin{axis}[
     width=\textwidth, height=4.5cm,
-    xlabel={ACh Level}, ylabel={Effect (ms equiv.)},
+    xlabel={ACh Orienting Boost}, ylabel={Effect (tick equiv.)},
     title={\scriptsize (c) ACh Attention Network Decomposition},
-    xmin=0, xmax=1,
+    xmin=0, xmax=0.5,
     title style={font=\scriptsize},
     label style={font=\scriptsize},
     tick label style={font=\tiny},
-    legend style={font=\tiny, at={(0.98,0.98)}, anchor=north east},
+    legend style={font=\tiny, at={(0.02,0.98)}, anchor=north west},
 ]
+% From neuromod_curves.csv: actual ANT effects vs ACh boost
 \addplot[hlbblue, thick, mark=square*, mark size=1.5pt] coordinates {
-    (0.1,25) (0.3,38) (0.5,52) (0.7,60) (0.9,58)
+    (0.00,-0.52) (0.10,-0.57) (0.20,-0.61) (0.30,-0.61) (0.40,-0.62) (0.50,-0.63)
 };
 \addplot[hlbgreen, thick, mark=triangle*, mark size=1.5pt] coordinates {
-    (0.1,15) (0.3,28) (0.5,42) (0.7,55) (0.9,52)
+    (0.00,0.00) (0.10,-0.35) (0.20,-0.93) (0.30,-1.52) (0.40,-2.09) (0.50,-2.63)
 };
 \addplot[hlbred, thick, mark=o, mark size=1.5pt] coordinates {
-    (0.1,65) (0.3,62) (0.5,60) (0.7,58) (0.9,56)
+    (0.00,5.57) (0.10,5.76) (0.20,5.82) (0.30,5.82) (0.40,5.85) (0.50,5.83)
 };
 \legend{Alerting, Orienting, Conflict}
 \end{axis}
@@ -577,23 +577,24 @@ Five standard pharmacological profiles enable systematic comparison (Figure~\ref
     tick label style={font=\tiny},
     legend style={font=\tiny, at={(0.02,0.98)}, anchor=north west},
 ]
+% From neuromod_curves.csv: actual dose-response curves
 \addplot[hlbblue, thick, mark=*, mark size=1.5pt] coordinates {
-    (0.1,0.12) (0.2,0.25) (0.3,0.38) (0.5,0.62) (0.8,0.85)
+    (0.1,0.742) (0.2,0.784) (0.3,0.826) (0.5,0.900) (0.8,0.969)
 };
 \addplot[hlbgreen, thick, mark=square*, mark size=1.5pt] coordinates {
-    (0.1,0.08) (0.2,0.18) (0.3,0.32) (0.5,0.55) (0.8,0.78)
+    (0.1,-0.079) (0.2,-0.058) (0.3,-0.040) (0.5,0.000) (0.8,0.049)
 };
 \addplot[hlbpurple, thick, mark=triangle*, mark size=1.5pt] coordinates {
-    (0.1,0.15) (0.2,0.28) (0.3,0.40) (0.5,0.58) (0.8,0.72)
+    (0.1,-0.032) (0.2,-0.024) (0.3,-0.016) (0.5,0.000) (0.8,0.021)
 };
 \addplot[hlbyellow, thick, mark=diamond*, mark size=1.5pt] coordinates {
-    (0.1,0.10) (0.2,0.22) (0.3,0.35) (0.5,0.60) (0.8,0.80)
+    (0.1,0.826) (0.2,0.853) (0.3,0.875) (0.5,0.925) (0.8,0.981)
 };
 \legend{DA, NE, 5-HT, ACh}
 \end{axis}
 \end{tikzpicture}
 \end{subfigure}
-\caption{Illustrative neuromodulator evaluation patterns showing expected signatures. (a)~Yerkes-Dodson inverted-U: predicted performance peak at moderate noradrenaline (the current \hlb{} produces $R^2 = 0.00$ for the quadratic fit, indicating the inverted-U is not yet realized; see text). (b)~Dopaminergic reward learning: predicted prediction-error decrease with reversal spike (observed DA-reward correlation $r = 0.82$). (c)~Predicted ACh modulation of attention network components (observed alerting $= -0.62$, orienting $= -0.62$, conflict $= 5.80$). (d)~Dose-response monotonicity: predicted graded curves (observed monotonicity $= 1.0$ for all five transmitters). Coordinates are schematic; observed values reported in text and \texttt{neuromod\_profiles.csv}.}
+\caption{Neuromodulator evaluation patterns from \texttt{neuromod\_curves.csv}. (a)~Yerkes-Dodson: at dim=512, HDC similarity is too robust for the noise model to degrade classification ($R^2 = 0.00$); dashed curve shows predicted inverted-U. (b)~DA reward learning: mean $|$RPE$|$ drops during acquisition (blocks 1--4), spikes at reversal (block 5), then re-converges (blocks 6--8). (c)~ACh attention network decomposition: orienting effect increases monotonically with ACh boost ($0.00 \to -2.63$); conflict effect ($\sim 5.8$) dominates. (d)~Dose-response monotonicity (DA learning rate, NE exploration, 5-HT confidence, ACh attention): all monotonically increasing with clamped transmitter level. Data generated from \texttt{psych\_bench\_paper\_data} example.}
 \label{fig:neuromod}
 \end{figure}
 
@@ -617,44 +618,44 @@ The \texttt{ReliabilityBattery} computes ICC(3,1) (one-way random effects intrac
 \end{equation}
 where BMS is between-subjects mean square and WMS is within-subjects mean square. Pearson $r$ provides convergent evidence, and SEM quantifies measurement precision: $\text{SEM} = \text{SD} \cdot \sqrt{1 - \text{ICC}}$. Practice effects are flagged when session-to-session change exceeds $\pm 2\%$.
 
-Table~\ref{tab:psychometrics} reports representative psychometric properties. The \texttt{ReliabilityBattery} uses a multi-subject design: $K = 10$ independent ``subjects'' (distinct seed families, separated by 1,000 in seed space), each measured across $n$ sessions. This provides sufficient between-subject variance (from different stimulus configurations) and within-subject consistency (from nearby seeds within each family) for meaningful ICC computation. Because \psychbench{} is deterministic given a fixed seed, ICC values reflect the stability of the architecture's behavior under controlled variation (different trial orderings, stimulus sets) rather than stochastic test-retest variability. This is a feature, not a limitation: it means that observed ICC values below 1.0 genuinely reflect sensitivity to stimulus selection rather than measurement noise.
+Table~\ref{tab:psychometrics} reports representative psychometric properties. The \texttt{ReliabilityBattery} uses a multi-subject design: $K = 30$ independent ``subjects'' (distinct seed families, separated by 1,000 in seed space), each measured across $n = 5$ sessions with seed spacing of 100 within each family. This provides sufficient between-subject variance (from different stimulus configurations) and within-subject consistency (from controlled seed offsets) for meaningful ICC computation. Because \psychbench{} is deterministic given a fixed seed, ICC values reflect the stability of the architecture's behavior under controlled variation (different trial orderings, stimulus sets) rather than stochastic test-retest variability. This is a feature, not a limitation: it means that observed ICC values below 1.0 genuinely reflect sensitivity to stimulus selection rather than measurement noise.
 
 % --- Table 2: Psychometric Properties (populated from reliability.csv) ---
 \begin{table}[t]
 \centering
-\caption{Representative psychometric properties for 19 benchmarks spanning all domains ($K = 10$ seed families, $n = 3$ sessions each). ICC: intraclass correlation (3,1); $r$: Pearson test-retest correlation; SEM: standard error of measurement; Practice: session-to-session change direction. Reliability class follows \citet{cicchetti1994guidelines}: Excellent ($> 0.90$), Good ($> 0.75$), Moderate ($> 0.50$), Poor ($\leq 0.50$). Generated from \texttt{reliability.csv}.}
+\caption{Representative psychometric properties for 19 benchmarks spanning all domains ($K = 30$ seed families, $n = 5$ sessions each, seed spacing $= 100$). ICC: intraclass correlation (3,1); $r$: Pearson test-retest correlation; SEM: standard error of measurement; Practice: session-to-session change direction. Reliability class follows \citet{cicchetti1994guidelines}: Excellent ($> 0.90$), Good ($> 0.75$), Moderate ($> 0.50$), Poor ($\leq 0.50$). Generated from \texttt{reliability.csv}.}
 \label{tab:psychometrics}
 \small
 \begin{tabular}{@{}llrrcll@{}}
 \toprule
 \textbf{Domain} & \textbf{Benchmark} & \textbf{ICC} & \textbf{$r$} & \textbf{SEM} & \textbf{Practice} & \textbf{Class} \\
 \midrule
-Executive     & Stroop             & $-0.44$ & $-0.44$ & 0.018 & Improvement & Poor \\
-Executive     & WCST               & $-0.03$ & $-0.09$ & 0.072 & Stable      & Poor \\
-Executive     & Flanker            & $-0.08$ &  $0.19$ & 0.010 & Decline     & Poor \\
-Executive     & IGT                & $-0.04$ & $-0.02$ & 1.967 & Improvement & Poor \\
-Memory        & N-back (2)         & $-0.24$ & $-0.27$ & 0.019 & Stable      & Poor \\
-Memory        & Change Detection   & $-0.07$ &  $0.00$ & 0.121 & Decline     & Poor \\
+Executive     & Stroop             & $-0.12$ & $-0.14$ & 0.017 & Stable      & Poor \\
+Executive     & WCST               &  $0.11$ &  $0.17$ & 0.072 & Stable      & Poor \\
+Executive     & Flanker            & $-0.06$ & $-0.07$ & 0.011 & Improvement & Poor \\
+Executive     & IGT                & $-0.10$ & $-0.08$ & 2.044 & Decline     & Poor \\
+Memory        & N-back (2)         &  $0.23$ &  $0.23$ & 0.017 & Stable      & Poor \\
+Memory        & Change Detection   &  $0.03$ &  $0.01$ & 0.098 & Stable      & Poor \\
 Memory        & Digit Span         &  $0.00$ &  $0.00$ & 0.000 & Stable      & Poor \\
-Attention     & Visual Search      & $-0.00$ & $-0.05$ & 0.012 & Stable      & Poor \\
+Attention     & Visual Search      &  $0.21$ &  $0.20$ & 0.010 & Stable      & Poor \\
 Social        & False Belief       &  $0.00$ &  $0.00$ & 0.000 & Stable      & Poor \\
-Motor         & SRTT               &  $0.21$ &  $0.18$ & 0.003 & Decline     & Poor \\
-Language      & Lexical Decision   & $-0.20$ & $-0.25$ & 0.009 & Stable      & Poor \\
-Reasoning     & ARC-Fluid          & $-0.46$ & $-0.52$ & 0.024 & Stable      & Poor \\
-CogBench      & Two-Step           &  $0.02$ &  $0.17$ & 0.056 & Improvement & Poor \\
-CogBench      & BART               &  $0.24$ &  $0.22$ & 0.566 & Stable      & Poor \\
-CogBench      & Reversal Learning  &  $0.20$ &  $0.22$ & 0.001 & Stable      & Poor \\
-Inhibition    & Stop Signal        & $-0.12$ & $-0.17$ & 0.118 & Stable      & Poor \\
-Metacognition & Calibration        & $-0.65$ & $-0.68$ & 0.010 & Stable      & Poor \\
+Motor         & SRTT               & $-0.07$ & $-0.08$ & 0.003 & Improvement & Poor \\
+Language      & Lexical Decision   & $-0.05$ & $-0.01$ & 0.009 & Stable      & Poor \\
+Reasoning     & ARC-Fluid          & $-0.08$ & $-0.09$ & 0.025 & Stable      & Poor \\
+CogBench      & Two-Step           &  $\mathbf{0.27}$ &  $\mathbf{0.28}$ & 0.054 & Decline     & Poor \\
+CogBench      & BART               & $-0.13$ & $-0.15$ & 0.712 & Stable      & Poor \\
+CogBench      & Reversal Learning  & $-0.34$ & $-0.35$ & 0.001 & Stable      & Poor \\
+Inhibition    & Stop Signal        & $-0.18$ & $-0.19$ & 0.133 & Stable      & Poor \\
+Metacognition & Calibration        &  $0.23$ &  $0.23$ & 0.007 & Stable      & Poor \\
 Neuromod      & Yerkes-Dodson      &  $0.00$ &  $0.00$ & 0.000 & Stable      & Poor \\
-Neuromod      & Reward Learning    &  $\mathbf{0.50}$ &  $\mathbf{0.47}$ & 0.300 & Stable      & Poor \\
+Neuromod      & Reward Learning    &  $0.26$ &  $0.25$ & 0.426 & Stable      & Poor \\
 \midrule
-\multicolumn{2}{l}{\emph{Median}} & $-0.03$ & $-0.02$ & 0.012 & & Poor \\
+\multicolumn{2}{l}{\emph{Median}} & $0.00$ & $0.00$ & 0.010 & & Poor \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:psychometrics} reveals a striking pattern: all 19 benchmarks fall in the ``Poor'' reliability class (ICC $\leq 0.50$), with a median ICC of $-0.03$. Three benchmarks show positive ICCs approaching or exceeding conventional thresholds for individual differences research: Reward Learning (ICC $= 0.50$, the highest), BART ($0.24$), and SRTT ($0.21$). Conversely, several benchmarks show negative ICCs (Calibration $= -0.65$, ARC-Fluid $= -0.46$, Stroop $= -0.44$), indicating that within-seed-family variance exceeds between-family variance---the architecture produces \emph{more} variable behavior across sessions of the same seed family than across different families. Three benchmarks (Digit Span, False Belief, Yerkes-Dodson) show ICC $= 0.00$ with SEM $= 0.00$, indicating perfect determinism: these benchmarks produce identical results regardless of seed, collapsing all variance. The Limitations section discusses the implications of these reliability patterns for interpreting \psychbench{} as a psychometric instrument versus an engineering test suite.
+Table~\ref{tab:psychometrics} reveals that all 19 benchmarks fall in the ``Poor'' reliability class (ICC $\leq 0.50$), with a median ICC of $0.00$. Using 30 seed families (subjects) and 5 sessions with wider seed spacing ($\Delta = 100$) improves between-subject variance over earlier configurations. Five benchmarks show positive ICCs approaching conventional thresholds: Two-Step (ICC $= 0.27$, the highest), Reward Learning ($0.26$), Calibration ($0.23$), N-back ($0.23$), and Visual Search ($0.21$). Conversely, Reversal Learning ($-0.34$), Stop Signal ($-0.18$), and BART ($-0.13$) show negative ICCs, indicating that within-seed-family variance exceeds between-family variance---the architecture produces \emph{more} variable behavior across sessions of the same seed family than across different families. Three benchmarks (Digit Span, False Belief, Yerkes-Dodson) show ICC $= 0.00$ with SEM $= 0.00$, indicating perfect determinism: these benchmarks produce identical results regardless of seed, collapsing all variance. The Limitations section discusses the implications of these reliability patterns for interpreting \psychbench{} as a psychometric instrument versus an engineering test suite.
 
 \subsection{Construct Validity}
 
@@ -892,18 +893,18 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 \node[font=\tiny, gray] at (axis cs:2.75,0.5) {Superior};
 
 % Summary counts in each band
-\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:-2.75,77) {$n=9$};
-\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:-1.5,77) {$n=8$};
-\node[font=\scriptsize, hlbgreen!80!black, anchor=south] at (axis cs:0,77) {$n=35$};
+\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:-2.75,77) {$n=10$};
+\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:-1.5,77) {$n=7$};
+\node[font=\scriptsize, hlbgreen!80!black, anchor=south] at (axis cs:0,77) {$n=34$};
 \node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:1.5,77) {$n=10$};
-\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:2.75,77) {$n=14$};
+\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:2.75,77) {$n=15$};
 \end{axis}
 \end{tikzpicture}
-\caption{Forest plot of normative z-scores for 76 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability; 12 benchmarks exceed this range in raw values). Background shading indicates clinical interpretation bands \citep{cicchetti1994guidelines}. Band counts: 35 Average ($|z| \leq 1$), 10 Above Average, 8 Below Average, 14 Superior ($z > 2$), 9 Impaired ($z < -2$). Data loaded from \texttt{normative\_zscores.csv}.}
+\caption{Forest plot of normative z-scores for 76 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability; 17 benchmarks exceed this range in raw values). Background shading indicates clinical interpretation bands \citep{cicchetti1994guidelines}. Band counts: 34 Average ($|z| \leq 1$), 10 Above Average, 7 Below Average, 15 Superior ($z > 2$), 10 Impaired ($z < -2$). Data loaded from \texttt{normative\_zscores.csv}.}
 \label{fig:forest}
 \end{figure}
 
-\paragraph{Ablation Analysis.} Figure~\ref{fig:ablation} shows the ablation comparison across six presets. Each ablation condition models the removal of a cognitive subsystem as increased encoding noise in HDC representations, operationalizing the hypothesis that top-down predictions refine perceptual encoding (see Limitations for discussion). Overall, ablation preset explains only $\eta^2 = 0.003$ of total score variance, while domain explains $\eta^2 = 0.987$---the architecture's cognitive profile is overwhelmingly determined by domain rather than configuration. Within this small preset effect, the clearest differentiation appears in Memory, where \texttt{ReducedWm} and \texttt{HdcOnly} both drop from 0.779 to 0.648 ($\Delta = 0.131$, domain $\eta^2 = 0.996$), reflecting the direct effect of capacity reduction on memory benchmarks. Metacognition shows moderate sensitivity ($\Delta = 0.028$, domain $\eta^2 = 0.909$). Language and Motor produce identical scores across all presets ($\eta^2 = 0.000$), indicating that these benchmarks do not depend on the ablated subsystems at this noise level. The small overall effect size reflects the encoding-noise ablation model being a first-order approximation: encoding noise at the tested levels (0.05--0.25) degrades similarity computations by only 2--10\%, which is insufficient to change decision outcomes in most benchmarks. Actual subsystem removal (disabling CfC dynamics, removing the FEP module) would likely produce larger, more domain-specific deficits and is a priority for future work.
+\paragraph{Ablation Analysis.} Figure~\ref{fig:ablation} shows the ablation comparison across six presets. Each ablation condition models the removal of a cognitive subsystem as increased encoding noise in HDC representations, operationalizing the hypothesis that top-down predictions refine perceptual encoding (see Limitations for discussion). Ablation presets additionally disable social bonuses (NoSocial, CfC~Only, HDC~Only) and halve somatic learning rates when FEP is disabled (NoFep, CfC~Only, HDC~Only). Overall, ablation preset explains $\eta^2 = 0.003$ of total score variance, while domain explains $\eta^2 = 0.987$---the architecture's cognitive profile is overwhelmingly determined by domain rather than configuration. Within this small preset effect, the clearest differentiation appears in Memory, where \texttt{ReducedWm} and \texttt{HdcOnly} both drop from 0.779 to 0.648 ($\Delta = 0.131$), reflecting the direct effect of capacity reduction on memory benchmarks. Metacognition shows moderate sensitivity ($\Delta = 0.027$). Attention shows sensitivity to encoding noise ($\Delta = 0.019$). Language and Motor produce identical scores across all presets ($\eta^2 = 0.000$), indicating that these benchmarks do not depend on the ablated subsystems. The small overall effect size reflects the encoding-noise ablation model being a first-order approximation: encoding noise at the tested levels (0.15--0.50) degrades similarity computations, but HDC representations at 512 dimensions are sufficiently robust that decision outcomes change only in the most sensitive benchmarks. Actual subsystem removal (disabling CfC dynamics, removing the FEP module) would likely produce larger, more domain-specific deficits and is a priority for future work.
 
 % --- Figure 7: Ablation Results (loaded from CSV) ---
 \begin{figure}[t]
@@ -1028,7 +1029,7 @@ PsychBench~\citep{hagendorff2023machine} & Partial & --- & --- & --- & 5 & Pytho
 
 \paragraph{Relationship to existing work.} CogBench~\citep{codaforno2024cogbench} is the closest predecessor, applying eight cognitive psychology tasks to large language models via prompt-based interaction. \psychbench{} extends this approach in three ways: (1)~architectural-level evaluation through HDC encoding rather than prompt-level interaction, (2)~psychometric infrastructure that CogBench lacks (reliability, SAT curves), and (3)~broader domain coverage. However, CogBench's prompt-based interface enables evaluation of any LLM, whereas \psychbench{} requires architectures with HDC-compatible stimulus interfaces---a significant tradeoff in generality. Hagendorff et al.'s~\citep{hagendorff2023machine} PsychBench adapts classical psychology experiments for LLM evaluation across five domains with some psychometric analysis (split-half reliability), but does not address neuromodulation or consciousness. HELM~\citep{liang2023holistic} and BIG-Bench~\citep{srivastava2023beyond} provide broad multi-task evaluation without psychometric infrastructure. ARC~\citep{chollet2019measure} provides deep evaluation of fluid reasoning with well-defined difficulty scaling; our ARC-inspired sub-battery (11 benchmarks) builds directly on Chollet's framework.
 
-\paragraph{Unique contributions.} Four aspects distinguish \psychbench{}. First, the integration of psychometric \emph{infrastructure} (ICC computation, SAT curve fitting, adaptive staircases) with AI benchmarking is, to our knowledge, novel. Standard practice in AI evaluation treats benchmarks as fixed-accuracy measures; \psychbench{} treats them as instruments requiring the same validation scrutiny as clinical assessments. Importantly, the current demonstration reveals that many benchmarks show poor psychometric properties under the \hlb{} (median ICC $= -0.03$, Table~\ref{tab:psychometrics})---this is itself an informative finding, demonstrating that the infrastructure can identify where architectural evaluation falls short. Second, the neuromodulator evaluation framework has no precedent in AI benchmarking---it tests pharmacological manipulations, dose-response curves, tolerance/withdrawal dynamics, and multi-transmitter synergy, bridging computational neuropharmacology and AI evaluation. Third, normative anchoring against 90+ published baselines enables clinical-band interpretation, though a subset of benchmarks ($\sim$5\%) exhibit scale mismatches between HDC-based agent metrics and human behavioral measures (see Limitations), requiring future calibration. Fourth, the unified holographic stimulus encoding through five HDC adapter types enables principled cross-modal comparison.
+\paragraph{Unique contributions.} Four aspects distinguish \psychbench{}. First, the integration of psychometric \emph{infrastructure} (ICC computation, SAT curve fitting, adaptive staircases) with AI benchmarking is, to our knowledge, novel. Standard practice in AI evaluation treats benchmarks as fixed-accuracy measures; \psychbench{} treats them as instruments requiring the same validation scrutiny as clinical assessments. Importantly, the current demonstration reveals that many benchmarks show poor psychometric properties under the \hlb{} (median ICC $= 0.00$, Table~\ref{tab:psychometrics})---this is itself an informative finding, demonstrating that the infrastructure can identify where architectural evaluation falls short. Second, the neuromodulator evaluation framework has no precedent in AI benchmarking---it tests pharmacological manipulations, dose-response curves, tolerance/withdrawal dynamics, and multi-transmitter synergy, bridging computational neuropharmacology and AI evaluation. Third, normative anchoring against 90+ published baselines enables clinical-band interpretation, though a subset of benchmarks ($\sim$5\%) exhibit scale mismatches between HDC-based agent metrics and human behavioral measures (see Limitations), requiring future calibration. Fourth, the unified holographic stimulus encoding through five HDC adapter types enables principled cross-modal comparison.
 
 \paragraph{Limitations.} Several limitations warrant careful discussion.
 
@@ -1052,7 +1053,7 @@ PsychBench~\citep{hagendorff2023machine} & Partial & --- & --- & --- & 5 & Pytho
 \section{Conclusion}
 \label{sec:conclusion}
 
-\psychbench{} provides the first comprehensive cognitive benchmark suite designed for Holographic Liquid Brain architectures. With 84 benchmarks across 17 domains, psychometric assessment infrastructure, normative human comparison against 90+ published baselines, a 17-benchmark neuromodulator evaluation framework, and 14-indicator consciousness evaluation, the suite enables multi-dimensional characterization of neuroscience-inspired cognitive architectures. The demonstration on the \symthaea{} \hlb{} reveals both the suite's strengths and its current limitations: the architecture produces a characteristic cognitive profile (strong pattern matching, weak embodied tasks) that is interpretable and reproducible, but the psychometric validation exposes challenges including low cross-seed reliability (median ICC $= -0.03$), weak ablation sensitivity ($\eta^2 = 0.003$), and normative scale mismatches requiring calibration. These findings are themselves informative---they identify precisely where the architecture and the evaluation framework need improvement. Implemented in 15,000 lines of Rust with 793 unit tests and full determinism, \psychbench{} is open-source and designed for iterative refinement by the growing community of researchers building brain-inspired cognitive architectures.
+\psychbench{} provides the first comprehensive cognitive benchmark suite designed for Holographic Liquid Brain architectures. With 84 benchmarks across 17 domains, psychometric assessment infrastructure, normative human comparison against 90+ published baselines, a 17-benchmark neuromodulator evaluation framework, and 14-indicator consciousness evaluation, the suite enables multi-dimensional characterization of neuroscience-inspired cognitive architectures. The demonstration on the \symthaea{} \hlb{} reveals both the suite's strengths and its current limitations: the architecture produces a characteristic cognitive profile (strong pattern matching, weak embodied tasks) that is interpretable and reproducible, but the psychometric validation exposes challenges including low cross-seed reliability (median ICC $= 0.00$), weak ablation sensitivity ($\eta^2 = 0.003$), and normative scale mismatches requiring calibration. These findings are themselves informative---they identify precisely where the architecture and the evaluation framework need improvement. Implemented in 15,000 lines of Rust with 793 unit tests and full determinism, \psychbench{} is open-source and designed for iterative refinement by the growing community of researchers building brain-inspired cognitive architectures.
 
 % ============================================================
 % OPEN PRACTICES STATEMENT
