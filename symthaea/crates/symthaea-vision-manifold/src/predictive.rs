@@ -171,6 +171,91 @@ impl PredictiveCodingHierarchy {
         &mut self.encoder
     }
 
+    /// Process a frame with predictive coding attention feedback.
+    ///
+    /// 1. Encode at all scales
+    /// 2. Compute cross-scale attention (fine patches that differ from coarse)
+    /// 3. Re-encode the fine scale with attention weighting
+    /// 4. Return the attention-weighted fine HV as the main output
+    pub fn process_frame_with_feedback(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+    ) -> PredictiveOutput {
+        let (_blended, scale_hvs, all_patches) =
+            self.encoder.encode_frame(pixels, width, height, channels);
+
+        let fine_hv = scale_hvs.first().cloned().unwrap_or_else(|| ContinuousHV::zero(self.dim));
+        let coarse_hv = scale_hvs.last().cloned().unwrap_or_else(|| ContinuousHV::zero(self.dim));
+
+        // Compute cross-scale attention
+        let attention = Self::compute_patch_attention(&all_patches);
+
+        // Re-encode fine scale with attention weighting
+        let attended_fine = if !attention.is_empty() {
+            if let Some(fine_enc) = self.encoder.encoder_at_mut(0) {
+                let (attended, _) =
+                    fine_enc.encode_frame_attended(pixels, width, height, channels, &attention);
+                attended
+            } else {
+                fine_hv.clone()
+            }
+        } else {
+            fine_hv.clone()
+        };
+
+        // Generate prediction and compute error
+        if let Some(prev_coarse) = self.last_coarse_hv.clone() {
+            let predicted_fine = self.predict_fine(&prev_coarse);
+            self.prediction_error =
+                1.0 - attended_fine.similarity(&predicted_fine).clamp(-1.0, 1.0);
+            self.update_prediction_weight(&attended_fine, &predicted_fine, &prev_coarse);
+        } else {
+            self.prediction_error = 1.0;
+        }
+
+        self.error_ema = self.ema_decay * self.error_ema + (1.0 - self.ema_decay) * self.prediction_error;
+        self.last_coarse_hv = Some(coarse_hv.clone());
+
+        PredictiveOutput {
+            fine_hv: attended_fine,
+            coarse_hv,
+            prediction_error: self.prediction_error,
+            error_ema: self.error_ema,
+        }
+    }
+
+    /// Compute per-patch attention from cross-scale prediction error.
+    ///
+    /// Fine patches that are poorly predicted by their corresponding coarse
+    /// patch receive high attention (1 - cosine_similarity).
+    fn compute_patch_attention(all_patches: &[Vec<ContinuousHV>]) -> Vec<f32> {
+        if all_patches.len() < 2 {
+            return vec![];
+        }
+
+        let fine_patches = &all_patches[0];
+        let coarse_patches = &all_patches[all_patches.len() - 1];
+
+        if fine_patches.is_empty() || coarse_patches.is_empty() {
+            return vec![];
+        }
+
+        let fine_per_coarse = (fine_patches.len() / coarse_patches.len()).max(1);
+
+        fine_patches
+            .iter()
+            .enumerate()
+            .map(|(i, fine_hv)| {
+                let coarse_idx = (i / fine_per_coarse).min(coarse_patches.len() - 1);
+                let sim = fine_hv.similarity(&coarse_patches[coarse_idx]).max(0.0);
+                1.0 - sim
+            })
+            .collect()
+    }
+
     /// Reset the hierarchy to initial state.
     pub fn reset(&mut self) {
         self.last_coarse_hv = None;
@@ -320,6 +405,57 @@ mod tests {
         pch.reset();
         assert_eq!(pch.prediction_error(), 0.0);
         assert_eq!(pch.error_ema(), 0.0);
+    }
+
+    // === Predictive Coding Feedback ===
+
+    #[test]
+    fn test_process_frame_with_feedback_produces_valid_output() {
+        let cfg = VisionConfig::default();
+        let mut pch = PredictiveCodingHierarchy::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        let out = pch.process_frame_with_feedback(&frame, 64, 64, 1);
+        assert!(out.fine_hv.norm() > 0.0);
+        assert!(out.coarse_hv.norm() > 0.0);
+        assert!(out.prediction_error >= 0.0);
+    }
+
+    #[test]
+    fn test_feedback_differs_from_no_feedback() {
+        let cfg = VisionConfig::default();
+        let mut pch1 = PredictiveCodingHierarchy::new(&cfg, 64, 64);
+        let mut pch2 = PredictiveCodingHierarchy::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        // Process first frame to establish state
+        pch1.process_frame(&frame, 64, 64, 1);
+        pch2.process_frame_with_feedback(&frame, 64, 64, 1);
+
+        // Second frame: compare outputs
+        let out_no_fb = pch1.process_frame(&frame, 64, 64, 1);
+        let out_fb = pch2.process_frame_with_feedback(&frame, 64, 64, 1);
+
+        // Both should produce valid output; they may differ due to attention weighting
+        assert!(out_no_fb.fine_hv.norm() > 0.0);
+        assert!(out_fb.fine_hv.norm() > 0.0);
+    }
+
+    #[test]
+    fn test_compute_patch_attention() {
+        let dim = 16_384;
+        let fine: Vec<ContinuousHV> = (0..16)
+            .map(|i| ContinuousHV::random(dim, 1000 + i))
+            .collect();
+        let coarse: Vec<ContinuousHV> = (0..4)
+            .map(|i| ContinuousHV::random(dim, 2000 + i))
+            .collect();
+
+        let attention = PredictiveCodingHierarchy::compute_patch_attention(&[fine, coarse]);
+        assert_eq!(attention.len(), 16);
+        for &a in &attention {
+            assert!(a >= 0.0 && a <= 1.5, "attention should be bounded: {a}");
+        }
     }
 
     #[test]

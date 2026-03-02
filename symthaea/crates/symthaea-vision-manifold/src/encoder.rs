@@ -392,25 +392,30 @@ impl PatchHdcEncoder {
         features
     }
 
-    /// Encode a feature vector into a ContinuousHV via weighted bind-bundle.
+    /// Encode a feature vector into a ContinuousHV via fused bind-and-accumulate.
     ///
     /// Feature weights modulate each feature's contribution to the final HV.
+    /// Uses a single accumulation buffer to avoid N intermediate allocations.
     fn encode_features(&self, features: &[f32]) -> ContinuousHV {
         let num = features.len().min(self.feature_hvs.len());
         if num == 0 {
             return ContinuousHV::zero(self.config.hdc_dim);
         }
 
-        let mut components = Vec::with_capacity(num);
-        let mut weights = Vec::with_capacity(num);
+        let dim = self.config.hdc_dim;
+        let mut accum = vec![0.0f32; dim];
+
         for (i, &val) in features.iter().take(num).enumerate() {
             let level_idx = self.quantize(val);
-            components.push(self.feature_hvs[i].bind(&self.level_hvs[level_idx]));
-            weights.push(self.feature_weights[i]);
+            let weight = self.feature_weights[i];
+            let feat_s = self.feature_hvs[i].as_slice();
+            let level_s = self.level_hvs[level_idx].as_slice();
+            for d in 0..dim {
+                accum[d] += weight * feat_s[d] * level_s[d];
+            }
         }
 
-        let refs: Vec<&ContinuousHV> = components.iter().collect();
-        ContinuousHV::weighted_bundle(&refs, &weights)
+        ContinuousHV::from_vec(accum).normalize()
     }
 
     /// Refine feature weights via contrastive learning.
@@ -584,6 +589,80 @@ impl MultiScaleEncoder {
     /// The patch sizes for each scale.
     pub fn scales(&self) -> &[usize] {
         &self.scales
+    }
+
+    /// Compute the static (non-saliency) blend weights for each scale.
+    pub fn static_weights(&self) -> Vec<f32> {
+        let n = self.encoders.len();
+        if n <= 1 {
+            return vec![1.0; n];
+        }
+        (0..n)
+            .map(|i| {
+                let t = i as f32 / (n - 1) as f32;
+                self.fine_weight * (1.0 - t) + (1.0 - self.fine_weight) * t
+            })
+            .collect()
+    }
+
+    /// Encode a frame with saliency-guided dynamic multi-scale fusion.
+    ///
+    /// When `per_scale_surprise` is provided (one value per scale), the blend
+    /// weights are adjusted: 50% static base + 50% surprise-proportional.
+    /// Scales with higher surprise receive more weight.
+    /// Falls back to static weights when surprise is absent or too short.
+    pub fn encode_frame_saliency_guided(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+        per_scale_surprise: Option<&[f32]>,
+    ) -> (ContinuousHV, Vec<ContinuousHV>, Vec<Vec<ContinuousHV>>) {
+        let n = self.encoders.len();
+        if n == 0 {
+            let dim = symthaea_core::hdc::HDC_DIMENSION;
+            return (ContinuousHV::zero(dim), vec![], vec![]);
+        }
+
+        let mut scale_hvs = Vec::with_capacity(n);
+        let mut all_patches = Vec::with_capacity(n);
+
+        for enc in &mut self.encoders {
+            let (hv, patches) = enc.encode_frame(pixels, width, height, channels);
+            scale_hvs.push(hv);
+            all_patches.push(patches);
+        }
+
+        if n == 1 {
+            return (scale_hvs[0].clone(), scale_hvs, all_patches);
+        }
+
+        let static_w = self.static_weights();
+
+        // Determine final weights: mix static with surprise-proportional
+        let weights: Vec<f32> = if let Some(surprise) = per_scale_surprise {
+            if surprise.len() >= n {
+                let total_surprise: f32 = surprise.iter().take(n).sum::<f32>().max(1e-8);
+                static_w
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &sw)| {
+                        let surprise_w = surprise[i] / total_surprise;
+                        0.5 * sw + 0.5 * surprise_w
+                    })
+                    .collect()
+            } else {
+                static_w
+            }
+        } else {
+            static_w
+        };
+
+        let refs: Vec<&ContinuousHV> = scale_hvs.iter().collect();
+        let blended = ContinuousHV::weighted_bundle(&refs, &weights);
+
+        (blended, scale_hvs, all_patches)
     }
 }
 
@@ -1012,6 +1091,86 @@ mod tests {
             sim < 1.0 - 1e-6,
             "Attended encoding should differ from uniform: sim={sim}"
         );
+    }
+
+    // === Saliency-Guided Multi-Scale Fusion ===
+
+    #[test]
+    fn test_saliency_guided_with_no_surprise() {
+        let cfg = VisionConfig::default();
+        let mut ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        let (hv_static, _, _) = ms.encode_frame(&frame, 64, 64, 1);
+        ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let (hv_saliency, _, _) =
+            ms.encode_frame_saliency_guided(&frame, 64, 64, 1, None);
+
+        // Without surprise, saliency-guided should match static
+        let sim = hv_static.similarity(&hv_saliency);
+        assert!(
+            (sim - 1.0).abs() < 1e-4,
+            "No-surprise saliency should match static: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_saliency_guided_with_unequal_surprise() {
+        let cfg = VisionConfig::default();
+        let mut ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        // High surprise at fine scale, low at coarse
+        let surprise = vec![0.9, 0.1];
+        let (hv_fine_surprise, _, _) =
+            ms.encode_frame_saliency_guided(&frame, 64, 64, 1, Some(&surprise));
+
+        ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        // Opposite: high surprise at coarse
+        let surprise2 = vec![0.1, 0.9];
+        let (hv_coarse_surprise, _, _) =
+            ms.encode_frame_saliency_guided(&frame, 64, 64, 1, Some(&surprise2));
+
+        // Different surprise distributions should produce different blends
+        let sim = hv_fine_surprise.similarity(&hv_coarse_surprise);
+        assert!(
+            sim < 1.0 - 1e-6,
+            "Different surprise distributions should differ: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_saliency_guided_falls_back_on_short_surprise() {
+        let cfg = VisionConfig::default();
+        let mut ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        // Only 1 surprise value for 2 scales → should fall back to static
+        let (hv_short, _, _) =
+            ms.encode_frame_saliency_guided(&frame, 64, 64, 1, Some(&[0.5]));
+        ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let (hv_static, _, _) = ms.encode_frame(&frame, 64, 64, 1);
+
+        let sim = hv_short.similarity(&hv_static);
+        assert!(
+            (sim - 1.0).abs() < 1e-4,
+            "Short surprise should fall back to static: sim={sim}"
+        );
+    }
+
+    // === RGB Multi-Scale ===
+
+    #[test]
+    fn test_multi_scale_rgb() {
+        let cfg = VisionConfig::default();
+        let mut ms = MultiScaleEncoder::new(&cfg, 64, 64);
+
+        let red_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 0, 0]).collect();
+        let (hv_red, scale_hvs, _) = ms.encode_frame(&red_frame, 64, 64, 3);
+
+        assert_eq!(hv_red.dim(), cfg.hdc_dim);
+        assert!(hv_red.norm() > 0.0);
+        assert_eq!(scale_hvs.len(), 2);
     }
 
     #[test]
