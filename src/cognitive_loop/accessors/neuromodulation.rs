@@ -138,8 +138,14 @@ impl CognitiveLoopService {
             // Phase 7: self-assessment telemetry
             self_assessment_pe_ema: self.neuromod.self_assessment.pe_ema() as f32,
             self_assessment_coherence_ema: self.neuromod.self_assessment.coherence_ema() as f32,
+            self_assessment_confidence_error_ema: self.neuromod.self_assessment.confidence_error_ema() as f32,
+            self_assessment_attention_ema: self.neuromod.self_assessment.attention_utilization_ema() as f32,
+            self_assessment_inhibition_error_ema: self.neuromod.self_assessment.inhibition_error_ema() as f32,
+            self_assessment_observations: self.neuromod.self_assessment.observations_count(),
+            self_assessment_cooldown: self.neuromod.self_assessment.cooldown_remaining(),
             self_assessment_calibration_fired: self.neuromod.self_assessment.last_triggered(),
             pending_calibration_waiting: self.neuromod.pending_calibration.is_some(),
+            inhibition_errors_this_cycle: 0, // populated by output phase from metadata flags
         }
     }
 

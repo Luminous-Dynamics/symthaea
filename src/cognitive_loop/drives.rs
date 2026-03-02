@@ -356,7 +356,9 @@ impl CuriosityDrive {
 
     /// Apply an [`ExplorationUpdate`] directly to this drive's exploration_urge.
     ///
-    /// Used by the feedback system writeback and by tests.
+    /// Used by unit tests that validate CuriosityDrive in isolation.
+    /// Production code routes through `set_exploration`/`scale_exploration` helpers
+    /// which dual-write to the ProposalCollector for divergence tracking.
     pub fn apply_exploration_update(&mut self, update: ExplorationUpdate) {
         match update {
             ExplorationUpdate::Set(val) => {

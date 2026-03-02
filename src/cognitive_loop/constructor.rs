@@ -390,6 +390,23 @@ impl CognitiveLoopService {
         // Read config flags before `config` is moved into Self
         let enable_primitive_consciousness = config.enable_primitive_consciousness;
 
+        // Pre-compute substrate feasibility from config.substrate_type.
+        let substrate_feasibility = {
+            use symthaea_core::hdc::substrate_independence::SubstrateRequirements;
+            let req = match config.substrate_type.canonical() {
+                super::config::SubstrateType::BiologicalNeurons => SubstrateRequirements::biological_neurons(),
+                super::config::SubstrateType::SiliconDigital => SubstrateRequirements::silicon_digital(),
+                super::config::SubstrateType::QuantumComputer => SubstrateRequirements::quantum_computer(),
+                super::config::SubstrateType::PhotonicProcessor => SubstrateRequirements::photonic_processor(),
+                super::config::SubstrateType::NeuromorphicChip => SubstrateRequirements::neuromorphic_chip(),
+                super::config::SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
+                super::config::SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
+                super::config::SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+                _ => SubstrateRequirements::silicon_digital(),
+            };
+            req.consciousness_feasibility()
+        };
+
         Ok(Self {
             config,
             encoder,
@@ -405,7 +422,7 @@ impl CognitiveLoopService {
             voice_feedback_bridge,
             temporal_signature_encoder,
             adaptive_behavior,
-            prediction_confidence: 0.5, // Start neutral
+            prediction_confidence: 0.5_f64, // Start neutral
             flow_state: FlowState::default(),
             emotion_contagion: EmotionContagion::default(),
             curiosity_drive: CuriosityDrive::default(),
@@ -695,6 +712,7 @@ impl CognitiveLoopService {
                     engine_smf, engine_mmi, engine_eq, engine_ucp,
                 )
             },
+            substrate_feasibility,
             ethics_engine: {
                 let engine_mp = MoralParser::new();
                 let engine_ma = MoralAlgebra::default_dim();
@@ -717,7 +735,13 @@ impl CognitiveLoopService {
                 } else {
                     None
                 };
-                super::ethics_engine::EthicsEngine::new(engine_mp, engine_ma, engine_ve, engine_hi)
+                super::ethics_engine::EthicsEngine::with_anomaly_config(
+                    engine_mp,
+                    engine_ma,
+                    engine_ve,
+                    engine_hi,
+                    config.moral_anomaly_config.clone(),
+                )
             },
             drive_manager: super::managers::DriveManager::default(),
             memory_manager: super::managers::MemoryManager::default(),

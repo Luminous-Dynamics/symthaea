@@ -42,7 +42,7 @@ proptest! {
 
     /// All CycleMetadata fields must be finite for any input sequence
     #[test]
-    fn prop_metadata_always_finite(inputs in input_sequence(5, 15)) {
+    fn prop_metadata_always_finite(inputs in input_sequence(20, 50)) {
         let mut service = test_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
@@ -67,7 +67,7 @@ proptest! {
 
     /// Bounded fields stay within their documented ranges
     #[test]
-    fn prop_fields_within_bounds(inputs in input_sequence(5, 15)) {
+    fn prop_fields_within_bounds(inputs in input_sequence(20, 50)) {
         let mut service = test_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
@@ -86,7 +86,7 @@ proptest! {
 
     /// Cycle count strictly increments by 1 each cycle
     #[test]
-    fn prop_cycle_count_monotonic(inputs in input_sequence(3, 20)) {
+    fn prop_cycle_count_monotonic(inputs in input_sequence(10, 40)) {
         let mut service = test_service();
         for (i, input) in inputs.iter().enumerate() {
             service.cycle(input);
@@ -110,7 +110,7 @@ proptest! {
 
     /// Codebook size never exceeds max_symbols (small capacity to trigger pruning)
     #[test]
-    fn prop_codebook_capacity_bounded(inputs in input_sequence(10, 30)) {
+    fn prop_codebook_capacity_bounded(inputs in input_sequence(20, 60)) {
         let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
             enable_primitive_consciousness: true,
             learning_threshold: 0.0,

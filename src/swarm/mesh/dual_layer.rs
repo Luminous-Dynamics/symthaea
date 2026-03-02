@@ -271,7 +271,7 @@ impl DualLayerMesh {
 
         match route {
             MeshRoute::LoRa => {
-                let transport = self.lora.as_ref().unwrap();
+                let transport = self.lora.as_ref().ok_or(MeshError::NoTransport)?;
                 let frags = fragment(packet.thought_id(), &envelope);
                 let mut buf = [0u8; LORA_MTU];
                 for frag in &frags {
@@ -295,11 +295,11 @@ impl DualLayerMesh {
                 }
             }
             MeshRoute::Batman => {
-                let transport = self.batman.as_ref().unwrap();
+                let transport = self.batman.as_ref().ok_or(MeshError::NoTransport)?;
                 transport.send_raw(&envelope)?;
             }
             MeshRoute::Yggdrasil => {
-                let transport = self.yggdrasil.as_ref().unwrap();
+                let transport = self.yggdrasil.as_ref().ok_or(MeshError::NoTransport)?;
                 transport.send_raw(&envelope)?;
             }
         }

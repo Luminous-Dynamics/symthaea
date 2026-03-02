@@ -345,6 +345,8 @@ pub struct SelfAssessmentMonitor {
     confidence_error_ema: f64,
     /// EMA of attention budget utilization.
     attention_utilization_ema: f64,
+    /// EMA of inhibition error rate (proxy for NE/prefrontal gating).
+    inhibition_error_ema: f64,
     /// Number of observations since last calibration.
     observations_since_calibration: u32,
     /// Minimum observations before triggering (avoids premature calibration).
@@ -365,6 +367,7 @@ impl Default for SelfAssessmentMonitor {
             coherence_ema: 0.7,
             confidence_error_ema: 0.0,
             attention_utilization_ema: 0.5,
+            inhibition_error_ema: 0.0,
             observations_since_calibration: 0,
             warmup_threshold: 200,    // ~4 seconds at 50Hz
             cooldown: 0,
@@ -385,6 +388,11 @@ pub struct SelfAssessmentInput {
     pub confidence_calibration_error: f32,
     /// Current attention budget utilization (0.0–1.0).
     pub attention_utilization: f32,
+    /// Inhibition error rate this cycle (0.0–1.0).
+    /// Fraction of active veto signals (prefrontal_veto, reasoning_gate_blocked,
+    /// safety_blocked) that fired, indicating insufficient prefrontal gating.
+    /// Science: Arnsten (2007) — NE modulates prefrontal cortex inhibitory control.
+    pub inhibition_error_rate: f32,
     /// Whether personality drift is flagged as anomalous.
     pub drift_anomalous: bool,
 }
@@ -404,6 +412,8 @@ impl SelfAssessmentMonitor {
             self.confidence_error_ema * (1.0 - ALPHA) + input.confidence_calibration_error as f64 * ALPHA;
         self.attention_utilization_ema =
             self.attention_utilization_ema * (1.0 - ALPHA) + input.attention_utilization as f64 * ALPHA;
+        self.inhibition_error_ema =
+            self.inhibition_error_ema * (1.0 - ALPHA) + input.inhibition_error_rate as f64 * ALPHA;
 
         self.observations_since_calibration += 1;
 
@@ -451,6 +461,14 @@ impl SelfAssessmentMonitor {
             needs_calibration = true;
         }
 
+        // NE proxy: inhibition error rate (Arnsten 2007)
+        // Baseline ~0.02; if EMA > 0.1, inhibition deficit → negative z (boost NE)
+        let inhib_z = -(self.inhibition_error_ema - 0.02) / 0.04; // negative z when high
+        if inhib_z < -1.0 {
+            z_scores.push(("Inhibition::StopSignal", inhib_z));
+            needs_calibration = true;
+        }
+
         // 5-HT proxy: attention utilization
         // Baseline ~0.6; if consistently >0.9, sustained attention deficit
         let attn_z = -(self.attention_utilization_ema - 0.6) / 0.15; // negative z when high
@@ -459,11 +477,10 @@ impl SelfAssessmentMonitor {
             needs_calibration = true;
         }
 
-        // Confidence proxy: calibration error
-        // Baseline ~0.05; if > 0.15, metacognitive miscalibration
-        if self.confidence_error_ema > 0.1 {
-            // Positive z = overconfident (high error despite high confidence)
-            let fok_z = (self.confidence_error_ema - 0.05) / 0.05;
+        // Confidence proxy: calibration error (bidirectional)
+        // Baseline ~0.05; both overconfidence (>0.1) and underconfidence trigger
+        let fok_z = (self.confidence_error_ema - 0.05) / 0.05;
+        if fok_z.abs() > 1.0 {
             z_scores.push(("Metacognition::FeelingOfKnowing", fok_z));
             needs_calibration = true;
         }
@@ -483,6 +500,7 @@ impl SelfAssessmentMonitor {
             coherence_ema = %format!("{:.3}", self.coherence_ema),
             confidence_error = %format!("{:.3}", self.confidence_error_ema),
             attention_util = %format!("{:.3}", self.attention_utilization_ema),
+            inhibition_error = %format!("{:.3}", self.inhibition_error_ema),
             adjustments = cal.adjustments.len(),
             "Self-assessment triggered calibration"
         );
@@ -512,9 +530,24 @@ impl SelfAssessmentMonitor {
         self.attention_utilization_ema
     }
 
+    /// Current inhibition error EMA (proxy for NE).
+    pub fn inhibition_error_ema(&self) -> f64 {
+        self.inhibition_error_ema
+    }
+
     /// Whether the last `check_trigger()` call fired a calibration.
     pub fn last_triggered(&self) -> bool {
         self.last_triggered
+    }
+
+    /// Number of observations since last calibration reset.
+    pub fn observations_count(&self) -> u32 {
+        self.observations_since_calibration
+    }
+
+    /// Remaining cooldown cycles before trigger is eligible again.
+    pub fn cooldown_remaining(&self) -> u32 {
+        self.cooldown
     }
 
     /// Reset after external calibration (e.g., from psych-bench).
@@ -741,6 +774,7 @@ mod tests {
             coherence: 0.2,
             confidence_calibration_error: 0.3,
             attention_utilization: 0.95,
+            inhibition_error_rate: 0.0,
             drift_anomalous: false,
         };
         for _ in 0..100 {
@@ -766,6 +800,7 @@ mod tests {
             coherence: 0.7,
             confidence_calibration_error: 0.0,
             attention_utilization: 0.5,
+            inhibition_error_rate: 0.0,
             drift_anomalous: false,
         };
 
@@ -797,6 +832,7 @@ mod tests {
             coherence: 0.7,
             confidence_calibration_error: 0.0,
             attention_utilization: 0.5,
+            inhibition_error_rate: 0.0,
             drift_anomalous: false,
         };
 
@@ -832,6 +868,7 @@ mod tests {
             coherence: 0.7,
             confidence_calibration_error: 0.0,
             attention_utilization: 0.5,
+            inhibition_error_rate: 0.0,
             drift_anomalous: true,
         };
 
@@ -875,6 +912,7 @@ mod tests {
             coherence: 0.75,
             confidence_calibration_error: 0.03,
             attention_utilization: 0.5,
+            inhibition_error_rate: 0.0,
             drift_anomalous: false,
         };
 
@@ -901,6 +939,7 @@ mod tests {
             coherence: 0.7,
             confidence_calibration_error: 0.0,
             attention_utilization: 0.5,
+            inhibition_error_rate: 0.0,
             drift_anomalous: false,
         };
 
@@ -913,5 +952,81 @@ mod tests {
         monitor.reset_after_calibration();
         assert_eq!(monitor.observations_since_calibration, 0);
         assert_eq!(monitor.cooldown, 50);
+    }
+
+    #[test]
+    fn test_self_assessment_ne_inhibition_proxy() {
+        let mut monitor = SelfAssessmentMonitor {
+            warmup_threshold: 10,
+            cooldown_duration: 5,
+            ..Default::default()
+        };
+
+        let bad_input = SelfAssessmentInput {
+            prediction_error: 0.08,
+            coherence: 0.7,
+            confidence_calibration_error: 0.03,
+            attention_utilization: 0.5,
+            inhibition_error_rate: 1.0, // veto every cycle
+            drift_anomalous: false,
+        };
+
+        for _ in 0..80 {
+            monitor.update(&bad_input);
+        }
+
+        let cal = monitor.check_trigger(false);
+        assert!(cal.is_some(), "High inhibition errors should trigger calibration");
+        assert!(
+            cal.unwrap().adjustments.iter().any(|a| a.transmitter == "NE"),
+            "Inhibition errors should map to NE adjustment"
+        );
+    }
+
+    #[test]
+    fn test_self_assessment_confidence_bidirectional() {
+        let mut monitor = SelfAssessmentMonitor {
+            warmup_threshold: 5,
+            cooldown_duration: 5,
+            ..Default::default()
+        };
+
+        let overconfident = SelfAssessmentInput {
+            prediction_error: 0.08,
+            coherence: 0.7,
+            confidence_calibration_error: 0.3, // high ECE
+            attention_utilization: 0.5,
+            inhibition_error_rate: 0.0,
+            drift_anomalous: false,
+        };
+
+        for _ in 0..60 {
+            monitor.update(&overconfident);
+        }
+
+        let cal = monitor.check_trigger(false);
+        assert!(cal.is_some(), "High ECE should trigger FoK calibration");
+        assert!(cal.unwrap().confidence_delta < 0.0, "Should reduce confidence");
+    }
+
+    #[test]
+    fn test_self_assessment_telemetry_accessors() {
+        let mut monitor = SelfAssessmentMonitor::default();
+        assert_eq!(monitor.observations_count(), 0);
+        assert_eq!(monitor.cooldown_remaining(), 0);
+        assert!((monitor.inhibition_error_ema() - 0.0).abs() < 1e-6);
+
+        let input = SelfAssessmentInput {
+            prediction_error: 0.3,
+            coherence: 0.5,
+            confidence_calibration_error: 0.1,
+            attention_utilization: 0.8,
+            inhibition_error_rate: 0.5,
+            drift_anomalous: false,
+        };
+        monitor.update(&input);
+        assert_eq!(monitor.observations_count(), 1);
+        assert!(monitor.inhibition_error_ema() > 0.0);
+        assert!(monitor.pe_ema() > 0.0);
     }
 }

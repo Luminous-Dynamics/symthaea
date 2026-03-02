@@ -1048,20 +1048,20 @@ impl CognitiveLoopService {
         // Apply consensus overrides from the previous cycle as Set proposals,
         // syncing actual fields so both direct-mutation and proposal paths
         // start from the same base value.
-        if self.config.consensus_feedback {
+        {
             let (consensus_conf, consensus_lr, consensus_explore, consensus_threshold) =
                 self.feedback_state.apply_pending_consensus();
             if let Some(conf) = consensus_conf {
-                self.prediction_confidence = (conf as f32).clamp(0.01, 0.99);
+                self.set_confidence("consensus_writeback", conf as f32);
             }
             if let Some(lr) = consensus_lr {
-                self.fep_lr_boost = lr as f32;
+                self.set_lr("consensus_writeback", lr as f32);
             }
             if let Some(explore) = consensus_explore {
-                self.curiosity_drive.exploration_urge = explore as f32;
+                self.set_exploration("consensus_writeback", explore as f32);
             }
             if let Some(thresh) = consensus_threshold {
-                self.carryover.learning.adaptive_threshold_scale = thresh as f32;
+                self.set_threshold("consensus_writeback", thresh as f32);
             }
         }
 
@@ -1221,6 +1221,13 @@ impl CognitiveLoopService {
             // multiplier accumulation across cycles. 5-HT effective is the clean
             // signal: low 5-HT → poor sustained attention → high "utilization".
             let sht_eff = self.neuromod.bath.serotonin.effective();
+            // Inhibition error: fraction of gating signals (prefrontal veto) that fired.
+            // Binary for now; extend to multi-signal average when more gates are tracked.
+            let inhibition_error_rate = if self.carryover.quality.cached_prefrontal_veto {
+                1.0
+            } else {
+                0.0
+            };
             let sa_input = super::super::calibration::SelfAssessmentInput {
                 prediction_error: self.stats.avg_prediction_error,
                 coherence: self.carryover.history.cached_coherence.unwrap_or(0.5),
@@ -1229,6 +1236,7 @@ impl CognitiveLoopService {
                 .abs(),
                 // Invert 5-HT: low serotonin → high utilization (sustained attn deficit)
                 attention_utilization: (1.0 - sht_eff).clamp(0.0, 1.0),
+                inhibition_error_rate,
                 drift_anomalous,
             };
             self.neuromod.self_assessment.update(&sa_input);
@@ -1274,16 +1282,31 @@ impl CognitiveLoopService {
         {
             // Copy values to avoid borrow overlap with adjust_exploration(&mut self)
             let free_energy = self.ethics_engine.last_moral_free_energy().free_energy;
+            let gain = self.ethics_engine.moral_exploration_gain();
             let (scenario_count, completeness) = {
                 let topo = self.ethics_engine.moral_topology().last_summary();
                 (topo.scenario_count, topo.completeness)
             };
 
-            // FEP-driven: continuous moral free energy signal
-            // F > 1.0 → novel moral territory → explore (scaled by KL divergence)
+            // Bidirectional feedback: last cycle's PE modulates FE→exploration gain.
+            // Uses avg_prediction_error as the outcome signal and the EMA-smoothed FE
+            // as baseline — when exploration reduced PE below the smoothed FE expectation,
+            // the coupling strengthens; when PE rose, it decays.
+            if self.stats.total_cycles > 5 {
+                let pe = self.stats.avg_prediction_error;
+                let fe_ema = self.ethics_engine.moral_fe_ema() as f32;
+                // Normalize: baseline PE ~0.3 for typical FE-driven exploration cycles
+                let baseline_pe = 0.3_f32 + fe_ema * 0.1;
+                self.ethics_engine
+                    .feedback_exploration_outcome(pe, baseline_pe);
+            }
+
+            // FEP-driven: continuous moral free energy signal with adaptive gain.
+            // F > 0.5 → novel moral territory → explore (scaled by adaptive gain)
             // F < 0.5 → familiar moral ground → no exploration boost
+            // Gain adapts via feedback_exploration_outcome() [0.05, 0.25].
             if free_energy > 0.5 {
-                let fe_boost = ((free_energy - 0.5) * 0.15).min(0.2) as f32;
+                let fe_boost = ((free_energy - 0.5) * gain as f64).min(0.2) as f32;
                 self.adjust_exploration("moral_free_energy", fe_boost);
             }
 
@@ -1336,6 +1359,13 @@ impl CognitiveLoopService {
         metadata.neuromod_phasic_replay_boost = phasic_da_replay_boost;
         metadata.neuromod_ne_reorienting_boost = ne_reorienting_boost;
         metadata.neuromod_drift_recovery_remaining = self.carryover.urgency.anomaly_drift_recovery;
+
+        // Populate inhibition error count from metadata flags (prefrontal veto,
+        // reasoning gate block, safety block). Feeds back into self-assessment
+        // NE proxy via SelfAssessmentInput::inhibition_error_rate next cycle.
+        metadata.neuromod.inhibition_errors_this_cycle = metadata.prefrontal_veto as u8
+            + metadata.reasoning_gate_blocked as u8
+            + metadata.safety_blocked as u8;
         metadata.ne_arousal_feedback = ne_arousal_feedback;
         metadata.confidence_velocity = confidence_velocity;
         metadata.sht_crash_dip = sht_crash_dip > 0.0;

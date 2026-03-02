@@ -160,7 +160,7 @@ proptest! {
     /// public CognitiveLoopService::cycle metadata.
     #[test]
     fn prop_urgency_from_fuzzed_cycle(
-        inputs in fuzz_input_sequence(5, 15),
+        inputs in fuzz_input_sequence(15, 40),
     ) {
         let mut service = minimal_service();
         for (i, input) in inputs.iter().enumerate() {
@@ -487,7 +487,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
-    fn prop_urgency_always_valid_variant(inputs in fuzz_input_sequence(5, 20)) {
+    fn prop_urgency_always_valid_variant(inputs in fuzz_input_sequence(15, 40)) {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
@@ -510,7 +510,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
-    fn prop_moral_score_bounded(inputs in fuzz_input_sequence(5, 20)) {
+    fn prop_moral_score_bounded(inputs in fuzz_input_sequence(15, 40)) {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
@@ -814,7 +814,7 @@ proptest! {
     /// Verify that every float in CycleMetadata is finite for random inputs.
     /// This catches any NaN/Inf propagation through the 75+ feedback loops.
     #[test]
-    fn prop_all_metadata_floats_finite(inputs in fuzz_input_sequence(5, 15)) {
+    fn prop_all_metadata_floats_finite(inputs in fuzz_input_sequence(20, 50)) {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);
@@ -938,7 +938,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
 
     #[test]
-    fn prop_output_vector_finite(inputs in fuzz_input_sequence(5, 20)) {
+    fn prop_output_vector_finite(inputs in fuzz_input_sequence(15, 40)) {
         let mut service = feedback_service();
         for (i, input) in inputs.iter().enumerate() {
             let result = service.cycle(input);

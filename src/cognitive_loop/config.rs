@@ -3,9 +3,11 @@
 //! Temporal backend selection (CfC vs HdcLtcUnified), training methods,
 //! and the main `CognitiveLoopConfig` builder.
 
+use crate::hdc::moral_topology::MoralAnomalyConfig;
 use crate::hdc_ltc_bridge::HdcLtcBridgeConfig;
 use serde::{Deserialize, Serialize};
 pub use symthaea_core::hdc::predictive_encoder::PredictiveEncoderConfig;
+pub use symthaea_core::hdc::substrate_independence::SubstrateType;
 
 // TEMPORAL BACKEND SELECTION
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -382,13 +384,6 @@ pub struct CognitiveLoopConfig {
     /// Intended for debugging and development, not production.
     pub trace_feedback: bool,
 
-    /// Enable consensus-mode feedback integration (default: true).
-    /// Routes the consensus writeback (averaged adds, geometric-mean scales)
-    /// through Set proposals at cycle start, keeping the divergence tracker
-    /// in sync with actual field values. Disabling reverts to direct-mutation
-    /// semantics where consensus values are computed but not applied.
-    pub consensus_feedback: bool,
-
     /// Enable nurture/attachment bridge (Bowlby attachment theory).
     /// When true, the cognitive loop maintains a NurtureAttachmentBridge that
     /// models caregiver presence/absence and modulates oxytocin, NE, 5-HT, DA,
@@ -396,6 +391,23 @@ pub struct CognitiveLoopConfig {
     /// Science: Bowlby (1969/1982), Ainsworth et al. (1978)
     #[cfg(feature = "nurture")]
     pub enable_nurture_attachment: bool,
+
+    /// Anomaly detection thresholds for moral topology.
+    /// Controls drift alert sensitivity, free energy spike detection, composite
+    /// anomaly score weights, and adaptive topology cadence tiers.
+    pub moral_anomaly_config: MoralAnomalyConfig,
+
+    /// Enable corrective feedback modulations when moral anomalies are detected.
+    /// When true, detected anomalies (value inversion, FE spike, fragmentation,
+    /// drift) trigger LR scaling, exploration adjustment, and confidence nudges.
+    /// Default: false (telemetry-only).
+    pub enable_moral_anomaly_response: bool,
+
+    /// Substrate type for consciousness feasibility calculation.
+    /// Determines how substrate-specific requirements (causality, integration,
+    /// binding, workspace) affect the Consciousness Equation V2 output.
+    /// Science: Putnam (1967) multiple realizability, Tononi (2004) substrate-independent Phi.
+    pub substrate_type: SubstrateType,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -457,9 +469,11 @@ impl Default for CognitiveLoopConfig {
             agent_did: None,
             attestation_buffer_capacity: 64,
             trace_feedback: false,
-            consensus_feedback: true,
             #[cfg(feature = "nurture")]
             enable_nurture_attachment: false,
+            moral_anomaly_config: MoralAnomalyConfig::default(),
+            enable_moral_anomaly_response: false,
+            substrate_type: SubstrateType::SiliconDigital,
         }
     }
 }

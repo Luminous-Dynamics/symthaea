@@ -311,7 +311,7 @@ pub struct CognitiveLoopService {
 
     /// Prediction confidence (0.0 to 1.0)
     /// Decays during uncertain states, grows with accurate predictions
-    prediction_confidence: f32,
+    prediction_confidence: f64,
 
     /// Flow state tracker
     /// Detects and maintains flow state for optimal cognitive engagement
@@ -704,6 +704,10 @@ pub struct CognitiveLoopService {
     /// into a single `measure()` call per cycle with co-prime interval scheduling.
     /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
     consciousness_engine: consciousness_engine::ConsciousnessEngine,
+
+    /// Pre-computed substrate feasibility [0,1] from config.substrate_type.
+    /// Scales Equation V2 consciousness to reflect substrate limitations.
+    substrate_feasibility: f64,
 
     /// Unified Ethics Engine: wraps MoralParser + MoralAlgebra + ValueEvaluator + Harmonies
     /// into a single `evaluate()` call per cycle with co-prime interval scheduling.

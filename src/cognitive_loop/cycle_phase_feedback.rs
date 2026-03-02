@@ -9,6 +9,15 @@ use std::time::Instant;
 
 use super::cycle::{DynamicsPhaseResult, FeedbackPhaseResult, PerceptionPhaseResult};
 use super::helpers::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
+use super::thresholds::{
+    EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD, EPISTEMIC_CAUTION_SCALE,
+    EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE, EPISTEMIC_REJECTION_LR_SCALE,
+    EPISTEMIC_TRUST_SCALE, EPISTEMIC_TRUST_THRESHOLD, EVOLUTION_NEGATIVE_EXPLORATION_MAX,
+    EVOLUTION_NEGATIVE_EXPLORATION_SCALE, EVOLUTION_PHI_THRESHOLD,
+    EVOLUTION_POSITIVE_CONFIDENCE_MAX, EVOLUTION_POSITIVE_CONFIDENCE_SCALE,
+    HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN, HARMONIC_INTERFERENCE_MAX_COUNT,
+    HARMONIC_INTERFERENCE_MAX_DAMPEN,
+};
 use super::{CognitiveLoopService, CycleState};
 
 impl CognitiveLoopService {
@@ -115,10 +124,12 @@ impl CognitiveLoopService {
         let hierarchical_ltc_phi = subsystem_metrics.hierarchical_ltc_phi;
         let evolution_generation = subsystem_metrics.evolution_generation;
         let evolution_phi_delta = subsystem_metrics.evolution_phi_delta;
-        let evolution_confidence_delta = if evolution_phi_delta > 0.01 {
-            (evolution_phi_delta * 0.05).min(0.03) as f32
-        } else if evolution_phi_delta < -0.01 {
-            -((-evolution_phi_delta) * 0.08).min(0.04) as f32
+        let evolution_confidence_delta = if evolution_phi_delta > EVOLUTION_PHI_THRESHOLD {
+            (evolution_phi_delta * EVOLUTION_POSITIVE_CONFIDENCE_SCALE)
+                .min(EVOLUTION_POSITIVE_CONFIDENCE_MAX) as f32
+        } else if evolution_phi_delta < -EVOLUTION_PHI_THRESHOLD {
+            -((-evolution_phi_delta) * EVOLUTION_NEGATIVE_EXPLORATION_SCALE)
+                .min(EVOLUTION_NEGATIVE_EXPLORATION_MAX) as f32
         } else {
             0.0
         };
@@ -208,23 +219,25 @@ impl CognitiveLoopService {
         }
 
         // ── Phase 20: Harmonic interferences → LR feedback ───────────────────
-        let harmonic_interference_lr_mod: f32 = if harmonic_interferences > 3 {
-            let dampen = ((harmonic_interferences - 3) as f32 * 0.02).min(0.1);
-            self.carryover.learning.subsystem_lr_factor *= 1.0 - dampen;
-            self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
-            self.stats.harmonic_interference_mod_count += 1;
-            -dampen
-        } else if harmonic_interferences == 0 {
-            let boost = 0.02_f32;
-            self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
-            self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
-            self.stats.harmonic_interference_mod_count += 1;
-            boost
-        } else {
-            0.0
-        };
+        let harmonic_interference_lr_mod: f32 =
+            if harmonic_interferences > HARMONIC_INTERFERENCE_MAX_COUNT {
+                let dampen = ((harmonic_interferences - HARMONIC_INTERFERENCE_MAX_COUNT) as f32
+                    * HARMONIC_INTERFERENCE_DAMPEN)
+                    .min(HARMONIC_INTERFERENCE_MAX_DAMPEN);
+                self.carryover.learning.subsystem_lr_factor *= 1.0 - dampen;
+                self.carryover.learning.subsystem_lr_factor =
+                    self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
+                self.stats.harmonic_interference_mod_count += 1;
+                -dampen
+            } else if harmonic_interferences == 0 {
+                self.carryover.learning.subsystem_lr_factor *= 1.0 + HARMONIC_ALL_CLEAR_BOOST;
+                self.carryover.learning.subsystem_lr_factor =
+                    self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
+                self.stats.harmonic_interference_mod_count += 1;
+                HARMONIC_ALL_CLEAR_BOOST
+            } else {
+                0.0
+            };
 
         // ── Phase 20: Causal relations density → urgency gating ──────────────
         let causal_urgency_gated = causal_relations_count > 10
@@ -246,22 +259,31 @@ impl CognitiveLoopService {
         let mut epistemic_coherence_gated = false;
         if !epistemic_gate_approved {
             let rejection_strength = (1.0 - epistemic_gate_confidence).clamp(0.0, 0.5);
-            self.carryover.learning.subsystem_lr_factor *= 1.0 - rejection_strength * 0.3;
-            self.scale_confidence("epistemic_reject", 1.0 - rejection_strength * 0.15);
-        } else if epistemic_gate_confidence > 0.6 {
-            let approval_boost = (epistemic_gate_confidence - 0.6) * 0.08;
+            self.carryover.learning.subsystem_lr_factor *=
+                1.0 - rejection_strength * EPISTEMIC_REJECTION_LR_SCALE;
+            self.scale_confidence(
+                "epistemic_reject",
+                1.0 - rejection_strength * EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
+            );
+        } else if epistemic_gate_confidence > EPISTEMIC_APPROVAL_THRESHOLD {
+            let approval_boost =
+                (epistemic_gate_confidence - EPISTEMIC_APPROVAL_THRESHOLD) * EPISTEMIC_APPROVAL_LR_SCALE;
             self.carryover.learning.subsystem_lr_factor *= 1.0 + approval_boost;
             self.carryover.learning.subsystem_lr_factor =
                 self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.3);
         }
 
-        if epistemic_gate_confidence < 0.4 && epistemic_gate_confidence > 0.0 {
-            let caution_factor = (0.4 - epistemic_gate_confidence) * 0.3;
+        if epistemic_gate_confidence < EPISTEMIC_CAUTION_THRESHOLD
+            && epistemic_gate_confidence > 0.0
+        {
+            let caution_factor =
+                (EPISTEMIC_CAUTION_THRESHOLD - epistemic_gate_confidence) * EPISTEMIC_CAUTION_SCALE;
             self.scale_threshold("epistemic_gate_caution", 1.0 + caution_factor);
             epistemic_coherence_gated = true;
             self.stats.epistemic_coherence_gated_count += 1;
-        } else if epistemic_gate_confidence > 0.8 {
-            let trust_factor = (epistemic_gate_confidence - 0.8) * 0.15;
+        } else if epistemic_gate_confidence > EPISTEMIC_TRUST_THRESHOLD {
+            let trust_factor =
+                (epistemic_gate_confidence - EPISTEMIC_TRUST_THRESHOLD) * EPISTEMIC_TRUST_SCALE;
             self.scale_threshold("epistemic_gate_trust", 1.0 - trust_factor);
         }
 
@@ -512,6 +534,10 @@ impl CognitiveLoopService {
                 attractor_detected: self.neuromod.phase_tracker.detect_attractor().is_some(),
                 sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
                 gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
+                substrate_feasibility: self.substrate_feasibility,
+                // Moral topology → consciousness coupling
+                moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
+                moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
             },
         );
         self.consciousness_engine
@@ -554,6 +580,51 @@ impl CognitiveLoopService {
         module_timings.consciousness_engine_equation_v2 = consciousness_output.equation_v2_us;
         module_timings.consciousness_engine_pipeline = consciousness_output.pipeline_us;
         module_timings.consciousness_engine_multimodal = consciousness_output.multimodal_us;
+
+        // ── Structural Phi telemetry ────────────────────────────────────
+        let (struct_micro, struct_meso, struct_macro, struct_bn, struct_er, struct_nc) =
+            if let Some(ref sp) = consciousness_output.structural_phi {
+                (
+                    sp.micro_phi,
+                    sp.meso_phi,
+                    sp.macro_phi,
+                    sp.bottleneck_score,
+                    sp.emergence_ratio,
+                    sp.num_clusters,
+                )
+            } else {
+                (0.0, 0.0, 0.0, 0.0, 0.0, 0)
+            };
+        let consciousness_weights = consciousness_output.current_weights;
+        let consciousness_weight_variance = consciousness_output.weight_variance;
+
+        // ── EqV2 limiting component → targeted boost ─────────────────────
+        // Complements Phase 19 gradient-based boost with equation-level
+        // bottleneck detection. Covers all 7 CoreComponents including
+        // Workspace, Recursion, Integration, Knowledge (not in gradient path).
+        if let Some(ref component) = consciousness_output.limiting_component {
+            use crate::consciousness::consciousness_equation_v2::CoreComponent;
+            match component {
+                CoreComponent::Workspace => {
+                    // Low workspace → boost attention budget and GWT broadcast
+                    self.adjust_confidence("eq_v2_workspace", 0.005);
+                }
+                CoreComponent::Recursion => {
+                    // Low recursion (HOT depth) → boost meta-cognitive sensitivity
+                    self.scale_lr("eq_v2_recursion", 1.02);
+                }
+                CoreComponent::Integration => {
+                    // Low integration → increase coherence sensitivity
+                    self.adjust_confidence("eq_v2_integration", 0.008);
+                }
+                CoreComponent::Knowledge => {
+                    // Low epistemic quality → boost exploration for information gain
+                    self.adjust_exploration("eq_v2_knowledge", 0.02);
+                }
+                // Attention, Binding, Efficacy already handled by Phase 19 gradient path
+                _ => {}
+            }
+        }
 
         // Soul experience integration
         let _t = Instant::now();
@@ -836,6 +907,16 @@ impl CognitiveLoopService {
             support_alert_fired,
             support_federation_graduated,
             support_efe,
+            // Structural Phi decomposition
+            structural_micro_phi: struct_micro,
+            structural_meso_phi: struct_meso,
+            structural_macro_phi: struct_macro,
+            structural_bottleneck: struct_bn,
+            structural_emergence_ratio: struct_er,
+            structural_num_clusters: struct_nc,
+            // Dynamic consciousness weights
+            consciousness_weights,
+            consciousness_weight_variance,
         }
     }
 }
