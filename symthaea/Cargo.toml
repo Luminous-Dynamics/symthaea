@@ -384,7 +384,7 @@ vision = ["ort", "hf-hub"]                            # SigLIP image embeddings 
 perception = ["embeddings", "vision"]                 # Full multimodal perception stack
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
-vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"]  # Vision manifold with real camera capture via nokhwa
+vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"]  # Vision manifold with real camera capture via V4L2
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
