@@ -1,18 +1,10 @@
-//! Feedback Variable Decoupling — Phase 2.2 of the Great Refactor
+//! Feedback Variable Integration — Consensus-based proposal system.
 //!
-//! Replaces direct `self.prediction_confidence += X` mutations with attributed
-//! proposals that are collected and integrated once per cycle.
-//!
-//! # Current mode: Dual-write bridge
-//!
-//! Helper methods on `CognitiveLoopService` (in `helpers/feedback_helpers.rs`)
-//! both record proposals AND apply the direct mutation, preserving exact behavior.
-//! The `integrate()` step computes what the proposal-based value *would* be,
-//! enabling verification before the full swap.
-//!
-//! # Future mode: Proposal-only integration
-//!
-//! Remove direct mutations from helpers; `integrate()` becomes the sole authority.
+//! All feedback variable mutations (`prediction_confidence`, `fep_lr_boost`,
+//! `exploration_urge`, `adaptive_threshold_scale`) are routed through attributed
+//! proposals. Each cycle, proposals are collected via helper methods and
+//! integrated using consensus (averaged adds, geometric mean scales) to produce
+//! noise-resistant values for the next cycle.
 
 use std::fmt;
 
@@ -98,40 +90,13 @@ impl ProposalCollector {
             .collect()
     }
 
-    /// Integrate all proposals using consensus mode (default).
+    /// Integrate all proposals using consensus mode.
     ///
     /// Consensus integration strategy:
     /// - `Set` proposals: last one wins (they're rare and intentional)
     /// - `Add` proposals: averaged (consensus), then applied
     /// - `Scale` proposals: geometric mean, then applied
-    ///
-    /// Currently used in tests; will become the sole integration path
-    /// when dual-write bridge is removed (see module doc).
     pub fn integrate(&self, base_value: f64, clamp_min: f64, clamp_max: f64) -> IntegrationResult {
-        self.integrate_with_mode(base_value, clamp_min, clamp_max, IntegrationMode::Consensus)
-    }
-
-    /// Integrate all proposals using sequential mode.
-    ///
-    /// Sequential mode matches the behavior of applying each proposal
-    /// in order (sum adds, product scales). Use this for cutover
-    /// validation — the result should match the direct-mutation value.
-    pub fn integrate_sequential(
-        &self,
-        base_value: f64,
-        clamp_min: f64,
-        clamp_max: f64,
-    ) -> IntegrationResult {
-        self.integrate_with_mode(base_value, clamp_min, clamp_max, IntegrationMode::Sequential)
-    }
-
-    fn integrate_with_mode(
-        &self,
-        base_value: f64,
-        clamp_min: f64,
-        clamp_max: f64,
-        mode: IntegrationMode,
-    ) -> IntegrationResult {
         let mut sets: Vec<(&'static str, f64)> = Vec::new();
         let mut adds: Vec<(&'static str, f64)> = Vec::new();
         let mut scales: Vec<(&'static str, f64)> = Vec::new();
@@ -151,33 +116,17 @@ impl ProposalCollector {
             base_value
         };
 
-        match mode {
-            IntegrationMode::Consensus => {
-                // Average additive proposals (noise-resistant consensus)
-                if !adds.is_empty() {
-                    let avg_delta: f64 =
-                        adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
-                    value += avg_delta;
-                }
-                // Geometric mean of multiplicative proposals
-                if !scales.is_empty() {
-                    let log_sum: f64 = scales.iter().map(|(_, f)| f.ln()).sum::<f64>();
-                    let geo_mean = (log_sum / scales.len() as f64).exp();
-                    value *= geo_mean;
-                }
-            }
-            IntegrationMode::Sequential => {
-                // Sum additive proposals (matches sequential += behavior)
-                if !adds.is_empty() {
-                    let total_delta: f64 = adds.iter().map(|(_, d)| d).sum::<f64>();
-                    value += total_delta;
-                }
-                // Product of multiplicative proposals (matches sequential *= behavior)
-                if !scales.is_empty() {
-                    let product: f64 = scales.iter().map(|(_, f)| f).product();
-                    value *= product;
-                }
-            }
+        // Average additive proposals (noise-resistant consensus)
+        if !adds.is_empty() {
+            let avg_delta: f64 =
+                adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
+            value += avg_delta;
+        }
+        // Geometric mean of multiplicative proposals
+        if !scales.is_empty() {
+            let log_sum: f64 = scales.iter().map(|(_, f)| f.ln()).sum::<f64>();
+            let geo_mean = (log_sum / scales.len() as f64).exp();
+            value *= geo_mean;
         }
 
         value = value.clamp(clamp_min, clamp_max);
@@ -195,17 +144,6 @@ impl Default for ProposalCollector {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Integration strategy for combining proposals.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum IntegrationMode {
-    /// Consensus: average adds, geometric mean scales. Noise-resistant.
-    /// Use for final production mode (reduces compounding drift).
-    Consensus,
-    /// Sequential: sum adds, product scales. Matches sequential mutation behavior.
-    /// Use for cutover validation (result should match direct-mutation value).
-    Sequential,
 }
 
 /// Result of integrating proposals.
@@ -231,22 +169,12 @@ impl fmt::Display for IntegrationResult {
 // FEEDBACK STATE — top-level container
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Divergence between direct-mutation values and proposal-integrated values,
-/// plus consensus-smoothed alternatives for the next cycle.
+/// Consensus-integrated feedback values computed at cycle end.
 ///
-/// A divergence of 0.0 means the proposal system perfectly reproduces
-/// the direct-mutation behavior. Non-zero divergence indicates mutations
-/// that bypass the proposal system (not routed through helpers).
-///
-/// The `consensus_*` fields contain noise-resistant integrated values
-/// (averaged adds, geometric mean scales) that can optionally replace
-/// the direct-mutation values at cycle end.
+/// These noise-resistant values (averaged adds, geometric mean scales)
+/// are stored for deferred writeback at the start of the next cycle.
 #[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct FeedbackDivergence {
-    pub confidence: f64,
-    pub learning_rate: f64,
-    pub exploration: f64,
-    pub threshold: f64,
+pub(crate) struct ConsensusResult {
     /// Consensus-integrated prediction_confidence for next cycle
     pub consensus_confidence: f64,
     /// Consensus-integrated fep_lr_boost value for next cycle
@@ -259,11 +187,10 @@ pub(crate) struct FeedbackDivergence {
 
 /// Decoupled feedback state for the cognitive loop.
 ///
-/// Replaces direct `self.prediction_confidence += X` and `self.fep_lr_boost *= X`
-/// mutations with attributed, integrated proposals.
-///
-/// Round 7 extends this to `exploration_urge` (27 sites) and
-/// `adaptive_threshold_scale` (8 sites).
+/// All feedback variable mutations are routed through attributed proposals.
+/// At cycle end, proposals are integrated using consensus (averaged adds,
+/// geometric mean scales) and the result is stored for deferred writeback
+/// at the next cycle start.
 #[derive(Debug, Clone)]
 pub(crate) struct FeedbackState {
     /// Proposals for `prediction_confidence` (0.0–1.0)
@@ -275,7 +202,7 @@ pub(crate) struct FeedbackState {
     /// Proposals for `adaptive_threshold_scale` (0.5–2.0)
     pub threshold: ProposalCollector,
 
-    // ── Cycle-start values for divergence computation ────────────────────
+    // ── Cycle-start values for consensus computation ────────────────────
     cycle_start_confidence: f64,
     cycle_start_lr: f64,
     cycle_start_exploration: f64,
@@ -291,18 +218,18 @@ pub(crate) struct FeedbackState {
     /// Last integrated threshold result
     pub last_threshold_integration: Option<IntegrationResult>,
 
-    /// Last computed divergence (set by `end_cycle()`, before any consensus writeback).
-    pub last_divergence: Option<FeedbackDivergence>,
+    /// Last computed consensus result (set by `end_cycle()`).
+    pub last_consensus: Option<ConsensusResult>,
 
     // ── Deferred consensus writeback ────────────────────────────────────
-    /// Consensus confidence to apply as a Set proposal at the start of the next cycle.
+    /// Consensus confidence to apply via helper at the start of the next cycle.
     /// Stored by `store_consensus_for_next_cycle()`, consumed by `apply_pending_consensus()`.
     pending_consensus_confidence: Option<f64>,
-    /// Consensus LR to apply as a Set proposal at the start of the next cycle.
+    /// Consensus LR to apply via helper at the start of the next cycle.
     pending_consensus_lr: Option<f64>,
-    /// Consensus exploration to apply as a Set proposal at the start of the next cycle.
+    /// Consensus exploration to apply via helper at the start of the next cycle.
     pending_consensus_exploration: Option<f64>,
-    /// Consensus threshold to apply as a Set proposal at the start of the next cycle.
+    /// Consensus threshold to apply via helper at the start of the next cycle.
     pending_consensus_threshold: Option<f64>,
 }
 
@@ -321,7 +248,7 @@ impl FeedbackState {
             last_lr_integration: None,
             last_exploration_integration: None,
             last_threshold_integration: None,
-            last_divergence: None,
+            last_consensus: None,
             pending_consensus_confidence: None,
             pending_consensus_lr: None,
             pending_consensus_exploration: None,
@@ -337,22 +264,17 @@ impl FeedbackState {
         self.threshold.clear();
     }
 
-    /// Integrate all feedback variables. Call at cycle end (Phase D: DECAY).
+    /// Integrate all feedback variables using consensus. Call at cycle end.
     ///
-    /// Current values are produced by direct mutations (the old path).
-    /// Sequential integration results are stored for comparison — these
-    /// should match the direct-mutation values if all mutations go through helpers.
-    ///
-    /// Returns divergence between direct mutation and sequential integration
-    /// for each variable (0.0 = perfect match).
+    /// Returns consensus-integrated values (averaged adds, geometric mean scales)
+    /// for all 4 feedback variables.
     pub fn end_cycle(
         &mut self,
-        current_confidence: f64,
-        current_lr: f64,
-        current_exploration: f64,
-        current_threshold: f64,
-    ) -> FeedbackDivergence {
-        // Use sequential integration (sum/product) — should match direct mutation exactly
+        _current_confidence: f64,
+        _current_lr: f64,
+        _current_exploration: f64,
+        _current_threshold: f64,
+    ) -> ConsensusResult {
         let base_confidence = self.cycle_start_confidence;
         let base_lr = self.cycle_start_lr;
         let base_exploration = self.cycle_start_exploration;
@@ -360,52 +282,34 @@ impl FeedbackState {
 
         let conf_result = self
             .confidence
-            .integrate_sequential(base_confidence, 0.0, 1.0);
-        let lr_result = self.learning_rate.integrate_sequential(base_lr, 1.0, 3.0);
-        let explore_result = self
-            .exploration
-            .integrate_sequential(base_exploration, 0.0, 1.0);
-        let thresh_result = self
-            .threshold
-            .integrate_sequential(base_threshold, 0.5, 2.0);
-
-        // Compute consensus integration (averaged adds, geometric mean scales)
-        // for all 4 feedback variables. These dampened values can optionally
-        // replace the direct-mutation values at cycle end.
-        let consensus_confidence = self
-            .confidence
             .integrate(base_confidence, 0.0, 1.0);
-        let consensus_lr = self
+        let lr_result = self
             .learning_rate
             .integrate(base_lr, 1.0, 3.0);
-        let consensus_exploration = self
+        let explore_result = self
             .exploration
             .integrate(base_exploration, 0.0, 1.0);
-        let consensus_threshold = self
+        let thresh_result = self
             .threshold
             .integrate(base_threshold, 0.5, 2.0);
 
-        let divergence = FeedbackDivergence {
-            confidence: (current_confidence - conf_result.effective).abs(),
-            learning_rate: (current_lr - lr_result.effective).abs(),
-            exploration: (current_exploration - explore_result.effective).abs(),
-            threshold: (current_threshold - thresh_result.effective).abs(),
-            consensus_confidence: consensus_confidence.effective,
-            consensus_lr: consensus_lr.effective,
-            consensus_exploration: consensus_exploration.effective,
-            consensus_threshold: consensus_threshold.effective,
+        let consensus = ConsensusResult {
+            consensus_confidence: conf_result.effective,
+            consensus_lr: lr_result.effective,
+            consensus_exploration: explore_result.effective,
+            consensus_threshold: thresh_result.effective,
         };
 
         self.last_confidence_integration = Some(conf_result);
         self.last_lr_integration = Some(lr_result);
         self.last_exploration_integration = Some(explore_result);
         self.last_threshold_integration = Some(thresh_result);
-        self.last_divergence = Some(divergence);
+        self.last_consensus = Some(consensus);
 
-        divergence
+        consensus
     }
 
-    /// Record cycle-start values for divergence computation.
+    /// Record cycle-start values for consensus computation.
     ///
     /// Call at cycle start (after `begin_cycle()`) with the current field values.
     pub fn snapshot_cycle_start(
@@ -423,20 +327,21 @@ impl FeedbackState {
 
     /// Store consensus-smoothed values for deferred application at the next cycle start.
     ///
-    /// Called at cycle end instead of directly overwriting the feedback fields.
-    /// The values are applied as `Set` proposals by `apply_pending_consensus()`
-    /// so the divergence tracker sees them.
-    pub fn store_consensus_for_next_cycle(&mut self, divergence: &FeedbackDivergence) {
-        self.pending_consensus_confidence = Some(divergence.consensus_confidence);
-        self.pending_consensus_lr = Some(divergence.consensus_lr);
-        self.pending_consensus_exploration = Some(divergence.consensus_exploration);
-        self.pending_consensus_threshold = Some(divergence.consensus_threshold);
+    /// Called at cycle end. The values are applied via helpers by
+    /// `apply_pending_consensus()` at the next cycle start.
+    pub fn store_consensus_for_next_cycle(&mut self, consensus: &ConsensusResult) {
+        self.pending_consensus_confidence = Some(consensus.consensus_confidence);
+        self.pending_consensus_lr = Some(consensus.consensus_lr);
+        self.pending_consensus_exploration = Some(consensus.consensus_exploration);
+        self.pending_consensus_threshold = Some(consensus.consensus_threshold);
     }
 
-    /// Apply any pending consensus values as `Set` proposals.
+    /// Return any pending consensus values for the caller to apply via helpers.
     ///
     /// Call at cycle start (after `begin_cycle()` + `snapshot_cycle_start()`).
-    /// Returns `(confidence, lr, exploration, threshold)` — the values applied.
+    /// Returns `(confidence, lr, exploration, threshold)` — the caller routes
+    /// these through `set_confidence` / `set_lr` / `set_exploration` / `set_threshold`
+    /// helpers, which emit the Set proposals themselves.
     pub fn apply_pending_consensus(
         &mut self,
     ) -> (Option<f64>, Option<f64>, Option<f64>, Option<f64>) {
@@ -444,18 +349,6 @@ impl FeedbackState {
         let lr = self.pending_consensus_lr.take();
         let exploration = self.pending_consensus_exploration.take();
         let threshold = self.pending_consensus_threshold.take();
-        if let Some(v) = confidence {
-            self.confidence.propose("consensus_writeback", FeedbackProposal::Set(v));
-        }
-        if let Some(v) = lr {
-            self.learning_rate.propose("consensus_writeback", FeedbackProposal::Set(v));
-        }
-        if let Some(v) = exploration {
-            self.exploration.propose("consensus_writeback", FeedbackProposal::Set(v));
-        }
-        if let Some(v) = threshold {
-            self.threshold.propose("consensus_writeback", FeedbackProposal::Set(v));
-        }
         (confidence, lr, exploration, threshold)
     }
 
@@ -645,214 +538,8 @@ mod tests {
         assert!(dump.is_empty());
     }
 
-    #[test]
-    fn test_sequential_integration_sums_adds() {
-        let mut collector = ProposalCollector::new();
-        collector.propose("a", FeedbackProposal::Add(0.1));
-        collector.propose("b", FeedbackProposal::Add(0.3));
-        // Sequential: sum of +0.1 and +0.3 = +0.4, applied to base 0.5 → 0.9
-        let result = collector.integrate_sequential(0.5, 0.0, 1.0);
-        assert!((result.effective - 0.9).abs() < 1e-10);
-        // Compare with consensus (average): +0.2 → 0.7
-        let consensus = collector.integrate(0.5, 0.0, 1.0);
-        assert!((consensus.effective - 0.7).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_sequential_integration_products_scales() {
-        let mut collector = ProposalCollector::new();
-        collector.propose("a", FeedbackProposal::Scale(0.9));
-        collector.propose("b", FeedbackProposal::Scale(0.9));
-        // Sequential: product 0.9 * 0.9 = 0.81, applied to base 1.0 → 0.81
-        let result = collector.integrate_sequential(1.0, 0.0, 2.0);
-        assert!((result.effective - 0.81).abs() < 1e-10);
-        // Compare with consensus (geomean): 0.9 → 0.9
-        let consensus = collector.integrate(1.0, 0.0, 2.0);
-        assert!((consensus.effective - 0.9).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_divergence_zero_when_fully_mediated() {
-        let mut state = FeedbackState::new();
-        state.begin_cycle();
-        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
-
-        // Simulate helpers: propose and apply
-        state
-            .confidence
-            .propose("test", FeedbackProposal::Add(0.1));
-        state
-            .learning_rate
-            .propose("test", FeedbackProposal::Scale(1.05));
-
-        // end_cycle with values matching sequential integration
-        // conf: 0.5 + 0.1 = 0.6, lr: 1.0 * 1.05 = 1.05
-        let divergence = state.end_cycle(0.6, 1.05, 0.3, 1.0);
-        assert!(divergence.confidence < 1e-10);
-        assert!(divergence.learning_rate < 1e-10);
-        assert!(divergence.exploration < 1e-10);
-        assert!(divergence.threshold < 1e-10);
-    }
-
-    #[test]
-    fn test_divergence_nonzero_with_bypass() {
-        let mut state = FeedbackState::new();
-        state.begin_cycle();
-        state.snapshot_cycle_start(0.5, 1.0, 0.3, 1.0);
-
-        // Only confidence is proposed
-        state
-            .confidence
-            .propose("test", FeedbackProposal::Add(0.1));
-        // But actual confidence was changed by both proposal AND bypass
-        let divergence = state.end_cycle(0.7, 1.0, 0.3, 1.0);
-        // Integrated: 0.5 + 0.1 = 0.6, actual: 0.7, divergence: 0.1
-        assert!((divergence.confidence - 0.1).abs() < 1e-10);
-    }
-
-    /// A/B test: consensus vs sequential integration on realistic proposal sequences.
-    ///
-    /// Runs the same proposals through both modes to quantify divergence,
-    /// establishing a baseline for the eventual migration from Sequential to Consensus.
-    #[test]
-    fn test_consensus_vs_sequential_divergence() {
-        let scenarios: Vec<(f64, Vec<FeedbackProposal>, f64, f64, &str)> = vec![
-            // (base, proposals, clamp_min, clamp_max, description)
-            (
-                0.5,
-                vec![
-                    FeedbackProposal::Add(0.03),
-                    FeedbackProposal::Scale(0.95),
-                    FeedbackProposal::Add(-0.01),
-                ],
-                0.0,
-                1.0,
-                "confidence",
-            ),
-            (
-                1.0,
-                vec![
-                    FeedbackProposal::Scale(1.1),
-                    FeedbackProposal::Scale(0.9),
-                    FeedbackProposal::Add(0.05),
-                ],
-                1.0,
-                3.0,
-                "learning_rate",
-            ),
-            (
-                0.3,
-                vec![
-                    FeedbackProposal::Add(0.05),
-                    FeedbackProposal::Add(-0.02),
-                    FeedbackProposal::Scale(1.1),
-                ],
-                0.0,
-                1.0,
-                "exploration",
-            ),
-            (
-                1.0,
-                vec![
-                    FeedbackProposal::Scale(0.85),
-                    FeedbackProposal::Scale(1.15),
-                ],
-                0.5,
-                2.0,
-                "threshold",
-            ),
-        ];
-
-        for (base, proposals, lo, hi, name) in scenarios {
-            let mut collector = ProposalCollector::new();
-            for p in &proposals {
-                collector.propose("test", *p);
-            }
-
-            let consensus = collector.integrate(base, lo, hi);
-            let sequential = collector.integrate_sequential(base, lo, hi);
-
-            let divergence = (consensus.effective - sequential.effective).abs();
-            // Log divergence for analysis
-            eprintln!(
-                "{name}: seq={:.4} cons={:.4} div={:.4}",
-                sequential.effective, consensus.effective, divergence
-            );
-
-            // Both should be within clamp bounds
-            assert!(
-                consensus.effective >= lo && consensus.effective <= hi,
-                "{name}: consensus {:.4} outside [{lo}, {hi}]",
-                consensus.effective
-            );
-            assert!(
-                sequential.effective >= lo && sequential.effective <= hi,
-                "{name}: sequential {:.4} outside [{lo}, {hi}]",
-                sequential.effective
-            );
-        }
-    }
-
-    /// Stress test: consensus mode produces less variance than sequential mode
-    /// across 100 cycles of random proposals (deterministic xorshift64 seed).
-    #[test]
-    fn test_consensus_stability_under_noise() {
-        // xorshift64 with known seed for reproducibility
-        let mut rng_state: u64 = 0xDEADBEEF_CAFEBABE;
-        let mut xorshift = || -> f64 {
-            rng_state ^= rng_state << 13;
-            rng_state ^= rng_state >> 7;
-            rng_state ^= rng_state << 17;
-            // Map to [-0.1, 0.1] range
-            (rng_state as f64 / u64::MAX as f64 - 0.5) * 0.2
-        };
-
-        let mut consensus_values = Vec::with_capacity(100);
-        let mut sequential_values = Vec::with_capacity(100);
-        let base = 0.5;
-
-        for _ in 0..100 {
-            let mut collector = ProposalCollector::new();
-            // 3-5 proposals per cycle: use xorshift to derive count
-            let count_seed = xorshift().abs();
-            let n_proposals = 3 + (count_seed * 30.0) as usize % 3;
-            for _ in 0..n_proposals {
-                let delta = xorshift();
-                if delta.abs() > 0.05 {
-                    collector.propose("noise", FeedbackProposal::Scale(1.0 + delta));
-                } else {
-                    collector.propose("noise", FeedbackProposal::Add(delta));
-                }
-            }
-
-            let cons = collector.integrate(base, 0.0, 1.0);
-            let seq = collector.integrate_sequential(base, 0.0, 1.0);
-            consensus_values.push(cons.effective);
-            sequential_values.push(seq.effective);
-        }
-
-        // Compute variance for each mode
-        let variance = |vals: &[f64]| -> f64 {
-            let n = vals.len() as f64;
-            let mean = vals.iter().sum::<f64>() / n;
-            vals.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n
-        };
-
-        let cons_var = variance(&consensus_values);
-        let seq_var = variance(&sequential_values);
-
-        eprintln!("consensus variance: {cons_var:.6}, sequential variance: {seq_var:.6}");
-
-        // Consensus averaging should produce less or equal variance
-        // (it averages adds instead of summing, and takes geometric mean of scales)
-        assert!(
-            cons_var <= seq_var * 1.1, // Allow 10% tolerance for edge cases
-            "Consensus variance ({cons_var:.6}) should be <= sequential ({seq_var:.6})"
-        );
-    }
-
     /// Verify that consensus writebacks routed through `store_consensus_for_next_cycle`
-    /// + `apply_pending_consensus` produce Set proposals across two cycles.
+    /// + `apply_pending_consensus` produce values across two cycles.
     #[test]
     fn test_consensus_writeback_routed_through_proposals() {
         let mut state = FeedbackState::new();
@@ -879,15 +566,15 @@ mod tests {
             .threshold
             .propose("test", FeedbackProposal::Scale(0.95));
 
-        let div = state.end_cycle(0.55, 1.1, 0.32, 0.95);
+        let consensus = state.end_cycle(0.55, 1.1, 0.32, 0.95);
 
         // Store consensus for next cycle (simulating what cycle_phase_output does)
-        state.store_consensus_for_next_cycle(&div);
+        state.store_consensus_for_next_cycle(&consensus);
 
         // Cycle 2: consensus should be applied
         state.begin_cycle();
         let (conf, lr, explore, thresh) = state.apply_pending_consensus();
-        // Consensus values should be applied as Set proposals
+        // Consensus values should be pending
         assert!(conf.is_some(), "consensus confidence should be pending");
         assert!(lr.is_some(), "consensus lr should be pending");
         assert!(explore.is_some(), "consensus exploration should be pending");
@@ -898,134 +585,5 @@ mod tests {
         assert!(lr.unwrap().is_finite());
         assert!(explore.unwrap().is_finite());
         assert!(thresh.unwrap().is_finite());
-    }
-
-    /// Multi-cycle divergence diagnostic for exploration_urge and prediction_confidence.
-    ///
-    /// After bypass fixes (Phase 7.5d), all exploration and confidence mutations
-    /// are routed through helpers. Divergence between direct-mutation and
-    /// sequential-integration should be near zero for both variables.
-    #[test]
-    fn test_multicycle_exploration_confidence_divergence() {
-        use super::super::CognitiveLoopConfig;
-        use super::super::CognitiveLoopService;
-
-        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-        let mut max_explore_div = 0.0f64;
-        let mut max_conf_div = 0.0f64;
-        let mut total_explore_proposals = 0usize;
-        let mut total_conf_proposals = 0usize;
-
-        for i in 0..50 {
-            let input = format!("exploration divergence diagnostic cycle {i}");
-            let _ = service.cycle(&input);
-
-            if let Some(ref exp_int) = service.feedback_state.last_exploration_integration {
-                total_explore_proposals += exp_int.n_adds + exp_int.n_scales + exp_int.n_sets;
-            }
-            if let Some(ref conf_int) = service.feedback_state.last_confidence_integration {
-                total_conf_proposals += conf_int.n_adds + conf_int.n_scales + conf_int.n_sets;
-            }
-
-            if let Some(ref div) = service.feedback_state.last_divergence {
-                if div.exploration > max_explore_div {
-                    max_explore_div = div.exploration;
-                }
-                if div.confidence > max_conf_div {
-                    max_conf_div = div.confidence;
-                }
-            }
-        }
-
-        // Sanity: proposals generated
-        assert!(
-            total_explore_proposals > 10,
-            "Expected 10+ exploration proposals, got {total_explore_proposals}"
-        );
-        assert!(
-            total_conf_proposals > 50,
-            "Expected 50+ confidence proposals, got {total_conf_proposals}"
-        );
-
-        // After bypass fixes (including CuriosityDrive::update() routing through
-        // proposals), exploration divergence should be near-zero. Remaining tolerance
-        // accounts for f32→f64 precision drift in the proposal integration path
-        // and confidence clamp boundary effects ([0.01, 0.99]).
-        assert!(
-            max_explore_div < 0.08,
-            "exploration_urge max divergence {max_explore_div:.6} exceeds 8%"
-        );
-        // Confidence has higher tolerance because f32 direct mutations accumulate
-        // differently than f64 proposal integration, especially with 50+ proposals
-        // per cycle. The ~6% divergence is from float precision, not bypasses.
-        assert!(
-            max_conf_div < 0.10,
-            "prediction_confidence max divergence {max_conf_div:.6} exceeds 10%"
-        );
-    }
-
-    /// Multi-cycle divergence diagnostic: runs 50 cognitive cycles and checks that
-    /// lr_divergence (fep_lr_boost) and threshold_divergence are near-zero,
-    /// confirming all mutations go through helpers (100% mediated).
-    #[test]
-    fn test_multicycle_lr_divergence_near_zero() {
-        use super::super::CognitiveLoopConfig;
-        use super::super::CognitiveLoopService;
-
-        let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-        let mut max_lr_div = 0.0f64;
-        let mut max_thresh_div = 0.0f64;
-        let mut total_lr_proposals = 0usize;
-        let mut total_thresh_proposals = 0usize;
-
-        for i in 0..50 {
-            let input = format!("divergence diagnostic cycle {i}");
-            let _ = service.cycle(&input);
-
-            // Collect proposal counts from the last integration
-            if let Some(ref lr_int) = service.feedback_state.last_lr_integration {
-                total_lr_proposals += lr_int.n_adds + lr_int.n_scales + lr_int.n_sets;
-            }
-            if let Some(ref thresh_int) = service.feedback_state.last_threshold_integration {
-                total_thresh_proposals += thresh_int.n_adds + thresh_int.n_scales + thresh_int.n_sets;
-            }
-
-            // Read divergence computed by end_cycle() (before consensus writeback).
-            if let Some(ref div) = service.feedback_state.last_divergence {
-                if div.learning_rate > max_lr_div {
-                    max_lr_div = div.learning_rate;
-                }
-                if div.threshold > max_thresh_div {
-                    max_thresh_div = div.threshold;
-                }
-            }
-        }
-
-        // We expect proposals to be generated (sanity check)
-        assert!(
-            total_lr_proposals > 100,
-            "Expected 100+ lr proposals over 50 cycles, got {total_lr_proposals}"
-        );
-        assert!(
-            total_thresh_proposals > 10,
-            "Expected 10+ threshold proposals over 50 cycles, got {total_thresh_proposals}"
-        );
-
-        // Sequential integration should match direct mutations for 100% mediated fields.
-        // Allow small tolerance for f32→f64 rounding in the integration path.
-        assert!(
-            max_lr_div < 0.01,
-            "fep_lr_boost max divergence {max_lr_div:.6} exceeds 1% — \
-             some mutations bypass helpers"
-        );
-        // Threshold has higher tolerance because sequential integration (sum adds, then
-        // product scales) doesn't preserve interleaving order. When threshold drops near
-        // the clamp boundary (0.5), the homeostasis drift add and scale operations
-        // produce different results depending on order. 5% tolerance accounts for this.
-        assert!(
-            max_thresh_div < 0.05,
-            "adaptive_threshold_scale max divergence {max_thresh_div:.6} exceeds 5% — \
-             unexpected bypass or severe ordering artifact"
-        );
     }
 }

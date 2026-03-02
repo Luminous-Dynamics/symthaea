@@ -31,7 +31,7 @@ impl CognitiveLoopService {
         let (emotion_nudge, _) = self.emotion_contagion.pattern_nudge();
 
         let consciousness_level = ConsciousnessSnapshot::compute_consciousness_level(
-            self.prediction_confidence,
+            self.prediction_confidence as f32,
             self.coherence_bridge.smoothed_coherence(),
             self.flow_state.intensity,
             pattern_confidence,
@@ -43,7 +43,7 @@ impl CognitiveLoopService {
             pattern,
             pattern_confidence,
             prediction_error: self.stats.avg_prediction_error,
-            prediction_confidence: self.prediction_confidence,
+            prediction_confidence: self.prediction_confidence as f32,
             predictions_trustworthy: self.predictions_trustworthy(),
             effective_learning_rate: self.stats.adaptive_learning_rate,
             learning_effectiveness: self.self_model_tier.self_reflection.learning_effectiveness(),
@@ -126,7 +126,7 @@ impl CognitiveLoopService {
     pub fn consciousness_level(&self) -> f32 {
         let (_, pattern_confidence) = self.temporal_signature_encoder.classify_state();
         ConsciousnessSnapshot::compute_consciousness_level(
-            self.prediction_confidence,
+            self.prediction_confidence as f32,
             self.coherence_bridge.smoothed_coherence(),
             self.flow_state.intensity,
             pattern_confidence,

@@ -261,6 +261,203 @@ pub const BIORHYTHM_INTERVAL: usize = 97;
 pub const STARTUP_WARMUP_CYCLES: usize = 50;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SELF-MODEL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Self-model accuracy EMA decay.
+/// Basis: Friston (2010) — self-model updates exponentially weighted.
+pub const SELF_MODEL_ACCURACY_EMA: f32 = 0.9;
+
+/// High self-model accuracy → trust boost multiplier.
+pub const SELF_MODEL_HIGH_TRUST_BOOST: f32 = 0.03;
+
+/// Low self-model accuracy → confidence scaling.
+pub const SELF_MODEL_LOW_CONFIDENCE_SCALE: f32 = 0.98;
+
+/// Self-model accuracy threshold for "high" classification.
+pub const SELF_MODEL_HIGH_THRESHOLD: f32 = 0.7;
+
+/// Self-model accuracy threshold for "low" classification.
+pub const SELF_MODEL_LOW_THRESHOLD: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RESONATOR
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Resonator prediction error threshold for exploration boost.
+/// Basis: Schmidhuber (2010) — curiosity from prediction error.
+pub const RESONATOR_ERROR_EXPLORATION_THRESHOLD: f32 = 0.5;
+
+/// Resonator error → exploration scale factor.
+pub const RESONATOR_ERROR_EXPLORATION_SCALE: f32 = 0.08;
+
+/// Resonator error → confidence dampen ratio (multiply on exploration).
+pub const RESONATOR_ERROR_CONFIDENCE_DAMPEN: f32 = 0.5;
+
+/// Resonator low error threshold for confidence boost.
+pub const RESONATOR_LOW_ERROR_THRESHOLD: f32 = 0.2;
+
+/// Resonator low error → confidence boost scale.
+pub const RESONATOR_LOW_ERROR_CONFIDENCE_SCALE: f32 = 0.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHENOMENAL BINDING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Binding strength threshold for confidence boost and threshold relief.
+pub const BINDING_CONFIDENCE_THRESHOLD: f32 = 0.7;
+
+/// Binding strength low threshold for caution/penalty.
+pub const BINDING_LOW_THRESHOLD: f32 = 0.3;
+
+/// Strong binding → threshold relief scale.
+pub const BINDING_STRONG_RELIEF_SCALE: f32 = 0.3;
+
+/// Weak binding → threshold caution scale.
+pub const BINDING_WEAK_CAUTION_SCALE: f32 = 0.2;
+
+/// Strong binding → confidence boost scale.
+pub const BINDING_STRONG_CONFIDENCE_SCALE: f32 = 0.1;
+
+/// Weak binding → confidence dampen scale.
+pub const BINDING_WEAK_CONFIDENCE_SCALE: f32 = 0.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREDICTION COHERENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Coherence EMA decay for prediction quality tracking.
+pub const COHERENCE_PREDICTION_EMA: f32 = 0.9;
+
+/// Low coherence threshold for confidence dampening.
+pub const COHERENCE_LOW_THRESHOLD: f32 = 0.5;
+
+/// Low coherence → confidence dampen scale.
+pub const COHERENCE_LOW_DAMPEN_SCALE: f32 = 0.04;
+
+/// High coherence threshold for confidence boost.
+pub const COHERENCE_HIGH_THRESHOLD: f32 = 0.8;
+
+/// Coherence → confidence boost factor.
+pub const COHERENCE_CONFIDENCE_BOOST: f32 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// WORLD MODEL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// World model stiffness threshold → learning rate boost.
+/// Basis: Friston (2005) — high precision priors resist updating.
+pub const WORLD_MODEL_STIFFNESS_THRESHOLD: f32 = 0.5;
+
+/// World model stiffness → LR nudge scale.
+pub const WORLD_MODEL_STIFFNESS_LR_SCALE: f32 = 0.05;
+
+/// World model sponginess threshold → learning rate reduction.
+pub const WORLD_MODEL_SPONGINESS_THRESHOLD: f32 = 0.2;
+
+/// Sponginess → LR dampen scale.
+pub const WORLD_MODEL_SPONGY_LR_SCALE: f32 = 0.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISTEMIC GATE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Epistemic gate: rejection → LR dampening scale.
+/// Basis: Friston (2017) — epistemic foraging gated by expected info gain.
+pub const EPISTEMIC_REJECTION_LR_SCALE: f32 = 0.3;
+
+/// Epistemic gate: rejection → confidence scaling factor.
+pub const EPISTEMIC_REJECTION_CONFIDENCE_SCALE: f32 = 0.15;
+
+/// Epistemic gate: approval threshold for LR boost.
+pub const EPISTEMIC_APPROVAL_THRESHOLD: f32 = 0.6;
+
+/// Epistemic gate: approval → LR boost scale.
+pub const EPISTEMIC_APPROVAL_LR_SCALE: f32 = 0.08;
+
+/// Caution threshold for epistemic gate (hedging behavior).
+pub const EPISTEMIC_CAUTION_THRESHOLD: f32 = 0.4;
+
+/// Caution → threshold scaling factor.
+pub const EPISTEMIC_CAUTION_SCALE: f32 = 0.3;
+
+/// Trust threshold for epistemic gate (full endorsement).
+pub const EPISTEMIC_TRUST_THRESHOLD: f32 = 0.8;
+
+/// Trust → threshold relief scale.
+pub const EPISTEMIC_TRUST_SCALE: f32 = 0.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EVOLUTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Evolution Phi threshold triggering confidence feedback.
+/// Basis: Tononi (2012) — Phi changes signal consciousness transitions.
+pub const EVOLUTION_PHI_THRESHOLD: f64 = 0.01;
+
+/// Positive evolution → confidence scale.
+pub const EVOLUTION_POSITIVE_CONFIDENCE_SCALE: f64 = 0.05;
+
+/// Positive evolution → confidence clamp.
+pub const EVOLUTION_POSITIVE_CONFIDENCE_MAX: f64 = 0.03;
+
+/// Negative evolution → exploration scale.
+pub const EVOLUTION_NEGATIVE_EXPLORATION_SCALE: f64 = 0.08;
+
+/// Negative evolution → exploration clamp.
+pub const EVOLUTION_NEGATIVE_EXPLORATION_MAX: f64 = 0.04;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HARMONIC INTERFERENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Max harmonic interference count before LR dampening.
+pub const HARMONIC_INTERFERENCE_MAX_COUNT: usize = 3;
+
+/// Per-interference LR dampening factor.
+pub const HARMONIC_INTERFERENCE_DAMPEN: f32 = 0.02;
+
+/// Max cumulative LR dampening from interference.
+pub const HARMONIC_INTERFERENCE_MAX_DAMPEN: f32 = 0.1;
+
+/// Harmony boost when all clear (0 interferences).
+pub const HARMONIC_ALL_CLEAR_BOOST: f32 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THALAMIC ROUTING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Thalamic salience boost for DeepThought routing.
+pub const THALAMIC_DEEP_SALIENCE: f32 = 0.2;
+
+/// Thalamic salience penalty for Reflex routing.
+pub const THALAMIC_REFLEX_SALIENCE: f32 = -0.1;
+
+/// DeepThought NE tonic production.
+/// Basis: Aston-Jones & Cohen (2005) — sustained alerting.
+pub const THALAMIC_DEEP_NE_TONIC: f32 = 0.05;
+
+/// DeepThought ACh tonic production.
+/// Basis: Sarter et al. (2005) — sustained attention via basal forebrain.
+pub const THALAMIC_DEEP_ACH_TONIC: f32 = 0.08;
+
+/// Reflex GABA inhibition.
+/// Basis: Buzsáki (2006) — GABAergic inhibition enables fast gating.
+pub const THALAMIC_REFLEX_GABA: f32 = 0.04;
+
+/// DeepThought learning rate multiplier.
+pub const THALAMIC_DEEP_LR_FACTOR: f32 = 1.3;
+
+/// Reflex learning rate multiplier.
+pub const THALAMIC_REFLEX_LR_FACTOR: f32 = 0.5;
+
+/// DeepThought attention budget scale.
+pub const THALAMIC_DEEP_BUDGET_SCALE: f64 = 2.0;
+
+/// Reflex attention budget scale.
+pub const THALAMIC_REFLEX_BUDGET_SCALE: f64 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // VALIDATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -350,7 +547,53 @@ pub fn validate() {
         "EMBODIED_PSI_WEIGHT must be >= 0"
     );
 
-    // 8. Psi weights don't exceed 1.0 total
+    // 8. Self-model ordering
+    assert!(
+        SELF_MODEL_LOW_THRESHOLD < SELF_MODEL_HIGH_THRESHOLD,
+        "SELF_MODEL_LOW_THRESHOLD ({}) must be < SELF_MODEL_HIGH_THRESHOLD ({})",
+        SELF_MODEL_LOW_THRESHOLD,
+        SELF_MODEL_HIGH_THRESHOLD
+    );
+
+    // 9. Epistemic gate ordering
+    assert!(
+        EPISTEMIC_CAUTION_THRESHOLD < EPISTEMIC_APPROVAL_THRESHOLD,
+        "EPISTEMIC_CAUTION_THRESHOLD ({}) must be < EPISTEMIC_APPROVAL_THRESHOLD ({})",
+        EPISTEMIC_CAUTION_THRESHOLD,
+        EPISTEMIC_APPROVAL_THRESHOLD
+    );
+    assert!(
+        EPISTEMIC_APPROVAL_THRESHOLD < EPISTEMIC_TRUST_THRESHOLD,
+        "EPISTEMIC_APPROVAL_THRESHOLD ({}) must be < EPISTEMIC_TRUST_THRESHOLD ({})",
+        EPISTEMIC_APPROVAL_THRESHOLD,
+        EPISTEMIC_TRUST_THRESHOLD
+    );
+
+    // 10. Binding threshold ordering
+    assert!(
+        BINDING_LOW_THRESHOLD < BINDING_CONFIDENCE_THRESHOLD,
+        "BINDING_LOW_THRESHOLD ({}) must be < BINDING_CONFIDENCE_THRESHOLD ({})",
+        BINDING_LOW_THRESHOLD,
+        BINDING_CONFIDENCE_THRESHOLD
+    );
+
+    // 11. Coherence ordering
+    assert!(
+        COHERENCE_LOW_THRESHOLD < COHERENCE_HIGH_THRESHOLD,
+        "COHERENCE_LOW_THRESHOLD ({}) must be < COHERENCE_HIGH_THRESHOLD ({})",
+        COHERENCE_LOW_THRESHOLD,
+        COHERENCE_HIGH_THRESHOLD
+    );
+
+    // 12. Thalamic budget scales
+    assert!(
+        THALAMIC_REFLEX_BUDGET_SCALE < THALAMIC_DEEP_BUDGET_SCALE,
+        "Reflex budget scale ({}) must be < DeepThought budget scale ({})",
+        THALAMIC_REFLEX_BUDGET_SCALE,
+        THALAMIC_DEEP_BUDGET_SCALE
+    );
+
+    // 13. Psi weights don't exceed 1.0 total
     let psi_total = FLOW_PSI_WEIGHT as f64
         + RELATIONAL_PSI_WEIGHT as f64
         + BODY_PSI_WEIGHT
@@ -423,5 +666,30 @@ mod tests {
         assert!(REWARD_GOOD_BASE > 0.0);
         assert!(REWARD_BAD_BASE < 0.0);
         assert!((0.0..=1.0).contains(&REWARD_EXTERNAL_BLEND));
+    }
+
+    #[test]
+    fn test_self_model_ordering() {
+        assert!(SELF_MODEL_LOW_THRESHOLD < SELF_MODEL_HIGH_THRESHOLD);
+        assert!(SELF_MODEL_ACCURACY_EMA > 0.0 && SELF_MODEL_ACCURACY_EMA < 1.0);
+    }
+
+    #[test]
+    fn test_epistemic_ordering() {
+        assert!(EPISTEMIC_CAUTION_THRESHOLD < EPISTEMIC_APPROVAL_THRESHOLD);
+        assert!(EPISTEMIC_APPROVAL_THRESHOLD < EPISTEMIC_TRUST_THRESHOLD);
+    }
+
+    #[test]
+    fn test_binding_ordering() {
+        assert!(BINDING_LOW_THRESHOLD < BINDING_CONFIDENCE_THRESHOLD);
+    }
+
+    #[test]
+    fn test_thalamic_budget_ordering() {
+        assert!(THALAMIC_REFLEX_BUDGET_SCALE < 1.0);
+        assert!(THALAMIC_DEEP_BUDGET_SCALE > 1.0);
+        assert!(THALAMIC_REFLEX_LR_FACTOR < 1.0);
+        assert!(THALAMIC_DEEP_LR_FACTOR > 1.0);
     }
 }

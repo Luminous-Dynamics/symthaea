@@ -450,6 +450,8 @@ fn phoneme_ids_to_formant_frames(phoneme_ids: &[u32], pacing: &LTCPacing) -> Vec
             voicing,
             time: current_time,
             source_type,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         });
 
         current_time += duration;
@@ -467,6 +469,8 @@ fn phoneme_ids_to_formant_frames(phoneme_ids: &[u32], pacing: &LTCPacing) -> Vec
             voicing,
             time: current_time,
             source_type,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         });
     }
 

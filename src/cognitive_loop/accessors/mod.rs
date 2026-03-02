@@ -665,4 +665,14 @@ mod tests {
         let s = make_service();
         assert!(s.user_state().is_none());
     }
+
+    // ── Moral topology summary ─────────────────────────────────────────
+
+    #[test]
+    fn moral_topology_summary_default_before_cycles() {
+        let s = make_service();
+        let summary = s.moral_topology_summary();
+        assert_eq!(summary.scenario_count, 0, "no scenarios before cycles");
+        assert_eq!(summary.beta_0, 0);
+    }
 }

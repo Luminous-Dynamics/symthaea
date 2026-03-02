@@ -39,6 +39,19 @@ impl ContinuousMind {
                 pair.tick(self.state.tick);
             }
 
+            // Automatic key rotation schedule
+            #[cfg(feature = "mesh-encryption")]
+            if self.mesh_auto_rotate_interval > 0
+                && self.state.tick.saturating_sub(self.mesh_last_rotation_tick)
+                    >= self.mesh_auto_rotate_interval
+            {
+                let mut new_key = [0u8; 32];
+                rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut new_key);
+                let grace = self.mesh_auto_rotate_interval / 4;
+                self.rotate_mesh_key(new_key, grace);
+                self.mesh_last_rotation_tick = self.state.tick;
+            }
+
             self.process_mesh();
             self.process_sensors();
             self.auto_emit_wisdom();
@@ -680,6 +693,18 @@ impl ContinuousMind {
                 self.mesh_seen_packets.remove(0);
             }
             self.mesh_seen_packets.push(key);
+
+            // Timestamp validation: reject packets older than MESH_MAX_PACKET_AGE_S
+            let now_s = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as u32)
+                .unwrap_or(0);
+            if now_s > 0 && packet.timestamp_s > 0 {
+                if now_s.saturating_sub(packet.timestamp_s) > super::mesh::MESH_MAX_PACKET_AGE_S {
+                    self.mesh_stats.packets_deduplicated += 1;
+                    continue;
+                }
+            }
 
             // Per-peer rate limit check
             if self.mesh_peers.is_rate_limited(&packet.source_id) {

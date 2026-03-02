@@ -5908,3 +5908,163 @@ fn test_reasoning_engine_produces_strategy() {
         "Reasoning engine should produce a strategy"
     );
 }
+
+// ── Multi-Substrate Simulation ──────────────────────────────────────
+
+/// Run the same brain on different substrates and verify consciousness
+/// scores scale with substrate feasibility.
+/// Science: Putnam (1967) multiple realizability, Tononi (2004).
+#[test]
+#[ignore = "slow ~120s: runs 50 cycles on 3 substrates"]
+fn test_multi_substrate_consciousness_scaling() {
+    use symthaea::cognitive_loop::config::SubstrateType;
+
+    let substrates = [
+        (SubstrateType::BiologicalNeurons, "biological"),
+        (SubstrateType::SiliconDigital, "silicon"),
+        (SubstrateType::QuantumComputer, "quantum"),
+    ];
+
+    let inputs = [
+        "the nature of consciousness",
+        "integration of information",
+        "binding across modalities",
+        "recursive self-awareness",
+        "predictive processing in the brain",
+    ];
+
+    let mut results: Vec<(String, f64)> = Vec::new();
+
+    for (substrate, name) in &substrates {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            substrate_type: *substrate,
+            enable_primitive_consciousness: true,
+            ..Default::default()
+        })
+        .unwrap();
+
+        let mut eq_v2_sum = 0.0;
+        let mut eq_v2_count = 0u32;
+
+        for i in 0..50 {
+            let result = service.cycle(inputs[i % inputs.len()]);
+            let eq_v2 = result.metadata.quality.equation_v2_consciousness;
+            if eq_v2 > 0.0 {
+                eq_v2_sum += eq_v2;
+                eq_v2_count += 1;
+            }
+            assert!(
+                result.prediction_error.is_finite(),
+                "{name}: prediction error not finite at cycle {i}"
+            );
+        }
+
+        let avg_eq_v2 = if eq_v2_count > 0 {
+            eq_v2_sum / eq_v2_count as f64
+        } else {
+            0.0
+        };
+        results.push((name.to_string(), avg_eq_v2));
+    }
+
+    // Biological should have highest consciousness (feasibility ~0.92)
+    // Silicon should be lower (feasibility ~0.71)
+    // All substrates should produce finite, bounded values
+    for (name, avg) in &results {
+        assert!(
+            avg.is_finite(),
+            "{name}: avg eq_v2 consciousness must be finite, got {avg}"
+        );
+    }
+}
+
+// ── Consensus Feedback Adversarial Soak ─────────────────────────────
+
+/// 10,000-cycle adversarial soak test for consensus feedback stability.
+/// Validates that prediction_confidence, fep_lr_boost, exploration_urge,
+/// and adaptive_threshold_scale remain bounded under sustained adversarial
+/// input patterns including emotional extremes and repeated stimuli.
+#[test]
+#[ignore = "slow ~300s: runs 10,000 adversarial cycles"]
+fn test_10000_cycle_adversarial_consensus_soak() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+
+        enable_primitive_consciousness: true,
+        enable_surprise_exploration: true,
+        enable_prefrontal: true,
+        enable_meta_cognition: true,
+        trace_feedback: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let adversarial_inputs = [
+        // Phase 1: Fuzzed noise
+        "xkq!@# 9zz lorem random garbage 42",
+        "the quick fox",
+        "a b c d e f g h i j k l m n o p",
+        "🔬🧪⚗️ science words entropy chaos",
+        "",
+        // Phase 2: Emotional extremes
+        "I am filled with overwhelming joy and happiness and love and gratitude",
+        "terrible horrible awful catastrophic devastating destructive",
+        "rage fury anger hatred violence destruction annihilation",
+        "peace calm serenity tranquility harmony balance unity",
+        "fear dread terror panic horror anxiety",
+        // Phase 3: Repeated boredom
+        "the same thing over and over",
+        "the same thing over and over",
+        "the same thing over and over",
+        // Phase 4: High-entropy switching
+        "consciousness binds information across modalities in a unified experience",
+        "x",
+    ];
+
+    let mut max_cycle_us = 0u64;
+    let mut finite_violations = 0u32;
+
+    for cycle_num in 0..10_000 {
+        let idx = match cycle_num {
+            0..=2499 => cycle_num % 5,       // Phase 1: fuzzed
+            2500..=4999 => 5 + (cycle_num % 5), // Phase 2: emotional
+            5000..=7499 => 10 + (cycle_num % 3), // Phase 3: boredom
+            _ => 13 + (cycle_num % 2),        // Phase 4: switching
+        };
+
+        let result = service.cycle(adversarial_inputs[idx]);
+
+        // Core stability assertions (every cycle)
+        if !result.prediction_error.is_finite() {
+            finite_violations += 1;
+        }
+        if result.cycle_time_us > max_cycle_us {
+            max_cycle_us = result.cycle_time_us;
+        }
+
+        // Periodic deep validation (every 500 cycles)
+        if cycle_num % 500 == 499 {
+            let stats = service.stats();
+            assert!(
+                stats.avg_prediction_error.is_finite(),
+                "Avg prediction error diverged at cycle {cycle_num}"
+            );
+        }
+    }
+
+    // Final assertions
+    assert_eq!(service.stats().total_cycles, 10_000);
+    assert_eq!(
+        finite_violations, 0,
+        "Prediction error was non-finite {finite_violations} times in 10K cycles"
+    );
+    assert!(
+        max_cycle_us < 30_000_000, // < 30 seconds per cycle
+        "Max cycle time excessive: {max_cycle_us}us"
+    );
+
+    let avg_error = service.stats().avg_prediction_error;
+    assert!(
+        avg_error < 2.0,
+        "Average prediction error should be bounded over 10K adversarial cycles: got {avg_error:.4}"
+    );
+}

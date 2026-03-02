@@ -10,6 +10,9 @@ pub struct DemoRunner {
     service: CognitiveLoopService,
     current_input: String,
     cycle_count: usize,
+    /// When true, sensitive vector fields are zeroed before sending over WebSocket.
+    /// Scalar aggregates (consciousness_level, mesh_health_score, etc.) are kept.
+    pub redact_telemetry: bool,
 }
 
 impl DemoRunner {
@@ -22,6 +25,7 @@ impl DemoRunner {
             service,
             current_input: "consciousness emerges from integrated information".to_string(),
             cycle_count: 0,
+            redact_telemetry: false,
         })
     }
 
@@ -43,7 +47,7 @@ impl DemoRunner {
         let result = self.service.cycle(&self.current_input);
         let m = &result.metadata;
 
-        DemoCycleData {
+        let mut data = DemoCycleData {
             cycle: self.cycle_count,
             prediction_error: result.prediction_error,
             consciousness_level: m.consciousness_level,
@@ -155,7 +159,19 @@ impl DemoRunner {
             moral_anomaly_score: m.ethics.moral_anomaly_score,
             moral_value_inversion: m.ethics.moral_value_inversion,
             moral_free_energy_spike: m.ethics.moral_free_energy_spike,
+        };
+
+        // Redact sensitive vector fields if requested (Item 3: telemetry protection).
+        // Keeps scalar aggregates (consciousness_level, mesh_health_score, etc.) intact.
+        if self.redact_telemetry {
+            data.thought_vector = vec![];
+            data.neuromod_state_vector = vec![];
+            data.bath_trajectory = vec![];
+            data.moral_trajectory = vec![];
+            data.bath_centroid = vec![];
         }
+
+        data
     }
 
     /// Reset the service to initial state.

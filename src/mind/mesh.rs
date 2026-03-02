@@ -4,7 +4,11 @@ use super::ContinuousMind;
 
 /// Size of the packet deduplication ring buffer (source_id + sequence pairs).
 #[cfg(feature = "mesh")]
-pub(super) const MESH_DEDUP_RING_SIZE: usize = 128;
+pub(super) const MESH_DEDUP_RING_SIZE: usize = 512;
+
+/// Maximum age of a mesh packet (seconds) before it's rejected as stale.
+#[cfg(feature = "mesh")]
+pub(super) const MESH_MAX_PACKET_AGE_S: u32 = 60;
 
 /// Duration of the bandwidth budget window.
 #[cfg(feature = "mesh")]
@@ -391,16 +395,30 @@ impl ContinuousMind {
     }
 
     /// Propagate the current encryption key to the bridge actor.
+    ///
+    /// Uses `key_version()` as the epoch to ensure nonce uniqueness
+    /// across key rotations.
     #[cfg(feature = "mesh-encryption")]
     fn propagate_encryption_key(&self) {
         if let Some(ref handle) = self.mesh_bridge {
-            let key = self
+            let (key, epoch) = self
                 .mesh_encryption_key
                 .as_ref()
-                .map(|pair| *pair.current_key());
+                .map(|p| (Some(*p.current_key()), p.key_version()))
+                .unwrap_or((None, self.mesh_encryption_epoch));
             handle.set_encryption_key(key);
-            handle.set_encryption_epoch(self.mesh_encryption_epoch);
+            handle.set_encryption_epoch(epoch);
         }
+    }
+
+    /// Set the automatic key rotation interval (in ticks).
+    ///
+    /// When set to a value > 0, the mesh encryption key is automatically
+    /// rotated every `ticks` cycles with a grace period of interval/4.
+    /// Set to 0 to disable automatic rotation.
+    #[cfg(feature = "mesh-encryption")]
+    pub fn set_mesh_auto_rotate_interval(&mut self, ticks: u64) {
+        self.mesh_auto_rotate_interval = ticks;
     }
 
     /// Initialize the per-peer X25519 key store.

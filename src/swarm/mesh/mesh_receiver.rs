@@ -45,6 +45,13 @@ struct PendingAssembly {
     assembler: FragmentAssembler,
     created_at: Instant,
     last_fragment_at: Instant,
+    /// Last fragment index seen — used to reject out-of-order fragments
+    /// with gap > 3 (likely injection or severe reordering).
+    last_fragment_index: Option<u8>,
+    /// Key fingerprint when the first fragment arrived — used to detect
+    /// mid-stream key rotation. Computed as `k[0] ^ k[15] ^ k[31]`.
+    #[cfg(feature = "mesh-encryption")]
+    key_fingerprint: Option<u8>,
 }
 
 // ============================================================================
@@ -70,6 +77,11 @@ pub struct ReceiverStats {
     pub whole_packets: u64,
     /// Packets that failed decryption (wrong key or corrupted ciphertext).
     pub packets_decrypt_failed: u64,
+    /// Fragments rejected due to excessive reordering (gap > 3 from last index).
+    pub fragments_reordered: u64,
+    /// Fragments rejected due to key fingerprint mismatch (mid-stream key rotation).
+    #[cfg(feature = "mesh-encryption")]
+    pub fragments_key_mismatch: u64,
 }
 
 // ============================================================================
@@ -215,13 +227,13 @@ impl MeshReceiver {
     pub fn receive_fragment(&mut self, source: [u8; 8], raw: &[u8]) -> Option<WisdomPacket> {
         // Decrypt fragment-level AEAD if enabled
         #[cfg(feature = "mesh-encryption")]
-        let decrypted_buf;
+        let decrypted_buf: zeroize::Zeroizing<Vec<u8>>;
         #[cfg(feature = "mesh-encryption")]
         let raw = if self.fragment_encryption {
             if let Some(ref key) = self.encryption_key {
                 match super::decrypt_fragment(raw, key) {
                     Some(plain) => {
-                        decrypted_buf = plain;
+                        decrypted_buf = zeroize::Zeroizing::new(plain);
                         decrypted_buf.as_slice()
                     }
                     None => {
@@ -263,6 +275,12 @@ impl MeshReceiver {
             self.ensure_capacity(now);
         }
 
+        // Compute key fingerprint for this fragment (Item 12)
+        #[cfg(feature = "mesh-encryption")]
+        let current_fingerprint: Option<u8> = self
+            .encryption_key
+            .map(|k| k[0] ^ k[15] ^ k[31]);
+
         // Get or create the assembler for this stream
         let assembly = self.pending.entry(key).or_insert_with(|| PendingAssembly {
             assembler: FragmentAssembler::new(
@@ -272,6 +290,9 @@ impl MeshReceiver {
             ),
             created_at: now,
             last_fragment_at: now,
+            last_fragment_index: None,
+            #[cfg(feature = "mesh-encryption")]
+            key_fingerprint: None,
         });
 
         assembly.last_fragment_at = now;
@@ -280,6 +301,35 @@ impl MeshReceiver {
         if assembly.assembler.has_fragment(frag.fragment_index) {
             self.stats.fragments_duplicate += 1;
             return None;
+        }
+
+        // Item 5: Reject fragments with excessive reordering (gap > 3)
+        if let Some(last_idx) = assembly.last_fragment_index {
+            let gap = if frag.fragment_index > last_idx {
+                frag.fragment_index - last_idx
+            } else {
+                last_idx - frag.fragment_index
+            };
+            if gap > 3 {
+                self.stats.fragments_reordered += 1;
+                return None;
+            }
+        }
+        assembly.last_fragment_index = Some(frag.fragment_index);
+
+        // Item 12: Reject fragments if encryption key changed mid-stream
+        #[cfg(feature = "mesh-encryption")]
+        {
+            if let Some(fp) = current_fingerprint {
+                match assembly.key_fingerprint {
+                    None => assembly.key_fingerprint = Some(fp),
+                    Some(stored_fp) if stored_fp != fp => {
+                        self.stats.fragments_key_mismatch += 1;
+                        return None;
+                    }
+                    _ => {}
+                }
+            }
         }
 
         let is_complete = assembly.assembler.feed(&frag);
@@ -330,25 +380,36 @@ impl MeshReceiver {
 
     /// Decode an assembled/received envelope: decrypt → decompress → parse.
     ///
-    /// When an encryption key is set, attempts decryption first. If decryption
-    /// fails, falls through to unencrypted parsing for backward compatibility
-    /// with peers that haven't enabled encryption.
+    /// When an encryption key is set, attempts decryption first. Tries versioned
+    /// format (1-byte version prefix), then standard ChaCha20-Poly1305,
+    /// then XChaCha20-Poly1305. If all fail, the packet is rejected.
     fn decode_envelope(&mut self, data: &[u8]) -> Option<WisdomPacket> {
         #[cfg(feature = "mesh-encryption")]
         if let Some(ref key) = self.encryption_key {
-            // Try standard ChaCha20-Poly1305 (12-byte nonce)
+            // Try versioned format: [version (1) | nonce (12) | ciphertext+tag]
+            if data.len() >= 1 + super::AEAD_NONCE_SIZE + super::AEAD_TAG_SIZE {
+                if let Some(decrypted) = super::decrypt_packet(&data[1..], key) {
+                    let decrypted = zeroize::Zeroizing::new(decrypted);
+                    return super::decompress_packet(&decrypted)
+                        .and_then(|raw| WisdomPacket::from_bytes(&raw))
+                        .or_else(|| WisdomPacket::from_bytes(&decrypted));
+                }
+            }
+            // Try standard ChaCha20-Poly1305 (12-byte nonce, no version prefix)
             if let Some(decrypted) = super::decrypt_packet(data, key) {
+                let decrypted = zeroize::Zeroizing::new(decrypted);
                 return super::decompress_packet(&decrypted)
                     .and_then(|raw| WisdomPacket::from_bytes(&raw))
                     .or_else(|| WisdomPacket::from_bytes(&decrypted));
             }
             // Try XChaCha20-Poly1305 (24-byte nonce)
             if let Some(decrypted) = super::decrypt_packet_xchacha(data, key) {
+                let decrypted = zeroize::Zeroizing::new(decrypted);
                 return super::decompress_packet(&decrypted)
                     .and_then(|raw| WisdomPacket::from_bytes(&raw))
                     .or_else(|| WisdomPacket::from_bytes(&decrypted));
             }
-            // Both failed — reject. When key is set, only authenticated
+            // All failed — reject. When key is set, only authenticated
             // ciphertext is accepted.
             self.stats.packets_decrypt_failed += 1;
             return None;

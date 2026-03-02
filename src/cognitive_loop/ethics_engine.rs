@@ -30,7 +30,10 @@ use crate::consciousness::unified_value_evaluator::{
 use crate::hdc::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
-use crate::hdc::moral_topology::{MoralTopology, MoralTopologyConfig, MoralTopologySummary};
+use crate::hdc::moral_topology::{
+    MoralAnomalyConfig, MoralAnomalyReport, MoralTopology, MoralTopologyConfig,
+    MoralTopologySummary,
+};
 
 /// Unified output from the ethics engine.
 #[derive(Debug, Clone)]
@@ -88,6 +91,10 @@ pub(crate) struct EthicsEngineOutput {
     /// Whether topology analysis was freshly computed this cycle.
     #[allow(dead_code)] // Constructed by engine; read via ethics_engine.moral_topology() accessor
     pub topology_fresh: bool,
+
+    // ── Stage 4b: Anomaly report ───────────────────────────────────────
+    /// Moral trajectory anomaly report (computed each cycle from latest topology).
+    pub anomaly_report: MoralAnomalyReport,
 
     // ── Stage 3b: Moral Geometry (FEP) ─────────────────────────────────
     /// 7D harmony coordinates for this cycle's action
@@ -167,10 +174,20 @@ struct EthicsEngineCache {
     last_harmonies_approved: bool,
     last_harmony_coordinates: [f64; 7],
     last_moral_free_energy: MoralFreeEnergy,
+    /// EMA-smoothed moral free energy (α=0.1).
+    /// Tracks trend rather than raw per-cycle spikes.
+    moral_fe_ema: f64,
+    /// Adaptive gain for moral FE → exploration coupling.
+    /// Decays on exploration failure (high PE), reinforces on success (low PE).
+    /// Range [0.05, 0.25], default 0.15.
+    /// Science: Daw et al. (2005) — model-based/model-free arbitration.
+    moral_exploration_gain: f32,
     /// Current topology evaluation interval (adaptive).
     topology_cadence: u64,
     /// Cycle number of last topology evaluation.
     last_topology_cycle: u64,
+    /// Cached anomaly report from last evaluation.
+    last_anomaly_report: MoralAnomalyReport,
 }
 
 impl Default for EthicsEngineCache {
@@ -182,8 +199,11 @@ impl Default for EthicsEngineCache {
             last_harmonies_approved: false,
             last_harmony_coordinates: [0.0; 7],
             last_moral_free_energy: MoralFreeEnergy::default(),
+            moral_fe_ema: 0.0,
+            moral_exploration_gain: 0.15,
             topology_cadence: 97,
             last_topology_cycle: 0,
+            last_anomaly_report: MoralAnomalyReport::default(),
         }
     }
 }
@@ -202,15 +222,33 @@ impl EthicsEngine {
         value_evaluator: Option<UnifiedValueEvaluator>,
         harmonies_integrator: Option<HarmoniesIntegrator>,
     ) -> Self {
+        Self::with_anomaly_config(
+            moral_parser,
+            moral_algebra,
+            value_evaluator,
+            harmonies_integrator,
+            MoralAnomalyConfig::default(),
+        )
+    }
+
+    /// Create a new ethics engine with custom anomaly detection thresholds.
+    pub fn with_anomaly_config(
+        moral_parser: MoralParser,
+        moral_algebra: MoralAlgebra,
+        value_evaluator: Option<UnifiedValueEvaluator>,
+        harmonies_integrator: Option<HarmoniesIntegrator>,
+        anomaly_config: MoralAnomalyConfig,
+    ) -> Self {
         let dim = moral_algebra.dim();
         let shared_basis = Arc::new(HarmonyBasis::new(dim));
 
-        let moral_topology = MoralTopology::with_basis(
+        let moral_topology = MoralTopology::with_anomaly_config(
             MoralTopologyConfig {
                 dim,
                 ..Default::default()
             },
             shared_basis.clone(),
+            anomaly_config,
         );
 
         // Share basis with HarmoniesIntegrator only when dimensions match.
@@ -401,6 +439,9 @@ impl EthicsEngine {
                     self.cache.last_harmonies_approved = eval.approved;
                     self.cache.last_harmony_coordinates = eval.harmony_coordinates;
                     self.cache.last_moral_free_energy = eval.moral_free_energy.clone();
+                    // EMA-smooth the moral free energy (α=0.1)
+                    self.cache.moral_fe_ema = self.cache.moral_fe_ema * 0.9
+                        + eval.moral_free_energy.free_energy * 0.1;
                     (
                         eval.overall_alignment,
                         eval.approved,
@@ -471,14 +512,15 @@ impl EthicsEngine {
                     );
                 }
 
-                // Adapt cadence based on moral drift
+                // Adapt cadence based on moral drift (thresholds from anomaly_config)
                 let drift = self.moral_topology.moral_drift(20);
-                self.cache.topology_cadence = if drift > 0.3 {
-                    30 // fast: moral stance shifting rapidly
-                } else if drift > 0.1 {
-                    60 // moderate
+                let ac = self.moral_topology.anomaly_config();
+                self.cache.topology_cadence = if drift > ac.cadence_drift_high {
+                    ac.cadence_fast // fast: moral stance shifting rapidly
+                } else if drift > ac.cadence_drift_moderate {
+                    ac.cadence_moderate // moderate
                 } else {
-                    120 // slow: stable moral stance, save compute
+                    ac.cadence_slow // slow: stable moral stance, save compute
                 };
                 self.cache.last_topology_cycle = input.cycle;
 
@@ -487,6 +529,10 @@ impl EthicsEngine {
                 (self.moral_topology.last_summary().clone(), false)
             };
         let topology_us = t.elapsed().as_micros() as u64;
+
+        // Compute anomaly report against latest topology summary
+        let anomaly_report = self.moral_topology.detect_anomalies(&topology_summary);
+        self.cache.last_anomaly_report = anomaly_report.clone();
 
         let total_us = total_start.elapsed().as_micros() as u64;
 
@@ -510,6 +556,7 @@ impl EthicsEngine {
             unified_confidence,
             confidence_delta,
             lr_factor,
+            anomaly_report,
             harmony_coordinates,
             moral_free_energy,
             topology_summary,
@@ -635,6 +682,44 @@ impl EthicsEngine {
     /// Cached moral free energy from last harmonies evaluation.
     pub fn last_moral_free_energy(&self) -> &MoralFreeEnergy {
         &self.cache.last_moral_free_energy
+    }
+
+    /// EMA-smoothed moral free energy.
+    pub fn moral_fe_ema(&self) -> f64 {
+        self.cache.moral_fe_ema
+    }
+
+    /// Current adaptive gain for moral FE → exploration coupling.
+    pub fn moral_exploration_gain(&self) -> f32 {
+        self.cache.moral_exploration_gain
+    }
+
+    /// Cached anomaly report from the last `evaluate()` call.
+    pub fn last_anomaly_report(&self) -> &MoralAnomalyReport {
+        &self.cache.last_anomaly_report
+    }
+
+    /// Bidirectional feedback: exploration outcome modulates FE→exploration gain.
+    ///
+    /// After an FE-driven exploration boost, the prediction error outcome tells
+    /// us whether the exploration was productive:
+    /// - Low PE (< baseline) → exploration resolved moral uncertainty → reinforce gain
+    /// - High PE (> baseline) → exploration unhelpful → decay gain
+    ///
+    /// Science: Daw et al. (2005) model-based/model-free arbitration;
+    /// Friston (2010) expected free energy minimization.
+    pub fn feedback_exploration_outcome(&mut self, pe: f32, baseline_pe: f32) {
+        let delta = pe - baseline_pe;
+        if delta < -0.05 {
+            // Exploration reduced PE → reinforce FE-exploration coupling
+            self.cache.moral_exploration_gain =
+                (self.cache.moral_exploration_gain + 0.01).min(0.25);
+        } else if delta > 0.1 {
+            // Exploration increased PE → decay coupling (diminishing returns)
+            self.cache.moral_exploration_gain =
+                (self.cache.moral_exploration_gain - 0.02).max(0.05);
+        }
+        // Small deltas: no change (exploration neutral)
     }
 }
 
@@ -827,6 +912,60 @@ mod tests {
             engine.cache.topology_cadence >= 60,
             "Stable input should keep cadence at 60+ (got {})",
             engine.cache.topology_cadence
+        );
+    }
+
+    #[test]
+    fn test_moral_fe_exploration_feedback_reinforces_on_low_pe() {
+        let mut engine = make_engine();
+        let initial_gain = engine.moral_exploration_gain();
+        assert!((initial_gain - 0.15).abs() < f32::EPSILON);
+
+        // Simulate successful exploration: PE well below baseline
+        engine.feedback_exploration_outcome(0.1, 0.3); // delta = -0.2
+        assert!(
+            engine.moral_exploration_gain() > initial_gain,
+            "Gain should increase on low PE: {}",
+            engine.moral_exploration_gain()
+        );
+    }
+
+    #[test]
+    fn test_moral_fe_exploration_feedback_decays_on_high_pe() {
+        let mut engine = make_engine();
+        let initial_gain = engine.moral_exploration_gain();
+
+        // Simulate failed exploration: PE well above baseline
+        engine.feedback_exploration_outcome(0.6, 0.3); // delta = +0.3
+        assert!(
+            engine.moral_exploration_gain() < initial_gain,
+            "Gain should decrease on high PE: {}",
+            engine.moral_exploration_gain()
+        );
+    }
+
+    #[test]
+    fn test_moral_fe_exploration_gain_clamped() {
+        let mut engine = make_engine();
+
+        // Repeated reinforcement should not exceed 0.25
+        for _ in 0..50 {
+            engine.feedback_exploration_outcome(0.05, 0.3);
+        }
+        assert!(
+            engine.moral_exploration_gain() <= 0.25,
+            "Gain should be clamped at 0.25: {}",
+            engine.moral_exploration_gain()
+        );
+
+        // Repeated decay should not go below 0.05
+        for _ in 0..50 {
+            engine.feedback_exploration_outcome(0.8, 0.3);
+        }
+        assert!(
+            engine.moral_exploration_gain() >= 0.05,
+            "Gain should be clamped at 0.05: {}",
+            engine.moral_exploration_gain()
         );
     }
 }

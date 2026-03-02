@@ -173,6 +173,12 @@ pub struct ContinuousMind {
     /// Per-peer X25519 key store for Diffie-Hellman key agreement.
     #[cfg(feature = "mesh-key-exchange")]
     pub(crate) mesh_peer_keys: Option<crate::swarm::mesh::PeerKeyStore>,
+    /// Automatic key rotation interval (ticks). 0 = disabled.
+    #[cfg(feature = "mesh-encryption")]
+    mesh_auto_rotate_interval: u64,
+    /// Tick of last automatic key rotation.
+    #[cfg(feature = "mesh-encryption")]
+    mesh_last_rotation_tick: u64,
     /// Ring buffer of recently-emitted wisdom packets for partition recovery replay.
     #[cfg(feature = "mesh")]
     mesh_replay_buffer: std::collections::VecDeque<crate::swarm::mesh::WisdomPacket>,
@@ -290,6 +296,10 @@ impl ContinuousMind {
             mesh_encryption_epoch: rand::Rng::gen::<u8>(&mut rand::thread_rng()),
             #[cfg(feature = "mesh-key-exchange")]
             mesh_peer_keys: None,
+            #[cfg(feature = "mesh-encryption")]
+            mesh_auto_rotate_interval: 0,
+            #[cfg(feature = "mesh-encryption")]
+            mesh_last_rotation_tick: 0,
             #[cfg(feature = "mesh")]
             mesh_replay_buffer: std::collections::VecDeque::with_capacity(
                 mesh::MESH_REPLAY_BUFFER_CAPACITY,
