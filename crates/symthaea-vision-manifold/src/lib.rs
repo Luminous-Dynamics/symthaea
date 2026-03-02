@@ -35,7 +35,7 @@ pub mod training;
 pub mod types;
 
 pub use attention::SurpriseMap;
-pub use bridge::VisionBridge;
+pub use bridge::{CrossManifoldPredictor, VisionBridge};
 pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 #[cfg(feature = "camera")]
 pub use camera::CameraSource;

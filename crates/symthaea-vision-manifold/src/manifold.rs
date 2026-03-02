@@ -46,6 +46,8 @@ pub struct VisionManifold {
     frame_count: u64,
     telemetry: VisionTelemetry,
     trainer: ManifoldTrainer,
+    /// Exponential moving average of prediction error for adaptive training.
+    error_ema: f32,
 }
 
 impl VisionManifold {
@@ -73,6 +75,7 @@ impl VisionManifold {
             frame_count: 0,
             telemetry: VisionTelemetry::default(),
             trainer,
+            error_ema: 0.0,
         }
     }
 
@@ -95,6 +98,9 @@ impl VisionManifold {
         self.observe_encoded(&frame_hv, &patch_hvs, dt);
         let evolve_us = t1.elapsed().as_micros() as u64;
 
+        // Preserve training_triggered/training_loss set by observe_encoded
+        let training_triggered = self.telemetry.training_triggered;
+        let training_loss = self.telemetry.training_loss;
         self.telemetry = VisionTelemetry {
             encode_time_us: encode_us,
             evolve_time_us: evolve_us,
@@ -106,8 +112,8 @@ impl VisionManifold {
                 .salient_patches()
                 .len(),
             frame_sequence: self.frame_count,
-            training_triggered: false,
-            training_loss: None,
+            training_triggered,
+            training_loss,
             output_hv_norm: 0.0,
             attention_boost_applied: 0.0,
         };
@@ -129,8 +135,17 @@ impl VisionManifold {
         if let Some(predicted) = self.last_prediction.clone() {
             self.prediction_error = 1.0 - frame_hv.similarity(&predicted).clamp(-1.0, 1.0);
 
-            // Trigger training when prediction error exceeds threshold
-            if self.prediction_error > self.config.training.error_threshold {
+            // Update adaptive error EMA
+            self.error_ema = 0.95 * self.error_ema + 0.05 * self.prediction_error;
+
+            // Adaptive training trigger: train when error exceeds either:
+            // 1. The configured threshold (catches large errors), OR
+            // 2. A spike above recent baseline (catches pattern changes even
+            //    when absolute error is small).
+            let spike_threshold = self.error_ema * 2.0 + 0.005;
+            let should_train = self.prediction_error > self.config.training.error_threshold
+                || (self.frame_count > 2 && self.prediction_error > spike_threshold);
+            if should_train {
                 if let Some(last_input) = self.last_frame_hv.clone() {
                     let result = self.train_step_inner(
                         &last_input, &predicted, frame_hv, dt,
@@ -405,6 +420,7 @@ impl VisionManifold {
         self.prediction_error = 0.0;
         self.coherence = 0.0;
         self.frame_count = 0;
+        self.error_ema = 0.0;
     }
 }
 
@@ -784,6 +800,64 @@ mod tests {
         };
 
         assert!(m.load_state(&bad_state).is_err());
+    }
+
+    // === RGB Manifold Tests ===
+
+    #[test]
+    fn test_manifold_rgb_frame() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        let rgb: Vec<u8> = (0..64 * 64).flat_map(|_| vec![128u8, 64, 192]).collect();
+        let tel = m.observe_frame(&rgb, 64, 64, 3, 0.033);
+        assert_eq!(tel.frame_sequence, 1);
+        assert!(m.state().norm() > 0.0);
+    }
+
+    #[test]
+    fn test_manifold_rgb_color_discrimination() {
+        let cfg = VisionConfig::default();
+        let mut m_red = VisionManifold::new(cfg.clone(), 64, 64);
+        let red: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 0, 0]).collect();
+        m_red.observe_frame(&red, 64, 64, 3, 0.033);
+
+        let mut m_blue = VisionManifold::new(cfg, 64, 64);
+        let blue: Vec<u8> = (0..64 * 64).flat_map(|_| vec![0u8, 0, 255]).collect();
+        m_blue.observe_frame(&blue, 64, 64, 3, 0.033);
+
+        let sim = m_red.state().similarity(m_blue.state());
+        assert!(
+            sim < 0.99,
+            "Red and blue manifold states should differ: sim={sim}"
+        );
+    }
+
+    // === Adaptive Training ===
+
+    #[test]
+    fn test_adaptive_training_triggers_on_alternating_pattern() {
+        let mut cfg = VisionConfig::default();
+        cfg.training.error_threshold = 0.05;
+        cfg.training.learning_rate = 0.01;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = solid_gray_frame(64, 64, 200);
+
+        let mut training_count = 0;
+        for step in 0..60 {
+            let frame = if step % 2 == 0 { &frame_a } else { &frame_b };
+            let tel = m.observe_frame(frame, 64, 64, 1, 0.033);
+            if tel.training_triggered {
+                training_count += 1;
+            }
+        }
+
+        assert!(
+            training_count > 0,
+            "Adaptive training should trigger on alternating pattern, got {training_count} triggers"
+        );
     }
 
     #[test]
