@@ -246,7 +246,7 @@ impl CognitiveLoopService {
                         core_values,
                         extended_values: HashMap::new(),
                         phase_coherence: HashMap::new(),
-                        substrate_feasibility: 1.0,
+                        substrate_feasibility: self.substrate_feasibility,
                         timestamp: self.stats.total_cycles as u64,
                         context: String::new(),
                     };
@@ -287,7 +287,7 @@ impl CognitiveLoopService {
                     let base_affect = crate::consciousness::affective_consciousness::CoreAffect {
                         valence,
                         arousal: prediction_error.abs().clamp(0.0, 1.0),
-                        dominance: self.prediction_confidence * 2.0 - 1.0,
+                        dominance: (self.prediction_confidence * 2.0 - 1.0) as f32,
                     };
                     let affect = ac.process_stimulus(
                         &format!("cycle_{}", self.stats.total_cycles),
@@ -357,7 +357,7 @@ impl CognitiveLoopService {
             self.primitive_tier.epistemic_gate
         {
             if self.stats.total_cycles % 13 == 0 {
-                let action_risk = (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
+                let action_risk = ((1.0 - self.prediction_confidence) as f32).clamp(0.0, 1.0);
                 let decision = gate.evaluate(input, action_risk);
                 let (confidence, approved) = match &decision {
                         crate::consciousness::gis_integration::EpistemicDecision::Proceed { confidence } => (*confidence, true),

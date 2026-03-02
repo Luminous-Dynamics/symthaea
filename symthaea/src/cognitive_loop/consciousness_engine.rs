@@ -82,6 +82,8 @@ pub(crate) struct ConsciousnessEngineOutput {
     // ── Dynamic weights telemetry ──────────────────────────────────────
     /// Current consciousness weights [spectral, equation, pipeline, multimodal].
     pub current_weights: [f64; 4],
+    /// Weight stability variance (0.0 = perfectly stable, >0.01 = oscillating).
+    pub weight_variance: f64,
 
     // ── Timing ─────────────────────────────────────────────────────────
     pub spectral_mip_us: u64,
@@ -125,6 +127,17 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     pub sht_2a_signal: f32,
     /// GABA-A signal (global gain reduction).
     pub gaba_a_signal: f32,
+    /// Substrate feasibility [0,1] from SubstrateRequirements.
+    /// Scales Equation V2 consciousness to reflect substrate limitations.
+    pub substrate_feasibility: f64,
+
+    // ── Moral topology → consciousness coupling ─────────────────────
+    /// Moral drift magnitude from moral_drift(20). Higher = greater shift.
+    /// Used for epistemic quality attenuation in EquationV2 Layer 3.
+    pub moral_drift: f64,
+    /// Composite moral anomaly score [0,1] from MoralAnomalyReport.
+    /// Used for unified consciousness dampening alongside bath coupling.
+    pub moral_anomaly_score: f64,
 }
 
 /// The unified consciousness measurement engine.
@@ -143,6 +156,9 @@ pub(crate) struct ConsciousnessEngine {
 
     // ── Layer 4: Full pipeline (optional) ──────────────────────────────
     unified_consciousness_pipeline: Option<UnifiedConsciousnessPipeline>,
+
+    // ── Moral coupling ─────────────────────────────────────────────────
+    moral_coupling: MoralConsciousnessCoupling,
 
     // ── Cached values (for non-firing cycles) ──────────────────────────
     cache: ConsciousnessEngineCache,
@@ -205,8 +221,39 @@ impl ConsciousnessWeights {
     }
 }
 
+/// Configuration for moral topology → consciousness coupling.
+///
+/// Two mechanisms:
+/// - **Drift-driven epistemic attenuation**: High moral drift reduces the Knowledge
+///   component in EquationV2, reflecting epistemic humility during value shifts.
+/// - **Anomaly dampening**: High moral anomaly score dampens unified consciousness
+///   alongside the existing bath (Seth 2013) coupling terms.
+#[derive(Debug, Clone)]
+pub(crate) struct MoralConsciousnessCoupling {
+    /// Whether moral-consciousness coupling is active.
+    pub enabled: bool,
+    /// Maximum attenuation of epistemic quality from moral drift (default: 0.30).
+    /// At `drift_saturation`, epistemic quality is reduced by this fraction.
+    pub drift_epistemic_attenuation: f64,
+    /// Drift value at which attenuation saturates (default: 0.5).
+    pub drift_saturation: f64,
+    /// Strength of anomaly dampening on unified consciousness (default: 0.15).
+    pub anomaly_dampening_strength: f64,
+}
+
+impl Default for MoralConsciousnessCoupling {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            drift_epistemic_attenuation: 0.30,
+            drift_saturation: 0.5,
+            anomaly_dampening_strength: 0.15,
+        }
+    }
+}
+
 /// Internal cache for inter-cycle persistence.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct ConsciousnessEngineCache {
     last_spectral_mip_phi: Option<f64>,
     last_hierarchical_mip_phi: Option<f64>,
@@ -221,6 +268,26 @@ struct ConsciousnessEngineCache {
     weights: ConsciousnessWeights,
     /// EMA-smoothed emergence ratio from structural Phi.
     smoothed_emergence_ratio: Option<f64>,
+    /// Rolling window of recent weight snapshots for variance computation.
+    weight_history: std::collections::VecDeque<[f64; 4]>,
+}
+
+impl Default for ConsciousnessEngineCache {
+    fn default() -> Self {
+        Self {
+            last_spectral_mip_phi: None,
+            last_hierarchical_mip_phi: None,
+            last_structural_phi: None,
+            last_sigma: None,
+            last_multimodal_phi: 0.0,
+            last_equation_v2_consciousness: 0.0,
+            last_pipeline_consciousness: 0.0,
+            last_limiting_component: None,
+            weights: ConsciousnessWeights::default(),
+            smoothed_emergence_ratio: None,
+            weight_history: std::collections::VecDeque::new(),
+        }
+    }
 }
 
 impl ConsciousnessEngine {
@@ -236,6 +303,7 @@ impl ConsciousnessEngine {
             multi_modal_integrator,
             consciousness_equation_v2,
             unified_consciousness_pipeline,
+            moral_coupling: MoralConsciousnessCoupling::default(),
             cache: ConsciousnessEngineCache::default(),
         }
     }
@@ -399,13 +467,27 @@ impl ConsciousnessEngine {
                 core_values.insert(CoreComponent::Attention, input.phi_attention_weight as f64);
                 core_values.insert(CoreComponent::Recursion, 0.5); // Placeholder: HOT depth
                 core_values.insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
-                core_values.insert(CoreComponent::Knowledge, input.epistemic_quality);
+
+                // Approach C: Drift-driven epistemic humility
+                // High moral drift → attenuate Knowledge component in EquationV2.
+                // Science: Epistemic humility during value shifts — if your moral
+                // stance is changing rapidly, "knowledge" claims carry less weight.
+                let effective_epistemic = if self.moral_coupling.enabled {
+                    let drift_ratio =
+                        (input.moral_drift / self.moral_coupling.drift_saturation).min(1.0);
+                    let attenuation =
+                        1.0 - drift_ratio * self.moral_coupling.drift_epistemic_attenuation;
+                    input.epistemic_quality * attenuation
+                } else {
+                    input.epistemic_quality
+                };
+                core_values.insert(CoreComponent::Knowledge, effective_epistemic);
 
                 let state = ConsciousnessStateV2 {
                     core_values,
                     extended_values: HashMap::new(),
                     phase_coherence: HashMap::new(),
-                    substrate_feasibility: 1.0,
+                    substrate_feasibility: input.substrate_feasibility,
                     timestamp: input.cycle,
                     context: String::new(),
                 };
@@ -489,10 +571,20 @@ impl ConsciousnessEngine {
         let gaba_a_dampen = -(input.gaba_a_signal - 0.4) * 0.08; // baseline GABA=0.4
         // Low entropy (stuck attractor) → consciousness depression
         let entropy_factor = if input.attractor_detected { -0.05 } else { 0.0 };
+        // Approach B: Anomaly dampens unified consciousness
+        // High moral anomaly score → reduce consciousness coherence.
+        // Science: Moral incoherence as a form of cognitive dissonance
+        // (Festinger 1957) — unresolved moral conflict reduces unified experience.
+        let moral_dampen = if self.moral_coupling.enabled {
+            -input.moral_anomaly_score * self.moral_coupling.anomaly_dampening_strength
+        } else {
+            0.0
+        };
         unified_consciousness = (unified_consciousness
             + sht_2a_boost as f64
             + gaba_a_dampen as f64
-            + entropy_factor)
+            + entropy_factor
+            + moral_dampen)
             .clamp(0.0, 1.0);
 
         let total_us = total_start.elapsed().as_micros() as u64;
@@ -516,6 +608,7 @@ impl ConsciousnessEngine {
             subsystem_lr_factor,
             episodic_consolidation_boost,
             current_weights: self.cache.weights.as_array(),
+            weight_variance: self.weight_variance(),
             spectral_mip_us,
             equation_v2_us,
             pipeline_us,
@@ -524,18 +617,50 @@ impl ConsciousnessEngine {
         }
     }
 
+    /// Compute weight variance across recent history (100-sample window).
+    fn weight_variance(&self) -> f64 {
+        let hist = &self.cache.weight_history;
+        if hist.len() < 2 {
+            return 0.0;
+        }
+        let n = hist.len() as f64;
+        let means: [f64; 4] = {
+            let mut m = [0.0; 4];
+            for w in hist {
+                for i in 0..4 {
+                    m[i] += w[i];
+                }
+            }
+            for i in 0..4 {
+                m[i] /= n;
+            }
+            m
+        };
+        let mut var = 0.0;
+        for w in hist {
+            for i in 0..4 {
+                var += (w[i] - means[i]).powi(2);
+            }
+        }
+        var / (n - 1.0) / 4.0 // Mean per-weight variance
+    }
+
     /// Update dynamic consciousness weights based on structural Phi decomposition.
     ///
-    /// EMA-smooths the emergence ratio (alpha=0.3, ~5-update settling at 194-cycle interval),
+    /// EMA-smooths the emergence ratio (alpha adaptive to weight stability),
     /// then modulates weights: high emergence boosts spectral (IIT is capturing real integration),
     /// low emergence boosts equation/pipeline (local metrics more informative).
     fn update_weights(&mut self, structural: &StructuralPhiResult) {
         let er = structural.emergence_ratio;
-        const ALPHA: f64 = 0.3;
+
+        // Adaptive alpha: high variance → slow down (alpha × 0.5 at variance=0.01)
+        let base_alpha = 0.3;
+        let variance = self.weight_variance();
+        let alpha = base_alpha * (1.0 / (1.0 + 50.0 * variance));
 
         // EMA smooth the emergence ratio
         let smoothed = match self.cache.smoothed_emergence_ratio {
-            Some(prev) => ALPHA * er + (1.0 - ALPHA) * prev,
+            Some(prev) => alpha * er + (1.0 - alpha) * prev,
             None => er,
         };
         self.cache.smoothed_emergence_ratio = Some(smoothed);
@@ -562,6 +687,12 @@ impl ConsciousnessEngine {
 
         // Normalize to sum=1.0
         w.normalize();
+
+        // Record weight snapshot
+        self.cache.weight_history.push_back(w.as_array());
+        if self.cache.weight_history.len() > 100 {
+            self.cache.weight_history.pop_front();
+        }
 
         self.cache.weights = w;
     }
@@ -605,6 +736,7 @@ impl ConsciousnessEngine {
         cache.last_multimodal_phi = self.cache.last_multimodal_phi;
         cache.last_equation_v2_consciousness = self.cache.last_equation_v2_consciousness;
         cache.last_hierarchical_mip_phi = self.cache.last_hierarchical_mip_phi;
+        cache.last_structural_phi = self.cache.last_structural_phi.clone();
     }
 
     /// Borrow the multi-modal integrator (if present).
@@ -668,6 +800,9 @@ mod tests {
             attractor_detected: false,
             sht_2a_signal: 0.5,
             gaba_a_signal: 0.4,
+            substrate_feasibility: 1.0,
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
         }
     }
 
@@ -754,6 +889,9 @@ mod tests {
                 attractor_detected: false,
                 sht_2a_signal: 0.5,
                 gaba_a_signal: 0.4,
+                substrate_feasibility: 1.0,
+                moral_drift: 0.0,
+                moral_anomaly_score: 0.0,
             };
             let output = engine.measure(&input);
 
@@ -816,6 +954,9 @@ mod tests {
                 attractor_detected: false,
                 sht_2a_signal: 0.5,
                 gaba_a_signal: 0.4,
+                substrate_feasibility: 1.0,
+                moral_drift: 0.0,
+                moral_anomaly_score: 0.0,
             };
             let output = engine.measure(&input);
 
@@ -879,6 +1020,9 @@ mod tests {
             attractor_detected: false,
             sht_2a_signal: 0.5,
             gaba_a_signal: 0.4,
+            substrate_feasibility: 1.0,
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
         };
         let out_base = engine.measure(&input_baseline);
 
@@ -913,6 +1057,9 @@ mod tests {
             attractor_detected: false,
             sht_2a_signal: 0.5,
             gaba_a_signal: 0.4,
+            substrate_feasibility: 1.0,
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
         };
         let out_base = engine.measure(&input_baseline);
 
@@ -947,6 +1094,9 @@ mod tests {
             attractor_detected: false,
             sht_2a_signal: 0.5,
             gaba_a_signal: 0.4,
+            substrate_feasibility: 1.0,
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
         };
         let out_no = engine.measure(&input_no_attractor);
 
@@ -982,6 +1132,9 @@ mod tests {
             attractor_detected: true,
             sht_2a_signal: 2.0, // Extreme
             gaba_a_signal: 0.0, // Low
+            substrate_feasibility: 1.0,
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
         };
         let out = engine.measure(&input);
         assert!(
@@ -1237,5 +1390,245 @@ mod tests {
         assert!(unified >= 0.0 && unified <= 1.0);
         let unified2 = engine.compute_unified(Some(0.0), 0.0, 0.0, 0.0);
         assert!(unified2 >= 0.0 && unified2 <= 1.0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Improvement 1: Structural Phi persistence
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_structural_phi_persists_in_cache() {
+        let mut engine = make_engine();
+        engine.cache.last_structural_phi = Some(StructuralPhiResult {
+            micro_phi: 0.15,
+            meso_phi: 0.25,
+            macro_phi: 0.35,
+            emergence_ratio: 1.5,
+            bottleneck_score: 0.1,
+            num_clusters: 3,
+            cluster_phis: vec![0.1, 0.2, 0.3],
+            cluster_sizes: vec![2, 2, 2],
+        });
+
+        let mut cc = ConsciousnessCache::default();
+        engine.update_cache(&mut cc);
+
+        assert!(cc.last_structural_phi.is_some());
+        let sp = cc.last_structural_phi.unwrap();
+        assert!((sp.micro_phi - 0.15).abs() < f64::EPSILON);
+        assert!((sp.emergence_ratio - 1.5).abs() < f64::EPSILON);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Improvement 3: Weight Stability Metrics
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_weight_variance_empty_history() {
+        let engine = make_engine();
+        assert_eq!(engine.weight_variance(), 0.0);
+    }
+
+    #[test]
+    fn test_weight_variance_stable_weights() {
+        let mut engine = make_engine();
+        let w = [0.35, 0.25, 0.25, 0.15];
+        for _ in 0..10 {
+            engine.cache.weight_history.push_back(w);
+        }
+        assert!(
+            engine.weight_variance() < 1e-15,
+            "Stable weights should have near-zero variance, got {}",
+            engine.weight_variance()
+        );
+    }
+
+    #[test]
+    fn test_weight_variance_oscillating_weights() {
+        let mut engine = make_engine();
+        let w1 = [0.45, 0.20, 0.20, 0.15];
+        let w2 = [0.25, 0.30, 0.30, 0.15];
+        for i in 0..20 {
+            if i % 2 == 0 {
+                engine.cache.weight_history.push_back(w1);
+            } else {
+                engine.cache.weight_history.push_back(w2);
+            }
+        }
+        assert!(
+            engine.weight_variance() > 0.001,
+            "Oscillating weights should have high variance, got {}",
+            engine.weight_variance()
+        );
+    }
+
+    #[test]
+    fn test_adaptive_alpha_slows_under_variance() {
+        let mut engine = make_engine();
+        // Fill history with oscillating weights to create high variance
+        let w1 = [0.45, 0.20, 0.20, 0.15];
+        let w2 = [0.25, 0.30, 0.30, 0.15];
+        for i in 0..20 {
+            if i % 2 == 0 {
+                engine.cache.weight_history.push_back(w1);
+            } else {
+                engine.cache.weight_history.push_back(w2);
+            }
+        }
+        let variance = engine.weight_variance();
+        let base_alpha = 0.3;
+        let alpha = base_alpha * (1.0 / (1.0 + 50.0 * variance));
+        assert!(
+            alpha < base_alpha,
+            "Alpha should be reduced under variance: alpha={}, base={}",
+            alpha,
+            base_alpha
+        );
+    }
+
+    #[test]
+    fn test_weight_history_bounded_at_100() {
+        let mut engine = make_engine();
+        let structural = StructuralPhiResult {
+            micro_phi: 0.1,
+            meso_phi: 0.2,
+            macro_phi: 0.3,
+            emergence_ratio: 1.5,
+            bottleneck_score: 0.1,
+            num_clusters: 3,
+            cluster_phis: vec![0.1, 0.2, 0.3],
+            cluster_sizes: vec![2, 2, 2],
+        };
+        for _ in 0..150 {
+            engine.update_weights(&structural);
+        }
+        assert!(
+            engine.cache.weight_history.len() <= 100,
+            "Weight history should be bounded at 100, got {}",
+            engine.cache.weight_history.len()
+        );
+    }
+
+    #[test]
+    fn test_weight_variance_in_output() {
+        let mut engine = make_engine();
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+        let input = make_input(&hdv, &hv16, 1);
+        let output = engine.measure(&input);
+        // With no history, variance should be 0.0
+        assert_eq!(output.weight_variance, 0.0);
+    }
+
+    // ── Moral topology → consciousness coupling tests ─────────────────
+
+    #[test]
+    fn test_drift_attenuates_epistemic_quality() {
+        // With equation V2 enabled, drift should reduce the Knowledge component
+        let eq = ConsciousnessEquationV2::default();
+        let config = symthaea_core::consciousness_metrics::MIPConfig::default();
+        let finder = SpectralMIPFinder::new(config);
+
+        let mut engine_no_drift = ConsciousnessEngine::new(finder.clone(), None, Some(eq.clone()), None);
+        let mut engine_drift = ConsciousnessEngine::new(finder, None, Some(eq), None);
+
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+
+        // Run both to cycle 23 (when equation V2 fires)
+        for cycle in 0..23 {
+            let input = make_input(&hdv, &hv16, cycle);
+            engine_no_drift.measure(&input);
+            engine_drift.measure(&input);
+        }
+
+        // At cycle 23: no drift
+        let input_no_drift = ConsciousnessEngineInput {
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
+            ..make_input(&hdv, &hv16, 23)
+        };
+        let out_no_drift = engine_no_drift.measure(&input_no_drift);
+
+        // At cycle 23: high drift
+        let input_drift = ConsciousnessEngineInput {
+            moral_drift: 0.4,
+            moral_anomaly_score: 0.0,
+            ..make_input(&hdv, &hv16, 23)
+        };
+        let out_drift = engine_drift.measure(&input_drift);
+
+        // With drift, equation_v2 should be lower (attenuated epistemic quality)
+        assert!(
+            out_drift.equation_v2_consciousness <= out_no_drift.equation_v2_consciousness,
+            "Drift {:.3} should attenuate EquationV2 (got drift={:.4}, no_drift={:.4})",
+            0.4,
+            out_drift.equation_v2_consciousness,
+            out_no_drift.equation_v2_consciousness,
+        );
+    }
+
+    #[test]
+    fn test_anomaly_dampens_unified_consciousness() {
+        let mut engine_nominal = make_engine();
+        let mut engine_anomaly = make_engine();
+
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+
+        let input_nominal = ConsciousnessEngineInput {
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
+            ..make_input(&hdv, &hv16, 1)
+        };
+        let out_nominal = engine_nominal.measure(&input_nominal);
+
+        let input_anomaly = ConsciousnessEngineInput {
+            moral_drift: 0.0,
+            moral_anomaly_score: 1.0,
+            ..make_input(&hdv, &hv16, 1)
+        };
+        let out_anomaly = engine_anomaly.measure(&input_anomaly);
+
+        assert!(
+            out_anomaly.unified_consciousness <= out_nominal.unified_consciousness,
+            "Anomaly score=1.0 should dampen consciousness (got anomaly={:.4}, nominal={:.4})",
+            out_anomaly.unified_consciousness,
+            out_nominal.unified_consciousness,
+        );
+    }
+
+    #[test]
+    fn test_coupling_disabled_no_effect() {
+        let mut engine = make_engine();
+        engine.moral_coupling.enabled = false;
+
+        let hdv = ContinuousHV::random(16384, 42);
+        let hv16 = BinaryHV::random(42);
+
+        // Extreme drift + anomaly, but coupling disabled
+        let input_extreme = ConsciousnessEngineInput {
+            moral_drift: 1.0,
+            moral_anomaly_score: 1.0,
+            ..make_input(&hdv, &hv16, 1)
+        };
+        let out_extreme = engine.measure(&input_extreme);
+
+        let mut engine2 = make_engine();
+        engine2.moral_coupling.enabled = false;
+        let input_zero = ConsciousnessEngineInput {
+            moral_drift: 0.0,
+            moral_anomaly_score: 0.0,
+            ..make_input(&hdv, &hv16, 1)
+        };
+        let out_zero = engine2.measure(&input_zero);
+
+        // With coupling disabled, both should produce identical results
+        assert!(
+            (out_extreme.unified_consciousness - out_zero.unified_consciousness).abs() < 1e-12,
+            "Disabled coupling should have no effect (extreme={:.6}, zero={:.6})",
+            out_extreme.unified_consciousness,
+            out_zero.unified_consciousness,
+        );
     }
 }

@@ -65,6 +65,8 @@ impl DegradationModel {
             weight_decay: 0.0,
             gating_steepness: 0.5, // Moderate gating for smooth degradation
             interp_bias: 0.0,
+            fourier_frequencies: Vec::new(), // Disabled — not needed for degradation dynamics
+            fourier_amplitude: 0.1,
         };
 
         let neuron = HdcLtcUnifiedNeuron::new(config, 42);
@@ -134,6 +136,8 @@ impl DegradationModel {
             weight_decay: 0.0,
             gating_steepness: 0.5,
             interp_bias: 0.0,
+            fourier_frequencies: Vec::new(),
+            fourier_amplitude: 0.1,
         };
         self.neuron = HdcLtcUnifiedNeuron::new(config, 42);
     }

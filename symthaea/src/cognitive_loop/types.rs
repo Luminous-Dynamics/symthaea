@@ -40,6 +40,9 @@ pub(crate) struct ConsciousnessCache {
     pub(crate) last_embodied_agency: f64,
     /// Last predictive free energy (cached for surprise amplitude scaling).
     pub(crate) last_predictive_free_energy: f64,
+    // ── Structural Phi persistence ──────────────────────────────────
+    /// Last structural Phi result (updated every 194 cycles by consciousness engine).
+    pub(crate) last_structural_phi: Option<symthaea_core::consciousness_metrics::StructuralPhiResult>,
 }
 
 impl Default for ConsciousnessCache {
@@ -59,6 +62,7 @@ impl Default for ConsciousnessCache {
             last_hierarchical_mip_phi: None,
             last_embodied_agency: 0.5,
             last_predictive_free_energy: 0.0,
+            last_structural_phi: None,
         }
     }
 }
@@ -111,7 +115,7 @@ impl Default for UrgencyState {
 #[derive(Debug, Clone)]
 pub(crate) struct LearningState {
     /// Prediction confidence snapshot at cycle start (drift clamping)
-    pub(crate) prediction_confidence: f32,
+    pub(crate) prediction_confidence: f64,
     /// MCE consciousness-level LR boost (decays 10%/cycle between MCE firings)
     pub(crate) mce_lr_boost: f32,
     /// Adaptive learning threshold multiplier (1.0 = config value as-is)
@@ -126,7 +130,7 @@ pub(crate) struct LearningState {
 impl Default for LearningState {
     fn default() -> Self {
         Self {
-            prediction_confidence: 0.5,
+            prediction_confidence: 0.5_f64,
             mce_lr_boost: 0.0,
             adaptive_threshold_scale: 1.0,
             subsystem_lr_factor: 1.0,
@@ -257,7 +261,7 @@ pub(crate) struct CycleHistory {
     /// Rolling window of recent prediction errors (last 16 cycles).
     pub(crate) error_history: std::collections::VecDeque<f32>,
     /// Self-model prediction: (cycle_made, predicted_confidence, predicted_urgency)
-    pub(crate) self_model_prediction: Option<(usize, f32, super::CycleUrgency)>,
+    pub(crate) self_model_prediction: Option<(usize, f64, super::CycleUrgency)>,
     /// Cached coherence value for this cycle (computed once, reused everywhere).
     pub(crate) cached_coherence: Option<f32>,
 }
@@ -546,10 +550,22 @@ pub struct NeuromodTelemetry {
     pub self_assessment_pe_ema: f32,
     /// Self-assessment coherence EMA (0.0–1.0).
     pub self_assessment_coherence_ema: f32,
+    /// Self-assessment confidence calibration error EMA (0.0–1.0).
+    pub self_assessment_confidence_error_ema: f32,
+    /// Self-assessment attention utilization EMA (0.0–1.0).
+    pub self_assessment_attention_ema: f32,
+    /// Self-assessment inhibition error rate EMA (0.0–1.0).
+    pub self_assessment_inhibition_error_ema: f32,
+    /// Observations since last calibration reset.
+    pub self_assessment_observations: u32,
+    /// Remaining cooldown cycles before trigger eligibility.
+    pub self_assessment_cooldown: u32,
     /// Whether self-assessment triggered auto-calibration this cycle.
     pub self_assessment_calibration_fired: bool,
     /// Whether a pending calibration is waiting to be applied (e.g., during sleep).
     pub pending_calibration_waiting: bool,
+    /// Inhibition error count this cycle (sum of prefrontal_veto + gate_blocked + safety).
+    pub inhibition_errors_this_cycle: u8,
 }
 
 /// Metadata about internal decision-making during a cycle.
@@ -882,6 +898,25 @@ pub struct CycleMetadata {
     /// Number of scales used in hierarchical MIP (0 when not computed).
     pub hierarchical_mip_scales: usize,
 
+    // ── Structural Phi decomposition ────────────────────────────────
+    /// Micro-Phi: within-cluster integration (0 when not computed).
+    pub structural_micro_phi: f64,
+    /// Meso-Phi: inter-cluster integration (0 when not computed).
+    pub structural_meso_phi: f64,
+    /// Macro-Phi: global spectral MIP (0 when not computed).
+    pub structural_macro_phi: f64,
+    /// Bottleneck score: gap between macro and meso Phi.
+    pub structural_bottleneck: f64,
+    /// Emergence ratio: macro / (micro + meso); > 1.0 = emergent.
+    pub structural_emergence_ratio: f64,
+    /// Number of detected clusters in hierarchical decomposition.
+    pub structural_num_clusters: usize,
+
+    // ── Dynamic consciousness weights ───────────────────────────────
+    /// Dynamic consciousness weights [spectral, equation, pipeline, multimodal].
+    pub consciousness_weights: [f64; 4],
+    /// Weight stability variance (0.0 = stable, >0.01 = oscillating).
+    pub consciousness_weight_variance: f64,
 
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
@@ -1289,8 +1324,14 @@ pub struct EthicalTelemetry {
     pub moral_anomaly_score: f64,
     /// True when the dominant harmony axis flipped since last evaluation.
     pub moral_value_inversion: bool,
-    /// True when free energy exceeds 2σ of rolling trajectory mean.
+    /// True when free energy exceeds configured σ multiplier of rolling trajectory mean.
     pub moral_free_energy_spike: bool,
+    /// True when moral_drift(20) exceeds configured threshold.
+    pub moral_drift_alert: bool,
+    /// True when β₀ increased since last topology evaluation.
+    pub moral_fragmentation_increase: bool,
+    /// True when anomaly response modulations were applied this cycle.
+    pub moral_anomaly_response_applied: bool,
 }
 
 /// Free energy principle (FEP) and predictive processing telemetry.
@@ -2163,5 +2204,22 @@ mod tests {
         let restored: ModuleTimings = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.core_hdc_encode, 100);
         assert_eq!(restored.core_training, 1000);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Improvement 1+3: Structural Phi + Weight fields in CycleMetadata
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_structural_phi_in_cycle_metadata_defaults_zero() {
+        let md = CycleMetadata::default();
+        assert_eq!(md.structural_micro_phi, 0.0);
+        assert_eq!(md.structural_meso_phi, 0.0);
+        assert_eq!(md.structural_macro_phi, 0.0);
+        assert_eq!(md.structural_bottleneck, 0.0);
+        assert_eq!(md.structural_emergence_ratio, 0.0);
+        assert_eq!(md.structural_num_clusters, 0);
+        assert_eq!(md.consciousness_weights, [0.0; 4]);
+        assert_eq!(md.consciousness_weight_variance, 0.0);
     }
 }
