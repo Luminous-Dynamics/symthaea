@@ -641,7 +641,7 @@ fn main() {
             for run in 0..n_runs {
                 let base_seed = 42u64.wrapping_add(run * 7919);
                 let mut rng = base_seed ^ 0x9E3779B97F4A7C15;
-                let mut next = |s: &mut u64| -> u64 {
+                let next = |s: &mut u64| -> u64 {
                     *s ^= *s << 13;
                     *s ^= *s >> 7;
                     *s ^= *s << 17;
@@ -786,7 +786,7 @@ fn main() {
             for run in 0..n_runs {
                 let base_seed = 42u64.wrapping_add(run * 6151);
                 let mut rng = base_seed ^ 0x9E3779B97F4A7C15;
-                let mut next = |s: &mut u64| -> u64 {
+                let next = |s: &mut u64| -> u64 {
                     *s ^= *s << 13;
                     *s ^= *s >> 7;
                     *s ^= *s << 17;
