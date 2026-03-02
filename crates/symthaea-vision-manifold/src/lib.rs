@@ -39,11 +39,11 @@ pub use bridge::{CrossManifoldPredictor, VisionBridge};
 pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 #[cfg(feature = "camera")]
 pub use camera::CameraSource;
-pub use encoder::{MultiScaleEncoder, PatchHdcEncoder};
-pub use manifold::{HorizonAccuracy, VisionManifold};
+pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder};
+pub use manifold::{HorizonAccuracy, SceneMemory, VisionManifold};
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
-    AttentionMap, LearningConfig, ManifoldState, MultiScaleConfig, PatchGrid, TrainingConfig,
-    TrainingMethod, VisionConfig, VisionTelemetry,
+    AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig, PatchGrid,
+    SceneMatch, TrainingConfig, TrainingMethod, VisionConfig, VisionTelemetry,
 };

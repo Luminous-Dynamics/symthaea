@@ -171,12 +171,14 @@ impl PredictiveCodingHierarchy {
         &mut self.encoder
     }
 
-    /// Process a frame with predictive coding attention feedback.
+    /// Process a frame with full predictive coding feedback loop.
     ///
+    /// Implements a proper cortical predictive coding cycle (Rao & Ballard 1999):
     /// 1. Encode at all scales
-    /// 2. Compute cross-scale attention (fine patches that differ from coarse)
-    /// 3. Re-encode the fine scale with attention weighting
-    /// 4. Return the attention-weighted fine HV as the main output
+    /// 2. Apply top-down prior: coarse prediction biases fine encoding
+    /// 3. Compute bottom-up error: cross-scale attention from prediction residuals
+    /// 4. Re-encode fine scale with attention weighting
+    /// 5. Update coarse→fine mapping from bottom-up error signal
     pub fn process_frame_with_feedback(
         &mut self,
         pixels: &[u8],
@@ -190,23 +192,33 @@ impl PredictiveCodingHierarchy {
         let fine_hv = scale_hvs.first().cloned().unwrap_or_else(|| ContinuousHV::zero(self.dim));
         let coarse_hv = scale_hvs.last().cloned().unwrap_or_else(|| ContinuousHV::zero(self.dim));
 
-        // Compute cross-scale attention
-        let attention = Self::compute_patch_attention(&all_patches);
-
-        // Re-encode fine scale with attention weighting
-        let attended_fine = if !attention.is_empty() {
-            if let Some(fine_enc) = self.encoder.encoder_at_mut(0) {
-                let (attended, _) =
-                    fine_enc.encode_frame_attended(pixels, width, height, channels, &attention);
-                attended
-            } else {
-                fine_hv.clone()
-            }
+        // Step 1: Apply top-down prior from previous coarse prediction
+        let top_down_fine = if let Some(ref prev_coarse) = self.last_coarse_hv {
+            let predicted = self.predict_fine(prev_coarse);
+            // Blend prediction with bottom-up: 80% bottom-up + 20% top-down prior
+            ContinuousHV::weighted_bundle(&[&fine_hv, &predicted], &[0.8, 0.2])
         } else {
             fine_hv.clone()
         };
 
-        // Generate prediction and compute error
+        // Step 2: Compute cross-scale attention (bottom-up error signal)
+        let attention = Self::compute_patch_attention(&all_patches);
+
+        // Step 3: Re-encode fine scale with attention weighting
+        let attended_fine = if !attention.is_empty() {
+            if let Some(fine_enc) = self.encoder.encoder_at_mut(0) {
+                let (attended, _) =
+                    fine_enc.encode_frame_attended(pixels, width, height, channels, &attention);
+                // Blend with top-down prior
+                ContinuousHV::weighted_bundle(&[&attended, &top_down_fine], &[0.7, 0.3])
+            } else {
+                top_down_fine
+            }
+        } else {
+            top_down_fine
+        };
+
+        // Step 4: Compute prediction error and update mapping (bottom-up → top-down)
         if let Some(prev_coarse) = self.last_coarse_hv.clone() {
             let predicted_fine = self.predict_fine(&prev_coarse);
             self.prediction_error =
