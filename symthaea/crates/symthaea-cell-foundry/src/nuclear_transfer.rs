@@ -55,10 +55,10 @@ impl ScntProtocol {
 
         // Stage-specific success multipliers (calibrated to real SCNT success rates)
         let stage_multiplier = match self.stage {
-            ScntStage::Enucleation => 0.95,       // Technical step, high success
-            ScntStage::NuclearInjection => 0.85,   // Moderate difficulty
-            ScntStage::Activation => 0.70,         // Needs proper reprogramming signals
-            ScntStage::FirstDivision => 0.60,      // Nuclear-cytoplasmic compatibility
+            ScntStage::Enucleation => 0.95,      // Technical step, high success
+            ScntStage::NuclearInjection => 0.85, // Moderate difficulty
+            ScntStage::Activation => 0.70,       // Needs proper reprogramming signals
+            ScntStage::FirstDivision => 0.60,    // Nuclear-cytoplasmic compatibility
             ScntStage::BlastocystFormation => 0.40, // Most critical step
             ScntStage::Complete | ScntStage::Failed => 1.0,
         };
@@ -125,7 +125,9 @@ impl ScntProtocol {
         };
 
         let base = self.success_probability;
-        stages_remaining.iter().fold(1.0, |acc, &mult| acc * base * mult)
+        stages_remaining
+            .iter()
+            .fold(1.0, |acc, &mult| acc * base * mult)
     }
 }
 
@@ -206,7 +208,11 @@ mod tests {
         let remaining = protocol.remaining_success_probability();
         assert!(remaining >= 0.0 && remaining <= 1.0);
         // Cumulative probability through 5 stages should be quite low
-        assert!(remaining < 0.5, "5-stage cumulative should be low: {}", remaining);
+        assert!(
+            remaining < 0.5,
+            "5-stage cumulative should be low: {}",
+            remaining
+        );
     }
 
     #[test]

@@ -94,8 +94,8 @@ pub use accelerator::{
 };
 
 pub use threat::{
-    ThreatFepAction, ThreatFepAgent, ThreatHdcEncoder, ThreatLevel, ThreatOutput,
-    ThreatPredictor, ThreatReading, ThreatTwin, THREAT_HORIZONS, THREAT_HORIZON_LABELS,
+    ThreatFepAction, ThreatFepAgent, ThreatHdcEncoder, ThreatLevel, ThreatOutput, ThreatPredictor,
+    ThreatReading, ThreatTwin, THREAT_HORIZONS, THREAT_HORIZON_LABELS,
 };
 
 pub use datacenter::{

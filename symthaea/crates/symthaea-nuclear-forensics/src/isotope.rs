@@ -149,7 +149,9 @@ impl IsotopicSignature {
     pub fn perturbed(&self, noise_fraction: f32, seed: u64) -> Self {
         let mut state = seed;
         let mut next = move || -> f32 {
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let bits = ((state >> 33) ^ state) as u32;
             (bits as f32 / u32::MAX as f32) * 2.0 - 1.0
         };
@@ -204,10 +206,24 @@ impl IsotopicSignature {
 mod tests {
     use super::*;
 
-    #[test] fn test_references_count() { assert_eq!(IsotopicSignature::references().len(), 5); }
-    #[test] fn test_heu_high_enrichment() { assert!(IsotopicSignature::highly_enriched_uranium().u235_u238 > 0.9); }
-    #[test] fn test_natural_no_fission_products() { let n = IsotopicSignature::natural_uranium(); assert_eq!(n.cs137_activity, 0.0); }
-    #[test] fn test_spent_fuel_has_fission_products() { let s = IsotopicSignature::spent_fuel(); assert!(s.cs137_activity > 0.5); }
+    #[test]
+    fn test_references_count() {
+        assert_eq!(IsotopicSignature::references().len(), 5);
+    }
+    #[test]
+    fn test_heu_high_enrichment() {
+        assert!(IsotopicSignature::highly_enriched_uranium().u235_u238 > 0.9);
+    }
+    #[test]
+    fn test_natural_no_fission_products() {
+        let n = IsotopicSignature::natural_uranium();
+        assert_eq!(n.cs137_activity, 0.0);
+    }
+    #[test]
+    fn test_spent_fuel_has_fission_products() {
+        let s = IsotopicSignature::spent_fuel();
+        assert!(s.cs137_activity > 0.5);
+    }
 
     #[test]
     fn test_perturbed_preserves_source() {
@@ -226,7 +242,12 @@ mod tests {
     fn test_normalized_values_bounded() {
         for sig in IsotopicSignature::references() {
             for v in sig.normalized_values() {
-                assert!(v >= 0.0 && v <= 1.0, "Normalized value {} out of range for {}", v, sig.name);
+                assert!(
+                    v >= 0.0 && v <= 1.0,
+                    "Normalized value {} out of range for {}",
+                    v,
+                    sig.name
+                );
             }
         }
     }
@@ -236,7 +257,11 @@ mod tests {
         for sig in IsotopicSignature::references() {
             let p = sig.perturbed(0.05, 123);
             assert_eq!(p.source, sig.source, "Source changed for {}", sig.name);
-            assert!(p.name.contains("perturbed"), "Name missing perturbed tag for {}", sig.name);
+            assert!(
+                p.name.contains("perturbed"),
+                "Name missing perturbed tag for {}",
+                sig.name
+            );
         }
     }
 
@@ -249,7 +274,13 @@ mod tests {
             for (i, (&o, &pe)) in orig.iter().zip(pert.iter()).enumerate() {
                 if o > 0.0 {
                     let rel_diff = (pe - o).abs() / o;
-                    assert!(rel_diff < 0.15, "Ratio {} deviated {:.1}% for {}", i, rel_diff * 100.0, sig.name);
+                    assert!(
+                        rel_diff < 0.15,
+                        "Ratio {} deviated {:.1}% for {}",
+                        i,
+                        rel_diff * 100.0,
+                        sig.name
+                    );
                 }
             }
         }
@@ -260,7 +291,11 @@ mod tests {
         let sig = IsotopicSignature::highly_enriched_uranium();
         let p1 = sig.perturbed(0.05, 42);
         let p2 = sig.perturbed(0.05, 42);
-        assert_eq!(p1.values(), p2.values(), "Same seed should produce identical perturbation");
+        assert_eq!(
+            p1.values(),
+            p2.values(),
+            "Same seed should produce identical perturbation"
+        );
     }
 
     #[test]
@@ -268,15 +303,30 @@ mod tests {
         let sig = IsotopicSignature::highly_enriched_uranium();
         let p1 = sig.perturbed(0.05, 42);
         let p2 = sig.perturbed(0.05, 99);
-        assert_ne!(p1.values(), p2.values(), "Different seeds should produce different perturbations");
+        assert_ne!(
+            p1.values(),
+            p2.values(),
+            "Different seeds should produce different perturbations"
+        );
     }
 
     #[test]
     fn test_all_references_non_negative_values() {
         for sig in IsotopicSignature::references() {
             for (i, v) in sig.values().iter().enumerate() {
-                assert!(*v >= 0.0, "Negative value at dim {} for {}: {}", i, sig.name, v);
-                assert!(v.is_finite(), "Non-finite value at dim {} for {}", i, sig.name);
+                assert!(
+                    *v >= 0.0,
+                    "Negative value at dim {} for {}: {}",
+                    i,
+                    sig.name,
+                    v
+                );
+                assert!(
+                    v.is_finite(),
+                    "Non-finite value at dim {} for {}",
+                    i,
+                    sig.name
+                );
             }
         }
     }

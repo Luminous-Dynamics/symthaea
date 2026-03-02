@@ -16,9 +16,9 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 // ─── Genesis crate imports ──────────────────────────────────────────────────
 
-use symthaea_genomics::DegradationModel;
 use symthaea_cell_foundry::MultiScalePredictor;
 use symthaea_ectogenesis::TemporalPlanner;
+use symthaea_genomics::DegradationModel;
 use symthaea_nurture::{CriticalPeriodDomain, CriticalPeriodModel, DevelopmentalAge};
 use symthaea_population::PopulationTrajectoryPredictor;
 
@@ -299,7 +299,10 @@ fn test_all_predictors_finite_for_large_dt() {
     let mut nurture = CriticalPeriodModel::new();
     let extreme_age = DevelopmentalAge::new(600.0); // 50 years in months
     let p = nurture.plasticity_at(CriticalPeriodDomain::Language, &extreme_age);
-    assert!(p.is_finite(), "nurture plasticity at 50 years should be finite");
+    assert!(
+        p.is_finite(),
+        "nurture plasticity at 50 years should be finite"
+    );
     assert_finite(nurture.neuron_state(), "nurture neuron at 50 years");
 }
 

@@ -378,6 +378,7 @@ pub mod consciousness; // Modular consciousness (re-exports consciousness_integr
 pub mod consciousness_dashboard;
 pub mod consciousness_evaluator; // Consciousness evaluation
 pub mod consciousness_integration; // Complete consciousness pipeline
+pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
 
 // Track 6: Language module dependencies

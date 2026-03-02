@@ -36,8 +36,12 @@ fn main() {
     // ── 1. Domain metadata ──────────────────────────────────────────────
     let names: Vec<&str> = predictors.iter().map(|p| p.domain()).collect();
     let taus: Vec<f32> = predictors.iter().map(|p| p.tau_base()).collect();
-    let horizon_counts: Vec<usize> = predictors.iter().map(|p| p.default_horizons().len()).collect();
-    let hlabels: Vec<Vec<&str>> = predictors.iter()
+    let horizon_counts: Vec<usize> = predictors
+        .iter()
+        .map(|p| p.default_horizons().len())
+        .collect();
+    let hlabels: Vec<Vec<&str>> = predictors
+        .iter()
         .map(|p| p.horizon_labels().iter().copied().collect())
         .collect();
     println!("Domains: {}", n);
@@ -67,7 +71,9 @@ fn main() {
 
         let r = l / s.max(0.001);
         let ok = r < 5.0 && r > 0.1;
-        if !ok { all_o1 = false; }
+        if !ok {
+            all_o1 = false;
+        }
 
         short_us.push(s);
         long_us.push(l);
@@ -75,7 +81,10 @@ fn main() {
         cost_pass.push(ok);
     }
 
-    println!("O(1) cost proof: {}", if all_o1 { "ALL PASS" } else { "SOME FAIL" });
+    println!(
+        "O(1) cost proof: {}",
+        if all_o1 { "ALL PASS" } else { "SOME FAIL" }
+    );
 
     // ── 3. Prediction drift (1 year forward) ────────────────────────────
     let one_year = 31_536_000.0_f32;
@@ -110,8 +119,12 @@ fn main() {
     html.push_str("<!DOCTYPE html><html><head><meta charset='utf-8'>\n");
     html.push_str("<title>Genesis Benchmark Suite Report</title>\n");
     html.push_str("<style>\n");
-    html.push_str("body{font-family:system-ui,sans-serif;margin:2em;background:#fafafa;color:#222}\n");
-    html.push_str("h1{color:#2c3e50}h2{color:#34495e;border-bottom:2px solid #ecf0f1;padding-bottom:4px}\n");
+    html.push_str(
+        "body{font-family:system-ui,sans-serif;margin:2em;background:#fafafa;color:#222}\n",
+    );
+    html.push_str(
+        "h1{color:#2c3e50}h2{color:#34495e;border-bottom:2px solid #ecf0f1;padding-bottom:4px}\n",
+    );
     html.push_str("table{border-collapse:collapse;margin:1em 0;width:100%}\n");
     html.push_str("th,td{border:1px solid #bdc3c7;padding:6px 10px;text-align:right}\n");
     html.push_str("th{background:#34495e;color:white}\n");
@@ -125,12 +138,19 @@ fn main() {
     // Executive summary
     html.push_str("<div class='summary'>\n");
     html.push_str(&format!("<strong>Domains:</strong> {} | ", n));
-    html.push_str(&format!("<strong>O(1) Cost Proof:</strong> <span class='{}'>{}</span> | ",
+    html.push_str(&format!(
+        "<strong>O(1) Cost Proof:</strong> <span class='{}'>{}</span> | ",
         if all_o1 { "pass" } else { "fail" },
-        if all_o1 { "ALL PASS" } else { "SOME FAIL" }));
-    html.push_str(&format!("<strong>Timescale Span:</strong> {:.1} orders of magnitude | ", orders));
-    html.push_str(&format!("<strong>Fastest tau:</strong> {:.6}s | <strong>Slowest tau:</strong> {:.0}s\n",
-        tau_min, tau_max));
+        if all_o1 { "ALL PASS" } else { "SOME FAIL" }
+    ));
+    html.push_str(&format!(
+        "<strong>Timescale Span:</strong> {:.1} orders of magnitude | ",
+        orders
+    ));
+    html.push_str(&format!(
+        "<strong>Fastest tau:</strong> {:.6}s | <strong>Slowest tau:</strong> {:.0}s\n",
+        tau_min, tau_max
+    ));
     html.push_str("</div>\n");
 
     // Domain registry table
@@ -139,7 +159,10 @@ fn main() {
     for i in 0..n {
         html.push_str(&format!(
             "<tr><td style='text-align:left'>{}</td><td>{:.6}</td><td>{}</td><td>{}</td></tr>\n",
-            names[i], taus[i], format_tau(taus[i]), horizon_counts[i]
+            names[i],
+            taus[i],
+            format_tau(taus[i]),
+            horizon_counts[i]
         ));
     }
     html.push_str("</table>\n");
@@ -162,7 +185,13 @@ fn main() {
     html.push_str("<table><tr><th style='text-align:left'>Domain</th><th>Drift</th><th>Visualization</th></tr>\n");
     for i in 0..n {
         let width = (drifts[i] * 400.0).min(400.0).max(1.0);
-        let color = if drifts[i] < 0.3 { "#27ae60" } else if drifts[i] < 0.6 { "#f1c40f" } else { "#e74c3c" };
+        let color = if drifts[i] < 0.3 {
+            "#27ae60"
+        } else if drifts[i] < 0.6 {
+            "#f1c40f"
+        } else {
+            "#e74c3c"
+        };
         html.push_str(&format!(
             "<tr><td style='text-align:left'>{}</td><td>{:.4}</td><td style='text-align:left'><span class='bar' style='width:{}px;background:{}'></span></td></tr>\n",
             names[i], drifts[i], width as u32, color
@@ -180,12 +209,24 @@ fn main() {
     html.push_str("</tr>\n");
     for i in 0..n {
         let short = &names[i][..names[i].len().min(12)];
-        html.push_str(&format!("<tr><th style='text-align:left;font-size:0.8em'>{}</th>", short));
+        html.push_str(&format!(
+            "<tr><th style='text-align:left;font-size:0.8em'>{}</th>",
+            short
+        ));
         for j in 0..n {
             let v = sim_matrix[i][j];
-            let bg = if v > 0.5 { "#27ae60" } else if v > 0.3 { "#f1c40f" } else { "#e74c3c" };
+            let bg = if v > 0.5 {
+                "#27ae60"
+            } else if v > 0.3 {
+                "#f1c40f"
+            } else {
+                "#e74c3c"
+            };
             let fg = if v > 0.5 { "white" } else { "#222" };
-            html.push_str(&format!("<td style='background:{};color:{};font-size:0.8em'>{:.3}</td>", bg, fg, v));
+            html.push_str(&format!(
+                "<td style='background:{};color:{};font-size:0.8em'>{:.3}</td>",
+                bg, fg, v
+            ));
         }
         html.push_str("</tr>\n");
     }
@@ -195,12 +236,23 @@ fn main() {
     html.push_str("<h2>Timescale Span Summary</h2>\n");
     html.push_str("<table><tr><th>Metric</th><th>Value</th></tr>\n");
     html.push_str(&format!("<tr><td>Domain count</td><td>{}</td></tr>\n", n));
-    html.push_str(&format!("<tr><td>Fastest tau</td><td>{:.6} s</td></tr>\n", tau_min));
-    html.push_str(&format!("<tr><td>Slowest tau</td><td>{:.0} s</td></tr>\n", tau_max));
-    html.push_str(&format!("<tr><td>Timescale span</td><td>{:.1} orders of magnitude</td></tr>\n", orders));
-    html.push_str(&format!("<tr><td>O(1) verified</td><td class='{}'>{}</td></tr>\n",
+    html.push_str(&format!(
+        "<tr><td>Fastest tau</td><td>{:.6} s</td></tr>\n",
+        tau_min
+    ));
+    html.push_str(&format!(
+        "<tr><td>Slowest tau</td><td>{:.0} s</td></tr>\n",
+        tau_max
+    ));
+    html.push_str(&format!(
+        "<tr><td>Timescale span</td><td>{:.1} orders of magnitude</td></tr>\n",
+        orders
+    ));
+    html.push_str(&format!(
+        "<tr><td>O(1) verified</td><td class='{}'>{}</td></tr>\n",
         if all_o1 { "pass" } else { "fail" },
-        if all_o1 { "YES" } else { "NO" }));
+        if all_o1 { "YES" } else { "NO" }
+    ));
     html.push_str("</table>\n");
 
     html.push_str("<p style='color:#7f8c8d;font-size:0.85em'>Generated by Symthaea Genesis Benchmark Suite</p>\n");
@@ -250,13 +302,24 @@ fn main() {
     }
     json.push_str("  ],\n");
     json.push_str("  \"similarity_matrix\": {\n");
-    json.push_str(&format!("    \"labels\": [{}],\n",
-        names.iter().map(|n| format!("\"{}\"", n)).collect::<Vec<_>>().join(", ")));
+    json.push_str(&format!(
+        "    \"labels\": [{}],\n",
+        names
+            .iter()
+            .map(|n| format!("\"{}\"", n))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
     json.push_str("    \"values\": [\n");
     for i in 0..n {
         let comma = if i < n - 1 { "," } else { "" };
-        json.push_str(&format!("      [{}]{}",
-            sim_matrix[i].iter().map(|v| format!("{:.4}", v)).collect::<Vec<_>>().join(", "),
+        json.push_str(&format!(
+            "      [{}]{}",
+            sim_matrix[i]
+                .iter()
+                .map(|v| format!("{:.4}", v))
+                .collect::<Vec<_>>()
+                .join(", "),
             comma
         ));
         json.push('\n');

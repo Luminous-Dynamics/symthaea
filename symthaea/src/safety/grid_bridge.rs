@@ -105,9 +105,18 @@ mod tests {
 
     #[test]
     fn test_grid_safety_to_level_mapping() {
-        assert_eq!(grid_safety_to_level(GridSafetyLevel::Green), SafetyLevel::Green);
-        assert_eq!(grid_safety_to_level(GridSafetyLevel::Yellow), SafetyLevel::Yellow);
-        assert_eq!(grid_safety_to_level(GridSafetyLevel::Orange), SafetyLevel::Orange);
+        assert_eq!(
+            grid_safety_to_level(GridSafetyLevel::Green),
+            SafetyLevel::Green
+        );
+        assert_eq!(
+            grid_safety_to_level(GridSafetyLevel::Yellow),
+            SafetyLevel::Yellow
+        );
+        assert_eq!(
+            grid_safety_to_level(GridSafetyLevel::Orange),
+            SafetyLevel::Orange
+        );
         assert_eq!(grid_safety_to_level(GridSafetyLevel::Red), SafetyLevel::Red);
     }
 
@@ -122,7 +131,11 @@ mod tests {
     #[test]
     fn test_gate_blocks_all_at_red() {
         let adapter = GridSafetyAdapter::new();
-        let output = mock_output(0.9, GridSafetyLevel::Red, GridFepAction::EmergencyCurtailment);
+        let output = mock_output(
+            0.9,
+            GridSafetyLevel::Red,
+            GridFepAction::EmergencyCurtailment,
+        );
         assert!(!adapter.gate_operation(&output, false).is_ok());
         assert!(!adapter.gate_operation(&output, true).is_ok());
     }

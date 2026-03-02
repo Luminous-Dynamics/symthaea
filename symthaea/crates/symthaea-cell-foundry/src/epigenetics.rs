@@ -65,12 +65,16 @@ pub fn encode_methylation_pattern(profile: &EpigeneticProfile) -> ContinuousHV {
         .scale(profile.global_methylation as f32);
     let h19 = ContinuousHV::random(HDC_DIMENSION, SEED_H19_IGF2)
         .scale(profile.h19_igf2_imprinting as f32);
-    let snrpn = ContinuousHV::random(HDC_DIMENSION, SEED_SNRPN)
-        .scale(profile.snrpn_imprinting as f32);
-    let x_inact = ContinuousHV::random(HDC_DIMENSION, SEED_X_INACT)
-        .scale(if profile.x_inactivation_status { 1.0 } else { 0.0 });
-    let telomere = ContinuousHV::random(HDC_DIMENSION, SEED_TELOMERE)
-        .scale(profile.telomere_length as f32);
+    let snrpn =
+        ContinuousHV::random(HDC_DIMENSION, SEED_SNRPN).scale(profile.snrpn_imprinting as f32);
+    let x_inact =
+        ContinuousHV::random(HDC_DIMENSION, SEED_X_INACT).scale(if profile.x_inactivation_status {
+            1.0
+        } else {
+            0.0
+        });
+    let telomere =
+        ContinuousHV::random(HDC_DIMENSION, SEED_TELOMERE).scale(profile.telomere_length as f32);
 
     ContinuousHV::bundle(&[&global_meth, &h19, &snrpn, &x_inact, &telomere])
 }
@@ -88,14 +92,16 @@ pub fn methylation_similarity(a: &EpigeneticProfile, b: &EpigeneticProfile) -> f
 ///
 /// Combines imprinting completeness, methylation level, and telomere length.
 pub fn epigenetic_quality_score(profile: &EpigeneticProfile) -> f64 {
-    let imprint_score =
-        (profile.h19_igf2_imprinting + profile.snrpn_imprinting) / 2.0;
+    let imprint_score = (profile.h19_igf2_imprinting + profile.snrpn_imprinting) / 2.0;
     let telomere_score = profile.telomere_length.clamp(0.0, 1.5) / 1.5;
     let meth_score = profile.global_methylation.clamp(0.0, 1.0);
-    let x_score = if profile.x_inactivation_status { 1.0 } else { 0.5 };
+    let x_score = if profile.x_inactivation_status {
+        1.0
+    } else {
+        0.5
+    };
 
-    (0.3 * imprint_score + 0.2 * telomere_score + 0.3 * meth_score + 0.2 * x_score)
-        .clamp(0.0, 1.0)
+    (0.3 * imprint_score + 0.2 * telomere_score + 0.3 * meth_score + 0.2 * x_score).clamp(0.0, 1.0)
 }
 
 #[cfg(test)]
@@ -191,7 +197,11 @@ mod tests {
     fn test_quality_score_healthy() {
         let profile = EpigeneticProfile::healthy_newborn();
         let score = epigenetic_quality_score(&profile);
-        assert!(score > 0.7, "Healthy profile should have high quality score: {}", score);
+        assert!(
+            score > 0.7,
+            "Healthy profile should have high quality score: {}",
+            score
+        );
     }
 
     #[test]

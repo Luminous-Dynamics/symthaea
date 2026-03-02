@@ -394,7 +394,10 @@ mod tests {
         let mut fs = FlowState::default();
         pump_flow_compatible(&mut fs, 3);
         assert_eq!(fs.streak, 3);
-        assert!(!fs.in_flow, "should not enter flow before FLOW_ENTRY_STREAK");
+        assert!(
+            !fs.in_flow,
+            "should not enter flow before FLOW_ENTRY_STREAK"
+        );
     }
 
     #[test]
@@ -533,11 +536,11 @@ mod tests {
         for _ in 0..6 {
             fs.update_with_thresholds(
                 ConsciousnessPattern::Focused,
-                0.3,  // error
-                0.8,  // coherence
-                0.7,  // confidence
-                0.5,  // relaxed error threshold
-                0.6,  // coherence threshold
+                0.3, // error
+                0.8, // coherence
+                0.7, // confidence
+                0.5, // relaxed error threshold
+                0.6, // coherence threshold
             );
         }
         assert!(fs.in_flow);
@@ -550,7 +553,11 @@ mod tests {
         for _ in 0..6 {
             fs.update_with_thresholds(
                 ConsciousnessPattern::Contemplative,
-                0.1, 0.8, 0.7, 0.25, 0.6,
+                0.1,
+                0.8,
+                0.7,
+                0.25,
+                0.6,
             );
         }
         assert!(fs.in_flow);
@@ -646,12 +653,27 @@ mod tests {
     #[test]
     fn response_strategy_opposite_is_symmetric_pair() {
         // Detailed <-> Concise
-        assert_eq!(ResponseStrategy::Detailed.opposite(), ResponseStrategy::Concise);
-        assert_eq!(ResponseStrategy::Concise.opposite(), ResponseStrategy::Detailed);
+        assert_eq!(
+            ResponseStrategy::Detailed.opposite(),
+            ResponseStrategy::Concise
+        );
+        assert_eq!(
+            ResponseStrategy::Concise.opposite(),
+            ResponseStrategy::Detailed
+        );
         // Clarifying -> Supportive -> Exploratory -> Clarifying (cycle)
-        assert_eq!(ResponseStrategy::Clarifying.opposite(), ResponseStrategy::Supportive);
-        assert_eq!(ResponseStrategy::Supportive.opposite(), ResponseStrategy::Exploratory);
-        assert_eq!(ResponseStrategy::Exploratory.opposite(), ResponseStrategy::Clarifying);
+        assert_eq!(
+            ResponseStrategy::Clarifying.opposite(),
+            ResponseStrategy::Supportive
+        );
+        assert_eq!(
+            ResponseStrategy::Supportive.opposite(),
+            ResponseStrategy::Exploratory
+        );
+        assert_eq!(
+            ResponseStrategy::Exploratory.opposite(),
+            ResponseStrategy::Clarifying
+        );
     }
 
     #[test]
@@ -663,7 +685,10 @@ mod tests {
         );
         // The Clarifying->Supportive->Exploratory cycle has period 3
         assert_eq!(
-            ResponseStrategy::Clarifying.opposite().opposite().opposite(),
+            ResponseStrategy::Clarifying
+                .opposite()
+                .opposite()
+                .opposite(),
             ResponseStrategy::Clarifying
         );
     }

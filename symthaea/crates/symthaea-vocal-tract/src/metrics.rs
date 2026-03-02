@@ -685,29 +685,35 @@ mod tests {
         let sample_rate = 24000u32;
         let n = sample_rate * 2;
 
-        // Modal voice: moderate rolloff
+        // Use formant frequencies as test frequencies directly so Goertzel
+        // measures meaningful power differences between modal and breathy.
+        let f1 = 500.0f32;
+        let f2 = 1500.0f32;
+        let f3 = 2500.0f32;
+
+        // Modal voice: moderate rolloff (-6 dB/octave)
         let modal: Vec<f32> = (0..n)
             .map(|i| {
                 let t = i as f32 / sample_rate as f32;
-                let h1 = (2.0 * std::f32::consts::PI * 120.0 * t).sin();
-                let h2 = 0.5 * (2.0 * std::f32::consts::PI * 240.0 * t).sin();
-                let h3 = 0.25 * (2.0 * std::f32::consts::PI * 360.0 * t).sin();
+                let h1 = (2.0 * std::f32::consts::PI * f1 * t).sin();
+                let h2 = 0.5 * (2.0 * std::f32::consts::PI * f2 * t).sin();
+                let h3 = 0.25 * (2.0 * std::f32::consts::PI * f3 * t).sin();
                 (h1 + h2 + h3) * 0.3
             })
             .collect();
-        let tilt_modal = compute_spectral_tilt(&modal, 500.0, 1500.0, 2500.0, sample_rate);
+        let tilt_modal = compute_spectral_tilt(&modal, f1, f2, f3, sample_rate);
 
-        // Breathy voice: steeper rolloff (less upper harmonics)
+        // Breathy voice: steeper rolloff (much less energy at higher formants)
         let breathy: Vec<f32> = (0..n)
             .map(|i| {
                 let t = i as f32 / sample_rate as f32;
-                let h1 = (2.0 * std::f32::consts::PI * 120.0 * t).sin();
-                let h2 = 0.1 * (2.0 * std::f32::consts::PI * 240.0 * t).sin();
-                let h3 = 0.01 * (2.0 * std::f32::consts::PI * 360.0 * t).sin();
+                let h1 = (2.0 * std::f32::consts::PI * f1 * t).sin();
+                let h2 = 0.1 * (2.0 * std::f32::consts::PI * f2 * t).sin();
+                let h3 = 0.01 * (2.0 * std::f32::consts::PI * f3 * t).sin();
                 (h1 + h2 + h3) * 0.3
             })
             .collect();
-        let tilt_breathy = compute_spectral_tilt(&breathy, 500.0, 1500.0, 2500.0, sample_rate);
+        let tilt_breathy = compute_spectral_tilt(&breathy, f1, f2, f3, sample_rate);
 
         assert!(
             tilt_breathy < tilt_modal,

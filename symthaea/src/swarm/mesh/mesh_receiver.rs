@@ -46,12 +46,12 @@ struct PendingAssembly {
     created_at: Instant,
     last_fragment_at: Instant,
     /// Last fragment index seen — used to reject out-of-order fragments
-    /// with gap > 3 (likely injection or severe reordering).
+    /// with gap exceeding the fragment range (likely injection).
     last_fragment_index: Option<u8>,
     /// Key fingerprint when the first fragment arrived — used to detect
-    /// mid-stream key rotation. Computed as `k[0] ^ k[15] ^ k[31]`.
+    /// mid-stream key rotation. 16-bit hash of the key for ~1/65536 collision rate.
     #[cfg(feature = "mesh-encryption")]
-    key_fingerprint: Option<u8>,
+    key_fingerprint: Option<u16>,
 }
 
 // ============================================================================
@@ -275,11 +275,15 @@ impl MeshReceiver {
             self.ensure_capacity(now);
         }
 
-        // Compute key fingerprint for this fragment (Item 12)
+        // Compute 16-bit key fingerprint for this fragment (Item 12).
+        // Samples 8 evenly-spaced bytes from the 32-byte key, folds into
+        // two u8 lanes via XOR, then combines into a u16 (~1/65536 collision).
         #[cfg(feature = "mesh-encryption")]
-        let current_fingerprint: Option<u8> = self
-            .encryption_key
-            .map(|k| k[0] ^ k[15] ^ k[31]);
+        let current_fingerprint: Option<u16> = self.encryption_key.map(|k| {
+            let lo = k[0] ^ k[4] ^ k[8] ^ k[12];
+            let hi = k[16] ^ k[20] ^ k[24] ^ k[31];
+            ((hi as u16) << 8) | (lo as u16)
+        });
 
         // Get or create the assembler for this stream
         let assembly = self.pending.entry(key).or_insert_with(|| PendingAssembly {
@@ -303,14 +307,19 @@ impl MeshReceiver {
             return None;
         }
 
-        // Item 5: Reject fragments with excessive reordering (gap > 3)
+        // Item 5: Reject fragments with excessive reordering.
+        // Use total_fragments as the max legitimate gap — radio delivers in
+        // arbitrary order, and FEC fragments (index 10) can arrive after any
+        // data fragment (indices 0-9). Only reject gaps that exceed the valid
+        // fragment index range, which indicates injection or severe corruption.
         if let Some(last_idx) = assembly.last_fragment_index {
             let gap = if frag.fragment_index > last_idx {
                 frag.fragment_index - last_idx
             } else {
                 last_idx - frag.fragment_index
             };
-            if gap > 3 {
+            let max_gap = frag.total_fragments.saturating_sub(1).max(3);
+            if gap > max_gap {
                 self.stats.fragments_reordered += 1;
                 return None;
             }
@@ -340,7 +349,9 @@ impl MeshReceiver {
             let used_fec = assembly.assembler.used_fec_recovery();
 
             // Decrypt (if key set) → decompress → parse, with fallback.
-            let packet = assembly.assembler.assemble()
+            let packet = assembly
+                .assembler
+                .assemble()
                 .and_then(|assembled| self.decode_envelope(&assembled));
 
             if let Some(packet) = packet {
@@ -916,7 +927,9 @@ mod tests {
         let mut envelope = Vec::with_capacity(1 + WISDOM_PACKET_SIZE);
         envelope.push(COMPRESS_NONE);
         envelope.extend_from_slice(&raw);
-        let result = receiver.receive_whole(&envelope).expect("should parse compressed envelope");
+        let result = receiver
+            .receive_whole(&envelope)
+            .expect("should parse compressed envelope");
         assert_eq!(result.sequence, 10);
         assert_eq!(result.wisdom.0, packet.wisdom.0);
         // Also verify that compress_packet produces a parseable envelope
@@ -987,5 +1000,138 @@ mod tests {
             "Unencrypted data should be rejected when encryption key is set"
         );
         assert_eq!(receiver.stats().packets_decrypt_failed, 1);
+    }
+
+    // -- Item 5: Fragment reorder validation --
+
+    #[test]
+    fn test_reorder_within_range_accepted() {
+        // Fragments arriving out of order but within total_fragments range
+        // should be accepted (normal radio behavior).
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(1, PEER_A, 0xAB);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+
+        // Feed fragments in reverse order: 10, 9, 8, ... 0
+        let mut completed = false;
+        for raw in wire.iter().rev() {
+            if receiver.receive_fragment(PEER_A, raw).is_some() {
+                completed = true;
+            }
+        }
+
+        assert!(completed, "Reverse-order delivery should still complete");
+        assert_eq!(
+            receiver.stats().fragments_reordered,
+            0,
+            "In-range reordering should not be rejected"
+        );
+        assert_eq!(receiver.stats().packets_complete, 1);
+    }
+
+    #[test]
+    fn test_fec_after_early_data_fragment_accepted() {
+        // FEC fragment (index 10) arriving right after data fragment 0
+        // should NOT be rejected — gap=10 is within total_fragments=11.
+        let mut receiver = MeshReceiver::new();
+        let packet = test_packet(1, PEER_A, 0xCD);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+
+        // Feed fragment 0, then FEC (index 10), then the rest
+        receiver.receive_fragment(PEER_A, &wire[0]);
+        receiver.receive_fragment(PEER_A, &wire[10]); // FEC, gap = 10
+
+        assert_eq!(
+            receiver.stats().fragments_reordered,
+            0,
+            "FEC fragment should not be rejected as reordered"
+        );
+
+        // Feed remaining fragments to complete assembly
+        let mut completed = false;
+        for raw in &wire[1..10] {
+            if receiver.receive_fragment(PEER_A, raw).is_some() {
+                completed = true;
+            }
+        }
+        assert!(completed, "Assembly should complete with all fragments");
+    }
+
+    // -- Item 12: Key fingerprint tracking --
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_key_fingerprint_consistent_key_passes() {
+        // All fragments received under the same encryption key — should complete.
+        use crate::swarm::mesh::encrypt_fragment;
+
+        let key = [0x55u8; 32];
+        let source = PEER_A;
+        let packet = test_packet(1, source, 0xEF);
+        let frags = packet.fragment();
+
+        let encrypted: Vec<Vec<u8>> = frags
+            .iter()
+            .map(|f| {
+                let mut buf = [0u8; LORA_MTU];
+                let len = f.to_bytes(&mut buf);
+                encrypt_fragment(&buf[..len], &key, &source, f.thought_id, f.fragment_index)
+            })
+            .collect();
+
+        let mut receiver = MeshReceiver::new()
+            .with_encryption_key(key)
+            .with_fragment_encryption(true);
+
+        let mut completed = false;
+        for raw in &encrypted {
+            if receiver.receive_fragment(source, raw).is_some() {
+                completed = true;
+            }
+        }
+
+        assert!(completed, "Same-key fragments should reassemble");
+        assert_eq!(
+            receiver.stats().fragments_key_mismatch,
+            0,
+            "No key mismatch when key is consistent"
+        );
+    }
+
+    #[cfg(feature = "mesh-encryption")]
+    #[test]
+    fn test_key_fingerprint_mid_stream_change_rejected() {
+        // Start receiving with key A, then change to key B mid-stream.
+        // Fragments under key B should be rejected due to fingerprint mismatch.
+        let key_a = [0xAA; 32];
+        let key_b = [0xBB; 32];
+        let source = PEER_A;
+
+        let packet = test_packet(1, source, 0xFE);
+        let frags = packet.fragment();
+        let wire = to_wire(&frags);
+
+        let mut receiver = MeshReceiver::new().with_encryption_key(key_a);
+
+        // Feed first 3 fragments under key A (unencrypted fragment data, key
+        // only used for fingerprint tracking in non-fragment-encryption mode)
+        for raw in &wire[..3] {
+            receiver.receive_fragment(source, raw);
+        }
+
+        // Change key mid-stream
+        receiver.set_encryption_key(Some(key_b));
+
+        // Feed remaining fragments — fingerprint should mismatch
+        for raw in &wire[3..] {
+            receiver.receive_fragment(source, raw);
+        }
+
+        assert!(
+            receiver.stats().fragments_key_mismatch > 0,
+            "Mid-stream key change should trigger fingerprint mismatch"
+        );
     }
 }

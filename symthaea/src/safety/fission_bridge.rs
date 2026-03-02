@@ -86,7 +86,11 @@ pub fn fission_safety_to_level(level: FissionSafetyLevel) -> SafetyLevel {
 mod tests {
     use super::*;
 
-    fn mock_output(free_energy: f64, safety: FissionSafetyLevel, action: FissionFepAction) -> FissionOutput {
+    fn mock_output(
+        free_energy: f64,
+        safety: FissionSafetyLevel,
+        action: FissionFepAction,
+    ) -> FissionOutput {
         FissionOutput {
             free_energy,
             recommended_action: action,
@@ -98,23 +102,43 @@ mod tests {
     #[test]
     fn test_healthy_fission_maps_to_green() {
         let mut adapter = FissionSafetyAdapter::new();
-        let output = mock_output(0.05, FissionSafetyLevel::Green, FissionFepAction::MaintainReactor);
+        let output = mock_output(
+            0.05,
+            FissionSafetyLevel::Green,
+            FissionFepAction::MaintainReactor,
+        );
         let assessment = adapter.assess(&output);
         assert_eq!(assessment.level, SafetyLevel::Green);
     }
 
     #[test]
     fn test_fission_safety_to_level_mapping() {
-        assert_eq!(fission_safety_to_level(FissionSafetyLevel::Green), SafetyLevel::Green);
-        assert_eq!(fission_safety_to_level(FissionSafetyLevel::Yellow), SafetyLevel::Yellow);
-        assert_eq!(fission_safety_to_level(FissionSafetyLevel::Orange), SafetyLevel::Orange);
-        assert_eq!(fission_safety_to_level(FissionSafetyLevel::Red), SafetyLevel::Red);
+        assert_eq!(
+            fission_safety_to_level(FissionSafetyLevel::Green),
+            SafetyLevel::Green
+        );
+        assert_eq!(
+            fission_safety_to_level(FissionSafetyLevel::Yellow),
+            SafetyLevel::Yellow
+        );
+        assert_eq!(
+            fission_safety_to_level(FissionSafetyLevel::Orange),
+            SafetyLevel::Orange
+        );
+        assert_eq!(
+            fission_safety_to_level(FissionSafetyLevel::Red),
+            SafetyLevel::Red
+        );
     }
 
     #[test]
     fn test_gate_blocks_risky_at_orange() {
         let adapter = FissionSafetyAdapter::new();
-        let output = mock_output(0.6, FissionSafetyLevel::Orange, FissionFepAction::ReducePower);
+        let output = mock_output(
+            0.6,
+            FissionSafetyLevel::Orange,
+            FissionFepAction::ReducePower,
+        );
         assert!(!adapter.gate_operation(&output, true).is_ok());
         assert!(adapter.gate_operation(&output, false).is_ok());
     }

@@ -20,6 +20,9 @@
 
 use crate::{Embedder, EmbeddingResult};
 use anyhow::Result;
+use ort::session::builder::GraphOptimizationLevel;
+use ort::session::Session;
+use ort::value::Tensor;
 
 /// Configuration for the ONNX embedder.
 #[derive(Debug, Clone)]
@@ -50,7 +53,7 @@ impl Default for OnnxEmbedderConfig {
 
 /// ONNX Runtime-based embedder.
 pub struct OnnxEmbedder {
-    session: ort::Session,
+    session: Session,
     tokenizer: tokenizers::Tokenizer,
     config: OnnxEmbedderConfig,
 }
@@ -58,8 +61,8 @@ pub struct OnnxEmbedder {
 impl OnnxEmbedder {
     /// Create a new ONNX embedder from config.
     pub fn new(config: OnnxEmbedderConfig) -> Result<Self> {
-        let session = ort::Session::builder()?
-            .with_optimization_level(ort::GraphOptimizationLevel::Level3)?
+        let session = Session::builder()?
+            .with_optimization_level(GraphOptimizationLevel::Level3)?
             .with_intra_threads(config.num_threads)?
             .commit_from_file(&config.model_path)?;
 
@@ -74,9 +77,7 @@ impl OnnxEmbedder {
     }
 
     /// Run inference on a single text and return the embedding vector.
-    pub fn run_inference(&self, text: &str) -> Result<Vec<f32>> {
-        use ndarray::Array2;
-
+    pub fn run_inference(&mut self, text: &str) -> Result<Vec<f32>> {
         let encoding = self
             .tokenizer
             .encode(text, true)
@@ -86,21 +87,23 @@ impl OnnxEmbedder {
         let mask = encoding.get_attention_mask();
         let seq_len = ids.len().min(self.config.max_seq_length);
 
-        // Build ndarray inputs [1, seq_len]
-        let input_ids = Array2::from_shape_fn((1, seq_len), |(_, j)| ids[j] as i64);
-        let attention_mask = Array2::from_shape_fn((1, seq_len), |(_, j)| mask[j] as i64);
+        // Build inputs as (shape, Vec<T>) — avoids ndarray version mismatch with ort
+        let input_ids_data: Vec<i64> = ids[..seq_len].iter().map(|&x| x as i64).collect();
+        let attention_mask_data: Vec<i64> = mask[..seq_len].iter().map(|&x| x as i64).collect();
+
+        let shape = vec![1i64, seq_len as i64];
+        let input_ids_tensor = Tensor::from_array((shape.clone(), input_ids_data))?;
+        let attention_mask_tensor = Tensor::from_array((shape, attention_mask_data))?;
 
         let outputs = self.session.run(ort::inputs![
-            "input_ids" => input_ids,
-            "attention_mask" => attention_mask,
-        ]?)?;
+            "input_ids" => input_ids_tensor,
+            "attention_mask" => attention_mask_tensor,
+        ])?;
 
         // Extract last_hidden_state [1, seq_len, hidden_dim]
-        let hidden_state = outputs[0]
-            .try_extract_tensor::<f32>()?;
-        let hidden_view = hidden_state.view();
-        let shape = hidden_view.shape();
-        let hidden_dim = shape[2];
+        // Shape derefs to [i64] so we index directly
+        let (hidden_shape, hidden_data) = outputs[0].try_extract_tensor::<f32>()?;
+        let hidden_dim = hidden_shape[2] as usize;
         let out_dim = self.config.embedding_dim.min(hidden_dim);
 
         // Last-token pooling: find last real token
@@ -109,9 +112,9 @@ impl OnnxEmbedder {
             .rposition(|&m| m == 1)
             .unwrap_or(seq_len.saturating_sub(1));
 
-        let mut embedding: Vec<f32> = (0..out_dim)
-            .map(|d| hidden_view[[0, last_idx, d]])
-            .collect();
+        // hidden_data layout: [batch=1, seq_len, hidden_dim] in row-major
+        let offset = last_idx * hidden_dim;
+        let mut embedding: Vec<f32> = hidden_data[offset..offset + out_dim].to_vec();
 
         // L2 normalize
         let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();

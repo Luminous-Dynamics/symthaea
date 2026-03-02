@@ -564,11 +564,7 @@ mod tests {
         let (handle, join) = AsyncMind::spawn(MindConfig::default());
 
         handle
-            .set_goal(
-                "test goal".to_string(),
-                ContinuousHV::random(512, 42),
-                0.8,
-            )
+            .set_goal("test goal".to_string(), ContinuousHV::random(512, 42), 0.8)
             .await;
         // Tick to process the goal input
         handle.tick().await;
@@ -628,10 +624,7 @@ mod tests {
         handle.input(input).await;
 
         let stats = handle.stats().await;
-        assert!(
-            stats.inputs_processed >= 1,
-            "raw input should be processed"
-        );
+        assert!(stats.inputs_processed >= 1, "raw input should be processed");
 
         handle.shutdown().await;
         join.await.unwrap();

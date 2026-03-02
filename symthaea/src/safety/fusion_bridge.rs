@@ -72,11 +72,7 @@ impl FusionSafetyAdapter {
     /// Check whether a fusion operation should be allowed given the twin's output.
     ///
     /// Maps `DisruptionRisk` to `SafetyLevel`, then applies the safety gate.
-    pub fn gate_operation(
-        &self,
-        output: &FusionTwinOutput,
-        is_risky: bool,
-    ) -> SafetyGateResult {
+    pub fn gate_operation(&self, output: &FusionTwinOutput, is_risky: bool) -> SafetyGateResult {
         let level = disruption_risk_to_safety_level(output.disruption_risk);
         safety_gate(level, is_risky)
     }
@@ -115,7 +111,11 @@ pub fn disruption_risk_to_safety_level(risk: DisruptionRisk) -> SafetyLevel {
 mod tests {
     use super::*;
 
-    fn mock_output(free_energy: f64, risk: DisruptionRisk, action: PlasmaFepAction) -> FusionTwinOutput {
+    fn mock_output(
+        free_energy: f64,
+        risk: DisruptionRisk,
+        action: PlasmaFepAction,
+    ) -> FusionTwinOutput {
         FusionTwinOutput {
             predictions: vec![(0.001, "1ms".to_string())],
             disruption_risk: risk,
@@ -143,10 +143,22 @@ mod tests {
 
     #[test]
     fn test_disruption_risk_to_safety_level_mapping() {
-        assert_eq!(disruption_risk_to_safety_level(DisruptionRisk::Green), SafetyLevel::Green);
-        assert_eq!(disruption_risk_to_safety_level(DisruptionRisk::Yellow), SafetyLevel::Yellow);
-        assert_eq!(disruption_risk_to_safety_level(DisruptionRisk::Orange), SafetyLevel::Orange);
-        assert_eq!(disruption_risk_to_safety_level(DisruptionRisk::Red), SafetyLevel::Red);
+        assert_eq!(
+            disruption_risk_to_safety_level(DisruptionRisk::Green),
+            SafetyLevel::Green
+        );
+        assert_eq!(
+            disruption_risk_to_safety_level(DisruptionRisk::Yellow),
+            SafetyLevel::Yellow
+        );
+        assert_eq!(
+            disruption_risk_to_safety_level(DisruptionRisk::Orange),
+            SafetyLevel::Orange
+        );
+        assert_eq!(
+            disruption_risk_to_safety_level(DisruptionRisk::Red),
+            SafetyLevel::Red
+        );
     }
 
     #[test]
@@ -170,7 +182,11 @@ mod tests {
         let emergency = mock_output(0.9, DisruptionRisk::Red, PlasmaFepAction::EmergencyShutdown);
         assert!(FusionSafetyAdapter::is_emergency(&emergency));
 
-        let soft = mock_output(0.6, DisruptionRisk::Orange, PlasmaFepAction::TriggerSoftLanding);
+        let soft = mock_output(
+            0.6,
+            DisruptionRisk::Orange,
+            PlasmaFepAction::TriggerSoftLanding,
+        );
         assert!(FusionSafetyAdapter::is_emergency(&soft));
 
         let normal = mock_output(0.1, DisruptionRisk::Green, PlasmaFepAction::MaintainState);
@@ -206,15 +222,27 @@ mod tests {
         let mut adapter = FusionSafetyAdapter::new();
 
         // Healthy plasma
-        let a1 = adapter.assess(&mock_output(0.05, DisruptionRisk::Green, PlasmaFepAction::MaintainState));
+        let a1 = adapter.assess(&mock_output(
+            0.05,
+            DisruptionRisk::Green,
+            PlasmaFepAction::MaintainState,
+        ));
         assert_eq!(a1.level, SafetyLevel::Green);
 
         // Degrading plasma
-        let a2 = adapter.assess(&mock_output(0.5, DisruptionRisk::Yellow, PlasmaFepAction::InjectGas));
+        let a2 = adapter.assess(&mock_output(
+            0.5,
+            DisruptionRisk::Yellow,
+            PlasmaFepAction::InjectGas,
+        ));
         assert!(a2.level >= SafetyLevel::Yellow);
 
         // Emergency
-        let a3 = adapter.assess(&mock_output(0.95, DisruptionRisk::Red, PlasmaFepAction::EmergencyShutdown));
+        let a3 = adapter.assess(&mock_output(
+            0.95,
+            DisruptionRisk::Red,
+            PlasmaFepAction::EmergencyShutdown,
+        ));
         assert!(a3.level >= SafetyLevel::Orange);
 
         // Verify cycle counter

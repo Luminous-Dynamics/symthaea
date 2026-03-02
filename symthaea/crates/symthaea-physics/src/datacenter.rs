@@ -9,11 +9,11 @@ use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 pub const DATACENTER_HORIZONS: &[f32] = &[
-    60.0,          // 1 min — burst detection
-    3_600.0,       // 1 hr — workload shift
-    86_400.0,      // 1 day — diurnal pattern
-    2_592_000.0,   // 1 month — capacity trend
-    31_536_000.0,  // 1 year — growth planning
+    60.0,         // 1 min — burst detection
+    3_600.0,      // 1 hr — workload shift
+    86_400.0,     // 1 day — diurnal pattern
+    2_592_000.0,  // 1 month — capacity trend
+    31_536_000.0, // 1 year — growth planning
 ];
 
 pub const DATACENTER_HORIZON_LABELS: &[&str] = &[
@@ -39,7 +39,9 @@ pub struct DatacenterHdcEncoder {
 impl DatacenterHdcEncoder {
     pub fn new() -> Self {
         let seeds: [u64; 4] = [0xDC7_0001, 0xDC7_0002, 0xDC7_0003, 0xDC7_0004];
-        Self { bases: seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s)) }
+        Self {
+            bases: seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s)),
+        }
     }
 
     pub fn encode(&self, reading: &DatacenterReading) -> ContinuousHV {
@@ -54,7 +56,9 @@ impl DatacenterHdcEncoder {
 }
 
 impl Default for DatacenterHdcEncoder {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct DatacenterPredictor {
@@ -69,7 +73,9 @@ impl DatacenterPredictor {
             dimension: HDC_DIMENSION,
             ..UnifiedConfig::default()
         };
-        Self { neuron: HdcLtcUnifiedNeuron::new(config, 0xDC7_10A0) }
+        Self {
+            neuron: HdcLtcUnifiedNeuron::new(config, 0xDC7_10A0),
+        }
     }
 
     pub fn predict_at_horizon(&self, current: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
@@ -85,18 +91,30 @@ impl DatacenterPredictor {
 }
 
 impl Default for DatacenterPredictor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl symthaea_core::temporal::TemporalPredictor for DatacenterPredictor {
     fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
         self.predict_at_horizon(current_state, horizon_seconds)
     }
-    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) { self.observe(state, dt_seconds); }
-    fn domain(&self) -> &'static str { "datacenter" }
-    fn tau_base(&self) -> f32 { 60.0 }
-    fn default_horizons(&self) -> &'static [f32] { DATACENTER_HORIZONS }
-    fn horizon_labels(&self) -> &'static [&'static str] { DATACENTER_HORIZON_LABELS }
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.observe(state, dt_seconds);
+    }
+    fn domain(&self) -> &'static str {
+        "datacenter"
+    }
+    fn tau_base(&self) -> f32 {
+        60.0
+    }
+    fn default_horizons(&self) -> &'static [f32] {
+        DATACENTER_HORIZONS
+    }
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        DATACENTER_HORIZON_LABELS
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -129,29 +147,43 @@ pub struct DatacenterFepAgent {
 
 impl DatacenterFepAgent {
     pub fn new() -> Self {
-        Self { reference_state: ContinuousHV::random(HDC_DIMENSION, 0xDC7_BEEF) }
+        Self {
+            reference_state: ContinuousHV::random(HDC_DIMENSION, 0xDC7_BEEF),
+        }
     }
 
-    pub fn set_reference(&mut self, reference: ContinuousHV) { self.reference_state = reference; }
+    pub fn set_reference(&mut self, reference: ContinuousHV) {
+        self.reference_state = reference;
+    }
 
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
         let sim = observed.similarity(&self.reference_state) as f64;
-        if !sim.is_finite() { return 1.0; }
+        if !sim.is_finite() {
+            return 1.0;
+        }
         (1.0 - sim).max(0.0)
     }
 
     pub fn select_action(&self, observed: &ContinuousHV) -> DatacenterFepAction {
         let fe = self.compute_free_energy(observed);
-        if fe > FE_EMERGENCY_COOL { DatacenterFepAction::EmergencyCooldown }
-        else if fe > FE_THROTTLE { DatacenterFepAction::ThrottleCompute }
-        else if fe > FE_MIGRATE { DatacenterFepAction::MigrateWorkloads }
-        else if fe > FE_COOL { DatacenterFepAction::AdjustCooling }
-        else { DatacenterFepAction::Maintain }
+        if fe > FE_EMERGENCY_COOL {
+            DatacenterFepAction::EmergencyCooldown
+        } else if fe > FE_THROTTLE {
+            DatacenterFepAction::ThrottleCompute
+        } else if fe > FE_MIGRATE {
+            DatacenterFepAction::MigrateWorkloads
+        } else if fe > FE_COOL {
+            DatacenterFepAction::AdjustCooling
+        } else {
+            DatacenterFepAction::Maintain
+        }
     }
 }
 
 impl Default for DatacenterFepAgent {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -197,24 +229,41 @@ impl DatacenterTwin {
         self.cycle_count += 1;
         let hv = self.encoder.encode(reading);
         self.predictor.observe(&hv, dt_seconds);
-        let sims: Vec<(f32, f32)> = DATACENTER_HORIZONS.iter()
+        let sims: Vec<(f32, f32)> = DATACENTER_HORIZONS
+            .iter()
             .map(|&h| (h, self.predictor.predict_at_horizon(&hv, h).similarity(&hv)))
             .collect();
         let fe = self.agent.compute_free_energy(&hv);
         let action = self.agent.select_action(&hv);
-        let level = if fe > FE_EMERGENCY_COOL { DatacenterSafetyLevel::Red }
-            else if fe > FE_THROTTLE { DatacenterSafetyLevel::Orange }
-            else if fe > FE_COOL { DatacenterSafetyLevel::Yellow }
-            else { DatacenterSafetyLevel::Green };
-        DatacenterOutput { free_energy: fe, recommended_action: action, safety_level: level, prediction_similarities: sims }
+        let level = if fe > FE_EMERGENCY_COOL {
+            DatacenterSafetyLevel::Red
+        } else if fe > FE_THROTTLE {
+            DatacenterSafetyLevel::Orange
+        } else if fe > FE_COOL {
+            DatacenterSafetyLevel::Yellow
+        } else {
+            DatacenterSafetyLevel::Green
+        };
+        DatacenterOutput {
+            free_energy: fe,
+            recommended_action: action,
+            safety_level: level,
+            prediction_similarities: sims,
+        }
     }
 
-    pub fn predictor(&self) -> &DatacenterPredictor { &self.predictor }
-    pub fn cycle_count(&self) -> u64 { self.cycle_count }
+    pub fn predictor(&self) -> &DatacenterPredictor {
+        &self.predictor
+    }
+    pub fn cycle_count(&self) -> u64 {
+        self.cycle_count
+    }
 }
 
 impl Default for DatacenterTwin {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -223,20 +272,32 @@ mod tests {
     use std::time::Instant;
 
     fn healthy() -> DatacenterReading {
-        DatacenterReading { power_draw: 0.6, cooling_load: 0.4, latency: 5.0, throughput: 0.8 }
+        DatacenterReading {
+            power_draw: 0.6,
+            cooling_load: 0.4,
+            latency: 5.0,
+            throughput: 0.8,
+        }
     }
 
     #[test]
     fn test_horizons_ordered() {
-        for i in 1..DATACENTER_HORIZONS.len() { assert!(DATACENTER_HORIZONS[i] > DATACENTER_HORIZONS[i - 1]); }
+        for i in 1..DATACENTER_HORIZONS.len() {
+            assert!(DATACENTER_HORIZONS[i] > DATACENTER_HORIZONS[i - 1]);
+        }
     }
 
     #[test]
-    fn test_horizons_labels_match() { assert_eq!(DATACENTER_HORIZONS.len(), DATACENTER_HORIZON_LABELS.len()); }
+    fn test_horizons_labels_match() {
+        assert_eq!(DATACENTER_HORIZONS.len(), DATACENTER_HORIZON_LABELS.len());
+    }
 
     #[test]
     fn test_encoder_dimension() {
-        assert_eq!(DatacenterHdcEncoder::new().encode(&healthy()).dim(), HDC_DIMENSION);
+        assert_eq!(
+            DatacenterHdcEncoder::new().encode(&healthy()).dim(),
+            HDC_DIMENSION
+        );
     }
 
     #[test]
@@ -251,10 +312,14 @@ mod tests {
         let pred = DatacenterPredictor::new();
         let input = ContinuousHV::random(HDC_DIMENSION, 42);
         let t1 = Instant::now();
-        for _ in 0..100 { let _ = pred.predict_at_horizon(&input, 60.0); }
+        for _ in 0..100 {
+            let _ = pred.predict_at_horizon(&input, 60.0);
+        }
         let short = t1.elapsed();
         let t2 = Instant::now();
-        for _ in 0..100 { let _ = pred.predict_at_horizon(&input, 31_536_000.0); }
+        for _ in 0..100 {
+            let _ = pred.predict_at_horizon(&input, 31_536_000.0);
+        }
         let long = t2.elapsed();
         let ratio = long.as_nanos() as f64 / short.as_nanos().max(1) as f64;
         assert!(ratio < 5.0 && ratio > 0.2, "O(1) violated: ratio={}", ratio);

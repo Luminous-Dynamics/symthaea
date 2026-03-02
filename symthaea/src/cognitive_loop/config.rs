@@ -408,6 +408,13 @@ pub struct CognitiveLoopConfig {
     /// binding, workspace) affect the Consciousness Equation V2 output.
     /// Science: Putnam (1967) multiple realizability, Tononi (2004) substrate-independent Phi.
     pub substrate_type: SubstrateType,
+
+    /// Optional substrate composition for hybrid consciousness analysis.
+    /// When set, overrides `substrate_type` for feasibility calculation,
+    /// using weighted blending of multiple substrate types.
+    #[serde(default)]
+    pub substrate_composition:
+        Option<symthaea_core::hdc::substrate_composition::SubstrateComposition>,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -474,6 +481,7 @@ impl Default for CognitiveLoopConfig {
             moral_anomaly_config: MoralAnomalyConfig::default(),
             enable_moral_anomaly_response: false,
             substrate_type: SubstrateType::SiliconDigital,
+            substrate_composition: None,
         }
     }
 }

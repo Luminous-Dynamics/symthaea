@@ -30,8 +30,8 @@ impl MultiScalePredictor {
     /// Uses a large tau_base suitable for biological timescales.
     pub fn new() -> Self {
         let config = UnifiedConfig {
-            tau_base: 3600.0,     // 1 hour base time constant
-            backbone_tau: 0.1,    // Mild state-dependent scaling
+            tau_base: 3600.0,  // 1 hour base time constant
+            backbone_tau: 0.1, // Mild state-dependent scaling
             dimension: HDC_DIMENSION,
             ..UnifiedConfig::default()
         };
@@ -67,10 +67,7 @@ impl MultiScalePredictor {
     ///
     /// Returns a vector of (horizon_seconds, predicted_state) tuples.
     /// Each prediction is O(1), so the total cost is O(N_HORIZONS).
-    pub fn predict_all_horizons(
-        &self,
-        current_state: &ContinuousHV,
-    ) -> Vec<(f32, ContinuousHV)> {
+    pub fn predict_all_horizons(&self, current_state: &ContinuousHV) -> Vec<(f32, ContinuousHV)> {
         BIO_HORIZONS
             .iter()
             .map(|&h| {

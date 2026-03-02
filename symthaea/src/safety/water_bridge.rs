@@ -10,9 +10,7 @@
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
 use super::gate::{safety_gate, SafetyGateResult};
-use symthaea_cell_foundry::hydrology::{
-    WaterFepAction, WaterFepAgent, WaterQualityReading,
-};
+use symthaea_cell_foundry::hydrology::{WaterFepAction, WaterFepAgent, WaterQualityReading};
 
 /// Input bundle for a single water safety assessment.
 ///
@@ -106,11 +104,7 @@ impl WaterSafetyAdapter {
     /// Check whether a water operation should proceed given current quality.
     ///
     /// Maps potability to safety level, then applies the safety gate.
-    pub fn gate_operation(
-        &self,
-        input: &WaterSafetyInput,
-        is_risky: bool,
-    ) -> SafetyGateResult {
+    pub fn gate_operation(&self, input: &WaterSafetyInput, is_risky: bool) -> SafetyGateResult {
         let level = potability_to_safety_level(input.reading.potability);
         safety_gate(level, is_risky)
     }

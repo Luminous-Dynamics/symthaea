@@ -49,7 +49,7 @@ pub enum BooleanOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Transform3D {
     pub scale: [f32; 3],
-    pub rotate: [f32; 3],    // Euler angles in radians (X, Y, Z)
+    pub rotate: [f32; 3], // Euler angles in radians (X, Y, Z)
     pub translate: [f32; 3],
 }
 
@@ -105,11 +105,21 @@ impl Transform3D {
 
 impl CSGNode {
     /// Create a primitive node
-    pub fn cube() -> Self { CSGNode::Primitive(Primitive::Cube) }
-    pub fn cylinder() -> Self { CSGNode::Primitive(Primitive::Cylinder) }
-    pub fn sphere() -> Self { CSGNode::Primitive(Primitive::Sphere) }
-    pub fn cone() -> Self { CSGNode::Primitive(Primitive::Cone) }
-    pub fn torus() -> Self { CSGNode::Primitive(Primitive::Torus) }
+    pub fn cube() -> Self {
+        CSGNode::Primitive(Primitive::Cube)
+    }
+    pub fn cylinder() -> Self {
+        CSGNode::Primitive(Primitive::Cylinder)
+    }
+    pub fn sphere() -> Self {
+        CSGNode::Primitive(Primitive::Sphere)
+    }
+    pub fn cone() -> Self {
+        CSGNode::Primitive(Primitive::Cone)
+    }
+    pub fn torus() -> Self {
+        CSGNode::Primitive(Primitive::Torus)
+    }
 
     /// Wrap in a transform
     pub fn with_transform(self, transform: Transform3D) -> Self {

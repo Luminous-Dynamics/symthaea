@@ -675,8 +675,8 @@ mod tests {
         let mut stats = LoopStats::default();
         stats.avg_prediction_error = 0.3;
         stats.avg_prediction_error_sq = 0.1; // E[X^2] = 0.1
-        let variance = stats.avg_prediction_error_sq
-            - stats.avg_prediction_error * stats.avg_prediction_error;
+        let variance =
+            stats.avg_prediction_error_sq - stats.avg_prediction_error * stats.avg_prediction_error;
         // 0.1 - 0.09 = 0.01
         assert!((variance - 0.01).abs() < 1e-6);
     }

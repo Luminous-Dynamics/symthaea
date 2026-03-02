@@ -119,4 +119,67 @@ impl CognitiveLoopService {
     pub fn latest_psi_attestation(&self) -> Option<&super::super::PsiAttestationRecord> {
         self.psi_attestation_buffer.back()
     }
+
+    /// Switch substrate type at runtime, recomputing consciousness feasibility.
+    ///
+    /// Returns (old_feasibility, new_feasibility) for telemetry.
+    pub fn reconfigure_substrate(
+        &mut self,
+        substrate: symthaea_core::hdc::substrate_independence::SubstrateType,
+    ) -> (f64, f64) {
+        use symthaea_core::hdc::substrate_independence::SubstrateRequirements;
+        let old = self.substrate_feasibility;
+        let canonical = substrate.canonical();
+        let req = match canonical {
+            super::super::config::SubstrateType::BiologicalNeurons => {
+                SubstrateRequirements::biological_neurons()
+            }
+            super::super::config::SubstrateType::SiliconDigital => {
+                SubstrateRequirements::silicon_digital()
+            }
+            super::super::config::SubstrateType::QuantumComputer => {
+                SubstrateRequirements::quantum_computer()
+            }
+            super::super::config::SubstrateType::PhotonicProcessor => {
+                SubstrateRequirements::photonic_processor()
+            }
+            super::super::config::SubstrateType::NeuromorphicChip => {
+                SubstrateRequirements::neuromorphic_chip()
+            }
+            super::super::config::SubstrateType::BiochemicalComputer => {
+                SubstrateRequirements::biochemical_computer()
+            }
+            super::super::config::SubstrateType::HybridSystem => {
+                SubstrateRequirements::hybrid_system()
+            }
+            super::super::config::SubstrateType::ExoticSubstrate => {
+                SubstrateRequirements::exotic_substrate()
+            }
+            _ => SubstrateRequirements::silicon_digital(),
+        };
+        self.substrate_feasibility = req.consciousness_feasibility();
+        self.config.substrate_type = canonical;
+        (old, self.substrate_feasibility)
+    }
+
+    /// Get the current substrate feasibility score.
+    pub fn substrate_feasibility(&self) -> f64 {
+        self.substrate_feasibility
+    }
+
+    /// Switch to a substrate composition at runtime, recomputing feasibility.
+    pub fn reconfigure_composition(
+        &mut self,
+        composition: symthaea_core::hdc::substrate_composition::SubstrateComposition,
+    ) {
+        self.substrate_feasibility = composition.feasibility();
+        self.config.substrate_composition = Some(composition);
+    }
+
+    /// Get the current substrate composition (if set).
+    pub fn substrate_composition(
+        &self,
+    ) -> Option<&symthaea_core::hdc::substrate_composition::SubstrateComposition> {
+        self.config.substrate_composition.as_ref()
+    }
 }

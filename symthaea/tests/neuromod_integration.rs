@@ -436,28 +436,36 @@ fn test_receptor_subtypes_all_finite() {
 
     // DA D1 (Go pathway) — excitatory subtype effective signal
     assert!(
-        m.neuromod.neuromod_da_d1.is_finite() && m.neuromod.neuromod_da_d1 >= 0.0 && m.neuromod.neuromod_da_d1 <= 2.0,
+        m.neuromod.neuromod_da_d1.is_finite()
+            && m.neuromod.neuromod_da_d1 >= 0.0
+            && m.neuromod.neuromod_da_d1 <= 2.0,
         "neuromod_da_d1 out of range: {}",
         m.neuromod.neuromod_da_d1
     );
 
     // DA D2 (NoGo pathway) — inhibitory subtype effective signal
     assert!(
-        m.neuromod.neuromod_da_d2.is_finite() && m.neuromod.neuromod_da_d2 >= 0.0 && m.neuromod.neuromod_da_d2 <= 2.0,
+        m.neuromod.neuromod_da_d2.is_finite()
+            && m.neuromod.neuromod_da_d2 >= 0.0
+            && m.neuromod.neuromod_da_d2 <= 2.0,
         "neuromod_da_d2 out of range: {}",
         m.neuromod.neuromod_da_d2
     );
 
     // NE alpha (tonic precision/focus)
     assert!(
-        m.neuromod.neuromod_ne_alpha.is_finite() && m.neuromod.neuromod_ne_alpha >= 0.0 && m.neuromod.neuromod_ne_alpha <= 2.0,
+        m.neuromod.neuromod_ne_alpha.is_finite()
+            && m.neuromod.neuromod_ne_alpha >= 0.0
+            && m.neuromod.neuromod_ne_alpha <= 2.0,
         "neuromod_ne_alpha out of range: {}",
         m.neuromod.neuromod_ne_alpha
     );
 
     // NE beta (phasic startle/reactivity)
     assert!(
-        m.neuromod.neuromod_ne_beta.is_finite() && m.neuromod.neuromod_ne_beta >= 0.0 && m.neuromod.neuromod_ne_beta <= 2.0,
+        m.neuromod.neuromod_ne_beta.is_finite()
+            && m.neuromod.neuromod_ne_beta >= 0.0
+            && m.neuromod.neuromod_ne_beta <= 2.0,
         "neuromod_ne_beta out of range: {}",
         m.neuromod.neuromod_ne_beta
     );
@@ -535,7 +543,10 @@ fn test_full_neuromod_pipeline_coherence() {
         let m = &r.metadata;
 
         // All four effective signals must be finite every cycle
-        assert!(m.neuromod.dopamine_effective.is_finite(), "cycle {i}: DA not finite");
+        assert!(
+            m.neuromod.dopamine_effective.is_finite(),
+            "cycle {i}: DA not finite"
+        );
         assert!(
             m.neuromod.noradrenaline_effective.is_finite(),
             "cycle {i}: NE not finite"
@@ -580,8 +591,14 @@ fn test_full_neuromod_pipeline_coherence() {
         );
 
         // Receptor subtypes must be finite
-        assert!(m.neuromod.neuromod_da_d1.is_finite(), "cycle {i}: DA D1 not finite");
-        assert!(m.neuromod.neuromod_da_d2.is_finite(), "cycle {i}: DA D2 not finite");
+        assert!(
+            m.neuromod.neuromod_da_d1.is_finite(),
+            "cycle {i}: DA D1 not finite"
+        );
+        assert!(
+            m.neuromod.neuromod_da_d2.is_finite(),
+            "cycle {i}: DA D2 not finite"
+        );
         assert!(
             m.neuromod.neuromod_ne_alpha.is_finite(),
             "cycle {i}: NE alpha not finite"
@@ -724,27 +741,32 @@ fn test_neuromod_100_cycle_stability() {
             m.neuromod.neuromod_gradient_scale
         );
         assert!(
-            m.neuromod.neuromod_plasticity_gate >= 0.2 && m.neuromod.neuromod_plasticity_gate <= 1.0,
+            m.neuromod.neuromod_plasticity_gate >= 0.2
+                && m.neuromod.neuromod_plasticity_gate <= 1.0,
             "cycle {i}: plasticity_gate={} out of [0.2,1.0]",
             m.neuromod.neuromod_plasticity_gate
         );
         assert!(
-            m.neuromod.neuromod_consciousness_mod >= 0.6 && m.neuromod.neuromod_consciousness_mod <= 1.2,
+            m.neuromod.neuromod_consciousness_mod >= 0.6
+                && m.neuromod.neuromod_consciousness_mod <= 1.2,
             "cycle {i}: consciousness_mod={} out of [0.6,1.2]",
             m.neuromod.neuromod_consciousness_mod
         );
         assert!(
-            m.neuromod.neuromod_mcts_exploration_mod >= 0.6 && m.neuromod.neuromod_mcts_exploration_mod <= 1.8,
+            m.neuromod.neuromod_mcts_exploration_mod >= 0.6
+                && m.neuromod.neuromod_mcts_exploration_mod <= 1.8,
             "cycle {i}: mcts_exploration_mod={} out of [0.6,1.8]",
             m.neuromod.neuromod_mcts_exploration_mod
         );
         assert!(
-            m.neuromod.neuromod_behavioral_flexibility >= 0.7 && m.neuromod.neuromod_behavioral_flexibility <= 1.5,
+            m.neuromod.neuromod_behavioral_flexibility >= 0.7
+                && m.neuromod.neuromod_behavioral_flexibility <= 1.5,
             "cycle {i}: behavioral_flexibility={} out of [0.7,1.5]",
             m.neuromod.neuromod_behavioral_flexibility
         );
         assert!(
-            m.neuromod.neuromod_attention_allocation >= 0.8 && m.neuromod.neuromod_attention_allocation <= 1.5,
+            m.neuromod.neuromod_attention_allocation >= 0.8
+                && m.neuromod.neuromod_attention_allocation <= 1.5,
             "cycle {i}: attention_allocation={} out of [0.8,1.5]",
             m.neuromod.neuromod_attention_allocation
         );
@@ -776,7 +798,8 @@ fn test_neuromod_snapshot_internal_consistency() {
 
     let snap = r
         .metadata
-        .neuromod.neuromod_snapshot
+        .neuromod
+        .neuromod_snapshot
         .as_ref()
         .expect("Snapshot should fire at cycle 10 (total_cycles % 10 == 0)");
 

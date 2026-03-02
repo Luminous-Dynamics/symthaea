@@ -6,7 +6,13 @@ use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 /// Aging prediction horizons in seconds: 1 day, 1 month, 1 year, 10 years, 50 years.
-pub const AGING_HORIZONS: &[f32] = &[86_400.0, 2_592_000.0, 31_536_000.0, 315_360_000.0, 1_576_800_000.0];
+pub const AGING_HORIZONS: &[f32] = &[
+    86_400.0,
+    2_592_000.0,
+    31_536_000.0,
+    315_360_000.0,
+    1_576_800_000.0,
+];
 /// Human-readable labels matching [`AGING_HORIZONS`] in order.
 pub const AGING_HORIZON_LABELS: &[&str] = &["1 day", "1 month", "1 year", "10 years", "50 years"];
 
@@ -39,14 +45,26 @@ pub struct MaterialAgingModel {
 impl MaterialAgingModel {
     /// Create a new aging model with a 1-day base timescale.
     pub fn new() -> Self {
-        let config = UnifiedConfig { tau_base: 86_400.0, backbone_tau: 0.1, dimension: HDC_DIMENSION, ..UnifiedConfig::default() };
-        Self { neuron: HdcLtcUnifiedNeuron::new(config, 0xA61_0E00), encoder: MaterialHdcEncoder::new() }
+        let config = UnifiedConfig {
+            tau_base: 86_400.0,
+            backbone_tau: 0.1,
+            dimension: HDC_DIMENSION,
+            ..UnifiedConfig::default()
+        };
+        Self {
+            neuron: HdcLtcUnifiedNeuron::new(config, 0xA61_0E00),
+            encoder: MaterialHdcEncoder::new(),
+        }
     }
 
     /// # Panics
     ///
     /// Panics if `horizon_seconds` is not finite or is non-positive.
-    pub fn predict_at_horizon(&self, material: &MaterialProperty, horizon_seconds: f32) -> AgingPrediction {
+    pub fn predict_at_horizon(
+        &self,
+        material: &MaterialProperty,
+        horizon_seconds: f32,
+    ) -> AgingPrediction {
         assert!(
             horizon_seconds.is_finite() && horizon_seconds > 0.0,
             "horizon_seconds must be finite and positive, got {}",
@@ -57,18 +75,34 @@ impl MaterialAgingModel {
         neuron_copy.evolve_closed_form(horizon_seconds, &current_hv);
         let predicted = neuron_copy.state().clone();
         let state_similarity = current_hv.similarity(&predicted);
-        let label = AGING_HORIZONS.iter().position(|&h| (h - horizon_seconds).abs() < 1.0)
-            .map(|i| AGING_HORIZON_LABELS[i].to_string()).unwrap_or_else(|| format!("{:.0}s", horizon_seconds));
-        AgingPrediction { horizon_seconds, horizon_label: label, predicted_state: predicted, state_similarity, remaining_strength: state_similarity.max(0.0) }
+        let label = AGING_HORIZONS
+            .iter()
+            .position(|&h| (h - horizon_seconds).abs() < 1.0)
+            .map(|i| AGING_HORIZON_LABELS[i].to_string())
+            .unwrap_or_else(|| format!("{:.0}s", horizon_seconds));
+        AgingPrediction {
+            horizon_seconds,
+            horizon_label: label,
+            predicted_state: predicted,
+            state_similarity,
+            remaining_strength: state_similarity.max(0.0),
+        }
     }
 
     /// Predict aging at all 5 standard horizons (1 day to 50 years).
     pub fn predict_all_horizons(&self, material: &MaterialProperty) -> Vec<AgingPrediction> {
-        AGING_HORIZONS.iter().map(|&h| self.predict_at_horizon(material, h)).collect()
+        AGING_HORIZONS
+            .iter()
+            .map(|&h| self.predict_at_horizon(material, h))
+            .collect()
     }
 }
 
-impl Default for MaterialAgingModel { fn default() -> Self { Self::new() } }
+impl Default for MaterialAgingModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl symthaea_core::temporal::TemporalPredictor for MaterialAgingModel {
     fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
@@ -102,19 +136,58 @@ impl symthaea_core::temporal::TemporalPredictor for MaterialAgingModel {
 mod tests {
     use super::*;
 
-    #[test] fn test_aging_horizons_ordered() { for i in 1..AGING_HORIZONS.len() { assert!(AGING_HORIZONS[i] > AGING_HORIZONS[i - 1]); } }
-    #[test] fn test_aging_horizons_labels_match() { assert_eq!(AGING_HORIZONS.len(), AGING_HORIZON_LABELS.len()); }
-    #[test] fn test_predict_dimension() { assert_eq!(MaterialAgingModel::new().predict_at_horizon(&MaterialProperty::steel_a36(), 86_400.0).predicted_state.dim(), HDC_DIMENSION); }
-    #[test] fn test_predict_all_horizons_count() { assert_eq!(MaterialAgingModel::new().predict_all_horizons(&MaterialProperty::steel_a36()).len(), AGING_HORIZONS.len()); }
+    #[test]
+    fn test_aging_horizons_ordered() {
+        for i in 1..AGING_HORIZONS.len() {
+            assert!(AGING_HORIZONS[i] > AGING_HORIZONS[i - 1]);
+        }
+    }
+    #[test]
+    fn test_aging_horizons_labels_match() {
+        assert_eq!(AGING_HORIZONS.len(), AGING_HORIZON_LABELS.len());
+    }
+    #[test]
+    fn test_predict_dimension() {
+        assert_eq!(
+            MaterialAgingModel::new()
+                .predict_at_horizon(&MaterialProperty::steel_a36(), 86_400.0)
+                .predicted_state
+                .dim(),
+            HDC_DIMENSION
+        );
+    }
+    #[test]
+    fn test_predict_all_horizons_count() {
+        assert_eq!(
+            MaterialAgingModel::new()
+                .predict_all_horizons(&MaterialProperty::steel_a36())
+                .len(),
+            AGING_HORIZONS.len()
+        );
+    }
 
     #[test]
     fn test_o1_property_aging() {
         let m = MaterialAgingModel::new();
         let s = MaterialProperty::steel_a36();
-        let t1 = std::time::Instant::now(); for _ in 0..100 { let _ = m.predict_at_horizon(&s, 86_400.0); } let d1 = t1.elapsed();
-        let t2 = std::time::Instant::now(); for _ in 0..100 { let _ = m.predict_at_horizon(&s, 1_576_800_000.0); } let d2 = t2.elapsed();
+        let t1 = std::time::Instant::now();
+        for _ in 0..100 {
+            let _ = m.predict_at_horizon(&s, 86_400.0);
+        }
+        let d1 = t1.elapsed();
+        let t2 = std::time::Instant::now();
+        for _ in 0..100 {
+            let _ = m.predict_at_horizon(&s, 1_576_800_000.0);
+        }
+        let d2 = t2.elapsed();
         let ratio = d2.as_nanos() as f64 / d1.as_nanos().max(1) as f64;
-        assert!(ratio < 5.0 && ratio > 0.2, "O(1): 1d={:?}, 50y={:?}, ratio={}", d1, d2, ratio);
+        assert!(
+            ratio < 5.0 && ratio > 0.2,
+            "O(1): 1d={:?}, 50y={:?}, ratio={}",
+            d1,
+            d2,
+            ratio
+        );
     }
 
     #[test]
@@ -150,8 +223,16 @@ mod tests {
         for mat in MaterialProperty::presets() {
             let preds = model.predict_all_horizons(&mat);
             for p in &preds {
-                assert!(p.state_similarity.is_finite(), "NaN state_similarity for {}", mat.name);
-                assert!(p.remaining_strength.is_finite(), "NaN remaining_strength for {}", mat.name);
+                assert!(
+                    p.state_similarity.is_finite(),
+                    "NaN state_similarity for {}",
+                    mat.name
+                );
+                assert!(
+                    p.remaining_strength.is_finite(),
+                    "NaN remaining_strength for {}",
+                    mat.name
+                );
             }
         }
     }
@@ -167,7 +248,11 @@ mod tests {
         m.observe(&seed, 86_400.0);
         let after = m.predict_at(&seed, 86_400.0);
         let sim = before.similarity(&after);
-        assert!(sim < 1.0, "observe() should change predictions, sim={}", sim);
+        assert!(
+            sim < 1.0,
+            "observe() should change predictions, sim={}",
+            sim
+        );
     }
 
     #[test]

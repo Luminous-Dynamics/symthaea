@@ -3262,34 +3262,85 @@ mod tests {
     #[cfg(feature = "magi_loop")]
     #[tokio::test]
     async fn test_confidence_to_epistemic_boundary_values() {
-        assert_eq!(Symthaea::confidence_to_epistemic(0.85), EpistemicStatus::Certain);
-        assert_eq!(Symthaea::confidence_to_epistemic(0.84), EpistemicStatus::Probable);
-        assert_eq!(Symthaea::confidence_to_epistemic(0.60), EpistemicStatus::Probable);
-        assert_eq!(Symthaea::confidence_to_epistemic(0.59), EpistemicStatus::Uncertain);
-        assert_eq!(Symthaea::confidence_to_epistemic(0.30), EpistemicStatus::Uncertain);
-        assert_eq!(Symthaea::confidence_to_epistemic(0.29), EpistemicStatus::Unknown);
-        assert_eq!(Symthaea::confidence_to_epistemic(0.12), EpistemicStatus::Unknown);
-        assert_eq!(Symthaea::confidence_to_epistemic(0.11), EpistemicStatus::OutOfDomain);
+        assert_eq!(
+            Symthaea::confidence_to_epistemic(0.85),
+            EpistemicStatus::Certain
+        );
+        assert_eq!(
+            Symthaea::confidence_to_epistemic(0.84),
+            EpistemicStatus::Probable
+        );
+        assert_eq!(
+            Symthaea::confidence_to_epistemic(0.60),
+            EpistemicStatus::Probable
+        );
+        assert_eq!(
+            Symthaea::confidence_to_epistemic(0.59),
+            EpistemicStatus::Uncertain
+        );
+        assert_eq!(
+            Symthaea::confidence_to_epistemic(0.30),
+            EpistemicStatus::Uncertain
+        );
+        assert_eq!(
+            Symthaea::confidence_to_epistemic(0.29),
+            EpistemicStatus::Unknown
+        );
+        assert_eq!(
+            Symthaea::confidence_to_epistemic(0.12),
+            EpistemicStatus::Unknown
+        );
+        assert_eq!(
+            Symthaea::confidence_to_epistemic(0.11),
+            EpistemicStatus::OutOfDomain
+        );
     }
 
     #[cfg(feature = "magi_loop")]
     #[tokio::test]
     async fn test_map_intent_to_domain_all_variants() {
-        assert_eq!(Symthaea::map_intent_to_domain(&SemanticIntent::Answer), PredictionDomain::Factual);
-        assert_eq!(Symthaea::map_intent_to_domain(&SemanticIntent::Clarify), PredictionDomain::Factual);
-        assert_eq!(Symthaea::map_intent_to_domain(&SemanticIntent::ProposeAction), PredictionDomain::ToolUse);
-        assert_eq!(Symthaea::map_intent_to_domain(&SemanticIntent::Acknowledge), PredictionDomain::UserBehavior);
-        assert_eq!(Symthaea::map_intent_to_domain(&SemanticIntent::Continue), PredictionDomain::UserBehavior);
-        assert_eq!(Symthaea::map_intent_to_domain(&SemanticIntent::Reflect), PredictionDomain::SystemState);
-        assert_eq!(Symthaea::map_intent_to_domain(&SemanticIntent::ExpressUncertainty), PredictionDomain::Factual);
-        assert_eq!(Symthaea::map_intent_to_domain(&SemanticIntent::Unknown), PredictionDomain::Factual);
+        assert_eq!(
+            Symthaea::map_intent_to_domain(&SemanticIntent::Answer),
+            PredictionDomain::Factual
+        );
+        assert_eq!(
+            Symthaea::map_intent_to_domain(&SemanticIntent::Clarify),
+            PredictionDomain::Factual
+        );
+        assert_eq!(
+            Symthaea::map_intent_to_domain(&SemanticIntent::ProposeAction),
+            PredictionDomain::ToolUse
+        );
+        assert_eq!(
+            Symthaea::map_intent_to_domain(&SemanticIntent::Acknowledge),
+            PredictionDomain::UserBehavior
+        );
+        assert_eq!(
+            Symthaea::map_intent_to_domain(&SemanticIntent::Continue),
+            PredictionDomain::UserBehavior
+        );
+        assert_eq!(
+            Symthaea::map_intent_to_domain(&SemanticIntent::Reflect),
+            PredictionDomain::SystemState
+        );
+        assert_eq!(
+            Symthaea::map_intent_to_domain(&SemanticIntent::ExpressUncertainty),
+            PredictionDomain::Factual
+        );
+        assert_eq!(
+            Symthaea::map_intent_to_domain(&SemanticIntent::Unknown),
+            PredictionDomain::Factual
+        );
     }
 
     #[tokio::test]
     async fn test_process_returns_non_empty_output() {
         let mut s = Symthaea::new(1024, 64).await.unwrap();
         let resp = s.process("hello").await.unwrap();
-        assert!(!resp.content.is_empty(), "Process output should not be empty");
+        assert!(
+            !resp.content.is_empty(),
+            "Process output should not be empty"
+        );
     }
 
     #[tokio::test]
@@ -3298,7 +3349,10 @@ mod tests {
         let _ = s.process("one").await;
         let _ = s.process("two").await;
         let _ = s.process("three").await;
-        assert_eq!(s.interactions, 3, "Three process calls should yield count=3");
+        assert_eq!(
+            s.interactions, 3,
+            "Three process calls should yield count=3"
+        );
     }
 
     #[tokio::test]

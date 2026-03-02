@@ -39,7 +39,9 @@ pub struct StrategicHdcEncoder {
 impl StrategicHdcEncoder {
     pub fn new() -> Self {
         let seeds: [u64; 4] = [0x578_0001, 0x578_0002, 0x578_0003, 0x578_0004];
-        Self { bases: seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s)) }
+        Self {
+            bases: seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s)),
+        }
     }
 
     pub fn encode(&self, reading: &StrategicReading) -> ContinuousHV {
@@ -54,7 +56,9 @@ impl StrategicHdcEncoder {
 }
 
 impl Default for StrategicHdcEncoder {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct StrategicPredictor {
@@ -69,7 +73,9 @@ impl StrategicPredictor {
             dimension: HDC_DIMENSION,
             ..UnifiedConfig::default()
         };
-        Self { neuron: HdcLtcUnifiedNeuron::new(config, 0x578_10A0) }
+        Self {
+            neuron: HdcLtcUnifiedNeuron::new(config, 0x578_10A0),
+        }
     }
 
     pub fn predict_at_horizon(&self, current: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
@@ -85,18 +91,30 @@ impl StrategicPredictor {
 }
 
 impl Default for StrategicPredictor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl symthaea_core::temporal::TemporalPredictor for StrategicPredictor {
     fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
         self.predict_at_horizon(current_state, horizon_seconds)
     }
-    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) { self.observe(state, dt_seconds); }
-    fn domain(&self) -> &'static str { "strategic_materials" }
-    fn tau_base(&self) -> f32 { 86_400.0 }
-    fn default_horizons(&self) -> &'static [f32] { STRATEGIC_HORIZONS }
-    fn horizon_labels(&self) -> &'static [&'static str] { STRATEGIC_HORIZON_LABELS }
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.observe(state, dt_seconds);
+    }
+    fn domain(&self) -> &'static str {
+        "strategic_materials"
+    }
+    fn tau_base(&self) -> f32 {
+        86_400.0
+    }
+    fn default_horizons(&self) -> &'static [f32] {
+        STRATEGIC_HORIZONS
+    }
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        STRATEGIC_HORIZON_LABELS
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -124,29 +142,43 @@ pub struct StrategicFepAgent {
 
 impl StrategicFepAgent {
     pub fn new() -> Self {
-        Self { reference_state: ContinuousHV::random(HDC_DIMENSION, 0x578_BEEF) }
+        Self {
+            reference_state: ContinuousHV::random(HDC_DIMENSION, 0x578_BEEF),
+        }
     }
 
-    pub fn set_reference(&mut self, reference: ContinuousHV) { self.reference_state = reference; }
+    pub fn set_reference(&mut self, reference: ContinuousHV) {
+        self.reference_state = reference;
+    }
 
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
         let sim = observed.similarity(&self.reference_state) as f64;
-        if !sim.is_finite() { return 1.0; }
+        if !sim.is_finite() {
+            return 1.0;
+        }
         (1.0 - sim).max(0.0)
     }
 
     pub fn select_action(&self, observed: &ContinuousHV) -> StrategicFepAction {
         let fe = self.compute_free_energy(observed);
-        if fe > 0.7 { StrategicFepAction::ImmediateWithdrawal }
-        else if fe > 0.5 { StrategicFepAction::ScheduleReplacement }
-        else if fe > 0.3 { StrategicFepAction::ReduceLoad }
-        else if fe > 0.1 { StrategicFepAction::IncreasedInspection }
-        else { StrategicFepAction::ContinueService }
+        if fe > 0.7 {
+            StrategicFepAction::ImmediateWithdrawal
+        } else if fe > 0.5 {
+            StrategicFepAction::ScheduleReplacement
+        } else if fe > 0.3 {
+            StrategicFepAction::ReduceLoad
+        } else if fe > 0.1 {
+            StrategicFepAction::IncreasedInspection
+        } else {
+            StrategicFepAction::ContinueService
+        }
     }
 }
 
 impl Default for StrategicFepAgent {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -155,20 +187,32 @@ mod tests {
     use std::time::Instant;
 
     fn healthy() -> StrategicReading {
-        StrategicReading { extreme_temp_resilience: 0.9, radiation_dose: 0.1, time_at_condition: 86_400.0, failure_probability: 0.001 }
+        StrategicReading {
+            extreme_temp_resilience: 0.9,
+            radiation_dose: 0.1,
+            time_at_condition: 86_400.0,
+            failure_probability: 0.001,
+        }
     }
 
     #[test]
     fn test_horizons_ordered() {
-        for i in 1..STRATEGIC_HORIZONS.len() { assert!(STRATEGIC_HORIZONS[i] > STRATEGIC_HORIZONS[i - 1]); }
+        for i in 1..STRATEGIC_HORIZONS.len() {
+            assert!(STRATEGIC_HORIZONS[i] > STRATEGIC_HORIZONS[i - 1]);
+        }
     }
 
     #[test]
-    fn test_horizons_labels_match() { assert_eq!(STRATEGIC_HORIZONS.len(), STRATEGIC_HORIZON_LABELS.len()); }
+    fn test_horizons_labels_match() {
+        assert_eq!(STRATEGIC_HORIZONS.len(), STRATEGIC_HORIZON_LABELS.len());
+    }
 
     #[test]
     fn test_encoder_dimension() {
-        assert_eq!(StrategicHdcEncoder::new().encode(&healthy()).dim(), HDC_DIMENSION);
+        assert_eq!(
+            StrategicHdcEncoder::new().encode(&healthy()).dim(),
+            HDC_DIMENSION
+        );
     }
 
     #[test]
@@ -176,10 +220,14 @@ mod tests {
         let pred = StrategicPredictor::new();
         let input = ContinuousHV::random(HDC_DIMENSION, 42);
         let t1 = Instant::now();
-        for _ in 0..100 { let _ = pred.predict_at_horizon(&input, 86_400.0); }
+        for _ in 0..100 {
+            let _ = pred.predict_at_horizon(&input, 86_400.0);
+        }
         let short = t1.elapsed();
         let t2 = Instant::now();
-        for _ in 0..100 { let _ = pred.predict_at_horizon(&input, 1_576_800_000.0); }
+        for _ in 0..100 {
+            let _ = pred.predict_at_horizon(&input, 1_576_800_000.0);
+        }
         let long = t2.elapsed();
         let ratio = long.as_nanos() as f64 / short.as_nanos().max(1) as f64;
         assert!(ratio < 5.0 && ratio > 0.2, "O(1) violated: ratio={}", ratio);

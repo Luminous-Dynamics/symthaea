@@ -13,11 +13,11 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 /// Design-production loop prediction horizons (seconds): 0.1s → 1s → 10s → 100s → 1 day.
 pub const DESIGN_LOOP_HORIZONS: &[f32] = &[
-    0.1,       // 0.1s — measure
-    1.0,       // 1s — feedback
-    10.0,      // 10s — adapt
-    100.0,     // 100s — convergence
-    86_400.0,  // 1 day — production
+    0.1,      // 0.1s — measure
+    1.0,      // 1s — feedback
+    10.0,     // 10s — adapt
+    100.0,    // 100s — convergence
+    86_400.0, // 1 day — production
 ];
 
 pub const DESIGN_LOOP_HORIZON_LABELS: &[&str] = &[
@@ -411,7 +411,10 @@ mod tests {
         twin.set_reference(&reading);
         let output = twin.step(&reading, 1.0);
         assert_eq!(output.safety_level, DesignLoopSafetyLevel::Green);
-        assert_eq!(output.recommended_action, DesignLoopFepAction::ContinueProduction);
+        assert_eq!(
+            output.recommended_action,
+            DesignLoopFepAction::ContinueProduction
+        );
     }
 
     #[test]
@@ -447,7 +450,11 @@ mod tests {
         let mut twin = DesignLoopTwin::new();
         let output = twin.step(&reading, 1.0);
         let (consciousness, error, coherence) = output.to_safety_tuple();
-        assert!((0.0..=1.0).contains(&consciousness), "consciousness={}", consciousness);
+        assert!(
+            (0.0..=1.0).contains(&consciousness),
+            "consciousness={}",
+            consciousness
+        );
         assert!((0.0..=1.0).contains(&error), "error={}", error);
         assert!(coherence.is_finite(), "coherence must be finite");
     }

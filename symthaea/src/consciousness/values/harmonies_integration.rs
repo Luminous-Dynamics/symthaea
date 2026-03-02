@@ -156,7 +156,10 @@ impl HarmoniesIntegrator {
     }
 
     /// Create a new integrator with a shared `HarmonyBasis`.
-    pub fn with_basis(config: HarmoniesIntegrationConfig, harmony_basis: Arc<HarmonyBasis>) -> Self {
+    pub fn with_basis(
+        config: HarmoniesIntegrationConfig,
+        harmony_basis: Arc<HarmonyBasis>,
+    ) -> Self {
         let harmonies = SevenHarmonies::default();
 
         // Build harmony embeddings from the semantic basis vectors
@@ -200,7 +203,11 @@ impl HarmoniesIntegrator {
                 .copied()
                 .unwrap_or(1.0);
 
-            let similarity = if similarity.is_finite() { similarity } else { 0.0 };
+            let similarity = if similarity.is_finite() {
+                similarity
+            } else {
+                0.0
+            };
             harmony_scores.insert(*harmony, similarity);
             weighted_sum += similarity * weight;
             weight_total += weight;
@@ -225,8 +232,7 @@ impl HarmoniesIntegrator {
         if coords_finite {
             let alpha = if self.prior_count == 0 { 1.0 } else { 0.1 };
             for i in 0..7 {
-                self.harmony_prior[i] =
-                    self.harmony_prior[i] * (1.0 - alpha) + coords[i] * alpha;
+                self.harmony_prior[i] = self.harmony_prior[i] * (1.0 - alpha) + coords[i] * alpha;
             }
         }
         self.prior_count += 1;
@@ -404,7 +410,12 @@ impl HarmoniesIntegrator {
         dominant_harmony_idx: u8,
         completeness: f64,
     ) {
-        self.apply_topology_feedback_with_kl(harmony_variance, dominant_harmony_idx, completeness, 0.0);
+        self.apply_topology_feedback_with_kl(
+            harmony_variance,
+            dominant_harmony_idx,
+            completeness,
+            0.0,
+        );
     }
 
     /// Extended topology feedback that also considers KL divergence.
@@ -431,7 +442,10 @@ impl HarmoniesIntegrator {
             let adjusted = if variance < 1e-4 {
                 // Blind spot: boost weight to encourage exploration
                 (weight * 1.15).min(2.0)
-            } else if i == dominant_harmony_idx as usize && completeness < 0.8 && kl_divergence <= 0.5 {
+            } else if i == dominant_harmony_idx as usize
+                && completeness < 0.8
+                && kl_divergence <= 0.5
+            {
                 // Dominant axis with poor completeness and low KL: slight attenuation
                 (weight * 0.95).max(0.5)
             } else if i == dominant_harmony_idx as usize && kl_divergence > 0.5 {
@@ -519,9 +533,7 @@ mod tests {
 
         // All harmonies at 1.0 initially
         for h in Harmony::all() {
-            assert!(
-                (*integrator.config.harmony_weights.get(&h).unwrap() - 1.0).abs() < 0.01,
-            );
+            assert!((*integrator.config.harmony_weights.get(&h).unwrap() - 1.0).abs() < 0.01,);
         }
 
         // Simulate low variance on ResonantCoherence (idx 0) = blind spot

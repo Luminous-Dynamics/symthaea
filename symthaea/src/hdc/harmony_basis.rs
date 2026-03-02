@@ -190,10 +190,7 @@ impl Default for MoralFreeEnergy {
 
 /// Softmax over 7 values with inverse temperature.
 fn softmax_7(coords: &[f64; 7], inv_temp: f64) -> [f64; 7] {
-    let max_val = coords
-        .iter()
-        .cloned()
-        .fold(f64::NEG_INFINITY, f64::max);
+    let max_val = coords.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
     let mut exp_vals = [0.0f64; 7];
     let mut sum = 0.0;
     for i in 0..7 {

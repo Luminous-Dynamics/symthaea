@@ -4,11 +4,11 @@
 //! attention schema, meta-cognition) into a single struct. All are `Option<T>`
 //! gated by independent `enable_*` config flags.
 
+use super::SelfReflection;
 use crate::consciousness::attention_schema::AttentionSchema;
 use crate::consciousness::narrative_self::{NarrativeSelfConfig, NarrativeSelfModel};
 use crate::consciousness::predictive_self::{PredictiveSelfConfig, PredictiveSelfModel};
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
-use super::SelfReflection;
 
 use super::CognitiveLoopConfig;
 
@@ -177,10 +177,22 @@ mod tests {
         let tier1 = SelfModelTierManager::new(&config);
         let tier2 = SelfModelTierManager::new(&config);
         // Both should produce the same pattern of Some/None
-        assert_eq!(tier1.meta_cognition.is_some(), tier2.meta_cognition.is_some());
-        assert_eq!(tier1.narrative_self.is_some(), tier2.narrative_self.is_some());
-        assert_eq!(tier1.predictive_self.is_some(), tier2.predictive_self.is_some());
-        assert_eq!(tier1.attention_schema.is_some(), tier2.attention_schema.is_some());
+        assert_eq!(
+            tier1.meta_cognition.is_some(),
+            tier2.meta_cognition.is_some()
+        );
+        assert_eq!(
+            tier1.narrative_self.is_some(),
+            tier2.narrative_self.is_some()
+        );
+        assert_eq!(
+            tier1.predictive_self.is_some(),
+            tier2.predictive_self.is_some()
+        );
+        assert_eq!(
+            tier1.attention_schema.is_some(),
+            tier2.attention_schema.is_some()
+        );
     }
 
     #[test]

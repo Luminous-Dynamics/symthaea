@@ -884,7 +884,8 @@ mod tests {
 
         // Encrypted output must differ from unencrypted compressed envelope
         assert_ne!(
-            encrypted_bytes, &unencrypted[..],
+            encrypted_bytes,
+            &unencrypted[..],
             "Encrypted output should differ from unencrypted compressed envelope"
         );
         // Encrypted output must be larger (nonce + tag overhead)
@@ -947,7 +948,8 @@ mod tests {
             completed.len()
         );
         assert_eq!(
-            receiver.stats().packets_decrypt_failed, 1,
+            receiver.stats().packets_decrypt_failed,
+            1,
             "Should record one decryption failure"
         );
     }
@@ -971,7 +973,11 @@ mod tests {
         let mesh_b = DualLayerMesh::new([2; 32]).with_lora(Box::new(b));
         let completed = mesh_b.poll_incoming(&mut receiver);
 
-        assert_eq!(completed.len(), 1, "Should reassemble and decrypt one packet");
+        assert_eq!(
+            completed.len(),
+            1,
+            "Should reassemble and decrypt one packet"
+        );
         assert_eq!(completed[0].sequence, original.sequence);
         assert_eq!(completed[0].source_id, original.source_id);
         assert_eq!(completed[0].wisdom.0, original.wisdom.0);

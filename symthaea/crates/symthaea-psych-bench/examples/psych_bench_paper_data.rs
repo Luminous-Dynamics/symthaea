@@ -648,19 +648,19 @@ fn main() {
                     *s
                 };
 
-                // Simple task
+                // Simple task: stimulus = target + noise (no prototypical anchor)
                 let target = ContinuousHV::random(dim, next(&mut rng));
                 let distractor = ContinuousHV::random(dim, next(&mut rng));
                 let mut correct = 0usize;
                 let trials = 20;
                 for _ in 0..trials {
-                    let stimulus = ContinuousHV::random(dim, next(&mut rng));
                     let noise_scale = 1.0 - (1.0 - (ne - 0.6_f64).powi(2) * 4.0).max(0.0);
-                    let noise_weight = (noise_scale * 0.3) as f32;
+                    let noise_weight = (noise_scale * 0.8) as f32;
+                    let signal_weight = (1.0 - noise_weight).max(0.05);
                     let noise_hv = ContinuousHV::random(dim, next(&mut rng));
                     let noisy = ContinuousHV::weighted_bundle(
-                        &[&stimulus, &target, &noise_hv],
-                        &[0.3, (0.7 - noise_weight).max(0.1), noise_weight],
+                        &[&target, &noise_hv],
+                        &[signal_weight, noise_weight],
                     );
                     if noisy.similarity(&target) > noisy.similarity(&distractor) {
                         correct += 1;
@@ -668,20 +668,20 @@ fn main() {
                 }
                 simple_accs.push(correct as f64 / trials as f64);
 
-                // Complex task
+                // Complex task: stimulus = proto[correct] + noise (no anchor)
                 let protos: Vec<ContinuousHV> = (0..4)
                     .map(|_| ContinuousHV::random(dim, next(&mut rng)))
                     .collect();
                 let mut correct = 0usize;
                 for _ in 0..trials {
                     let ci = (next(&mut rng) % 4) as usize;
-                    let stimulus = ContinuousHV::random(dim, next(&mut rng));
                     let noise_scale = 1.0 - (1.0 - (ne - 0.45_f64).powi(2) * 5.0).max(0.0);
-                    let noise_weight = (noise_scale * 0.4) as f32;
+                    let noise_weight = (noise_scale * 0.9) as f32;
+                    let signal_weight = (1.0 - noise_weight).max(0.05);
                     let noise_hv = ContinuousHV::random(dim, next(&mut rng));
                     let noisy = ContinuousHV::weighted_bundle(
-                        &[&stimulus, &protos[ci], &noise_hv],
-                        &[0.3, (0.7 - noise_weight).max(0.1), noise_weight],
+                        &[&protos[ci], &noise_hv],
+                        &[signal_weight, noise_weight],
                     );
                     let best = protos
                         .iter()
@@ -837,7 +837,16 @@ fn main() {
                         let margin =
                             (stim.similarity(&left_p) as f64 - stim.similarity(&right_p) as f64)
                                 .abs();
-                        rt_sum += 5.0 + (1.0 - margin.min(1.0)) * 8.0;
+                        let mut rt = 5.0 + (1.0 - margin.min(1.0)) * 8.0;
+                        // NE-mediated alerting: temporal preparation reduces baseline RT
+                        if alert_cue {
+                            rt -= 1.2;
+                        }
+                        // ACh-mediated orienting: spatial filtering reduces baseline RT
+                        if orient_cue {
+                            rt -= 0.8;
+                        }
+                        rt_sum += rt.max(1.0);
                     }
                     mean_rts[ci] = rt_sum / trials_per as f64;
                 }

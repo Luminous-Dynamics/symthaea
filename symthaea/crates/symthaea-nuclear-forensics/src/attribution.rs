@@ -42,7 +42,10 @@ impl NuclearAttributionAgent {
     ///
     /// Panics if `refs` is empty — at least one reference signature is required.
     pub fn with_references(refs: Vec<IsotopicSignature>) -> Self {
-        assert!(!refs.is_empty(), "NuclearAttributionAgent requires at least one reference signature");
+        assert!(
+            !refs.is_empty(),
+            "NuclearAttributionAgent requires at least one reference signature"
+        );
         let encoder = IsotopicHdcEncoder::new();
         let reference_hvs = refs.iter().map(|r| encoder.encode(r)).collect();
         Self {
@@ -56,23 +59,27 @@ impl NuclearAttributionAgent {
     /// Attribute an unknown sample by HDC similarity to references.
     pub fn attribute(&self, unknown: &IsotopicSignature) -> AttributionResult {
         let unknown_hv = self.encoder.encode(unknown);
-        let mut similarities: Vec<(String, NuclearSource, f32)> = self.references.iter()
+        let mut similarities: Vec<(String, NuclearSource, f32)> = self
+            .references
+            .iter()
             .zip(self.reference_hvs.iter())
-            .map(|(r, ref_hv)| {
-                (r.name.clone(), r.source, unknown_hv.similarity(ref_hv))
-            })
+            .map(|(r, ref_hv)| (r.name.clone(), r.source, unknown_hv.similarity(ref_hv)))
             .collect();
         similarities.sort_by(|a, b| {
             match (a.2.is_nan(), b.2.is_nan()) {
                 (true, true) => std::cmp::Ordering::Equal,
-                (true, false) => std::cmp::Ordering::Greater,  // NaN sorts last
+                (true, false) => std::cmp::Ordering::Greater, // NaN sorts last
                 (false, true) => std::cmp::Ordering::Less,
                 (false, false) => b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal),
             }
         });
 
         let best = &similarities[0];
-        let second = if similarities.len() > 1 { similarities[1].2 } else { 0.0 };
+        let second = if similarities.len() > 1 {
+            similarities[1].2
+        } else {
+            0.0
+        };
         let margin = best.2 - second;
         let confidence = (best.2 * 0.7 + margin * 0.3).clamp(0.0, 1.0);
 
@@ -80,19 +87,29 @@ impl NuclearAttributionAgent {
             matched_source: best.1,
             matched_name: best.0.clone(),
             confidence,
-            all_similarities: similarities.iter().map(|(n, _, s)| (n.clone(), *s)).collect(),
+            all_similarities: similarities
+                .iter()
+                .map(|(n, _, s)| (n.clone(), *s))
+                .collect(),
         }
     }
 
     /// Attribute with age estimation from decay model.
-    pub fn attribute_with_age(&self, unknown: &IsotopicSignature) -> (AttributionResult, crate::decay_model::AgeEstimate) {
+    pub fn attribute_with_age(
+        &self,
+        unknown: &IsotopicSignature,
+    ) -> (AttributionResult, crate::decay_model::AgeEstimate) {
         let attr = self.attribute(unknown);
         let age = self.decay_model.estimate_age(unknown);
         (attr, age)
     }
 }
 
-impl Default for NuclearAttributionAgent { fn default() -> Self { Self::new() } }
+impl Default for NuclearAttributionAgent {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -174,8 +191,12 @@ mod tests {
         let agent = NuclearAttributionAgent::new();
         for sig in &IsotopicSignature::references() {
             let r = agent.attribute(sig);
-            assert!(r.confidence >= 0.0 && r.confidence <= 1.0,
-                "Confidence out of [0,1] for {}: {}", sig.name, r.confidence);
+            assert!(
+                r.confidence >= 0.0 && r.confidence <= 1.0,
+                "Confidence out of [0,1] for {}: {}",
+                sig.name,
+                r.confidence
+            );
         }
     }
 
@@ -186,12 +207,21 @@ mod tests {
         let agent = NuclearAttributionAgent::new();
         for sig in &IsotopicSignature::references() {
             let (attr, age) = agent.attribute_with_age(sig);
-            assert_eq!(attr.matched_source, sig.source,
-                "attribute_with_age source mismatch for {}", sig.name);
-            assert!(age.estimated_age_seconds.is_finite(),
-                "NaN age for {}", sig.name);
-            assert!(age.confidence >= 0.0 && age.confidence <= 1.0,
-                "confidence out of [0,1] for {}", sig.name);
+            assert_eq!(
+                attr.matched_source, sig.source,
+                "attribute_with_age source mismatch for {}",
+                sig.name
+            );
+            assert!(
+                age.estimated_age_seconds.is_finite(),
+                "NaN age for {}",
+                sig.name
+            );
+            assert!(
+                age.confidence >= 0.0 && age.confidence <= 1.0,
+                "confidence out of [0,1] for {}",
+                sig.name
+            );
         }
     }
 
@@ -204,6 +234,9 @@ mod tests {
         sig.sr90_activity = 0.0;
         let (attr, age) = agent.attribute_with_age(&sig);
         assert_eq!(attr.matched_source, NuclearSource::NaturalUranium);
-        assert_eq!(age.confidence, 0.0, "no usable decay ratios → zero confidence");
+        assert_eq!(
+            age.confidence, 0.0,
+            "no usable decay ratios → zero confidence"
+        );
     }
 }

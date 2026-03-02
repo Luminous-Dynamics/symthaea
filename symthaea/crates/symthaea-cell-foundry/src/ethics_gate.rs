@@ -47,10 +47,7 @@ impl EthicsGate {
             ));
         }
         if !self.irb_approved {
-            return Err(format!(
-                "Manipulation '{}' requires IRB approval",
-                action
-            ));
+            return Err(format!("Manipulation '{}' requires IRB approval", action));
         }
         Ok(())
     }
@@ -68,9 +65,7 @@ impl EthicsGate {
             .iter()
             .any(|a| a == "gamete_creation")
         {
-            return Err(
-                "IVG protocol requires explicit gamete-creation consent approval".into(),
-            );
+            return Err("IVG protocol requires explicit gamete-creation consent approval".into());
         }
 
         Ok(())

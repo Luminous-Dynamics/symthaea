@@ -4,9 +4,9 @@
 //! The physics backend translates HDC-encoded forces into physical simulation,
 //! and the surprise between expected and actual response feeds back into FEP.
 
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use crate::primitives::FAB_KERNEL_DIM;
 use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 // Force type seeds
 const TENSION_SEED: u64 = 0x5445_4E53_1001;
@@ -21,16 +21,32 @@ const Y_AXIS_SEED: u64 = 0x5941_5849_2002;
 const Z_AXIS_SEED: u64 = 0x5A41_5849_2003;
 
 /// Force type prototype HVs
-pub fn tension_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, TENSION_SEED) }
-pub fn compression_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, COMPRESSION_SEED) }
-pub fn shear_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, SHEAR_SEED) }
-pub fn torsion_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, TORSION_SEED) }
-pub fn bending_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, BENDING_SEED) }
+pub fn tension_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, TENSION_SEED)
+}
+pub fn compression_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, COMPRESSION_SEED)
+}
+pub fn shear_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, SHEAR_SEED)
+}
+pub fn torsion_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, TORSION_SEED)
+}
+pub fn bending_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, BENDING_SEED)
+}
 
 /// Axis prototype HVs
-pub fn x_axis_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, X_AXIS_SEED) }
-pub fn y_axis_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, Y_AXIS_SEED) }
-pub fn z_axis_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, Z_AXIS_SEED) }
+pub fn x_axis_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, X_AXIS_SEED)
+}
+pub fn y_axis_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, Y_AXIS_SEED)
+}
+pub fn z_axis_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, Z_AXIS_SEED)
+}
 
 /// Compose a directional force by binding force type with direction
 pub fn compose_force(force_type: &ContinuousHV, direction: &ContinuousHV) -> ContinuousHV {
@@ -94,7 +110,9 @@ impl DeformationField {
         if self.displacements.is_empty() {
             return 0.0;
         }
-        let sum: f32 = self.displacements.iter()
+        let sum: f32 = self
+            .displacements
+            .iter()
             .map(|d| (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt())
             .sum();
         sum / self.displacements.len() as f32
@@ -140,7 +158,10 @@ mod tests {
             expected_resistance: 50.0,
         };
         let surprise = force.surprise(100.0);
-        assert!((surprise - 1.0).abs() < 0.001, "Double expected = 1.0 surprise");
+        assert!(
+            (surprise - 1.0).abs() < 0.001,
+            "Double expected = 1.0 surprise"
+        );
     }
 
     #[test]

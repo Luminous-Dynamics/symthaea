@@ -1672,7 +1672,11 @@ impl ConsciousnessUnificationNSMGrounding {
     }
 
     /// Query emotions by semantic similarity
-    pub(crate) fn query_emotions(&self, query: &BinaryHV, threshold: f32) -> Vec<(&UnifiedEmotion, f32)> {
+    pub(crate) fn query_emotions(
+        &self,
+        query: &BinaryHV,
+        threshold: f32,
+    ) -> Vec<(&UnifiedEmotion, f32)> {
         let mut results: Vec<_> = self
             .emotions
             .iter()
@@ -2423,7 +2427,10 @@ mod tests {
         let b: Vec<String> = vec!["THINK".into(), "BAD".into(), "NOT".into()];
         let hv_a = encode_primitives(&a, &system);
         let hv_b = encode_primitives(&b, &system);
-        assert_ne!(hv_a.0, hv_b.0, "Different word sets should produce different encodings");
+        assert_ne!(
+            hv_a.0, hv_b.0,
+            "Different word sets should produce different encodings"
+        );
     }
 
     #[test]
@@ -2431,7 +2438,10 @@ mod tests {
         let system = PrimitiveSystem::new();
         let primitives: Vec<String> = vec!["KNOW".into()];
         let hv = encode_primitives(&primitives, &system);
-        assert!(hv.0.iter().any(|&b| b != 0), "Single-word encoding should be non-zero");
+        assert!(
+            hv.0.iter().any(|&b| b != 0),
+            "Single-word encoding should be non-zero"
+        );
     }
 
     #[test]
@@ -2445,7 +2455,11 @@ mod tests {
             PhiMethod::TheoryVotingAggregate,
         ] {
             let g = PhiMethodPrimitiveGrounding::new(*method, &system);
-            assert!(!g.nsm_primitives.is_empty(), "{:?} should have primitives", method);
+            assert!(
+                !g.nsm_primitives.is_empty(),
+                "{:?} should have primitives",
+                method
+            );
         }
     }
 
@@ -2492,17 +2506,33 @@ mod tests {
     fn test_emotion_grounding_all_19_mapped() {
         let system = PrimitiveSystem::new();
         let all_emotions = [
-            UnifiedEmotion::Joy, UnifiedEmotion::Sadness, UnifiedEmotion::Anger,
-            UnifiedEmotion::Fear, UnifiedEmotion::Surprise, UnifiedEmotion::Disgust,
-            UnifiedEmotion::Trust, UnifiedEmotion::Anticipation, UnifiedEmotion::Love,
-            UnifiedEmotion::Peace, UnifiedEmotion::Curiosity, UnifiedEmotion::Gratitude,
-            UnifiedEmotion::Seeking, UnifiedEmotion::Rage, UnifiedEmotion::Lust,
-            UnifiedEmotion::Care, UnifiedEmotion::Panic, UnifiedEmotion::Play,
+            UnifiedEmotion::Joy,
+            UnifiedEmotion::Sadness,
+            UnifiedEmotion::Anger,
+            UnifiedEmotion::Fear,
+            UnifiedEmotion::Surprise,
+            UnifiedEmotion::Disgust,
+            UnifiedEmotion::Trust,
+            UnifiedEmotion::Anticipation,
+            UnifiedEmotion::Love,
+            UnifiedEmotion::Peace,
+            UnifiedEmotion::Curiosity,
+            UnifiedEmotion::Gratitude,
+            UnifiedEmotion::Seeking,
+            UnifiedEmotion::Rage,
+            UnifiedEmotion::Lust,
+            UnifiedEmotion::Care,
+            UnifiedEmotion::Panic,
+            UnifiedEmotion::Play,
             UnifiedEmotion::Neutral,
         ];
         for emotion in &all_emotions {
             let g = UnifiedEmotionPrimitiveGrounding::new(*emotion, &system);
-            assert!(!g.nsm_primitives.is_empty(), "{:?} should have primitives", emotion);
+            assert!(
+                !g.nsm_primitives.is_empty(),
+                "{:?} should have primitives",
+                emotion
+            );
         }
     }
 
@@ -2522,7 +2552,10 @@ mod tests {
         let system = PrimitiveSystem::new();
         let joy = UnifiedEmotionPrimitiveGrounding::new(UnifiedEmotion::Joy, &system);
         let fear = UnifiedEmotionPrimitiveGrounding::new(UnifiedEmotion::Fear, &system);
-        let hamming: u32 = joy.primitive_encoding.0.iter()
+        let hamming: u32 = joy
+            .primitive_encoding
+            .0
+            .iter()
             .zip(fear.primitive_encoding.0.iter())
             .map(|(a, b)| (a ^ b).count_ones())
             .sum();
@@ -2570,9 +2603,16 @@ mod tests {
         let grounding = ConsciousnessUnificationNSMGrounding::new(&system);
         let joy_encoding = &grounding.emotions[&UnifiedEmotion::Joy].primitive_encoding;
         let results = grounding.query_emotions(joy_encoding, 0.0);
-        assert!(!results.is_empty(), "Self-query should return at least one result");
+        assert!(
+            !results.is_empty(),
+            "Self-query should return at least one result"
+        );
         // Joy's own encoding should be top match (similarity = 1.0 for self)
-        assert_eq!(*results[0].0, UnifiedEmotion::Joy, "Top result should be Joy");
+        assert_eq!(
+            *results[0].0,
+            UnifiedEmotion::Joy,
+            "Top result should be Joy"
+        );
     }
 
     #[test]

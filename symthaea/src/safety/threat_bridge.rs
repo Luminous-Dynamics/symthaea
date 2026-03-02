@@ -105,9 +105,18 @@ mod tests {
 
     #[test]
     fn test_threat_to_safety_level_mapping() {
-        assert_eq!(threat_to_safety_level(ThreatLevel::Green), SafetyLevel::Green);
-        assert_eq!(threat_to_safety_level(ThreatLevel::Yellow), SafetyLevel::Yellow);
-        assert_eq!(threat_to_safety_level(ThreatLevel::Orange), SafetyLevel::Orange);
+        assert_eq!(
+            threat_to_safety_level(ThreatLevel::Green),
+            SafetyLevel::Green
+        );
+        assert_eq!(
+            threat_to_safety_level(ThreatLevel::Yellow),
+            SafetyLevel::Yellow
+        );
+        assert_eq!(
+            threat_to_safety_level(ThreatLevel::Orange),
+            SafetyLevel::Orange
+        );
         assert_eq!(threat_to_safety_level(ThreatLevel::Red), SafetyLevel::Red);
     }
 

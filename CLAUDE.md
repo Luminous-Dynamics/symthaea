@@ -44,8 +44,8 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Full roadmap**: @THE_SUBSTRATE_ROADMAP.md (load when needed)
 
 ### Symthaea (Holographic Liquid Brain)
-- **Path**: `symthaea/` (main crate), `symthaea-core/`, 46 extracted sub-crates in `symthaea/crates/`
-- **Status**: v0.5.0, ~985K lines Rust (~778K code), ~3,735+ tests (main crate), 47 workspace members
+- **Path**: `symthaea/` (main crate), `symthaea-core/`, 45 sub-crates in `symthaea/crates/`, 18 genesis-mission crates
+- **Status**: v0.5.0, ~985K lines Rust (~778K code), ~3,735+ tests (main crate), 65+ workspace members
 - **Core**: HDC (16,384D) + IIT/Phi + LTC/CfC + Active Inference + 12-region Actor Brain
 - **Architecture**: Predictive coding loop — HDC encode → CfC evolve → predict → learn (50Hz)
 - **Key entry points**:
@@ -53,8 +53,8 @@ Full rules: @.claude/rules/DEVELOPMENT.md
   - `src/cognitive_loop/cycle.rs` — core cognitive pipeline with rayon-parallel post-processing
   - `symthaea-core/src/hdc/hdc_ltc_unified.rs` — unified HDC-LTC neuron (O(1) closed-form temporal jumps)
 - **Build**: `cargo test --lib` (default features), `cargo test --all-features`
-- **CI**: `symthaea-ci.yml` (GREEN) — fmt, clippy, test, docs, 18 feature matrix, 21 sub-crates
-- **Features**: 47 feature flags (default=[]), key flags: `reasoning_engine`, `identity`, `neural-bridge`, `lancedb-backend`
+- **CI**: `symthaea-ci.yml` (GREEN) — fmt, clippy, test, docs, 39 feature matrix, 45 sub-crates
+- **Features**: 88 feature flags (default=[]), key flags: `reasoning_engine`, `identity`, `neural-bridge`, `lancedb-backend`
 - **Integration status**: Core pipeline fully wired with surprise exploration, prefrontal gating, meta-cognition, reasoning engine (7-step cycle with Phi/gating/planning), moral algebra, CycleMetadata telemetry, social coherence (ToM in Mind module). ~25% of `src/` modules remain structural/disconnected (iroh P2P, some consciousness subsystems).
 - **Sub-crate pattern**: `pub use symthaea_X as module_name;` in consciousness/mod.rs for zero API changes
 

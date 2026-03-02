@@ -607,18 +607,27 @@ mod tests {
 
         // Run a cycle — reward should be consumed
         let result = service.cycle("reward test");
-        assert!(result.prediction_error.is_finite(), "cycle after reward should produce finite prediction error");
+        assert!(
+            result.prediction_error.is_finite(),
+            "cycle after reward should produce finite prediction error"
+        );
 
         // Inject another reward to verify it was reset
         // (if it wasn't consumed, the second provide_reward would stack)
         service.provide_reward(0.3);
         let result2 = service.cycle("second cycle");
-        assert!(result2.prediction_error.is_finite(), "second cycle should produce finite prediction error");
+        assert!(
+            result2.prediction_error.is_finite(),
+            "second cycle should produce finite prediction error"
+        );
 
         // After consumption, providing 0.0 should leave no reward
         // This verifies the reset mechanism works
         let result3 = service.cycle("no reward cycle");
-        assert!(result3.prediction_error.is_finite(), "cycle without reward should produce finite prediction error");
+        assert!(
+            result3.prediction_error.is_finite(),
+            "cycle without reward should produce finite prediction error"
+        );
     }
 
     #[test]

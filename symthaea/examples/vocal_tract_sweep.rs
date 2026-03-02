@@ -38,11 +38,8 @@ fn main() {
         ls_blend: f32,
         ls_lambda: f32,
     ) -> (f32, Vec<(String, f32)>, f32) {
-        let mut ltc = VocalTractController::new_with_weight_init(
-            genesis,
-            config,
-            params.weight_init_scale,
-        );
+        let mut ltc =
+            VocalTractController::new_with_weight_init(genesis, config, params.weight_init_scale);
 
         let phonemes = db.all_phonemes();
         let targets: Vec<(&str, &symthaea::voice::formant_targets::FormantTarget)> = phonemes
@@ -94,7 +91,11 @@ fn main() {
     }
 
     println!("=== Vocal Tract Parameter Sweep (Phase 24 + LS) ===\n");
-    println!("Epochs: {}, Phonemes: {}\n", epochs, db.all_phonemes().len());
+    println!(
+        "Epochs: {}, Phonemes: {}\n",
+        epochs,
+        db.all_phonemes().len()
+    );
 
     let baseline_params = TrainingHyperparams::default();
     let baseline_config = VocalTractConfig::default();
@@ -105,8 +106,14 @@ fn main() {
     print!("Baseline (Phase 24, blend=0.7, lambda=0.01)... ");
     let start = Instant::now();
     let (baseline_avg, baseline_per, baseline_loss) = evaluate(
-        &genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels,
-        baseline_blend, baseline_lambda,
+        &genesis,
+        &db,
+        &baseline_config,
+        &baseline_params,
+        epochs,
+        &test_vowels,
+        baseline_blend,
+        baseline_lambda,
     );
     println!("done in {:.0}s", start.elapsed().as_secs_f32());
     print_result("BASELINE+LS", baseline_avg, baseline_loss, &baseline_per);
@@ -115,8 +122,14 @@ fn main() {
     print!("Gradient-only (no LS)... ");
     let start = Instant::now();
     let (grad_avg, grad_per, grad_loss) = evaluate(
-        &genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels,
-        0.0, baseline_lambda,
+        &genesis,
+        &db,
+        &baseline_config,
+        &baseline_params,
+        epochs,
+        &test_vowels,
+        0.0,
+        baseline_lambda,
     );
     println!("done in {:.0}s", start.elapsed().as_secs_f32());
     print_result("GRADIENT-ONLY", grad_avg, grad_loss, &grad_per);
@@ -132,8 +145,14 @@ fn main() {
         print!("  {}... ", label);
         let start = Instant::now();
         let (avg, per, loss) = evaluate(
-            &genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels,
-            val, baseline_lambda,
+            &genesis,
+            &db,
+            &baseline_config,
+            &baseline_params,
+            epochs,
+            &test_vowels,
+            val,
+            baseline_lambda,
         );
         println!("done in {:.0}s", start.elapsed().as_secs_f32());
         print_result(&label, avg, loss, &per);
@@ -151,8 +170,14 @@ fn main() {
         print!("  {}... ", label);
         let start = Instant::now();
         let (avg, per, loss) = evaluate(
-            &genesis, &db, &baseline_config, &baseline_params, epochs, &test_vowels,
-            baseline_blend, val,
+            &genesis,
+            &db,
+            &baseline_config,
+            &baseline_params,
+            epochs,
+            &test_vowels,
+            baseline_blend,
+            val,
         );
         println!("done in {:.0}s", start.elapsed().as_secs_f32());
         print_result(&label, avg, loss, &per);
@@ -172,8 +197,14 @@ fn main() {
         print!("  {}... ", label);
         let start = Instant::now();
         let (avg, per, loss) = evaluate(
-            &genesis, &db, &c, &baseline_params, epochs, &test_vowels,
-            baseline_blend, baseline_lambda,
+            &genesis,
+            &db,
+            &c,
+            &baseline_params,
+            epochs,
+            &test_vowels,
+            baseline_blend,
+            baseline_lambda,
         );
         println!("done in {:.0}s", start.elapsed().as_secs_f32());
         print_result(&label, avg, loss, &per);
@@ -201,18 +232,23 @@ fn main() {
             .iter()
             .filter_map(|name| db.lookup(name).map(|t| (name.as_str(), t)))
             .collect();
-        let loss = ltc.train_on_phoneme_targets_configured(
-            &genesis, &targets, epochs, &baseline_params,
-        );
+        let loss =
+            ltc.train_on_phoneme_targets_configured(&genesis, &targets, epochs, &baseline_params);
         symthaea::voice::train_controller_transitions(&mut ltc, &genesis, &db, 10);
 
         // First LS pass
         ltc.refine_output_projection_ls_configured(
-            &genesis, &targets, baseline_blend, baseline_lambda,
+            &genesis,
+            &targets,
+            baseline_blend,
+            baseline_lambda,
         );
         // Second LS pass (re-collects HVs with updated weights)
         ltc.refine_output_projection_ls_configured(
-            &genesis, &targets, baseline_blend, baseline_lambda,
+            &genesis,
+            &targets,
+            baseline_blend,
+            baseline_lambda,
         );
 
         // Evaluate
@@ -260,8 +296,14 @@ fn main() {
         print!("  {}... ", label);
         let start = Instant::now();
         let (avg, per, loss) = evaluate(
-            &genesis, &db, &baseline_config, &baseline_params, val, &test_vowels,
-            baseline_blend, baseline_lambda,
+            &genesis,
+            &db,
+            &baseline_config,
+            &baseline_params,
+            val,
+            &test_vowels,
+            baseline_blend,
+            baseline_lambda,
         );
         println!("done in {:.0}s", start.elapsed().as_secs_f32());
         print_result(&label, avg, loss, &per);

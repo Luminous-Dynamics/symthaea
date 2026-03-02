@@ -187,11 +187,11 @@ pub use symthaea_sensorimotor as sensorimotor_contingencies;
 // Genesis Pipeline re-exports (feature-gated)
 // ============================================================================
 #[cfg(feature = "genesis")]
-pub use symthaea_genomics as genomics;
-#[cfg(feature = "genesis")]
 pub use symthaea_cell_foundry as cell_foundry;
 #[cfg(feature = "genesis")]
 pub use symthaea_ectogenesis as ectogenesis;
+#[cfg(feature = "genesis")]
+pub use symthaea_genomics as genomics;
 #[cfg(feature = "nurture")]
 pub use symthaea_nurture as nurture;
 #[cfg(feature = "population")]
@@ -452,11 +452,14 @@ pub mod mycelix_bridge;
 // ============================================================================
 
 pub use affective_consciousness::{AffectiveConsciousnessAnalyzer, CoreAffect, EmotionCategory};
+pub use attention_schema::{AttentionSchema, AttentionSchemaConfig, AttentionState};
 pub use autopoietic_consciousness::{AutopoieticConsciousness, AutopoieticState};
 pub use compositionality::{
     ComposedPrimitive, CompositionMetadata, CompositionResult, CompositionStats, CompositionType,
     CompositionalityConfig, CompositionalityEngine,
 };
+pub use consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent, EquationConfig};
+pub use consciousness_thermodynamics::{ConsciousnessThermodynamicsAnalyzer, ThermodynamicsConfig};
 pub use contextual_weights::{
     ActionDomain, ActionType, ContextualWeights, DomainClassifier, HarmonyWeightProfile,
 };
@@ -464,6 +467,7 @@ pub use cross_modal_binding::{BindingResult, CrossModalBinder};
 pub use dream::{
     DreamEngine, DreamEngineConfig, DreamEngineStats, DreamEvent, DreamResult, Wisdom,
 };
+pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
 pub use fep_active_inference::{
     ActionSelectionResult, ActiveInferenceAgent, ActiveInferenceAgentConfig,
     ActiveInferenceAgentStats, ActiveInferenceSummary, CognitiveLoopFEPBridge,
@@ -473,22 +477,18 @@ pub use fep_active_inference::{
     StateTransition, TemporalDifferenceLearner, TemporalDifferenceLearningConfig,
     TemporalDifferenceLearningStats,
 };
+pub use harmonics::{FiduciaryHarmonic, HarmonicField, HarmonicResolver};
+pub use hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC};
 pub use master_consciousness_equation::{
     AgentModel, ComponentWeights, ConsciousnessInputs, ConsciousnessResult, EmbodimentFactor,
     FutureScenario, MasterConsciousnessEquation, MasterEquationConfig, NarrativeCoherence,
     NarrativeEpisode, SelfModel, SocialEmbedding,
 };
+pub use metacognitive_monitoring::{MetacognitiveMonitor, MonitoringResult};
 pub use multi_modal_integration::{
     IntegrationConfig, IntegrationEvent, IntegrationEventType, IntegrationResult, ModalInput,
     MultiModalIntegrator,
 };
-pub use attention_schema::{AttentionSchema, AttentionSchemaConfig, AttentionState};
-pub use consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent, EquationConfig};
-pub use consciousness_thermodynamics::{ConsciousnessThermodynamicsAnalyzer, ThermodynamicsConfig};
-pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
-pub use harmonics::{FiduciaryHarmonic, HarmonicField, HarmonicResolver};
-pub use hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC};
-pub use metacognitive_monitoring::{MetacognitiveMonitor, MonitoringResult};
 pub use narrative_self::{
     AutobiographicalSelf, CoreSelf, NarrativeSelfConfig, NarrativeSelfModel, ProtoSelf,
 };

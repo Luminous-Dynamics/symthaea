@@ -443,7 +443,11 @@ mod tests {
     fn from_neuromod_trust_from_oxytocin() {
         let state = UserState::from_neuromod(0.3, 0.5, 0.3, 0.5);
         // trust = (0.5 + 0.5 * 0.3) = 0.65
-        assert!(state.trust_in_sophia > 0.5, "trust={}", state.trust_in_sophia);
+        assert!(
+            state.trust_in_sophia > 0.5,
+            "trust={}",
+            state.trust_in_sophia
+        );
         assert!((state.trust_in_sophia - 0.65).abs() < 0.01);
     }
 

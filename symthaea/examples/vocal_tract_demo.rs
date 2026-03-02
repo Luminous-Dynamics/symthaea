@@ -440,8 +440,12 @@ fn main() {
                     };
 
                     let frame = pipeline.tick_with_anticipation(
-                        &cog_state, None, dt,
-                        Some(phoneme), next_ph, remaining,
+                        &cog_state,
+                        None,
+                        dt,
+                        Some(phoneme),
+                        next_ph,
+                        remaining,
                         &prosody,
                     );
                     all_frames.push(frame);

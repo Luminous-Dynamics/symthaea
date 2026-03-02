@@ -52,7 +52,10 @@ fn main() {
 
     // Consciousness gate
     let gate_result = consciousness_gate(0.1, 0.5);
-    println!("  Consciousness gate (0.1 vs 0.5 threshold): {:?}", gate_result);
+    println!(
+        "  Consciousness gate (0.1 vs 0.5 threshold): {:?}",
+        gate_result
+    );
 
     // Generate audit report
     println!("\n--- Audit Report (Markdown) ---");

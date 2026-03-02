@@ -4,9 +4,9 @@ use crate::consciousness::consciousness_resonance::ResonanceAnalyzer;
 use crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer;
 use crate::consciousness::embodied_cognition::EmbodiedConsciousnessAnalyzer;
 use crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy;
+use crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer;
 use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
 use crate::consciousness::temporal_consciousness::TemporalConsciousnessAnalyzer;
-use crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer;
 
 /// Groups 7 optional consciousness analyzer CLS fields into a single tier.
 ///
@@ -35,4 +35,3 @@ pub(crate) struct ConsciousnessMonitorTier {
     /// Multi-level variational free energy hierarchy.
     pub hierarchical_free_energy: Option<HierarchicalFreeEnergy>,
 }
-

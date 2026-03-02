@@ -204,11 +204,19 @@ pub struct DemoCycleData {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum ClientMessage {
-    TextInput { text: String },
-    Thermodynamics { load: f32 },
-    Command { command: String },
+    TextInput {
+        text: String,
+    },
+    Thermodynamics {
+        load: f32,
+    },
+    Command {
+        command: String,
+    },
     /// Toggle vision manifold: `{"vision": true}` / `{"vision": false}`
-    Vision { vision: bool },
+    Vision {
+        vision: bool,
+    },
 }
 
 /// WebSocket upgrade handler.

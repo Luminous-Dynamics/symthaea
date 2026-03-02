@@ -83,9 +83,7 @@ impl IvgProtocol {
                 self.cell_state.pluripotency_score -= 0.3;
                 GermCellStage::PgcInduction
             }
-            GermCellStage::PgcInduction if self.day >= 7 => {
-                GermCellStage::EarlyGerm
-            }
+            GermCellStage::PgcInduction if self.day >= 7 => GermCellStage::EarlyGerm,
             GermCellStage::EarlyGerm if self.day >= 14 => {
                 // Gate: verify synapsis checkpoint
                 let (pass, score) = MeiosisMonitor::verify_synapsis(&self.cell_state);

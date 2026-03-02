@@ -48,7 +48,10 @@ fn main() {
     println!("\n--- Self-Match Verification ---");
     for sig in IsotopicSignature::references() {
         let r = agent.attribute(&sig);
-        println!("  {} → {:?} (confidence={:.3})", sig.name, r.matched_source, r.confidence);
+        println!(
+            "  {} → {:?} (confidence={:.3})",
+            sig.name, r.matched_source, r.confidence
+        );
     }
 
     // 4. O(1) temporal prediction proof (predict_at_horizon replaces backdate)

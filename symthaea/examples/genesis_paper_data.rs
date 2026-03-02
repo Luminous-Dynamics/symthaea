@@ -5,17 +5,17 @@
 //!
 //! Run with: `cargo run --example genesis_paper_data --features population,nurture`
 
-use symthaea_population::{
-    encode_individual, encode_locus, heterozygosity_after_generations, observed_heterozygosity,
-    Allele, BiologicalSex, BreedingStrategy, Genotype, Individual, Locus, Pedigree,
-    PedigreeEntry, Population, PopulationSimulator, PopulationTrajectoryPredictor,
-};
-use symthaea_nurture::{AttachmentSystem, CaregiverAction};
-use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use std::fs;
 use std::io::Write;
+use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
+use symthaea_nurture::{AttachmentSystem, CaregiverAction};
+use symthaea_population::{
+    encode_individual, encode_locus, heterozygosity_after_generations, observed_heterozygosity,
+    Allele, BiologicalSex, BreedingStrategy, Genotype, Individual, Locus, Pedigree, PedigreeEntry,
+    Population, PopulationSimulator, PopulationTrajectoryPredictor,
+};
 
 /// Create a founder population with balanced allelic diversity at each locus.
 fn make_founder_population(
@@ -133,7 +133,7 @@ fn generate_het_decay_data() {
     // Three effective population sizes: Ne ~ 50, 200, 500
     // Using balanced sex ratios so Ne ~ N
     let configs: [(usize, usize, &str); 3] = [
-        (25, 25, "ne50"),   // Ne ~ 50
+        (25, 25, "ne50"),    // Ne ~ 50
         (100, 100, "ne200"), // Ne ~ 200
         (250, 250, "ne500"), // Ne ~ 500
     ];
@@ -144,7 +144,9 @@ fn generate_het_decay_data() {
     for (idx, &(n_f, n_m, label)) in configs.iter().enumerate() {
         let target_size = n_f + n_m;
         let ne = target_size as f64;
-        println!("  Running {label} (N={target_size}, Ne~{ne:.0}) for {generations} generations...");
+        println!(
+            "  Running {label} (N={target_size}, Ne~{ne:.0}) for {generations} generations..."
+        );
 
         let mut rng = StdRng::seed_from_u64(42 + idx as u64);
         let (pop, mut ped) = make_founder_population(n_f, n_m, &loci, &mut rng);
@@ -261,10 +263,7 @@ fn generate_attachment_trajectories() {
         writeln!(
             file,
             "{interaction},{:.6},{:.6},{:.6},{:.6}",
-            trajectories[0][i],
-            trajectories[1][i],
-            trajectories[2][i],
-            trajectories[3][i]
+            trajectories[0][i], trajectories[1][i], trajectories[2][i], trajectories[3][i]
         )
         .unwrap();
     }
@@ -287,12 +286,7 @@ fn generate_cfc_vs_sim() {
     let loci = make_loci(n_loci);
 
     let mut rng = StdRng::seed_from_u64(777);
-    let (pop, mut ped) = make_founder_population(
-        target_size / 2,
-        target_size / 2,
-        &loci,
-        &mut rng,
-    );
+    let (pop, mut ped) = make_founder_population(target_size / 2, target_size / 2, &loci, &mut rng);
 
     let h0 = mean_heterozygosity(&pop);
     println!("  Initial H(0) = {h0:.4}");
@@ -314,7 +308,11 @@ fn generate_cfc_vs_sim() {
     // Write CSV
     let path = "papers/data/cfc_vs_sim.csv";
     let mut file = fs::File::create(path).expect("create cfc_vs_sim.csv");
-    writeln!(file, "generation,simulation_het,cfc_predicted_het,analytical_het").unwrap();
+    writeln!(
+        file,
+        "generation,simulation_het,cfc_predicted_het,analytical_het"
+    )
+    .unwrap();
 
     for gen in 0..=generations {
         let sim_het = sim_result.generations[gen as usize].heterozygosity;
@@ -327,16 +325,10 @@ fn generate_cfc_vs_sim() {
         // Analytical prediction
         let ana_het = heterozygosity_after_generations(h0, ne, gen);
 
-        writeln!(
-            file,
-            "{gen},{sim_het:.6},{cfc_het:.6},{ana_het:.6}"
-        )
-        .unwrap();
+        writeln!(file, "{gen},{sim_het:.6},{cfc_het:.6},{ana_het:.6}").unwrap();
 
         if gen % 10 == 0 {
-            println!(
-                "    Gen {gen:3}: sim={sim_het:.4} cfc={cfc_het:.4} analytical={ana_het:.4}"
-            );
+            println!("    Gen {gen:3}: sim={sim_het:.4} cfc={cfc_het:.4} analytical={ana_het:.4}");
         }
     }
 

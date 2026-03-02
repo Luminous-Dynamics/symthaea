@@ -98,8 +98,7 @@ impl MeshBridgeHandle {
         #[cfg(feature = "mesh-encryption")]
         let shared_epoch: SharedEpoch = Arc::new(std::sync::atomic::AtomicU8::new(0));
         #[cfg(feature = "mesh-encryption")]
-        let shared_generation: SharedKeyGeneration =
-            Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let shared_generation: SharedKeyGeneration = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
         let handle = Self {
             outbound_tx,
@@ -159,8 +158,7 @@ impl MeshBridgeHandle {
     #[cfg(feature = "mesh-encryption")]
     pub fn set_encryption_key(&self, key: Option<[u8; 32]>) {
         *self.shared_key.lock().unwrap() = key;
-        self.shared_generation
-            .fetch_add(1, Ordering::Release);
+        self.shared_generation.fetch_add(1, Ordering::Release);
     }
 
     /// Set the encryption epoch byte.

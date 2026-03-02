@@ -18,11 +18,11 @@ use super::super::{CognitiveLoopService, CycleResult, MoralJudgmentSummary, Resp
 use crate::cognitive_loop::thresholds::{
     BODY_PSI_WEIGHT,
     EMBODIED_PSI_WEIGHT,
-    // Psi synthesis
-    FLOW_PSI_WEIGHT,
     // FEP / Surprise
     FEP_LR_DECAY,
     FEP_SURPRISE_SCALE,
+    // Psi synthesis
+    FLOW_PSI_WEIGHT,
     MEMORY_CONTEXT_BOOST_SCALE,
     MEMORY_RECALL_SIM_THRESHOLD,
     // Memory recall
@@ -338,13 +338,8 @@ impl CognitiveLoopService {
                     .set_boredom_threshold(current_threshold * SURPRISE_BOREDOM_DAMPEN);
                 let expl_factor = bridge.exploration_factor;
                 deferred_exploration_delta = Some(expl_factor * 0.3);
-                exploration_action = action.map(|a| {
-                    format!(
-                        "perturbation[{}d,scale={:.3}]",
-                        a.len(),
-                        expl_factor
-                    )
-                });
+                exploration_action =
+                    action.map(|a| format!("perturbation[{}d,scale={:.3}]", a.len(), expl_factor));
                 tracing::debug!(
                     surprise = surprise,
                     threshold = bridge.tracker().threshold(),
@@ -570,7 +565,8 @@ impl CognitiveLoopService {
                 if let Some(ref fe) = self.fep_agent.last_fe_components {
                     let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
                     self.self_model_tier.self_reflection.trust_threshold =
-                        (self.self_model_tier.self_reflection.trust_threshold * 0.9 + precision_mod * 0.1)
+                        (self.self_model_tier.self_reflection.trust_threshold * 0.9
+                            + precision_mod * 0.1)
                             .clamp(0.1, 0.9);
                 }
             }
@@ -792,11 +788,7 @@ impl CognitiveLoopService {
                 self.scale_confidence("moral_consent_viol", 0.7);
                 self.carryover.learning.subsystem_lr_factor *= 0.5;
                 moral_steering_category = "consent";
-            } else if moral_judgment
-                .violations
-                .iter()
-                .any(|v| v.contains("harm"))
-            {
+            } else if moral_judgment.violations.iter().any(|v| v.contains("harm")) {
                 self.scale_exploration("harm_detected", 0.4);
                 self.scale_confidence("moral_harm_detect", 0.85);
                 moral_steering_category = "harm";

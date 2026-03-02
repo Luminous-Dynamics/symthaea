@@ -12,11 +12,11 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 /// Grid prediction horizons (seconds): 1min → 1hr → 1day → 1month → 1year.
 pub const GRID_HORIZONS: &[f32] = &[
-    60.0,          // 1 minute — frequency excursion
-    3_600.0,       // 1 hour — demand ramp
-    86_400.0,      // 1 day — diurnal cycle
-    2_592_000.0,   // 1 month — seasonal load
-    31_536_000.0,  // 1 year — capacity planning
+    60.0,         // 1 minute — frequency excursion
+    3_600.0,      // 1 hour — demand ramp
+    86_400.0,     // 1 day — diurnal cycle
+    2_592_000.0,  // 1 month — seasonal load
+    31_536_000.0, // 1 year — capacity planning
 ];
 
 pub const GRID_HORIZON_LABELS: &[&str] = &[

@@ -135,8 +135,7 @@ impl ContinuousMind {
 
         // 2. ECB stress buffer: reduce allostatic load under chronic stress (Piomelli 2003)
         if self.dream_bath.allostatic_load > 0.3 {
-            self.dream_bath.allostatic_load =
-                (self.dream_bath.allostatic_load - 0.02).max(0.0);
+            self.dream_bath.allostatic_load = (self.dream_bath.allostatic_load - 0.02).max(0.0);
             self.stats.dream_allostatic_recovery += 1;
         }
 
@@ -631,9 +630,7 @@ impl ContinuousMind {
         }
 
         // Partition detection: if all peers expired, trigger replay buffer flush
-        if self.mesh_peers.is_partitioned(&self.mesh_stats)
-            && !self.mesh_replay_buffer.is_empty()
-        {
+        if self.mesh_peers.is_partitioned(&self.mesh_stats) && !self.mesh_replay_buffer.is_empty() {
             tracing::warn!(
                 target: "symthaea::mind::mesh",
                 replay_count = self.mesh_replay_buffer.len(),
@@ -1360,7 +1357,10 @@ mod tests {
             .with_verification(true);
         mind.input(input);
         mind.process_inputs();
-        assert_eq!(mind.working_memory_sources[0], MemorySource::UserInteraction);
+        assert_eq!(
+            mind.working_memory_sources[0],
+            MemorySource::UserInteraction
+        );
         assert!(mind.working_memory_verified[0]);
     }
 
@@ -1454,8 +1454,7 @@ mod tests {
         let mut mind = activated_mind();
         // Add diverse random vectors — dissimilar items boost integration
         for i in 0..5 {
-            mind.working_memory
-                .push(ContinuousHV::random(512, 100 + i));
+            mind.working_memory.push(ContinuousHV::random(512, 100 + i));
         }
         mind.update_consciousness();
         assert!(
@@ -1486,8 +1485,7 @@ mod tests {
     fn update_consciousness_relational_psi_boost() {
         let mut mind = activated_mind();
         for i in 0..5 {
-            mind.working_memory
-                .push(ContinuousHV::random(512, 200 + i));
+            mind.working_memory.push(ContinuousHV::random(512, 200 + i));
         }
         mind.update_consciousness();
         let base_level = mind.state.consciousness_level;
@@ -1510,8 +1508,7 @@ mod tests {
     fn update_consciousness_relational_psi_zero_no_boost() {
         let mut mind = activated_mind();
         for i in 0..3 {
-            mind.working_memory
-                .push(ContinuousHV::random(512, 300 + i));
+            mind.working_memory.push(ContinuousHV::random(512, 300 + i));
         }
         mind.relational_psi = 0.0;
         mind.update_consciousness();
@@ -1540,8 +1537,7 @@ mod tests {
     fn generate_output_requires_tick_multiple_of_10() {
         let mut mind = activated_mind();
         mind.state.consciousness_level = 0.5;
-        mind.working_memory
-            .push(ContinuousHV::random(512, 42));
+        mind.working_memory.push(ContinuousHV::random(512, 42));
 
         // Tick not a multiple of 10 — should return None
         mind.state.tick = 7;
@@ -1567,8 +1563,7 @@ mod tests {
         mind.state.consciousness_level = 0.5;
         mind.state.thermodynamic_load = 0.9; // High load
         mind.state.tick = 10;
-        mind.working_memory
-            .push(ContinuousHV::random(512, 42));
+        mind.working_memory.push(ContinuousHV::random(512, 42));
 
         // The holocell.simulate() may or may not exceed 0.9 predicted load,
         // but with high thermodynamic_load the veto path is possible.
@@ -1593,7 +1588,7 @@ mod tests {
         let evicted = mind.take_evicted();
         assert_eq!(evicted.len(), 1);
         assert_eq!(evicted[0].1, 42); // steps_survived
-        // Buffer should be empty after drain
+                                      // Buffer should be empty after drain
         assert!(mind.take_evicted().is_empty());
     }
 
@@ -1653,10 +1648,8 @@ mod tests {
     fn process_dream_preserves_dissimilar_memories() {
         let mut mind = activated_mind();
         // Use different seeds — random 512-dim vectors will be dissimilar
-        mind.working_memory
-            .push(ContinuousHV::random(512, 100));
-        mind.working_memory
-            .push(ContinuousHV::random(512, 200));
+        mind.working_memory.push(ContinuousHV::random(512, 100));
+        mind.working_memory.push(ContinuousHV::random(512, 200));
         mind.working_memory_ticks.push(0);
         mind.working_memory_ticks.push(1);
         mind.working_memory_sources.push(MemorySource::Internal);
@@ -1737,8 +1730,7 @@ mod tests {
     #[test]
     fn process_dream_no_crash_on_single_memory() {
         let mut mind = activated_mind();
-        mind.working_memory
-            .push(ContinuousHV::random(512, 42));
+        mind.working_memory.push(ContinuousHV::random(512, 42));
         mind.working_memory_ticks.push(0);
         mind.working_memory_sources.push(MemorySource::Internal);
         mind.working_memory_verified.push(false);

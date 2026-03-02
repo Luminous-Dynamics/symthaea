@@ -14,7 +14,11 @@ fn main() {
 
     // 1. Create a synthetic disruption scenario (100 healthy + 50 disruption steps)
     let scenario = synthetic_disruption_scenario(100, 50);
-    println!("Scenario: {} steps ({} healthy + 50 disruption)", scenario.len(), 100);
+    println!(
+        "Scenario: {} steps ({} healthy + 50 disruption)",
+        scenario.len(),
+        100
+    );
 
     // 2. Initialize digital twin with healthy reference
     let mut twin = FusionDigitalTwin::new();

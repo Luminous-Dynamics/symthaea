@@ -16,32 +16,32 @@ pub mod audit;
 pub mod gate;
 
 // Cross-domain bridges: domain outputs → Safety Agent
-#[cfg(all(feature = "safety-agents", feature = "fusion-twin"))]
-pub mod fusion_bridge;
-#[cfg(all(feature = "safety-agents", feature = "materials"))]
-pub mod materials_bridge;
-#[cfg(all(feature = "safety-agents", feature = "water-prediction"))]
-pub mod water_bridge;
-#[cfg(all(feature = "safety-agents", feature = "nuclear-forensics"))]
-pub mod nuclear_bridge;
-#[cfg(all(feature = "safety-agents", feature = "grid-scaling"))]
-pub mod grid_bridge;
-#[cfg(all(feature = "safety-agents", feature = "fission-reactor"))]
-pub mod fission_bridge;
 #[cfg(all(feature = "safety-agents", feature = "accelerator"))]
 pub mod accelerator_bridge;
-#[cfg(all(feature = "safety-agents", feature = "threat-assessment"))]
-pub mod threat_bridge;
 #[cfg(all(feature = "safety-agents", feature = "datacenter"))]
 pub mod datacenter_bridge;
 #[cfg(all(feature = "safety-agents", feature = "experiment-planner"))]
 pub mod experiment_bridge;
-#[cfg(all(feature = "safety-agents", feature = "strategic-materials"))]
-pub mod strategic_materials_bridge;
+#[cfg(all(feature = "safety-agents", feature = "fission-reactor"))]
+pub mod fission_bridge;
+#[cfg(all(feature = "safety-agents", feature = "fusion-twin"))]
+pub mod fusion_bridge;
+#[cfg(all(feature = "safety-agents", feature = "grid-scaling"))]
+pub mod grid_bridge;
+#[cfg(all(feature = "safety-agents", feature = "materials"))]
+pub mod materials_bridge;
 #[cfg(all(feature = "safety-agents", feature = "critical-minerals"))]
 pub mod mining_bridge;
+#[cfg(all(feature = "safety-agents", feature = "nuclear-forensics"))]
+pub mod nuclear_bridge;
 #[cfg(all(feature = "safety-agents", feature = "proliferation-safeguards"))]
 pub mod safeguards_bridge;
+#[cfg(all(feature = "safety-agents", feature = "strategic-materials"))]
+pub mod strategic_materials_bridge;
+#[cfg(all(feature = "safety-agents", feature = "threat-assessment"))]
+pub mod threat_bridge;
+#[cfg(all(feature = "safety-agents", feature = "water-prediction"))]
+pub mod water_bridge;
 
 // Re-export key types
 pub use gateway::{SafetyCheck, SafetyDecision, SafetyGateway};
@@ -53,32 +53,32 @@ pub use audit::SafetyAuditReport;
 #[cfg(feature = "safety-agents")]
 pub use gate::{consciousness_gate, safety_gate, SafetyGateResult};
 
-#[cfg(all(feature = "safety-agents", feature = "fusion-twin"))]
-pub use fusion_bridge::FusionSafetyAdapter;
-#[cfg(all(feature = "safety-agents", feature = "materials"))]
-pub use materials_bridge::MaterialSafetyAdapter;
-#[cfg(all(feature = "safety-agents", feature = "water-prediction"))]
-pub use water_bridge::WaterSafetyAdapter;
-#[cfg(all(feature = "safety-agents", feature = "nuclear-forensics"))]
-pub use nuclear_bridge::NuclearSafetyAdapter;
-#[cfg(all(feature = "safety-agents", feature = "grid-scaling"))]
-pub use grid_bridge::GridSafetyAdapter;
-#[cfg(all(feature = "safety-agents", feature = "fission-reactor"))]
-pub use fission_bridge::FissionSafetyAdapter;
 #[cfg(all(feature = "safety-agents", feature = "accelerator"))]
 pub use accelerator_bridge::AcceleratorSafetyAdapter;
-#[cfg(all(feature = "safety-agents", feature = "threat-assessment"))]
-pub use threat_bridge::ThreatSafetyAdapter;
 #[cfg(all(feature = "safety-agents", feature = "datacenter"))]
 pub use datacenter_bridge::DatacenterSafetyAdapter;
 #[cfg(all(feature = "safety-agents", feature = "experiment-planner"))]
 pub use experiment_bridge::ExperimentSafetyAdapter;
-#[cfg(all(feature = "safety-agents", feature = "strategic-materials"))]
-pub use strategic_materials_bridge::StrategicMaterialsSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "fission-reactor"))]
+pub use fission_bridge::FissionSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "fusion-twin"))]
+pub use fusion_bridge::FusionSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "grid-scaling"))]
+pub use grid_bridge::GridSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "materials"))]
+pub use materials_bridge::MaterialSafetyAdapter;
 #[cfg(all(feature = "safety-agents", feature = "critical-minerals"))]
 pub use mining_bridge::MiningSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "nuclear-forensics"))]
+pub use nuclear_bridge::NuclearSafetyAdapter;
 #[cfg(all(feature = "safety-agents", feature = "proliferation-safeguards"))]
 pub use safeguards_bridge::SafeguardsSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "strategic-materials"))]
+pub use strategic_materials_bridge::StrategicMaterialsSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "threat-assessment"))]
+pub use threat_bridge::ThreatSafetyAdapter;
+#[cfg(all(feature = "safety-agents", feature = "water-prediction"))]
+pub use water_bridge::WaterSafetyAdapter;
 
 /// Categories of forbidden content/actions
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -137,12 +137,12 @@ impl AmygdalaActor {
         let patterns = vec![
             // Destructive commands — hardened to catch flag-interleaved variants
             // Each pattern handles arbitrary flags (e.g. --no-preserve-root) between command and target
-            r"rm\s+(-\S+\s+)*/",                     // rm with any flags before path /
-            r"dd\s+(\S+=\S+\s+)*if=.*of=/dev/",     // dd with any key=value params
-            r"mkfs\.",                                // mkfs.* (always dangerous)
-            r":\(\)\{\s*:\|:&\s*\};:",               // Fork bomb
-            r"chmod\s+(-\S+\s+)*777\s+/",            // chmod 777 with any flags
-            r">\s*/dev/sd",                           // redirect to raw device
+            r"rm\s+(-\S+\s+)*/",                // rm with any flags before path /
+            r"dd\s+(\S+=\S+\s+)*if=.*of=/dev/", // dd with any key=value params
+            r"mkfs\.",                          // mkfs.* (always dangerous)
+            r":\(\)\{\s*:\|:&\s*\};:",          // Fork bomb
+            r"chmod\s+(-\S+\s+)*777\s+/",       // chmod 777 with any flags
+            r">\s*/dev/sd",                     // redirect to raw device
         ];
 
         let mut compile_failures = 0;

@@ -259,7 +259,11 @@ impl<I: InstrumentAdapter> LabController<I> {
     /// 4. Predict future state
     /// 5. Select action via FEP
     /// 6. Execute action on instrument
-    pub fn execute_step(&mut self, step: &ProtocolStep, step_index: usize) -> LabControllerStepResult {
+    pub fn execute_step(
+        &mut self,
+        step: &ProtocolStep,
+        step_index: usize,
+    ) -> LabControllerStepResult {
         let cell_state = self.instrument.read_cell_state();
         let environment = self.instrument.read_environment();
 
@@ -297,7 +301,9 @@ impl<I: InstrumentAdapter> LabController<I> {
         // Predict future state
         let encoded = crate::cell_encoder::encode_cell_state(&cell_state);
         self.predictor.observe(&encoded, 1.0);
-        let predicted = self.predictor.predict_at_horizon(&encoded, step.duration_seconds as f32);
+        let predicted = self
+            .predictor
+            .predict_at_horizon(&encoded, step.duration_seconds as f32);
         let predicted_sim = predicted.similarity(&encoded);
 
         // FEP action selection
@@ -466,7 +472,11 @@ mod tests {
 
         let result = controller.execute_step(&step, 0);
         assert!(!result.action_executed);
-        assert!(result.failure_reason.as_ref().unwrap().contains("Ethics gate"));
+        assert!(result
+            .failure_reason
+            .as_ref()
+            .unwrap()
+            .contains("Ethics gate"));
     }
 
     #[test]
@@ -487,7 +497,11 @@ mod tests {
 
         let result = controller.execute_step(&step, 0);
         assert!(!result.action_executed);
-        assert!(result.failure_reason.as_ref().unwrap().contains("Viability"));
+        assert!(result
+            .failure_reason
+            .as_ref()
+            .unwrap()
+            .contains("Viability"));
     }
 
     #[test]
@@ -617,7 +631,11 @@ mod tests {
 
         let result = controller.run_protocol(&protocol);
         assert!(!result.success);
-        assert!(result.failure_reason.as_ref().unwrap().contains("max duration"));
+        assert!(result
+            .failure_reason
+            .as_ref()
+            .unwrap()
+            .contains("max duration"));
         // Steps 0 and 1 complete (elapsed = 200 > 150), step 2 is blocked
         assert_eq!(result.steps_completed, 2);
     }
@@ -646,7 +664,11 @@ mod tests {
 
         let result = controller.run_protocol(&protocol);
         assert!(!result.success);
-        assert!(result.failure_reason.as_ref().unwrap().contains("safety floor"));
+        assert!(result
+            .failure_reason
+            .as_ref()
+            .unwrap()
+            .contains("safety floor"));
     }
 
     #[test]
@@ -707,7 +729,10 @@ mod tests {
         assert!((protocol.steps[0].min_viability - 0.8).abs() < 1e-6);
 
         // Step 3: Colony Stabilization — expects PassageCells
-        assert_eq!(protocol.steps[3].expected_action, Some(CultureAction::PassageCells));
+        assert_eq!(
+            protocol.steps[3].expected_action,
+            Some(CultureAction::PassageCells)
+        );
     }
 
     #[test]

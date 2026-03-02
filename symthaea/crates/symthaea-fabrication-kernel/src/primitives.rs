@@ -21,21 +21,43 @@ const SUBTRACT_SEED: u64 = 0x5355_4254_0050;
 const INTERSECT_SEED: u64 = 0x494E_5445_0060;
 
 // Shape primitives
-pub fn cube_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, CUBE_SEED) }
-pub fn cylinder_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, CYLINDER_SEED) }
-pub fn sphere_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, SPHERE_SEED) }
-pub fn cone_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, CONE_SEED) }
-pub fn torus_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, TORUS_SEED) }
+pub fn cube_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, CUBE_SEED)
+}
+pub fn cylinder_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, CYLINDER_SEED)
+}
+pub fn sphere_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, SPHERE_SEED)
+}
+pub fn cone_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, CONE_SEED)
+}
+pub fn torus_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, TORUS_SEED)
+}
 
 // Transform operators
-pub fn scale_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, SCALE_SEED) }
-pub fn rotate_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, ROTATE_SEED) }
-pub fn translate_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, TRANSLATE_SEED) }
+pub fn scale_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, SCALE_SEED)
+}
+pub fn rotate_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, ROTATE_SEED)
+}
+pub fn translate_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, TRANSLATE_SEED)
+}
 
 // Boolean operators
-pub fn union_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, UNION_SEED) }
-pub fn subtract_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, SUBTRACT_SEED) }
-pub fn intersect_hv() -> ContinuousHV { ContinuousHV::random(FAB_KERNEL_DIM, INTERSECT_SEED) }
+pub fn union_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, UNION_SEED)
+}
+pub fn subtract_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, SUBTRACT_SEED)
+}
+pub fn intersect_hv() -> ContinuousHV {
+    ContinuousHV::random(FAB_KERNEL_DIM, INTERSECT_SEED)
+}
 
 /// Encode a scalar parameter as an HV by scaling a base random vector
 pub fn param_hv(param_seed: u64, value: f32) -> ContinuousHV {
@@ -75,7 +97,10 @@ mod tests {
     fn test_orthogonal() {
         let c = cube_hv();
         let s = sphere_hv();
-        assert!(c.similarity(&s).abs() < 0.1, "Primitives should be near-orthogonal");
+        assert!(
+            c.similarity(&s).abs() < 0.1,
+            "Primitives should be near-orthogonal"
+        );
     }
 
     #[test]

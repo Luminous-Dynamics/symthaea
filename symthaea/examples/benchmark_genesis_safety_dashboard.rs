@@ -5,14 +5,22 @@
 //! comprehensive safety dashboard.
 
 use symthaea::safety::{
-    SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics,
-    SafetyAuditReport,
+    SafetyAgent, SafetyAssessment, SafetyAuditReport, SafetyLevel, SafetyMetrics,
 };
 
 const DOMAIN_NAMES: &[&str] = &[
-    "fusion", "grid", "fission", "accelerator", "threat", "datacenter",
-    "water", "materials", "experiment", "strategic_materials",
-    "critical_minerals", "safeguards",
+    "fusion",
+    "grid",
+    "fission",
+    "accelerator",
+    "threat",
+    "datacenter",
+    "water",
+    "materials",
+    "experiment",
+    "strategic_materials",
+    "critical_minerals",
+    "safeguards",
 ];
 
 fn main() {
@@ -43,7 +51,8 @@ fn main() {
             assessments.push(assessment);
         }
 
-        let peak = assessments.iter()
+        let peak = assessments
+            .iter()
             .map(|a| a.level)
             .max()
             .unwrap_or(SafetyLevel::Green);
@@ -53,18 +62,32 @@ fn main() {
     }
 
     // Overall system health = worst across all domains
-    let overall = peak_levels.iter().copied().max().unwrap_or(SafetyLevel::Green);
+    let overall = peak_levels
+        .iter()
+        .copied()
+        .max()
+        .unwrap_or(SafetyLevel::Green);
 
     // Console summary
     println!("Overall System Health: {:?}\n", overall);
-    println!("{:>20}  {:>6}  {:>6}  {:>6}  {:>6}  {:>8}",
-        "Domain", "Green", "Yellow", "Orange", "Red", "Peak");
-    println!("{:>20}  {:>6}  {:>6}  {:>6}  {:>6}  {:>8}",
-        "------", "-----", "------", "------", "---", "----");
+    println!(
+        "{:>20}  {:>6}  {:>6}  {:>6}  {:>6}  {:>8}",
+        "Domain", "Green", "Yellow", "Orange", "Red", "Peak"
+    );
+    println!(
+        "{:>20}  {:>6}  {:>6}  {:>6}  {:>6}  {:>8}",
+        "------", "-----", "------", "------", "---", "----"
+    );
     for i in 0..n {
-        println!("{:>20}  {:>6}  {:>6}  {:>6}  {:>6}  {:>8?}",
-            DOMAIN_NAMES[i], level_counts[i][0], level_counts[i][1],
-            level_counts[i][2], level_counts[i][3], peak_levels[i]);
+        println!(
+            "{:>20}  {:>6}  {:>6}  {:>6}  {:>6}  {:>8?}",
+            DOMAIN_NAMES[i],
+            level_counts[i][0],
+            level_counts[i][1],
+            level_counts[i][2],
+            level_counts[i][3],
+            peak_levels[i]
+        );
     }
 
     // Generate reports
@@ -163,7 +186,9 @@ fn generate_html(
     h.push_str("<title>Genesis Safety Dashboard</title>\n");
     h.push_str("<style>\n");
     h.push_str("body{font-family:system-ui,sans-serif;margin:2em;background:#fafafa;color:#222}\n");
-    h.push_str("h1{color:#2c3e50}h2{color:#34495e;border-bottom:2px solid #ecf0f1;padding-bottom:4px}\n");
+    h.push_str(
+        "h1{color:#2c3e50}h2{color:#34495e;border-bottom:2px solid #ecf0f1;padding-bottom:4px}\n",
+    );
     h.push_str("table{border-collapse:collapse;margin:1em 0;width:100%}\n");
     h.push_str("th,td{border:1px solid #bdc3c7;padding:6px 10px;text-align:center}\n");
     h.push_str("th{background:#34495e;color:white}\n");
@@ -180,7 +205,8 @@ fn generate_html(
     h.push_str("<h2>Overall System Health</h2>\n");
     h.push_str(&format!(
         "<p><span class='badge' style='background:{}'>{}</span></p>\n",
-        level_color(overall), level_name(overall)
+        level_color(overall),
+        level_name(overall)
     ));
 
     // Domain card grid
@@ -192,10 +218,22 @@ fn generate_html(
             level_color(last.level)
         ));
         h.push_str(&format!("<h3>{}</h3>\n", display_name(DOMAIN_NAMES[i])));
-        h.push_str(&format!("<div class='metric'>Current: <strong>{}</strong></div>\n", level_name(last.level)));
-        h.push_str(&format!("<div class='metric'>Consciousness: {:.2}</div>\n", last.consciousness_level));
-        h.push_str(&format!("<div class='metric'>Pred Error: {:.2}</div>\n", last.prediction_error));
-        h.push_str(&format!("<div class='metric'>Peak: <strong>{}</strong></div>\n", level_name(peak_levels[i])));
+        h.push_str(&format!(
+            "<div class='metric'>Current: <strong>{}</strong></div>\n",
+            level_name(last.level)
+        ));
+        h.push_str(&format!(
+            "<div class='metric'>Consciousness: {:.2}</div>\n",
+            last.consciousness_level
+        ));
+        h.push_str(&format!(
+            "<div class='metric'>Pred Error: {:.2}</div>\n",
+            last.prediction_error
+        ));
+        h.push_str(&format!(
+            "<div class='metric'>Peak: <strong>{}</strong></div>\n",
+            level_name(peak_levels[i])
+        ));
         h.push_str("</div>\n");
     }
     h.push_str("</div>\n");
@@ -204,14 +242,19 @@ fn generate_html(
     h.push_str("<h2>Level Transition Timeline</h2>\n");
     h.push_str("<p style='font-size:0.85em;color:#666'>Phase 1 (0-24): Healthy | Phase 2 (25-49): Degrading | Phase 3 (50-74): Critical | Phase 4 (75-99): Recovery</p>\n");
     for i in 0..n {
-        h.push_str(&format!("<p style='margin:4px 0'><strong>{}</strong></p>\n", display_name(DOMAIN_NAMES[i])));
+        h.push_str(&format!(
+            "<p style='margin:4px 0'><strong>{}</strong></p>\n",
+            display_name(DOMAIN_NAMES[i])
+        ));
         h.push_str("<svg width='600' height='20'>\n");
         let steps = all_assessments[i].len();
         let w = 600.0 / steps as f64;
         for (j, a) in all_assessments[i].iter().enumerate() {
             h.push_str(&format!(
                 "<rect x='{}' y='0' width='{}' height='20' fill='{}'/>\n",
-                (j as f64 * w) as u32, (w + 1.0) as u32, level_color(a.level)
+                (j as f64 * w) as u32,
+                (w + 1.0) as u32,
+                level_color(a.level)
             ));
         }
         h.push_str("</svg>\n");
@@ -276,13 +319,26 @@ fn generate_markdown(all_assessments: &[Vec<SafetyAssessment>]) -> String {
         let report = SafetyAuditReport::from_assessments(&all_assessments[i]);
         md.push_str(&format!("### {}\n\n", display_name(DOMAIN_NAMES[i])));
         md.push_str(&format!("- **Peak level**: {:?}\n", report.peak_level));
-        md.push_str(&format!("- **Mean consciousness**: {:.3}\n", report.mean_consciousness));
-        md.push_str(&format!("- **Min consciousness**: {:.3}\n", report.min_consciousness));
-        md.push_str(&format!("- **Mean prediction error**: {:.3}\n", report.mean_prediction_error));
+        md.push_str(&format!(
+            "- **Mean consciousness**: {:.3}\n",
+            report.mean_consciousness
+        ));
+        md.push_str(&format!(
+            "- **Min consciousness**: {:.3}\n",
+            report.min_consciousness
+        ));
+        md.push_str(&format!(
+            "- **Mean prediction error**: {:.3}\n",
+            report.mean_prediction_error
+        ));
         md.push_str(&format!("- **Had emergency**: {}\n", report.had_emergency));
-        md.push_str(&format!("- **Level counts**: G={} Y={} O={} R={}\n\n",
-            report.level_counts.green, report.level_counts.yellow,
-            report.level_counts.orange, report.level_counts.red));
+        md.push_str(&format!(
+            "- **Level counts**: G={} Y={} O={} R={}\n\n",
+            report.level_counts.green,
+            report.level_counts.yellow,
+            report.level_counts.orange,
+            report.level_counts.red
+        ));
     }
     md
 }

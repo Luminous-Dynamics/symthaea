@@ -213,7 +213,9 @@ pub struct ContinuousMind {
 }
 
 impl ContinuousMind {
-    /// Create a new continuous mind
+    /// Create a new continuous mind with default (non-deterministic) initialization.
+    ///
+    /// For reproducible behavior across runs, use [`Self::from_genesis()`] instead.
     pub fn new(config: MindConfig) -> Self {
         let dim = config.dimension;
         let social = if config.enable_social_coherence {
@@ -322,6 +324,9 @@ impl ContinuousMind {
     }
 
     /// Create a continuous mind with deterministic RNG from a genesis seed.
+    ///
+    /// All HDC vectors and network weights derive from `genesis` + `label`,
+    /// making the system fully reproducible across runs.
     pub fn from_genesis(
         config: MindConfig,
         genesis: &symthaea_core::genesis::GenesisSeed,
@@ -338,12 +343,12 @@ impl ContinuousMind {
         mind
     }
 
-    /// Add input to the mind
+    /// Queue an input for processing on the next `tick()`.
     pub fn input(&mut self, input: MindInput) {
         self.input_queue.push(input);
     }
 
-    /// Add a perception input
+    /// Queue a raw perception (continuous HDC vector) for the next tick.
     pub fn perceive(&mut self, content: ContinuousHV) {
         self.input(MindInput::new(InputType::Perception, content));
     }
@@ -364,12 +369,10 @@ impl ContinuousMind {
         self.state.arousal = (self.state.arousal + m * (1.0 - self.state.arousal)).clamp(0.0, 1.0);
 
         // Slight negative valence shift (surprise ≠ positive)
-        self.state.emotional_valence =
-            (self.state.emotional_valence - m * 0.2).clamp(-1.0, 1.0);
+        self.state.emotional_valence = (self.state.emotional_valence - m * 0.2).clamp(-1.0, 1.0);
 
         // Boost cognitive temperature → more exploratory sampling
-        self.state.mood_temperature =
-            (self.state.mood_temperature + m * 0.3).clamp(0.0, 2.0);
+        self.state.mood_temperature = (self.state.mood_temperature + m * 0.3).clamp(0.0, 2.0);
 
         tracing::debug!(
             target: "symthaea::mind::surprise",
@@ -412,7 +415,7 @@ impl ContinuousMind {
         self.input(input);
     }
 
-    /// Set a goal
+    /// Set an active goal with a priority weight and HDC embedding.
     pub fn set_goal(
         &mut self,
         description: impl Into<String>,
@@ -428,32 +431,32 @@ impl ContinuousMind {
         self.input(input);
     }
 
-    /// Activate the mind
+    /// Activate the mind, enabling perception processing on subsequent ticks.
     pub fn activate(&mut self) {
         self.state.is_active = true;
     }
 
-    /// Deactivate the mind
+    /// Deactivate the mind, pausing perception processing.
     pub fn deactivate(&mut self) {
         self.state.is_active = false;
     }
 
-    /// Get current state
+    /// Get a read-only reference to the current mind state (arousal, valence, thought, etc.).
     pub fn state(&self) -> &MindState {
         &self.state
     }
 
-    /// Get configuration
+    /// Get the configuration this mind was created with.
     pub fn config(&self) -> &MindConfig {
         &self.config
     }
 
-    /// Get statistics
+    /// Get cumulative mind statistics (tick count, perception count, etc.).
     pub fn stats(&self) -> &MindStats {
         &self.stats
     }
 
-    /// Get working memory contents
+    /// Get working memory contents (7±2 items, activation-decay managed).
     pub fn working_memory(&self) -> &[ContinuousHV] {
         &self.working_memory
     }
@@ -485,12 +488,12 @@ impl ContinuousMind {
         std::mem::take(&mut self.evicted_items)
     }
 
-    /// Get active goals
+    /// Get all currently active (non-completed) goals.
     pub fn active_goals(&self) -> Vec<&Goal> {
         self.goals.iter().filter(|g| g.is_active).collect()
     }
 
-    /// Awaken the mind - start consciousness processing
+    /// Awaken the mind — activate, reset timers, and begin consciousness processing.
     pub fn awaken(&mut self) {
         self.state.is_active = true;
         self.state.is_conscious = true;
@@ -514,14 +517,14 @@ impl ContinuousMind {
         state
     }
 
-    /// Request graceful shutdown of the mind
+    /// Request graceful shutdown of the mind (checked each tick via `is_shutdown_requested()`).
     pub fn request_shutdown(&mut self) {
         self.state.is_active = false;
         self.state.is_conscious = false;
         self.shutdown_requested = true;
     }
 
-    /// Check if shutdown was requested
+    /// Returns `true` if `request_shutdown()` has been called.
     pub fn is_shutdown_requested(&self) -> bool {
         self.shutdown_requested
     }

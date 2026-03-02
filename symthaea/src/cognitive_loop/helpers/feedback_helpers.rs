@@ -132,11 +132,7 @@ impl super::super::CognitiveLoopService {
     ///
     /// Used sparingly (seizure protection freeze, etc).
     #[inline]
-    pub(in crate::cognitive_loop) fn set_exploration(
-        &mut self,
-        source: &'static str,
-        value: f32,
-    ) {
+    pub(in crate::cognitive_loop) fn set_exploration(&mut self, source: &'static str, value: f32) {
         self.feedback_state
             .exploration
             .propose(source, FeedbackProposal::Set(value as f64));
@@ -151,11 +147,7 @@ impl super::super::CognitiveLoopService {
     ///
     /// Usage: `self.scale_threshold("subsystem_name", 0.95);`
     #[inline]
-    pub(in crate::cognitive_loop) fn scale_threshold(
-        &mut self,
-        source: &'static str,
-        factor: f32,
-    ) {
+    pub(in crate::cognitive_loop) fn scale_threshold(&mut self, source: &'static str, factor: f32) {
         self.feedback_state
             .threshold
             .propose(source, FeedbackProposal::Scale(factor as f64));
@@ -167,11 +159,7 @@ impl super::super::CognitiveLoopService {
     ///
     /// Used for consensus writeback at cycle start.
     #[inline]
-    pub(in crate::cognitive_loop) fn set_threshold(
-        &mut self,
-        source: &'static str,
-        value: f32,
-    ) {
+    pub(in crate::cognitive_loop) fn set_threshold(&mut self, source: &'static str, value: f32) {
         self.feedback_state
             .threshold
             .propose(source, FeedbackProposal::Set(value as f64));

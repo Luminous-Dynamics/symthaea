@@ -81,7 +81,7 @@ impl CognitiveLoopService {
                 dissipative_health_gated = false;
             }
             // Cache for next cycle
-            self.carryover.quality.last_dissipative_health = dissipative_health as f64;
+            self.carryover.quality.last_dissipative_health = dissipative_health;
             self.carryover.quality.last_phenomenal_binding = phenomenal_binding_strength;
         }
 
@@ -182,5 +182,104 @@ impl CognitiveLoopService {
             coherence_velocity,
             coherence_velocity_gated,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, ModuleTimings};
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn test_quality_healthy_system_no_gating() {
+        let mut svc = make_service();
+        svc.carryover.quality.last_dissipative_health = 0.9;
+        svc.carryover.quality.last_phenomenal_binding = 0.8;
+        svc.carryover.quality.last_coherence = 0.7;
+        svc.stats.total_cycles = 100;
+        let mut timings = ModuleTimings::default();
+        let result = svc.run_quality_and_homeostasis(0.7, false, 0.5, 1.0, 0.9, 0.8, &mut timings);
+        assert_eq!(result.dissipative_lr_factor, 1.0);
+        assert!(!result.dissipative_health_gated);
+    }
+
+    #[test]
+    fn test_quality_unhealthy_both_gated() {
+        let mut svc = make_service();
+        svc.carryover.quality.last_dissipative_health = 0.2;
+        svc.carryover.quality.last_phenomenal_binding = 0.3;
+        svc.carryover.quality.last_coherence = 0.7;
+        svc.stats.total_cycles = 100;
+        let mut timings = ModuleTimings::default();
+        let result = svc.run_quality_and_homeostasis(0.7, false, 0.5, 1.0, 0.2, 0.3, &mut timings);
+        assert!(result.dissipative_lr_factor < 1.0);
+        assert!(result.dissipative_lr_factor >= 0.7);
+        assert!(result.dissipative_health_gated);
+    }
+
+    #[test]
+    fn test_quality_unhealthy_single_dimension() {
+        let mut svc = make_service();
+        svc.carryover.quality.last_dissipative_health = 0.3;
+        svc.carryover.quality.last_phenomenal_binding = 0.8;
+        svc.carryover.quality.last_coherence = 0.7;
+        svc.stats.total_cycles = 100;
+        let mut timings = ModuleTimings::default();
+        let result = svc.run_quality_and_homeostasis(0.7, false, 0.5, 1.0, 0.3, 0.8, &mut timings);
+        assert!(result.dissipative_lr_factor < 1.0);
+        assert!(result.dissipative_lr_factor >= 0.85);
+        assert!(result.dissipative_health_gated);
+    }
+
+    #[test]
+    fn test_coherence_velocity_stable() {
+        let mut svc = make_service();
+        svc.carryover.quality.last_coherence = 0.7;
+        svc.stats.total_cycles = 100;
+        let mut timings = ModuleTimings::default();
+        // Small coherence change → no gating
+        let result = svc.run_quality_and_homeostasis(0.72, false, 0.5, 1.0, 0.9, 0.8, &mut timings);
+        assert!(!result.coherence_velocity_gated);
+        assert!((result.coherence_velocity - 0.02).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_coherence_velocity_rapid_drop() {
+        let mut svc = make_service();
+        svc.carryover.quality.last_coherence = 0.7;
+        svc.stats.total_cycles = 100;
+        let mut timings = ModuleTimings::default();
+        // Large coherence drop → gating
+        let result = svc.run_quality_and_homeostasis(0.4, false, 0.5, 1.0, 0.9, 0.8, &mut timings);
+        assert!(result.coherence_velocity_gated);
+        assert!(result.coherence_velocity < -0.15);
+    }
+
+    #[test]
+    fn test_temporal_discontinuity_gates() {
+        let mut svc = make_service();
+        svc.carryover.quality.last_coherence = 0.7;
+        svc.stats.total_cycles = 100;
+        let mut timings = ModuleTimings::default();
+        // Temporal discontinuity → gating even with stable coherence
+        let result = svc.run_quality_and_homeostasis(0.7, true, 0.5, 1.0, 0.9, 0.8, &mut timings);
+        assert!(result.coherence_velocity_gated);
+    }
+
+    #[test]
+    fn test_homeostasis_exploration_clamp() {
+        let mut svc = make_service();
+        svc.carryover.quality.last_coherence = 0.5;
+        svc.stats.total_cycles = 100;
+        // Start with extreme exploration
+        svc.curiosity_drive.exploration_urge = 0.1;
+        let mut timings = ModuleTimings::default();
+        let _result = svc.run_quality_and_homeostasis(0.5, false, 0.1, 1.0, 0.9, 0.8, &mut timings);
+        // Exploration should be clamped within ±0.5 of start (0.1)
+        assert!(svc.curiosity_drive.exploration_urge >= 0.0);
+        assert!(svc.curiosity_drive.exploration_urge <= 0.6);
     }
 }

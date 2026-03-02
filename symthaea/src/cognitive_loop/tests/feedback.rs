@@ -1191,7 +1191,6 @@ fn test_thermodynamics_binding_hfe_synergy() {
 #[test]
 fn test_consensus_1000_cycles_stable() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-
         trace_feedback: true,
         enable_surprise_exploration: true,
         learning_threshold: 0.0,
@@ -1228,7 +1227,6 @@ fn test_consensus_1000_cycles_stable() {
 #[test]
 fn test_consensus_adversarial_inputs() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-
         enable_surprise_exploration: true,
         learning_threshold: 0.0,
         ..Default::default()
@@ -1267,7 +1265,6 @@ fn test_consensus_adversarial_inputs() {
 #[test]
 fn test_consensus_divergence_bounded() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-
         trace_feedback: true,
         enable_surprise_exploration: true,
         learning_threshold: 0.0,

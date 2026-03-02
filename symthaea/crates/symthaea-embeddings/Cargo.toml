@@ -56,7 +56,7 @@ async-embed = ["dep:tokio"]
 parallel = ["dep:rayon"]
 persistent-cache = ["dep:redb", "dep:blake3", "dep:dirs"]
 embed-channel = []
-ort-embed = ["dep:ort", "dep:tokenizers", "dep:ndarray"]
+ort-embed = ["dep:ort", "dep:tokenizers"]
 
 [[bench]]
 name = "embedding_bench"

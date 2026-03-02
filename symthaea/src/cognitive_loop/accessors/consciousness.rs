@@ -46,7 +46,10 @@ impl CognitiveLoopService {
             prediction_confidence: self.prediction_confidence as f32,
             predictions_trustworthy: self.predictions_trustworthy(),
             effective_learning_rate: self.stats.adaptive_learning_rate,
-            learning_effectiveness: self.self_model_tier.self_reflection.learning_effectiveness(),
+            learning_effectiveness: self
+                .self_model_tier
+                .self_reflection
+                .learning_effectiveness(),
             in_flow: self.flow_state.in_flow,
             flow_intensity: self.flow_state.intensity,
             flow_streak: self.flow_state.streak,

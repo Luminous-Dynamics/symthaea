@@ -136,7 +136,7 @@ pub fn cognitive_state_to_voice_quality(
     let rd = 1.0 + emotional_valence; // [-1,1] → [0.0, 2.0]
 
     // Arousal → perturbation: high arousal = tense (more jitter), low = relaxed
-    let jitter_scale = 0.5 + emotional_arousal;    // [0,1] → [0.5, 1.5]
+    let jitter_scale = 0.5 + emotional_arousal; // [0,1] → [0.5, 1.5]
     let shimmer_scale = 0.5 + emotional_arousal;
 
     // Arousal → bandwidth: high arousal = tight (narrow BW), low = relaxed (wider)
@@ -692,7 +692,9 @@ impl FormantVocoder {
 
         for (i, frame) in frames.iter().enumerate() {
             let next_frame = frames.get(i + 1).unwrap_or(frame);
-            let vq = quality.get(i).unwrap_or_else(|| quality.last().unwrap_or(&default_quality));
+            let vq = quality
+                .get(i)
+                .unwrap_or_else(|| quality.last().unwrap_or(&default_quality));
 
             // Apply bandwidth scaling to resonators
             let mut scaled_frame = *frame;
@@ -702,7 +704,7 @@ impl FormantVocoder {
             self.update_resonators(&scaled_frame);
 
             let tilt = vq.spectral_tilt.unwrap_or(self.config.spectral_tilt);
-            let jitter = self.config.jitter * vq.jitter_scale;
+            let _jitter = self.config.jitter * vq.jitter_scale;
             let shimmer = self.config.shimmer * vq.shimmer_scale;
 
             for j in 0..samples_per_frame {
@@ -738,9 +740,13 @@ impl FormantVocoder {
                 self.radiation_prev = filtered;
 
                 // Apply shimmer-scaled energy
+                // OU shimmer returns values centered around mu=1.0.
+                // Scale the deviation by (quality shimmer / base shimmer).
                 let dt = 1.0 / self.config.sample_rate as f32;
-                let shimmer_ou = self.ou_shimmer.step(dt, shimmer);
-                let shimmer_factor = (1.0 + shimmer_ou).clamp(0.5, 1.5);
+                let shimmer_ou = self.ou_shimmer.tick(dt);
+                let deviation = shimmer_ou - 1.0;
+                let scale = shimmer / self.config.shimmer.max(0.001);
+                let shimmer_factor = (1.0 + deviation * scale).clamp(0.5, 1.5);
 
                 let output = radiated * current.energy * shimmer_factor * self.config.volume;
                 let smoothed = self.lowpass.process(output);
@@ -752,28 +758,39 @@ impl FormantVocoder {
     }
 
     /// Generate source excitation with explicit Rd override (for voice quality modulation).
-    fn generate_source_with_rd(&mut self, current: &FormantFrame, progress: f32, rd: f32) -> f32 {
+    fn generate_source_with_rd(&mut self, current: &FormantFrame, _progress: f32, rd: f32) -> f32 {
         match current.source_type {
             SourceType::Vowel | SourceType::Liquid => {
                 let dt = 1.0 / self.config.sample_rate as f32;
-                let jitter_offset = self.ou_jitter.step(dt, self.config.jitter);
-                let f0_jittered = current.f0 * (1.0 + jitter_offset);
-                let glottal = self.glottal.next_sample(f0_jittered, self.config.sample_rate, rd);
-                let noise_amp = self.config.aspiration_level * self.glottal.aspiration_envelope();
-                let noise = self.noise.next_white() * noise_amp;
-                glottal + noise
+                let jitter_factor = self.ou_jitter.tick(dt);
+                let f0_jittered = current.f0 * jitter_factor;
+
+                let prev_phase = self.glottal.phase;
+                let voiced = self.glottal.tick_with_rd(f0_jittered, rd) * current.voicing;
+                if self.glottal.phase < prev_phase {
+                    let shimmer_dt = 1.0 / current.f0.max(50.0);
+                    self.shimmer_factor = self.ou_shimmer.tick(shimmer_dt);
+                }
+                let unvoiced = self.noise.pink() * (1.0 - current.voicing) * 0.3;
+                let aspiration = if self.glottal.is_open() {
+                    self.noise.white()
+                        * self.config.aspiration_level
+                        * (1.0 - rd.clamp(0.0, 1.0) * 0.7)
+                } else {
+                    0.0
+                };
+                (voiced + aspiration + unvoiced) * 30.0
             }
             SourceType::Nasal => {
                 let dt = 1.0 / self.config.sample_rate as f32;
-                let jitter_offset = self.ou_jitter.step(dt, self.config.jitter);
-                let f0_jittered = current.f0 * (1.0 + jitter_offset);
-                let glottal = self.glottal.next_sample(f0_jittered, self.config.sample_rate, rd);
-                let noise = self.noise.next_white() * self.config.aspiration_level * 0.5;
-                glottal + noise
+                let jitter_factor = self.ou_jitter.tick(dt);
+                let f0_jittered = current.f0 * jitter_factor;
+                let voiced = self.glottal.tick_with_rd(f0_jittered, rd) * current.voicing;
+                voiced * 30.0
             }
             _ => {
                 // For non-voiced types, delegate to standard source
-                self.generate_source(current, progress)
+                self.generate_source(current, _progress)
             }
         }
     }
@@ -856,10 +873,9 @@ impl FormantVocoder {
                 // (bright, high-frequency energy), non-sibilants (/F/, /TH/)
                 // use pink noise (gentler, lower spectral emphasis).
                 // F2 position serves as proxy: high F2 → sibilant.
-                let sibilance =
-                    ((self.current_f2 - 1500.0) / 1000.0).clamp(0.0, 1.0);
-                let noise = self.noise.white() * sibilance
-                    + self.noise.pink() * (1.0 - sibilance) * 2.0;
+                let sibilance = ((self.current_f2 - 1500.0) / 1000.0).clamp(0.0, 1.0);
+                let noise =
+                    self.noise.white() * sibilance + self.noise.pink() * (1.0 - sibilance) * 2.0;
                 let noise = noise * 0.5;
                 let voiced = if current.voicing > 0.5 {
                     self.glottal.tick(current.f0) * 0.3
@@ -1599,7 +1615,7 @@ mod tests {
         // because F3 is at a higher harmonic and needs rolloff compensation.
         // Use high F0 (300Hz) so F1 is at harmonic 2 (below cap) and F3 at harmonic 8.
         let f0 = 300.0;
-        let a1 = formant_amplitude_correction(500.0, f0);  // F1 ~ harmonic 2
+        let a1 = formant_amplitude_correction(500.0, f0); // F1 ~ harmonic 2
         let a3 = formant_amplitude_correction(2500.0, f0); // F3 ~ harmonic 8
 
         assert!(
@@ -1843,7 +1859,10 @@ mod tests {
         // Positive valence → higher Rd (breathy voice)
         let vq = cognitive_state_to_voice_quality(0.8, 0.5, 0.6);
         let rd = vq.rd.unwrap();
-        assert!(rd > 1.5, "Positive valence should produce breathy (high Rd): {rd}");
+        assert!(
+            rd > 1.5,
+            "Positive valence should produce breathy (high Rd): {rd}"
+        );
     }
 
     #[test]
@@ -1866,15 +1885,12 @@ mod tests {
         // Low consciousness → forced pressed Rd
         let vq = cognitive_state_to_voice_quality(0.5, 0.5, 0.1);
         let rd = vq.rd.unwrap();
-        assert!(
-            rd <= 0.6,
-            "Low consciousness should force pressed Rd: {rd}"
-        );
+        assert!(rd <= 0.6, "Low consciousness should force pressed Rd: {rd}");
     }
 
     #[test]
     fn test_synthesize_with_quality_produces_audio() {
-        let mut vocoder = FormantVocoder::new(VocoderConfig::default());
+        let mut vocoder = FormantVocoder::new();
         let frames: Vec<FormantFrame> = (0..20)
             .map(|i| FormantFrame {
                 f1: 500.0,

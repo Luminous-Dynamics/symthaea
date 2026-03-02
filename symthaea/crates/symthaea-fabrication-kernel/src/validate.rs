@@ -20,15 +20,12 @@ pub struct ValidationReport {
 impl ValidationReport {
     /// True if mesh passes all checks
     pub fn is_valid(&self) -> bool {
-        self.out_of_bounds_indices.is_empty()
-            && self.degenerate_triangles.is_empty()
+        self.out_of_bounds_indices.is_empty() && self.degenerate_triangles.is_empty()
     }
 
     /// True if mesh is suitable for 3D printing (valid + watertight + consistent normals)
     pub fn is_printable(&self) -> bool {
-        self.is_valid()
-            && self.is_watertight
-            && self.inconsistent_normals.is_empty()
+        self.is_valid() && self.is_watertight && self.inconsistent_normals.is_empty()
     }
 }
 
@@ -151,7 +148,8 @@ pub fn check_normal_consistency(mesh: &TriangleMesh) -> Vec<usize> {
             e1[2] * e2[0] - e1[0] * e2[2],
             e1[0] * e2[1] - e1[1] * e2[0],
         ];
-        let face_len = (face_n[0] * face_n[0] + face_n[1] * face_n[1] + face_n[2] * face_n[2]).sqrt();
+        let face_len =
+            (face_n[0] * face_n[0] + face_n[1] * face_n[1] + face_n[2] * face_n[2]).sqrt();
         if face_len < 1e-10 {
             continue; // Degenerate — skip
         }
@@ -250,7 +248,11 @@ mod tests {
         let mesh = resolve_to_mesh(&CSGNode::cube());
         let vol = compute_signed_volume(&mesh);
         // Unit cube: volume = 1.0
-        assert!((vol - 1.0).abs() < 0.01, "cube volume should be ~1.0, got {}", vol);
+        assert!(
+            (vol - 1.0).abs() < 0.01,
+            "cube volume should be ~1.0, got {}",
+            vol
+        );
     }
 
     #[test]
@@ -270,7 +272,11 @@ mod tests {
         let report = validate_mesh(&mesh);
         let total_edges = mesh.triangle_count() * 3;
         let boundary_pct = report.boundary_edges as f32 / total_edges as f32;
-        assert!(boundary_pct < 0.05, "sphere boundary edges should be <5%, got {:.1}%", boundary_pct * 100.0);
+        assert!(
+            boundary_pct < 0.05,
+            "sphere boundary edges should be <5%, got {:.1}%",
+            boundary_pct * 100.0
+        );
     }
 
     #[test]
@@ -278,7 +284,11 @@ mod tests {
         let mesh = resolve_to_mesh(&CSGNode::sphere());
         let vol = compute_signed_volume(&mesh);
         // Unit sphere r=0.5: V = (4/3)π(0.5)³ ≈ 0.524
-        assert!(vol > 0.4 && vol < 0.6, "sphere volume should be ~0.524, got {}", vol);
+        assert!(
+            vol > 0.4 && vol < 0.6,
+            "sphere volume should be ~0.524, got {}",
+            vol
+        );
     }
 
     #[test]
@@ -357,7 +367,8 @@ mod tests {
         assert!(
             (original_vol - imported_vol).abs() < 0.01,
             "volume should be preserved: {} vs {}",
-            original_vol, imported_vol
+            original_vol,
+            imported_vol
         );
     }
 }

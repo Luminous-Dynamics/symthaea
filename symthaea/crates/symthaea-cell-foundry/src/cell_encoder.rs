@@ -75,10 +75,7 @@ pub fn encode_cell_state(state: &CellState) -> ContinuousHV {
         (state.division_count as f64).min(100.0) / 100.0,
         SEED_DIVISION_COUNT,
     );
-    let age_hv = encode_scalar(
-        (state.age_hours / 1000.0).min(1.0),
-        SEED_AGE_HOURS,
-    );
+    let age_hv = encode_scalar((state.age_hours / 1000.0).min(1.0), SEED_AGE_HOURS);
     let methylation_hv = encode_scalar(state.methylation_score, SEED_METHYLATION);
 
     // Encode gene expression: bind(gene_role_hv, expression_level_hv) per gene
@@ -254,7 +251,11 @@ mod tests {
         // All seeds must be unique
         for i in 0..seeds.len() {
             for j in (i + 1)..seeds.len() {
-                assert_ne!(seeds[i], seeds[j], "Seed collision for types {} and {}", i, j);
+                assert_ne!(
+                    seeds[i], seeds[j],
+                    "Seed collision for types {} and {}",
+                    i, j
+                );
             }
         }
     }
@@ -264,6 +265,9 @@ mod tests {
         let mut state = CellState::new_somatic();
         state.gene_expression = vec![];
         let hv = encode_cell_state(&state);
-        assert!(hv.norm() > 0.0, "Should still encode even with empty gene expression");
+        assert!(
+            hv.norm() > 0.0,
+            "Should still encode even with empty gene expression"
+        );
     }
 }

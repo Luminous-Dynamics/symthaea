@@ -45,18 +45,15 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     // Front vowels — bandwidths from Klatt (1980) / Hawks & Miller (1995)
     db.insert(
         "IY".into(),
-        FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0)
-            .with_bandwidths(40.0, 70.0, 130.0),
+        FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0).with_bandwidths(40.0, 70.0, 130.0),
     ); // "beat" — high tongue, tight coupling
     db.insert(
         "IH".into(),
-        FormantTarget::vowel(390.0, 1990.0, 2550.0, 80.0)
-            .with_bandwidths(50.0, 80.0, 140.0),
+        FormantTarget::vowel(390.0, 1990.0, 2550.0, 80.0).with_bandwidths(50.0, 80.0, 140.0),
     ); // "bit"
     db.insert(
         "EY".into(),
-        FormantTarget::vowel(476.0, 2089.0, 2691.0, 120.0)
-            .with_bandwidths(50.0, 80.0, 140.0),
+        FormantTarget::vowel(476.0, 2089.0, 2691.0, 120.0).with_bandwidths(50.0, 80.0, 140.0),
     ); // "bait" (diphthong start)
     db.insert(
         "EH".into(),
@@ -64,15 +61,13 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     ); // "bet" — mid (default 60/90/150)
     db.insert(
         "AE".into(),
-        FormantTarget::vowel(660.0, 1720.0, 2410.0, 100.0)
-            .with_bandwidths(80.0, 100.0, 160.0),
+        FormantTarget::vowel(660.0, 1720.0, 2410.0, 100.0).with_bandwidths(80.0, 100.0, 160.0),
     ); // "bat" — lower tongue, wider
 
     // Central vowels
     db.insert(
         "AH".into(),
-        FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0)
-            .with_bandwidths(70.0, 90.0, 150.0),
+        FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0).with_bandwidths(70.0, 90.0, 150.0),
     ); // "but" (stressed)
     db.insert(
         "AX".into(),
@@ -80,40 +75,33 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     ); // schwa (unchanged)
     db.insert(
         "ER".into(),
-        FormantTarget::vowel(490.0, 1350.0, 1690.0, 100.0)
-            .with_bandwidths(70.0, 100.0, 200.0),
+        FormantTarget::vowel(490.0, 1350.0, 1690.0, 100.0).with_bandwidths(70.0, 100.0, 200.0),
     ); // "bird" — R-coloring widens B3
     db.insert(
         "AXR".into(),
-        FormantTarget::vowel(500.0, 1400.0, 1750.0, 80.0)
-            .with_bandwidths(70.0, 100.0, 200.0),
+        FormantTarget::vowel(500.0, 1400.0, 1750.0, 80.0).with_bandwidths(70.0, 100.0, 200.0),
     ); // unstressed r-colored
 
     // Back vowels
     db.insert(
         "AA".into(),
-        FormantTarget::vowel(730.0, 1090.0, 2440.0, 100.0)
-            .with_bandwidths(100.0, 110.0, 170.0),
+        FormantTarget::vowel(730.0, 1090.0, 2440.0, 100.0).with_bandwidths(100.0, 110.0, 170.0),
     ); // "bot" — open, loose coupling
     db.insert(
         "AO".into(),
-        FormantTarget::vowel(570.0, 840.0, 2410.0, 100.0)
-            .with_bandwidths(90.0, 100.0, 160.0),
+        FormantTarget::vowel(570.0, 840.0, 2410.0, 100.0).with_bandwidths(90.0, 100.0, 160.0),
     ); // "bought"
     db.insert(
         "OW".into(),
-        FormantTarget::vowel(497.0, 910.0, 2459.0, 120.0)
-            .with_bandwidths(80.0, 90.0, 150.0),
+        FormantTarget::vowel(497.0, 910.0, 2459.0, 120.0).with_bandwidths(80.0, 90.0, 150.0),
     ); // "boat" (diphthong)
     db.insert(
         "UH".into(),
-        FormantTarget::vowel(440.0, 1020.0, 2240.0, 80.0)
-            .with_bandwidths(60.0, 80.0, 140.0),
+        FormantTarget::vowel(440.0, 1020.0, 2240.0, 80.0).with_bandwidths(60.0, 80.0, 140.0),
     ); // "book" — tight rounding
     db.insert(
         "UW".into(),
-        FormantTarget::vowel(300.0, 870.0, 2240.0, 100.0)
-            .with_bandwidths(45.0, 75.0, 135.0),
+        FormantTarget::vowel(300.0, 870.0, 2240.0, 100.0).with_bandwidths(45.0, 75.0, 135.0),
     ); // "boot" — very tight rounding
 
     // Diphthongs
@@ -587,7 +575,8 @@ mod tests {
         assert!(
             (m.nasal_zero_freq - n.nasal_zero_freq).abs() > 100.0,
             "M and N should have different zero freqs: M={}, N={}",
-            m.nasal_zero_freq, n.nasal_zero_freq
+            m.nasal_zero_freq,
+            n.nasal_zero_freq
         );
     }
 

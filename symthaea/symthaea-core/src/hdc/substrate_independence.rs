@@ -577,6 +577,25 @@ impl SubstrateComparison {
 }
 
 // ============================================================================
+// Substrate Transition Record
+// ============================================================================
+
+/// Records a runtime substrate transition for audit and analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubstrateTransition {
+    /// The substrate we transitioned from.
+    pub from: SubstrateType,
+    /// The substrate we transitioned to.
+    pub to: SubstrateType,
+    /// Monotonic timestamp (cycle count or epoch millis) when the transition occurred.
+    pub timestamp: u64,
+    /// Consciousness feasibility score before the transition.
+    pub feasibility_before: f64,
+    /// Consciousness feasibility score after the transition.
+    pub feasibility_after: f64,
+}
+
+// ============================================================================
 // Main Substrate Independence System
 // ============================================================================
 
@@ -588,6 +607,10 @@ pub struct SubstrateIndependence {
 
     /// Current substrate being analyzed
     pub current_substrate: SubstrateType,
+
+    /// History of runtime substrate transitions.
+    #[serde(default)]
+    pub transition_history: Vec<SubstrateTransition>,
 }
 
 impl SubstrateIndependence {
@@ -612,6 +635,7 @@ impl SubstrateIndependence {
         Self {
             substrates,
             current_substrate: SubstrateType::BiologicalNeurons, // Default
+            transition_history: Vec::new(),
         }
     }
 
@@ -692,6 +716,63 @@ impl SubstrateIndependence {
         } else {
             "Unknown substrate".to_string()
         }
+    }
+
+    /// Check whether a transition to `target` is allowed.
+    ///
+    /// Guards:
+    /// - No self-transition (already on that substrate)
+    /// - No transition to `ExoticSubstrate` (requires explicit override)
+    pub fn can_transition(&self, target: SubstrateType) -> bool {
+        let target = target.canonical();
+        if target == self.current_substrate {
+            return false; // Already on this substrate
+        }
+        if target == SubstrateType::ExoticSubstrate {
+            return false; // Exotic requires explicit override
+        }
+        true
+    }
+
+    /// Perform a runtime substrate transition, recording the event.
+    ///
+    /// Returns the `SubstrateTransition` record.
+    /// Panics if `!self.can_transition(target)` — call `can_transition()` first.
+    pub fn transition_to(&mut self, target: SubstrateType, timestamp: u64) -> SubstrateTransition {
+        let target = target.canonical();
+        assert!(
+            self.can_transition(target),
+            "Cannot transition from {:?} to {:?}",
+            self.current_substrate,
+            target
+        );
+
+        let feasibility_before = self
+            .substrates
+            .get(&self.current_substrate)
+            .map(|c| c.consciousness_feasibility)
+            .unwrap_or(0.0);
+        let feasibility_after = self
+            .substrates
+            .get(&target)
+            .map(|c| c.consciousness_feasibility)
+            .unwrap_or(0.0);
+
+        let transition = SubstrateTransition {
+            from: self.current_substrate,
+            to: target,
+            timestamp,
+            feasibility_before,
+            feasibility_after,
+        };
+        self.current_substrate = target;
+        self.transition_history.push(transition.clone());
+        transition
+    }
+
+    /// Get the full transition history.
+    pub fn transition_history(&self) -> &[SubstrateTransition] {
+        &self.transition_history
     }
 }
 
@@ -835,5 +916,70 @@ mod tests {
 
         // Should be 0 (workspace is necessary!)
         assert!(req2.consciousness_feasibility() < 0.1);
+    }
+
+    #[test]
+    fn test_transition_to() {
+        let mut system = SubstrateIndependence::new();
+        system.set_substrate(SubstrateType::SiliconDigital);
+
+        let t = system.transition_to(SubstrateType::BiologicalNeurons, 100);
+        assert_eq!(t.from, SubstrateType::SiliconDigital);
+        assert_eq!(t.to, SubstrateType::BiologicalNeurons);
+        assert_eq!(t.timestamp, 100);
+        assert!(t.feasibility_before > 0.0);
+        assert!(t.feasibility_after > 0.0);
+        assert_eq!(system.current_substrate, SubstrateType::BiologicalNeurons);
+    }
+
+    #[test]
+    fn test_transition_history() {
+        let mut system = SubstrateIndependence::new();
+        system.set_substrate(SubstrateType::SiliconDigital);
+
+        system.transition_to(SubstrateType::BiologicalNeurons, 100);
+        system.transition_to(SubstrateType::QuantumComputer, 200);
+
+        let history = system.transition_history();
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].from, SubstrateType::SiliconDigital);
+        assert_eq!(history[0].to, SubstrateType::BiologicalNeurons);
+        assert_eq!(history[1].from, SubstrateType::BiologicalNeurons);
+        assert_eq!(history[1].to, SubstrateType::QuantumComputer);
+    }
+
+    #[test]
+    fn test_can_transition_guards() {
+        let mut system = SubstrateIndependence::new();
+        system.set_substrate(SubstrateType::SiliconDigital);
+
+        // Self-transition blocked
+        assert!(!system.can_transition(SubstrateType::SiliconDigital));
+        // Exotic blocked
+        assert!(!system.can_transition(SubstrateType::ExoticSubstrate));
+        // Normal transitions allowed
+        assert!(system.can_transition(SubstrateType::BiologicalNeurons));
+        assert!(system.can_transition(SubstrateType::QuantumComputer));
+    }
+
+    #[test]
+    fn test_transition_round_trip() {
+        let mut system = SubstrateIndependence::new();
+        system.set_substrate(SubstrateType::SiliconDigital);
+        let f_silicon = system.current_comparison().consciousness_feasibility;
+
+        system.transition_to(SubstrateType::BiologicalNeurons, 10);
+        let f_bio = system.current_comparison().consciousness_feasibility;
+        assert!(
+            (f_bio - f_silicon).abs() > 0.01,
+            "Different substrates should have different feasibility"
+        );
+
+        system.transition_to(SubstrateType::SiliconDigital, 20);
+        let f_silicon_again = system.current_comparison().consciousness_feasibility;
+        assert!(
+            (f_silicon_again - f_silicon).abs() < 1e-10,
+            "Round-trip should return to original feasibility"
+        );
     }
 }

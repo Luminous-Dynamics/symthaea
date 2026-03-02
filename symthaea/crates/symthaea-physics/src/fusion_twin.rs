@@ -89,10 +89,26 @@ impl FusionHdcEncoder {
 
         // Normalize to [0, 1] range (NaN-safe: division only when count > 0)
         let norms = [
-            if counts[0] > 0 { (sums[0] / counts[0] as f64 / 2.0).clamp(0.0, 1.0) } else { 0.0 },
-            if counts[1] > 0 { (sums[1] / counts[1] as f64 / 10.0).clamp(0.0, 1.0) } else { 0.0 },
-            if counts[2] > 0 { (sums[2] / counts[2] as f64 / 15.0).clamp(0.0, 1.0) } else { 0.0 },
-            if counts[3] > 0 { (sums[3] / counts[3] as f64 / 5.0).clamp(0.0, 1.0) } else { 0.0 },
+            if counts[0] > 0 {
+                (sums[0] / counts[0] as f64 / 2.0).clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
+            if counts[1] > 0 {
+                (sums[1] / counts[1] as f64 / 10.0).clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
+            if counts[2] > 0 {
+                (sums[2] / counts[2] as f64 / 15.0).clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
+            if counts[3] > 0 {
+                (sums[3] / counts[3] as f64 / 5.0).clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
         ];
 
         let weights: Vec<f32> = norms.iter().map(|&v| v as f32).collect();
@@ -145,10 +161,7 @@ impl PlasmaMultiScalePredictor {
     }
 
     /// Predict at all plasma horizons (1 ms to 10 s).
-    pub fn predict_all_horizons(
-        &self,
-        current_state: &ContinuousHV,
-    ) -> Vec<(f32, ContinuousHV)> {
+    pub fn predict_all_horizons(&self, current_state: &ContinuousHV) -> Vec<(f32, ContinuousHV)> {
         PLASMA_HORIZONS
             .iter()
             .map(|&h| (h, self.predict_at_horizon(current_state, h)))
@@ -301,15 +314,15 @@ impl PlasmaFepAgent {
         let free_energy = self.compute_free_energy(current_hv);
 
         // Check for specific dangerous conditions
-        let has_critical_density = readings.iter().any(|r| {
-            r.sensor == PlasmaSensorType::ElectronDensity && r.value > 1.5
-        });
-        let has_high_radiation = readings.iter().any(|r| {
-            r.sensor == PlasmaSensorType::RadiatedPower && r.value > 8.0
-        });
-        let has_low_safety_factor = readings.iter().any(|r| {
-            r.sensor == PlasmaSensorType::SafetyFactor && r.value < 1.5
-        });
+        let has_critical_density = readings
+            .iter()
+            .any(|r| r.sensor == PlasmaSensorType::ElectronDensity && r.value > 1.5);
+        let has_high_radiation = readings
+            .iter()
+            .any(|r| r.sensor == PlasmaSensorType::RadiatedPower && r.value > 8.0);
+        let has_low_safety_factor = readings
+            .iter()
+            .any(|r| r.sensor == PlasmaSensorType::SafetyFactor && r.value < 1.5);
 
         if free_energy > FE_EMERGENCY || has_low_safety_factor {
             PlasmaFepAction::EmergencyShutdown
@@ -500,10 +513,10 @@ pub fn synthetic_disruption_scenario(
             // Disruption onset: density rises, radiation spikes, safety factor drops
             let frac = (step - healthy_steps) as f64 / disruption_steps.max(1) as f64;
             (
-                0.8 + frac * 0.8,  // 0.8 → 1.6
-                5.0 - frac * 2.0,  // 5.0 → 3.0
-                2.0 + frac * 8.0,  // 2.0 → 10.0
-                3.5 - frac * 2.5,  // 3.5 → 1.0
+                0.8 + frac * 0.8, // 0.8 → 1.6
+                5.0 - frac * 2.0, // 5.0 → 3.0
+                2.0 + frac * 8.0, // 2.0 → 10.0
+                3.5 - frac * 2.5, // 3.5 → 1.0
             )
         };
 
@@ -572,7 +585,9 @@ mod tests {
         assert!(
             ratio < 5.0 && ratio > 0.2,
             "O(1) property: 1ms took {:?}, 10s took {:?}, ratio={}",
-            time_1ms, time_10s, ratio
+            time_1ms,
+            time_10s,
+            ratio
         );
     }
 
@@ -591,7 +606,11 @@ mod tests {
         let ref_hv = ContinuousHV::random(HDC_DIMENSION, 42);
         agent.set_reference(ref_hv.clone());
         let fe = agent.compute_free_energy(&ref_hv);
-        assert!(fe < 0.01, "Free energy should be ~0 for reference state, got {}", fe);
+        assert!(
+            fe < 0.01,
+            "Free energy should be ~0 for reference state, got {}",
+            fe
+        );
     }
 
     #[test]
@@ -644,16 +663,19 @@ mod tests {
         assert!(
             last_output.disruption_risk >= DisruptionRisk::Yellow,
             "Full disruption should trigger at least Yellow risk, got {:?} (fe={:.3})",
-            last_output.disruption_risk, last_output.free_energy
+            last_output.disruption_risk,
+            last_output.free_energy
         );
     }
 
     #[test]
     fn test_digital_twin_cycle_count() {
         let mut twin = FusionDigitalTwin::new();
-        let readings = vec![
-            PlasmaReading::new(PlasmaSensorType::ElectronDensity, 0.8, 0.0),
-        ];
+        let readings = vec![PlasmaReading::new(
+            PlasmaSensorType::ElectronDensity,
+            0.8,
+            0.0,
+        )];
         twin.step(&readings, 0.001);
         twin.step(&readings, 0.001);
         assert_eq!(twin.cycle_count(), 2);
@@ -709,14 +731,26 @@ mod tests {
         // Zero HV will have zero norm → similarity may be NaN
         let zero_hv = ContinuousHV::zero(HDC_DIMENSION);
         let fe = agent.compute_free_energy(&zero_hv);
-        assert!(fe.is_finite(), "Free energy should be finite even for zero HV");
+        assert!(
+            fe.is_finite(),
+            "Free energy should be finite even for zero HV"
+        );
     }
 
     #[test]
     fn test_from_index_out_of_bounds_returns_emergency() {
-        assert_eq!(PlasmaFepAction::from_index(6), PlasmaFepAction::EmergencyShutdown);
-        assert_eq!(PlasmaFepAction::from_index(100), PlasmaFepAction::EmergencyShutdown);
-        assert_eq!(PlasmaFepAction::from_index(usize::MAX), PlasmaFepAction::EmergencyShutdown);
+        assert_eq!(
+            PlasmaFepAction::from_index(6),
+            PlasmaFepAction::EmergencyShutdown
+        );
+        assert_eq!(
+            PlasmaFepAction::from_index(100),
+            PlasmaFepAction::EmergencyShutdown
+        );
+        assert_eq!(
+            PlasmaFepAction::from_index(usize::MAX),
+            PlasmaFepAction::EmergencyShutdown
+        );
     }
 
     #[test]
@@ -766,9 +800,11 @@ mod tests {
     #[test]
     fn test_encode_window_negative_values_clamped() {
         let encoder = FusionHdcEncoder::new();
-        let readings = vec![
-            PlasmaReading::new(PlasmaSensorType::ElectronDensity, -5.0, 0.0),
-        ];
+        let readings = vec![PlasmaReading::new(
+            PlasmaSensorType::ElectronDensity,
+            -5.0,
+            0.0,
+        )];
         let hv = encoder.encode_window(&readings);
         assert!(hv.values.iter().all(|v| v.is_finite()));
     }

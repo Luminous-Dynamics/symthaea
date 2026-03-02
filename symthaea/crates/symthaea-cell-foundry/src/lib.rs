@@ -40,7 +40,9 @@ pub use reprogramming::ReprogrammingProtocol;
 pub use types::*;
 
 // Genesis Mission Challenge 10: Autonomous Lab Controller
-pub use lab_controller::{InstrumentAdapter, LabController, LabProtocol, MockInstrument, ProtocolStep};
+pub use lab_controller::{
+    InstrumentAdapter, LabController, LabProtocol, MockInstrument, ProtocolStep,
+};
 
 // Genesis Mission Challenge 5: Experiment Planner
 pub use experiment_planner::{

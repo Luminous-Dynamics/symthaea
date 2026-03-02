@@ -66,10 +66,23 @@ impl MaterialProperties {
 /// Cross-section geometry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CrossSection {
-    Rectangle { width: f64, height: f64 },
-    Circle { radius: f64 },
-    HollowCircle { outer_radius: f64, inner_radius: f64 },
-    IBeam { flange_width: f64, flange_height: f64, web_height: f64, web_thickness: f64 },
+    Rectangle {
+        width: f64,
+        height: f64,
+    },
+    Circle {
+        radius: f64,
+    },
+    HollowCircle {
+        outer_radius: f64,
+        inner_radius: f64,
+    },
+    IBeam {
+        flange_width: f64,
+        flange_height: f64,
+        web_height: f64,
+        web_thickness: f64,
+    },
 }
 
 impl CrossSection {
@@ -77,12 +90,16 @@ impl CrossSection {
         match self {
             CrossSection::Rectangle { width, height } => width * height,
             CrossSection::Circle { radius } => std::f64::consts::PI * radius * radius,
-            CrossSection::HollowCircle { outer_radius, inner_radius } => {
-                std::f64::consts::PI * (outer_radius * outer_radius - inner_radius * inner_radius)
-            }
-            CrossSection::IBeam { flange_width, flange_height, web_height, web_thickness } => {
-                2.0 * flange_width * flange_height + web_height * web_thickness
-            }
+            CrossSection::HollowCircle {
+                outer_radius,
+                inner_radius,
+            } => std::f64::consts::PI * (outer_radius * outer_radius - inner_radius * inner_radius),
+            CrossSection::IBeam {
+                flange_width,
+                flange_height,
+                web_height,
+                web_thickness,
+            } => 2.0 * flange_width * flange_height + web_height * web_thickness,
         }
     }
 
@@ -90,10 +107,16 @@ impl CrossSection {
         match self {
             CrossSection::Rectangle { width, height } => width * height.powi(3) / 12.0,
             CrossSection::Circle { radius } => std::f64::consts::PI * radius.powi(4) / 4.0,
-            CrossSection::HollowCircle { outer_radius, inner_radius } => {
-                std::f64::consts::PI * (outer_radius.powi(4) - inner_radius.powi(4)) / 4.0
-            }
-            CrossSection::IBeam { flange_width, flange_height, web_height, web_thickness } => {
+            CrossSection::HollowCircle {
+                outer_radius,
+                inner_radius,
+            } => std::f64::consts::PI * (outer_radius.powi(4) - inner_radius.powi(4)) / 4.0,
+            CrossSection::IBeam {
+                flange_width,
+                flange_height,
+                web_height,
+                web_thickness,
+            } => {
                 let total_h = 2.0 * flange_height + web_height;
                 let outer = flange_width * total_h.powi(3) / 12.0;
                 let inner = (flange_width - web_thickness) * web_height.powi(3) / 12.0;
@@ -109,7 +132,11 @@ impl CrossSection {
             CrossSection::HollowCircle { outer_radius, .. } => {
                 self.moment_of_inertia() / outer_radius
             }
-            CrossSection::IBeam { flange_height, web_height, .. } => {
+            CrossSection::IBeam {
+                flange_height,
+                web_height,
+                ..
+            } => {
                 let total_h = 2.0 * flange_height + web_height;
                 self.moment_of_inertia() / (total_h / 2.0)
             }
@@ -137,7 +164,11 @@ pub struct AnalyticalBackend {
 }
 
 impl AnalyticalBackend {
-    pub fn new(material: MaterialProperties, cross_section: CrossSection, beam_length: f64) -> Self {
+    pub fn new(
+        material: MaterialProperties,
+        cross_section: CrossSection,
+        beam_length: f64,
+    ) -> Self {
         Self {
             material,
             cross_section,
@@ -239,13 +270,17 @@ impl PhysicsBackend for AnalyticalBackend {
         for i in 0..n_points {
             let x = (i as f64 / (n_points - 1) as f64) * self.beam_length;
             // Parabolic deflection profile for simply-supported beam
-            let y = 4.0 * self.state.positions[0][1] as f64
+            let y = 4.0
+                * self.state.positions[0][1] as f64
                 * (x / self.beam_length)
                 * (1.0 - x / self.beam_length);
             displacements.push([x as f32, y as f32, 0.0]);
             strains.push((y / self.beam_length).abs() as f32);
         }
-        Some(DeformationField { displacements, strains })
+        Some(DeformationField {
+            displacements,
+            strains,
+        })
     }
 
     fn get_reaction_force(&self, _point: [f32; 3]) -> f32 {
@@ -284,7 +319,10 @@ mod tests {
 
     #[test]
     fn test_rectangle_area() {
-        let cs = CrossSection::Rectangle { width: 0.01, height: 0.02 };
+        let cs = CrossSection::Rectangle {
+            width: 0.01,
+            height: 0.02,
+        };
         assert!((cs.area() - 0.0002).abs() < 1e-10);
     }
 
@@ -298,7 +336,10 @@ mod tests {
     #[test]
     fn test_hollow_circle() {
         let solid = CrossSection::Circle { radius: 0.02 };
-        let hollow = CrossSection::HollowCircle { outer_radius: 0.02, inner_radius: 0.01 };
+        let hollow = CrossSection::HollowCircle {
+            outer_radius: 0.02,
+            inner_radius: 0.01,
+        };
         assert!(hollow.area() < solid.area());
         assert!(hollow.moment_of_inertia() < solid.moment_of_inertia());
     }
@@ -307,7 +348,10 @@ mod tests {
     fn test_axial_stress() {
         let backend = AnalyticalBackend::new(
             MaterialProperties::steel(),
-            CrossSection::Rectangle { width: 0.01, height: 0.01 },
+            CrossSection::Rectangle {
+                width: 0.01,
+                height: 0.01,
+            },
             1.0,
         );
         let stress = backend.axial_stress(1000.0); // 1000N on 1cm² = 10 MPa
@@ -318,12 +362,18 @@ mod tests {
     fn test_deflection_steel_vs_pla() {
         let steel_backend = AnalyticalBackend::new(
             MaterialProperties::steel(),
-            CrossSection::Rectangle { width: 0.01, height: 0.01 },
+            CrossSection::Rectangle {
+                width: 0.01,
+                height: 0.01,
+            },
             0.5,
         );
         let pla_backend = AnalyticalBackend::new(
             MaterialProperties::pla(),
-            CrossSection::Rectangle { width: 0.01, height: 0.01 },
+            CrossSection::Rectangle {
+                width: 0.01,
+                height: 0.01,
+            },
             0.5,
         );
         let force = 100.0;
@@ -334,11 +384,17 @@ mod tests {
     fn test_analyze_safety_factor() {
         let backend = AnalyticalBackend::new(
             MaterialProperties::steel(),
-            CrossSection::Rectangle { width: 0.02, height: 0.02 },
+            CrossSection::Rectangle {
+                width: 0.02,
+                height: 0.02,
+            },
             0.5,
         );
         let result = backend.analyze(100.0, 500.0);
-        assert!(result.safety_factor > 1.0, "Steel beam should be safe under moderate load");
+        assert!(
+            result.safety_factor > 1.0,
+            "Steel beam should be safe under moderate load"
+        );
         assert!(result.von_mises_stress > 0.0);
     }
 
@@ -346,7 +402,10 @@ mod tests {
     fn test_physics_backend_step() {
         let mut backend = AnalyticalBackend::new(
             MaterialProperties::pla(),
-            CrossSection::Rectangle { width: 0.02, height: 0.01 },
+            CrossSection::Rectangle {
+                width: 0.02,
+                height: 0.01,
+            },
             0.3,
         );
         let force = ForceHV {
@@ -364,7 +423,10 @@ mod tests {
     fn test_deformation_field() {
         let mut backend = AnalyticalBackend::new(
             MaterialProperties::pla(),
-            CrossSection::Rectangle { width: 0.02, height: 0.01 },
+            CrossSection::Rectangle {
+                width: 0.02,
+                height: 0.01,
+            },
             0.3,
         );
         let force = ForceHV {
@@ -383,7 +445,10 @@ mod tests {
     fn test_surprise_loop() {
         let mut backend = AnalyticalBackend::new(
             MaterialProperties::steel(),
-            CrossSection::Rectangle { width: 0.02, height: 0.02 },
+            CrossSection::Rectangle {
+                width: 0.02,
+                height: 0.02,
+            },
             0.5,
         );
         let force = ForceHV {

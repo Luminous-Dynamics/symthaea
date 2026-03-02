@@ -4,8 +4,7 @@ use crate::properties::MaterialProperty;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 const SEEDS: [u64; 8] = [
-    0xCA7_A001, 0xCA7_A002, 0xCA7_A003, 0xCA7_A004,
-    0xCA7_A005, 0xCA7_A006, 0xCA7_A007, 0xCA7_A008,
+    0xCA7_A001, 0xCA7_A002, 0xCA7_A003, 0xCA7_A004, 0xCA7_A005, 0xCA7_A006, 0xCA7_A007, 0xCA7_A008,
 ];
 
 /// Encodes material properties into 16,384D continuous hypervectors.
@@ -39,34 +38,68 @@ impl MaterialHdcEncoder {
     /// Compute pairwise similarity matrix for a set of materials.
     pub fn similarity_matrix(&self, materials: &[MaterialProperty]) -> Vec<Vec<f32>> {
         let hvs: Vec<ContinuousHV> = materials.iter().map(|m| self.encode(m)).collect();
-        hvs.iter().map(|a| hvs.iter().map(|b| a.similarity(b)).collect()).collect()
+        hvs.iter()
+            .map(|a| hvs.iter().map(|b| a.similarity(b)).collect())
+            .collect()
     }
 }
 
-impl Default for MaterialHdcEncoder { fn default() -> Self { Self::new() } }
+impl Default for MaterialHdcEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test] fn test_encode_dimension() { assert_eq!(MaterialHdcEncoder::new().encode(&MaterialProperty::steel_a36()).dim(), HDC_DIMENSION); }
-    #[test] fn test_encode_nonzero() { assert!(MaterialHdcEncoder::new().encode(&MaterialProperty::steel_a36()).norm() > 0.0); }
+    #[test]
+    fn test_encode_dimension() {
+        assert_eq!(
+            MaterialHdcEncoder::new()
+                .encode(&MaterialProperty::steel_a36())
+                .dim(),
+            HDC_DIMENSION
+        );
+    }
+    #[test]
+    fn test_encode_nonzero() {
+        assert!(
+            MaterialHdcEncoder::new()
+                .encode(&MaterialProperty::steel_a36())
+                .norm()
+                > 0.0
+        );
+    }
 
     #[test]
     fn test_self_similarity() {
         let enc = MaterialHdcEncoder::new();
-        let s = enc.similarity(&MaterialProperty::steel_a36(), &MaterialProperty::steel_a36());
+        let s = enc.similarity(
+            &MaterialProperty::steel_a36(),
+            &MaterialProperty::steel_a36(),
+        );
         assert!(s > 0.99, "Self-similarity should be ~1.0, got {}", s);
     }
 
     #[test]
     fn test_metals_cluster() {
         let enc = MaterialHdcEncoder::new();
-        let steel_titanium = enc.similarity(&MaterialProperty::steel_a36(), &MaterialProperty::titanium_ti6al4v());
-        let steel_carbon = enc.similarity(&MaterialProperty::steel_a36(), &MaterialProperty::carbon_fiber_t300());
-        assert!(steel_titanium > steel_carbon,
+        let steel_titanium = enc.similarity(
+            &MaterialProperty::steel_a36(),
+            &MaterialProperty::titanium_ti6al4v(),
+        );
+        let steel_carbon = enc.similarity(
+            &MaterialProperty::steel_a36(),
+            &MaterialProperty::carbon_fiber_t300(),
+        );
+        assert!(
+            steel_titanium > steel_carbon,
             "Steel-Titanium ({}) should be more similar than Steel-CarbonFiber ({})",
-            steel_titanium, steel_carbon);
+            steel_titanium,
+            steel_carbon
+        );
     }
 
     #[test]
@@ -79,6 +112,10 @@ mod tests {
     #[test]
     fn test_similarity_matrix_symmetric() {
         let m = MaterialHdcEncoder::new().similarity_matrix(&MaterialProperty::presets());
-        for i in 0..5 { for j in 0..5 { assert!((m[i][j] - m[j][i]).abs() < 1e-6); } }
+        for i in 0..5 {
+            for j in 0..5 {
+                assert!((m[i][j] - m[j][i]).abs() < 1e-6);
+            }
+        }
     }
 }
