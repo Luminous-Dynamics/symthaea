@@ -308,8 +308,7 @@ impl CognitiveLoopService {
         // PHASE 3: FEEDBACK
         // Consciousness metrics, quality gating, homeostasis, dream engine
         // ═══════════════════════════════════════════════════════════════════
-        let feedback =
-            self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
+        let feedback = self.phase_feedback(input, &perception, &mut dynamics, &mut module_timings);
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 4: OUTPUT
