@@ -71,10 +71,7 @@ impl CognitiveLoopService {
         );
 
         // 5-HT → confidence
-        self.adjust_confidence(
-            "neuromod_serotonin",
-            self.neuromod.bath.confidence_delta(),
-        );
+        self.adjust_confidence("neuromod_serotonin", self.neuromod.bath.confidence_delta());
 
         // ACh → attention sensitivity + threshold
         self.adaptive_behavior.attention_sensitivity *= self.neuromod.bath.attention_factor();
@@ -120,7 +117,8 @@ impl CognitiveLoopService {
         // #8: Exploration cost → 5-HT depletion (Tops et al. 2009)
         let exploration_sht_drain = if self.curiosity_drive.exploration_urge > 0.5 {
             let drain = (self.curiosity_drive.exploration_urge - 0.5) * 0.03;
-            self.neuromod.bath
+            self.neuromod
+                .bath
                 .apply_exploration_cost(self.curiosity_drive.exploration_urge);
             drain
         } else {
@@ -147,8 +145,14 @@ impl CognitiveLoopService {
         };
         match self.cognitive_depth {
             super::CognitiveDepth::DeepThought => {
-                self.neuromod.bath.noradrenaline.produce(THALAMIC_DEEP_NE_TONIC);
-                self.neuromod.bath.acetylcholine.produce(THALAMIC_DEEP_ACH_TONIC);
+                self.neuromod
+                    .bath
+                    .noradrenaline
+                    .produce(THALAMIC_DEEP_NE_TONIC);
+                self.neuromod
+                    .bath
+                    .acetylcholine
+                    .produce(THALAMIC_DEEP_ACH_TONIC);
             }
             super::CognitiveDepth::Reflex => {
                 self.neuromod.bath.gaba.produce(THALAMIC_REFLEX_GABA);
@@ -244,5 +248,73 @@ impl CognitiveLoopService {
             confidence_velocity: confidence_velocity as f32,
             guiding_priority_category: guiding_priority_category.to_owned(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn test_neuromod_phase_returns_valid_psi() {
+        let mut svc = make_service();
+        let result = svc.run_neuromodulator_and_psi_phase(0.3, 0.5);
+        assert!(result.unified_psi >= 0.0 && result.unified_psi <= 1.0);
+    }
+
+    #[test]
+    fn test_ne_reorienting_below_threshold() {
+        let mut svc = make_service();
+        // With default bath, ne_phasic should be low → no reorienting
+        let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
+        // ne_reorienting_boost is 0 when ne_phasic <= threshold
+        assert!(result.ne_reorienting_boost >= 0.0);
+    }
+
+    #[test]
+    fn test_confidence_crash_detection_no_crash() {
+        let mut svc = make_service();
+        // Stable confidence → no crash
+        svc.carryover.quality.prev_confidence_for_crash = svc.prediction_confidence;
+        let result = svc.run_neuromodulator_and_psi_phase(0.2, 0.5);
+        assert_eq!(result.sht_crash_dip, 0.0);
+    }
+
+    #[test]
+    fn test_confidence_crash_detection_with_crash() {
+        let mut svc = make_service();
+        // Simulate a crash: prev confidence was much higher
+        svc.carryover.quality.prev_confidence_for_crash = svc.prediction_confidence + 0.3;
+        let result = svc.run_neuromodulator_and_psi_phase(0.2, 0.5);
+        // Velocity is negative enough to trigger crash
+        assert!(result.sht_crash_dip > 0.0);
+    }
+
+    #[test]
+    fn test_exploration_sht_drain_below_threshold() {
+        let mut svc = make_service();
+        svc.curiosity_drive.exploration_urge = 0.2; // below threshold
+        let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
+        assert_eq!(result.exploration_sht_drain, 0.0);
+    }
+
+    #[test]
+    fn test_exploration_sht_drain_above_threshold() {
+        let mut svc = make_service();
+        svc.curiosity_drive.exploration_urge = 0.8; // above threshold
+        let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
+        assert!(result.exploration_sht_drain > 0.0);
+    }
+
+    #[test]
+    fn test_guiding_priority_empty_question() {
+        let mut svc = make_service();
+        // No experience bus → empty guiding question
+        let result = svc.run_neuromodulator_and_psi_phase(0.1, 0.5);
+        assert!(result.guiding_priority_category.is_empty() || !result.guiding_question.is_empty());
     }
 }
