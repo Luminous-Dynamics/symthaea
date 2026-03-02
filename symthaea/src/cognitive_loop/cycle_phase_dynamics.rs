@@ -14,7 +14,6 @@ use std::time::Instant;
 
 use super::cycle::{DynamicsPhaseResult, PerceptionPhaseResult};
 use super::helpers;
-use super::training::TrainingSample;
 use super::thresholds::{
     ATTENTION_BUDGET_US, BINDING_CONFIDENCE_THRESHOLD, BINDING_LOW_THRESHOLD,
     BINDING_STRONG_CONFIDENCE_SCALE, BINDING_STRONG_RELIEF_SCALE, BINDING_WEAK_CAUTION_SCALE,
@@ -30,9 +29,10 @@ use super::thresholds::{
     SELF_MODEL_HIGH_TRUST_BOOST, SELF_MODEL_LOW_CONFIDENCE_SCALE, SELF_MODEL_LOW_THRESHOLD,
     THALAMIC_DEEP_BUDGET_SCALE, THALAMIC_DEEP_LR_FACTOR, THALAMIC_DEEP_SALIENCE,
     THALAMIC_REFLEX_BUDGET_SCALE, THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE,
-    WORLD_MODEL_SPONGINESS_THRESHOLD,
-    WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
+    WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE,
+    WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
+use super::training::TrainingSample;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, TrainingMethod,
 };
@@ -127,12 +127,9 @@ impl CognitiveLoopService {
                 let confidence_error = (self.prediction_confidence - pred_confidence).abs() as f32;
                 let urgency_match = if urgency == pred_urgency { 1.0f32 } else { 0.0 };
                 let accuracy = (1.0 - confidence_error) * 0.7 + urgency_match * 0.3;
-                self.carryover.learning.self_model_accuracy = self
-                    .carryover
-                    .learning
-                    .self_model_accuracy
-                    * SELF_MODEL_ACCURACY_EMA
-                    + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
+                self.carryover.learning.self_model_accuracy =
+                    self.carryover.learning.self_model_accuracy * SELF_MODEL_ACCURACY_EMA
+                        + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
                 self.stats.self_model_predictions_validated += 1;
                 self.stats.avg_self_model_accuracy = self.stats.avg_self_model_accuracy
                     * SELF_MODEL_ACCURACY_EMA
@@ -226,8 +223,7 @@ impl CognitiveLoopService {
             self.stats.binding_threshold_mod_count += 1;
             -relief
         } else if cached_binding < BINDING_LOW_THRESHOLD && cached_binding > 0.0 {
-            let caution =
-                (BINDING_LOW_THRESHOLD - cached_binding) * BINDING_WEAK_CAUTION_SCALE;
+            let caution = (BINDING_LOW_THRESHOLD - cached_binding) * BINDING_WEAK_CAUTION_SCALE;
             self.scale_threshold("binding_weak_caution", 1.0 + caution);
             self.stats.binding_threshold_mod_count += 1;
             caution
@@ -260,8 +256,7 @@ impl CognitiveLoopService {
             if let Some(ref mut res_mem) = self.resonator_memory {
                 let res_start = Instant::now();
 
-                let res_dim_ok =
-                    perception.compressed_state.len() == res_mem.resonator.config.dim;
+                let res_dim_ok = perception.compressed_state.len() == res_mem.resonator.config.dim;
                 if res_dim_ok && !res_mem.is_empty() {
                     if let Ok(matches) =
                         res_mem.retrieve(&[("content", &perception.compressed_state)])
@@ -273,14 +268,11 @@ impl CognitiveLoopService {
                             super::CognitiveDepth::Cortical => MEMORY_RECALL_TOP_K,
                             super::CognitiveDepth::Reflex => 1,
                         };
-                        let top_matches: Vec<_> =
-                            matches.into_iter().take(recall_k).collect();
+                        let top_matches: Vec<_> = matches.into_iter().take(recall_k).collect();
 
                         let best_match_sim = top_matches
                             .iter()
-                            .map(|m| {
-                                helpers::cosine_f32(&perception.compressed_state, &m.hv)
-                            })
+                            .map(|m| helpers::cosine_f32(&perception.compressed_state, &m.hv))
                             .fold(0.0f32, f32::max);
                         let match_timestamps: Vec<u64> =
                             top_matches.iter().map(|m| m.timestamp).collect();
@@ -344,10 +336,7 @@ impl CognitiveLoopService {
                                                     .clamp(-1.0, 1.0);
                                         }
                                         "high" => {
-                                            self.adjust_confidence(
-                                                "resonator_factor_high",
-                                                0.03,
-                                            );
+                                            self.adjust_confidence("resonator_factor_high", 0.03);
                                         }
                                         _ => {}
                                     }
@@ -356,10 +345,7 @@ impl CognitiveLoopService {
                         }
 
                         if best_match_sim > 0.3 {
-                            self.adjust_confidence(
-                                "resonator_recall_prime",
-                                best_match_sim * 0.02,
-                            );
+                            self.adjust_confidence("resonator_recall_prime", best_match_sim * 0.02);
                             resonator_wm_primed = true;
                         }
 
@@ -527,7 +513,10 @@ impl CognitiveLoopService {
             * arousal_tau_factor
             * codebook_tau_factor
             * arousal_recovery_tau_factor
-            * self.somatic_bridge.to_interoceptive_signals().tau_slowdown_factor as f32;
+            * self
+                .somatic_bridge
+                .to_interoceptive_signals()
+                .tau_slowdown_factor as f32;
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -568,17 +557,18 @@ impl CognitiveLoopService {
         // 6b. World Model
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        self.world_model.update_sensory(&perception.compressed_state);
+        self.world_model
+            .update_sensory(&perception.compressed_state);
 
         let wm_stiffness = self.world_model.avg_error.clamp(0.0, 1.0);
         if self.stats.total_cycles > 20 {
             if wm_stiffness > WORLD_MODEL_STIFFNESS_THRESHOLD {
-                let stiffness_nudge =
-                    (wm_stiffness - WORLD_MODEL_STIFFNESS_THRESHOLD) * WORLD_MODEL_STIFFNESS_LR_SCALE;
+                let stiffness_nudge = (wm_stiffness - WORLD_MODEL_STIFFNESS_THRESHOLD)
+                    * WORLD_MODEL_STIFFNESS_LR_SCALE;
                 self.adjust_lr("wm_stiff", stiffness_nudge);
             } else if wm_stiffness < WORLD_MODEL_SPONGINESS_THRESHOLD {
-                let spongy_dampen = (WORLD_MODEL_SPONGINESS_THRESHOLD - wm_stiffness)
-                    * WORLD_MODEL_SPONGY_LR_SCALE;
+                let spongy_dampen =
+                    (WORLD_MODEL_SPONGINESS_THRESHOLD - wm_stiffness) * WORLD_MODEL_SPONGY_LR_SCALE;
                 self.scale_lr("wm_spongy", 1.0 - spongy_dampen);
             }
         }
@@ -811,8 +801,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // NEUROMODULATOR BATH + PSI SYNTHESIS (extracted to cycle_neuromod_phase.rs)
         // ═══════════════════════════════════════════════════════════════════════
-        let neuromod_result =
-            self.run_neuromodulator_and_psi_phase(prediction_error, coherence);
+        let neuromod_result = self.run_neuromodulator_and_psi_phase(prediction_error, coherence);
         let ne_reorienting_boost = neuromod_result.ne_reorienting_boost;
         let ne_arousal_feedback = neuromod_result.ne_arousal_feedback;
         let sht_crash_dip = neuromod_result.sht_crash_dip;
@@ -927,9 +916,9 @@ impl CognitiveLoopService {
             super::CognitiveDepth::Cortical => 1.0,
             super::CognitiveDepth::Reflex => THALAMIC_REFLEX_BUDGET_SCALE,
         };
-        let attention_budget_us =
-            (ATTENTION_BUDGET_US as f64 * neuromod_attention_alloc as f64 * depth_budget_scale)
-                as u64;
+        let attention_budget_us = (ATTENTION_BUDGET_US as f64
+            * neuromod_attention_alloc as f64
+            * depth_budget_scale) as u64;
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
@@ -1260,7 +1249,8 @@ impl CognitiveLoopService {
         // #13: Report learning activity to glutamate channel
         {
             let is_night = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
-            self.neuromod.bath
+            self.neuromod
+                .bath
                 .report_learning(effective_lr, prediction_error, is_night);
             let fatigue = self.neuromod.bath.learning_fatigue_factor();
             if fatigue < 1.0 {

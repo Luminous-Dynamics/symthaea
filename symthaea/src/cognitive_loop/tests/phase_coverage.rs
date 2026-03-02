@@ -100,8 +100,7 @@ fn quality_coherence_stable() {
     service.carryover.quality.last_coherence = 0.5;
     let mut timings = ModuleTimings::default();
 
-    let result =
-        service.run_quality_and_homeostasis(0.52, false, 0.3, 1.0, 0.8, 0.8, &mut timings);
+    let result = service.run_quality_and_homeostasis(0.52, false, 0.3, 1.0, 0.8, 0.8, &mut timings);
 
     assert!(
         !result.coherence_velocity_gated,
@@ -183,18 +182,21 @@ fn neuromod_gaba_seizure_freezes() {
     // Simulate seizure-like E/I imbalance: pump glutamate to spike ei_ratio > 1.5
     service.neuromod.bath.glutamate.produce(2.0);
     // Process E/I homeostasis to trigger seizure protection
-    service.neuromod.bath.update(&symthaea_neuromodulators::NeuromodulatorInputs {
-        prediction_error: 0.3,
-        surprise: false,
-        reward_signal: 0.0,
-        coherence: 0.5,
-        arousal: 0.5,
-        binding_strength: 0.5,
-        epistemic_confidence: 0.5,
-        flow_active: false,
-        consciousness_level: None,
-        moral_signal: None,
-    });
+    service
+        .neuromod
+        .bath
+        .update(&symthaea_neuromodulators::NeuromodulatorInputs {
+            prediction_error: 0.3,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.5,
+            arousal: 0.5,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
+        });
 
     let _result = service.run_neuromodulator_and_psi_phase(0.3, 0.5);
 
@@ -307,12 +309,22 @@ fn output_metadata_fields_finite() {
     let result = service.cycle("test input");
 
     // Check key f32/f64 fields on CycleResult and metadata
-    assert!(result.prediction_error.is_finite(), "prediction_error not finite");
-    assert!(result.cycle_time_us > 0, "cycle_time_us should be positive: {}", result.cycle_time_us);
+    assert!(
+        result.prediction_error.is_finite(),
+        "prediction_error not finite"
+    );
+    assert!(
+        result.cycle_time_us > 0,
+        "cycle_time_us should be positive: {}",
+        result.cycle_time_us
+    );
     let m = &result.metadata;
     assert!(m.fep.fep_surprise.is_finite(), "fep_surprise not finite");
     assert!(m.fep.fep_accuracy.is_finite(), "fep_accuracy not finite");
-    assert!(m.fep.fep_complexity.is_finite(), "fep_complexity not finite");
+    assert!(
+        m.fep.fep_complexity.is_finite(),
+        "fep_complexity not finite"
+    );
 }
 
 #[test]
@@ -542,14 +554,18 @@ fn coordinator_enriched_priority_modulates() {
     let base_priority = 0.5;
 
     // Before any retrievals: enriched ≈ base + coherence_bonus
-    let before = service.memory_coordinator.enriched_priority(base_priority, hash);
+    let before = service
+        .memory_coordinator
+        .enriched_priority(base_priority, hash);
 
     // After recording retrievals
     service.memory_coordinator.record_retrieval(hash);
     service.memory_coordinator.record_retrieval(hash);
     service.memory_coordinator.record_retrieval(hash);
 
-    let after = service.memory_coordinator.enriched_priority(base_priority, hash);
+    let after = service
+        .memory_coordinator
+        .enriched_priority(base_priority, hash);
     assert!(
         after > before,
         "retrievals should increase enriched priority: before={}, after={}",
@@ -606,7 +622,10 @@ fn thalamic_reflex_boosts_gaba() {
 #[test]
 fn thalamic_cortical_no_tonic_bias() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    assert_eq!(service.cognitive_depth, super::super::CognitiveDepth::Cortical);
+    assert_eq!(
+        service.cognitive_depth,
+        super::super::CognitiveDepth::Cortical
+    );
 
     let ne_before = service.neuromod.bath.noradrenaline.effective();
     let ach_before = service.neuromod.bath.acetylcholine.effective();
