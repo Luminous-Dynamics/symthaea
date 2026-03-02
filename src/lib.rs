@@ -325,9 +325,9 @@ pub use symthaea_embeddings as embeddings;
 #[cfg(feature = "benchmarks")]
 pub mod benchmarks;
 
-// Integration (cfg-gated - needs significant API alignment)
-// The integration module expects ExecutionStrategy as enum with variants
-// (Lost, Curious, Confident, Autopilot) and other API differences
+// Integration (cfg-gated for build isolation)
+// ConsciousPipeline depends on ExecutionStrategy from language module
+// and pulls in heavyweight nix-mind dependencies.
 #[cfg(any(feature = "integration_module", feature = "nix-mind"))]
 pub mod integration;
 

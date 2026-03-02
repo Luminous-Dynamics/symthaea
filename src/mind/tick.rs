@@ -456,11 +456,17 @@ impl ContinuousMind {
             }
 
             // Phase 6: Oxytocin-mediated bath coupling (Feldman 2012)
-            // TODO: wire once NeuromodulatorBath::couple_with_peer() is implemented
+            // Blend local neurochemistry toward peer state via oxytocin-gated coupling.
+            // Uses dream_bath as the mind's local neuromodulator state — coupling is
+            // gentle (5% oxytocin-mediated) and affects only DA/NE/5-HT/ACh.
             #[cfg(feature = "multi_agent")]
-            if let Some(ref _bath) = msg.bath_state {
-                // Coupling logic deferred — ContinuousMind has no direct
-                // cognitive_loop field; needs an accessor or message.
+            if let Some(ref peer_bath) = msg.bath_state {
+                self.dream_bath.couple_with_peer(peer_bath);
+                tracing::trace!(
+                    target: "symthaea::mind::social",
+                    agent = %msg.agent_id,
+                    "Applied neuromodulator bath coupling"
+                );
             }
         }
 
@@ -517,7 +523,7 @@ impl ContinuousMind {
                 behavior: self.state.current_thought.clone(),
                 context: self.state.current_thought.clone(),
                 interaction_outcome: None,
-                bath_state: None, // Bath lives in CognitiveLoopService, not Mind
+                bath_state: Some(self.dream_bath.state_vector().to_vec()),
             });
 
             // Cap outbox to prevent unbounded growth

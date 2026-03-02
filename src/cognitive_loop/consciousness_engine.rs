@@ -215,6 +215,8 @@ struct ConsciousnessEngineCache {
     last_multimodal_phi: f64,
     last_equation_v2_consciousness: f64,
     last_pipeline_consciousness: f64,
+    /// Limiting component from last equation v2 computation
+    last_limiting_component: Option<CoreComponent>,
     /// Dynamic consciousness weights (self-calibrating).
     weights: ConsciousnessWeights,
     /// EMA-smoothed emergence ratio from structural Phi.
@@ -409,6 +411,7 @@ impl ConsciousnessEngine {
                 };
                 let result = eq.compute(&state);
                 self.cache.last_equation_v2_consciousness = result.consciousness;
+                self.cache.last_limiting_component = Some(result.limiting_factor);
                 result.consciousness
             } else {
                 self.cache.last_equation_v2_consciousness
@@ -504,7 +507,7 @@ impl ConsciousnessEngine {
             multimodal_phi,
             equation_v2_consciousness,
             pipeline_consciousness,
-            limiting_component: None, // TODO: extract from equation v2 result
+            limiting_component: self.cache.last_limiting_component,
             unified_consciousness,
             sigma: self.cache.last_sigma,
             confidence_delta,

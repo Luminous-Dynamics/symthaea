@@ -1879,7 +1879,7 @@ impl Symthaea {
                                 {
                                     if exit_code != 0 {
                                         tracing::warn!(target: "symthaea::action", "Action failed, injecting surprise signal");
-                                        // TODO: self.mind.inject_surprise(1.0);
+                                        self.mind.inject_surprise(1.0);
                                     }
                                 }
                             }

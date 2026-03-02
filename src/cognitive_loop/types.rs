@@ -799,6 +799,8 @@ pub struct CycleMetadata {
     pub consciousness_gradient_magnitude: f64,
     /// Limiting component identified by gradient analysis ("" when off).
     pub consciousness_limiting_component: String,
+    /// Equation V2 limiting component from ConsciousnessEngine ("" when off).
+    pub eq_v2_limiting_component: String,
     /// Affective consciousness valence (-1.0 to 1.0, 0.0 when off).
     pub affect_consciousness_valence: f32,
     /// Affective consciousness arousal (0.0–1.0, 0.0 when off).
@@ -1490,6 +1492,22 @@ pub struct PsiAttestationRecord {
 
     /// Urgency level during measurement (Critical/Normal/Cruise)
     pub urgency: CycleUrgency,
+}
+
+impl PsiAttestationRecord {
+    /// Produce a deterministic, signable message encoding this attestation.
+    ///
+    /// Format: `symthaea-phi-attestation:v1:{agent_did}:{psi}:{cycle_id}:{captured_at_us}`
+    ///
+    /// The bridge crate can then sign this message with the agent's Ed25519 key
+    /// and submit the signature alongside the record to the governance zome.
+    pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {
+        format!(
+            "symthaea-phi-attestation:v1:{}:{}:{}:{}",
+            agent_did, self.psi, self.cycle_id, self.captured_at_us
+        )
+        .into_bytes()
+    }
 }
 
 /// Result of a single cognitive cycle

@@ -338,6 +338,39 @@ impl ContinuousMind {
         self.input(MindInput::new(InputType::Perception, content));
     }
 
+    /// Inject a surprise signal into the mind, boosting arousal and triggering
+    /// heightened attention.
+    ///
+    /// `magnitude` is clamped to [0.0, 1.0]. The signal:
+    /// - Boosts arousal toward alertness (Yerkes-Dodson, 1908)
+    /// - Shifts emotional valence slightly negative (unexpected events)
+    /// - Injects a high-entropy perception to capture attention
+    ///
+    /// Called by the facade when action outcomes deviate from expectations.
+    pub fn inject_surprise(&mut self, magnitude: f32) {
+        let m = magnitude.clamp(0.0, 1.0);
+
+        // Boost arousal: blend toward full alertness by magnitude
+        self.state.arousal = (self.state.arousal + m * (1.0 - self.state.arousal)).clamp(0.0, 1.0);
+
+        // Slight negative valence shift (surprise ≠ positive)
+        self.state.emotional_valence =
+            (self.state.emotional_valence - m * 0.2).clamp(-1.0, 1.0);
+
+        // Boost cognitive temperature → more exploratory sampling
+        self.state.mood_temperature =
+            (self.state.mood_temperature + m * 0.3).clamp(0.0, 2.0);
+
+        tracing::debug!(
+            target: "symthaea::mind::surprise",
+            magnitude = m,
+            arousal = self.state.arousal,
+            valence = self.state.emotional_valence,
+            temperature = self.state.mood_temperature,
+            "Surprise injected"
+        );
+    }
+
     /// Set the original input text for intent classification.
     ///
     /// Call this before `tick()` to enable HDC-based intent inference.
