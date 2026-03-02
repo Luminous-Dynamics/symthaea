@@ -186,6 +186,25 @@ Neuromod & Live-Loop Ablation & In-loop knockout & 2002 & behavioral\_delta & --
 
 \end{longtable}
 
+\clearpage
+\section*{Supplementary Data Files}
+
+The following CSV data files are included in the repository under \texttt{papers/data/psych\_bench/} and are regenerated deterministically by:
+
+\begin{quote}
+\texttt{cargo run -p symthaea-psych-bench --example psych\_bench\_paper\_data}
+\end{quote}
+
+\begin{itemize}
+\item \texttt{normative\_zscores.csv} --- Per-benchmark normative z-scores comparing agent performance against published human baselines (Figure~5 forest plot). Columns: benchmark, metric, agent value, human mean, human SD, z-score (sign-corrected), percentile, clinical band.
+\item \texttt{cognitive\_profile.csv} --- Domain-level cognitive profile scores (Figure~4 radar chart). Eight domains with score, benchmark count, and qualitative interpretation.
+\item \texttt{reliability.csv} --- Test-retest reliability (ICC) for each benchmark across 3 sessions $\times$ 10 seed families (Table~2).
+\item \texttt{correlations.csv} --- Cross-domain correlation matrix for 10 key mechanism pairs (Table~3).
+\item \texttt{ablation\_domains.csv} --- Domain scores under 6 ablation presets (Figure~7 grouped bar chart).
+\item \texttt{sat\_*.csv} --- Speed-accuracy tradeoff curves for individual benchmarks (Figure~8).
+\item \texttt{neuromod\_profiles.csv} --- Neuromodulator benchmark results including behavioral knockout effect sizes, dose-response monotonicity, tolerance/withdrawal dynamics, and consciousness pharmacology.
+\end{itemize}
+
 \bibliographystyle{apalike}
 \bibliography{psych_bench_references}
 

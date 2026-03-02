@@ -420,8 +420,8 @@ The neuromodulator evaluation framework is \psychbench{}'s most novel contributi
 \centering
 \caption{Neuromodulator benchmark summary. Each benchmark targets specific transmitter systems and implements established neuroscience paradigms. DA = dopamine, NE = noradrenaline, 5-HT = serotonin, ACh = acetylcholine, GABA = $\gamma$-aminobutyric acid, OT = oxytocin.}
 \label{tab:neuromod}
-\small
-\begin{tabular}{@{}lllll@{}}
+\scriptsize
+\begin{tabular}{@{}p{2.5cm}p{2.1cm}p{2.3cm}p{2.1cm}p{2.6cm}@{}}
 \toprule
 \textbf{Benchmark} & \textbf{Transmitter} & \textbf{Paradigm} & \textbf{Key Metric} & \textbf{Citation} \\
 \midrule
@@ -892,14 +892,14 @@ We demonstrate \psychbench{} on the \symthaea{} Holographic Liquid Brain, a cogn
 \node[font=\tiny, gray] at (axis cs:2.75,0.5) {Superior};
 
 % Summary counts in each band
-\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:-2.75,77) {$n=11$};
-\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:-1.5,77) {$n=6$};
-\node[font=\scriptsize, hlbgreen!80!black, anchor=south] at (axis cs:0,77) {$n=30$};
+\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:-2.75,77) {$n=9$};
+\node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:-1.5,77) {$n=8$};
+\node[font=\scriptsize, hlbgreen!80!black, anchor=south] at (axis cs:0,77) {$n=35$};
 \node[font=\scriptsize, hlbyellow!80!black, anchor=south] at (axis cs:1.5,77) {$n=10$};
-\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:2.75,77) {$n=19$};
+\node[font=\scriptsize, hlbred, anchor=south] at (axis cs:2.75,77) {$n=14$};
 \end{axis}
 \end{tikzpicture}
-\caption{Forest plot of normative z-scores for 76 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability; 30 benchmarks exceed this range in raw values). Background shading indicates clinical interpretation bands \citep{cicchetti1994guidelines}. Band counts: 30 Average ($|z| \leq 1$), 10 Above Average, 6 Below Average, 19 Superior ($z > 2$), 11 Impaired ($z < -2$). Clamped benchmarks include 19 at $+3$ (many with raw $z > 10$, reflecting mismatched metric scales) and 11 at $-3$. Data loaded from \texttt{normative\_zscores.csv}.}
+\caption{Forest plot of normative z-scores for 76 benchmarks with matched human baselines (z-scores clamped to $\pm 3$ for readability; 12 benchmarks exceed this range in raw values). Background shading indicates clinical interpretation bands \citep{cicchetti1994guidelines}. Band counts: 35 Average ($|z| \leq 1$), 10 Above Average, 8 Below Average, 14 Superior ($z > 2$), 9 Impaired ($z < -2$). Data loaded from \texttt{normative\_zscores.csv}.}
 \label{fig:forest}
 \end{figure}
 
@@ -1011,8 +1011,8 @@ All APIs are deterministic given a fixed seed, enabling exact replication. The f
 \centering
 \caption{Comparison of \psychbench{} with existing AI benchmark suites. Columns indicate presence of psychometric infrastructure (reliability, SAT curves), normative human comparison (z-scores against published baselines), neuromodulator manipulation testing, consciousness indicators, number of cognitive domains covered, and implementation language.}
 \label{tab:comparison}
-\small
-\begin{tabular}{@{}lcccccc@{}}
+\scriptsize
+\begin{tabular}{@{}p{3.2cm}cccccc@{}}
 \toprule
 \textbf{Suite} & \textbf{Psychometrics} & \textbf{Normative} & \textbf{Neuromod} & \textbf{Consciousness} & \textbf{Domains} & \textbf{Language} \\
 \midrule
@@ -1026,7 +1026,9 @@ PsychBench~\citep{hagendorff2023machine} & Partial & --- & --- & --- & 5 & Pytho
 \end{tabular}
 \end{table}
 
-\paragraph{Unique contributions.} Four aspects distinguish \psychbench{}. First, the integration of psychometric infrastructure (ICC reliability, SAT curves, adaptive staircases) with AI benchmarking is, to our knowledge, novel. Standard practice in AI evaluation treats benchmarks as fixed-accuracy measures; \psychbench{} treats them as psychological instruments subject to the same validation standards as clinical assessments. Second, the neuromodulator evaluation framework has no precedent in AI benchmarking---it tests pharmacological manipulations, dose-response curves, tolerance/withdrawal dynamics, and multi-transmitter synergy, creating a bridge between computational neuropharmacology and AI evaluation. Third, the normative anchoring against 90+ published baselines enables clinical-band interpretation, moving beyond ``accuracy on task X'' to ``this architecture performs at the 88th percentile relative to the human population, specifically in set-shifting flexibility.'' Fourth, the unified holographic stimulus encoding through five HDC adapter types enables principled cross-modal comparison: because all stimuli share a common geometric space, similarity between visual working memory items and semantic associates is directly computable.
+\paragraph{Relationship to existing work.} CogBench~\citep{codaforno2024cogbench} is the closest predecessor, applying eight cognitive psychology tasks to large language models via prompt-based interaction. \psychbench{} extends this approach in three ways: (1)~architectural-level evaluation through HDC encoding rather than prompt-level interaction, (2)~psychometric infrastructure that CogBench lacks (reliability, SAT curves), and (3)~broader domain coverage. However, CogBench's prompt-based interface enables evaluation of any LLM, whereas \psychbench{} requires architectures with HDC-compatible stimulus interfaces---a significant tradeoff in generality. Hagendorff et al.'s~\citep{hagendorff2023machine} PsychBench adapts classical psychology experiments for LLM evaluation across five domains with some psychometric analysis (split-half reliability), but does not address neuromodulation or consciousness. HELM~\citep{liang2023holistic} and BIG-Bench~\citep{srivastava2023beyond} provide broad multi-task evaluation without psychometric infrastructure. ARC~\citep{chollet2019measure} provides deep evaluation of fluid reasoning with well-defined difficulty scaling; our ARC-inspired sub-battery (11 benchmarks) builds directly on Chollet's framework.
+
+\paragraph{Unique contributions.} Four aspects distinguish \psychbench{}. First, the integration of psychometric \emph{infrastructure} (ICC computation, SAT curve fitting, adaptive staircases) with AI benchmarking is, to our knowledge, novel. Standard practice in AI evaluation treats benchmarks as fixed-accuracy measures; \psychbench{} treats them as instruments requiring the same validation scrutiny as clinical assessments. Importantly, the current demonstration reveals that many benchmarks show poor psychometric properties under the \hlb{} (median ICC $= -0.03$, Table~\ref{tab:psychometrics})---this is itself an informative finding, demonstrating that the infrastructure can identify where architectural evaluation falls short. Second, the neuromodulator evaluation framework has no precedent in AI benchmarking---it tests pharmacological manipulations, dose-response curves, tolerance/withdrawal dynamics, and multi-transmitter synergy, bridging computational neuropharmacology and AI evaluation. Third, normative anchoring against 90+ published baselines enables clinical-band interpretation, though a subset of benchmarks ($\sim$5\%) exhibit scale mismatches between HDC-based agent metrics and human behavioral measures (see Limitations), requiring future calibration. Fourth, the unified holographic stimulus encoding through five HDC adapter types enables principled cross-modal comparison.
 
 \paragraph{Limitations.} Several limitations warrant careful discussion.
 
@@ -1036,11 +1038,11 @@ PsychBench~\citep{hagendorff2023machine} & Partial & --- & --- & --- & 5 & Pytho
 
 \emph{Domain-specific weaknesses.} The cognitive profile reveals notable weaknesses in Language processing (lowest domain score), reflecting the architecture's reliance on holographic compositional semantics rather than distributional language models. Social cognition benchmarks are similarly constrained by the absence of embodied social experience. These weaknesses are informative---they demonstrate that the cognitive profile genuinely captures architectural biases---but they limit the suite's sensitivity for evaluating architectures that may compensate through different mechanisms.
 
-\emph{Normative z-score interpretation.} Several benchmarks produce extreme normative z-scores ($|z| > 5$) because the human baseline standard deviations for those paradigms are very small. These extremes reflect the ratio $(\text{HLB} - \mu_\text{human}) / \sigma_\text{human}$ and should be interpreted as ``far from human typical'' rather than as meaningful psychometric distances. The forest plot (Figure~\ref{fig:forest}) clips z-scores to $[-3, +3]$ for visual clarity; unclipped values are available in the supplementary CSV data.
+\emph{Normative z-score interpretation.} Several benchmarks produce extreme normative z-scores ($|z| > 3$) for two reasons: (1)~scale mismatches where HDC-based agent metrics operate on different scales than human behavioral measures (e.g., lexicality effect measured as discrimination accuracy rather than RT advantage), and (2)~genuinely large deviations from human norms (e.g., agent CPT $d' = 4.65$ vs.\ human $d' = 2.80$). The forest plot (Figure~\ref{fig:forest}) clips to $[-3, +3]$; unclipped values are available in the supplementary CSV data.
 
 \emph{Encoding noise as theoretical construct.} The ablation study models the removal of cognitive subsystems (e.g., Active Inference, social cognition) as increased encoding noise in HDC representations. This operationalizes the theoretical claim that top-down predictions from these subsystems refine perceptual encoding. While this produces meaningful and interpretable differentiation across ablation conditions, it is a modeling choice rather than a mechanistic observation; the actual effect of removing FEP on HDC encoding quality would require a fully modular ablation at the architectural level.
 
-\emph{Additional constraints.} The working memory implementation uses a lightweight token-based model rather than biologically detailed spiking networks, limiting the fidelity of capacity constraints. Reaction times are measured in computational ticks rather than milliseconds, requiring calibration for direct comparison with human RT distributions (though the ex-Gaussian decomposition of tick-based RTs is internally valid). The consciousness evaluation provides binary indicator presence/absence rather than quantitative $\Phi$ values, which remain intractable for systems of this scale. The benchmark suite is designed for \hlb{}-class architectures with explicit neuromodulatory subsystems; adapting it to LLMs would require substantial modification of the neuromod battery and stimulus encoding pipeline.
+\emph{Additional constraints.} Reaction times are measured in computational ticks rather than milliseconds, requiring calibration for direct comparison with human RT distributions. The consciousness evaluation provides binary indicator presence/absence rather than quantitative $\Phi$ values, which remain intractable for systems of this scale. The suite targets \hlb{}-class architectures with explicit neuromodulatory subsystems; adapting it to LLMs would require substantial modification of the neuromod battery and HDC encoding pipeline.
 
 \paragraph{Future directions.} Several extensions are planned. Expanding the consciousness evaluation to include quantitative $\Phi$ approximations (using graph-theoretic proxies rather than exhaustive partition search) would strengthen the link to IIT. Adding developmental benchmarks (testing how cognitive profiles change with training time, analogous to developmental trajectories in children) would enable longitudinal evaluation. Integration with neuroimaging-derived benchmarks (e.g., tasks with known neural correlates from fMRI studies) would enable neural-level comparison beyond behavioral metrics. Finally, a web-based leaderboard for cross-architecture comparison would facilitate community adoption.
 
@@ -1050,7 +1052,7 @@ PsychBench~\citep{hagendorff2023machine} & Partial & --- & --- & --- & 5 & Pytho
 \section{Conclusion}
 \label{sec:conclusion}
 
-\psychbench{} provides the first comprehensive cognitive benchmark suite designed for Holographic Liquid Brain architectures. With 84 benchmarks across 17 domains, psychometric validation infrastructure, normative human comparison against 90+ published baselines, a 17-benchmark neuromodulator evaluation framework, and 14-indicator consciousness evaluation, the suite enables rigorous, multi-dimensional characterization of neuroscience-inspired cognitive architectures. The demonstration on the \symthaea{} \hlb{} reveals a characteristic cognitive profile---strong holographic pattern matching in reasoning and executive function, with liquid temporal dynamics driving attention and motor learning---that is interpretable, reproducible, and directly comparable to human norms. Implemented in 15,000 lines of Rust with 793 unit tests and full determinism, \psychbench{} is open-source and ready for adoption by the growing community of researchers building brain-inspired cognitive architectures.
+\psychbench{} provides the first comprehensive cognitive benchmark suite designed for Holographic Liquid Brain architectures. With 84 benchmarks across 17 domains, psychometric assessment infrastructure, normative human comparison against 90+ published baselines, a 17-benchmark neuromodulator evaluation framework, and 14-indicator consciousness evaluation, the suite enables multi-dimensional characterization of neuroscience-inspired cognitive architectures. The demonstration on the \symthaea{} \hlb{} reveals both the suite's strengths and its current limitations: the architecture produces a characteristic cognitive profile (strong pattern matching, weak embodied tasks) that is interpretable and reproducible, but the psychometric validation exposes challenges including low cross-seed reliability (median ICC $= -0.03$), weak ablation sensitivity ($\eta^2 = 0.003$), and normative scale mismatches requiring calibration. These findings are themselves informative---they identify precisely where the architecture and the evaluation framework need improvement. Implemented in 15,000 lines of Rust with 793 unit tests and full determinism, \psychbench{} is open-source and designed for iterative refinement by the growing community of researchers building brain-inspired cognitive architectures.
 
 % ============================================================
 % OPEN PRACTICES STATEMENT
