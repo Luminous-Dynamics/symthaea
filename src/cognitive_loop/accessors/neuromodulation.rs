@@ -68,14 +68,10 @@ impl CognitiveLoopService {
             neuromod_da_phasic: self.neuromod.bath.da_phasic(),
             neuromod_ne_phasic: self.neuromod.bath.ne_phasic(),
             neuromod_consciousness_mod: self.neuromod.bath.consciousness_modulation(),
-            neuromod_sleep_consolidation_boost: self
-                .neuromod
-                .bath
-                .sleep_consolidation_boost(),
+            neuromod_sleep_consolidation_boost: self.neuromod.bath.sleep_consolidation_boost(),
             neuromod_attention_allocation: neuromod_attention_alloc,
             neuromod_plasticity_gate: self.neuromod.bath.plasticity_gate(),
-            neuromod_mcts_exploration_mod: self.neuromod.bath.mcts_exploration_modulation()
-                as f32,
+            neuromod_mcts_exploration_mod: self.neuromod.bath.mcts_exploration_modulation() as f32,
             replay_da_tag_avg: 0.0, // populated by episodic replay phase if applicable
             circadian_hour: self.biorhythm.hour as f32,
             neuromod_da_d1: self.neuromod.bath.da_d1_effective(),
@@ -126,11 +122,7 @@ impl CognitiveLoopService {
             neuromod_attractor_detected: self.neuromod.phase_tracker.detect_attractor().is_some(),
             active_injection_count: self.neuromod.bath.active_injections.len() as u8,
             // Phase 6: endocannabinoid + subtypes
-            neuromod_endocannabinoid_effective: self
-                .neuromod
-                .bath
-                .endocannabinoid
-                .effective(),
+            neuromod_endocannabinoid_effective: self.neuromod.bath.endocannabinoid.effective(),
             neuromod_sht_1a_signal: self.neuromod.bath.sht_1a_signal(),
             neuromod_sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
             neuromod_gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
@@ -138,9 +130,16 @@ impl CognitiveLoopService {
             // Phase 7: self-assessment telemetry
             self_assessment_pe_ema: self.neuromod.self_assessment.pe_ema() as f32,
             self_assessment_coherence_ema: self.neuromod.self_assessment.coherence_ema() as f32,
-            self_assessment_confidence_error_ema: self.neuromod.self_assessment.confidence_error_ema() as f32,
-            self_assessment_attention_ema: self.neuromod.self_assessment.attention_utilization_ema() as f32,
-            self_assessment_inhibition_error_ema: self.neuromod.self_assessment.inhibition_error_ema() as f32,
+            self_assessment_confidence_error_ema: self
+                .neuromod
+                .self_assessment
+                .confidence_error_ema() as f32,
+            self_assessment_attention_ema: self.neuromod.self_assessment.attention_utilization_ema()
+                as f32,
+            self_assessment_inhibition_error_ema: self
+                .neuromod
+                .self_assessment
+                .inhibition_error_ema() as f32,
             self_assessment_observations: self.neuromod.self_assessment.observations_count(),
             self_assessment_cooldown: self.neuromod.self_assessment.cooldown_remaining(),
             self_assessment_calibration_fired: self.neuromod.self_assessment.last_triggered(),
@@ -166,7 +165,8 @@ impl CognitiveLoopService {
 
     /// Export the bath trajectory as a serializable timeline.
     pub fn bath_timeline(&self) -> super::super::neuromodulators::BathTimeline {
-        self.neuromod.phase_tracker
+        self.neuromod
+            .phase_tracker
             .to_timeline(self.neuromod.bath.phase_label())
     }
 
@@ -197,8 +197,9 @@ impl CognitiveLoopService {
     /// // Applied automatically on next sleep→wake transition
     /// ```
     pub fn ingest_calibration(&mut self, normative_z_scores: &[(&str, &str, f64)]) {
-        let cal =
-            super::super::calibration::NeuromodCalibration::from_normative_z_scores(normative_z_scores);
+        let cal = super::super::calibration::NeuromodCalibration::from_normative_z_scores(
+            normative_z_scores,
+        );
         tracing::info!(
             coverage = cal.coverage,
             adjustments = cal.adjustments.len(),

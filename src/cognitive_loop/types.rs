@@ -42,7 +42,8 @@ pub(crate) struct ConsciousnessCache {
     pub(crate) last_predictive_free_energy: f64,
     // ── Structural Phi persistence ──────────────────────────────────
     /// Last structural Phi result (updated every 194 cycles by consciousness engine).
-    pub(crate) last_structural_phi: Option<symthaea_core::consciousness_metrics::StructuralPhiResult>,
+    pub(crate) last_structural_phi:
+        Option<symthaea_core::consciousness_metrics::StructuralPhiResult>,
 }
 
 impl Default for ConsciousnessCache {
@@ -1127,6 +1128,16 @@ pub struct CycleMetadata {
     /// Populated by the facade after cycle completion (bridge pattern).
     #[serde(default)]
     pub speech_simplified_count: u64,
+
+    /// Describes a substrate transition that occurred during this cycle (if any).
+    /// Format: "SiliconDigital → BiologicalNeurons (0.71 → 0.95)"
+    #[serde(default)]
+    pub substrate_transition: Option<String>,
+
+    /// Whether the prediction model is currently in consolidation mode.
+    /// Set in prediction.rs when replay-driven consolidation is active.
+    #[serde(default)]
+    pub is_consolidating: bool,
 }
 
 fn default_response_profile() -> String {
