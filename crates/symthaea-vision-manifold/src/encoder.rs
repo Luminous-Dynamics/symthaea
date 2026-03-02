@@ -169,7 +169,7 @@ impl PatchHdcEncoder {
         let n = patch_features.len();
         let side = (n as f32).sqrt().ceil() as usize;
         let cols = side.min(self.max_cols);
-        let rows = (n + cols - 1) / cols;
+        let rows = n.div_ceil(cols);
 
         let mut patch_hvs = Vec::with_capacity(n);
         for (idx, features) in patch_features.iter().enumerate() {

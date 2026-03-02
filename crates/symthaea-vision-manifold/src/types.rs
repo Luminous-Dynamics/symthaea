@@ -84,20 +84,15 @@ impl Default for MultiScaleConfig {
 }
 
 /// Training method for CfC temporal dynamics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TrainingMethod {
     /// Analytical gradient through closed-form CfC.
     Bptt,
     /// Zeroth-order Simultaneous Perturbation Stochastic Approximation.
     Spsa,
     /// BPTT with SPSA fallback when gradients are unstable.
+    #[default]
     BpttWithSpsaFallback,
-}
-
-impl Default for TrainingMethod {
-    fn default() -> Self {
-        Self::BpttWithSpsaFallback
-    }
 }
 
 /// Configuration for CfC temporal training.
