@@ -375,9 +375,10 @@ impl ConsciousnessEngine {
             }
         }
 
-        // Update dynamic consciousness weights from structural Phi
-        if let Some(structural) = self.cache.last_structural_phi.clone() {
-            self.update_weights(&structural);
+        // Update dynamic consciousness weights from structural Phi.
+        // Extract emergence_ratio to avoid cloning the full struct (Vec allocs).
+        if let Some(er) = self.cache.last_structural_phi.as_ref().map(|s| s.emergence_ratio) {
+            self.update_weights_from_emergence(er);
         }
 
         // Structural Phi feedback: cross-region binding diagnostics
@@ -650,8 +651,7 @@ impl ConsciousnessEngine {
     /// EMA-smooths the emergence ratio (alpha adaptive to weight stability),
     /// then modulates weights: high emergence boosts spectral (IIT is capturing real integration),
     /// low emergence boosts equation/pipeline (local metrics more informative).
-    fn update_weights(&mut self, structural: &StructuralPhiResult) {
-        let er = structural.emergence_ratio;
+    fn update_weights_from_emergence(&mut self, er: f64) {
 
         // Adaptive alpha: high variance → slow down (alpha × 0.5 at variance=0.01)
         let base_alpha = 0.3;
