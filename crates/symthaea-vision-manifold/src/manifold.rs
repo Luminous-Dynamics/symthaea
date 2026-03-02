@@ -25,7 +25,7 @@ use symthaea_core::temporal::TemporalPredictor;
 use crate::attention::SurpriseMap;
 use crate::encoder::PatchHdcEncoder;
 use crate::training::{BpttResult, ManifoldTrainer};
-use crate::types::{VisionConfig, VisionTelemetry};
+use crate::types::{ManifoldState, VisionConfig, VisionTelemetry};
 
 /// A CfC temporal manifold over holographic video encodings.
 ///
@@ -257,6 +257,11 @@ impl VisionManifold {
         self.config.tau_base
     }
 
+    /// Access the learned weight HV (for inspection/comparison).
+    pub fn weight_hv(&self) -> &ContinuousHV {
+        &self.weight_hv
+    }
+
     /// Total training steps performed.
     pub fn training_steps(&self) -> u64 {
         self.trainer.total_steps()
@@ -340,6 +345,54 @@ impl VisionManifold {
             errors,
             frame_sequence: self.frame_count,
         }
+    }
+
+    /// Snapshot the manifold's learned state for serialization.
+    ///
+    /// Captures weight_hv, tau_base, feature_weights, and training steps
+    /// so the manifold can be resumed from a trained checkpoint.
+    pub fn save_state(&self) -> ManifoldState {
+        ManifoldState {
+            weight_hv: self.weight_hv.as_slice().to_vec(),
+            tau_base: self.config.tau_base,
+            feature_weights: self.encoder.feature_weights().to_vec(),
+            training_steps: self.trainer.total_steps(),
+            hdc_dim: self.config.hdc_dim,
+            num_features: self.config.num_features,
+        }
+    }
+
+    /// Restore the manifold from a saved state.
+    ///
+    /// Validates dimensional compatibility before applying. Returns `Err`
+    /// if the saved state is incompatible with the current config.
+    pub fn load_state(&mut self, state: &ManifoldState) -> Result<(), String> {
+        if state.hdc_dim != self.config.hdc_dim {
+            return Err(format!(
+                "HDC dimension mismatch: saved={}, current={}",
+                state.hdc_dim, self.config.hdc_dim
+            ));
+        }
+        if state.weight_hv.len() != self.config.hdc_dim {
+            return Err(format!(
+                "Weight HV length mismatch: saved={}, expected={}",
+                state.weight_hv.len(),
+                self.config.hdc_dim
+            ));
+        }
+
+        self.weight_hv = ContinuousHV::from_vec(state.weight_hv.clone());
+        self.config.tau_base = state.tau_base;
+
+        // Restore feature weights if compatible
+        let current_weights = self.encoder.feature_weights().len();
+        if state.feature_weights.len() == current_weights {
+            // Apply via contrastive interface would change weights — instead set directly
+            // We need mutable access to the encoder's weights
+            self.encoder.set_feature_weights(&state.feature_weights);
+        }
+
+        Ok(())
     }
 
     /// Reset manifold to initial state.
@@ -668,5 +721,82 @@ mod tests {
         // Intermediate dt → 0 < sigma < 1
         let mid = m.gating(0.5);
         assert!(mid > 0.0 && mid < 1.0, "mid sigma = {mid}");
+    }
+
+    // === State Persistence ===
+
+    #[test]
+    fn test_save_state_captures_fields() {
+        let cfg = VisionConfig::default();
+        let m = VisionManifold::new(cfg.clone(), 64, 64);
+
+        let state = m.save_state();
+        assert_eq!(state.hdc_dim, cfg.hdc_dim);
+        assert_eq!(state.weight_hv.len(), cfg.hdc_dim);
+        assert!((state.tau_base - cfg.tau_base).abs() < 1e-6);
+        assert_eq!(state.training_steps, 0);
+        assert_eq!(state.feature_weights.len(), cfg.total_features());
+    }
+
+    #[test]
+    fn test_save_load_roundtrip() {
+        let cfg = VisionConfig::default();
+        let mut m1 = VisionManifold::new(cfg.clone(), 64, 64);
+
+        // Evolve manifold so it has non-trivial state
+        let frame = gradient_frame(64, 64);
+        for _ in 0..10 {
+            m1.observe_frame(&frame, 64, 64, 1, 0.033);
+        }
+
+        let saved = m1.save_state();
+
+        // Load into a fresh manifold
+        let mut m2 = VisionManifold::new(cfg, 64, 64);
+        assert!(m2.load_state(&saved).is_ok());
+
+        // Weight HVs should match
+        let sim = m2.weight_hv().similarity(m1.weight_hv());
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Loaded weight_hv should match saved: sim={sim}"
+        );
+
+        // Tau should match
+        assert!(
+            (m2.current_tau() - m1.current_tau()).abs() < 1e-6,
+            "Loaded tau should match"
+        );
+    }
+
+    #[test]
+    fn test_load_state_rejects_dimension_mismatch() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        let bad_state = ManifoldState {
+            weight_hv: vec![0.0; 100], // Wrong dimension
+            tau_base: 0.5,
+            feature_weights: vec![],
+            training_steps: 0,
+            hdc_dim: 100,
+            num_features: 5,
+        };
+
+        assert!(m.load_state(&bad_state).is_err());
+    }
+
+    #[test]
+    fn test_save_state_serializable() {
+        let cfg = VisionConfig::default();
+        let m = VisionManifold::new(cfg, 64, 64);
+        let state = m.save_state();
+
+        // Should be JSON-serializable
+        let json = serde_json::to_string(&state).expect("Should serialize");
+        let deserialized: ManifoldState =
+            serde_json::from_str(&json).expect("Should deserialize");
+        assert_eq!(deserialized.hdc_dim, state.hdc_dim);
+        assert_eq!(deserialized.weight_hv.len(), state.weight_hv.len());
     }
 }

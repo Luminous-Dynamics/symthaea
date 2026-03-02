@@ -30,6 +30,7 @@ pub mod bridge;
 pub mod camera;
 pub mod encoder;
 pub mod manifold;
+pub mod predictive;
 pub mod training;
 pub mod types;
 
@@ -40,8 +41,9 @@ pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 pub use camera::CameraSource;
 pub use encoder::{MultiScaleEncoder, PatchHdcEncoder};
 pub use manifold::{HorizonAccuracy, VisionManifold};
+pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
-    AttentionMap, LearningConfig, MultiScaleConfig, PatchGrid, TrainingConfig, TrainingMethod,
-    VisionConfig, VisionTelemetry,
+    AttentionMap, LearningConfig, ManifoldState, MultiScaleConfig, PatchGrid, TrainingConfig,
+    TrainingMethod, VisionConfig, VisionTelemetry,
 };

@@ -32,6 +32,8 @@ pub struct PatchHdcEncoder {
     feature_weights: Vec<f32>,
     max_rows: usize,
     max_cols: usize,
+    /// Previous frame's per-patch mean luminance for motion features.
+    pub(crate) prev_patch_lum: Vec<f32>,
 }
 
 impl PatchHdcEncoder {
@@ -48,14 +50,15 @@ impl PatchHdcEncoder {
             .map(|c| ContinuousHV::random(config.hdc_dim, config.seed + 50_000 + c as u64))
             .collect();
 
-        let feature_hvs: Vec<ContinuousHV> = (0..config.num_features)
+        let total_features = config.total_features();
+        let feature_hvs: Vec<ContinuousHV> = (0..total_features)
             .map(|f| ContinuousHV::random(config.hdc_dim, config.seed + 100_000 + f as u64))
             .collect();
 
         let level_hvs =
             Self::generate_level_hvs(config.hdc_dim, config.num_levels, config.seed + 200_000);
 
-        let feature_weights = vec![1.0 / config.num_features as f32; config.num_features];
+        let feature_weights = vec![1.0 / total_features as f32; total_features];
 
         Self {
             config: config.clone(),
@@ -66,6 +69,7 @@ impl PatchHdcEncoder {
             feature_weights,
             max_rows,
             max_cols,
+            prev_patch_lum: Vec::new(),
         }
     }
 
@@ -110,7 +114,7 @@ impl PatchHdcEncoder {
     /// * `width` / `height` — Frame dimensions in pixels.
     /// * `channels` — Bytes per pixel (1 for grayscale, 3 for RGB, 4 for RGBA).
     pub fn encode_frame(
-        &self,
+        &mut self,
         pixels: &[u8],
         width: u32,
         height: u32,
@@ -122,30 +126,98 @@ impl PatchHdcEncoder {
         }
 
         let mut patch_hvs = Vec::with_capacity(grid.num_patches());
+        let mut current_lum = Vec::with_capacity(grid.num_patches());
 
         for row in 0..grid.rows {
             for col in 0..grid.cols {
+                let patch_idx = row * grid.cols + col;
+                let prev_lum = self.prev_patch_lum.get(patch_idx).copied().unwrap_or(0.0);
                 let features = self.extract_patch_features(
                     pixels,
                     width,
                     channels,
                     col * self.config.patch_size,
                     row * self.config.patch_size,
+                    prev_lum,
                 );
+                // Store current luminance (first feature = mean_r for grayscale, or weighted lum)
+                let mean_lum = 0.299 * features[0] + 0.587 * features[1] + 0.114 * features[2];
+                current_lum.push(mean_lum);
+
                 let appearance = self.encode_features(&features);
                 let position = self.position_hv(row, col);
                 patch_hvs.push(position.bind(&appearance));
             }
         }
 
+        self.prev_patch_lum = current_lum;
+
         let refs: Vec<&ContinuousHV> = patch_hvs.iter().collect();
         let frame_hv = ContinuousHV::bundle(&refs);
         (frame_hv, patch_hvs)
     }
 
+    /// Encode a frame with attention-weighted patch contributions.
+    ///
+    /// Patches with higher attention values contribute more to the frame HV,
+    /// making the encoding focus on surprising/salient regions.
+    pub fn encode_frame_attended(
+        &mut self,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+        channels: usize,
+        attention: &[f32],
+    ) -> (ContinuousHV, Vec<ContinuousHV>) {
+        let grid = PatchGrid::new(width, height, self.config.patch_size);
+        if grid.num_patches() == 0 {
+            return (ContinuousHV::zero(self.config.hdc_dim), vec![]);
+        }
+
+        let mut patch_hvs = Vec::with_capacity(grid.num_patches());
+        let mut current_lum = Vec::with_capacity(grid.num_patches());
+
+        for row in 0..grid.rows {
+            for col in 0..grid.cols {
+                let patch_idx = row * grid.cols + col;
+                let prev_lum = self.prev_patch_lum.get(patch_idx).copied().unwrap_or(0.0);
+                let features = self.extract_patch_features(
+                    pixels,
+                    width,
+                    channels,
+                    col * self.config.patch_size,
+                    row * self.config.patch_size,
+                    prev_lum,
+                );
+                let mean_lum = 0.299 * features[0] + 0.587 * features[1] + 0.114 * features[2];
+                current_lum.push(mean_lum);
+
+                let appearance = self.encode_features(&features);
+                let position = self.position_hv(row, col);
+                patch_hvs.push(position.bind(&appearance));
+            }
+        }
+
+        self.prev_patch_lum = current_lum;
+
+        // Compute attention-weighted bundle
+        let max_att = attention.iter().copied().fold(0.0f32, f32::max).max(1e-8);
+        let weights: Vec<f32> = (0..patch_hvs.len())
+            .map(|i| {
+                let att = attention.get(i).copied().unwrap_or(0.0) / max_att;
+                // Base weight 1.0 + attention boost up to 2x
+                1.0 + att
+            })
+            .collect();
+
+        let refs: Vec<&ContinuousHV> = patch_hvs.iter().collect();
+        let frame_hv = ContinuousHV::weighted_bundle(&refs, &weights);
+        (frame_hv, patch_hvs)
+    }
+
     /// Convenience wrapper for single-channel grayscale frames.
     pub fn encode_grayscale(
-        &self,
+        &mut self,
         pixels: &[u8],
         width: u32,
         height: u32,
@@ -196,8 +268,11 @@ impl PatchHdcEncoder {
         self.row_hvs[r].bind(&self.col_hvs[c])
     }
 
-    /// Extract 5 features from a single patch:
-    /// [mean_r, mean_g, mean_b, edge_density, variance]
+    /// Extract features from a single patch.
+    ///
+    /// Base features (5): [mean_r, mean_g, mean_b, edge_density, variance]
+    /// Motion features (+2 if enabled): [temporal_diff, motion_magnitude]
+    /// Color features (+2 if enabled): [mean_cb, mean_cr]
     ///
     /// All values normalized to [0, 1].
     fn extract_patch_features(
@@ -207,6 +282,7 @@ impl PatchHdcEncoder {
         channels: usize,
         patch_x: usize,
         patch_y: usize,
+        prev_mean_lum: f32,
     ) -> Vec<f32> {
         let ps = self.config.patch_size;
         let stride = width as usize * channels.max(1);
@@ -217,6 +293,9 @@ impl PatchHdcEncoder {
         let mut sum_sq = 0.0f32;
         let mut edge_sum = 0.0f32;
         let mut count = 0.0f32;
+        // For color chrominance
+        let mut sum_cb = 0.0f32;
+        let mut sum_cr = 0.0f32;
 
         for dy in 0..ps {
             for dx in 0..ps {
@@ -245,18 +324,26 @@ impl PatchHdcEncoder {
                 let lum = 0.299 * r + 0.587 * g + 0.114 * b;
                 sum_sq += lum * lum;
 
+                // YCbCr chrominance (ITU-R BT.601)
+                if channels >= 3 && self.config.enable_color {
+                    // Cb = 128 - 0.169*R - 0.331*G + 0.500*B
+                    // Cr = 128 + 0.500*R - 0.419*G - 0.081*B
+                    sum_cb += 128.0 - 0.169 * r - 0.331 * g + 0.500 * b;
+                    sum_cr += 128.0 + 0.500 * r - 0.419 * g - 0.081 * b;
+                }
+
                 // Horizontal gradient magnitude for edge detection
                 if dx > 0 {
                     let prev_offset = y * stride + (x - 1) * channels.max(1);
                     if prev_offset + channels.max(1) <= pixels.len() {
-                        let prev_lum = if channels >= 3 {
+                        let prev_lum_pixel = if channels >= 3 {
                             0.299 * pixels[prev_offset] as f32
                                 + 0.587 * pixels[prev_offset + 1] as f32
                                 + 0.114 * pixels[prev_offset + 2] as f32
                         } else {
                             pixels[prev_offset] as f32
                         };
-                        edge_sum += (lum - prev_lum).abs();
+                        edge_sum += (lum - prev_lum_pixel).abs();
                     }
                 }
 
@@ -265,7 +352,7 @@ impl PatchHdcEncoder {
         }
 
         if count == 0.0 {
-            return vec![0.0; self.config.num_features];
+            return vec![0.0; self.config.total_features()];
         }
 
         let inv_count = 1.0 / count;
@@ -277,14 +364,39 @@ impl PatchHdcEncoder {
         let variance = (sum_sq * inv_count * inv_255 * inv_255 - mean_lum * mean_lum).max(0.0);
         let edge_density = (edge_sum * inv_count * inv_255).min(1.0);
 
-        vec![mean_r, mean_g, mean_b, edge_density, variance]
+        let mut features = vec![mean_r, mean_g, mean_b, edge_density, variance];
+
+        // Motion features: temporal difference and magnitude
+        if self.config.enable_motion {
+            let temporal_diff = (mean_lum - prev_mean_lum).abs().min(1.0);
+            // Motion magnitude: combine temporal diff with edge density as proxy
+            let motion_magnitude = (temporal_diff * 0.7 + edge_density * 0.3).min(1.0);
+            features.push(temporal_diff);
+            features.push(motion_magnitude);
+        }
+
+        // Color features: Cb and Cr chrominance
+        if self.config.enable_color {
+            if channels >= 3 {
+                let mean_cb = (sum_cb * inv_count * inv_255).clamp(0.0, 1.0);
+                let mean_cr = (sum_cr * inv_count * inv_255).clamp(0.0, 1.0);
+                features.push(mean_cb);
+                features.push(mean_cr);
+            } else {
+                // Grayscale: chrominance is neutral (0.5 = no color)
+                features.push(0.5);
+                features.push(0.5);
+            }
+        }
+
+        features
     }
 
     /// Encode a feature vector into a ContinuousHV via weighted bind-bundle.
     ///
     /// Feature weights modulate each feature's contribution to the final HV.
     fn encode_features(&self, features: &[f32]) -> ContinuousHV {
-        let num = features.len().min(self.config.num_features);
+        let num = features.len().min(self.feature_hvs.len());
         if num == 0 {
             return ContinuousHV::zero(self.config.hdc_dim);
         }
@@ -312,7 +424,7 @@ impl PatchHdcEncoder {
         negative: &ContinuousHV,
         lr: f32,
     ) {
-        let num = self.config.num_features;
+        let num = self.feature_weights.len();
         // Compute per-feature contribution direction
         for i in 0..num {
             let basis = &self.feature_hvs[i];
@@ -338,6 +450,22 @@ impl PatchHdcEncoder {
     /// Current feature weights (for inspection/serialization).
     pub fn feature_weights(&self) -> &[f32] {
         &self.feature_weights
+    }
+
+    /// Set feature weights directly (for state restoration).
+    ///
+    /// Weights are clamped and normalized to sum to 1.0.
+    pub fn set_feature_weights(&mut self, weights: &[f32]) {
+        let n = self.feature_weights.len().min(weights.len());
+        for i in 0..n {
+            self.feature_weights[i] = weights[i].clamp(0.01, 10.0);
+        }
+        let sum: f32 = self.feature_weights.iter().sum();
+        if sum > 0.0 {
+            for w in &mut self.feature_weights {
+                *w /= sum;
+            }
+        }
     }
 
     /// Quantize a [0, 1] feature value to a level index.
@@ -404,7 +532,7 @@ impl MultiScaleEncoder {
     /// The blended HV uses a linear weight ramp: finest scale gets `fine_weight`,
     /// coarsest gets `1 - fine_weight`, intermediate scales are linearly interpolated.
     pub fn encode_frame(
-        &self,
+        &mut self,
         pixels: &[u8],
         width: u32,
         height: u32,
@@ -419,7 +547,7 @@ impl MultiScaleEncoder {
         let mut scale_hvs = Vec::with_capacity(n);
         let mut all_patches = Vec::with_capacity(n);
 
-        for enc in &self.encoders {
+        for enc in &mut self.encoders {
             let (hv, patches) = enc.encode_frame(pixels, width, height, channels);
             scale_hvs.push(hv);
             all_patches.push(patches);
@@ -446,6 +574,11 @@ impl MultiScaleEncoder {
     /// Access the encoder at a specific scale index.
     pub fn encoder_at(&self, scale_idx: usize) -> Option<&PatchHdcEncoder> {
         self.encoders.get(scale_idx)
+    }
+
+    /// Mutable access to the encoder at a specific scale index.
+    pub fn encoder_at_mut(&mut self, scale_idx: usize) -> Option<&mut PatchHdcEncoder> {
+        self.encoders.get_mut(scale_idx)
     }
 
     /// The patch sizes for each scale.
@@ -486,10 +619,12 @@ mod tests {
     #[test]
     fn test_encode_determinism() {
         let cfg = VisionConfig::default();
-        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
         let frame = gradient_frame(64, 64);
 
         let (hv1, _) = enc.encode_grayscale(&frame, 64, 64);
+        // Reset motion state for determinism
+        enc.prev_patch_lum.clear();
         let (hv2, _) = enc.encode_grayscale(&frame, 64, 64);
 
         assert!((hv1.similarity(&hv2) - 1.0).abs() < 1e-6, "Same frame must produce identical HV");
@@ -498,12 +633,13 @@ mod tests {
     #[test]
     fn test_similar_frames_similar_hvs() {
         let cfg = VisionConfig::default();
-        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
 
         let frame1 = solid_gray_frame(64, 64, 128);
         let frame2 = solid_gray_frame(64, 64, 130); // slight change
 
         let (hv1, _) = enc.encode_grayscale(&frame1, 64, 64);
+        enc.prev_patch_lum.clear();
         let (hv2, _) = enc.encode_grayscale(&frame2, 64, 64);
 
         let sim = hv1.similarity(&hv2);
@@ -513,14 +649,16 @@ mod tests {
     #[test]
     fn test_similarity_ordering() {
         let cfg = VisionConfig::default();
-        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
 
         let frame_a = solid_gray_frame(64, 64, 128);
         let frame_similar = solid_gray_frame(64, 64, 130);
         let frame_different = gradient_frame(64, 64);
 
         let (hv_a, _) = enc.encode_grayscale(&frame_a, 64, 64);
+        enc.prev_patch_lum.clear();
         let (hv_sim, _) = enc.encode_grayscale(&frame_similar, 64, 64);
+        enc.prev_patch_lum.clear();
         let (hv_diff, _) = enc.encode_grayscale(&frame_different, 64, 64);
 
         let sim_close = hv_a.similarity(&hv_sim);
@@ -565,7 +703,7 @@ mod tests {
     #[test]
     fn test_encode_empty_frame() {
         let cfg = VisionConfig::default();
-        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
         let (hv, patches) = enc.encode_grayscale(&[], 0, 0);
         assert_eq!(patches.len(), 0);
         assert_eq!(hv.dim(), cfg.hdc_dim);
@@ -574,7 +712,7 @@ mod tests {
     #[test]
     fn test_patch_count_matches_grid() {
         let cfg = VisionConfig::default();
-        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
         let frame = gradient_frame(64, 64);
         let (_, patches) = enc.encode_grayscale(&frame, 64, 64);
         assert_eq!(patches.len(), 64); // 8×8 patches
@@ -583,14 +721,16 @@ mod tests {
     #[test]
     fn test_checkerboard_vs_gradient_vs_solid() {
         let cfg = VisionConfig::default();
-        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
 
         let solid = solid_gray_frame(64, 64, 128);
         let checker = checkerboard_frame(64, 64, 4);
         let grad = gradient_frame(64, 64);
 
         let (hv_solid, _) = enc.encode_grayscale(&solid, 64, 64);
+        enc.prev_patch_lum.clear();
         let (hv_checker, _) = enc.encode_grayscale(&checker, 64, 64);
+        enc.prev_patch_lum.clear();
         let (hv_grad, _) = enc.encode_grayscale(&grad, 64, 64);
 
         // All three should produce distinct encodings (not identical)
@@ -628,8 +768,9 @@ mod tests {
         let cfg = VisionConfig::default();
         let enc = PatchHdcEncoder::new(&cfg, 64, 64);
         let weights = enc.feature_weights();
-        assert_eq!(weights.len(), cfg.num_features);
-        let expected = 1.0 / cfg.num_features as f32;
+        let total = cfg.total_features();
+        assert_eq!(weights.len(), total);
+        let expected = 1.0 / total as f32;
         for &w in weights {
             assert!((w - expected).abs() < 1e-6);
         }
@@ -696,7 +837,7 @@ mod tests {
     #[test]
     fn test_multi_scale_encoding_produces_valid_hv() {
         let cfg = VisionConfig::default();
-        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let mut ms = MultiScaleEncoder::new(&cfg, 64, 64);
         let frame = gradient_frame(64, 64);
 
         let (blended, scale_hvs, all_patches) = ms.encode_frame(&frame, 64, 64, 1);
@@ -714,7 +855,7 @@ mod tests {
     #[test]
     fn test_multi_scale_captures_both_structures() {
         let cfg = VisionConfig::default();
-        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let mut ms = MultiScaleEncoder::new(&cfg, 64, 64);
 
         // Checkerboard on gradient should differ from solid on gradient
         let checker_on_gradient = {
@@ -740,6 +881,7 @@ mod tests {
         };
 
         let (hv_cg, _, _) = ms.encode_frame(&checker_on_gradient, 64, 64, 1);
+        ms = MultiScaleEncoder::new(&cfg, 64, 64);
         let (hv_sg, _, _) = ms.encode_frame(&solid_on_gradient, 64, 64, 1);
 
         let sim = hv_cg.similarity(&hv_sg);
@@ -753,7 +895,7 @@ mod tests {
     fn test_multi_scale_single_scale_passthrough() {
         let mut cfg = VisionConfig::default();
         cfg.multi_scale.scales = vec![8];
-        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let mut ms = MultiScaleEncoder::new(&cfg, 64, 64);
         let frame = gradient_frame(64, 64);
 
         let (blended, scale_hvs, _) = ms.encode_frame(&frame, 64, 64, 1);
@@ -764,5 +906,122 @@ mod tests {
             (sim - 1.0).abs() < 1e-5,
             "Single scale should pass through directly: sim={sim}"
         );
+    }
+
+    // === Motion Features ===
+
+    #[test]
+    fn test_motion_features_detect_change() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        // First frame: dark
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let (hv_a, _) = enc.encode_grayscale(&frame_a, 64, 64);
+
+        // Second frame: bright — motion features should be non-zero
+        let frame_b = solid_gray_frame(64, 64, 200);
+        let (hv_b, _) = enc.encode_grayscale(&frame_b, 64, 64);
+
+        // Third frame: same bright — motion features should be near-zero
+        let (hv_c, _) = enc.encode_grayscale(&frame_b, 64, 64);
+
+        // hv_b (with motion) should be more different from hv_a than hv_c is from hv_b
+        // because the motion features capture temporal change
+        assert!(hv_a.norm() > 0.0);
+        assert!(hv_b.norm() > 0.0);
+        assert!(hv_c.norm() > 0.0);
+    }
+
+    #[test]
+    fn test_motion_disabled() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_motion = false;
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        // Without motion, total features = 5 + 2 color = 7
+        assert_eq!(enc.feature_weights().len(), 7);
+    }
+
+    // === Color Features ===
+
+    #[test]
+    fn test_color_features_rgb() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        // Red frame (RGB)
+        let red_frame: Vec<u8> = (0..64 * 64)
+            .flat_map(|_| vec![255u8, 0, 0])
+            .collect();
+        let (hv_red, _) = enc.encode_frame(&red_frame, 64, 64, 3);
+
+        enc.prev_patch_lum.clear();
+
+        // Blue frame (RGB)
+        let blue_frame: Vec<u8> = (0..64 * 64)
+            .flat_map(|_| vec![0u8, 0, 255])
+            .collect();
+        let (hv_blue, _) = enc.encode_frame(&blue_frame, 64, 64, 3);
+
+        // Red and blue should produce different encodings due to chrominance features
+        let sim = hv_red.similarity(&hv_blue);
+        assert!(sim < 0.95, "Red and blue frames should differ: sim={sim}");
+    }
+
+    #[test]
+    fn test_color_disabled() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_color = false;
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        // Without color, total features = 5 + 2 motion = 7
+        assert_eq!(enc.feature_weights().len(), 7);
+    }
+
+    #[test]
+    fn test_all_features_disabled() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_motion = false;
+        cfg.enable_color = false;
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        // Base only = 5
+        assert_eq!(enc.feature_weights().len(), 5);
+    }
+
+    // === Attention-Weighted Encoding ===
+
+    #[test]
+    fn test_attended_encoding_differs_from_uniform() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        let (hv_uniform, _) = enc.encode_grayscale(&frame, 64, 64);
+        enc.prev_patch_lum.clear();
+
+        // Create non-uniform attention (high in top-left, low elsewhere)
+        let grid = enc.grid_for(64, 64);
+        let mut attention = vec![0.0f32; grid.num_patches()];
+        attention[0] = 1.0;
+        attention[1] = 0.8;
+
+        let (hv_attended, _) = enc.encode_frame_attended(&frame, 64, 64, 1, &attention);
+
+        // Should be similar (same content) but not identical (different weighting)
+        let sim = hv_uniform.similarity(&hv_attended);
+        assert!(
+            sim < 1.0 - 1e-6,
+            "Attended encoding should differ from uniform: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_attended_encoding_with_empty_attention() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        // Empty attention → all weights default to 1.0 (uniform)
+        let (hv, _) = enc.encode_frame_attended(&frame, 64, 64, 1, &[]);
+        assert!(hv.norm() > 0.0);
     }
 }
