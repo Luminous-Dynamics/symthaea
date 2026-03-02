@@ -1396,4 +1396,98 @@ mod tests {
         assert_eq!(vectors.len(), 0);
         assert!(hv.norm() < 1e-6);
     }
+
+    // === Edge Case Hardening ===
+
+    #[test]
+    fn test_encode_frame_truncated_pixels() {
+        // Pixel buffer shorter than expected — should not panic
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        // Only provide half the expected pixels
+        let frame = vec![128u8; 64 * 32];
+        let (hv, patches) = enc.encode_frame(&frame, 64, 64, 1);
+        // Should still produce a valid (possibly partial) encoding
+        assert!(hv.dim() == cfg.hdc_dim);
+        let _ = patches; // May have fewer patches than expected
+    }
+
+    #[test]
+    fn test_encode_frame_extra_pixels() {
+        // Pixel buffer longer than expected — extra pixels should be ignored
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let frame = vec![128u8; 64 * 64 * 2]; // 2x expected
+        let (hv, patches) = enc.encode_frame(&frame, 64, 64, 1);
+        assert_eq!(hv.dim(), cfg.hdc_dim);
+        assert_eq!(patches.len(), 64); // 8x8 patches
+    }
+
+    #[test]
+    fn test_encode_frame_single_pixel_patch() {
+        let mut cfg = VisionConfig::default();
+        cfg.patch_size = 1;
+        let mut enc = PatchHdcEncoder::new(&cfg, 8, 8);
+        let frame = vec![128u8; 64];
+        let (hv, patches) = enc.encode_frame(&frame, 8, 8, 1);
+        assert!(hv.dim() == cfg.hdc_dim);
+        assert_eq!(patches.len(), 64); // 8x8 patches
+    }
+
+    #[test]
+    fn test_set_feature_weights_partial_update() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        // Partial weights: updates first 2 features, renormalizes all
+        enc.set_feature_weights(&[0.5, 0.5]);
+        let weights = enc.feature_weights();
+        let sum: f32 = weights.iter().sum();
+        // Should still be normalized to 1.0
+        assert!(
+            (sum - 1.0).abs() < 1e-4,
+            "Weights should sum to 1.0 after partial set: {sum}"
+        );
+        assert!(weights.iter().all(|w| w.is_finite() && *w > 0.0));
+    }
+
+    #[test]
+    fn test_refine_contrastive_with_zero_hv() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        let zero_hv = ContinuousHV::zero(cfg.hdc_dim);
+        let random_hv = ContinuousHV::random(cfg.hdc_dim, 42);
+
+        // Should not panic or produce NaN
+        enc.refine_contrastive(&zero_hv, &random_hv, 0.1);
+        for &w in enc.feature_weights() {
+            assert!(w.is_finite(), "Weights should remain finite after zero-HV refinement");
+        }
+    }
+
+    #[test]
+    fn test_encode_frame_rgba() {
+        let cfg = VisionConfig::default();
+        let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![128u8, 64, 192, 255]).collect();
+
+        let (hv, patches) = enc.encode_frame(&frame, 64, 64, 4);
+        assert!(hv.norm() > 0.0);
+        assert!(!patches.is_empty());
+    }
+
+    #[test]
+    fn test_multiscale_mismatched_frame_size() {
+        // Frame smaller than coarse patch size
+        let mut cfg = VisionConfig::default();
+        cfg.multi_scale.scales = vec![8, 64]; // Coarse is 64, but frame is only 32x32
+        let mut ms = MultiScaleEncoder::new(&cfg, 32, 32);
+        let frame = vec![128u8; 32 * 32];
+
+        // Coarse encoder (64px patches) produces 0 patches on 32x32 frame — should not crash
+        let (hv, scale_hvs, _) = ms.encode_frame(&frame, 32, 32, 1);
+        assert_eq!(hv.dim(), cfg.hdc_dim);
+        assert_eq!(scale_hvs.len(), 2);
+    }
 }
