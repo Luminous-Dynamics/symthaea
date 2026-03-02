@@ -327,6 +327,16 @@ jobs:
           - "consciousness_full,school_learning"
           - "all_benchmarks,reasoning_engine"
           - "genesis,reasoning_engine"
+          - "liquid-mamba,reasoning_engine"
+          - "vision-manifold,full_perception"
+          - "vocal-tract,voice-tts"
+          - "embeddings,reasoning_engine"
+          - "mesh-encryption,swarm"
+          - "api_module,full_consciousness"
+          - "neural-bridge,reasoning_engine"
+          - "web_research_module,reasoning_engine"
+          - "nix-mind,reasoning_engine"
+          - "vision-manifold-camera,full_perception"
     steps:
       - uses: actions/checkout@v4
 
@@ -430,6 +440,16 @@ jobs:
           - symthaea-nurture
           - symthaea-materials
           - symthaea-nuclear-forensics
+          - symthaea-neuromodulators
+          - symthaea-memory
+          - symthaea-vocal-tract
+          - symthaea-wisdom
+          - symthaea-vision-manifold
+          - symthaea-narrative-self
+          - symthaea-consciousness-equation
+          - symthaea-embeddings
+          - symthaea-seven-harmonies
+          - symthaea-observability
     steps:
       - uses: actions/checkout@v4
 
@@ -506,3 +526,46 @@ jobs:
           output=$(cargo run --example benchmark_genesis_${{ matrix.name }} --features "${{ matrix.features }}" --release 2>&1)
           echo "$output"
           echo "$output" | grep -q "PASS" || { echo "::error::Benchmark did not print PASS"; exit 1; }
+
+  stress-tests:
+    name: Stress Tests (nightly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Run on: weekly schedule (same as psych-bench), or manual dispatch
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-stress-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stress-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Run proptest stress battery
+        env:
+          PROPTEST_CASES: 500
+        run: |
+          cargo test --test proptest_cognitive_loop --release -- --nocapture 2>&1 | tee proptest-cognitive.txt
+          cargo test --test proptest_feedback_stability --release -- --nocapture 2>&1 | tee proptest-feedback.txt
+
+      - name: Upload stress test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-test-results-${{ github.sha }}
+          path: proptest-*.txt
+          retention-days: 30

@@ -349,3 +349,38 @@ jobs:
           echo "## Benchmark Summary" >> $GITHUB_STEP_SUMMARY
           python3 scripts/format_summary.py \
             --results aggregated_results.json >> $GITHUB_STEP_SUMMARY
+
+  # OSWorld-Verified: NixOS VM benchmark (self-hosted NixOS runner only)
+  osworld:
+    name: OSWorld-Verified Benchmark
+    runs-on: [self-hosted, nixos]
+    timeout-minutes: 120
+    if: |
+      (github.event_name == 'schedule') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.benchmark_suite == 'full' || inputs.benchmark_suite == 'standard'))
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check OSWorld data readiness
+        run: |
+          if [ ! -f benchmarks/external/osworld-verified/data/READY ]; then
+            echo "::warning::OSWorld data not initialized. Run fetch.sh first."
+            exit 0
+          fi
+
+      - name: Build OSWorld NixOS VM
+        working-directory: symthaea/benchmarks/external/osworld-verified/nixos
+        run: nix build .#vm
+
+      - name: Run OSWorld benchmark
+        working-directory: symthaea/benchmarks/external/osworld-verified
+        run: ./run.sh
+
+      - name: Upload OSWorld results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: osworld-results-${{ github.sha }}
+          path: benchmarks/external/results/osworld-verified.json
+          retention-days: 90

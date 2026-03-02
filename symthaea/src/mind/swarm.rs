@@ -122,9 +122,22 @@ impl ContinuousMind {
             } => {
                 // v1.7.0 BROCA PHASE:
                 // Apply the linguistic adaptation from the swarm to our tongue.
-                tracing::info!(id = %lora_id, "BROCA: Applying swarm linguistic delta to local voice.");
-                // TODO: Wire llm_organ field into ContinuousMind for LoRA application
-                let _ = (&lora_id, &delta_bytes);
+                tracing::info!(id = %lora_id, bytes = delta_bytes.len(), "BROCA: Applying swarm linguistic delta to local voice.");
+                #[cfg(feature = "liquid-mamba")]
+                if let Some(ref backend) = self.llm_backend {
+                    match backend.apply_lora(&lora_id, &delta_bytes) {
+                        Ok(()) => {
+                            tracing::info!(id = %lora_id, "BROCA: LoRA delta applied successfully");
+                        }
+                        Err(e) => {
+                            tracing::warn!(id = %lora_id, error = %e, "BROCA: Failed to apply LoRA delta");
+                        }
+                    }
+                }
+                #[cfg(not(feature = "liquid-mamba"))]
+                {
+                    let _ = (&lora_id, &delta_bytes);
+                }
             }
             crate::swarm::SwarmMessage::TaskRequest {
                 task_id,
