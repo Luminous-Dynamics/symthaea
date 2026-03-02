@@ -8,11 +8,13 @@
 
 ## Executive Summary
 
-Symthaea's codebase contains files named with "phi" that compute **algebraic connectivity (λ₂)**, NOT Integrated Information Theory's Φ. These are fundamentally different metrics with **near-zero correlation** (r = 0.097).
+Symthaea's codebase contains files named with "phi" that compute **algebraic connectivity (λ₂)**, NOT Integrated Information Theory's Φ. These are fundamentally different metrics. The SpectralConnectivity (λ₂) tier correlates poorly with the ExhaustivePartition (Exact) tier: **Pearson r = -0.14, Spearman rho = -0.59**. (An earlier methodology incorrectly reported r = 0.097.)
 
 **Bottom Line:**
-- `phi_real.rs` computes **λ₂** (spectral graph metric)
+- `phi_real.rs` computes **λ₂** (spectral graph metric) -- it measures graph mixing time, NOT IIT integration
 - True IIT Φ is in `tiered_phi/` (exact tier only, n≤12)
+- All tiers are HDC-based (pairwise BinaryHV similarity), NOT true IIT (which requires transition probability matrices)
+- The production SpectralMIPFinder (MI Laplacian + Fiedler + MIP sweep on ContinuousHV covariance) has UNKNOWN correlation with Exact -- it is a different algorithm on different representations
 - Do NOT use λ₂ as a proxy for consciousness claims
 
 ---
@@ -83,12 +85,23 @@ Requires computing information loss across ALL possible bipartitions.
 
 On January 17, 2026, we ran a dual-metric comparison across 19 network topologies:
 
-**Results:**
+**Results (corrected March 2026 -- earlier methodology attributed r = 0.097 to wrong algorithm):**
+
+SpectralConnectivity (λ₂) tier vs ExhaustivePartition (Exact) tier:
+
 | Correlation | Value | Interpretation |
 |-------------|-------|----------------|
-| Pearson (r) | **0.0972** | Near-zero linear correlation |
-| Spearman (ρ) | **0.0070** | Near-zero rank correlation |
-| Avg Rank Diff | **6.42** | Rankings completely divergent |
+| Pearson (r) | **-0.14** | Weak negative linear correlation |
+| Spearman (ρ) | **-0.59** | Moderate negative rank correlation |
+
+SampledPartition (Heuristic) tier vs ExhaustivePartition (Exact) tier:
+
+| Correlation | Value | Interpretation |
+|-------------|-------|----------------|
+| Pearson (r) | **0.9998** | Near-perfect linear correlation |
+| Spearman (ρ) | **0.9985** | Near-perfect rank correlation |
+
+**Note:** The production SpectralMIPFinder (MI Laplacian + Fiedler + MIP sweep on ContinuousHV covariance) operates on a different representation than the HDC-based tiers above. Its correlation with Exact is UNKNOWN. All HDC-based tiers use pairwise BinaryHV similarity, not true IIT transition probability matrices.
 
 **Example of divergence:**
 | Topology | λ₂ Rank | Φ Rank | Difference |
@@ -202,7 +215,7 @@ Our experiments found:
 | Question | Answer |
 |----------|--------|
 | Is `phi_real.rs` computing IIT Φ? | **No** - it computes λ₂ |
-| Are λ₂ and Φ correlated? | **No** - r = 0.097 (essentially zero) |
+| Are λ₂ and Φ correlated? | **No** - Pearson r = -0.14, Spearman rho = -0.59 (weak/negative; earlier methodology incorrectly reported r = 0.097) |
 | Can λ₂ proxy for consciousness? | **No** - different properties entirely |
 | Is our λ₂ research valid? | **Yes** - just needs honest framing |
 | What should we rename? | `phi_real.rs` → `spectral_connectivity.rs` |

@@ -97,10 +97,13 @@ We evaluated 19 distinct topologies across five categories:
 
 > **IMPORTANT METRIC CLARIFICATION**: This section computes λ₂ (algebraic connectivity /
 > Fiedler value), a spectral graph metric—**NOT** IIT's integrated information (Φ).
-> While λ₂ correlates with network integration properties, it does NOT measure consciousness
-> in the IIT sense. True IIT Φ requires computing minimum information partition (MIP), which
-> is computationally intractable for n > 12 nodes. See `docs/METRIC_DEFINITIONS.md` for the
-> critical distinction between λ₂ and IIT Φ (empirical correlation r = 0.097).
+> λ₂ measures graph mixing time, not IIT integration. The SpectralConnectivity (λ₂) tier has
+> Pearson r = -0.14, Spearman rho = -0.59 vs ExhaustivePartition (Exact IIT Φ) — a weak
+> negative correlation. True IIT Φ requires computing minimum information partition (MIP),
+> which is computationally intractable for n > 12 nodes. The production SpectralMIPFinder
+> (MI Laplacian + Fiedler + MIP sweep on ContinuousHV covariance) is a distinct algorithm
+> whose correlation with Exact is unknown. See `docs/METRIC_DEFINITIONS.md` for the full
+> distinction between λ₂, SampledPartition (Heuristic, r = 0.9998 vs Exact), and IIT Φ.
 
 #### 2.3.1 Algebraic Connectivity Method
 

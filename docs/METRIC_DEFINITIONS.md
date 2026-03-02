@@ -45,7 +45,7 @@ L = I - D^(-1/2) A D^(-1/2)
 lambda-2 = second-smallest eigenvalue of L
 ```
 
-**Critical Warning:** lambda-2 and IIT Phi have **near-zero correlation** (r = 0.097). Do NOT use lambda-2 as a proxy for consciousness.
+**Critical Warning:** lambda-2 and IIT Phi are poorly correlated. SpectralConnectivity (lambda-2) vs ExhaustivePartition (Exact): Pearson r = -0.14, Spearman rho = -0.59 (earlier methodology incorrectly reported r = 0.097). lambda-2 measures graph mixing time, NOT IIT integration. All HDC-based tiers use pairwise BinaryHV similarity, not true IIT (which requires transition probability matrices). Do NOT use lambda-2 as a proxy for consciousness.
 
 ---
 
@@ -56,9 +56,9 @@ Symthaea implements a 4-tier Phi approximation system:
 | Tier | Method | Complexity | Accuracy | Use Case |
 |------|--------|-----------|----------|----------|
 | **Exact** | Full IIT 3.0 | O(2^n) | Ground truth | n <= 12 only |
-| **Heuristic** | HDC binding | O(n^2) | r = 0.85 vs exact | Research approximation |
+| **Heuristic (SampledPartition)** | HDC binding | O(n^2) | r = 0.9998 vs exact | Research approximation |
 | **Resonator** | Coupled oscillators | O(n log n) | r = 0.72 vs exact | Real-time monitoring |
-| **Spectral** | lambda-2 | O(n^3) | r = 0.097 vs exact | **NOT for consciousness** |
+| **Spectral (SpectralConnectivity)** | lambda-2 | O(n^3) | r = -0.14 vs exact | **NOT for consciousness** (measures mixing time, not integration) |
 
 ---
 
@@ -140,9 +140,9 @@ Cross-validation results between metric implementations:
 
 | Metric A | Metric B | Pearson r | Interpretation |
 |----------|----------|-----------|----------------|
-| Exact Phi | Heuristic Phi | 0.85 | Good proxy |
+| Exact Phi | Heuristic (SampledPartition) | 0.9998 | Excellent proxy (Spearman rho = 0.9985) |
 | Exact Phi | Resonator Phi | 0.72 | Moderate proxy |
-| Exact Phi | lambda-2 | 0.097 | **No relationship** |
+| Exact Phi | lambda-2 (SpectralConnectivity) | -0.14 | **No relationship** (Spearman rho = -0.59; earlier methodology incorrectly reported r = 0.097) |
 | Exact Phi | Binding (R) | 0.45 | Weak relationship |
 
 ---

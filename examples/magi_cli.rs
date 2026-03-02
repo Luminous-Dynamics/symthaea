@@ -2712,7 +2712,7 @@ impl MagiCli {
             DIM, RESET, CYAN, RESET, RED, RESET, DIM, RESET
         );
         println!(
-            "  {}│{}           IIT-Aligned: {}❌ NO{} (r = 0.097 correlation)           {}│{}",
+            "  {}│{}           IIT-Aligned: {}❌ NO{} (r ≈ -0.14 vs Exact)             {}│{}",
             DIM, RESET, RED, RESET, DIM, RESET
         );
         println!(
@@ -2769,11 +2769,11 @@ impl MagiCli {
             DIM, RESET, DIM, RESET
         );
         println!(
-            "  {}│{}  Pearson (r):    {}0.097{}  (near-zero linear correlation)         {}│{}",
+            "  {}│{}  Pearson (r):    {}-0.14{}  (anti-correlated with Exact tier)      {}│{}",
             DIM, RESET, RED, RESET, DIM, RESET
         );
         println!(
-            "  {}│{}  Spearman (ρ):   {}0.007{}  (near-zero rank correlation)           {}│{}",
+            "  {}│{}  Spearman (ρ):   {}-0.59{}  (anti-correlated rank ordering)        {}│{}",
             DIM, RESET, RED, RESET, DIM, RESET
         );
         println!(

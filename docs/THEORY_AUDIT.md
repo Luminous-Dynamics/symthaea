@@ -47,7 +47,7 @@ Symthaea incorporates six consciousness/AI theories. This audit maps claims to r
 - They have **opposite** topology preferences:
   - λ₂ favors uniform k-regular graphs
   - IIT Φ favors hub-and-spoke structures
-- Experimental verification: r = 0.097 correlation (essentially zero)
+- Experimental verification: SpectralConnectivity (λ₂) vs ExhaustivePartition (Exact): Pearson r = -0.14, Spearman rho = -0.59 (earlier methodology incorrectly reported r = 0.097). Note: all tiers are HDC-based (pairwise BinaryHV similarity), not true IIT (which requires TPMs). λ₂ measures graph mixing time, not IIT integration.
 
 ### Recommendation
 
