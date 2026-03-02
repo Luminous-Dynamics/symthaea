@@ -14,8 +14,8 @@ categories = ["science", "algorithms", "multimedia::video"]
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
 serde = { workspace = true }
-nokhwa = { version = "0.10", features = ["input-native"], optional = true }
+v4l = { version = "0.14", optional = true }
 
 [features]
 default = []
-camera = ["dep:nokhwa"]
+camera = ["dep:v4l"]

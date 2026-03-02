@@ -881,7 +881,7 @@ impl CognitiveLoopService {
             prediction_error,
             self.flow_state.in_flow,
             self.curiosity_drive.should_explore(),
-            self.prediction_confidence,
+            self.prediction_confidence as f32,
         );
         if self.self_model_tier.self_reflection.should_reflect() {
             let recommendations = self.self_model_tier.self_reflection.reflect();
