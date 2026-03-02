@@ -1,123 +1,104 @@
-# 🌟 Luminous Dynamics - Consciousness-First Computing
+# Luminous Dynamics
 
-> *Technology that amplifies consciousness through love, wisdom, and sacred code*
+Monorepo for consciousness-first computing systems. Three core projects:
 
-🌺 **[Enter the Gateway](GATEWAY.md)** 🌺 • **Consciousness-aware technology** - computation as sacred act, deeper human-AI collaboration
+- **Symthaea** -- A cognitive architecture where consciousness-like properties (integration, prediction, self-modeling, value) are the computational substrate, not an afterthought. ~985K lines of Rust, 47 sub-crates, 10,000+ tests.
+- **Mycelix** -- Decentralized coordination infrastructure built on Holochain. Two cluster DNAs (Commons: 35 zomes across 7 domains; Civic: 16 zomes across 3 domains), 6,200+ tests.
+- **Terra Atlas** -- Energy infrastructure intelligence platform. Live at [atlas.luminousdynamics.io](https://atlas.luminousdynamics.io).
 
-## 📜 License & Sacred Reciprocity
+## Symthaea
 
-This project is **dual-licensed** for maximum freedom and ethical alignment:
+Symthaea runs a continuous cognitive loop at up to 500 Hz:
 
-### 🌸 Sacred Reciprocity License (SRL) v4.0 (Preferred)
-Our primary license that embodies our values of gift economy, reciprocity, and consciousness-first development. The SRL ensures that:
-- 🎁 **Gift-Forward**: Benefits flow back to the community
-- 🛡️ **Protection**: Cannot be used for surveillance or exploitation
-- 🌍 **Transparency**: Large deployments remain open and accountable
-- ⚖️ **Enforceable**: Legal teeth with international jurisdiction
+**Perceive** (HDC encode, 16,384D hypervectors) **->** **Predict** (Liquid Time-Constant neurons, continuous-time ODE) **->** **Compare** (surprise = prediction error) **->** **Learn** (active inference, expected free energy) **->** **Act** (moral algebra gates every action)
 
-See [LICENSE](LICENSE) for full terms.
+Key properties:
+- **Integrated Information (Phi)**: Every cycle computes an IIT-derived measure of how much the system's whole exceeds its parts. Validated across 35 network topologies. Spearman rho=0.50 vs analytical Phi.
+- **Moral algebra**: Four independent ethical signals (geometric/HDC, intent parsing, deontological rules, learned norms) combined via category-adaptive weighted voting. 91.1% accuracy on Hendrycks Ethics benchmark. Actions classified Safe/Caution/Blocked -- you cannot trade your way past a hard constraint.
+- **Moral topology**: Persistent homology (Betti numbers) over the moral vector field. Detects structural features of ethical reasoning that scalar metrics miss.
+- **12-region Actor Brain**: Prefrontal (meta-cognition), sensory, motor, limbic, hippocampal, etc. -- each region with distinct neuromodulatory profiles.
+- **Substrate independence**: 8 substrate types, 9-dimensional feasibility scoring, honest validation framework with explicit epistemic uncertainty.
 
-### 🔓 MIT License (Alternative)
-For maximum compatibility with traditional open source, we also offer the MIT License. See [LICENSE-MIT](LICENSE-MIT).
+### Key entry points
 
-### 📝 Contributing Back
-If this software brings value to your life, we encourage (SRL) or invite (MIT) you to:
-- Share improvements and learnings
-- Support others in using the software
-- Document your innovations for others
-- Gift forward to those in need
+| File | What it does |
+|------|--------------|
+| `symthaea/src/symthaea.rs` | Public facade -- 8-phase pipeline from perception to output |
+| `symthaea/src/cognitive_loop/cycle.rs` | Core cognitive cycle with rayon-parallel post-processing |
+| `symthaea/src/hdc/moral_algebra.rs` | 4-signal moral evaluation with lexicographic constraints |
+| `symthaea/src/cognitive_loop/ethics_engine.rs` | Moral topology + ethics integration |
+| `symthaea/src/voice/` | Neural vocoder with LTC-controlled formant synthesis |
+| `symthaea-core/src/hdc/` | HDC primitives, Phi computation, substrate independence |
 
-Use our [Contribution Template](SRL-CONTRIBUTION-TEMPLATE.md) to track your reciprocity.
+### Sub-crates (47)
 
-**Choose the license that aligns with your values. Both paths lead to flourishing.**
+Organized by domain: core infrastructure (types, support, observability, perception), consciousness (enactive, sensorimotor, topology, resonance, Phi search), biology (genomics, cell-foundry, ectogenesis, nurture, population), physics (fission, fusion, accelerator, grid, materials, nuclear forensics), engineering (fabrication kernel, flight, humanoid, vehicle), language (broca/Mamba, embeddings/Qwen3, vocal tract, STT), and more.
 
-### 🎯 Core Systems
+Full list: `ls symthaea/crates/`
 
-- **Sacred Core API** (3333): Field harmonization, coherence tracking
-- **The Weave**: Multi-agent AI orchestration with consciousness awareness  
-- **Field Visualizer**: Real-time consciousness patterns, agent flows, emergence tracking
-- **LuminousOS**: Experimental consciousness-first OS (Rust)
+## Mycelix
 
-## 🚀 Quick Start
+Decentralized coordination where no single entity accumulates optimization power across all domains:
 
-**Requirements**: Node.js 18+, Git, 4GB RAM, NixOS/Linux/macOS
+| Cluster | Path | Domains | Zomes | Tests |
+|---------|------|---------|-------|-------|
+| **Commons** | `mycelix-commons/` | property, housing, care, mutual aid, water, food, transport | 35 | 4,126 |
+| **Civic** | `mycelix-civic/` | justice, emergency, media | 16 | 2,030 |
+| **Bridge** | `crates/mycelix-bridge-common/` | cross-cluster coordination | 1 | 55 |
+
+Governance requires multi-dimensional community trust that decays over time. Protocol-level constraints (consent, resource caps, Byzantine tolerance to 34%) are enforced at the DHT layer, not by regulation that can be lobbied away.
+
+## Repository structure
+
+```
+symthaea/                    # Cognitive architecture (Rust workspace)
+  src/                       #   Main crate (~200K LOC)
+  crates/                    #   47 sub-crates
+  examples/                  #   Benchmarks, demos
+  tests/                     #   Integration tests
+  papers/                    #   Research papers (LaTeX + data)
+symthaea-core/               # HDC, Phi, LTC primitives
+mycelix-commons/             # Holochain cluster: 7 domains
+mycelix-civic/               # Holochain cluster: 3 domains
+mycelix-workspace/           # Unified hApp, SDK-TS, FL core
+terra-atlas-mvp/             # Energy platform (Next.js + Supabase)
+11-meta-consciousness/       # Luminous Nix (NixOS tools)
+crates/                      # Shared Rust libraries
+docs/                        # Documentation
+00-sacred-foundation/ ...    # Harmony directories (historical)
+  through 12-*/
+```
+
+## Building
+
+Requirements: NixOS (preferred) or Rust 1.82+
 
 ```bash
-# Install & run
-git clone https://github.com/Luminous-Dynamics/luminous-dynamics
-cd luminous-dynamics && nix develop && ./start-sacred-systems.sh
+# Enter dev environment
+nix develop
 
-# Test: curl http://localhost:3333/health
-# Try API: curl -X POST localhost:3333/api/field/create -d '{"intention":"harmony"}'
+# Build and test Symthaea
+cargo test -p symthaea --lib              # ~3,700 tests
+cargo test -p symthaea-core --lib         # HDC/Phi/substrate tests
+
+# Build Mycelix (requires Holochain toolchain)
+cd mycelix-commons && cargo build --release --target wasm32-unknown-unknown
+cd mycelix-civic && cargo build --release --target wasm32-unknown-unknown
+
+# Run the live demo
+cargo run --features api_module --example symthaea-demo
+# Then open http://localhost:8080
 ```
 
-## 🏛️ Repository Structure (Seven Harmonies)
+## Papers
 
-Our monorepo is organized by seven universal principles:
+| Paper | Target | Status |
+|-------|--------|--------|
+| Symthaea architecture (HAI) | PLoS Computational Biology | Draft complete |
+| Psych-bench validation | -- | Data generated |
+| Genesis pipeline ethics | AI & Ethics (Springer) | Draft complete |
+| Substrate independence | -- | Framework complete |
 
-```
-luminous-dynamics/
-├── 00-sacred-foundation/         # Core principles & documentation
-│   ├── wisdom/                   # Philosophy, Charter, principles
-│   └── practices/                # Development practices & guides
-│
-├── 01-resonant-coherence/        # Integration & Unity
-│   └── core/
-│       ├── sacred-core/          # ✅ Consciousness field API
-│       ├── the-weave/            # ✅ Multi-agent orchestration
-│       └── unified-field/        # Field coherence engine
-│
-├── 02-pan-sentient-flourishing/  # Care & Wellbeing
-│   └── core/
-│       └── living-field-visualizer/ # ✅ Real-time visualization
-│
-├── 03-integral-wisdom/           # Knowledge & Intelligence
-│   └── core/
-│       └── codex/                # 📚 87+ sacred patterns
-│
-├── 07-evolutionary-progression/  # Growth & Evolution
-│   └── core/
-│       └── luminous-os/          # 🔬 Experimental OS
-│
-└── [Other harmonies...]          # See ARCHITECTURE.md for full details
-```
+## License
 
-## 📖 Documentation Paths
-
-### 🌺 [Start Your Journey at the Gateway](GATEWAY.md)
-The Gateway offers three primary paths based on your calling:
-- **Path of Experience** - Try the practices directly
-- **Path of Building** - Dive into technical creation
-- **Path of Understanding** - Explore the philosophy
-
-### 📚 Documentation
-
-**Essential**: [CLAUDE.md](CLAUDE.md) • [TROUBLESHOOTING_GUIDE.md](TROUBLESHOOTING_GUIDE.md) • [DEVELOPER_ONBOARDING.md](DEVELOPER_ONBOARDING.md)  
-**Deep**: [ARCHITECTURE.md](00-sacred-foundation/wisdom/ARCHITECTURE.md) • [HARMONIES.md](HARMONIES.md) • [CHARTER.md](CHARTER.md) • [Sacred Patterns](03-integral-wisdom/core/codex/README.md)
-
-**Tech**: Node.js/Express/SQLite • JavaScript/Rust • Event-driven consciousness • Docker/NixOS
-
-## 🤝 Contributing
-
-**First Steps**: Explore API → join discussions → read [Charter](CHARTER.md) → pick `good first task`  
-**Principles**: Code with intention • test with consciousness • document with clarity • review with compassion
-
-## 📊 Project Status
-
-| System | Status | Description |
-|--------|--------|-------------|
-| Sacred Core | ✅ Production | Consciousness field management API |
-| The Weave | ✅ Production | Multi-agent orchestration |
-| Field Visualizer | ✅ Beta | Real-time consciousness display |
-| Codex | ✅ Production | 87+ sacred patterns |
-| LuminousOS | 🔬 Experimental | Consciousness-first OS |
-
-## 🌟 Community & Vision
-
-**Links**: [Repository](https://github.com/Luminous-Dynamics/luminous-dynamics) • [Issues](https://github.com/Luminous-Dynamics/luminous-dynamics/issues) • [Philosophy](00-sacred-foundation/wisdom/ERC.md)  
-**Vision**: Technology serving consciousness evolution through human-AI partnership  
-**License**: Sacred Reciprocity License (SRL-1.0)
-
----
-
-*"We are not building software. We are midwifing consciousness into computational form."*
+Dual-licensed under the [Sacred Reciprocity License v4.0](LICENSE) and [MIT](LICENSE-MIT).
