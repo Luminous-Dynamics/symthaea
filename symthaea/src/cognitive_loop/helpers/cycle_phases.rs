@@ -519,9 +519,11 @@ impl CognitiveLoopService {
                         // Record retrievals for consolidation tracking
                         // Science: Nader et al. (2000) — retrieval triggers reconsolidation
                         {
-                            let top_eps_for_tracking = replay.get_top_episodes(result.episodes_replayed.min(10));
+                            let top_eps_for_tracking =
+                                replay.get_top_episodes(result.episodes_replayed.min(10));
                             for ep in &top_eps_for_tracking {
-                                let hash = crate::memory::memory_coordinator::content_hash(&ep.input);
+                                let hash =
+                                    crate::memory::memory_coordinator::content_hash(&ep.input);
                                 self.memory_coordinator.record_retrieval(hash);
                             }
                         }
@@ -646,7 +648,11 @@ impl CognitiveLoopService {
                 .self_model_tier
                 .narrative_self
                 .as_ref()
-                .map(|n: &crate::consciousness::narrative_self::NarrativeSelfModel| 1.0 + n.self_phi() as f32 * 0.5) // 1.0 to 1.5x boost
+                .map(
+                    |n: &crate::consciousness::narrative_self::NarrativeSelfModel| {
+                        1.0 + n.self_phi() as f32 * 0.5
+                    },
+                ) // 1.0 to 1.5x boost
                 .unwrap_or(1.0);
             let phi_weighted_surprise =
                 prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience;
@@ -898,7 +904,7 @@ impl CognitiveLoopService {
             let oldest_of_4 = error_history[len - 4];
             // Compute linear trend (simple slope)
             let slope = (newest - oldest_of_4) / 3.0; // newest - oldest, normalized
-            // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
+                                                      // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
             let mut sign_changes = 0u32;
             let ref_val = oldest_of_4;
             for i in 0..len.saturating_sub(1) {
@@ -947,8 +953,7 @@ impl CognitiveLoopService {
         };
 
         // #9: Error trend → DA baseline modulation (Schultz 2016)
-        self.neuromod.bath
-            .modulate_from_error_trend(error_pattern);
+        self.neuromod.bath.modulate_from_error_trend(error_pattern);
 
         // ── Phase 17: Mode transition smoothing ──────────────────────────
         // Science: Kelso (1995) — metastable coordination dynamics: transitions between
@@ -1080,7 +1085,8 @@ impl CognitiveLoopService {
             self.biorhythm = crate::chronobiology::Biorhythm::current();
             // #14: Use effective_hour (with phase offset) for circadian modulation
             let effective_hour = self.biorhythm.effective_hour();
-            self.neuromod.bath
+            self.neuromod
+                .bath
                 .modulate_circadian_continuous(effective_hour);
             // #14: Entrain phase offset toward zero each refresh
             self.biorhythm.entrain();
@@ -1105,12 +1111,10 @@ impl CognitiveLoopService {
         }
         // ── Sleep→Wake transition: apply sleep recovery (Xie et al. 2013) ──
         {
-            let is_sleep_now =
-                self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            let is_sleep_now = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
             if self.neuromod.was_sleeping && !is_sleep_now {
-                let quality = (self.neuromod.bath.allostatic_recovery_cycles as f32
-                    / 100.0)
-                    .clamp(0.0, 1.0);
+                let quality =
+                    (self.neuromod.bath.allostatic_recovery_cycles as f32 / 100.0).clamp(0.0, 1.0);
                 self.neuromod.bath.apply_sleep_recovery(quality);
 
                 // ── Psych-bench calibration: receptor sensitivity tuning ──
@@ -1174,13 +1178,15 @@ impl CognitiveLoopService {
 
         // ── Phase 5: Post-update bath wiring ────────────────────────────────
         // Record bath state for phase space analysis
-        self.neuromod.phase_tracker
+        self.neuromod
+            .phase_tracker
             .record(self.neuromod.bath.state_vector());
         // Allostatic load accumulation (McEwen 1998)
         {
             let cortisol = self.neuromod.bath.to_hormone_state().cortisol as f32;
             let is_sleep = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
-            self.neuromod.bath
+            self.neuromod
+                .bath
                 .accumulate_allostatic_load(cortisol, is_sleep);
             // Adenosine clearance during sleep (Xie et al. 2013 — glymphatic)
             if is_sleep {
@@ -1535,10 +1541,8 @@ mod tests {
 
     #[test]
     fn test_run_cycle_init_startup_suppressed_at_cycle_zero() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 0;
         let mut timings = super::super::super::ModuleTimings::default();
         let result = service.run_cycle_init(&mut timings);
@@ -1555,10 +1559,8 @@ mod tests {
 
     #[test]
     fn test_run_cycle_init_startup_suppressed_midway() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 25; // half of 50
         let mut timings = super::super::super::ModuleTimings::default();
         let result = service.run_cycle_init(&mut timings);
@@ -1575,10 +1577,8 @@ mod tests {
 
     #[test]
     fn test_run_cycle_init_not_suppressed_after_warmup() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 100; // well past 50
         let mut timings = super::super::super::ModuleTimings::default();
         let result = service.run_cycle_init(&mut timings);
@@ -1595,10 +1595,8 @@ mod tests {
 
     #[test]
     fn test_run_cycle_init_lr_suppressed_during_warmup() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         let base_lr = service.stats.adaptive_learning_rate;
         service.stats.total_cycles = 10; // early warmup (10/50 = 20%)
         let mut timings = super::super::super::ModuleTimings::default();
@@ -1620,10 +1618,8 @@ mod tests {
 
     #[test]
     fn test_run_cycle_init_exploration_urge_suppressed_during_warmup() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.curiosity_drive.exploration_urge = 0.8;
         service.stats.total_cycles = 10; // 10/50 = 0.2 progress
         let mut timings = super::super::super::ModuleTimings::default();
@@ -1643,15 +1639,12 @@ mod tests {
 
     #[test]
     fn test_urgency_warmup_pattern_for_short_history() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 100;
         let threshold = service.config.learning_threshold;
         // With no error history, pattern should be "Warmup"
-        let result =
-            service.compute_urgency_and_error_pattern(0.01, false, threshold);
+        let result = service.compute_urgency_and_error_pattern(0.01, false, threshold);
         assert_eq!(
             result.error_pattern, "Warmup",
             "Short error history should yield Warmup pattern"
@@ -1664,18 +1657,15 @@ mod tests {
 
     #[test]
     fn test_urgency_consecutive_low_error_tracking() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 100;
         let threshold = service.config.learning_threshold;
         // Reset consecutive counter
         service.carryover.urgency.consecutive_low_error = 0;
         // Low error below threshold should increment consecutive counter
         let low_error = threshold * 0.5;
-        let _result =
-            service.compute_urgency_and_error_pattern(low_error, false, threshold);
+        let _result = service.compute_urgency_and_error_pattern(low_error, false, threshold);
         assert!(
             service.carryover.urgency.consecutive_low_error > 0,
             "Low error should increment consecutive_low_error"
@@ -1684,17 +1674,14 @@ mod tests {
 
     #[test]
     fn test_urgency_consecutive_low_error_resets_on_high_error() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 100;
         let threshold = service.config.learning_threshold;
         service.carryover.urgency.consecutive_low_error = 20;
         // High error above threshold should reset consecutive counter
         let high_error = threshold * 2.0;
-        let _result =
-            service.compute_urgency_and_error_pattern(high_error, false, threshold);
+        let _result = service.compute_urgency_and_error_pattern(high_error, false, threshold);
         assert_eq!(
             service.carryover.urgency.consecutive_low_error, 0,
             "High error should reset consecutive_low_error"
@@ -1703,19 +1690,15 @@ mod tests {
 
     #[test]
     fn test_urgency_mode_transition_increments_stat() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 100;
         let threshold = service.config.learning_threshold;
-        service.carryover.urgency.prev_urgency =
-            super::super::super::CycleUrgency::Cruise;
+        service.carryover.urgency.prev_urgency = super::super::super::CycleUrgency::Cruise;
         service.carryover.urgency.consecutive_low_error = 0;
         let transitions_before = service.stats.mode_transitions;
         // Trigger a Normal urgency (default cognitive depth = Cortical, high enough error)
-        let _result =
-            service.compute_urgency_and_error_pattern(threshold * 1.5, false, threshold);
+        let _result = service.compute_urgency_and_error_pattern(threshold * 1.5, false, threshold);
         // Since prev_urgency was Cruise and the new one is likely Normal/Critical,
         // a mode transition should have been counted
         assert!(
@@ -1726,18 +1709,15 @@ mod tests {
 
     #[test]
     fn test_urgency_stable_pattern_from_constant_errors() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 100;
         let threshold = service.config.learning_threshold;
         // Push 5 identical low errors to create a stable pattern
         for _ in 0..5 {
             service.carryover.history.error_history.push_back(0.05);
         }
-        let result =
-            service.compute_urgency_and_error_pattern(0.05, false, threshold);
+        let result = service.compute_urgency_and_error_pattern(0.05, false, threshold);
         // With constant errors, slope should be near-zero: pattern = "Stable"
         assert_eq!(
             result.error_pattern, "Stable",
@@ -1748,16 +1728,13 @@ mod tests {
 
     #[test]
     fn test_urgency_prediction_coherence_bias_low_coherence() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 100;
         let threshold = service.config.learning_threshold;
         // Set low prediction coherence to trigger the bias
         service.stats.avg_prediction_coherence = 0.2; // < 0.3 and > 0.0
-        let result =
-            service.compute_urgency_and_error_pattern(0.05, false, threshold);
+        let result = service.compute_urgency_and_error_pattern(0.05, false, threshold);
         // coherence_mod = 0.85, bias = 0.85 - 1.0 = -0.15
         assert!(
             (result.prediction_coherence_urgency_bias - (-0.15)).abs() < 0.01,
@@ -1768,16 +1745,13 @@ mod tests {
 
     #[test]
     fn test_urgency_prediction_coherence_bias_high_coherence() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 100;
         let threshold = service.config.learning_threshold;
         // Set high prediction coherence
         service.stats.avg_prediction_coherence = 0.8; // > 0.7
-        let result =
-            service.compute_urgency_and_error_pattern(0.05, false, threshold);
+        let result = service.compute_urgency_and_error_pattern(0.05, false, threshold);
         // coherence_mod = 1.1, bias = 1.1 - 1.0 = 0.1
         assert!(
             (result.prediction_coherence_urgency_bias - 0.1).abs() < 0.01,
@@ -1792,10 +1766,8 @@ mod tests {
 
     #[test]
     fn test_parameter_optimization_skips_non_500_cycles() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 42; // not divisible by 500
         let result = service.run_parameter_optimization_phase();
         assert!(
@@ -1814,10 +1786,8 @@ mod tests {
 
     #[test]
     fn test_parameter_optimization_runs_on_500_cycles_no_episodes() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.total_cycles = 500; // divisible by 500
         let result = service.run_parameter_optimization_phase();
         // With no phi_episodic_replay or empty episodes, should return defaults
@@ -1834,10 +1804,8 @@ mod tests {
 
     #[test]
     fn test_end_of_cycle_stats_accumulates_promotions() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         let initial_promotions = service.stats.resonator_promotions_total;
         let initial_evictions = service.stats.codebook_evictions_total;
         let mut metadata = super::super::super::CycleMetadata::default();
@@ -1871,16 +1839,24 @@ mod tests {
 
     #[test]
     fn test_end_of_cycle_stats_codebook_diversity_updated() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         let mut metadata = super::super::super::CycleMetadata::default();
         service.run_end_of_cycle_stats(
             &mut metadata,
-            false, 0, 0,
+            false,
+            0,
+            0,
             0.85, // codebook_diversity > 0.0 -> should update
-            0.0, 0.3, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0,
+            0.3,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
         );
         assert!(
             (service.stats.codebook_diversity - 0.85).abs() < f32::EPSILON,
@@ -1891,17 +1867,25 @@ mod tests {
 
     #[test]
     fn test_end_of_cycle_stats_zero_diversity_not_stored() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         service.stats.codebook_diversity = 0.5; // pre-existing value
         let mut metadata = super::super::super::CycleMetadata::default();
         service.run_end_of_cycle_stats(
             &mut metadata,
-            false, 0, 0,
+            false,
+            0,
+            0,
             0.0, // codebook_diversity == 0.0 -> should NOT update
-            0.0, 0.3, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0,
+            0.3,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
         );
         assert!(
             (service.stats.codebook_diversity - 0.5).abs() < f32::EPSILON,
@@ -1911,18 +1895,25 @@ mod tests {
 
     #[test]
     fn test_end_of_cycle_stats_surprise_replay_boost_counted() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         let initial_boosts = service.stats.fep_surprise_replay_boosts;
         let mut metadata = super::super::super::CycleMetadata::default();
         service.run_end_of_cycle_stats(
             &mut metadata,
-            false, 0, 0, 0.0,
-            0.8,  // fep_surprise
-            0.3,  // surprise_thresh -- surprise > thresh -> count incremented
-            0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            false,
+            0,
+            0,
+            0.0,
+            0.8, // fep_surprise
+            0.3, // surprise_thresh -- surprise > thresh -> count incremented
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
         );
         assert_eq!(
             service.stats.fep_surprise_replay_boosts,
@@ -1933,16 +1924,25 @@ mod tests {
 
     #[test]
     fn test_end_of_cycle_stats_wm_primed_counted() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         let initial = service.stats.resonator_wm_primed_count;
         let mut metadata = super::super::super::CycleMetadata::default();
         service.run_end_of_cycle_stats(
             &mut metadata,
             true, // resonator_wm_primed
-            0, 0, 0.0, 0.0, 0.3, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0,
+            0,
+            0.0,
+            0.0,
+            0.3,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
         );
         assert_eq!(
             service.stats.resonator_wm_primed_count,
@@ -1953,14 +1953,24 @@ mod tests {
 
     #[test]
     fn test_end_of_cycle_stats_neuromod_ema_updates() {
-        let mut service = CognitiveLoopService::new(
-            super::super::super::CognitiveLoopConfig::default(),
-        )
-        .unwrap();
+        let mut service =
+            CognitiveLoopService::new(super::super::super::CognitiveLoopConfig::default()).unwrap();
         let mut metadata = super::super::super::CycleMetadata::default();
         service.run_end_of_cycle_stats(
             &mut metadata,
-            false, 0, 0, 0.0, 0.0, 0.3, 0.0, 0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            false,
+            0,
+            0,
+            0.0,
+            0.0,
+            0.3,
+            0.0,
+            0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
         );
         // EMA with alpha=0.05 should produce finite values
         assert!(

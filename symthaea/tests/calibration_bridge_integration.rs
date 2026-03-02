@@ -39,7 +39,11 @@ fn test_ingest_and_force_apply_calibration() {
     warmup(&mut service, 20);
 
     // Record pre-calibration DA sensitivity
-    let pre_da = service.cycle("baseline").metadata.neuromod.dopamine_effective;
+    let pre_da = service
+        .cycle("baseline")
+        .metadata
+        .neuromod
+        .dopamine_effective;
 
     // Ingest calibration: high interference z-score → attenuate DA
     let scores = vec![
@@ -332,9 +336,11 @@ fn test_calibration_confidence_adjustment() {
     let pre_confidence = pre_result.metadata.reasoning_confidence;
 
     // Ingest calibration with overconfident FoK signal
-    let scores = vec![
-        ("Metacognition::FeelingOfKnowing", "calibration_error_ece", -1.5),
-    ];
+    let scores = vec![(
+        "Metacognition::FeelingOfKnowing",
+        "calibration_error_ece",
+        -1.5,
+    )];
     service.ingest_calibration(&scores);
     service.apply_pending_calibration();
 

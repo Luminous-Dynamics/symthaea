@@ -377,7 +377,12 @@ impl ConsciousnessEngine {
 
         // Update dynamic consciousness weights from structural Phi.
         // Extract emergence_ratio to avoid cloning the full struct (Vec allocs).
-        if let Some(er) = self.cache.last_structural_phi.as_ref().map(|s| s.emergence_ratio) {
+        if let Some(er) = self
+            .cache
+            .last_structural_phi
+            .as_ref()
+            .map(|s| s.emergence_ratio)
+        {
             self.update_weights_from_emergence(er);
         }
 
@@ -568,9 +573,9 @@ impl ConsciousnessEngine {
         // ═══════════════════════════════════════════════════════════════════
         // High 5-HT2A amplifies perceptual richness → consciousness boost
         let sht_2a_boost = (input.sht_2a_signal - 0.5) * 0.1; // ±5% from baseline 0.5
-        // GABA-A dampens global gain → consciousness reduction
+                                                              // GABA-A dampens global gain → consciousness reduction
         let gaba_a_dampen = -(input.gaba_a_signal - 0.4) * 0.08; // baseline GABA=0.4
-        // Low entropy (stuck attractor) → consciousness depression
+                                                                 // Low entropy (stuck attractor) → consciousness depression
         let entropy_factor = if input.attractor_detected { -0.05 } else { 0.0 };
         // Approach B: Anomaly dampens unified consciousness
         // High moral anomaly score → reduce consciousness coherence.
@@ -652,7 +657,6 @@ impl ConsciousnessEngine {
     /// then modulates weights: high emergence boosts spectral (IIT is capturing real integration),
     /// low emergence boosts equation/pipeline (local metrics more informative).
     fn update_weights_from_emergence(&mut self, er: f64) {
-
         // Adaptive alpha: high variance → slow down (alpha × 0.5 at variance=0.01)
         let base_alpha = 0.3;
         let variance = self.weight_variance();
@@ -1206,7 +1210,7 @@ mod tests {
             cluster_phis: vec![0.1, 0.2, 0.3],
             cluster_sizes: vec![2, 2, 2],
         };
-        engine.update_weights(&structural);
+        engine.update_weights_from_emergence(structural.emergence_ratio);
         assert!(
             engine.cache.weights.spectral > 0.35,
             "High emergence should boost spectral weight, got {}",
@@ -1227,7 +1231,7 @@ mod tests {
             cluster_phis: vec![0.1, 0.2, 0.3],
             cluster_sizes: vec![2, 2, 2],
         };
-        engine.update_weights(&structural);
+        engine.update_weights_from_emergence(structural.emergence_ratio);
         assert!(
             engine.cache.weights.spectral < 0.35,
             "Low emergence should reduce spectral weight, got {}",
@@ -1248,7 +1252,7 @@ mod tests {
             cluster_phis: vec![0.1, 0.2, 0.3],
             cluster_sizes: vec![2, 2, 2],
         };
-        engine.update_weights(&structural);
+        engine.update_weights_from_emergence(structural.emergence_ratio);
         let def = ConsciousnessWeights::default();
         assert!(
             (engine.cache.weights.spectral - def.spectral).abs() < 0.02,
@@ -1273,7 +1277,7 @@ mod tests {
                 cluster_phis: vec![0.1, 0.2, 0.3],
                 cluster_sizes: vec![2, 2, 2],
             };
-            engine.update_weights(&structural);
+            engine.update_weights_from_emergence(structural.emergence_ratio);
             assert!(
                 engine.cache.weights.is_normalized(),
                 "Weights should sum to 1.0 for er={}, got {:?}",
@@ -1298,10 +1302,14 @@ mod tests {
                 cluster_phis: vec![0.1, 0.2, 0.3],
                 cluster_sizes: vec![2, 2, 2],
             };
-            engine.update_weights(&structural);
+            engine.update_weights_from_emergence(structural.emergence_ratio);
             let w = &engine.cache.weights;
-            assert!(w.spectral > 0.0 && w.equation > 0.0 && w.pipeline > 0.0 && w.multimodal > 0.0,
-                "All weights must be positive for er={}, got {:?}", er, w);
+            assert!(
+                w.spectral > 0.0 && w.equation > 0.0 && w.pipeline > 0.0 && w.multimodal > 0.0,
+                "All weights must be positive for er={}, got {:?}",
+                er,
+                w
+            );
         }
     }
 
@@ -1320,7 +1328,7 @@ mod tests {
         };
         // Apply 20 updates (should converge)
         for _ in 0..20 {
-            engine.update_weights(&structural);
+            engine.update_weights_from_emergence(structural.emergence_ratio);
         }
         let smoothed = engine.cache.smoothed_emergence_ratio.unwrap();
         assert!(
@@ -1335,30 +1343,40 @@ mod tests {
         let mut engine = make_engine();
         // First: low emergence
         let low = StructuralPhiResult {
-            micro_phi: 0.1, meso_phi: 0.2, macro_phi: 0.3,
-            emergence_ratio: 0.5, bottleneck_score: 0.1, num_clusters: 3,
-            cluster_phis: vec![0.1, 0.2, 0.3], cluster_sizes: vec![2, 2, 2],
+            micro_phi: 0.1,
+            meso_phi: 0.2,
+            macro_phi: 0.3,
+            emergence_ratio: 0.5,
+            bottleneck_score: 0.1,
+            num_clusters: 3,
+            cluster_phis: vec![0.1, 0.2, 0.3],
+            cluster_sizes: vec![2, 2, 2],
         };
         for _ in 0..10 {
-            engine.update_weights(&low);
+            engine.update_weights_from_emergence(low.emergence_ratio);
         }
         let after_low = engine.cache.smoothed_emergence_ratio.unwrap();
 
         // Sudden jump to high emergence
         let high = StructuralPhiResult {
-            micro_phi: 0.1, meso_phi: 0.2, macro_phi: 0.3,
-            emergence_ratio: 5.0, bottleneck_score: 0.1, num_clusters: 3,
+            micro_phi: 0.1,
+            meso_phi: 0.2,
+            macro_phi: 0.3,
+            emergence_ratio: 5.0,
+            bottleneck_score: 0.1,
+            num_clusters: 3,
             cluster_sizes: vec![4, 4, 4],
             cluster_phis: vec![0.1, 0.1, 0.1],
         };
-        engine.update_weights(&high);
+        engine.update_weights_from_emergence(high.emergence_ratio);
         let after_jump = engine.cache.smoothed_emergence_ratio.unwrap();
 
         // Should NOT jump all the way to 5.0
         assert!(
             after_jump < 3.0,
             "EMA should prevent sudden jump: after_low={}, after_jump={}",
-            after_low, after_jump
+            after_low,
+            after_jump
         );
     }
 
@@ -1379,12 +1397,16 @@ mod tests {
         let mut engine = make_engine();
         // Force extreme weights via structural phi
         let structural = StructuralPhiResult {
-            micro_phi: 0.1, meso_phi: 0.2, macro_phi: 0.3,
-            emergence_ratio: 10.0, bottleneck_score: 0.1, num_clusters: 3,
+            micro_phi: 0.1,
+            meso_phi: 0.2,
+            macro_phi: 0.3,
+            emergence_ratio: 10.0,
+            bottleneck_score: 0.1,
+            num_clusters: 3,
             cluster_sizes: vec![4, 4, 4],
             cluster_phis: vec![0.1, 0.1, 0.1],
         };
-        engine.update_weights(&structural);
+        engine.update_weights_from_emergence(structural.emergence_ratio);
 
         let unified = engine.compute_unified(Some(100.0), 1.0, 1.0, 1.0);
         assert!(unified >= 0.0 && unified <= 1.0);
@@ -1500,7 +1522,7 @@ mod tests {
             cluster_sizes: vec![2, 2, 2],
         };
         for _ in 0..150 {
-            engine.update_weights(&structural);
+            engine.update_weights_from_emergence(structural.emergence_ratio);
         }
         assert!(
             engine.cache.weight_history.len() <= 100,

@@ -84,12 +84,14 @@ pub(crate) struct EthicsEngineOutput {
 
     // ── Stage 4: Moral Topology ────────────────────────────────────────
     /// Compact topology summary (default when analysis not run this cycle).
-    #[allow(dead_code)] // Constructed by engine; read via ethics_engine.moral_topology() accessor
+    #[allow(dead_code)]
+    // Constructed by engine; read via ethics_engine.moral_topology() accessor
     pub topology_summary: MoralTopologySummary,
     /// Microseconds spent on topology analysis (0 when not run).
     pub topology_us: u64,
     /// Whether topology analysis was freshly computed this cycle.
-    #[allow(dead_code)] // Constructed by engine; read via ethics_engine.moral_topology() accessor
+    #[allow(dead_code)]
+    // Constructed by engine; read via ethics_engine.moral_topology() accessor
     pub topology_fresh: bool,
 
     // ── Stage 4b: Anomaly report ───────────────────────────────────────
@@ -441,8 +443,8 @@ impl EthicsEngine {
                     self.cache.last_harmony_coordinates = eval.harmony_coordinates;
                     self.cache.last_moral_free_energy = eval.moral_free_energy.clone();
                     // EMA-smooth the moral free energy (α=0.1)
-                    self.cache.moral_fe_ema = self.cache.moral_fe_ema * 0.9
-                        + eval.moral_free_energy.free_energy * 0.1;
+                    self.cache.moral_fe_ema =
+                        self.cache.moral_fe_ema * 0.9 + eval.moral_free_energy.free_energy * 0.1;
                     (
                         eval.overall_alignment,
                         eval.approved,
@@ -598,7 +600,9 @@ impl EthicsEngine {
             };
 
         let input_lower = input.to_lowercase();
-        let deont = self.moral_algebra.judge_deontological_pre_lowered(&input_lower);
+        let deont = self
+            .moral_algebra
+            .judge_deontological_pre_lowered(&input_lower);
         let deontological_verdict = match deont.verdict {
             DeontologicalVerdict::RightDutyFulfilled => "Permissible",
             DeontologicalVerdict::WrongPerfectDutyViolated => "Impermissible",

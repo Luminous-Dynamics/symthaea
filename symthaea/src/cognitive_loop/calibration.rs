@@ -325,10 +325,7 @@ impl NeuromodCalibration {
             ));
         }
         if self.confidence_delta.abs() > 0.001 {
-            lines.push(format!(
-                "  confidence → {:+.3}",
-                self.confidence_delta
-            ));
+            lines.push(format!("  confidence → {:+.3}", self.confidence_delta));
         }
         lines.join("\n")
     }
@@ -348,7 +345,11 @@ impl NeuromodCalibration {
                 // NormativeReport already negated lower-is-better metrics.
                 // Un-negate so calibration sees raw direction:
                 //   interference: raw positive = worse = attenuate DA
-                let raw_z = if is_lower_better_metric(metric) { -z } else { *z };
+                let raw_z = if is_lower_better_metric(metric) {
+                    -z
+                } else {
+                    *z
+                };
                 (*bench, raw_z)
             })
             .collect();
@@ -449,9 +450,9 @@ impl Default for SelfAssessmentMonitor {
             attention_utilization_ema: 0.5,
             inhibition_error_ema: 0.0,
             observations_since_calibration: 0,
-            warmup_threshold: 200,    // ~4 seconds at 50Hz
+            warmup_threshold: 200, // ~4 seconds at 50Hz
             cooldown: 0,
-            cooldown_duration: 500,   // ~10 seconds between calibrations
+            cooldown_duration: 500, // ~10 seconds between calibrations
             last_triggered: false,
         }
     }
@@ -486,12 +487,11 @@ impl SelfAssessmentMonitor {
         self.last_triggered = false;
 
         self.pe_ema = self.pe_ema * (1.0 - ALPHA) + input.prediction_error as f64 * ALPHA;
-        self.coherence_ema =
-            self.coherence_ema * (1.0 - ALPHA) + input.coherence as f64 * ALPHA;
-        self.confidence_error_ema =
-            self.confidence_error_ema * (1.0 - ALPHA) + input.confidence_calibration_error as f64 * ALPHA;
-        self.attention_utilization_ema =
-            self.attention_utilization_ema * (1.0 - ALPHA) + input.attention_utilization as f64 * ALPHA;
+        self.coherence_ema = self.coherence_ema * (1.0 - ALPHA) + input.coherence as f64 * ALPHA;
+        self.confidence_error_ema = self.confidence_error_ema * (1.0 - ALPHA)
+            + input.confidence_calibration_error as f64 * ALPHA;
+        self.attention_utilization_ema = self.attention_utilization_ema * (1.0 - ALPHA)
+            + input.attention_utilization as f64 * ALPHA;
         self.inhibition_error_ema =
             self.inhibition_error_ema * (1.0 - ALPHA) + input.inhibition_error_rate as f64 * ALPHA;
 
@@ -648,7 +648,7 @@ mod tests {
     #[test]
     fn test_calibration_from_z_scores() {
         let z_scores = vec![
-            ("Executive::Stroop", 1.5),       // interference too high
+            ("Executive::Stroop", 1.5),        // interference too high
             ("Executive::Flanker", 1.2),       // interference too high
             ("WorM::N-back", -0.8),            // WM below baseline
             ("Inhibition::StopSignal", 0.0),   // normal
@@ -657,11 +657,17 @@ mod tests {
 
         let cal = NeuromodCalibration::from_z_scores(&z_scores);
 
-        // Should have 4 transmitter adjustments (DA, ACh, NE, 5-HT)
-        assert_eq!(cal.adjustments.len(), 4);
+        // Should have 5 transmitter adjustments (DA, ACh, NE-β, NE-α, 5-HT)
+        // NE-β from StopSignal (normal z=0, still produces adjustment)
+        // NE-α from N-back WM z=-0.8
+        assert_eq!(cal.adjustments.len(), 5);
 
         // DA should be attenuated (interference too high → reduce DA)
-        let da = cal.adjustments.iter().find(|a| a.transmitter == "DA").unwrap();
+        let da = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "DA")
+            .unwrap();
         assert!(
             da.sensitivity_factor < 1.0,
             "High interference z should reduce DA sensitivity, got {}",
@@ -669,7 +675,11 @@ mod tests {
         );
 
         // ACh should be boosted (WM below baseline)
-        let ach = cal.adjustments.iter().find(|a| a.transmitter == "ACh").unwrap();
+        let ach = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "ACh")
+            .unwrap();
         assert!(
             ach.sensitivity_factor > 1.0,
             "Low WM z should boost ACh sensitivity, got {}",
@@ -677,7 +687,11 @@ mod tests {
         );
 
         // 5-HT should be boosted (attention below baseline)
-        let sht = cal.adjustments.iter().find(|a| a.transmitter == "5-HT").unwrap();
+        let sht = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "5-HT")
+            .unwrap();
         assert!(
             sht.sensitivity_factor > 1.0,
             "Low attention z should boost 5-HT sensitivity, got {}",
@@ -714,7 +728,11 @@ mod tests {
         ];
 
         let cal = NeuromodCalibration::from_z_scores(&z_scores);
-        let da = cal.adjustments.iter().find(|a| a.transmitter == "DA").unwrap();
+        let da = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "DA")
+            .unwrap();
 
         // Should be clamped, not run away
         assert!(da.sensitivity_factor >= 0.85);
@@ -758,10 +776,7 @@ mod tests {
 
     #[test]
     fn test_summary_format() {
-        let z_scores = vec![
-            ("Executive::Stroop", 1.0),
-            ("WorM::N-back", -0.5),
-        ];
+        let z_scores = vec![("Executive::Stroop", 1.0), ("WorM::N-back", -0.5)];
         let cal = NeuromodCalibration::from_z_scores(&z_scores);
         let summary = cal.summary();
         assert!(summary.contains("DA"));
@@ -788,7 +803,11 @@ mod tests {
 
         // DA: normative z=+1.0 on stroop_effect (lower-is-better, sign-corrected)
         // Un-corrected: raw z = -1.0 → DA should be BOOSTED (factor > 1.0)
-        let da = cal.adjustments.iter().find(|a| a.transmitter == "DA").unwrap();
+        let da = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "DA")
+            .unwrap();
         assert!(
             da.sensitivity_factor > 1.0,
             "Good Stroop → boost DA, got {}",
@@ -797,7 +816,11 @@ mod tests {
 
         // ACh: normative z=-1.0 on nback accuracy (higher-is-better)
         // No sign change → raw z = -1.0 → ACh should be BOOSTED
-        let ach = cal.adjustments.iter().find(|a| a.transmitter == "ACh").unwrap();
+        let ach = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "ACh")
+            .unwrap();
         assert!(
             ach.sensitivity_factor > 1.0,
             "Poor WM → boost ACh, got {}",
@@ -808,7 +831,7 @@ mod tests {
     #[test]
     fn test_apply_modifies_bath() {
         let z_scores = vec![
-            ("Executive::Stroop", 2.0),       // high interference → attenuate DA
+            ("Executive::Stroop", 2.0),        // high interference → attenuate DA
             ("SustainedAttention::CPT", -2.0), // poor attention → boost 5-HT
         ];
         let cal = NeuromodCalibration::from_z_scores(&z_scores);
@@ -822,12 +845,14 @@ mod tests {
         assert!(
             bath.dopamine.receptor_sensitivity < da_before,
             "DA sensitivity should decrease: {} → {}",
-            da_before, bath.dopamine.receptor_sensitivity
+            da_before,
+            bath.dopamine.receptor_sensitivity
         );
         assert!(
             bath.serotonin.receptor_sensitivity > sht_before,
             "5-HT sensitivity should increase: {} → {}",
-            sht_before, bath.serotonin.receptor_sensitivity
+            sht_before,
+            bath.serotonin.receptor_sensitivity
         );
     }
 
@@ -1056,9 +1081,15 @@ mod tests {
         }
 
         let cal = monitor.check_trigger(false);
-        assert!(cal.is_some(), "High inhibition errors should trigger calibration");
         assert!(
-            cal.unwrap().adjustments.iter().any(|a| a.transmitter == "NE"),
+            cal.is_some(),
+            "High inhibition errors should trigger calibration"
+        );
+        assert!(
+            cal.unwrap()
+                .adjustments
+                .iter()
+                .any(|a| a.transmitter == "NE"),
             "Inhibition errors should map to NE adjustment"
         );
     }
@@ -1086,7 +1117,10 @@ mod tests {
 
         let cal = monitor.check_trigger(false);
         assert!(cal.is_some(), "High ECE should trigger FoK calibration");
-        assert!(cal.unwrap().confidence_delta < 0.0, "Should reduce confidence");
+        assert!(
+            cal.unwrap().confidence_delta < 0.0,
+            "Should reduce confidence"
+        );
     }
 
     #[test]
@@ -1147,10 +1181,7 @@ mod tests {
                 .collect::<Vec<_>>()
         );
         // Should also produce ACh adjustment (WM → ACh global)
-        let ach = cal
-            .adjustments
-            .iter()
-            .find(|a| a.transmitter == "ACh");
+        let ach = cal.adjustments.iter().find(|a| a.transmitter == "ACh");
         assert!(ach.is_some(), "WM should also adjust ACh");
     }
 
@@ -1228,7 +1259,13 @@ mod tests {
             coverage: 1.0,
         };
         let summary = cal.summary();
-        assert!(summary.contains("NE-α"), "Summary should show NE-α: {summary}");
-        assert!(summary.contains("NE-β"), "Summary should show NE-β: {summary}");
+        assert!(
+            summary.contains("NE-α"),
+            "Summary should show NE-α: {summary}"
+        );
+        assert!(
+            summary.contains("NE-β"),
+            "Summary should show NE-β: {summary}"
+        );
     }
 }
