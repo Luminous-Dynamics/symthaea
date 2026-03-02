@@ -30,6 +30,12 @@ pub(crate) struct NeuromodManager {
 
     /// Hysteresis-based phase transition detector (prevents flicker between labels).
     pub phase_detector: neuromodulators::PhaseTransitionDetector,
+
+    /// Running calibration battery subprocess (async, non-blocking).
+    pub calibration_battery_child: Option<std::process::Child>,
+
+    /// Calibration history for drift tracking (sliding window of last N profiles).
+    pub calibration_history: super::calibration::CalibrationHistory,
 }
 
 impl Default for NeuromodManager {
@@ -43,6 +49,8 @@ impl Default for NeuromodManager {
             last_calibration_summary: None,
             self_assessment: calibration::SelfAssessmentMonitor::default(),
             phase_detector: neuromodulators::PhaseTransitionDetector::new(5),
+            calibration_battery_child: None,
+            calibration_history: super::calibration::CalibrationHistory::default(),
         }
     }
 }
