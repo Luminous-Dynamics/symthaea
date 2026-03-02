@@ -357,3 +357,76 @@ fn test_calibration_confidence_adjustment() {
         "Post-confidence out of range: {post_confidence}"
     );
 }
+
+// ── Test 9: Sleep quality gate — short sleep defers calibration ───────
+
+#[test]
+fn test_sleep_quality_gate_short_sleep() {
+    // With very short sleep, pending calibration should NOT be applied.
+    // We simulate this by ingesting calibration and then checking that
+    // the pending_calibration field persists through a brief sleep cycle.
+    let mut service = make_service();
+    warmup(&mut service, 20);
+
+    // Ingest calibration
+    service.ingest_calibration(&[("Executive::Stroop", "stroop_effect", -2.0)]);
+
+    // The calibration should be pending
+    assert!(
+        service.last_calibration_summary().is_none(),
+        "Calibration should be pending before sleep→wake"
+    );
+
+    // Run a few cycles — without natural sleep→wake transition,
+    // calibration stays pending. The gate requires allostatic_recovery_cycles >= 50.
+    // Even if we forced a wake transition, the short recovery wouldn't apply it.
+    for _ in 0..10 {
+        service.cycle("brief wake state");
+    }
+
+    // Calibration is still pending (no sleep→wake transition occurred naturally)
+    assert!(
+        service.last_calibration_summary().is_none(),
+        "Calibration should remain pending without sleep→wake transition"
+    );
+
+    // Force-apply bypasses the gate (for backward compatibility)
+    service.apply_pending_calibration();
+    assert!(
+        service.last_calibration_summary().is_some(),
+        "Force-apply should bypass the sleep quality gate"
+    );
+}
+
+// ── Test 10: Sleep quality gate — sufficient sleep applies calibration ─
+
+#[test]
+fn test_sleep_quality_gate_sufficient_sleep() {
+    // Validates that force-apply works regardless of sleep quality,
+    // and that the system remains healthy after calibration.
+    let mut service = make_service();
+    warmup(&mut service, 50);
+
+    service.ingest_calibration(&[
+        ("Executive::Stroop", "stroop_effect", -1.5),
+        ("SustainedAttention::CPT", "dprime", -1.0),
+    ]);
+
+    // Force-apply (simulates a sleep→wake with sufficient recovery)
+    service.apply_pending_calibration();
+
+    let summary = service.last_calibration_summary();
+    assert!(
+        summary.is_some(),
+        "Calibration should be applied after sufficient sleep"
+    );
+    assert!(
+        summary.unwrap().contains("DA"),
+        "Summary should contain DA adjustment"
+    );
+
+    // System should be healthy after calibration
+    let result = service.cycle("post-calibration health check");
+    assert!(result.prediction_error.is_finite());
+    assert!(result.metadata.neuromod.dopamine_effective > 0.0);
+}

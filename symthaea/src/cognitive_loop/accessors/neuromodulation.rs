@@ -219,6 +219,22 @@ impl CognitiveLoopService {
     /// Use sparingly — normal flow waits for sleep→wake transition.
     pub fn apply_pending_calibration(&mut self) {
         if let Some(cal) = self.neuromod.pending_calibration.take() {
+            // Record in history before applying (captures the intended adjustment)
+            self.neuromod.calibration_history.record(&cal, self.stats.total_cycles as u64);
+
+            // Check for systematic drift and warn
+            let drifters = self.neuromod.calibration_history.systematic_drift_transmitters();
+            if !drifters.is_empty() {
+                for (transmitter, direction) in &drifters {
+                    tracing::warn!(
+                        %transmitter,
+                        direction = %format!("{direction:+.4}"),
+                        history_len = self.neuromod.calibration_history.len(),
+                        "Systematic calibration drift detected — consider adjusting baseline"
+                    );
+                }
+            }
+
             cal.apply(&mut self.neuromod.bath);
             // Apply confidence delta (routed through feedback proposal system)
             self.adjust_confidence("neuromod_calibration", cal.confidence_delta);
@@ -233,5 +249,130 @@ impl CognitiveLoopService {
     /// Get the last applied calibration summary (if any).
     pub fn last_calibration_summary(&self) -> Option<&str> {
         self.neuromod.last_calibration_summary.as_deref()
+    }
+
+    /// Export pending calibration as a shareable profile for multi-agent coordination.
+    ///
+    /// Returns `None` if no pending calibration exists.
+    pub fn export_calibration_profile(
+        &self,
+        agent_id: Option<String>,
+    ) -> Option<super::super::calibration::SharedCalibrationProfile> {
+        self.neuromod
+            .pending_calibration
+            .as_ref()
+            .map(|cal| cal.to_shareable(agent_id))
+    }
+
+    /// Merge a peer agent's calibration profile into pending calibration.
+    ///
+    /// Weight formula: `base_weight + oxytocin.effective() * oxy_scale`
+    /// - `base_weight` = 0.05 (minimum peer influence regardless of oxytocin)
+    /// - `oxy_scale` = 0.15 (oxytocin modulates trust-based social learning)
+    /// - Total weight capped at 0.35 by merge internals (0.5 hard cap in merge)
+    ///
+    /// Higher oxytocin → more trust → stronger peer influence.
+    /// At typical oxy levels (~1.0), weight ≈ 0.20.
+    /// At high oxy (~1.5), weight ≈ 0.275.
+    ///
+    /// If no pending calibration exists, this is a no-op — we don't create
+    /// calibrations from peer data alone.
+    ///
+    /// Science: Zak (2012) — oxytocin modulates trust-based social learning;
+    ///   Boyd & Richerson (1985) — conformist transmission in social learning.
+    pub fn merge_peer_calibration(
+        &mut self,
+        peer: &super::super::calibration::SharedCalibrationProfile,
+    ) {
+        if let Some(ref mut cal) = self.neuromod.pending_calibration {
+            const BASE_WEIGHT: f32 = 0.05;
+            const OXY_SCALE: f32 = 0.15;
+            let oxy_weight = BASE_WEIGHT + self.neuromod.bath.oxytocin.effective() * OXY_SCALE;
+            // merge_peer_calibration clamps at 0.5, but we cap at 0.35 here
+            let weight = oxy_weight.min(0.35);
+            cal.merge_peer_calibration(peer, weight);
+            tracing::info!(
+                weight,
+                oxy_effective = self.neuromod.bath.oxytocin.effective(),
+                peer_agent = ?peer.agent_id,
+                "Merged peer calibration profile"
+            );
+        }
+    }
+
+    /// Spawn calibration battery as async subprocess during Night phase onset.
+    ///
+    /// Non-blocking: spawns the child process and stores the handle. Call
+    /// `poll_calibration_battery()` on subsequent cycles to check for completion.
+    /// Only available when the `calibration_battery` binary exists on PATH.
+    pub fn spawn_calibration_battery(&mut self, seed: u64) {
+        // Don't spawn if one is already running
+        if self.neuromod.calibration_battery_child.is_some() {
+            return;
+        }
+        match std::process::Command::new("calibration_battery")
+            .args(["--seed", &seed.to_string(), "--trials", "5"])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+        {
+            Ok(child) => {
+                tracing::info!(pid = child.id(), "Spawned async calibration battery");
+                self.neuromod.calibration_battery_child = Some(child);
+            }
+            Err(e) => {
+                tracing::debug!(?e, "calibration_battery not available on PATH");
+            }
+        }
+    }
+
+    /// Poll the running calibration battery for completion (non-blocking).
+    ///
+    /// Returns `true` if the battery finished and results were ingested.
+    /// Call this once per cycle during the neuromod phase.
+    pub fn poll_calibration_battery(&mut self) -> bool {
+        let child = match self.neuromod.calibration_battery_child.as_mut() {
+            Some(c) => c,
+            None => return false,
+        };
+
+        // Non-blocking check: try_wait returns Ok(Some(status)) if done
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // Process finished — take ownership to read stdout
+                let mut child = self.neuromod.calibration_battery_child.take().unwrap();
+                if status.success() {
+                    use std::io::Read;
+                    let mut stdout = String::new();
+                    if let Some(ref mut pipe) = child.stdout {
+                        let _ = pipe.read_to_string(&mut stdout);
+                    }
+                    match super::super::calibration::NeuromodCalibration::from_json_z_scores(&stdout)
+                    {
+                        Ok(cal) => {
+                            tracing::info!(
+                                adjustments = cal.adjustments.len(),
+                                coverage = cal.coverage,
+                                "Async calibration battery completed"
+                            );
+                            self.neuromod.pending_calibration = Some(cal);
+                            return true;
+                        }
+                        Err(e) => {
+                            tracing::warn!(?e, "Failed to parse calibration battery output");
+                        }
+                    }
+                } else {
+                    tracing::debug!(?status, "calibration_battery exited with error");
+                }
+                false
+            }
+            Ok(None) => false, // Still running
+            Err(e) => {
+                tracing::warn!(?e, "Error polling calibration battery");
+                self.neuromod.calibration_battery_child.take();
+                false
+            }
+        }
     }
 }

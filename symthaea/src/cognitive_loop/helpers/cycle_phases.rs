@@ -1042,7 +1042,7 @@ impl CognitiveLoopService {
         }
 
         // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
-        let exploration_urge_start = self.curiosity_drive.exploration_urge;
+        let exploration_urge_start = self.curiosity_drive.exploration_urge as f32;
 
         // Snapshot confidence for end-of-cycle drift clamping (Task G)
         self.carryover.learning.prediction_confidence = self.prediction_confidence;
@@ -1072,9 +1072,9 @@ impl CognitiveLoopService {
 
         self.feedback_state.snapshot_cycle_start(
             self.prediction_confidence,
-            self.fep_lr_boost as f64,
-            self.curiosity_drive.exploration_urge as f64,
-            self.carryover.learning.adaptive_threshold_scale as f64,
+            self.fep_lr_boost,
+            self.curiosity_drive.exploration_urge,
+            self.carryover.learning.adaptive_threshold_scale,
         );
         // ── Phase 2.3: Clear subsystem output collector ────
         self.subsystem_collector.clear();
@@ -1121,12 +1121,37 @@ impl CognitiveLoopService {
                 // Apply any pending calibration during sleep→wake, mirroring
                 // synaptic homeostasis (Tononi & Cirelli 2006): receptor
                 // sensitivities adjust during sleep to correct performance drift.
+                //
+                // Gate: require minimum sleep duration for calibration to take effect.
+                // Too-short sleep doesn't provide enough homeostatic consolidation.
+                // Science: Tononi & Cirelli (2006) — synaptic homeostasis hypothesis.
+                const MIN_SLEEP_FOR_CALIBRATION: u32 = 50; // ~1s at 50Hz
+                let recovery_cycles = self.neuromod.bath.allostatic_recovery_cycles;
                 if self.neuromod.pending_calibration.is_some() {
-                    self.apply_pending_calibration();
-                    // Reset self-assessment cooldown: external calibration supersedes
-                    self.neuromod.self_assessment.reset_after_calibration();
+                    if recovery_cycles >= MIN_SLEEP_FOR_CALIBRATION {
+                        self.apply_pending_calibration();
+                        // Reset self-assessment cooldown: external calibration supersedes
+                        self.neuromod.self_assessment.reset_after_calibration();
+                    } else {
+                        tracing::warn!(
+                            recovery_cycles,
+                            min = MIN_SLEEP_FOR_CALIBRATION,
+                            "Sleep too short — deferring calibration to next sleep→wake"
+                        );
+                        // pending_calibration kept for next sleep→wake
+                    }
                 }
             }
+
+            // ── Wake→Sleep transition: optional calibration battery spawn ──
+            // Spawn calibration battery subprocess at sleep onset so results
+            // are ready by the next sleep→wake transition.
+            if !self.neuromod.was_sleeping && is_sleep_now {
+                if self.neuromod.pending_calibration.is_none() {
+                    self.spawn_calibration_battery(self.stats.total_cycles as u64);
+                }
+            }
+
             self.neuromod.was_sleeping = is_sleep_now;
         }
 
@@ -1244,8 +1269,17 @@ impl CognitiveLoopService {
                 attention_utilization: (1.0 - sht_eff).clamp(0.0, 1.0),
                 inhibition_error_rate,
                 drift_anomalous,
+                // Phase 1F: 5 new proxy signals for expanded 9-transmitter calibration
+                social_coherence: self.neuromod.bath.oxytocin.effective() * 0.5 + 0.5,
+                ei_ratio: self.neuromod.bath.ei_ratio(),
+                excitotoxicity_risk: self.neuromod.bath.excitotoxicity_risk(),
+                sleep_pressure: self.neuromod.bath.adenosine.effective(),
+                allostatic_load: self.neuromod.bath.allostatic_load,
             };
             self.neuromod.self_assessment.update(&sa_input);
+
+            // Poll async calibration battery (non-blocking).
+            self.poll_calibration_battery();
 
             // Check if self-assessment triggers calibration.
             // Guard: don't overwrite pending external (psych-bench) calibration —
@@ -1413,33 +1447,44 @@ impl CognitiveLoopService {
         metadata.somatic_stress = self.somatic_bridge.systemic_stress();
         metadata.mood_temperature = self.mood_temperature;
         // Phase 2.2: feedback proposal attribution telemetry
-        metadata.feedback_confidence_proposals = self.feedback_state.confidence.len() as u32;
-        metadata.feedback_lr_proposals = self.feedback_state.learning_rate.len() as u32;
-        metadata.feedback_exploration_proposals = self.feedback_state.exploration.len() as u32;
-        metadata.feedback_threshold_proposals = self.feedback_state.threshold.len() as u32;
+        metadata.feedback.feedback_confidence_proposals =
+            self.feedback_state.confidence.len() as u32;
+        metadata.feedback.feedback_lr_proposals =
+            self.feedback_state.learning_rate.len() as u32;
+        metadata.feedback.feedback_exploration_proposals =
+            self.feedback_state.exploration.len() as u32;
+        metadata.feedback.feedback_threshold_proposals =
+            self.feedback_state.threshold.len() as u32;
+        // Consensus outcomes from last end_cycle() integration
+        if let Some(ref consensus) = self.feedback_state.last_consensus {
+            metadata.feedback.consensus_confidence = consensus.consensus_confidence;
+            metadata.feedback.consensus_lr = consensus.consensus_lr;
+            metadata.feedback.consensus_exploration = consensus.consensus_exploration;
+            metadata.feedback.consensus_threshold = consensus.consensus_threshold;
+        }
         if self.config.trace_feedback {
-            metadata.feedback_trace_confidence = self
+            metadata.feedback.feedback_trace_confidence = self
                 .feedback_state
                 .confidence
                 .dump_proposals()
                 .into_iter()
                 .map(|(s, d)| (s.to_string(), d))
                 .collect();
-            metadata.feedback_trace_lr = self
+            metadata.feedback.feedback_trace_lr = self
                 .feedback_state
                 .learning_rate
                 .dump_proposals()
                 .into_iter()
                 .map(|(s, d)| (s.to_string(), d))
                 .collect();
-            metadata.feedback_trace_exploration = self
+            metadata.feedback.feedback_trace_exploration = self
                 .feedback_state
                 .exploration
                 .dump_proposals()
                 .into_iter()
                 .map(|(s, d)| (s.to_string(), d))
                 .collect();
-            metadata.feedback_trace_threshold = self
+            metadata.feedback.feedback_trace_threshold = self
                 .feedback_state
                 .threshold
                 .dump_proposals()
