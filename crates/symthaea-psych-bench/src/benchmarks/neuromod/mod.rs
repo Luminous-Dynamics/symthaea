@@ -54,5 +54,5 @@ pub use reward_learning::RewardLearningBenchmark;
 pub use tolerance_withdrawal::ToleranceWithdrawalBenchmark;
 pub use yerkes_dodson::YerkesDodsonBenchmark;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "symthaea-backend"))]
 mod live_social_affect;
