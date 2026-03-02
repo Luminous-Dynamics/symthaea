@@ -495,6 +495,16 @@ impl PatchHdcEncoder {
     pub fn max_cols(&self) -> usize {
         self.max_cols
     }
+
+    /// Row basis HVs (for external consumers like MotionField).
+    pub fn row_basis(&self) -> &[ContinuousHV] {
+        &self.row_hvs
+    }
+
+    /// Column basis HVs (for external consumers like MotionField).
+    pub fn col_basis(&self) -> &[ContinuousHV] {
+        &self.col_hvs
+    }
 }
 
 /// Multi-scale spatial pyramid encoder.
@@ -663,6 +673,121 @@ impl MultiScaleEncoder {
         let blended = ContinuousHV::weighted_bundle(&refs, &weights);
 
         (blended, scale_hvs, all_patches)
+    }
+}
+
+/// Directional motion field via HDC binding.
+///
+/// Computes per-patch motion vectors from the temporal difference gradient
+/// of adjacent patches, then encodes them as a holographic motion field HV
+/// by binding direction basis vectors with position and magnitude.
+///
+/// 8 cardinal/ordinal directions: N, NE, E, SE, S, SW, W, NW.
+pub struct MotionField {
+    direction_hvs: Vec<ContinuousHV>,
+    dim: usize,
+}
+
+impl MotionField {
+    /// Create a motion field encoder with 8 direction basis vectors.
+    pub fn new(dim: usize, seed: u64) -> Self {
+        let direction_hvs: Vec<ContinuousHV> = (0..8)
+            .map(|d| ContinuousHV::random(dim, seed + 900_000 + d as u64))
+            .collect();
+        Self { direction_hvs, dim }
+    }
+
+    /// Compute the motion field from current and previous per-patch luminances.
+    ///
+    /// Returns `(motion_field_hv, per_patch_motion_vectors)` where each motion
+    /// vector is `[dx, dy]` in normalized [-1, 1] range.
+    ///
+    /// The motion field HV encodes WHERE motion is happening and in WHAT DIRECTION
+    /// by binding `direction_hv ⊗ position_hv` weighted by magnitude.
+    pub fn compute(
+        &self,
+        current_lum: &[f32],
+        prev_lum: &[f32],
+        rows: usize,
+        cols: usize,
+        row_hvs: &[ContinuousHV],
+        col_hvs: &[ContinuousHV],
+    ) -> (ContinuousHV, Vec<[f32; 2]>) {
+        let n = rows * cols;
+        if n == 0 || current_lum.len() < n || prev_lum.len() < n {
+            return (ContinuousHV::zero(self.dim), vec![]);
+        }
+
+        // Compute temporal difference grid
+        let td: Vec<f32> = current_lum.iter()
+            .zip(prev_lum.iter())
+            .map(|(c, p)| (c - p).abs())
+            .collect();
+
+        // Compute per-patch motion vectors from temporal difference gradient
+        let mut vectors = Vec::with_capacity(n);
+        let mut motion_components: Vec<(ContinuousHV, f32)> = Vec::new();
+
+        for r in 0..rows {
+            for c in 0..cols {
+                let idx = r * cols + c;
+                // Spatial gradient of temporal difference → motion direction
+                let dx = if c > 0 && c + 1 < cols {
+                    (td[r * cols + c + 1] - td[r * cols + c - 1]) * 0.5
+                } else if c + 1 < cols {
+                    td[r * cols + c + 1] - td[idx]
+                } else if c > 0 {
+                    td[idx] - td[r * cols + c - 1]
+                } else {
+                    0.0
+                };
+
+                let dy = if r > 0 && r + 1 < rows {
+                    (td[(r + 1) * cols + c] - td[(r - 1) * cols + c]) * 0.5
+                } else if r + 1 < rows {
+                    td[(r + 1) * cols + c] - td[idx]
+                } else if r > 0 {
+                    td[idx] - td[(r - 1) * cols + c]
+                } else {
+                    0.0
+                };
+
+                vectors.push([dx, dy]);
+
+                let magnitude = (dx * dx + dy * dy).sqrt();
+                if magnitude > 0.01 {
+                    // Quantize to nearest of 8 directions
+                    let angle = dy.atan2(dx);
+                    let dir_idx = ((angle + std::f32::consts::PI)
+                        / (std::f32::consts::PI / 4.0))
+                        .round() as usize
+                        % 8;
+
+                    // Bind direction with position
+                    let r_idx = r.min(row_hvs.len().saturating_sub(1));
+                    let c_idx = c.min(col_hvs.len().saturating_sub(1));
+                    let pos = row_hvs[r_idx].bind(&col_hvs[c_idx]);
+                    let dir_pos = self.direction_hvs[dir_idx].bind(&pos);
+                    motion_components.push((dir_pos, magnitude));
+                }
+            }
+        }
+
+        // Bundle all motion components weighted by magnitude
+        let motion_hv = if motion_components.is_empty() {
+            ContinuousHV::zero(self.dim)
+        } else {
+            let refs: Vec<&ContinuousHV> = motion_components.iter().map(|(hv, _)| hv).collect();
+            let weights: Vec<f32> = motion_components.iter().map(|(_, w)| *w).collect();
+            ContinuousHV::weighted_bundle(&refs, &weights)
+        };
+
+        (motion_hv, vectors)
+    }
+
+    /// Number of direction basis vectors (always 8).
+    pub fn num_directions(&self) -> usize {
+        8
     }
 }
 
@@ -1182,5 +1307,93 @@ mod tests {
         // Empty attention → all weights default to 1.0 (uniform)
         let (hv, _) = enc.encode_frame_attended(&frame, 64, 64, 1, &[]);
         assert!(hv.norm() > 0.0);
+    }
+
+    // === Motion Field ===
+
+    #[test]
+    fn test_motion_field_construction() {
+        let mf = MotionField::new(16_384, 42_000);
+        assert_eq!(mf.num_directions(), 8);
+    }
+
+    #[test]
+    fn test_motion_field_no_motion() {
+        let mf = MotionField::new(16_384, 42_000);
+        let cfg = VisionConfig::default();
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+
+        // Same luminance at both times → no motion
+        let lum = vec![0.5f32; 64];
+        let (hv, vectors) = mf.compute(
+            &lum, &lum, 8, 8,
+            enc.row_basis(), enc.col_basis(),
+        );
+        assert_eq!(vectors.len(), 64);
+        // All motion vectors should be ~zero
+        for v in &vectors {
+            assert!(v[0].abs() < 1e-6 && v[1].abs() < 1e-6);
+        }
+        // Motion field HV should be zero (no motion components)
+        assert!(hv.norm() < 1e-6, "No motion should produce zero HV");
+    }
+
+    #[test]
+    fn test_motion_field_detects_direction() {
+        let mf = MotionField::new(16_384, 42_000);
+        let cfg = VisionConfig::default();
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let rows = 8;
+        let cols = 8;
+
+        // Prev: uniform luminance
+        let prev = vec![0.5f32; rows * cols];
+        // Current: bright spot moving rightward (bright on right side)
+        let mut curr = vec![0.5f32; rows * cols];
+        for r in 3..5 {
+            for c in 5..7 {
+                curr[r * cols + c] = 0.9;
+            }
+        }
+
+        let (hv_right, vectors) = mf.compute(
+            &curr, &prev, rows, cols,
+            enc.row_basis(), enc.col_basis(),
+        );
+
+        // Some patches should have non-zero motion
+        let has_motion = vectors.iter().any(|v| v[0].abs() > 0.01 || v[1].abs() > 0.01);
+        assert!(has_motion, "Should detect motion from brightness change");
+        assert!(hv_right.norm() > 0.0, "Motion field HV should be non-zero");
+
+        // Now create leftward motion
+        let mut curr_left = vec![0.5f32; rows * cols];
+        for r in 3..5 {
+            for c in 1..3 {
+                curr_left[r * cols + c] = 0.9;
+            }
+        }
+
+        let (hv_left, _) = mf.compute(
+            &curr_left, &prev, rows, cols,
+            enc.row_basis(), enc.col_basis(),
+        );
+
+        // Rightward and leftward motion should produce different HVs
+        let sim = hv_right.similarity(&hv_left);
+        assert!(
+            sim < 0.95,
+            "Different motion directions should produce different HVs: sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_motion_field_empty_input() {
+        let mf = MotionField::new(16_384, 42_000);
+        let cfg = VisionConfig::default();
+        let enc = PatchHdcEncoder::new(&cfg, 64, 64);
+        let (hv, vectors) = mf.compute(&[], &[], 0, 0, enc.row_basis(), enc.col_basis());
+        assert_eq!(vectors.len(), 0);
+        assert!(hv.norm() < 1e-6);
     }
 }

@@ -446,4 +446,105 @@ mod tests {
         pred.reset();
         assert_eq!(pred.prediction_error(), 0.0);
     }
+
+    // === Full Vision→Cognitive Pipeline Integration Test ===
+
+    #[test]
+    fn test_full_pipeline_100_frames() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg.clone(), 128, 128);
+
+        // Synthetic video sequence: static → scene change → oscillating
+        let frame_a: Vec<u8> = vec![128; 128 * 128];
+        let frame_b: Vec<u8> = (0..128 * 128)
+            .map(|i| ((i % 128 + i / 128) % 256) as u8)
+            .collect();
+
+        let mut all_hvs = Vec::with_capacity(100);
+        for i in 0..100 {
+            let frame = match i {
+                0..=30 => &frame_a,     // Static scene
+                31..=50 => &frame_b,    // Scene change
+                _ => {
+                    if i % 2 == 0 { &frame_a } else { &frame_b }
+                }
+            };
+
+            let (hv, tel) = bridge.process_frame_with_telemetry(frame, 128, 128, 1, 0.033);
+
+            // Validate HV constraints for cycle_with_hv() compatibility
+            assert_eq!(hv.dim(), cfg.hdc_dim, "Frame {i}: wrong dimension");
+            assert!(hv.norm() > 0.0, "Frame {i}: zero-norm HV");
+            assert!(hv.norm().is_finite(), "Frame {i}: non-finite norm");
+
+            // All values should be finite
+            assert!(
+                hv.as_slice().iter().all(|v| v.is_finite()),
+                "Frame {i}: non-finite values in HV"
+            );
+
+            // Telemetry should be sane
+            assert!(tel.prediction_error >= 0.0 && tel.prediction_error.is_finite());
+            assert!(tel.manifold_coherence >= 0.0 && tel.manifold_coherence.is_finite());
+
+            all_hvs.push(hv);
+        }
+
+        assert_eq!(bridge.frame_count(), 100);
+
+        // Static scene HVs should be similar to each other
+        let static_sim = all_hvs[5].similarity(&all_hvs[25]);
+        assert!(
+            static_sim > 0.5,
+            "Static scene HVs should be similar: sim={static_sim}"
+        );
+
+        // Scene change should produce different HVs
+        let change_sim = all_hvs[25].similarity(&all_hvs[35]);
+        assert!(
+            change_sim < static_sim || change_sim < 0.99,
+            "Scene change should produce different HVs"
+        );
+
+        // Verify health is OK
+        let health = bridge.manifold().compute_health();
+        assert!(health.is_healthy, "Manifold should be healthy after 100 frames");
+        assert_eq!(health.total_frames, 100);
+    }
+
+    #[test]
+    fn test_pipeline_rgb_end_to_end() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg.clone(), 64, 64);
+
+        // Red→Green→Blue color cycle
+        let colors: Vec<Vec<u8>> = vec![
+            (0..64 * 64).flat_map(|_| vec![255u8, 0, 0]).collect(),
+            (0..64 * 64).flat_map(|_| vec![0u8, 255, 0]).collect(),
+            (0..64 * 64).flat_map(|_| vec![0u8, 0, 255]).collect(),
+        ];
+
+        let mut hvs = Vec::new();
+        for (i, color_frame) in colors.iter().enumerate() {
+            for _ in 0..10 {
+                let hv = bridge.process_frame(color_frame, 64, 64, 3, 0.033);
+                if i > 0 || hvs.len() >= 5 {
+                    // After warm-up
+                    assert!(hv.norm() > 0.0);
+                }
+                hvs.push(hv);
+            }
+        }
+
+        assert_eq!(bridge.frame_count(), 30);
+
+        // Different color states should be distinguishable
+        let red_hv = &hvs[8];  // Late red
+        let blue_hv = &hvs[28]; // Late blue
+        let sim = red_hv.similarity(blue_hv);
+        assert!(
+            sim < 0.99,
+            "Red and blue should produce different pipeline outputs: sim={sim}"
+        );
+    }
 }

@@ -280,6 +280,45 @@ pub struct ManifoldState {
     pub num_features: usize,
 }
 
+/// Result of a scene recognition query against stored landmarks.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SceneMatch {
+    /// Index of the matched scene in the memory buffer.
+    pub scene_id: usize,
+    /// Cosine similarity between current state and the matched scene.
+    pub similarity: f32,
+    /// Frame number at which this scene was last stored.
+    pub stored_at_frame: u64,
+    /// Number of frames since the scene was last stored.
+    pub frames_since_stored: u64,
+}
+
+/// Health diagnostics for the vision manifold.
+///
+/// Tracks drift, stability, and training quality metrics for monitoring.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ManifoldHealth {
+    /// Cosine similarity between current weight_hv and initial weight_hv.
+    /// Values near 1.0 = minimal drift; low values = significant adaptation.
+    pub weight_drift: f32,
+    /// Current tau_base value (should stay in [0.01, 10.0]).
+    pub tau_value: f32,
+    /// Shannon entropy of encoder feature weights (higher = more uniform).
+    pub encoder_weight_entropy: f32,
+    /// Fraction of recent frames that triggered training.
+    pub training_frequency: f32,
+    /// Mean prediction error over recent frames.
+    pub mean_prediction_error: f32,
+    /// Mean coherence over recent frames.
+    pub mean_coherence: f32,
+    /// Total frames observed.
+    pub total_frames: u64,
+    /// Total training steps performed.
+    pub total_training_steps: u64,
+    /// Whether the manifold appears healthy (heuristic).
+    pub is_healthy: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

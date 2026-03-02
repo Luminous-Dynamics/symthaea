@@ -25,7 +25,7 @@ use symthaea_core::temporal::TemporalPredictor;
 use crate::attention::SurpriseMap;
 use crate::encoder::PatchHdcEncoder;
 use crate::training::{BpttResult, ManifoldTrainer};
-use crate::types::{ManifoldState, VisionConfig, VisionTelemetry};
+use crate::types::{ManifoldHealth, ManifoldState, SceneMatch, VisionConfig, VisionTelemetry};
 
 /// A CfC temporal manifold over holographic video encodings.
 ///
@@ -158,6 +158,11 @@ impl VisionManifold {
 
         // Update per-patch surprise map
         self.surprise.update(patch_hvs, &self.last_patch_hvs);
+
+        // Auto-refine encoder from surprise (closed-loop active inference)
+        if self.surprise.max_surprise() > self.config.surprise_threshold {
+            self.refine_from_attention();
+        }
 
         // Evolve CfC state: state' = x_inf + (state - x_inf) * exp(-dt/τ)
         let x_inf = self.equilibrium(frame_hv);
@@ -410,6 +415,62 @@ impl VisionManifold {
         Ok(())
     }
 
+    /// Compute health diagnostics for the manifold.
+    ///
+    /// Returns a `ManifoldHealth` snapshot with drift, stability, and training
+    /// quality metrics. Call periodically (e.g. every 100 frames) for monitoring.
+    pub fn compute_health(&self) -> ManifoldHealth {
+        // Weight drift: compare current weight_hv with initial (via norm ratio)
+        let weight_drift = {
+            let initial = ContinuousHV::random(self.config.hdc_dim, self.config.seed + 300_000);
+            self.weight_hv.similarity(&initial).clamp(-1.0, 1.0)
+        };
+
+        // Encoder weight entropy
+        let encoder_weight_entropy = {
+            let weights = self.encoder.feature_weights();
+            let sum: f32 = weights.iter().sum();
+            if sum > 0.0 {
+                let mut ent = 0.0f32;
+                for &w in weights {
+                    if w > 0.0 {
+                        let p = w / sum;
+                        ent -= p * p.ln();
+                    }
+                }
+                ent
+            } else {
+                0.0
+            }
+        };
+
+        // Training frequency (from total steps vs frames)
+        let training_frequency = if self.frame_count > 0 {
+            self.trainer.total_steps() as f32 / self.frame_count as f32
+        } else {
+            0.0
+        };
+
+        let tau_value = self.config.tau_base;
+        let is_healthy = tau_value > 0.01
+            && tau_value < 10.0
+            && self.prediction_error.is_finite()
+            && self.coherence.is_finite()
+            && encoder_weight_entropy > 0.0;
+
+        ManifoldHealth {
+            weight_drift,
+            tau_value,
+            encoder_weight_entropy,
+            training_frequency,
+            mean_prediction_error: self.prediction_error,
+            mean_coherence: self.coherence,
+            total_frames: self.frame_count,
+            total_training_steps: self.trainer.total_steps(),
+            is_healthy,
+        }
+    }
+
     /// Reset manifold to initial state.
     pub fn reset(&mut self) {
         self.state = ContinuousHV::zero(self.config.hdc_dim);
@@ -435,6 +496,85 @@ pub struct HorizonAccuracy {
     pub errors: Vec<f32>,
     /// Frame at which this was evaluated.
     pub frame_sequence: u64,
+}
+
+/// Episodic scene memory: stores landmark scene HVs for recognition.
+///
+/// When the manifold is stable (high coherence, low prediction error),
+/// the current state is stored as a landmark. On new frames, the memory
+/// can be queried for scene recognition ("I've been here before").
+pub struct SceneMemory {
+    landmarks: Vec<(ContinuousHV, u64)>, // (state_hv, stored_at_frame)
+    capacity: usize,
+    recognition_threshold: f32,
+}
+
+impl SceneMemory {
+    /// Create a scene memory with given capacity.
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            landmarks: Vec::with_capacity(capacity),
+            capacity,
+            recognition_threshold: 0.85,
+        }
+    }
+
+    /// Set the recognition similarity threshold (default: 0.85).
+    pub fn set_threshold(&mut self, threshold: f32) {
+        self.recognition_threshold = threshold.clamp(0.0, 1.0);
+    }
+
+    /// Store a scene landmark. Uses ring-buffer eviction when full.
+    pub fn remember(&mut self, state: &ContinuousHV, frame: u64) {
+        // Don't store near-duplicates
+        if self.landmarks.iter().any(|(hv, _)| state.similarity(hv) > 0.98) {
+            return;
+        }
+        if self.landmarks.len() >= self.capacity {
+            // Evict oldest
+            self.landmarks.remove(0);
+        }
+        self.landmarks.push((state.clone(), frame));
+    }
+
+    /// Recognize the current state against stored landmarks.
+    ///
+    /// Returns the best match if similarity exceeds the recognition threshold.
+    pub fn recognize(&self, state: &ContinuousHV, current_frame: u64) -> Option<SceneMatch> {
+        let mut best: Option<(usize, f32, u64)> = None;
+
+        for (idx, (landmark, stored_frame)) in self.landmarks.iter().enumerate() {
+            let sim = state.similarity(landmark);
+            if sim >= self.recognition_threshold {
+                match best {
+                    Some((_, best_sim, _)) if sim <= best_sim => {}
+                    _ => best = Some((idx, sim, *stored_frame)),
+                }
+            }
+        }
+
+        best.map(|(scene_id, similarity, stored_at_frame)| SceneMatch {
+            scene_id,
+            similarity,
+            stored_at_frame,
+            frames_since_stored: current_frame.saturating_sub(stored_at_frame),
+        })
+    }
+
+    /// Number of stored landmarks.
+    pub fn len(&self) -> usize {
+        self.landmarks.len()
+    }
+
+    /// Whether the memory is empty.
+    pub fn is_empty(&self) -> bool {
+        self.landmarks.is_empty()
+    }
+
+    /// Clear all stored landmarks.
+    pub fn clear(&mut self) {
+        self.landmarks.clear();
+    }
 }
 
 impl TemporalPredictor for VisionManifold {
@@ -872,5 +1012,152 @@ mod tests {
             serde_json::from_str(&json).expect("Should deserialize");
         assert_eq!(deserialized.hdc_dim, state.hdc_dim);
         assert_eq!(deserialized.weight_hv.len(), state.weight_hv.len());
+    }
+
+    // === Auto-Refinement ===
+
+    #[test]
+    fn test_auto_refinement_modifies_weights_on_scene_change() {
+        let mut cfg = VisionConfig::default();
+        cfg.learning.contrastive_lr = 0.1; // Larger LR for test visibility
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        let weights_before: Vec<f32> = m.encoder().feature_weights().to_vec();
+
+        // Alternate between very different scenes to accumulate refinement
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = gradient_frame(64, 64);
+
+        for i in 0..20 {
+            let frame = if i % 2 == 0 { &frame_a } else { &frame_b };
+            m.observe_frame(frame, 64, 64, 1, 0.033);
+        }
+
+        let weights_after: Vec<f32> = m.encoder().feature_weights().to_vec();
+
+        // After many auto-refinement cycles, weights should have drifted
+        let max_change: f32 = weights_before
+            .iter()
+            .zip(weights_after.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            max_change > 1e-6,
+            "Auto-refinement should modify weights over 20 frames, max_change={max_change}"
+        );
+    }
+
+    // === Scene Memory ===
+
+    #[test]
+    fn test_scene_memory_construction() {
+        let mem = SceneMemory::new(16);
+        assert!(mem.is_empty());
+        assert_eq!(mem.len(), 0);
+    }
+
+    #[test]
+    fn test_scene_memory_remember_and_recognize() {
+        let mut mem = SceneMemory::new(16);
+        let dim = 16_384;
+
+        let scene_a = ContinuousHV::random(dim, 100);
+        let scene_b = ContinuousHV::random(dim, 200);
+
+        mem.remember(&scene_a, 10);
+        mem.remember(&scene_b, 20);
+        assert_eq!(mem.len(), 2);
+
+        // Should recognize scene_a
+        let result = mem.recognize(&scene_a, 30);
+        assert!(result.is_some(), "Should recognize stored scene");
+        let m = result.unwrap();
+        assert!(m.similarity > 0.99);
+        assert_eq!(m.stored_at_frame, 10);
+        assert_eq!(m.frames_since_stored, 20);
+    }
+
+    #[test]
+    fn test_scene_memory_rejects_unknown() {
+        let mut mem = SceneMemory::new(16);
+        let dim = 16_384;
+
+        let scene_a = ContinuousHV::random(dim, 100);
+        mem.remember(&scene_a, 10);
+
+        // A completely different scene should not be recognized
+        let unknown = ContinuousHV::random(dim, 999);
+        let result = mem.recognize(&unknown, 20);
+        assert!(result.is_none(), "Should not recognize unknown scene");
+    }
+
+    #[test]
+    fn test_scene_memory_deduplication() {
+        let mut mem = SceneMemory::new(16);
+        let dim = 16_384;
+
+        let scene = ContinuousHV::random(dim, 100);
+        mem.remember(&scene, 10);
+        mem.remember(&scene, 20); // Near-duplicate — should be skipped
+        assert_eq!(mem.len(), 1, "Should not store near-duplicates");
+    }
+
+    #[test]
+    fn test_scene_memory_eviction() {
+        let mut mem = SceneMemory::new(3);
+        let dim = 16_384;
+
+        for i in 0..5 {
+            let scene = ContinuousHV::random(dim, 100 + i);
+            mem.remember(&scene, i);
+        }
+        assert_eq!(mem.len(), 3, "Should cap at capacity");
+    }
+
+    // === Health Telemetry ===
+
+    #[test]
+    fn test_health_initial() {
+        let cfg = VisionConfig::default();
+        let m = VisionManifold::new(cfg, 64, 64);
+        let health = m.compute_health();
+
+        assert!(health.is_healthy);
+        assert!(health.tau_value > 0.0);
+        assert_eq!(health.total_frames, 0);
+        assert_eq!(health.total_training_steps, 0);
+        // Initial weight_drift should be ~1.0 (no drift from initial)
+        assert!(
+            health.weight_drift > 0.9,
+            "Initial weight drift should be near 1.0: {}",
+            health.weight_drift
+        );
+    }
+
+    #[test]
+    fn test_health_after_processing() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        for _ in 0..20 {
+            m.observe_frame(&frame, 64, 64, 1, 0.033);
+        }
+
+        let health = m.compute_health();
+        assert!(health.is_healthy);
+        assert_eq!(health.total_frames, 20);
+        assert!(health.mean_coherence > 0.0);
+        assert!(health.encoder_weight_entropy > 0.0);
+    }
+
+    #[test]
+    fn test_health_serializable() {
+        let cfg = VisionConfig::default();
+        let m = VisionManifold::new(cfg, 64, 64);
+        let health = m.compute_health();
+
+        let json = serde_json::to_string(&health).expect("Should serialize");
+        let _: ManifoldHealth = serde_json::from_str(&json).expect("Should deserialize");
     }
 }
