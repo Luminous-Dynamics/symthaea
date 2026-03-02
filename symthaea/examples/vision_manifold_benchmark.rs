@@ -178,16 +178,16 @@ fn main() {
     println!("━━━ Benchmark 4: Multi-Scale Discrimination ━━━━━━━━━━━━━━━━━━━━━");
     {
         let cfg = VisionConfig::default();
-        let encoder = MultiScaleEncoder::new(&cfg, width, height);
+        let mut encoder = MultiScaleEncoder::new(&cfg, width, height);
 
         // Fine checkerboard (2px blocks) should differ from coarse (32px blocks)
         let fine_checker = checkerboard_frame(2, 128);
         let coarse_checker = checkerboard_frame(32, 128);
         let uniform = solid_frame(128);
 
-        let hv_fine = encoder.encode_frame(&fine_checker, width, height, 1);
-        let hv_coarse = encoder.encode_frame(&coarse_checker, width, height, 1);
-        let hv_uniform = encoder.encode_frame(&uniform, width, height, 1);
+        let (hv_fine, _, _) = encoder.encode_frame(&fine_checker, width, height, 1);
+        let (hv_coarse, _, _) = encoder.encode_frame(&coarse_checker, width, height, 1);
+        let (hv_uniform, _, _) = encoder.encode_frame(&uniform, width, height, 1);
 
         let sim_fine_coarse = hv_fine.similarity(&hv_coarse);
         let sim_fine_uniform = hv_fine.similarity(&hv_uniform);

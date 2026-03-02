@@ -11,8 +11,14 @@ pub struct VisionConfig {
     pub patch_size: usize,
     /// Number of quantization levels for pixel features (default: 32).
     pub num_levels: usize,
-    /// Number of features extracted per patch (default: 5).
+    /// Number of base features extracted per patch (default: 5).
+    ///
+    /// Total features = base + motion (2, if enabled) + color (2, if enabled).
     pub num_features: usize,
+    /// Enable motion features (temporal_diff, motion_magnitude). Default: true.
+    pub enable_motion: bool,
+    /// Enable color features (mean_cb, mean_cr from YCbCr). Default: true.
+    pub enable_color: bool,
     /// Base time constant for CfC dynamics in seconds (default: 0.5).
     pub tau_base: f32,
     /// Surprise threshold for spatial attention (default: 0.3).
@@ -29,6 +35,20 @@ pub struct VisionConfig {
     pub training: TrainingConfig,
 }
 
+impl VisionConfig {
+    /// Total number of features per patch (base + motion + color).
+    pub fn total_features(&self) -> usize {
+        let mut n = self.num_features;
+        if self.enable_motion {
+            n += 2; // temporal_diff, motion_magnitude
+        }
+        if self.enable_color {
+            n += 2; // mean_cb, mean_cr
+        }
+        n
+    }
+}
+
 impl Default for VisionConfig {
     fn default() -> Self {
         Self {
@@ -36,6 +56,8 @@ impl Default for VisionConfig {
             patch_size: 8,
             num_levels: 32,
             num_features: 5,
+            enable_motion: true,
+            enable_color: true,
             tau_base: 0.5,
             surprise_threshold: 0.3,
             surprise_decay: 0.9,
@@ -238,6 +260,26 @@ impl AttentionMap {
     }
 }
 
+/// Serializable snapshot of the manifold's learned state.
+///
+/// Captures everything needed to resume from a trained checkpoint:
+/// weight_hv, tau_base, feature_weights, and training step count.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManifoldState {
+    /// Learned CfC weight hypervector.
+    pub weight_hv: Vec<f32>,
+    /// Learned time constant.
+    pub tau_base: f32,
+    /// Per-feature encoder weights.
+    pub feature_weights: Vec<f32>,
+    /// Total training steps completed.
+    pub training_steps: u64,
+    /// Config snapshot for compatibility checking.
+    pub hdc_dim: usize,
+    /// Number of base features.
+    pub num_features: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -248,6 +290,24 @@ mod tests {
         assert_eq!(cfg.hdc_dim, 16_384);
         assert_eq!(cfg.patch_size, 8);
         assert_eq!(cfg.num_levels, 32);
+        assert!(cfg.enable_motion);
+        assert!(cfg.enable_color);
+        assert_eq!(cfg.total_features(), 9); // 5 base + 2 motion + 2 color
+    }
+
+    #[test]
+    fn test_total_features_combinations() {
+        let mut cfg = VisionConfig::default();
+        assert_eq!(cfg.total_features(), 9);
+
+        cfg.enable_motion = false;
+        assert_eq!(cfg.total_features(), 7); // 5 + 2 color
+
+        cfg.enable_color = false;
+        assert_eq!(cfg.total_features(), 5); // base only
+
+        cfg.enable_motion = true;
+        assert_eq!(cfg.total_features(), 7); // 5 + 2 motion
     }
 
     #[test]
