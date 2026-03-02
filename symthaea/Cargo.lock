@@ -14480,8 +14480,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "burn",
+ "criterion",
  "half",
  "hf-hub",
+ "lru 0.16.3",
  "memmap2",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
@@ -14490,6 +14492,7 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "tokenizers",
+ "tokio",
  "tracing",
 ]
 

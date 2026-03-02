@@ -61,9 +61,8 @@ impl Qwen3ModelConfig {
         }
     }
 
-    /// Tiny config for unit tests (fast init, negligible memory).
-    #[cfg(test)]
-    pub(crate) fn tiny() -> Self {
+    /// Tiny config for unit tests and benchmarks (fast init, negligible memory).
+    pub fn tiny() -> Self {
         Self {
             vocab_size: 256,
             hidden_size: 64,

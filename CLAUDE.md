@@ -44,8 +44,8 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Full roadmap**: @THE_SUBSTRATE_ROADMAP.md (load when needed)
 
 ### Symthaea (Holographic Liquid Brain)
-- **Path**: `symthaea/` (main crate), `symthaea-core/`, 28 extracted sub-crates in `symthaea/crates/`
-- **Status**: v0.5.0, ~343K LOC Rust, ~8,690+ tests (3,046 main + 3,544 core + 2,100 sub-crates), 30 workspace members
+- **Path**: `symthaea/` (main crate), `symthaea-core/`, 46 extracted sub-crates in `symthaea/crates/`
+- **Status**: v0.5.0, ~985K lines Rust (~778K code), ~3,735+ tests (main crate), 47 workspace members
 - **Core**: HDC (16,384D) + IIT/Phi + LTC/CfC + Active Inference + 12-region Actor Brain
 - **Architecture**: Predictive coding loop — HDC encode → CfC evolve → predict → learn (50Hz)
 - **Key entry points**:

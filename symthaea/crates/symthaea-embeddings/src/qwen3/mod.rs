@@ -9,6 +9,18 @@
 //! - **Qwen3-Embedding-0.6B**: 1024D output, 8192 context length
 //! - **Qwen3-Embedding-1.5B**: 1536D output (QWEN3_FULL_DIMENSION)
 //!
+//! ## Precision & Quantization
+//!
+//! | Mode | Method | Load Speed | Memory | Quality |
+//! |------|--------|------------|--------|---------|
+//! | f32 | default | Baseline | 2.4 GB | Full |
+//! | f16 | `.with_f16()` | ~2x faster | 1.2 GB disk | Full |
+//! | MRL | `.with_matryoshka_dim(256)` | Same | Smaller index | Slightly reduced |
+//!
+//! burn 0.18 does **not** support int8/int4 quantization. f16 is the only
+//! precision reduction available. Combine f16 with Matryoshka dimension
+//! reduction for the smallest effective footprint.
+//!
 //! ## Usage
 //!
 //! ```rust,ignore
@@ -455,6 +467,14 @@ pub struct Qwen3Config {
     /// Halves model loading time and on-disk size. Runtime memory is
     /// unchanged on CPU (NdArray) but enables f16 compute on WGPU.
     pub half_precision: bool,
+
+    /// Maximum number of cached embeddings (LRU eviction). Default: 10,000.
+    pub cache_capacity: usize,
+
+    /// Optional instruction prefix for retrieval tasks.
+    /// When set, text is formatted as "Instruct: {instruction}\nQuery: {text}"
+    /// before tokenization, following the Qwen3-Embedding prompt template.
+    pub instruction: Option<String>,
 }
 
 impl Default for Qwen3Config {
@@ -470,6 +490,8 @@ impl Default for Qwen3Config {
             device: Device::Cpu,
             num_threads: 4,
             half_precision: false,
+            cache_capacity: 10_000,
+            instruction: None,
         }
     }
 }
@@ -530,9 +552,30 @@ impl Qwen3Config {
         self
     }
 
-    /// Enable half-precision weight loading (f16 storage, faster load)
+    /// Enable half-precision weight loading (f16 storage, faster load).
+    ///
+    /// # Quantization Status (burn 0.18)
+    ///
+    /// burn 0.18 does NOT support int8 or int4 quantization.
+    /// f16 is the only precision reduction available. Combine with
+    /// Matryoshka dimension reduction (`.with_matryoshka_dim()`) for
+    /// smallest effective footprint.
     pub fn with_half_precision(mut self) -> Self {
         self.half_precision = true;
+        self
+    }
+
+    /// Alias for [`with_half_precision`](Self::with_half_precision).
+    pub fn with_f16(self) -> Self {
+        self.with_half_precision()
+    }
+
+    /// Set an instruction prefix for retrieval tasks.
+    ///
+    /// When set, text is formatted as `"Instruct: {instruction}\nQuery: {text}"`
+    /// before tokenization, following the Qwen3-Embedding prompt template.
+    pub fn with_instruction(mut self, instruction: impl Into<String>) -> Self {
+        self.instruction = Some(instruction.into());
         self
     }
 
@@ -589,8 +632,8 @@ pub struct Qwen3Embedder {
     /// Model loaded state
     model_loaded: bool,
 
-    /// Embedding cache for deduplication
-    cache: std::collections::HashMap<String, Vec<f32>>,
+    /// Embedding cache with LRU eviction
+    cache: lru::LruCache<String, Vec<f32>>,
 
     /// Statistics
     stats: Qwen3Stats,
@@ -624,10 +667,12 @@ pub struct Qwen3Stats {
 impl Qwen3Embedder {
     /// Create a new Qwen3 embedder
     pub fn new(config: Qwen3Config) -> Result<Self> {
+        let cache_cap = std::num::NonZeroUsize::new(config.cache_capacity)
+            .unwrap_or(std::num::NonZeroUsize::new(10_000).unwrap());
         let mut embedder = Self {
             config,
             model_loaded: false,
-            cache: std::collections::HashMap::new(),
+            cache: lru::LruCache::new(cache_cap),
             stats: Qwen3Stats::default(),
             #[cfg(feature = "burn")]
             inference: None,
@@ -832,7 +877,7 @@ impl Qwen3Embedder {
     pub fn embed(&mut self, text: &str) -> Result<EmbeddingResult> {
         let start = Instant::now();
 
-        // Check cache first
+        // Check cache first (LRU — get() promotes to most-recently-used)
         if let Some(cached) = self.cache.get(text) {
             self.stats.cache_hits += 1;
             return Ok(EmbeddingResult::new(cached.clone(), "qwen3-cached"));
@@ -860,8 +905,8 @@ impl Qwen3Embedder {
         let n = self.stats.total_embeddings as f32;
         self.stats.avg_time_ms = (self.stats.avg_time_ms * (n - 1.0) + elapsed) / n;
 
-        // Cache the result
-        self.cache.insert(text.to_string(), embedding.clone());
+        // Cache the result (LRU — oldest evicted when at capacity)
+        self.cache.put(text.to_string(), embedding.clone());
 
         let mut result = EmbeddingResult::new(embedding, "qwen3-embedding").with_time(elapsed);
 
@@ -890,7 +935,7 @@ impl Qwen3Embedder {
                             let text = texts[i];
                             self.stats.total_embeddings += 1;
                             self.stats.total_chars += text.len() as u64;
-                            self.cache.insert(text.to_string(), emb.clone());
+                            self.cache.put(text.to_string(), emb.clone());
                             Ok(EmbeddingResult::new(emb, "qwen3-embedding"))
                         })
                         .collect();
@@ -918,10 +963,14 @@ impl Qwen3Embedder {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Tokenizer not loaded"))?;
 
-        // Batch tokenize
-        let inputs: Vec<tokenizers::EncodeInput> = texts
+        // Apply instruction prefix if configured, then batch tokenize
+        let formatted: Vec<std::borrow::Cow<'_, str>> = texts
             .iter()
-            .map(|t| tokenizers::EncodeInput::Single((*t).into()))
+            .map(|t| self.format_text(t))
+            .collect();
+        let inputs: Vec<tokenizers::EncodeInput> = formatted
+            .iter()
+            .map(|t| tokenizers::EncodeInput::Single(t.as_ref().into()))
             .collect();
         let encodings = tokenizer
             .encode_batch(inputs, true)
@@ -958,6 +1007,15 @@ impl Qwen3Embedder {
         )
     }
 
+    /// Format text with instruction prefix if configured.
+    #[cfg(feature = "burn")]
+    fn format_text<'a>(&self, text: &'a str) -> std::borrow::Cow<'a, str> {
+        match &self.config.instruction {
+            Some(instr) => std::borrow::Cow::Owned(format!("Instruct: {instr}\nQuery: {text}")),
+            None => std::borrow::Cow::Borrowed(text),
+        }
+    }
+
     /// Run Burn inference through the backend-erased model.
     #[cfg(feature = "burn")]
     fn burn_embed(&self, text: &str) -> Result<Vec<f32>> {
@@ -970,9 +1028,12 @@ impl Qwen3Embedder {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Tokenizer not loaded"))?;
 
+        // Apply instruction prefix if configured
+        let formatted = self.format_text(text);
+
         // Tokenize
         let encoding = tokenizer
-            .encode(text, true)
+            .encode(formatted.as_ref(), true)
             .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
 
         let ids = encoding.get_ids();
@@ -1003,8 +1064,17 @@ impl Qwen3Embedder {
         let dim = self.config.embedding_dim;
         let mut embedding = vec![0.0f32; dim];
 
-        // Use text content to generate deterministic embedding
+        // Use text content to generate deterministic embedding.
+        // Incorporate instruction prefix into hash so prefixed embeddings
+        // differ deterministically from unprefixed ones.
         let mut hash: u64 = 0x5174_1AEA_5174_1AEA; // "SYMTHAEA"
+        if let Some(ref instr) = self.config.instruction {
+            for byte in instr.bytes() {
+                hash = hash.wrapping_mul(37).wrapping_add(byte as u64);
+            }
+            // Separator to avoid collisions between instruction suffix and text prefix
+            hash = hash.wrapping_mul(37).wrapping_add(0xFF);
+        }
         for byte in text.bytes() {
             hash = hash.wrapping_mul(31).wrapping_add(byte as u64);
         }
@@ -1180,6 +1250,87 @@ impl Embedder for Qwen3Embedder {
 /// Simple text embedder (alias for backward compatibility)
 pub type TextEmbedder = Qwen3Embedder;
 
+// ── Async wrapper ─────────────────────────────────────────────────────
+
+/// Async wrapper around [`Qwen3Embedder`] using `tokio::task::spawn_blocking`.
+///
+/// Shares state via `Arc<Mutex<Qwen3Embedder>>` — cloning an `AsyncQwen3Embedder`
+/// shares the same underlying embedder (model weights, cache, stats).
+///
+/// ```rust,ignore
+/// let embedder = AsyncQwen3Embedder::new(Qwen3Config::simulated())?;
+/// let result = embedder.embed("Hello, world!".into()).await?;
+/// ```
+#[cfg(feature = "async-embed")]
+#[derive(Clone)]
+pub struct AsyncQwen3Embedder {
+    inner: std::sync::Arc<std::sync::Mutex<Qwen3Embedder>>,
+}
+
+#[cfg(feature = "async-embed")]
+impl AsyncQwen3Embedder {
+    /// Create a new async embedder from config.
+    pub fn new(config: Qwen3Config) -> Result<Self> {
+        let embedder = Qwen3Embedder::new(config)?;
+        Ok(Self {
+            inner: std::sync::Arc::new(std::sync::Mutex::new(embedder)),
+        })
+    }
+
+    /// Wrap an existing synchronous embedder.
+    pub fn from_embedder(embedder: Qwen3Embedder) -> Self {
+        Self {
+            inner: std::sync::Arc::new(std::sync::Mutex::new(embedder)),
+        }
+    }
+
+    /// Embed a single text asynchronously.
+    pub async fn embed(&self, text: String) -> Result<EmbeddingResult> {
+        let inner = self.inner.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut embedder = inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            embedder.embed(&text)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking join error: {e}"))?
+    }
+
+    /// Embed multiple texts asynchronously.
+    pub async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<EmbeddingResult>> {
+        let inner = self.inner.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut embedder = inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+            embedder.embed_batch(&refs)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking join error: {e}"))?
+    }
+
+    /// Check if the underlying model is loaded.
+    pub fn is_model_loaded(&self) -> bool {
+        self.inner
+            .lock()
+            .map(|e| e.is_model_loaded())
+            .unwrap_or(false)
+    }
+
+    /// Clear the embedding cache.
+    pub fn clear_cache(&self) {
+        if let Ok(mut e) = self.inner.lock() {
+            e.clear_cache();
+        }
+    }
+
+    /// Get a snapshot of the current statistics.
+    pub fn stats(&self) -> Qwen3Stats {
+        self.inner
+            .lock()
+            .map(|e| e.stats().clone())
+            .unwrap_or_default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1260,6 +1411,93 @@ mod tests {
     fn test_gpu_config() {
         let config = Qwen3Config::simulated().with_gpu();
         assert_eq!(config.device, Device::Wgpu);
+    }
+
+    #[test]
+    fn test_instruction_config() {
+        let config = Qwen3Config::simulated()
+            .with_instruction("Retrieve relevant passages");
+        assert_eq!(config.instruction.as_deref(), Some("Retrieve relevant passages"));
+    }
+
+    #[test]
+    fn test_instruction_changes_embedding() {
+        let mut plain = Qwen3Embedder::new(Qwen3Config::simulated()).unwrap();
+        let mut prefixed = Qwen3Embedder::new(
+            Qwen3Config::simulated().with_instruction("Retrieve relevant passages"),
+        ).unwrap();
+
+        let text = "What is quantum computing?";
+        let emb_plain = plain.embed(text).unwrap();
+        let emb_prefixed = prefixed.embed(text).unwrap();
+
+        // Instruction prefix should change the embedding
+        let dot: f32 = emb_plain.embedding.iter()
+            .zip(emb_prefixed.embedding.iter())
+            .map(|(a, b)| a * b)
+            .sum();
+        assert!(dot < 0.999, "Instruction prefix should change embedding, cosine={dot}");
+    }
+
+    #[test]
+    fn test_instruction_deterministic() {
+        let mut emb1 = Qwen3Embedder::new(
+            Qwen3Config::simulated().with_instruction("Search"),
+        ).unwrap();
+        let mut emb2 = Qwen3Embedder::new(
+            Qwen3Config::simulated().with_instruction("Search"),
+        ).unwrap();
+
+        let r1 = emb1.embed("test query").unwrap();
+        let r2 = emb2.embed("test query").unwrap();
+        assert_eq!(r1.embedding, r2.embedding);
+    }
+
+    #[test]
+    fn test_lru_eviction() {
+        let mut config = Qwen3Config::simulated();
+        config.cache_capacity = 3;
+        let mut embedder = Qwen3Embedder::new(config).unwrap();
+
+        embedder.embed("text1").unwrap();
+        embedder.embed("text2").unwrap();
+        embedder.embed("text3").unwrap();
+        assert_eq!(embedder.cache_size(), 3);
+
+        // Fourth insert evicts the least-recently-used (text1)
+        embedder.embed("text4").unwrap();
+        assert_eq!(embedder.cache_size(), 3);
+    }
+
+    #[test]
+    fn test_f16_alias() {
+        let config = Qwen3Config::simulated().with_f16();
+        assert!(config.half_precision);
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "async-embed")]
+mod async_tests {
+    use super::*;
+
+    #[test]
+    fn test_async_embedder_creation() {
+        let embedder = AsyncQwen3Embedder::new(Qwen3Config::simulated()).unwrap();
+        assert!(!embedder.is_model_loaded());
+    }
+
+    #[test]
+    fn test_async_embedder_clone_shares_state() {
+        let embedder = AsyncQwen3Embedder::new(Qwen3Config::simulated()).unwrap();
+        let clone = embedder.clone();
+
+        // Both should point to the same Arc — clearing cache on one affects the other
+        {
+            let mut inner = embedder.inner.lock().unwrap();
+            inner.embed("shared text").unwrap();
+        }
+        assert_eq!(clone.stats().total_embeddings, 1);
     }
 }
 
@@ -1541,5 +1779,81 @@ mod burn_tests {
                 "Batch vs sequential mismatch for seq {i}: cosine={dot:.4}"
             );
         }
+    }
+
+    #[test]
+    fn test_batch_cls_token_pooling() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny();
+        let model = cfg.init::<B>(&device);
+
+        let real_ids = vec![1i32, 2, 3, 4];
+        let real_mask = vec![1u32; 4];
+
+        // Single sequence via forward_and_pool
+        let single = super::forward_and_pool(
+            &model, &real_ids, &real_mask, 4, &device,
+            super::PoolingStrategy::ClsToken, 64, true,
+        ).unwrap();
+
+        // Batch: unpadded + padded
+        let batch_ids = vec![
+            vec![1, 2, 3, 4],
+            vec![1, 2, 3, 4, 0, 0, 0, 0],
+        ];
+        let batch_masks = vec![
+            vec![1u32; 4],
+            vec![1, 1, 1, 1, 0, 0, 0, 0],
+        ];
+        let batch = super::forward_and_pool_batch_direct(
+            &model, &batch_ids, &batch_masks, &device,
+            super::PoolingStrategy::ClsToken, 64, true,
+        ).unwrap();
+
+        // CLS reads position 0 — padding should not affect it
+        let dot0: f32 = batch[0].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
+        assert!(dot0 > 0.999, "CLS unpadded batch should match single: cosine={dot0:.6}");
+
+        let dot1: f32 = batch[1].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
+        assert!(dot1 > 0.999, "CLS padded batch should match single: cosine={dot1:.6}");
+    }
+
+    #[test]
+    fn test_batch_max_pooling() {
+        let device = burn::backend::ndarray::NdArrayDevice::Cpu;
+        let cfg = Qwen3ModelConfig::tiny();
+        let model = cfg.init::<B>(&device);
+
+        let real_ids = vec![1i32, 2, 3, 4];
+        let real_mask = vec![1u32; 4];
+
+        // Single sequence via forward_and_pool
+        let single = super::forward_and_pool(
+            &model, &real_ids, &real_mask, 4, &device,
+            super::PoolingStrategy::MaxPooling, 64, true,
+        ).unwrap();
+
+        // Batch: unpadded + padded
+        let batch_ids = vec![
+            vec![1, 2, 3, 4],
+            vec![1, 2, 3, 4, 0, 0, 0, 0],
+        ];
+        let batch_masks = vec![
+            vec![1u32; 4],
+            vec![1, 1, 1, 1, 0, 0, 0, 0],
+        ];
+        let batch = super::forward_and_pool_batch_direct(
+            &model, &batch_ids, &batch_masks, &device,
+            super::PoolingStrategy::MaxPooling, 64, true,
+        ).unwrap();
+
+        // Unpadded should match closely
+        let dot0: f32 = batch[0].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
+        assert!(dot0 > 0.999, "Max-pool unpadded batch should match single: cosine={dot0:.6}");
+
+        // Padded: max over padding-influenced hidden states may vary more
+        // (additive mask zeroes attention but residual stream still differs)
+        let dot1: f32 = batch[1].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
+        assert!(dot1 > 0.95, "Max-pool padded batch should be close to single: cosine={dot1:.6}");
     }
 }
