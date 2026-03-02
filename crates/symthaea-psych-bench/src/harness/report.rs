@@ -1421,6 +1421,7 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "blink_magnitude"
             | "perseverative_errors"
             | "trials_to_first_category"
+            | "trials_to_criterion"
             | "restless_bandit_regret"
     )
 }

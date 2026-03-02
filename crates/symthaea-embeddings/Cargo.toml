@@ -32,6 +32,18 @@ memmap2 = { version = "0.9", optional = true }
 # Async support (optional — enabled via `async-embed` feature)
 tokio = { workspace = true, optional = true }
 
+# Parallel batch projection (optional — enabled via `parallel` feature)
+rayon = { workspace = true, optional = true }
+
+# Persistent cache (optional — enabled via `persistent-cache` feature)
+redb = { version = "2.4", optional = true }
+blake3 = { workspace = true, optional = true }
+dirs = { version = "5.0", optional = true }
+
+# ONNX runtime backend (optional — enabled via `ort-embed` feature)
+ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }
+ndarray = { workspace = true, optional = true }
+
 [dev-dependencies]
 criterion = "0.5"
 
@@ -41,6 +53,10 @@ burn = ["dep:burn", "dep:safetensors", "dep:tokenizers", "dep:tracing", "dep:hal
 burn-wgpu = ["burn", "burn/wgpu"]
 burn-hub = ["burn", "dep:hf-hub"]
 async-embed = ["dep:tokio"]
+parallel = ["dep:rayon"]
+persistent-cache = ["dep:redb", "dep:blake3", "dep:dirs"]
+embed-channel = []
+ort-embed = ["dep:ort", "dep:tokenizers", "dep:ndarray"]
 
 [[bench]]
 name = "embedding_bench"

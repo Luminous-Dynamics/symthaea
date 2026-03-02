@@ -22,6 +22,27 @@ pub struct RuntimeConsciousnessData {
     pub num_clusters: usize,
 }
 
+impl RuntimeConsciousnessData {
+    /// Construct from structural Phi fields (typically extracted from CycleMetadata).
+    pub fn from_structural(
+        micro_phi: f64,
+        meso_phi: f64,
+        macro_phi: f64,
+        bottleneck_score: f64,
+        emergence_ratio: f64,
+        num_clusters: usize,
+    ) -> Self {
+        Self {
+            micro_phi,
+            meso_phi,
+            macro_phi,
+            bottleneck_score,
+            emergence_ratio,
+            num_clusters,
+        }
+    }
+}
+
 /// Status of a consciousness indicator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IndicatorStatus {
@@ -116,5 +137,21 @@ impl ButlinIndicatorReport {
             ));
         }
         lines.join("\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_runtime_consciousness_from_structural() {
+        let data = RuntimeConsciousnessData::from_structural(0.1, 0.2, 0.3, 0.05, 1.5, 4);
+        assert!((data.micro_phi - 0.1).abs() < f64::EPSILON);
+        assert!((data.meso_phi - 0.2).abs() < f64::EPSILON);
+        assert!((data.macro_phi - 0.3).abs() < f64::EPSILON);
+        assert!((data.bottleneck_score - 0.05).abs() < f64::EPSILON);
+        assert!((data.emergence_ratio - 1.5).abs() < f64::EPSILON);
+        assert_eq!(data.num_clusters, 4);
     }
 }

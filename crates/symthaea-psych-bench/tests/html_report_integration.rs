@@ -105,7 +105,7 @@ fn test_html_reliability_section_integration() {
     ];
     let bench_refs: Vec<&dyn PsychBenchmark> = benchmarks.iter().map(|b| b.as_ref()).collect();
 
-    let battery = ReliabilityBattery::run(&bench_refs, &config, 3);
+    let battery = ReliabilityBattery::run(&bench_refs, &config, 3, 10);
 
     let mut html = String::new();
     write_reliability_section(&mut html, &battery);

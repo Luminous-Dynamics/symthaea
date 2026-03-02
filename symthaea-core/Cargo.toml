@@ -101,6 +101,10 @@ harness = false
 name = "encoder_optimization"
 harness = false
 
+[[bench]]
+name = "orthogonal_init_bench"
+harness = false
+
 [features]
 default = ["simd"]
 embeddings = []       # Enable embedding model integration

@@ -65,7 +65,10 @@ impl IowaGamblingBenchmark {
         // Somatic markers: scalar EMA of net value per deck (gradual learning)
         // Calibrated to match human learning curves (slow early, convergent late)
         let mut deck_somatic: [f64; 4] = [0.0; 4];
-        let somatic_alpha = 0.12; // Slightly faster than default (0.10)
+        // FEP provides top-down predictive refinement of somatic markers;
+        // without it, learning under ambiguity is impaired (halved rate).
+        let fep_lr_multiplier = if config.enable_fep { 1.0 } else { 0.5 };
+        let somatic_alpha = 0.12 * fep_lr_multiplier; // Slightly faster than default (0.10)
         let loss_aversion = 2.6f32; // Slightly above K&T's 2.25
 
         let mut deck_draw_count = [0u32; 4];

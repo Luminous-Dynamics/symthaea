@@ -6976,6 +6976,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hkdf"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
+dependencies = [
+ "hmac",
+]
+
+[[package]]
 name = "hmac"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12429,6 +12438,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "redb"
+version = "2.6.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eca1e9d98d5a7e9002d0013e18d5a9b000aee942eb134883a82f06ebffb6c01"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14266,6 +14284,7 @@ dependencies = [
  "futures",
  "hex",
  "hf-hub",
+ "hkdf",
  "hound",
  "ignore",
  "image 0.24.9",
@@ -14313,6 +14332,7 @@ dependencies = [
  "symthaea-embeddings",
  "symthaea-enactive",
  "symthaea-exploration",
+ "symthaea-fabrication-kernel",
  "symthaea-factor-graph",
  "symthaea-fep",
  "symthaea-field-dynamics",
@@ -14360,6 +14380,7 @@ dependencies = [
  "wasmtime",
  "x25519-dalek",
  "zbus 4.4.0",
+ "zeroize",
 ]
 
 [[package]]
@@ -14479,14 +14500,20 @@ name = "symthaea-embeddings"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "burn",
  "criterion",
+ "dirs 5.0.1",
  "half",
  "hf-hub",
  "lru 0.16.3",
  "memmap2",
+ "ndarray 0.16.1",
+ "ort",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
+ "rayon",
+ "redb",
  "safetensors",
  "serde",
  "serde_json",

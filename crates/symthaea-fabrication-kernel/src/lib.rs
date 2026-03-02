@@ -13,6 +13,9 @@ pub mod import;
 pub mod validate;
 pub mod thought;
 pub mod simulator;
+pub mod manufacturing;
+pub mod building;
+pub mod design_loop;
 #[cfg(feature = "analytical")]
 pub mod analytical;
 

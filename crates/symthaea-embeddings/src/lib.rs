@@ -41,6 +41,12 @@
 
 pub mod qwen3;
 
+#[cfg(feature = "persistent-cache")]
+pub mod cache;
+
+#[cfg(feature = "embed-channel")]
+pub mod channel;
+
 use anyhow::Result;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
@@ -252,8 +258,19 @@ impl HdcBridge {
         Self::to_hv16(&projected)
     }
 
-    /// Project multiple embeddings in batch (more efficient)
+    /// Project multiple embeddings in batch.
+    ///
+    /// With the `parallel` feature enabled, batches of 4+ embeddings are
+    /// projected in parallel using rayon. Below that threshold, rayon
+    /// thread-pool overhead exceeds the benefit and sequential is used.
     pub fn project_batch(&self, embeddings: &[Vec<f32>]) -> Vec<BinaryHV> {
+        #[cfg(feature = "parallel")]
+        {
+            if embeddings.len() >= 4 {
+                use rayon::prelude::*;
+                return embeddings.par_iter().map(|e| self.project(e)).collect();
+            }
+        }
         embeddings.iter().map(|e| self.project(e)).collect()
     }
 
@@ -497,5 +514,70 @@ mod tests {
         // Should be identical
         let sim = hv1.similarity(&hv2);
         assert_eq!(sim, 1.0, "Same seed should produce identical projections");
+    }
+
+    #[test]
+    fn test_parallel_batch_matches_sequential() {
+        let bridge = HdcBridge::new();
+        let embeddings: Vec<Vec<f32>> = (0..8)
+            .map(|i| {
+                (0..QWEN3_DIMENSION)
+                    .map(|j| ((i * 1000 + j) as f32 * 0.001).sin())
+                    .collect()
+            })
+            .collect();
+
+        let sequential: Vec<BinaryHV> = embeddings.iter().map(|e| bridge.project(e)).collect();
+        let batched = bridge.project_batch(&embeddings);
+
+        assert_eq!(sequential.len(), batched.len());
+        for (i, (s, b)) in sequential.iter().zip(batched.iter()).enumerate() {
+            assert_eq!(
+                s.similarity(b),
+                1.0,
+                "Batch[{i}] should be identical to sequential"
+            );
+        }
+    }
+
+    #[test]
+    fn test_parallel_batch_small() {
+        // Batch < 4 should use sequential fallback (no rayon overhead)
+        let bridge = HdcBridge::new();
+        let embeddings: Vec<Vec<f32>> = (0..3)
+            .map(|i| vec![(i as f32 + 1.0) * 0.1; QWEN3_DIMENSION])
+            .collect();
+
+        let result = bridge.project_batch(&embeddings);
+        assert_eq!(result.len(), 3);
+    }
+
+    #[test]
+    fn test_parallel_batch_similarity() {
+        let bridge = HdcBridge::new();
+
+        // Create similar embeddings (small perturbations)
+        let base: Vec<f32> = (0..QWEN3_DIMENSION)
+            .map(|i| (i as f32 * 0.01).sin())
+            .collect();
+        let embeddings: Vec<Vec<f32>> = (0..8)
+            .map(|i| {
+                base.iter()
+                    .enumerate()
+                    .map(|(j, &v)| v + (i as f32 * 0.001) * ((j as f32).cos()))
+                    .collect()
+            })
+            .collect();
+
+        let hvs = bridge.project_batch(&embeddings);
+        // Adjacent embeddings should be similar
+        for i in 0..hvs.len() - 1 {
+            let sim = hvs[i].similarity(&hvs[i + 1]);
+            assert!(
+                sim > 0.8,
+                "Adjacent similar embeddings should produce similar HVs, got {sim} at [{i},{j}]",
+                j = i + 1
+            );
+        }
     }
 }

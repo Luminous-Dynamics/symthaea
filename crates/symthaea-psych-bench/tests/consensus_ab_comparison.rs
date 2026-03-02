@@ -37,7 +37,8 @@ fn make_loop_config(consensus: bool) -> CognitiveLoopConfig {
         if consensus { "consensus" } else { "sequential" }
     ));
     config.async_training = false;
-    config.consensus_feedback = consensus;
+    // consensus_feedback removed — consensus is now always-on
+    let _ = consensus;
     config
 }
 

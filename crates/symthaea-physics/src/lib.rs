@@ -22,11 +22,16 @@
 
 #![deny(unsafe_code)]
 
+pub mod accelerator;
 pub mod cmod_adapter;
+pub mod datacenter;
+pub mod fission;
 pub mod fusion_twin;
+pub mod grid;
 pub mod multiscale;
 pub mod plasma_control;
 pub mod plasma_hdc_encoder;
+pub mod threat;
 
 pub use plasma_hdc_encoder::{
     // Phi integration
@@ -70,6 +75,33 @@ pub use multiscale::{
 pub use fusion_twin::{
     DisruptionRisk, FusionDigitalTwin, FusionTwinOutput, PlasmaFepAction, PlasmaFepAgent,
     PlasmaMultiScalePredictor, PLASMA_HORIZONS, PLASMA_HORIZON_LABELS,
+};
+
+pub use grid::{
+    GridFepAction, GridFepAgent, GridHdcEncoder, GridOutput, GridPredictor, GridReading,
+    GridSafetyLevel, GridTwin, GRID_HORIZONS, GRID_HORIZON_LABELS,
+};
+
+pub use fission::{
+    FissionFepAction, FissionFepAgent, FissionHdcEncoder, FissionOutput, FissionPredictor,
+    FissionReading, FissionSafetyLevel, FissionTwin, FISSION_HORIZONS, FISSION_HORIZON_LABELS,
+};
+
+pub use accelerator::{
+    AcceleratorFepAction, AcceleratorFepAgent, AcceleratorHdcEncoder, AcceleratorOutput,
+    AcceleratorPredictor, AcceleratorReading, AcceleratorSafetyLevel, AcceleratorTwin,
+    ACCELERATOR_HORIZONS, ACCELERATOR_HORIZON_LABELS,
+};
+
+pub use threat::{
+    ThreatFepAction, ThreatFepAgent, ThreatHdcEncoder, ThreatLevel, ThreatOutput,
+    ThreatPredictor, ThreatReading, ThreatTwin, THREAT_HORIZONS, THREAT_HORIZON_LABELS,
+};
+
+pub use datacenter::{
+    DatacenterFepAction, DatacenterFepAgent, DatacenterHdcEncoder, DatacenterOutput,
+    DatacenterPredictor, DatacenterReading, DatacenterSafetyLevel, DatacenterTwin,
+    DATACENTER_HORIZONS, DATACENTER_HORIZON_LABELS,
 };
 
 pub use cmod_adapter::{

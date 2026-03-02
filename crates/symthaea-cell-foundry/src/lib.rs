@@ -11,6 +11,7 @@ pub mod cell_encoder;
 pub mod culture_controller;
 pub mod epigenetics;
 pub mod ethics_gate;
+pub mod experiment_planner;
 pub mod fep_agent;
 pub mod hydrology;
 pub mod ivg_protocol;
@@ -40,6 +41,12 @@ pub use types::*;
 
 // Genesis Mission Challenge 10: Autonomous Lab Controller
 pub use lab_controller::{InstrumentAdapter, LabController, LabProtocol, MockInstrument, ProtocolStep};
+
+// Genesis Mission Challenge 5: Experiment Planner
+pub use experiment_planner::{
+    ExperimentFepAction, ExperimentFepAgent, ExperimentHdcEncoder, ExperimentPredictor,
+    ExperimentReading, EXPERIMENT_HORIZONS, EXPERIMENT_HORIZON_LABELS,
+};
 
 // Genesis Mission Challenge 8: Water Prediction
 pub use hydrology::{

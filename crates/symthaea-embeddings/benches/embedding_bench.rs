@@ -59,6 +59,36 @@ fn simulation_batch_8(c: &mut Criterion) {
     });
 }
 
+fn bridge_project_single(c: &mut Criterion) {
+    use symthaea_embeddings::HdcBridge;
+
+    let bridge = HdcBridge::new();
+    let embedding: Vec<f32> = (0..1024).map(|i| (i as f32 * 0.01).sin()).collect();
+
+    c.bench_function("bridge_project_single", |b| {
+        b.iter(|| bridge.project(black_box(&embedding)))
+    });
+}
+
+fn bridge_project_batch(c: &mut Criterion) {
+    use symthaea_embeddings::HdcBridge;
+
+    let bridge = HdcBridge::new();
+    let mut group = c.benchmark_group("bridge_project_batch");
+
+    for &size in &[4, 16, 64] {
+        let embeddings: Vec<Vec<f32>> = (0..size)
+            .map(|i| (0..1024).map(|j| ((i * 1000 + j) as f32 * 0.001).sin()).collect())
+            .collect();
+
+        group.bench_function(format!("{size}"), |b| {
+            b.iter(|| bridge.project_batch(black_box(&embeddings)))
+        });
+    }
+
+    group.finish();
+}
+
 fn simulation_dimensions(c: &mut Criterion) {
     let dims = [64, 128, 256, 512, 1024];
     let mut group = c.benchmark_group("simulation_mrl_dimensions");
@@ -84,6 +114,8 @@ criterion_group!(
     simulation_cached_embed,
     simulation_batch_8,
     simulation_dimensions,
+    bridge_project_single,
+    bridge_project_batch,
 );
 
 // ── Burn benchmarks (feature-gated) ─────────────────────────────────
