@@ -204,6 +204,203 @@ fn pearson_r(x: &[f32], y: &[f32]) -> f32 {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERCEPTUAL METRICS — HNR + Spectral Tilt
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Perceptual quality metrics computed from audio samples.
+///
+/// Measures voice naturalness beyond formant accuracy:
+/// - **HNR**: How periodic (harmonic) vs noisy the voiced signal is
+/// - **Spectral Tilt**: How rapidly energy falls with frequency
+#[derive(Debug, Clone, Default)]
+pub struct PerceptualMetrics {
+    /// Harmonic-to-Noise Ratio (dB) for voiced segments.
+    /// Higher = cleaner voicing. Typical: 15–25 dB for normal speech.
+    pub hnr: f32,
+    /// Actual spectral slope (dB/octave).
+    pub spectral_tilt: f32,
+    /// |actual - expected(-12)| dB/octave — deviation from modal voice target.
+    pub spectral_tilt_deviation: f32,
+    /// Number of voiced analysis windows.
+    pub voiced_frames: usize,
+    /// Total analysis windows.
+    pub total_frames: usize,
+}
+
+/// Compute Harmonic-to-Noise Ratio via autocorrelation.
+///
+/// For each voiced window of `3 * period` samples, compute the normalized
+/// autocorrelation at lag T0 = sample_rate / f0. HNR = 10 log10(r / (1 - r)).
+///
+/// Returns HNR in dB (higher = cleaner voicing). Capped at 40 dB.
+pub fn compute_hnr(samples: &[f32], f0: f32, sample_rate: u32) -> f32 {
+    if samples.is_empty() || f0 < 50.0 {
+        return 0.0;
+    }
+
+    let period = (sample_rate as f32 / f0.max(50.0)).round() as usize;
+    if period == 0 {
+        return 0.0;
+    }
+
+    let window_size = period * 3;
+    if samples.len() < window_size {
+        return 0.0;
+    }
+
+    let mut total_r = 0.0f64;
+    let mut count = 0usize;
+
+    // Slide windows across the signal
+    let step = window_size / 2; // 50% overlap
+    let mut offset = 0;
+    while offset + window_size <= samples.len() {
+        let window = &samples[offset..offset + window_size];
+
+        // Check if window has sufficient energy (skip silence)
+        let energy: f32 = window.iter().map(|s| s * s).sum::<f32>() / window.len() as f32;
+        if energy < 1e-8 {
+            offset += step;
+            continue;
+        }
+
+        // Normalized autocorrelation at lag = period
+        let mut num = 0.0f64;
+        let mut den = 0.0f64;
+        for i in 0..window_size - period {
+            num += window[i] as f64 * window[i + period] as f64;
+            den += window[i] as f64 * window[i] as f64;
+        }
+
+        if den > 1e-12 {
+            let r = (num / den).clamp(-1.0, 1.0);
+            if r > 0.0 && r < 1.0 {
+                total_r += r;
+                count += 1;
+            }
+        }
+
+        offset += step;
+    }
+
+    if count == 0 {
+        return 0.0;
+    }
+
+    let avg_r = total_r / count as f64;
+    if avg_r <= 0.0 || avg_r >= 1.0 {
+        return 0.0;
+    }
+
+    // HNR = 10 * log10(r / (1 - r))
+    let hnr = 10.0 * (avg_r / (1.0 - avg_r)).log10();
+    (hnr as f32).clamp(-10.0, 40.0)
+}
+
+/// Compute spectral tilt via formant power regression (Goertzel algorithm).
+///
+/// Measures power at F1, F2, F3 frequencies using Goertzel's algorithm,
+/// then fits a line in log-frequency / log-power space to get dB/octave slope.
+///
+/// Expected: ~-12 dB/octave for modal voice (LF glottal model).
+pub fn compute_spectral_tilt(samples: &[f32], f1: f32, f2: f32, f3: f32, sample_rate: u32) -> f32 {
+    if samples.is_empty() || f1 <= 0.0 || f2 <= 0.0 || f3 <= 0.0 {
+        return 0.0;
+    }
+
+    let sr = sample_rate as f32;
+    let freqs = [f1, f2, f3];
+    let mut powers = [0.0f32; 3];
+
+    // Goertzel algorithm for each formant frequency
+    for (i, &freq) in freqs.iter().enumerate() {
+        let k = (freq / sr * samples.len() as f32).round();
+        let omega = 2.0 * std::f32::consts::PI * k / samples.len() as f32;
+        let coeff = 2.0 * omega.cos();
+
+        let mut s1: f64 = 0.0;
+        let mut s2: f64 = 0.0;
+
+        for &sample in samples {
+            let s0 = sample as f64 + coeff as f64 * s1 - s2;
+            s2 = s1;
+            s1 = s0;
+        }
+
+        // Power = |X(k)|^2 / N^2
+        let real = s1 - s2 * (omega.cos() as f64);
+        let imag = s2 * (omega.sin() as f64);
+        let power = (real * real + imag * imag) / (samples.len() as f64 * samples.len() as f64);
+        powers[i] = power as f32;
+    }
+
+    // Linear regression in log-log space: log2(freq) vs 10*log10(power)
+    // Slope gives dB/octave
+    let log_freqs = [f1.log2(), f2.log2(), f3.log2()];
+    let log_powers: [f32; 3] = [
+        if powers[0] > 1e-20 { 10.0 * powers[0].log10() } else { -200.0 },
+        if powers[1] > 1e-20 { 10.0 * powers[1].log10() } else { -200.0 },
+        if powers[2] > 1e-20 { 10.0 * powers[2].log10() } else { -200.0 },
+    ];
+
+    // Simple linear regression: slope = (Σxy - n*mx*my) / (Σx² - n*mx²)
+    let n = 3.0f32;
+    let mx = log_freqs.iter().sum::<f32>() / n;
+    let my = log_powers.iter().sum::<f32>() / n;
+
+    let mut sxy = 0.0f32;
+    let mut sxx = 0.0f32;
+    for i in 0..3 {
+        let dx = log_freqs[i] - mx;
+        let dy = log_powers[i] - my;
+        sxy += dx * dy;
+        sxx += dx * dx;
+    }
+
+    if sxx.abs() < 1e-10 {
+        return 0.0;
+    }
+
+    sxy / sxx // dB per octave (log2 freq)
+}
+
+impl VocalTractMetrics {
+    /// Compute metrics including perceptual quality analysis from audio.
+    ///
+    /// Like `compute()` but also analyzes the synthesized audio waveform
+    /// for HNR and spectral tilt.
+    pub fn compute_with_audio(
+        frames: &[FormantFrame],
+        targets: &[FormantTarget],
+        target_f0: f32,
+        samples: &[f32],
+        sample_rate: u32,
+    ) -> (Self, PerceptualMetrics) {
+        let base = Self::compute(frames, targets, target_f0);
+
+        // Compute perceptual metrics from audio
+        let hnr = compute_hnr(samples, target_f0, sample_rate);
+
+        // Use average formant frequencies for spectral tilt
+        let n = frames.len().max(1) as f32;
+        let avg_f1 = frames.iter().map(|f| f.f1).sum::<f32>() / n;
+        let avg_f2 = frames.iter().map(|f| f.f2).sum::<f32>() / n;
+        let avg_f3 = frames.iter().map(|f| f.f3).sum::<f32>() / n;
+        let tilt = compute_spectral_tilt(samples, avg_f1, avg_f2, avg_f3, sample_rate);
+
+        let perceptual = PerceptualMetrics {
+            hnr,
+            spectral_tilt: tilt,
+            spectral_tilt_deviation: (tilt - (-12.0)).abs(),
+            voiced_frames: frames.iter().filter(|f| f.voicing > 0.5).count(),
+            total_frames: frames.len(),
+        };
+
+        (base, perceptual)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -390,6 +587,131 @@ mod tests {
             metrics.mean_f1_error < 300.0,
             "Regression guard: mean F1 error {} Hz exceeds 300 Hz limit",
             metrics.mean_f1_error
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Item 1: Perceptual metrics tests (HNR + spectral tilt)
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_hnr_clean_vowel() {
+        // Synthesize a clean periodic vowel (no noise) → high HNR
+        let sample_rate = 24000u32;
+        let f0 = 120.0;
+        let duration_samples = sample_rate; // 1 second
+        let samples: Vec<f32> = (0..duration_samples)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                // Pure harmonic signal: fundamental + harmonics
+                let h1 = (2.0 * std::f32::consts::PI * f0 * t).sin();
+                let h2 = 0.5 * (2.0 * std::f32::consts::PI * 2.0 * f0 * t).sin();
+                let h3 = 0.25 * (2.0 * std::f32::consts::PI * 3.0 * f0 * t).sin();
+                (h1 + h2 + h3) * 0.3
+            })
+            .collect();
+
+        let hnr = compute_hnr(&samples, f0, sample_rate);
+        assert!(
+            hnr > 15.0,
+            "Clean harmonic signal should have HNR > 15 dB: {hnr:.1}"
+        );
+    }
+
+    #[test]
+    fn test_hnr_noisy_lower() {
+        // Signal with added noise → lower HNR
+        let sample_rate = 24000u32;
+        let f0 = 120.0;
+        let duration_samples = sample_rate;
+
+        // Clean signal
+        let clean: Vec<f32> = (0..duration_samples)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                (2.0 * std::f32::consts::PI * f0 * t).sin() * 0.3
+            })
+            .collect();
+        let hnr_clean = compute_hnr(&clean, f0, sample_rate);
+
+        // Noisy signal: add pseudo-random noise (xorshift)
+        let mut rng = 12345u64;
+        let noisy: Vec<f32> = clean
+            .iter()
+            .map(|&s| {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                let noise = (rng as f32 / u64::MAX as f32) * 2.0 - 1.0;
+                s + noise * 0.3
+            })
+            .collect();
+        let hnr_noisy = compute_hnr(&noisy, f0, sample_rate);
+
+        assert!(
+            hnr_noisy < hnr_clean,
+            "Noisy signal should have lower HNR: clean={hnr_clean:.1}, noisy={hnr_noisy:.1}"
+        );
+    }
+
+    #[test]
+    fn test_spectral_tilt_modal_vowel() {
+        // Generate a signal with known spectral rolloff
+        let sample_rate = 24000u32;
+        let f0 = 120.0;
+        let n = sample_rate * 2; // 2 seconds for stable Goertzel
+
+        // Simulate glottal source with ~-12 dB/octave rolloff
+        let samples: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                let h1 = (2.0 * std::f32::consts::PI * f0 * t).sin();
+                let h2 = 0.25 * (2.0 * std::f32::consts::PI * 2.0 * f0 * t).sin();
+                let h3 = 0.0625 * (2.0 * std::f32::consts::PI * 3.0 * f0 * t).sin();
+                (h1 + h2 + h3) * 0.3
+            })
+            .collect();
+
+        let tilt = compute_spectral_tilt(&samples, 500.0, 1500.0, 2500.0, sample_rate);
+        // Should be negative (energy decreases with frequency)
+        assert!(
+            tilt < 0.0,
+            "Spectral tilt should be negative: {tilt:.1}"
+        );
+    }
+
+    #[test]
+    fn test_spectral_tilt_breathy_steeper() {
+        let sample_rate = 24000u32;
+        let n = sample_rate * 2;
+
+        // Modal voice: moderate rolloff
+        let modal: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                let h1 = (2.0 * std::f32::consts::PI * 120.0 * t).sin();
+                let h2 = 0.5 * (2.0 * std::f32::consts::PI * 240.0 * t).sin();
+                let h3 = 0.25 * (2.0 * std::f32::consts::PI * 360.0 * t).sin();
+                (h1 + h2 + h3) * 0.3
+            })
+            .collect();
+        let tilt_modal = compute_spectral_tilt(&modal, 500.0, 1500.0, 2500.0, sample_rate);
+
+        // Breathy voice: steeper rolloff (less upper harmonics)
+        let breathy: Vec<f32> = (0..n)
+            .map(|i| {
+                let t = i as f32 / sample_rate as f32;
+                let h1 = (2.0 * std::f32::consts::PI * 120.0 * t).sin();
+                let h2 = 0.1 * (2.0 * std::f32::consts::PI * 240.0 * t).sin();
+                let h3 = 0.01 * (2.0 * std::f32::consts::PI * 360.0 * t).sin();
+                (h1 + h2 + h3) * 0.3
+            })
+            .collect();
+        let tilt_breathy = compute_spectral_tilt(&breathy, 500.0, 1500.0, 2500.0, sample_rate);
+
+        assert!(
+            tilt_breathy < tilt_modal,
+            "Breathy should have steeper tilt: modal={tilt_modal:.1}, breathy={tilt_breathy:.1}"
         );
     }
 }

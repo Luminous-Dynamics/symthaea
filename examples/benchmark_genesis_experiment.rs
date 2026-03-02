@@ -1,7 +1,7 @@
 //! Genesis Mission Challenge 5: Experiment Planner
 //!
-//! Demonstrates HDC + CfC encoder/predictor for experiment optimization.
-//! O(1) prediction cost proof across 3 orders of magnitude.
+//! Demonstrates HDC + CfC experiment planning with
+//! O(1) prediction cost from 1 hour to 1 month.
 
 fn main() {
     println!("=== Genesis Mission Challenge 5: Experiment Planner ===\n");
@@ -10,7 +10,9 @@ fn main() {
         ExperimentHdcEncoder, ExperimentPredictor, ExperimentReading, EXPERIMENT_HORIZONS,
     };
 
-    // 1. Create healthy experiment reading
+    let encoder = ExperimentHdcEncoder::new();
+    let mut predictor = ExperimentPredictor::new();
+
     let reading = ExperimentReading {
         experiment_uncertainty: 0.2,
         cost: 0.3,
@@ -18,40 +20,33 @@ fn main() {
         info_gain: 0.7,
     };
 
-    // 2. Encode and observe
-    let enc = ExperimentHdcEncoder::new();
-    let mut pred = ExperimentPredictor::new();
-    let hv = enc.encode(&reading);
-    pred.observe(&hv, 3600.0);
-    println!("Encoded experiment reading (dim={})", hv.dim());
+    let hv = encoder.encode(&reading);
+    predictor.observe(&hv, 3600.0);
 
-    // 3. Predict at each horizon
-    for (i, &h) in EXPERIMENT_HORIZONS.iter().enumerate() {
-        let predicted = pred.predict_at_horizon(&hv, h);
-        let sim = predicted.similarity(&hv);
-        println!("  Horizon {} ({:.0}s): similarity={:.4}", i, h, sim);
+    println!("--- Experiment Prediction ---");
+    for &horizon in EXPERIMENT_HORIZONS {
+        let predicted = predictor.predict_at_horizon(&hv, horizon);
+        let drift = 1.0 - hv.similarity(&predicted);
+        println!("  Horizon {:>12.0}s: drift={:.4}", horizon, drift);
     }
 
-    // 4. O(1) cost proof
     println!("\n--- O(1) Prediction Cost Proof ---");
-    let input = symthaea::symthaea_core::hdc::unified_hv::ContinuousHV::random(
-        symthaea::symthaea_core::hdc::unified_hv::HDC_DIMENSION, 42,
+    let input = symthaea_core::hdc::unified_hv::ContinuousHV::random(
+        symthaea_core::hdc::unified_hv::HDC_DIMENSION,
+        42,
     );
-
-    let short_h = EXPERIMENT_HORIZONS[0];
-    let long_h = EXPERIMENT_HORIZONS[EXPERIMENT_HORIZONS.len() - 1];
-
-    let t1 = std::time::Instant::now();
-    for _ in 0..1000 { let _ = pred.predict_at_horizon(&input, short_h); }
-    let short_us = t1.elapsed().as_micros() as f64 / 1000.0;
-
-    let t2 = std::time::Instant::now();
-    for _ in 0..1000 { let _ = pred.predict_at_horizon(&input, long_h); }
-    let long_us = t2.elapsed().as_micros() as f64 / 1000.0;
-
-    println!("  Short ({:.0}s):  {:.1}us/pred", short_h, short_us);
-    println!("  Long  ({:.0}s): {:.1}us/pred", long_h, long_us);
-    println!("  Ratio: {:.2}", long_us / short_us.max(0.001));
+    for &horizon in EXPERIMENT_HORIZONS {
+        let start = std::time::Instant::now();
+        for _ in 0..1000 {
+            let _ = predictor.predict_at_horizon(&input, horizon);
+        }
+        let elapsed = start.elapsed();
+        println!(
+            "  Horizon {:>12.0}s: {:.1}µs/prediction",
+            horizon,
+            elapsed.as_micros() as f64 / 1000.0
+        );
+    }
 
     println!("\nPASS: Experiment Planner operational");
 }

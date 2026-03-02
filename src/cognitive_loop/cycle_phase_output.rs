@@ -426,7 +426,7 @@ impl CognitiveLoopService {
 
         // ── Phase 2.2: End feedback proposal collection ──────────────────
         let feedback_consensus = self.feedback_state.end_cycle(
-            self.prediction_confidence as f64,
+            self.prediction_confidence,
             self.fep_lr_boost as f64,
             self.curiosity_drive.exploration_urge as f64,
             self.carryover.learning.adaptive_threshold_scale as f64,

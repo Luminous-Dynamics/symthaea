@@ -267,6 +267,81 @@ impl VisionManifold {
         &mut self.encoder
     }
 
+    /// Saliency-guided encoding refinement (closed-loop active inference).
+    ///
+    /// Uses the surprise map to select positive (high-surprise) and negative
+    /// (low-surprise) exemplar HVs, then refines the encoder's feature weights
+    /// via contrastive learning. This makes the encoder adapt to attend to
+    /// whatever is currently surprising in the scene.
+    pub fn refine_from_attention(&mut self) {
+        let attention = self.surprise.attention_map();
+        if self.last_patch_hvs.is_empty() || attention.values.is_empty() {
+            return;
+        }
+
+        let max_surprise = attention.max_surprise();
+        if max_surprise < 1e-6 {
+            return;
+        }
+
+        // Find the highest and lowest surprise patches
+        let mut best_idx = 0;
+        let mut worst_idx = 0;
+        let mut best_val = f32::NEG_INFINITY;
+        let mut worst_val = f32::INFINITY;
+
+        for (i, &v) in attention.values.iter().enumerate() {
+            if i < self.last_patch_hvs.len() {
+                if v > best_val {
+                    best_val = v;
+                    best_idx = i;
+                }
+                if v < worst_val {
+                    worst_val = v;
+                    worst_idx = i;
+                }
+            }
+        }
+
+        if best_idx == worst_idx {
+            return;
+        }
+
+        let positive = self.last_patch_hvs[best_idx].clone();
+        let negative = self.last_patch_hvs[worst_idx].clone();
+        let lr = self.config.learning.contrastive_lr;
+        self.encoder.refine_contrastive(&positive, &negative, lr);
+    }
+
+    /// Evaluate prediction accuracy at multiple temporal horizons.
+    ///
+    /// Returns a `HorizonAccuracy` with per-horizon prediction error measured
+    /// against the current frame. Call after `observe_frame()` to get accuracy
+    /// of predictions that were made N steps ago.
+    pub fn evaluate_horizons(&self) -> HorizonAccuracy {
+        let horizons = self.default_horizons();
+        let labels = self.horizon_labels();
+        let mut errors = Vec::with_capacity(horizons.len());
+
+        if let Some(ref frame_hv) = self.last_frame_hv {
+            let state = self.state();
+            for &h in horizons {
+                let predicted = self.predict_horizon(frame_hv, h);
+                let error = 1.0 - state.similarity(&predicted).clamp(-1.0, 1.0);
+                errors.push(error);
+            }
+        } else {
+            errors.resize(horizons.len(), 1.0);
+        }
+
+        HorizonAccuracy {
+            horizons: horizons.to_vec(),
+            labels: labels.iter().map(|s| s.to_string()).collect(),
+            errors,
+            frame_sequence: self.frame_count,
+        }
+    }
+
     /// Reset manifold to initial state.
     pub fn reset(&mut self) {
         self.state = ContinuousHV::zero(self.config.hdc_dim);
@@ -278,6 +353,19 @@ impl VisionManifold {
         self.coherence = 0.0;
         self.frame_count = 0;
     }
+}
+
+/// Multi-horizon prediction accuracy snapshot.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct HorizonAccuracy {
+    /// Prediction horizons in seconds.
+    pub horizons: Vec<f32>,
+    /// Human-readable labels for each horizon.
+    pub labels: Vec<String>,
+    /// Prediction error (1 - cos_sim) at each horizon.
+    pub errors: Vec<f32>,
+    /// Frame at which this was evaluated.
+    pub frame_sequence: u64,
 }
 
 impl TemporalPredictor for VisionManifold {
@@ -467,6 +555,103 @@ mod tests {
         assert_eq!(m.frame_count(), 0);
         assert_eq!(m.prediction_error(), 0.0);
         assert_eq!(m.coherence(), 0.0);
+    }
+
+    #[test]
+    fn test_refine_from_attention_modifies_weights() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        let dt = 0.033;
+
+        // Need at least 2 frames so surprise map has data
+        let frame_a = solid_gray_frame(64, 64, 50);
+        m.observe_frame(&frame_a, 64, 64, 1, dt);
+
+        // Scene change creates surprise contrast
+        let frame_b = gradient_frame(64, 64);
+        m.observe_frame(&frame_b, 64, 64, 1, dt);
+
+        let weights_before: Vec<f32> = m.encoder().feature_weights().to_vec();
+        m.refine_from_attention();
+        let weights_after: Vec<f32> = m.encoder().feature_weights().to_vec();
+
+        // Weights should have changed (surprise contrast drives contrastive update)
+        let changed = weights_before
+            .iter()
+            .zip(weights_after.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-8);
+        assert!(changed, "Saliency refinement should modify encoder weights");
+    }
+
+    #[test]
+    fn test_refine_from_attention_noop_when_no_surprise() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        // Only one frame observed — surprise map is all zeros
+        let frame = solid_gray_frame(64, 64, 128);
+        m.observe_frame(&frame, 64, 64, 1, 0.033);
+
+        let weights_before: Vec<f32> = m.encoder().feature_weights().to_vec();
+        m.refine_from_attention();
+        let weights_after: Vec<f32> = m.encoder().feature_weights().to_vec();
+
+        // Should be a no-op (no surprise contrast)
+        assert_eq!(weights_before, weights_after);
+    }
+
+    #[test]
+    fn test_evaluate_horizons_structure() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+        m.observe_frame(&frame, 64, 64, 1, 0.033);
+
+        let acc = m.evaluate_horizons();
+
+        assert_eq!(acc.horizons.len(), 4);
+        assert_eq!(acc.labels.len(), 4);
+        assert_eq!(acc.errors.len(), 4);
+        assert_eq!(acc.frame_sequence, 1);
+        assert_eq!(acc.labels[0], "next_frame");
+        assert_eq!(acc.labels[3], "scene_scale");
+    }
+
+    #[test]
+    fn test_evaluate_horizons_error_ordering() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        // Converge on the frame
+        for _ in 0..10 {
+            m.observe_frame(&frame, 64, 64, 1, 0.033);
+        }
+
+        let acc = m.evaluate_horizons();
+
+        // Short horizon prediction should be at least as good as long horizon
+        // (closer to current state means less divergence from equilibrium)
+        assert!(
+            acc.errors[0] <= acc.errors[3] + 0.05,
+            "Short horizon error ({}) should be <= long horizon error ({})",
+            acc.errors[0],
+            acc.errors[3]
+        );
+    }
+
+    #[test]
+    fn test_evaluate_horizons_before_any_frame() {
+        let cfg = VisionConfig::default();
+        let m = VisionManifold::new(cfg, 64, 64);
+
+        // No frames observed — should return default errors
+        let acc = m.evaluate_horizons();
+        assert_eq!(acc.errors.len(), 4);
+        // All errors should be 1.0 (maximum)
+        for &e in &acc.errors {
+            assert!((e - 1.0).abs() < 1e-6, "Pre-frame error should be 1.0, got {e}");
+        }
     }
 
     #[test]

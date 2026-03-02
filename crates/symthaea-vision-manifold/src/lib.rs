@@ -39,7 +39,7 @@ pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 #[cfg(feature = "camera")]
 pub use camera::CameraSource;
 pub use encoder::{MultiScaleEncoder, PatchHdcEncoder};
-pub use manifold::VisionManifold;
+pub use manifold::{HorizonAccuracy, VisionManifold};
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
     AttentionMap, LearningConfig, MultiScaleConfig, PatchGrid, TrainingConfig, TrainingMethod,

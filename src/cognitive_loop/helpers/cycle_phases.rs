@@ -749,7 +749,7 @@ impl CognitiveLoopService {
             );
             let (adjusted, was_informed) = self
                 .dream_feedback_bridge
-                .adjust_confidence(self.prediction_confidence as f64, context_hash);
+                .adjust_confidence(self.prediction_confidence, context_hash);
             if was_informed {
                 self.set_confidence("dream_feedback", (adjusted as f32).clamp(0.0, 1.0));
             }
@@ -1066,7 +1066,7 @@ impl CognitiveLoopService {
         }
 
         self.feedback_state.snapshot_cycle_start(
-            self.prediction_confidence as f64,
+            self.prediction_confidence,
             self.fep_lr_boost as f64,
             self.curiosity_drive.exploration_urge as f64,
             self.carryover.learning.adaptive_threshold_scale as f64,
@@ -1231,7 +1231,7 @@ impl CognitiveLoopService {
             let sa_input = super::super::calibration::SelfAssessmentInput {
                 prediction_error: self.stats.avg_prediction_error,
                 coherence: self.carryover.history.cached_coherence.unwrap_or(0.5),
-                confidence_calibration_error: (self.prediction_confidence
+                confidence_calibration_error: (self.prediction_confidence as f32
                     - (1.0 - self.stats.avg_prediction_error.min(1.0)))
                 .abs(),
                 // Invert 5-HT: low serotonin → high utilization (sustained attn deficit)

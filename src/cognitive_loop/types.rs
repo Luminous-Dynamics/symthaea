@@ -188,7 +188,7 @@ pub(crate) struct QualityMetrics {
     pub(crate) last_grid_complexity: f32,
     /// Previous cycle's prediction confidence (for crash detection).
     /// Science: Cools et al. (2008) — rapid confidence drop triggers serotonergic dip.
-    pub(crate) prev_confidence_for_crash: f32,
+    pub(crate) prev_confidence_for_crash: f64,
     /// Last moral score from perception phase (cached for neuromod feedback).
     /// Science: Zak (2012) — moral sentiment drives oxytocin/DA pathways.
     pub(crate) last_moral_score: f32,

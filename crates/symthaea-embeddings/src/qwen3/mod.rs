@@ -676,10 +676,10 @@ impl Qwen3Embedder {
         let cache_cap = std::num::NonZeroUsize::new(config.cache_capacity)
             .unwrap_or(std::num::NonZeroUsize::new(10_000).unwrap());
         #[cfg(feature = "persistent-cache")]
-        let persistent_cache = {
+        let persistent_cache = if !config.use_simulated {
             let pc_config = crate::cache::PersistentCacheConfig {
                 path: None, // default: ~/.cache/symthaea/embeddings.redb
-                model_name: config.model_path.clone().unwrap_or_else(|| "simulated".into()),
+                model_name: config.model_path.clone().unwrap_or_else(|| "unknown".into()),
                 dimension: config.embedding_dim,
             };
             match crate::cache::PersistentCache::open(pc_config) {
@@ -689,6 +689,8 @@ impl Qwen3Embedder {
                     None
                 }
             }
+        } else {
+            None
         };
 
         let mut embedder = Self {

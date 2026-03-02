@@ -138,6 +138,24 @@ impl CognitiveLoopService {
             self.scale_exploration("seizure_protection", 0.1);
         }
 
+        // Thalamic depth → tonic neuromodulator bias
+        // Science: Aston-Jones & Cohen (2005) — NE tonic mode (exploration) vs phasic (exploitation)
+        // Science: Sarter et al. (2005) — sustained attention via basal forebrain ACh
+        // Science: Buzsáki (2006) — GABAergic inhibition enables fast gating
+        use super::thresholds::{
+            THALAMIC_DEEP_ACH_TONIC, THALAMIC_DEEP_NE_TONIC, THALAMIC_REFLEX_GABA,
+        };
+        match self.cognitive_depth {
+            super::CognitiveDepth::DeepThought => {
+                self.neuromod.bath.noradrenaline.produce(THALAMIC_DEEP_NE_TONIC);
+                self.neuromod.bath.acetylcholine.produce(THALAMIC_DEEP_ACH_TONIC);
+            }
+            super::CognitiveDepth::Reflex => {
+                self.neuromod.bath.gaba.produce(THALAMIC_REFLEX_GABA);
+            }
+            super::CognitiveDepth::Cortical => {} // balanced — no tonic bias
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 10h. Update Consciousness Unification Engine with current Phi
         // ═══════════════════════════════════════════════════════════════════════
@@ -157,9 +175,9 @@ impl CognitiveLoopService {
         if let Some(ref mut bus) = self.experience_bus {
             bus.current_signals = crate::experience::PrincipledSignals {
                 prediction_error,
-                uncertainty: 1.0 - self.prediction_confidence,
+                uncertainty: (1.0 - self.prediction_confidence) as f32,
                 coherence: coherence.clamp(0.0, 1.0),
-                confidence: self.prediction_confidence,
+                confidence: self.prediction_confidence as f32,
                 salience: self.curiosity_drive.exploration_urge,
                 phi_monitor: unified_psi as f32,
             };
@@ -223,7 +241,7 @@ impl CognitiveLoopService {
             ne_arousal_feedback,
             sht_crash_dip,
             exploration_sht_drain,
-            confidence_velocity,
+            confidence_velocity: confidence_velocity as f32,
             guiding_priority_category: guiding_priority_category.to_owned(),
         }
     }

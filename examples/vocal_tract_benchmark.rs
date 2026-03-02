@@ -627,6 +627,61 @@ fn main() {
     }
     println!();
 
+    // ── Benchmark 9: Perceptual Quality ─────────────────────────────────
+    println!("--- Benchmark 9: Perceptual Quality ---");
+    {
+        use symthaea_vocal_tract::{compute_hnr, compute_spectral_tilt};
+
+        // Synthesize a steady vowel (AH) for perceptual analysis
+        let ah_target = db
+            .lookup("AH")
+            .expect("AH should be in database");
+        let f0 = 120.0;
+        let n_frames = 200; // 1 second at 200Hz
+        let dt = 1.0 / 200.0;
+        let mut frames = Vec::with_capacity(n_frames);
+        for i in 0..n_frames {
+            let frame = pipeline.tick(
+                &cognitive_state,
+                None,
+                dt,
+                Some("AH"),
+            );
+            frames.push(frame);
+        }
+
+        // Convert to audio
+        let mut vocoder = symthaea::voice::FormantVocoder::new(
+            symthaea::voice::VocoderConfig::default(),
+        );
+        // Set time stamps
+        for (i, f) in frames.iter_mut().enumerate() {
+            f.time = i as f32 * dt;
+        }
+        let samples = vocoder.synthesize(&frames);
+
+        if !samples.is_empty() {
+            let hnr = compute_hnr(&samples, f0, 24000);
+            let tilt = compute_spectral_tilt(
+                &samples,
+                ah_target.f1,
+                ah_target.f2,
+                ah_target.f3,
+                24000,
+            );
+            let tilt_dev = (tilt - (-12.0)).abs();
+
+            println!("  HNR (voiced):     {:.1} dB (target: >15 dB)", hnr);
+            println!(
+                "  Spectral Tilt:    {:.1} dB/oct (target: ~-12, dev: {:.1})",
+                tilt, tilt_dev
+            );
+        } else {
+            println!("  [skipped — no audio produced]");
+        }
+    }
+    println!();
+
     // ── Summary ──────────────────────────────────────────────────────────
     println!("=== Benchmark Complete ===");
 }

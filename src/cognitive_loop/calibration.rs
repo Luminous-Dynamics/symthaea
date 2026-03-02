@@ -26,11 +26,26 @@
 //! calibration.apply(&mut bath);
 //! ```
 
+/// Optional receptor subtype for fine-grained calibration.
+///
+/// When `None`, the adjustment targets the transmitter's global
+/// `receptor_sensitivity`. When set, it routes to a specific subtype
+/// (e.g., NE α vs β, DA D1 vs D2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReceptorSubtype {
+    /// NE α — tonic precision / working memory gating (Arnsten 2007)
+    NeAlpha,
+    /// NE β — phasic reactivity / inhibitory control
+    NeBeta,
+}
+
 /// Calibration adjustment for a single neuromodulator transmitter.
 #[derive(Debug, Clone)]
 pub struct TransmitterCalibration {
     /// Target transmitter (DA, NE, 5-HT, ACh).
     pub transmitter: &'static str,
+    /// Optional receptor subtype for fine-grained routing.
+    pub subtype: Option<ReceptorSubtype>,
     /// Current z-score from psych-bench normative comparison.
     pub z_score: f64,
     /// Benchmark(s) driving this calibration.
@@ -88,6 +103,7 @@ impl NeuromodCalibration {
             let factor = z_to_sensitivity_factor(mean_z, false);
             adjustments.push(TransmitterCalibration {
                 transmitter: "DA",
+                subtype: None,
                 z_score: mean_z,
                 source_benchmarks: da_benchmarks.iter().map(|s| s.to_string()).collect(),
                 sensitivity_factor: factor,
@@ -118,6 +134,7 @@ impl NeuromodCalibration {
             let factor = z_to_sensitivity_factor(mean_z, false);
             adjustments.push(TransmitterCalibration {
                 transmitter: "ACh",
+                subtype: None,
                 z_score: mean_z,
                 source_benchmarks: ach_benchmarks.iter().map(|s| s.to_string()).collect(),
                 sensitivity_factor: factor,
@@ -134,26 +151,66 @@ impl NeuromodCalibration {
             });
         }
 
-        // NE calibration: inhibition benchmarks
-        let ne_benchmarks = ["Inhibition::StopSignal", "Inhibition::GoNoGo"];
-        let ne_z: Vec<f64> = z_scores
+        // NE calibration: subtype-specific routing (Arnsten 2007).
+        //
+        // NE α (tonic): modulates working memory precision via sustained
+        //   prefrontal activity. Poor WM (N-back/DigitSpan) → boost α.
+        // NE β (phasic): modulates inhibitory control via rapid reactivity.
+        //   Poor inhibition (StopSignal/GoNoGo) → boost β.
+        //
+        // When only inhibition data is available, fall back to global NE.
+        let ne_inhib_benchmarks = ["Inhibition::StopSignal", "Inhibition::GoNoGo"];
+        let ne_inhib_z: Vec<f64> = z_scores
             .iter()
-            .filter(|(name, _)| ne_benchmarks.contains(name))
+            .filter(|(name, _)| ne_inhib_benchmarks.contains(name))
             .map(|(_, z)| *z)
             .collect();
-        if !ne_z.is_empty() {
-            let mean_z = ne_z.iter().sum::<f64>() / ne_z.len() as f64;
+
+        // Check if WM benchmarks also inform NE α
+        let ne_wm_benchmarks = ["WorM::N-back", "WorM::DigitSpan"];
+        let ne_wm_z: Vec<f64> = z_scores
+            .iter()
+            .filter(|(name, _)| ne_wm_benchmarks.contains(name))
+            .map(|(_, z)| *z)
+            .collect();
+
+        // Route NE β (phasic) from inhibition data
+        if !ne_inhib_z.is_empty() {
+            let mean_z = ne_inhib_z.iter().sum::<f64>() / ne_inhib_z.len() as f64;
             valid_count += 1;
             let factor = z_to_sensitivity_factor(mean_z, false);
             adjustments.push(TransmitterCalibration {
                 transmitter: "NE",
+                subtype: Some(ReceptorSubtype::NeBeta),
                 z_score: mean_z,
-                source_benchmarks: ne_benchmarks.iter().map(|s| s.to_string()).collect(),
+                source_benchmarks: ne_inhib_benchmarks.iter().map(|s| s.to_string()).collect(),
                 sensitivity_factor: factor,
                 rationale: format!(
-                    "Inhibition z={mean_z:.2}: {}",
+                    "Inhibition z={mean_z:.2} → NE β (phasic): {}",
                     if mean_z < -0.5 {
-                        "below human baseline → boost NE"
+                        "poor inhibitory control → boost β"
+                    } else {
+                        "within normal range"
+                    }
+                ),
+            });
+        }
+
+        // Route NE α (tonic) from WM data
+        if !ne_wm_z.is_empty() {
+            let mean_z = ne_wm_z.iter().sum::<f64>() / ne_wm_z.len() as f64;
+            // Don't double-count if WM already counted for ACh
+            let factor = z_to_sensitivity_factor(mean_z, false);
+            adjustments.push(TransmitterCalibration {
+                transmitter: "NE",
+                subtype: Some(ReceptorSubtype::NeAlpha),
+                z_score: mean_z,
+                source_benchmarks: ne_wm_benchmarks.iter().map(|s| s.to_string()).collect(),
+                sensitivity_factor: factor,
+                rationale: format!(
+                    "Working memory z={mean_z:.2} → NE α (tonic): {}",
+                    if mean_z < -0.5 {
+                        "poor WM precision → boost α"
                     } else {
                         "within normal range"
                     }
@@ -174,6 +231,7 @@ impl NeuromodCalibration {
             let factor = z_to_sensitivity_factor(mean_z, false);
             adjustments.push(TransmitterCalibration {
                 transmitter: "5-HT",
+                subtype: None,
                 z_score: mean_z,
                 source_benchmarks: sht_benchmarks.iter().map(|s| s.to_string()).collect(),
                 sensitivity_factor: factor,
@@ -219,6 +277,23 @@ impl NeuromodCalibration {
     /// factor, clamping to `[0.5, 2.0]` (the physiological range).
     pub fn apply(&self, bath: &mut symthaea_neuromodulators::NeuromodulatorBath) {
         for adj in &self.adjustments {
+            // NE subtype routing: α/β have independent sensitivity fields
+            if adj.transmitter == "NE" {
+                match adj.subtype {
+                    Some(ReceptorSubtype::NeAlpha) => {
+                        bath.ne_subtypes.excitatory =
+                            (bath.ne_subtypes.excitatory * adj.sensitivity_factor).clamp(0.5, 2.0);
+                        continue;
+                    }
+                    Some(ReceptorSubtype::NeBeta) => {
+                        bath.ne_subtypes.inhibitory =
+                            (bath.ne_subtypes.inhibitory * adj.sensitivity_factor).clamp(0.5, 2.0);
+                        continue;
+                    }
+                    None => {} // fall through to global NE
+                }
+            }
+
             let transmitter = match adj.transmitter {
                 "DA" => &mut bath.dopamine,
                 "NE" => &mut bath.noradrenaline,
@@ -239,9 +314,14 @@ impl NeuromodCalibration {
             self.coverage * 100.0
         ));
         for adj in &self.adjustments {
+            let label = match &adj.subtype {
+                Some(ReceptorSubtype::NeAlpha) => "NE-α",
+                Some(ReceptorSubtype::NeBeta) => "NE-β",
+                None => adj.transmitter,
+            };
             lines.push(format!(
                 "  {} → sensitivity ×{:.3} (z={:.2}, {})",
-                adj.transmitter, adj.sensitivity_factor, adj.z_score, adj.rationale
+                label, adj.sensitivity_factor, adj.z_score, adj.rationale
             ));
         }
         if self.confidence_delta.abs() > 0.001 {
@@ -1028,5 +1108,127 @@ mod tests {
         assert_eq!(monitor.observations_count(), 1);
         assert!(monitor.inhibition_error_ema() > 0.0);
         assert!(monitor.pe_ema() > 0.0);
+    }
+
+    #[test]
+    fn test_ne_subtype_routing_inhibition_to_beta() {
+        // Inhibition benchmarks should route to NE β (phasic reactivity)
+        let cal = NeuromodCalibration::from_z_scores(&[("Inhibition::StopSignal", -2.0)]);
+        let ne_adj = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "NE")
+            .expect("Should have NE adjustment");
+        assert_eq!(
+            ne_adj.subtype,
+            Some(ReceptorSubtype::NeBeta),
+            "Inhibition should route to NE β"
+        );
+        assert!(
+            ne_adj.sensitivity_factor > 1.0,
+            "Negative z (poor inhibition) should boost NE β"
+        );
+    }
+
+    #[test]
+    fn test_ne_subtype_routing_wm_to_alpha() {
+        // Working memory benchmarks should route to NE α (tonic precision)
+        let cal = NeuromodCalibration::from_z_scores(&[("WorM::N-back", -2.0)]);
+        let ne_alpha = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "NE" && a.subtype == Some(ReceptorSubtype::NeAlpha));
+        assert!(
+            ne_alpha.is_some(),
+            "WM should route to NE α: {:?}",
+            cal.adjustments
+                .iter()
+                .map(|a| (&a.transmitter, &a.subtype))
+                .collect::<Vec<_>>()
+        );
+        // Should also produce ACh adjustment (WM → ACh global)
+        let ach = cal
+            .adjustments
+            .iter()
+            .find(|a| a.transmitter == "ACh");
+        assert!(ach.is_some(), "WM should also adjust ACh");
+    }
+
+    #[test]
+    fn test_ne_subtype_apply_routes_to_bath() {
+        let mut bath = symthaea_neuromodulators::NeuromodulatorBath::default();
+        let pre_alpha = bath.ne_subtypes.excitatory;
+        let pre_beta = bath.ne_subtypes.inhibitory;
+
+        let cal = NeuromodCalibration {
+            adjustments: vec![
+                TransmitterCalibration {
+                    transmitter: "NE",
+                    subtype: Some(ReceptorSubtype::NeBeta),
+                    z_score: -2.0,
+                    source_benchmarks: vec!["Inhibition::StopSignal".into()],
+                    sensitivity_factor: 1.15,
+                    rationale: "boost β".into(),
+                },
+                TransmitterCalibration {
+                    transmitter: "NE",
+                    subtype: Some(ReceptorSubtype::NeAlpha),
+                    z_score: -1.5,
+                    source_benchmarks: vec!["WorM::N-back".into()],
+                    sensitivity_factor: 1.10,
+                    rationale: "boost α".into(),
+                },
+            ],
+            confidence_delta: 0.0,
+            coverage: 1.0,
+        };
+        cal.apply(&mut bath);
+
+        assert!(
+            (bath.ne_subtypes.excitatory - pre_alpha * 1.10).abs() < 0.001,
+            "NE α should be boosted: {} vs expected {}",
+            bath.ne_subtypes.excitatory,
+            pre_alpha * 1.10
+        );
+        assert!(
+            (bath.ne_subtypes.inhibitory - pre_beta * 1.15).abs() < 0.001,
+            "NE β should be boosted: {} vs expected {}",
+            bath.ne_subtypes.inhibitory,
+            pre_beta * 1.15
+        );
+        // Global NE sensitivity should be unchanged
+        assert!(
+            (bath.noradrenaline.receptor_sensitivity - 1.0).abs() < 0.001,
+            "Global NE should be unchanged"
+        );
+    }
+
+    #[test]
+    fn test_ne_subtype_summary_labels() {
+        let cal = NeuromodCalibration {
+            adjustments: vec![
+                TransmitterCalibration {
+                    transmitter: "NE",
+                    subtype: Some(ReceptorSubtype::NeAlpha),
+                    z_score: -1.0,
+                    source_benchmarks: vec![],
+                    sensitivity_factor: 1.1,
+                    rationale: "test".into(),
+                },
+                TransmitterCalibration {
+                    transmitter: "NE",
+                    subtype: Some(ReceptorSubtype::NeBeta),
+                    z_score: -2.0,
+                    source_benchmarks: vec![],
+                    sensitivity_factor: 1.2,
+                    rationale: "test".into(),
+                },
+            ],
+            confidence_delta: 0.0,
+            coverage: 1.0,
+        };
+        let summary = cal.summary();
+        assert!(summary.contains("NE-α"), "Summary should show NE-α: {summary}");
+        assert!(summary.contains("NE-β"), "Summary should show NE-β: {summary}");
     }
 }

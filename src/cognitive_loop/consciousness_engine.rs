@@ -1522,15 +1522,23 @@ mod tests {
 
     // ── Moral topology → consciousness coupling tests ─────────────────
 
+    fn make_engine_with_eq_v2() -> ConsciousnessEngine {
+        let config = SpectralMIPConfig {
+            num_components: 64,
+            window_size: 20,
+            min_samples: 5,
+            regularization: 1e-6,
+        };
+        let finder = SpectralMIPFinder::new(config);
+        let eq = ConsciousnessEquationV2::default();
+        ConsciousnessEngine::new(finder, None, Some(eq), None)
+    }
+
     #[test]
     fn test_drift_attenuates_epistemic_quality() {
         // With equation V2 enabled, drift should reduce the Knowledge component
-        let eq = ConsciousnessEquationV2::default();
-        let config = symthaea_core::consciousness_metrics::MIPConfig::default();
-        let finder = SpectralMIPFinder::new(config);
-
-        let mut engine_no_drift = ConsciousnessEngine::new(finder.clone(), None, Some(eq.clone()), None);
-        let mut engine_drift = ConsciousnessEngine::new(finder, None, Some(eq), None);
+        let mut engine_no_drift = make_engine_with_eq_v2();
+        let mut engine_drift = make_engine_with_eq_v2();
 
         let hdv = ContinuousHV::random(16384, 42);
         let hv16 = BinaryHV::random(42);

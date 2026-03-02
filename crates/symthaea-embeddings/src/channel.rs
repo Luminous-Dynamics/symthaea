@@ -133,7 +133,8 @@ mod tests {
 
     #[test]
     fn test_channel_multiple_requests() {
-        let channel = EmbeddingChannel::spawn(Qwen3Config::simulated()).unwrap();
+        // Use larger capacity to avoid backpressure during test
+        let channel = EmbeddingChannel::spawn_with_capacity(Qwen3Config::simulated(), 16).unwrap();
 
         let mut receivers = Vec::new();
         for i in 0..10 {

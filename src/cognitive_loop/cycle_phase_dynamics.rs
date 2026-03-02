@@ -28,7 +28,9 @@ use super::thresholds::{
     RESONATOR_ERROR_EXPLORATION_THRESHOLD, RESONATOR_LOW_ERROR_CONFIDENCE_SCALE,
     RESONATOR_LOW_ERROR_THRESHOLD, SELF_MODEL_ACCURACY_EMA, SELF_MODEL_HIGH_THRESHOLD,
     SELF_MODEL_HIGH_TRUST_BOOST, SELF_MODEL_LOW_CONFIDENCE_SCALE, SELF_MODEL_LOW_THRESHOLD,
-    THALAMIC_DEEP_SALIENCE, THALAMIC_REFLEX_SALIENCE, WORLD_MODEL_SPONGINESS_THRESHOLD,
+    THALAMIC_DEEP_BUDGET_SCALE, THALAMIC_DEEP_LR_FACTOR, THALAMIC_DEEP_SALIENCE,
+    THALAMIC_REFLEX_BUDGET_SCALE, THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE,
+    WORLD_MODEL_SPONGINESS_THRESHOLD,
     WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
 use super::{
@@ -122,7 +124,7 @@ impl CognitiveLoopService {
             self.carryover.history.self_model_prediction.take()
         {
             if self.stats.total_cycles >= made_at + 5 {
-                let confidence_error = (self.prediction_confidence - pred_confidence).abs();
+                let confidence_error = (self.prediction_confidence - pred_confidence).abs() as f32;
                 let urgency_match = if urgency == pred_urgency { 1.0f32 } else { 0.0 };
                 let accuracy = (1.0 - confidence_error) * 0.7 + urgency_match * 0.3;
                 self.carryover.learning.self_model_accuracy = self
@@ -264,8 +266,15 @@ impl CognitiveLoopService {
                     if let Ok(matches) =
                         res_mem.retrieve(&[("content", &perception.compressed_state)])
                     {
+                        // Thalamic depth → recall depth gating
+                        // Science: Cowan (2001) — WM capacity scales with attentional focus
+                        let recall_k = match self.cognitive_depth {
+                            super::CognitiveDepth::DeepThought => MEMORY_RECALL_TOP_K * 2,
+                            super::CognitiveDepth::Cortical => MEMORY_RECALL_TOP_K,
+                            super::CognitiveDepth::Reflex => 1,
+                        };
                         let top_matches: Vec<_> =
-                            matches.into_iter().take(MEMORY_RECALL_TOP_K).collect();
+                            matches.into_iter().take(recall_k).collect();
 
                         let best_match_sim = top_matches
                             .iter()
@@ -628,7 +637,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_success = prediction_error < self.config.learning_threshold;
         self.active_inference_bridge
-            .observe_resolution(self.prediction_confidence as f64, prediction_success);
+            .observe_resolution(self.prediction_confidence, prediction_success);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6 FEP Active Inference
@@ -782,7 +791,7 @@ impl CognitiveLoopService {
             let outcome_obs = Observation::from_consciousness_state(
                 self.social.external_reward as f64,
                 coherence as f64,
-                self.prediction_confidence as f64,
+                self.prediction_confidence,
                 effective_lr as f64,
             );
             self.fep_agent
@@ -825,7 +834,7 @@ impl CognitiveLoopService {
             let r = self.enhanced_fep_bridge.cycle(
                 prediction_error as f64,
                 coherence as f64,
-                self.prediction_confidence as f64,
+                self.prediction_confidence,
                 effective_lr as f64,
             );
             self.fep_learning_signal = r.learning_signal as f32;
@@ -911,7 +920,16 @@ impl CognitiveLoopService {
 
         // ── Phase 15: Attention budget check ─────────────────────────────────
         let neuromod_attention_alloc = self.neuromod.bath.attention_budget_allocation();
-        let attention_budget_us = (ATTENTION_BUDGET_US as f32 * neuromod_attention_alloc) as u64;
+        // Thalamic depth → attention budget scaling
+        // Science: Kahneman (1973) — deliberation allocates more attentional resources
+        let depth_budget_scale = match self.cognitive_depth {
+            super::CognitiveDepth::DeepThought => THALAMIC_DEEP_BUDGET_SCALE,
+            super::CognitiveDepth::Cortical => 1.0,
+            super::CognitiveDepth::Reflex => THALAMIC_REFLEX_BUDGET_SCALE,
+        };
+        let attention_budget_us =
+            (ATTENTION_BUDGET_US as f64 * neuromod_attention_alloc as f64 * depth_budget_scale)
+                as u64;
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
@@ -980,7 +998,7 @@ impl CognitiveLoopService {
             let ec_metrics = ECMetrics {
                 phi: unified_psi,
                 gwt: coherence as f64,
-                ast: self.prediction_confidence as f64,
+                ast: self.prediction_confidence,
                 pp: (1.0 - prediction_error as f64).clamp(0.0, 1.0),
                 rpt: pattern_confidence as f64,
                 embodiment: self.fep_learning_signal as f64,
@@ -1129,6 +1147,16 @@ impl CognitiveLoopService {
             effective_lr
         };
 
+        // Thalamic depth → learning rate gating
+        // Science: Aston-Jones & Cohen (2005) — phasic NE (exploitation/learning) vs tonic (exploration)
+        // DeepThought enhances learning; Reflex minimizes it for cached patterns
+        let effective_lr = effective_lr
+            * match self.cognitive_depth {
+                super::CognitiveDepth::DeepThought => THALAMIC_DEEP_LR_FACTOR,
+                super::CognitiveDepth::Cortical => 1.0,
+                super::CognitiveDepth::Reflex => THALAMIC_REFLEX_LR_FACTOR,
+            };
+
         let neuromod_threshold =
             perception.effective_threshold * self.neuromod.bath.threshold_gate();
 
@@ -1244,7 +1272,7 @@ impl CognitiveLoopService {
         if !learning_occurred && self.carryover.urgency.consecutive_low_error > 5 {
             if let Some(top) = self.goal_system.top_goal() {
                 let top_id = top.id.clone();
-                let delta = 0.01 * (1.0 + self.prediction_confidence * 0.5);
+                let delta = (0.01 * (1.0 + self.prediction_confidence * 0.5)) as f32;
                 self.goal_system.update_progress(&top_id, delta);
             }
         }

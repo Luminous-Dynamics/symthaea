@@ -407,6 +407,8 @@ impl CognitiveLoopService {
             req.consciousness_feasibility()
         };
 
+        let moral_anomaly_config = config.moral_anomaly_config.clone();
+
         Ok(Self {
             config,
             encoder,
@@ -740,7 +742,7 @@ impl CognitiveLoopService {
                     engine_ma,
                     engine_ve,
                     engine_hi,
-                    config.moral_anomaly_config.clone(),
+                    moral_anomaly_config.clone(),
                 )
             },
             drive_manager: super::managers::DriveManager::default(),

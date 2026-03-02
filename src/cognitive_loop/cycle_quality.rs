@@ -133,7 +133,7 @@ impl CognitiveLoopService {
                 .prediction_confidence
                 .clamp(confidence_start - max_drift, confidence_start + max_drift)
                 .clamp(0.0, 1.0);
-            self.set_confidence("homeostasis_drift_clamp", clamped);
+            self.set_confidence("homeostasis_drift_clamp", clamped as f32);
         }
 
         // Clamp attention_sensitivity to [0.5, 2.0] after all modifications.

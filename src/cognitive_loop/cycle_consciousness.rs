@@ -922,7 +922,7 @@ impl CognitiveLoopService {
                     ); // high error = high evolution pressure
                     field.set_level(
                         FiduciaryHarmonic::IntegralWisdom,
-                        self.prediction_confidence as f64,
+                        self.prediction_confidence,
                     );
                     field.set_level(
                         FiduciaryHarmonic::PanSentientFlourishing,
