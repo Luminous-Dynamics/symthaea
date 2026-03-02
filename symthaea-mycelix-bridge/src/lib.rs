@@ -309,8 +309,9 @@ fn gradient_id_from_hash(hash: &[u8; 32]) -> String {
 /// Spectral connectivity assessment from Symthaea's PhiEngine.
 ///
 /// Uses algebraic connectivity (Fiedler value) of the network graph.
-/// NOT true IIT Phi — correlation with IIT Phi is r=0.097 (near zero).
-/// See `symthaea-core/src/consciousness_metrics/` for the real IIT Phi calculator.
+/// NOT true IIT Phi — SpectralConnectivity λ₂ has r≈-0.14 vs ExhaustivePartition tier.
+/// See `symthaea-core/src/consciousness_metrics/spectral_mip.rs` for the
+/// production SpectralMIPFinder (MI Laplacian + MIP sweep, separate algorithm).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpectralConnectivityAssessment {
     /// Connectivity score before applying the update.

@@ -13,8 +13,11 @@ IIT Phi (Integrated Information Theory's Φ).
 **What it computes**: The algebraic connectivity (Fiedler value) of the network's
 connectivity graph, computed via Symthaea's PhiEngine.
 
-**What it does NOT compute**: True IIT Phi (Φ). The correlation between SpectralConnectivity
-and true IIT Phi is r=0.097 (near zero). This metric captures network connectivity structure,
+**What it does NOT compute**: True IIT Phi (Φ). The SpectralConnectivity (lambda2) tier has
+Pearson r = -0.14, Spearman rho = -0.59 vs ExhaustivePartition (Exact IIT Phi) -- a weak
+negative correlation. Lambda2 measures graph mixing time, not IIT integration. The production
+SpectralMIPFinder (MI Laplacian + Fiedler + MIP sweep) is a distinct algorithm whose
+correlation with Exact is unknown. This metric captures network connectivity structure,
 not integrated information.
 
 **Fields**:
@@ -29,7 +32,7 @@ not integrated information.
 - `ConsciousnessVector` — One of 6 dimensions in the C-Vector (see Section 5)
 
 **Known limitations**:
-- Near-zero correlation with true IIT Phi
+- Weak negative correlation with true IIT Phi (lambda2 measures graph mixing time, not integration)
 - Can be trivially gamed by maintaining graph connectivity without genuine integration
 - Sensitive to network topology but blind to causal structure
 

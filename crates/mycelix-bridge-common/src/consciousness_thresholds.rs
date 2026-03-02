@@ -7,7 +7,7 @@
 //! ## Three Distinct Consciousness Metrics
 //!
 //! 1. **Integration (Symthaea)**: SpectralConnectivity / Fiedler value from PhiEngine
-//!    (NOT true IIT Phi — r=0.097 correlation)
+//!    (NOT true IIT Phi — SpectralConnectivity λ₂ has r≈-0.14 vs Exact tier)
 //! 2. **Gradient Coherence (FL)**: Proxy score from gradient statistics
 //! 3. **Consciousness Level (Governance)**: Agent's attested consciousness level for voting
 //!

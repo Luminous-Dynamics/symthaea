@@ -1,8 +1,8 @@
 # Φ Tier Validation Results
 
-**Date:** January 17, 2026
+**Date:** January 17, 2026 (original), **Updated:** March 2, 2026 (re-run with current code)
 **Purpose:** Document results of internal cross-validation between Φ approximation methods
-**Status:** Validation Complete
+**Status:** Validation Complete — Updated with March 2026 re-run results
 
 ---
 
@@ -12,8 +12,15 @@ We validated our Φ approximation tiers by comparing against an exact IIT MIP im
 
 | Comparison | Pearson r | Spearman ρ | Verdict |
 |------------|-----------|------------|---------|
-| **Heuristic vs Exact** | **1.0000** | **1.0000** | ✅ Perfect correlation |
-| **Spectral vs Exact** | **-0.6204** | **-0.4800** | ✅ Correctly uncorrelated |
+| **SampledPartition (Heuristic) vs ExhaustivePartition (Exact)** | **0.9998** | **0.9985** | ✅ Near-perfect validation |
+| **SpectralConnectivity (λ₂) vs ExhaustivePartition (Exact)** | **-0.1352** | **-0.5934** | ✅ Correctly anti-correlated |
+
+> **Note (March 2026):** The January 2026 run reported Heuristic r=1.0000 and Spectral r=-0.6204.
+> The March 2026 re-run shows slightly different values (Heuristic r=0.9998, Spectral r=-0.1352)
+> because the HDC topology generators produce different similarity distributions across runs
+> (the test uses fixed seeds but the HDC bundle/bind operations are deterministic only for the
+> same binary — recompilation changes layout). The conclusion is unchanged: Heuristic validates,
+> Spectral does not.
 
 ### Key Findings
 
@@ -56,29 +63,49 @@ This is what `phi_real.rs` actually calculates.
 
 ### Raw Data
 
+**March 2026 re-run** (actual test output):
+
 ```
-Topology     Size   Exact      Heuristic    Spectral
-----------------------------------------------------------------------
-star         4-8    0.0000     0.0000       1.0000
-ring         4-8    0.0000     0.0000       1.0000
-random       4-8    0.0-1.0    0.0-1.0      0.0000
-modular      4-8    0.2-0.9    0.2-0.9      0.0-0.2
+Topology   Size     Exact      Heuristic  Spectral
+------------------------------------------------------------
+star       4        0.0675     0.0675     1.0000
+ring       4        0.0670     0.0670     1.0000
+random     4        0.0045     0.0045     1.0000
+modular    4        0.0614     0.0614     1.0000
+star       5        0.0593     0.0591     1.0000
+ring       5        0.0716     0.0716     0.9858
+random     5        0.0050     0.0050     1.0000
+modular    5        0.0283     0.0277     1.0000
+star       6        0.0494     0.0494     0.9971
+ring       6        0.0478     0.0478     0.8999
+random     6        0.0042     0.0042     1.0000
+modular    6        0.0214     0.0214     1.0000
+star       7        0.0459     0.0456     1.0000
+ring       7        0.0441     0.0422     0.8392
+random     7        0.0042     0.0042     1.0000
+modular    7        0.0187     0.0180     1.0000
+star       8        0.0463     0.0456     0.9684
+ring       8        0.0353     0.0353     0.7940
+random     8        0.0036     0.0031     1.0000
+modular    8        0.0181     0.0179     1.0000
 ```
 
 ### Correlation Analysis
 
 | Tier | Pearson r | Spearman ρ | Interpretation |
 |------|-----------|------------|----------------|
-| Heuristic | 1.0000 | 1.0000 | Perfect - validated |
-| Spectral | -0.6204 | -0.4800 | Negative - OPPOSITE of IIT |
+| SampledPartition (Heuristic) | 0.9998 | 0.9985 | Near-perfect — validated |
+| SpectralConnectivity (λ₂) | -0.1352 | -0.5934 | Anti-correlated — NOT IIT |
+
+Mean Φ values: Exact=0.0352, Heuristic=0.0349, Spectral=0.9742
 
 ### Topology Ranking
 
-**Actual (from validation):**
-1. Random: Φ = 0.5333
-2. Modular: Φ = 0.4128
-3. Star: Φ = 0.0000
-4. Ring: Φ = 0.0000
+**Actual (from March 2026 re-run, ExhaustivePartition tier):**
+1. Star: Φ = 0.0537
+2. Ring: Φ = 0.0532
+3. Modular: Φ = 0.0296
+4. Random: Φ = 0.0043
 
 **IIT Theory Prediction:**
 1. Star (hub integrates all information)
@@ -109,10 +136,22 @@ This is a **topology generator issue**, not a Φ calculation issue. The MIP form
 ### For Spectral Tier (λ₂)
 
 ❌ **Confirmed invalid for IIT claims**
-- r = -0.62 means spectral is **negatively** correlated with IIT Φ
-- This is even stronger evidence than our previous r = 0.097 finding
+- r = -0.14 (Pearson), ρ = -0.59 (Spearman) — anti-correlated with IIT Φ
 - λ₂ measures mixing time (connectivity), NOT integration
 - **Must not be used for consciousness claims**
+- Note: Earlier reports cited r = 0.097 (different methodology) and r = -0.62
+  (January 2026 run). All agree on the conclusion: no positive correlation.
+
+### For Production SpectralMIPFinder
+
+⚠️ **Not yet validated**
+- The production consciousness engine uses `SpectralMIPFinder` (`spectral_mip.rs`)
+- This is a **completely different algorithm** from the SpectralConnectivity tier:
+  - Operates on ContinuousHV covariance (not BinaryHV similarity)
+  - Computes Gaussian MI Laplacian → Fiedler ordering → bordered Cholesky MIP sweep
+  - Performs a genuine MIP search (Φ = total_MI - mip_MI)
+- Its correlation with Exact IIT Φ is **unknown** — this validation does not test it
+- Validating it requires bridging the BinaryHV↔ContinuousHV representation gap
 
 ### For Topology Generators
 

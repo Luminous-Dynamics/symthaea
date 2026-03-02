@@ -457,7 +457,7 @@ Three distinct metrics across the system — honestly named, not interchangeable
 
 | Metric | What It Actually Computes | Source | Renamed From |
 |--------|--------------------------|--------|-------------|
-| **Integration** | SpectralConnectivity (Fiedler value), r=0.097 correlation with IIT Phi | Symthaea PhiEngine via bridge | `PhiAssessment` → `IntegrationAssessment` |
+| **Integration** | SpectralConnectivity (Fiedler value / lambda2), Pearson r = -0.14 vs Exact IIT Phi (lambda2 measures graph mixing time, not integration) | Symthaea PhiEngine via bridge | `PhiAssessment` → `IntegrationAssessment` |
 | **Coherence** | Gradient L2 norm + entropy (output consistency) | mycelix-fl `coherence.rs` | `phi.rs` → `coherence.rs` |
 | **Consciousness Level** | Attested consciousness for governance gating | Governance bridge attestation | `PhiAttestation` → `ConsciousnessAttestation` |
 

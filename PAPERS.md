@@ -687,15 +687,18 @@ The phi-lab codebase contains TWO separate Phi implementations:
 | `phi_real.rs` | `phi-lab/src/hdc/phi_real.rs` | **Algebraic connectivity (lambda2)** — 2nd smallest eigenvalue of normalized Laplacian | O(n^3) | YES — all 260 measurements |
 | `integrated_information.rs` | `phi-lab/src/hdc/tiered_phi.rs` | True IIT-inspired Phi via minimum information partition | O(2^n) | NEVER USED for paper results |
 
-### Dual-Metric Comparison Results (Jan 17, 2026)
+### Dual-Metric Comparison Results (corrected)
 
-| Metric | Value | Meaning |
-|--------|-------|---------|
-| Pearson r | 0.0972 | Near-zero linear correlation |
-| Spearman rho | 0.0070 | Rankings completely divergent |
-| Average rank difference | 6.42 | Mean 13-position difference across topologies |
+| Tier Comparison | Pearson r | Spearman rho | Meaning |
+|----------------|-----------|-------------|---------|
+| SpectralConnectivity (lambda2) vs ExhaustivePartition (Exact) | -0.14 | -0.59 | Weak negative correlation; lambda2 measures graph mixing time, not IIT integration |
+| SampledPartition (Heuristic) vs ExhaustivePartition (Exact) | 0.9998 | 0.9985 | Near-perfect correlation; Heuristic closely tracks Exact |
 
-**Example rank divergences**: Line graph (lambda2 rank 19, Phi rank 6), Klein Bottle (lambda2 rank 5, Phi rank 18)
+> **Note**: The earlier reported r = 0.0972 / rho = 0.0070 was from a prior methodology and was
+> attributed to the wrong algorithm tier. The production SpectralMIPFinder (MI Laplacian + Fiedler +
+> MIP sweep on ContinuousHV covariance) is a distinct algorithm whose correlation with Exact is UNKNOWN.
+
+**Example rank divergences (lambda2 vs Exact)**: Line graph (lambda2 rank 19, Phi rank 6), Klein Bottle (lambda2 rank 5, Phi rank 18)
 
 ### PyPhi Validation Claim: UNVERIFIED
 

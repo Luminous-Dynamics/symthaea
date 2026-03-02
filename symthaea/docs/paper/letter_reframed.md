@@ -16,7 +16,7 @@ This document is a **completely reframed** version of our original submission. D
 | Consciousness research | Spectral graph theory research |
 | IIT validation | Network topology analysis |
 
-**Correlation between λ₂ and IIT Φ: r = 0.097** (essentially zero)
+**Correlation between λ₂ (SpectralConnectivity) and IIT Φ (ExhaustivePartition Exact): Pearson r = -0.14, Spearman rho = -0.59** (weak/negative; earlier methodology incorrectly reported r = 0.097). Note: λ₂ measures graph mixing time, not IIT integration. All tiers are HDC-based (pairwise BinaryHV similarity), not true IIT (which requires transition probability matrices).
 
 Rather than proceed with scientifically inaccurate claims, we are resubmitting with honest framing. The research findings remain valid and interesting—they are simply spectral connectivity findings, not consciousness findings.
 
@@ -106,7 +106,7 @@ To be explicitly clear, we make **no claims** about:
 - Validation of Integrated Information Theory
 - Consciousness capacity of networks
 
-Our λ₂ measurements are **spectral graph properties**, not consciousness metrics. The correlation between λ₂ and IIT Φ is r ≈ 0.10 (essentially zero), meaning these metrics capture entirely different properties.
+Our λ₂ measurements are **spectral graph properties**, not consciousness metrics. The SpectralConnectivity (λ₂) tier vs ExhaustivePartition (Exact) tier shows Pearson r = -0.14 and Spearman rho = -0.59 (earlier methodology incorrectly reported r ~ 0.10). The SampledPartition (Heuristic) tier, by contrast, correlates near-perfectly with Exact (r = 0.9998). The production SpectralMIPFinder operates on a different representation (ContinuousHV covariance) and has UNKNOWN correlation with Exact.
 
 ### Scientific Contributions
 
@@ -178,9 +178,9 @@ On January 17, 2026, we ran systematic dual-metric comparison:
 
 | Metric Pair | Correlation | Interpretation |
 |-------------|-------------|----------------|
-| λ₂ vs IIT Φ | r = 0.097 | Near-zero |
-| λ₂ vs Heuristic λ₂ | r = 1.000 | Identical |
-| λ₂ vs Exact IIT | r = -0.62 | Opposite direction |
+| SpectralConnectivity (λ₂) vs ExhaustivePartition (Exact) | Pearson r = -0.14, Spearman rho = -0.59 | Weak/negative (earlier methodology incorrectly reported r = 0.097) |
+| SampledPartition (Heuristic) vs ExhaustivePartition (Exact) | Pearson r = 0.9998, Spearman rho = 0.9985 | Near-perfect |
+| SpectralMIPFinder (production) vs ExhaustivePartition (Exact) | UNKNOWN | Different algorithm, different representation (ContinuousHV covariance) |
 
 This revealed that files named `phi_*.rs` were computing λ₂, not IIT Φ.
 

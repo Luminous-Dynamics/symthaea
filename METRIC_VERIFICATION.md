@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Multiple implementations across phi-lab and symthaea compute **different metrics** but label them all "Phi" or claim they measure IIT integrated information. The metrics have **fundamentally different topology preferences** and **near-zero correlation** (r = 0.0972) with each other.
+Multiple implementations across phi-lab and symthaea compute **different metrics** but label them all "Phi" or claim they measure IIT integrated information. The metrics have **fundamentally different topology preferences** and **weak negative correlation** (Pearson r = -0.14, Spearman rho = -0.59) between SpectralConnectivity (lambda2) and ExhaustivePartition (Exact IIT Phi). Note: the production SpectralMIPFinder (MI Laplacian + Fiedler + MIP sweep on ContinuousHV covariance) is a distinct algorithm whose correlation with Exact remains unknown.
 
 **P1 (HAI)**: SAFE — honestly labels lambda2 as a proxy, documents limitations.
 **P7 (Master Equation)**: AFFECTED — claims IIT Phi but uses lambda2.
@@ -70,9 +70,16 @@ From `phi-lab/papers/temporal_topology_consciousness/CRITICAL_FINDINGS.md`:
 
 | Comparison Metric | Value | Meaning |
 |-------------------|-------|---------|
-| Pearson r (lambda2 vs IIT Phi) | **0.0972** | Near-zero linear correlation |
-| Spearman rho | **0.0070** | Rankings completely divergent |
-| Average rank difference | **6.42** | Mean 13-position difference across 19 topologies |
+| Pearson r (SpectralConnectivity lambda2 vs ExhaustivePartition Exact) | **-0.14** | Weak negative linear correlation |
+| Spearman rho (SpectralConnectivity lambda2 vs ExhaustivePartition Exact) | **-0.59** | Moderate negative rank correlation — rankings substantially divergent |
+| SampledPartition (Heuristic) Pearson r vs Exact | **0.9998** | Near-perfect linear correlation |
+| SampledPartition (Heuristic) Spearman rho vs Exact | **0.9985** | Near-perfect rank correlation |
+
+> **Note**: The earlier reported r = 0.0972 / rho = 0.0070 was from a prior methodology and was
+> attributed to the wrong algorithm tier. The corrected values above distinguish SpectralConnectivity
+> (lambda2, which measures graph mixing time, not IIT integration) from SampledPartition (Heuristic,
+> which closely tracks Exact IIT Phi). The production SpectralMIPFinder (MI Laplacian + Fiedler +
+> MIP sweep on ContinuousHV covariance) is a distinct algorithm whose correlation with Exact is UNKNOWN.
 
 Example rank divergences:
 - Line graph: lambda2 rank 19, Phi rank 6
@@ -106,7 +113,7 @@ Example rank divergences:
 1. PyPhi validation feature is gated (`#[cfg(feature = "pyphi")]`)
 2. Feature appears never compiled by default
 3. No results file exists in repository
-4. Actual correlation when tested: r = 0.0972 (not 0.994)
+4. Actual correlation when tested: SpectralConnectivity (lambda2) vs Exact has Pearson r = -0.14 (not 0.994). Lambda2 measures graph mixing time, not IIT integration.
 
 **Severity**: Unsubstantiated claim. Must be removed before submission.
 
@@ -132,7 +139,7 @@ Example rank divergences:
 - Reframe as "spectral topology" paper (already drafted: `letter_reframed.md`)
 - Remove ALL IIT/Tononi claims
 - Remove PyPhi validation claim (r = 0.994)
-- Add honest statement: "lambda2 shows near-zero correlation (r = 0.0972) with IIT Phi"
+- Add honest statement: "SpectralConnectivity (lambda2) shows weak negative correlation (Pearson r = -0.14, Spearman rho = -0.59) with ExhaustivePartition (Exact IIT Phi); lambda2 measures graph mixing time, not IIT integration"
 - Core finding (99.2% optimal 3D small-world, lambda2 → 0.5 asymptotically) remains novel
 - Retarget: Network Neuroscience or Journal of Complex Networks
 
