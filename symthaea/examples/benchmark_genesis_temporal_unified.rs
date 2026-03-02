@@ -12,6 +12,7 @@ fn main() {
     // ── Build one predictor per domain ────────────────────────────────────
 
     let predictors: Vec<Box<dyn TemporalPredictor>> = vec![
+        // Original 5 domains
         Box::new(symthaea_physics::PlasmaMultiScalePredictor::new()),
         Box::new(symthaea_cell_foundry::HydrologicalPredictor::new()),
         Box::new(symthaea_materials::MaterialAgingModel::new()),
@@ -19,6 +20,16 @@ fn main() {
         Box::new(symthaea_physics::ScalePredictor::new(
             symthaea_physics::PhysicalScale::Molecular,
         )),
+        // 12 new domains (DOE 2026 expansion)
+        Box::new(symthaea_physics::GridPredictor::new()),
+        Box::new(symthaea_physics::FissionPredictor::new()),
+        Box::new(symthaea_physics::AcceleratorPredictor::new()),
+        Box::new(symthaea_physics::ThreatPredictor::new()),
+        Box::new(symthaea_physics::DatacenterPredictor::new()),
+        Box::new(symthaea_cell_foundry::ExperimentPredictor::new()),
+        Box::new(symthaea_materials::StrategicPredictor::new()),
+        Box::new(symthaea_materials::MiningPredictor::new()),
+        Box::new(symthaea_nuclear_forensics::SafeguardsPredictor::new()),
     ];
 
     // ── 1. Domain metadata ────────────────────────────────────────────────
