@@ -4,11 +4,11 @@
 //! and its explicit CSG operation tree, enabling bidirectional mapping
 //! between the "thought space" and "geometry space".
 
-use symthaea_core::hdc::unified_hv::ContinuousHV;
 use crate::csg::{BooleanOp, CSGNode, Primitive};
-use crate::mesh::{TriangleMesh, resolve_to_mesh};
+use crate::mesh::{resolve_to_mesh, TriangleMesh};
 use crate::primitives::*;
 use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 /// Printer constraints for parametric generation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,11 +54,7 @@ impl GeometricThought {
         if let Some(ref constraints) = self.printer_constraints {
             let mesh = self.resolve();
             let (min, max) = mesh_aabb(&mesh);
-            let size = [
-                max[0] - min[0],
-                max[1] - min[1],
-                max[2] - min[2],
-            ];
+            let size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
             size[0] <= constraints.max_build_volume[0]
                 && size[1] <= constraints.max_build_volume[1]
                 && size[2] <= constraints.max_build_volume[2]
@@ -111,8 +107,12 @@ fn mesh_aabb(mesh: &TriangleMesh) -> ([f32; 3], [f32; 3]) {
     let mut max = [f32::MIN; 3];
     for v in &mesh.vertices {
         for i in 0..3 {
-            if v[i] < min[i] { min[i] = v[i]; }
-            if v[i] > max[i] { max[i] = v[i]; }
+            if v[i] < min[i] {
+                min[i] = v[i];
+            }
+            if v[i] > max[i] {
+                max[i] = v[i];
+            }
         }
     }
     (min, max)

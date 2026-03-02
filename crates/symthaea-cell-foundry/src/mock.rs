@@ -40,10 +40,10 @@ impl MockIncubator {
     pub fn step(&mut self, dt_hours: f64) {
         let drift = self.drift_rate * dt_hours;
         self.environment.temperature_celsius -= drift * 0.5; // Heat loss
-        self.environment.co2_percent -= drift * 0.3;          // CO2 diffusion
-        self.environment.ph += drift * 0.1;                   // pH drift up as CO2 drops
-        self.environment.humidity_percent -= drift * 0.2;     // Evaporation
-        self.environment.media_volume_ml -= drift * 0.05;     // Evaporation
+        self.environment.co2_percent -= drift * 0.3; // CO2 diffusion
+        self.environment.ph += drift * 0.1; // pH drift up as CO2 drops
+        self.environment.humidity_percent -= drift * 0.2; // Evaporation
+        self.environment.media_volume_ml -= drift * 0.05; // Evaporation
 
         // Clamp to physical limits
         self.environment.temperature_celsius = self.environment.temperature_celsius.max(15.0);
@@ -75,9 +75,9 @@ pub struct MockCellPopulation {
     /// Individual cell states in this population.
     pub cells: Vec<CellState>,
     /// Net growth rate in doublings per day under ideal conditions.
-    pub growth_rate: f64,  // Doublings per day
+    pub growth_rate: f64, // Doublings per day
     /// Fraction of cells that die per day under ideal conditions.
-    pub death_rate: f64,   // Fraction dying per day
+    pub death_rate: f64, // Fraction dying per day
 }
 
 impl MockCellPopulation {
@@ -88,19 +88,17 @@ impl MockCellPopulation {
             .collect();
         Self {
             cells,
-            growth_rate: 0.5,  // One doubling every 2 days
-            death_rate: 0.05,  // 5% death per day
+            growth_rate: 0.5, // One doubling every 2 days
+            death_rate: 0.05, // 5% death per day
         }
     }
 
     /// Create a population of iPSC cells.
     pub fn new_ipsc(initial_count: usize) -> Self {
-        let cells = (0..initial_count)
-            .map(|_| CellState::new_ipsc())
-            .collect();
+        let cells = (0..initial_count).map(|_| CellState::new_ipsc()).collect();
         Self {
             cells,
-            growth_rate: 0.7,  // iPSCs grow faster
+            growth_rate: 0.7, // iPSCs grow faster
             death_rate: 0.03,
         }
     }
@@ -129,7 +127,10 @@ impl MockCellPopulation {
         let new_cells = (self.cells.len() as f64 * effective_growth) as usize;
         for _ in 0..new_cells {
             let mut new_cell = CellState {
-                cell_type: self.cells.first().map_or(CellType::Somatic, |c| c.cell_type),
+                cell_type: self
+                    .cells
+                    .first()
+                    .map_or(CellType::Somatic, |c| c.cell_type),
                 viability: 0.95,
                 pluripotency_score: self.cells.first().map_or(0.0, |c| c.pluripotency_score),
                 division_count: 0,
@@ -226,7 +227,11 @@ mod tests {
     fn test_mock_population_viability() {
         let pop = MockCellPopulation::new(100);
         let viability = pop.viability();
-        assert!(viability > 0.9, "Initial viability should be high: {}", viability);
+        assert!(
+            viability > 0.9,
+            "Initial viability should be high: {}",
+            viability
+        );
     }
 
     #[test]

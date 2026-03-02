@@ -1137,9 +1137,7 @@ async fn test_mind_to_mind_affective_roundtrip() {
 #[cfg(feature = "mesh")]
 #[test]
 fn test_lora_double_loss_graceful() {
-    use crate::swarm::mesh::{
-        MeshUrgency, PayloadType, WisdomPacket, LORA_MTU,
-    };
+    use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket, LORA_MTU};
     use symthaea_core::hdc::BinaryHV;
 
     // Build a WisdomPacket and fragment it
@@ -2825,8 +2823,7 @@ async fn test_bridge_key_propagation_roundtrip() {
 
     let key = [0xCC; 32];
 
-    let (transport_a, transport_b) =
-        BiLoopbackTransport::pair("propagate_a", "propagate_b", 2200);
+    let (transport_a, transport_b) = BiLoopbackTransport::pair("propagate_a", "propagate_b", 2200);
 
     // Create mesh routers WITHOUT encryption keys initially
     let mesh_a = DualLayerMesh::new([0xCC; 32]).with_batman(Box::new(transport_a));
@@ -2876,8 +2873,8 @@ async fn test_bridge_key_propagation_roundtrip() {
 #[test]
 fn test_xchacha_send_receive_roundtrip() {
     use crate::swarm::mesh::{
-        MeshReceiver, WisdomPacket,
-        MeshUrgency, PayloadType, compress_packet, encrypt_packet_xchacha,
+        compress_packet, encrypt_packet_xchacha, MeshReceiver, MeshUrgency, PayloadType,
+        WisdomPacket,
     };
     use symthaea_core::hdc::BinaryHV;
 
@@ -2903,7 +2900,10 @@ fn test_xchacha_send_receive_roundtrip() {
     // Receiver with standard encryption key should auto-detect XChaCha
     let mut receiver = MeshReceiver::new().with_encryption_key(key);
     let decoded = receiver.receive_whole(&encrypted);
-    assert!(decoded.is_some(), "XChaCha-encrypted packet should be decoded");
+    assert!(
+        decoded.is_some(),
+        "XChaCha-encrypted packet should be decoded"
+    );
     let decoded = decoded.unwrap();
     assert_eq!(decoded.sequence, 42);
     assert_eq!(decoded.phi, 0.75);
@@ -2954,8 +2954,7 @@ fn test_rapid_key_rotation_under_load() {
                 wisdom: BinaryHV([rotation; 2048]),
             };
             let compressed = compress_packet(&packet.to_bytes());
-            let encrypted =
-                pair.encrypt_typed(&compressed, &source_id, 0, pair.key_version(), seq);
+            let encrypted = pair.encrypt_typed(&compressed, &source_id, 0, pair.key_version(), seq);
 
             // Decrypt with same pair — should always succeed
             if pair.decrypt(&encrypted).is_some() {
@@ -2967,7 +2966,10 @@ fn test_rapid_key_rotation_under_load() {
         pair.tick(rotation as u64 * 100 + 60);
     }
 
-    assert_eq!(received, total, "All packets should decrypt during rotation");
+    assert_eq!(
+        received, total,
+        "All packets should decrypt during rotation"
+    );
 }
 
 /// Verify key_version wraps correctly from 255 → 0 and decrypt still works.
@@ -2990,7 +2992,8 @@ fn test_rotating_key_pair_version_wrapping() {
         // Encrypt and decrypt with versioned format
         let plaintext = b"test payload for version wrapping";
         let compressed = compress_packet(plaintext);
-        let encrypted = pair.encrypt_typed(&compressed, &source_id, 0, pair.key_version(), i as u32);
+        let encrypted =
+            pair.encrypt_typed(&compressed, &source_id, 0, pair.key_version(), i as u32);
         let decrypted = pair.decrypt(&encrypted);
         assert!(
             decrypted.is_some(),
@@ -3095,7 +3098,13 @@ fn test_fragment_swap_rejected() {
             let mut buf = [0u8; 256];
             let len = f.to_bytes(&mut buf);
             let raw = &buf[..len];
-            crate::swarm::mesh::encrypt_fragment(raw, &key, &source_id, f.thought_id, f.fragment_index)
+            crate::swarm::mesh::encrypt_fragment(
+                raw,
+                &key,
+                &source_id,
+                f.thought_id,
+                f.fragment_index,
+            )
         })
         .collect();
 
@@ -3271,7 +3280,8 @@ fn test_fragment_replay_after_completion() {
     );
     // Should NOT produce a second completed packet
     assert_eq!(
-        receiver.stats().packets_complete, 1,
+        receiver.stats().packets_complete,
+        1,
         "Replay should not increment packets_complete"
     );
 }
@@ -3282,7 +3292,9 @@ fn test_fragment_replay_after_completion() {
 #[cfg(feature = "mesh-encryption")]
 #[test]
 fn test_downgrade_unencrypted_rejected() {
-    use crate::swarm::mesh::{compress_packet, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket};
+    use crate::swarm::mesh::{
+        compress_packet, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket,
+    };
     use symthaea_core::hdc::BinaryHV;
 
     let key = [0x88u8; 32];
@@ -3310,7 +3322,8 @@ fn test_downgrade_unencrypted_rejected() {
         "Unencrypted packet must be rejected when encryption is enabled (downgrade attack)"
     );
     assert_eq!(
-        receiver.stats().packets_decrypt_failed, 1,
+        receiver.stats().packets_decrypt_failed,
+        1,
         "Downgrade attempt should be counted as decrypt failure"
     );
 }

@@ -14,11 +14,11 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 /// Hydrological prediction horizons (seconds).
 pub const WATER_HORIZONS: &[f32] = &[
-    3_600.0,       // 1 hour   — contamination response
-    86_400.0,      // 1 day    — daily monitoring
-    604_800.0,     // 1 week   — weekly patterns
-    2_592_000.0,   // 1 month  — seasonal trends
-    31_536_000.0,  // 1 year   — annual cycles
+    3_600.0,      // 1 hour   — contamination response
+    86_400.0,     // 1 day    — daily monitoring
+    604_800.0,    // 1 week   — weekly patterns
+    2_592_000.0,  // 1 month  — seasonal trends
+    31_536_000.0, // 1 year   — annual cycles
 ];
 
 /// Human-readable horizon labels.
@@ -88,12 +88,17 @@ impl WaterQualityReading {
         let ph_err = (self.ph - ref_reading.ph) / ref_reading.ph;
         let turb_err = (self.turbidity_ntu - ref_reading.turbidity_ntu).max(0.0) / 1.0;
         let tds_err = (self.tds_mg_l - ref_reading.tds_mg_l).max(0.0) / 500.0;
-        let do_err = (ref_reading.dissolved_oxygen_mg_l - self.dissolved_oxygen_mg_l).max(0.0) / 8.0;
+        let do_err =
+            (ref_reading.dissolved_oxygen_mg_l - self.dissolved_oxygen_mg_l).max(0.0) / 8.0;
         let nit_err = (self.nitrates_mg_l - ref_reading.nitrates_mg_l).max(0.0) / 10.0;
         let col_err = self.coliform_per_100ml / 10.0;
 
-        ph_err * ph_err + turb_err * turb_err + tds_err * tds_err
-            + do_err * do_err + nit_err * nit_err + col_err * col_err
+        ph_err * ph_err
+            + turb_err * turb_err
+            + tds_err * tds_err
+            + do_err * do_err
+            + nit_err * nit_err
+            + col_err * col_err
     }
 }
 
@@ -185,7 +190,11 @@ impl HydrologicalPredictor {
     /// # Panics
     ///
     /// Panics if `horizon_seconds` is not finite or is non-positive.
-    pub fn predict_at_horizon(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+    pub fn predict_at_horizon(
+        &self,
+        current_state: &ContinuousHV,
+        horizon_seconds: f32,
+    ) -> ContinuousHV {
         assert!(
             horizon_seconds.is_finite() && horizon_seconds > 0.0,
             "horizon_seconds must be finite and positive, got {}",
@@ -460,7 +469,10 @@ mod tests {
         r2.ph = 7.3; // tiny change
         let hv1 = encoder.encode(&r1);
         let hv2 = encoder.encode(&r2);
-        assert!(hv1.similarity(&hv2) > 0.9, "Similar readings should produce similar HVs");
+        assert!(
+            hv1.similarity(&hv2) > 0.9,
+            "Similar readings should produce similar HVs"
+        );
     }
 
     #[test]
@@ -511,7 +523,9 @@ mod tests {
         assert!(
             ratio < 5.0 && ratio > 0.2,
             "O(1) property: 1h took {:?}, 1y took {:?}, ratio={}",
-            time_1h, time_1y, ratio
+            time_1h,
+            time_1y,
+            ratio
         );
     }
 
@@ -526,7 +540,10 @@ mod tests {
     fn test_fep_action_contaminated() {
         let agent = WaterFepAgent::new();
         let reading = WaterQualityReading::contaminated();
-        assert_eq!(agent.select_action(&reading), WaterFepAction::EmergencyShutoff);
+        assert_eq!(
+            agent.select_action(&reading),
+            WaterFepAction::EmergencyShutoff
+        );
     }
 
     #[test]
@@ -534,7 +551,10 @@ mod tests {
         let agent = WaterFepAgent::new();
         let mut reading = WaterQualityReading::clean();
         reading.turbidity_ntu = 8.0;
-        assert_eq!(agent.select_action(&reading), WaterFepAction::ActivateFilters);
+        assert_eq!(
+            agent.select_action(&reading),
+            WaterFepAction::ActivateFilters
+        );
     }
 
     #[test]
@@ -550,7 +570,10 @@ mod tests {
         let agent = WaterFepAgent::new();
         let mut reading = WaterQualityReading::clean();
         reading.nitrates_mg_l = 15.0;
-        assert_eq!(agent.select_action(&reading), WaterFepAction::ReduceExtraction);
+        assert_eq!(
+            agent.select_action(&reading),
+            WaterFepAction::ReduceExtraction
+        );
     }
 
     #[test]
@@ -594,8 +617,14 @@ mod tests {
 
     #[test]
     fn test_from_index_out_of_bounds_returns_shutoff() {
-        assert_eq!(WaterFepAction::from_index(6), WaterFepAction::EmergencyShutoff);
-        assert_eq!(WaterFepAction::from_index(100), WaterFepAction::EmergencyShutoff);
+        assert_eq!(
+            WaterFepAction::from_index(6),
+            WaterFepAction::EmergencyShutoff
+        );
+        assert_eq!(
+            WaterFepAction::from_index(100),
+            WaterFepAction::EmergencyShutoff
+        );
     }
 
     #[test]

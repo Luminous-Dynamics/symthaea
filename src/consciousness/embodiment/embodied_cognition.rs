@@ -1331,7 +1331,11 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Find body parts by semantic similarity to query vector
-    pub(crate) fn query_body_parts(&self, query: &BinaryHV, threshold: f32) -> Vec<(&BodyPart, f32)> {
+    pub(crate) fn query_body_parts(
+        &self,
+        query: &BinaryHV,
+        threshold: f32,
+    ) -> Vec<(&BodyPart, f32)> {
         let mut results: Vec<_> = self
             .body_parts
             .iter()
@@ -1343,7 +1347,11 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Find movements by semantic similarity to query vector
-    pub(crate) fn query_movements(&self, query: &BinaryHV, threshold: f32) -> Vec<(&MovementType, f32)> {
+    pub(crate) fn query_movements(
+        &self,
+        query: &BinaryHV,
+        threshold: f32,
+    ) -> Vec<(&MovementType, f32)> {
         let mut results: Vec<_> = self
             .movements
             .iter()

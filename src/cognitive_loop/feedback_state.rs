@@ -118,8 +118,7 @@ impl ProposalCollector {
 
         // Average additive proposals (noise-resistant consensus)
         if !adds.is_empty() {
-            let avg_delta: f64 =
-                adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
+            let avg_delta: f64 = adds.iter().map(|(_, d)| d).sum::<f64>() / adds.len() as f64;
             value += avg_delta;
         }
         // Geometric mean of multiplicative proposals
@@ -280,18 +279,10 @@ impl FeedbackState {
         let base_exploration = self.cycle_start_exploration;
         let base_threshold = self.cycle_start_threshold;
 
-        let conf_result = self
-            .confidence
-            .integrate(base_confidence, 0.0, 1.0);
-        let lr_result = self
-            .learning_rate
-            .integrate(base_lr, 1.0, 3.0);
-        let explore_result = self
-            .exploration
-            .integrate(base_exploration, 0.0, 1.0);
-        let thresh_result = self
-            .threshold
-            .integrate(base_threshold, 0.5, 2.0);
+        let conf_result = self.confidence.integrate(base_confidence, 0.0, 1.0);
+        let lr_result = self.learning_rate.integrate(base_lr, 1.0, 3.0);
+        let explore_result = self.exploration.integrate(base_exploration, 0.0, 1.0);
+        let thresh_result = self.threshold.integrate(base_threshold, 0.5, 2.0);
 
         let consensus = ConsensusResult {
             consensus_confidence: conf_result.effective,

@@ -13,11 +13,11 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 /// Manufacturing prediction horizons (seconds): 0.1s → 1s → 10s → 100s → 1 day.
 pub const MANUFACTURING_HORIZONS: &[f32] = &[
-    0.1,       // 0.1s — tool pass
-    1.0,       // 1s — operation
-    10.0,      // 10s — cycle
-    100.0,     // 100s — batch
-    86_400.0,  // 1 day — shift
+    0.1,      // 0.1s — tool pass
+    1.0,      // 1s — operation
+    10.0,     // 10s — cycle
+    100.0,    // 100s — batch
+    86_400.0, // 1 day — shift
 ];
 
 pub const MANUFACTURING_HORIZON_LABELS: &[&str] = &[
@@ -351,7 +351,10 @@ mod tests {
 
     #[test]
     fn test_horizons_labels_match() {
-        assert_eq!(MANUFACTURING_HORIZONS.len(), MANUFACTURING_HORIZON_LABELS.len());
+        assert_eq!(
+            MANUFACTURING_HORIZONS.len(),
+            MANUFACTURING_HORIZON_LABELS.len()
+        );
     }
 
     #[test]
@@ -450,7 +453,11 @@ mod tests {
         let output = twin.step(&reading, 1.0);
         let (consciousness, error, coherence) = output.to_safety_tuple();
         // All values should be in [0, 1]
-        assert!((0.0..=1.0).contains(&consciousness), "consciousness={}", consciousness);
+        assert!(
+            (0.0..=1.0).contains(&consciousness),
+            "consciousness={}",
+            consciousness
+        );
         assert!((0.0..=1.0).contains(&error), "error={}", error);
         assert!(coherence.is_finite(), "coherence must be finite");
     }

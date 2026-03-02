@@ -9,10 +9,10 @@ use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 pub const EXPERIMENT_HORIZONS: &[f32] = &[
-    3_600.0,       // 1 hr — batch completion
-    86_400.0,      // 1 day — daily schedule
-    604_800.0,     // 1 week — experiment cycle
-    2_592_000.0,   // 1 month — campaign
+    3_600.0,     // 1 hr — batch completion
+    86_400.0,    // 1 day — daily schedule
+    604_800.0,   // 1 week — experiment cycle
+    2_592_000.0, // 1 month — campaign
 ];
 
 pub const EXPERIMENT_HORIZON_LABELS: &[&str] = &[
@@ -37,7 +37,9 @@ pub struct ExperimentHdcEncoder {
 impl ExperimentHdcEncoder {
     pub fn new() -> Self {
         let seeds: [u64; 4] = [0xE4A_0001, 0xE4A_0002, 0xE4A_0003, 0xE4A_0004];
-        Self { bases: seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s)) }
+        Self {
+            bases: seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s)),
+        }
     }
 
     pub fn encode(&self, reading: &ExperimentReading) -> ContinuousHV {
@@ -52,7 +54,9 @@ impl ExperimentHdcEncoder {
 }
 
 impl Default for ExperimentHdcEncoder {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct ExperimentPredictor {
@@ -67,7 +71,9 @@ impl ExperimentPredictor {
             dimension: HDC_DIMENSION,
             ..UnifiedConfig::default()
         };
-        Self { neuron: HdcLtcUnifiedNeuron::new(config, 0xE4A_10A0) }
+        Self {
+            neuron: HdcLtcUnifiedNeuron::new(config, 0xE4A_10A0),
+        }
     }
 
     pub fn predict_at_horizon(&self, current: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
@@ -83,18 +89,30 @@ impl ExperimentPredictor {
 }
 
 impl Default for ExperimentPredictor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl symthaea_core::temporal::TemporalPredictor for ExperimentPredictor {
     fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
         self.predict_at_horizon(current_state, horizon_seconds)
     }
-    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) { self.observe(state, dt_seconds); }
-    fn domain(&self) -> &'static str { "experiment" }
-    fn tau_base(&self) -> f32 { 3_600.0 }
-    fn default_horizons(&self) -> &'static [f32] { EXPERIMENT_HORIZONS }
-    fn horizon_labels(&self) -> &'static [&'static str] { EXPERIMENT_HORIZON_LABELS }
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.observe(state, dt_seconds);
+    }
+    fn domain(&self) -> &'static str {
+        "experiment"
+    }
+    fn tau_base(&self) -> f32 {
+        3_600.0
+    }
+    fn default_horizons(&self) -> &'static [f32] {
+        EXPERIMENT_HORIZONS
+    }
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        EXPERIMENT_HORIZON_LABELS
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -122,29 +140,43 @@ pub struct ExperimentFepAgent {
 
 impl ExperimentFepAgent {
     pub fn new() -> Self {
-        Self { reference_state: ContinuousHV::random(HDC_DIMENSION, 0xE4A_BEEF) }
+        Self {
+            reference_state: ContinuousHV::random(HDC_DIMENSION, 0xE4A_BEEF),
+        }
     }
 
-    pub fn set_reference(&mut self, reference: ContinuousHV) { self.reference_state = reference; }
+    pub fn set_reference(&mut self, reference: ContinuousHV) {
+        self.reference_state = reference;
+    }
 
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
         let sim = observed.similarity(&self.reference_state) as f64;
-        if !sim.is_finite() { return 1.0; }
+        if !sim.is_finite() {
+            return 1.0;
+        }
         (1.0 - sim).max(0.0)
     }
 
     pub fn select_action(&self, observed: &ContinuousHV) -> ExperimentFepAction {
         let fe = self.compute_free_energy(observed);
-        if fe > 0.7 { ExperimentFepAction::Abort }
-        else if fe > 0.5 { ExperimentFepAction::Pause }
-        else if fe > 0.3 { ExperimentFepAction::Reallocate }
-        else if fe > 0.1 { ExperimentFepAction::Replicate }
-        else { ExperimentFepAction::Continue }
+        if fe > 0.7 {
+            ExperimentFepAction::Abort
+        } else if fe > 0.5 {
+            ExperimentFepAction::Pause
+        } else if fe > 0.3 {
+            ExperimentFepAction::Reallocate
+        } else if fe > 0.1 {
+            ExperimentFepAction::Replicate
+        } else {
+            ExperimentFepAction::Continue
+        }
     }
 }
 
 impl Default for ExperimentFepAgent {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -153,20 +185,32 @@ mod tests {
     use std::time::Instant;
 
     fn healthy() -> ExperimentReading {
-        ExperimentReading { experiment_uncertainty: 0.2, cost: 0.3, time_remaining: 604_800.0, info_gain: 0.7 }
+        ExperimentReading {
+            experiment_uncertainty: 0.2,
+            cost: 0.3,
+            time_remaining: 604_800.0,
+            info_gain: 0.7,
+        }
     }
 
     #[test]
     fn test_horizons_ordered() {
-        for i in 1..EXPERIMENT_HORIZONS.len() { assert!(EXPERIMENT_HORIZONS[i] > EXPERIMENT_HORIZONS[i - 1]); }
+        for i in 1..EXPERIMENT_HORIZONS.len() {
+            assert!(EXPERIMENT_HORIZONS[i] > EXPERIMENT_HORIZONS[i - 1]);
+        }
     }
 
     #[test]
-    fn test_horizons_labels_match() { assert_eq!(EXPERIMENT_HORIZONS.len(), EXPERIMENT_HORIZON_LABELS.len()); }
+    fn test_horizons_labels_match() {
+        assert_eq!(EXPERIMENT_HORIZONS.len(), EXPERIMENT_HORIZON_LABELS.len());
+    }
 
     #[test]
     fn test_encoder_dimension() {
-        assert_eq!(ExperimentHdcEncoder::new().encode(&healthy()).dim(), HDC_DIMENSION);
+        assert_eq!(
+            ExperimentHdcEncoder::new().encode(&healthy()).dim(),
+            HDC_DIMENSION
+        );
     }
 
     #[test]
@@ -174,10 +218,14 @@ mod tests {
         let pred = ExperimentPredictor::new();
         let input = ContinuousHV::random(HDC_DIMENSION, 42);
         let t1 = Instant::now();
-        for _ in 0..100 { let _ = pred.predict_at_horizon(&input, 3_600.0); }
+        for _ in 0..100 {
+            let _ = pred.predict_at_horizon(&input, 3_600.0);
+        }
         let short = t1.elapsed();
         let t2 = Instant::now();
-        for _ in 0..100 { let _ = pred.predict_at_horizon(&input, 2_592_000.0); }
+        for _ in 0..100 {
+            let _ = pred.predict_at_horizon(&input, 2_592_000.0);
+        }
         let long = t2.elapsed();
         let ratio = long.as_nanos() as f64 / short.as_nanos().max(1) as f64;
         assert!(ratio < 5.0 && ratio > 0.2, "O(1) violated: ratio={}", ratio);

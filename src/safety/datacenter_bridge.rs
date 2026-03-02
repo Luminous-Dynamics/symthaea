@@ -86,7 +86,11 @@ pub fn datacenter_safety_to_level(level: DatacenterSafetyLevel) -> SafetyLevel {
 mod tests {
     use super::*;
 
-    fn mock_output(free_energy: f64, safety: DatacenterSafetyLevel, action: DatacenterFepAction) -> DatacenterOutput {
+    fn mock_output(
+        free_energy: f64,
+        safety: DatacenterSafetyLevel,
+        action: DatacenterFepAction,
+    ) -> DatacenterOutput {
         DatacenterOutput {
             free_energy,
             recommended_action: action,
@@ -98,23 +102,43 @@ mod tests {
     #[test]
     fn test_healthy_datacenter_maps_to_green() {
         let mut adapter = DatacenterSafetyAdapter::new();
-        let output = mock_output(0.05, DatacenterSafetyLevel::Green, DatacenterFepAction::Maintain);
+        let output = mock_output(
+            0.05,
+            DatacenterSafetyLevel::Green,
+            DatacenterFepAction::Maintain,
+        );
         let assessment = adapter.assess(&output);
         assert_eq!(assessment.level, SafetyLevel::Green);
     }
 
     #[test]
     fn test_datacenter_safety_to_level_mapping() {
-        assert_eq!(datacenter_safety_to_level(DatacenterSafetyLevel::Green), SafetyLevel::Green);
-        assert_eq!(datacenter_safety_to_level(DatacenterSafetyLevel::Yellow), SafetyLevel::Yellow);
-        assert_eq!(datacenter_safety_to_level(DatacenterSafetyLevel::Orange), SafetyLevel::Orange);
-        assert_eq!(datacenter_safety_to_level(DatacenterSafetyLevel::Red), SafetyLevel::Red);
+        assert_eq!(
+            datacenter_safety_to_level(DatacenterSafetyLevel::Green),
+            SafetyLevel::Green
+        );
+        assert_eq!(
+            datacenter_safety_to_level(DatacenterSafetyLevel::Yellow),
+            SafetyLevel::Yellow
+        );
+        assert_eq!(
+            datacenter_safety_to_level(DatacenterSafetyLevel::Orange),
+            SafetyLevel::Orange
+        );
+        assert_eq!(
+            datacenter_safety_to_level(DatacenterSafetyLevel::Red),
+            SafetyLevel::Red
+        );
     }
 
     #[test]
     fn test_gate_blocks_risky_at_orange() {
         let adapter = DatacenterSafetyAdapter::new();
-        let output = mock_output(0.6, DatacenterSafetyLevel::Orange, DatacenterFepAction::ThrottleCompute);
+        let output = mock_output(
+            0.6,
+            DatacenterSafetyLevel::Orange,
+            DatacenterFepAction::ThrottleCompute,
+        );
         assert!(!adapter.gate_operation(&output, true).is_ok());
         assert!(adapter.gate_operation(&output, false).is_ok());
     }
@@ -122,7 +146,11 @@ mod tests {
     #[test]
     fn test_gate_blocks_all_at_red() {
         let adapter = DatacenterSafetyAdapter::new();
-        let output = mock_output(0.9, DatacenterSafetyLevel::Red, DatacenterFepAction::EmergencyCooldown);
+        let output = mock_output(
+            0.9,
+            DatacenterSafetyLevel::Red,
+            DatacenterFepAction::EmergencyCooldown,
+        );
         assert!(!adapter.gate_operation(&output, false).is_ok());
         assert!(!adapter.gate_operation(&output, true).is_ok());
     }

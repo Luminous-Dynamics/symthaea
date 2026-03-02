@@ -680,7 +680,7 @@ fn test_resonator_recall_no_panic_on_cold_start() {
     let result = service.cycle("cold start input with no prior episodes");
     assert!(result.prediction_error.is_finite());
     assert!(result.metadata.memory.resonator_episodes <= 1); // encoding may fire on high pred_error
-                                                      // Factorization needs >= 2 episodes, so 0 on first cycle
+                                                             // Factorization needs >= 2 episodes, so 0 on first cycle
     assert_eq!(result.metadata.memory.resonator_factorization_iters, 0);
 }
 
@@ -813,8 +813,7 @@ fn test_response_profile_serde_roundtrip() {
 
     // Serialize and deserialize preserves the profile
     let json = serde_json::to_string(&result.metadata).unwrap();
-    let deser: super::super::types::CycleMetadata =
-        serde_json::from_str(&json).unwrap();
+    let deser: super::super::types::CycleMetadata = serde_json::from_str(&json).unwrap();
     assert_eq!(
         result.metadata.response_profile, deser.response_profile,
         "response_profile should survive serde roundtrip"

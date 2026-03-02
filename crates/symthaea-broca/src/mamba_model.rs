@@ -15,9 +15,21 @@ use candle_nn::VarBuilder;
 
 /// Manual RMSNorm implementation using primitive tensor ops.
 ///
-/// Replaces `candle_nn::RmsNorm` to avoid the missing CUDA kernel in candle 0.8.
-/// All individual ops (sqr, sum_keepdim, div, sqrt, broadcast_mul) have CUDA
-/// kernels, so this works on both CPU and GPU.
+/// Replaces `candle_nn::RmsNorm` to avoid a missing CUDA kernel in candle 0.8.
+/// The upstream `candle_nn::RmsNorm` uses a fused custom kernel that was not
+/// ported to CUDA at the time of vendoring (candle-transformers 0.8.4).
+///
+/// # CUDA Safety
+///
+/// All operations used here have individual CUDA kernel implementations:
+/// - `sqr()` — element-wise square
+/// - `sum_keepdim()` — reduction with dimension preservation
+/// - `broadcast_div()` — broadcasted division
+/// - `sqrt()` — element-wise square root
+/// - `broadcast_mul()` — broadcasted multiplication (weight scaling)
+///
+/// This makes the vendored RmsNorm fully CUDA-compatible without requiring
+/// any custom CUDA kernels beyond what candle-core provides.
 #[derive(Clone, Debug)]
 struct RmsNorm {
     weight: Tensor,

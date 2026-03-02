@@ -35,10 +35,10 @@ use symthaea_nurture::{
 
 // ─── Population ──────────────────────────────────────────────────────────────
 use symthaea_population::{
-    encode_individual, encode_locus, heterozygosity_after_generations,
-    observed_heterozygosity, Allele, BiologicalSex, BreedingStrategy,
-    EthicalTension, Genotype, GovernanceTier, Individual, Locus, MatingPair, Pedigree,
-    PedigreeEntry, Population, PopulationDecision, PopulationSimulator,
+    encode_individual, encode_locus, heterozygosity_after_generations, observed_heterozygosity,
+    Allele, BiologicalSex, BreedingStrategy, EthicalTension, Genotype, GovernanceTier, Individual,
+    Locus, MatingPair, Pedigree, PedigreeEntry, Population, PopulationDecision,
+    PopulationSimulator,
 };
 
 // =============================================================================
@@ -62,9 +62,18 @@ fn test_genomics_assembly_to_cell_state() {
 
     // Step 3: Assess assembly quality
     let quality = QualityAssessor::assess_assembly(&contigs);
-    assert!(quality.total_length > 0, "Assembly should have non-zero total length");
-    assert!(quality.num_contigs > 0, "Assembly should have at least one contig");
-    assert!(quality.completeness > 0.0, "Completeness should be positive");
+    assert!(
+        quality.total_length > 0,
+        "Assembly should have non-zero total length"
+    );
+    assert!(
+        quality.num_contigs > 0,
+        "Assembly should have at least one contig"
+    );
+    assert!(
+        quality.completeness > 0.0,
+        "Completeness should be positive"
+    );
 
     // Step 4: Use assembly quality metrics to construct a cell state
     // A high-quality assembly implies we can proceed with cell manipulation
@@ -72,13 +81,19 @@ fn test_genomics_assembly_to_cell_state() {
     // Modulate viability based on assembly completeness (simulating
     // the idea that better DNA quality -> more viable starting material)
     cell.viability = 0.8 + 0.2 * quality.completeness;
-    assert!(cell.viability > 0.8, "Cell viability should reflect assembly quality");
+    assert!(
+        cell.viability > 0.8,
+        "Cell viability should reflect assembly quality"
+    );
     assert_eq!(cell.cell_type, CellType::Somatic);
 
     // Step 5: Verify the cell state can be HDC-encoded
     let cell_hv = encode_cell_state(&cell);
     assert_eq!(cell_hv.dim(), HDC_DIMENSION);
-    assert!(cell_hv.norm() > 0.0, "Encoded cell state HV should be non-zero");
+    assert!(
+        cell_hv.norm() > 0.0,
+        "Encoded cell state HV should be non-zero"
+    );
 }
 
 // =============================================================================
@@ -136,7 +151,11 @@ fn test_ectogenesis_fetal_monitoring() {
         monitor.record(metrics);
     }
 
-    assert_eq!(monitor.history.len(), 11, "Should have recorded 11 measurements");
+    assert_eq!(
+        monitor.history.len(),
+        11,
+        "Should have recorded 11 measurements"
+    );
 
     // Growth percentile for normative data should be near 50th percentile
     let percentile = monitor.growth_percentile();
@@ -195,16 +214,26 @@ fn test_ectogenesis_consent_proxy_escalation() {
     let gate = EctogenesisEthicsGate::fully_approved();
 
     // PreSentient: low bar (0.3)
-    assert!(gate.check_intervention(GestationalWeek::new(4), "test", 0.4).is_ok());
-    assert!(gate.check_intervention(GestationalWeek::new(4), "test", 0.1).is_err());
+    assert!(gate
+        .check_intervention(GestationalWeek::new(4), "test", 0.4)
+        .is_ok());
+    assert!(gate
+        .check_intervention(GestationalWeek::new(4), "test", 0.1)
+        .is_err());
 
     // Sentient: high bar (0.7) + all approvals required
-    assert!(gate.check_intervention(GestationalWeek::new(30), "test", 0.8).is_ok());
-    assert!(gate.check_intervention(GestationalWeek::new(30), "test", 0.5).is_err());
+    assert!(gate
+        .check_intervention(GestationalWeek::new(30), "test", 0.8)
+        .is_ok());
+    assert!(gate
+        .check_intervention(GestationalWeek::new(30), "test", 0.5)
+        .is_err());
 
     // Unapproved gate fails for sentient even with high benefit
     let unapproved = EctogenesisEthicsGate::unapproved();
-    assert!(unapproved.check_intervention(GestationalWeek::new(30), "test", 0.9).is_err());
+    assert!(unapproved
+        .check_intervention(GestationalWeek::new(30), "test", 0.9)
+        .is_err());
 }
 
 // =============================================================================
@@ -445,14 +474,22 @@ fn test_hdc_vectors_flow_across_pipeline() {
     let contigs = assembler.assemble(&reads);
     assert!(!contigs.is_empty());
     for contig in &contigs {
-        assert_eq!(contig.hv.dim(), HDC_DIMENSION, "Contig HV should be 16,384D");
+        assert_eq!(
+            contig.hv.dim(),
+            HDC_DIMENSION,
+            "Contig HV should be 16,384D"
+        );
         assert!(contig.hv.norm() > 0.0, "Contig HV should be non-zero");
     }
 
     // Cell Foundry: cell state HVs
     let somatic = CellState::new_somatic();
     let somatic_hv = encode_cell_state(&somatic);
-    assert_eq!(somatic_hv.dim(), HDC_DIMENSION, "Cell state HV should be 16,384D");
+    assert_eq!(
+        somatic_hv.dim(),
+        HDC_DIMENSION,
+        "Cell state HV should be 16,384D"
+    );
     assert!(somatic_hv.norm() > 0.0, "Cell state HV should be non-zero");
 
     let ipsc = CellState::new_ipsc();
@@ -468,7 +505,11 @@ fn test_hdc_vectors_flow_across_pipeline() {
     // Ectogenesis: fetal state HVs
     let fetal_hv_w20 = encode_fetal_state(&FetalMetrics::normative(GestationalWeek::new(20)));
     let fetal_hv_w30 = encode_fetal_state(&FetalMetrics::normative(GestationalWeek::new(30)));
-    assert_eq!(fetal_hv_w20.dim(), HDC_DIMENSION, "Fetal HV should be 16,384D");
+    assert_eq!(
+        fetal_hv_w20.dim(),
+        HDC_DIMENSION,
+        "Fetal HV should be 16,384D"
+    );
     assert_eq!(fetal_hv_w30.dim(), HDC_DIMENSION);
     assert!(fetal_hv_w20.norm() > 0.0, "Fetal HV should be non-zero");
     assert!(fetal_hv_w30.norm() > 0.0);
@@ -487,7 +528,10 @@ fn test_hdc_vectors_flow_across_pipeline() {
         HDC_DIMENSION,
         "Attachment HV should be 16,384D"
     );
-    assert!(initial_attachment_hv.norm() > 0.0, "Attachment HV should be non-zero");
+    assert!(
+        initial_attachment_hv.norm() > 0.0,
+        "Attachment HV should be non-zero"
+    );
     // Working model HV should also be valid
     assert_eq!(
         attachment.internal_working_model.model_hv.dim(),
@@ -525,7 +569,11 @@ fn test_hdc_vectors_flow_across_pipeline() {
         },
     ];
     let genome_hv = encode_individual(&loci, &genotypes);
-    assert_eq!(genome_hv.dim(), HDC_DIMENSION, "Genome HV should be 16,384D");
+    assert_eq!(
+        genome_hv.dim(),
+        HDC_DIMENSION,
+        "Genome HV should be 16,384D"
+    );
     assert!(genome_hv.norm() > 0.0, "Genome HV should be non-zero");
 
     // All HVs share the same dimensionality, proving pipeline-wide compatibility
@@ -650,8 +698,14 @@ fn test_ethics_gates_present_at_each_stage() {
     let min_pre = ecto_gate.minimum_benefit(GestationalWeek::new(3));
     let min_em = ecto_gate.minimum_benefit(GestationalWeek::new(15));
     let min_sent = ecto_gate.minimum_benefit(GestationalWeek::new(30));
-    assert!(min_pre < min_em, "Minimum benefit should increase: {min_pre} < {min_em}");
-    assert!(min_em < min_sent, "Minimum benefit should increase: {min_em} < {min_sent}");
+    assert!(
+        min_pre < min_em,
+        "Minimum benefit should increase: {min_pre} < {min_em}"
+    );
+    assert!(
+        min_em < min_sent,
+        "Minimum benefit should increase: {min_em} < {min_sent}"
+    );
 
     // Population ethics: governance tiers with escalating thresholds
     let pairing_decision = PopulationDecision::ApprovePairing(MatingPair {
@@ -666,7 +720,8 @@ fn test_ethics_gates_present_at_each_stage() {
         "Pairing should be Citizen-tier"
     );
 
-    let strategy_decision = PopulationDecision::ModifyStrategy(BreedingStrategy::HdcDistanceMaximize);
+    let strategy_decision =
+        PopulationDecision::ModifyStrategy(BreedingStrategy::HdcDistanceMaximize);
     assert_eq!(
         strategy_decision.required_tier(),
         GovernanceTier::Constitutional,
@@ -693,7 +748,10 @@ fn test_ethics_gates_present_at_each_stage() {
     // Population ethical tension encoding produces valid HDC vectors
     let tension = EthicalTension::new("test_tension", 0.4, 0.3, 0.2, 0.1);
     assert_eq!(tension.tension_hv.dim(), HDC_DIMENSION);
-    assert!(tension.tension_hv.norm() > 0.5, "Ethical tension HV should be normalized");
+    assert!(
+        tension.tension_hv.norm() > 0.5,
+        "Ethical tension HV should be normalized"
+    );
     assert_eq!(tension.dominant_value(), "autonomy"); // 0.4 = unambiguous max
 }
 
@@ -888,10 +946,14 @@ fn test_strange_situation_cognitive_loop() {
         .map(|m| m.attachment_security.unwrap_or(0.0))
         .collect();
     let calm_range = calm_scores.iter().cloned().fold(f64::INFINITY, f64::min)
-        ..=calm_scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        ..=calm_scores
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
     assert!(
         *calm_range.end() - *calm_range.start() < 0.2,
         "calm phase security should be stable (range < 0.2): [{}, {}]",
-        calm_range.start(), calm_range.end()
+        calm_range.start(),
+        calm_range.end()
     );
 }

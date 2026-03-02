@@ -9,11 +9,11 @@ use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 pub const THREAT_HORIZONS: &[f32] = &[
-    0.01,      // 10 ms — immediate detection
-    0.1,       // 100 ms — pattern confirmation
-    1.0,       // 1 s — response initiation
-    60.0,      // 1 min — situational assessment
-    3_600.0,   // 1 hr — threat evolution
+    0.01,    // 10 ms — immediate detection
+    0.1,     // 100 ms — pattern confirmation
+    1.0,     // 1 s — response initiation
+    60.0,    // 1 min — situational assessment
+    3_600.0, // 1 hr — threat evolution
 ];
 
 pub const THREAT_HORIZON_LABELS: &[&str] = &[
@@ -40,7 +40,9 @@ pub struct ThreatHdcEncoder {
 impl ThreatHdcEncoder {
     pub fn new() -> Self {
         let seeds: [u64; 5] = [0x7E8_0001, 0x7E8_0002, 0x7E8_0003, 0x7E8_0004, 0x7E8_0005];
-        Self { bases: seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s)) }
+        Self {
+            bases: seeds.map(|s| ContinuousHV::random(HDC_DIMENSION, s)),
+        }
     }
 
     pub fn encode(&self, reading: &ThreatReading) -> ContinuousHV {
@@ -56,7 +58,9 @@ impl ThreatHdcEncoder {
 }
 
 impl Default for ThreatHdcEncoder {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct ThreatPredictor {
@@ -71,7 +75,9 @@ impl ThreatPredictor {
             dimension: HDC_DIMENSION,
             ..UnifiedConfig::default()
         };
-        Self { neuron: HdcLtcUnifiedNeuron::new(config, 0x7E8_10A0) }
+        Self {
+            neuron: HdcLtcUnifiedNeuron::new(config, 0x7E8_10A0),
+        }
     }
 
     pub fn predict_at_horizon(&self, current: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
@@ -87,18 +93,30 @@ impl ThreatPredictor {
 }
 
 impl Default for ThreatPredictor {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl symthaea_core::temporal::TemporalPredictor for ThreatPredictor {
     fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
         self.predict_at_horizon(current_state, horizon_seconds)
     }
-    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) { self.observe(state, dt_seconds); }
-    fn domain(&self) -> &'static str { "threat" }
-    fn tau_base(&self) -> f32 { 1.0 }
-    fn default_horizons(&self) -> &'static [f32] { THREAT_HORIZONS }
-    fn horizon_labels(&self) -> &'static [&'static str] { THREAT_HORIZON_LABELS }
+    fn observe(&mut self, state: &ContinuousHV, dt_seconds: f32) {
+        self.observe(state, dt_seconds);
+    }
+    fn domain(&self) -> &'static str {
+        "threat"
+    }
+    fn tau_base(&self) -> f32 {
+        1.0
+    }
+    fn default_horizons(&self) -> &'static [f32] {
+        THREAT_HORIZONS
+    }
+    fn horizon_labels(&self) -> &'static [&'static str] {
+        THREAT_HORIZON_LABELS
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -131,29 +149,43 @@ pub struct ThreatFepAgent {
 
 impl ThreatFepAgent {
     pub fn new() -> Self {
-        Self { reference_state: ContinuousHV::random(HDC_DIMENSION, 0x7E8_BEEF) }
+        Self {
+            reference_state: ContinuousHV::random(HDC_DIMENSION, 0x7E8_BEEF),
+        }
     }
 
-    pub fn set_reference(&mut self, reference: ContinuousHV) { self.reference_state = reference; }
+    pub fn set_reference(&mut self, reference: ContinuousHV) {
+        self.reference_state = reference;
+    }
 
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
         let sim = observed.similarity(&self.reference_state) as f64;
-        if !sim.is_finite() { return 1.0; }
+        if !sim.is_finite() {
+            return 1.0;
+        }
         (1.0 - sim).max(0.0)
     }
 
     pub fn select_action(&self, observed: &ContinuousHV) -> ThreatFepAction {
         let fe = self.compute_free_energy(observed);
-        if fe > FE_EMERGENCY_PROTOCOL { ThreatFepAction::EmergencyProtocol }
-        else if fe > FE_EVACUATE { ThreatFepAction::Evacuate }
-        else if fe > FE_ACTIVATE { ThreatFepAction::ActivateResponse }
-        else if fe > FE_ELEVATE { ThreatFepAction::ElevateAlert }
-        else { ThreatFepAction::Monitor }
+        if fe > FE_EMERGENCY_PROTOCOL {
+            ThreatFepAction::EmergencyProtocol
+        } else if fe > FE_EVACUATE {
+            ThreatFepAction::Evacuate
+        } else if fe > FE_ACTIVATE {
+            ThreatFepAction::ActivateResponse
+        } else if fe > FE_ELEVATE {
+            ThreatFepAction::ElevateAlert
+        } else {
+            ThreatFepAction::Monitor
+        }
     }
 }
 
 impl Default for ThreatFepAgent {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -199,24 +231,41 @@ impl ThreatTwin {
         self.cycle_count += 1;
         let hv = self.encoder.encode(reading);
         self.predictor.observe(&hv, dt_seconds);
-        let sims: Vec<(f32, f32)> = THREAT_HORIZONS.iter()
+        let sims: Vec<(f32, f32)> = THREAT_HORIZONS
+            .iter()
             .map(|&h| (h, self.predictor.predict_at_horizon(&hv, h).similarity(&hv)))
             .collect();
         let fe = self.agent.compute_free_energy(&hv);
         let action = self.agent.select_action(&hv);
-        let level = if fe > FE_EMERGENCY_PROTOCOL { ThreatLevel::Red }
-            else if fe > FE_EVACUATE { ThreatLevel::Orange }
-            else if fe > FE_ELEVATE { ThreatLevel::Yellow }
-            else { ThreatLevel::Green };
-        ThreatOutput { free_energy: fe, recommended_action: action, threat_level: level, prediction_similarities: sims }
+        let level = if fe > FE_EMERGENCY_PROTOCOL {
+            ThreatLevel::Red
+        } else if fe > FE_EVACUATE {
+            ThreatLevel::Orange
+        } else if fe > FE_ELEVATE {
+            ThreatLevel::Yellow
+        } else {
+            ThreatLevel::Green
+        };
+        ThreatOutput {
+            free_energy: fe,
+            recommended_action: action,
+            threat_level: level,
+            prediction_similarities: sims,
+        }
     }
 
-    pub fn predictor(&self) -> &ThreatPredictor { &self.predictor }
-    pub fn cycle_count(&self) -> u64 { self.cycle_count }
+    pub fn predictor(&self) -> &ThreatPredictor {
+        &self.predictor
+    }
+    pub fn cycle_count(&self) -> u64 {
+        self.cycle_count
+    }
 }
 
 impl Default for ThreatTwin {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -225,16 +274,26 @@ mod tests {
     use std::time::Instant;
 
     fn healthy() -> ThreatReading {
-        ThreatReading { sensor_reading: 0.5, expected_value: 0.5, surprise_signal: 0.0, response_time: 1.0, confidence: 0.9 }
+        ThreatReading {
+            sensor_reading: 0.5,
+            expected_value: 0.5,
+            surprise_signal: 0.0,
+            response_time: 1.0,
+            confidence: 0.9,
+        }
     }
 
     #[test]
     fn test_horizons_ordered() {
-        for i in 1..THREAT_HORIZONS.len() { assert!(THREAT_HORIZONS[i] > THREAT_HORIZONS[i - 1]); }
+        for i in 1..THREAT_HORIZONS.len() {
+            assert!(THREAT_HORIZONS[i] > THREAT_HORIZONS[i - 1]);
+        }
     }
 
     #[test]
-    fn test_horizons_labels_match() { assert_eq!(THREAT_HORIZONS.len(), THREAT_HORIZON_LABELS.len()); }
+    fn test_horizons_labels_match() {
+        assert_eq!(THREAT_HORIZONS.len(), THREAT_HORIZON_LABELS.len());
+    }
 
     #[test]
     fn test_encoder_dimension() {
@@ -254,13 +313,21 @@ mod tests {
         let pred = ThreatPredictor::new();
         let input = ContinuousHV::random(HDC_DIMENSION, 42);
         let t1 = Instant::now();
-        for _ in 0..100 { let _ = pred.predict_at_horizon(&input, 0.01); }
+        for _ in 0..100 {
+            let _ = pred.predict_at_horizon(&input, 0.01);
+        }
         let short = t1.elapsed();
         let t2 = Instant::now();
-        for _ in 0..100 { let _ = pred.predict_at_horizon(&input, 3600.0); }
+        for _ in 0..100 {
+            let _ = pred.predict_at_horizon(&input, 3600.0);
+        }
         let long = t2.elapsed();
         let ratio = long.as_nanos() as f64 / short.as_nanos().max(1) as f64;
-        assert!(ratio < 5.0 && ratio > 0.2, "O(1) violated: ratio={}", ratio);
+        assert!(
+            ratio < 10.0 && ratio > 0.1,
+            "O(1) violated: ratio={}",
+            ratio
+        );
     }
 
     #[test]

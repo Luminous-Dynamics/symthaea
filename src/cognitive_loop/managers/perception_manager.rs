@@ -198,9 +198,7 @@ impl CognitiveSubsystem for PerceptionManager {
         self.budget_exceeded_streak = u32::from_le_bytes(
             data[8..12]
                 .try_into()
-                .map_err(|_| {
-                    "PerceptionManager: corrupt checkpoint bytes [8..12]".to_string()
-                })?,
+                .map_err(|_| "PerceptionManager: corrupt checkpoint bytes [8..12]".to_string())?,
         );
         self.vigilant = data[12] != 0;
         Ok(())

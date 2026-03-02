@@ -395,7 +395,10 @@ mod tests {
         twin.set_reference(&reading);
         let output = twin.step(&reading, 1.0);
         assert_eq!(output.safety_level, AcceleratorSafetyLevel::Green);
-        assert_eq!(output.recommended_action, AcceleratorFepAction::MaintainBeam);
+        assert_eq!(
+            output.recommended_action,
+            AcceleratorFepAction::MaintainBeam
+        );
     }
 
     #[test]

@@ -24,6 +24,18 @@ use crate::mamba_model::{Config, Model, State};
 ///
 /// Returns CUDA GPU 0 if available (requires the `cuda` feature),
 /// otherwise falls back to CPU.
+///
+/// # CUDA Requirements
+///
+/// - Compile with `--features cuda` (enables `candle-core/cuda`)
+/// - NVIDIA GPU with CUDA toolkit installed
+/// - On NixOS: `LD_LIBRARY_PATH="/run/opengl-driver/lib"` required
+///
+/// # Fallback Behavior
+///
+/// If CUDA is unavailable (feature disabled, no GPU, or driver error),
+/// silently falls back to CPU. Mamba-130m runs at ~430ms/forward on
+/// CPU (with `RUSTFLAGS="-C target-cpu=native"` for AVX2+FMA).
 pub fn best_device() -> Device {
     #[cfg(feature = "cuda")]
     {

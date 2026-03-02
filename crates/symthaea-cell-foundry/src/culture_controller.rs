@@ -62,7 +62,7 @@ impl CultureController {
     pub fn new(target: CultureEnvironment) -> Self {
         // Use a configuration with longer time constants suitable for biological processes
         let config = UnifiedConfig {
-            tau_base: 10.0,       // 10 second base — biological control is slow
+            tau_base: 10.0, // 10 second base — biological control is slow
             backbone_tau: 0.3,
             dimension: HDC_DIMENSION,
             ..UnifiedConfig::default()
@@ -85,11 +85,7 @@ impl CultureController {
     ///
     /// Encodes the current environment into an HDC vector, evolves the LTC
     /// neuron state, and decodes the neuron's output into environment adjustments.
-    pub fn step(
-        &mut self,
-        current_env: &CultureEnvironment,
-        dt_seconds: f32,
-    ) -> CultureAdjustment {
+    pub fn step(&mut self, current_env: &CultureEnvironment, dt_seconds: f32) -> CultureAdjustment {
         let env_hv = encode_environment(current_env);
         self.neuron.evolve_closed_form(dt_seconds, &env_hv);
         self.decode_adjustment(current_env)
@@ -140,8 +136,7 @@ impl CultureController {
         let delta_ph = ph_error * gain;
 
         // Media change needed if pH drift is large or culture is old
-        let media_change_needed =
-            ph_error.abs() > 0.3 || current.passage_number > 20;
+        let media_change_needed = ph_error.abs() > 0.3 || current.passage_number > 20;
 
         CultureAdjustment {
             delta_temp,
@@ -245,7 +240,10 @@ mod tests {
         let mut current = CultureEnvironment::standard();
         current.ph = 8.0; // large drift
         let adj = controller.step(&current, 1.0);
-        assert!(adj.media_change_needed, "Large pH drift should trigger media change");
+        assert!(
+            adj.media_change_needed,
+            "Large pH drift should trigger media change"
+        );
     }
 
     #[test]

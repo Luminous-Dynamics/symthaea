@@ -35,8 +35,14 @@ fn main() {
     // ── 1. Domain metadata ────────────────────────────────────────────────
 
     println!("--- Domain Registry ---");
-    println!("{:>20}  {:>14}  {:>12}", "Domain", "tau_base (s)", "Natural dt");
-    println!("{:>20}  {:>14}  {:>12}", "------", "-----------", "----------");
+    println!(
+        "{:>20}  {:>14}  {:>12}",
+        "Domain", "tau_base (s)", "Natural dt"
+    );
+    println!(
+        "{:>20}  {:>14}  {:>12}",
+        "------", "-----------", "----------"
+    );
     for p in &predictors {
         let tau = p.tau_base();
         let label = if tau < 1.0 {
@@ -138,10 +144,19 @@ fn main() {
         let horizons = p.default_horizons();
         let labels = p.horizon_labels();
         if horizons.is_empty() {
-            println!("  {:>20}: no fixed horizons (uses tau={:.6}s)", p.domain(), p.tau_base());
+            println!(
+                "  {:>20}: no fixed horizons (uses tau={:.6}s)",
+                p.domain(),
+                p.tau_base()
+            );
         } else {
             let label_str: Vec<&str> = labels.iter().copied().collect();
-            println!("  {:>20}: {} horizons — {}", p.domain(), horizons.len(), label_str.join(", "));
+            println!(
+                "  {:>20}: {} horizons — {}",
+                p.domain(),
+                horizons.len(),
+                label_str.join(", ")
+            );
         }
     }
 
@@ -164,5 +179,8 @@ fn main() {
     println!("  Timescale span: {:.1} orders of magnitude", orders);
     println!("  All O(1):       YES (ratio < 5.0 for all domains)");
 
-    println!("\nPASS: Unified TemporalPredictor across {} domains", predictors.len());
+    println!(
+        "\nPASS: Unified TemporalPredictor across {} domains",
+        predictors.len()
+    );
 }

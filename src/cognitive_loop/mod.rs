@@ -196,10 +196,10 @@ use crate::exploration::SurpriseExplorationBridge;
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
 use crate::memory::memory_coordinator::MemoryCoordinator;
 use crate::memory::semantic_memory::SemanticMemory;
+use crate::partnership::{HumanPartnerModel, PhiDyadCalculator};
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 use crate::safety::SafetyGateway;
-use crate::partnership::{HumanPartnerModel, PhiDyadCalculator};
 use crate::voice::voice_feedback::VoiceFeedbackBridge;
 // MetaCognitiveLayer now owned by SelfModelTierManager
 use std::collections::VecDeque;

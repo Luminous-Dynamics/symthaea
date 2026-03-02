@@ -155,10 +155,31 @@ impl MaterialProperty {
 mod tests {
     use super::*;
 
-    #[test] fn test_presets_count() { assert_eq!(MaterialProperty::presets().len(), 5); }
-    #[test] fn test_steel_category() { assert_eq!(MaterialProperty::steel_a36().category, MaterialCategory::Metal); }
-    #[test] fn test_concrete_category() { assert_eq!(MaterialProperty::concrete_c30().category, MaterialCategory::Ceramic); }
-    #[test] fn test_carbon_fiber_category() { assert_eq!(MaterialProperty::carbon_fiber_t300().category, MaterialCategory::Composite); }
+    #[test]
+    fn test_presets_count() {
+        assert_eq!(MaterialProperty::presets().len(), 5);
+    }
+    #[test]
+    fn test_steel_category() {
+        assert_eq!(
+            MaterialProperty::steel_a36().category,
+            MaterialCategory::Metal
+        );
+    }
+    #[test]
+    fn test_concrete_category() {
+        assert_eq!(
+            MaterialProperty::concrete_c30().category,
+            MaterialCategory::Ceramic
+        );
+    }
+    #[test]
+    fn test_carbon_fiber_category() {
+        assert_eq!(
+            MaterialProperty::carbon_fiber_t300().category,
+            MaterialCategory::Composite
+        );
+    }
 
     #[test]
     fn test_normalized_bounded() {
@@ -204,7 +225,11 @@ mod tests {
             assert!(m.thermal_conductivity_w_mk > 0.0, "thermal for {}", m.name);
             assert!(m.specific_heat_j_kgk > 0.0, "specific heat for {}", m.name);
             assert!(m.melting_point_c > 0.0, "melting for {}", m.name);
-            assert!(m.corrosion_resistance >= 0.0 && m.corrosion_resistance <= 1.0, "corrosion for {}", m.name);
+            assert!(
+                m.corrosion_resistance >= 0.0 && m.corrosion_resistance <= 1.0,
+                "corrosion for {}",
+                m.name
+            );
             assert!(m.fatigue_limit_mpa > 0.0, "fatigue for {}", m.name);
         }
     }

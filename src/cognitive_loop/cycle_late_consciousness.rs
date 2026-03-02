@@ -234,7 +234,8 @@ impl CognitiveLoopService {
                 }
             } else {
                 // Read cached accuracy/depth without updating (avoid 0.0 in telemetry on skip)
-                self.self_model_tier.meta_cognition
+                self.self_model_tier
+                    .meta_cognition
                     .as_ref()
                     .map(|m| (m.accuracy(), m.depth()))
                     .unwrap_or((0.0, 0))
@@ -379,7 +380,8 @@ impl CognitiveLoopService {
             }
         } else {
             // Read cached self_phi without processing (avoid 0.0 triggering weak-identity feedback)
-            self.self_model_tier.narrative_self
+            self.self_model_tier
+                .narrative_self
                 .as_ref()
                 .map(|n| n.self_phi())
                 .unwrap_or(0.0)

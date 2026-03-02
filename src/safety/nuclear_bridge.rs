@@ -90,11 +90,7 @@ impl NuclearSafetyAdapter {
     /// Check whether a nuclear operation should proceed given attribution confidence.
     ///
     /// Maps confidence to safety level, then applies the safety gate.
-    pub fn gate_operation(
-        &self,
-        input: &NuclearSafetyInput,
-        is_risky: bool,
-    ) -> SafetyGateResult {
+    pub fn gate_operation(&self, input: &NuclearSafetyInput, is_risky: bool) -> SafetyGateResult {
         let level = confidence_to_safety_level(input.attribution.confidence);
         safety_gate(level, is_risky)
     }
@@ -194,7 +190,9 @@ mod tests {
 
     #[test]
     fn test_is_suspicious() {
-        assert!(!NuclearSafetyAdapter::is_suspicious(&high_confidence_input()));
+        assert!(!NuclearSafetyAdapter::is_suspicious(
+            &high_confidence_input()
+        ));
     }
 
     #[test]

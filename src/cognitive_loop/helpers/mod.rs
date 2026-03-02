@@ -565,14 +565,20 @@ impl CognitiveLoopService {
         self.stats.novelty_bonus = self.curiosity_drive.novelty_bonus;
 
         // Self-reflection stats
-        self.stats.self_assessment = format!("{:?}", self.self_model_tier.self_reflection.self_assessment);
+        self.stats.self_assessment =
+            format!("{:?}", self.self_model_tier.self_reflection.self_assessment);
         self.stats.reflection_count = self.self_model_tier.self_reflection.reflection_count;
         self.stats.adjustments_made = self.self_model_tier.self_reflection.adjustments_made;
-        self.stats.learning_effectiveness = self.self_model_tier.self_reflection.learning_effectiveness();
+        self.stats.learning_effectiveness = self
+            .self_model_tier
+            .self_reflection
+            .learning_effectiveness();
         let summary = self.self_model_tier.self_reflection.summary();
         self.stats.next_reflection_in = summary.next_reflection_in;
-        self.stats.adapted_flow_threshold = self.self_model_tier.self_reflection.flow_error_threshold;
-        self.stats.adapted_boredom_threshold = self.self_model_tier.self_reflection.boredom_threshold;
+        self.stats.adapted_flow_threshold =
+            self.self_model_tier.self_reflection.flow_error_threshold;
+        self.stats.adapted_boredom_threshold =
+            self.self_model_tier.self_reflection.boredom_threshold;
 
         // ═══════════════════════════════════════════════════════════════════════
         // MEGA-UNIFIED ARCHITECTURE STATS

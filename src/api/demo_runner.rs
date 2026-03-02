@@ -178,7 +178,11 @@ impl DemoRunner {
             moral_surprise: m.harmonics.moral_surprise,
             moral_scenario_distribution: m.harmonics.moral_scenario_distribution,
             moral_prior_distribution: m.harmonics.moral_prior_distribution,
-            moral_betti: [m.ethics.moral_topo_beta_0, m.ethics.moral_topo_beta_1, m.ethics.moral_topo_beta_2],
+            moral_betti: [
+                m.ethics.moral_topo_beta_0,
+                m.ethics.moral_topo_beta_1,
+                m.ethics.moral_topo_beta_2,
+            ],
             moral_unity: m.ethics.moral_topo_unity,
             moral_completeness: m.ethics.moral_topo_completeness,
             moral_circularity: m.ethics.moral_topo_circularity,

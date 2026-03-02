@@ -4,8 +4,8 @@ use crate::isotope::IsotopicSignature;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 const SEEDS: [u64; 9] = [
-    0xACE_0001, 0xACE_0002, 0xACE_0003, 0xACE_0004, 0xACE_0005,
-    0xACE_0006, 0xACE_0007, 0xACE_0008, 0xACE_0009,
+    0xACE_0001, 0xACE_0002, 0xACE_0003, 0xACE_0004, 0xACE_0005, 0xACE_0006, 0xACE_0007, 0xACE_0008,
+    0xACE_0009,
 ];
 
 /// Encodes isotopic signatures into 16,384D continuous hypervectors.
@@ -39,31 +39,63 @@ impl IsotopicHdcEncoder {
     /// Compute pairwise similarity matrix for a set of signatures.
     pub fn similarity_matrix(&self, signatures: &[IsotopicSignature]) -> Vec<Vec<f32>> {
         let hvs: Vec<ContinuousHV> = signatures.iter().map(|s| self.encode(s)).collect();
-        hvs.iter().map(|a| hvs.iter().map(|b| a.similarity(b)).collect()).collect()
+        hvs.iter()
+            .map(|a| hvs.iter().map(|b| a.similarity(b)).collect())
+            .collect()
     }
 }
 
-impl Default for IsotopicHdcEncoder { fn default() -> Self { Self::new() } }
+impl Default for IsotopicHdcEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test] fn test_encode_dimension() { assert_eq!(IsotopicHdcEncoder::new().encode(&IsotopicSignature::highly_enriched_uranium()).dim(), HDC_DIMENSION); }
-    #[test] fn test_encode_nonzero_norm() { assert!(IsotopicHdcEncoder::new().encode(&IsotopicSignature::highly_enriched_uranium()).norm() > 0.0); }
+    #[test]
+    fn test_encode_dimension() {
+        assert_eq!(
+            IsotopicHdcEncoder::new()
+                .encode(&IsotopicSignature::highly_enriched_uranium())
+                .dim(),
+            HDC_DIMENSION
+        );
+    }
+    #[test]
+    fn test_encode_nonzero_norm() {
+        assert!(
+            IsotopicHdcEncoder::new()
+                .encode(&IsotopicSignature::highly_enriched_uranium())
+                .norm()
+                > 0.0
+        );
+    }
 
     #[test]
     fn test_self_similarity() {
         let enc = IsotopicHdcEncoder::new();
-        let s = enc.similarity(&IsotopicSignature::highly_enriched_uranium(), &IsotopicSignature::highly_enriched_uranium());
+        let s = enc.similarity(
+            &IsotopicSignature::highly_enriched_uranium(),
+            &IsotopicSignature::highly_enriched_uranium(),
+        );
         assert!(s > 0.99, "Self-similarity should be ~1.0, got {}", s);
     }
 
     #[test]
     fn test_heu_vs_natural_different() {
         let enc = IsotopicHdcEncoder::new();
-        let s = enc.similarity(&IsotopicSignature::highly_enriched_uranium(), &IsotopicSignature::natural_uranium());
-        assert!(s < 0.999, "HEU vs Natural should be distinguishable, got {}", s);
+        let s = enc.similarity(
+            &IsotopicSignature::highly_enriched_uranium(),
+            &IsotopicSignature::natural_uranium(),
+        );
+        assert!(
+            s < 0.999,
+            "HEU vs Natural should be distinguishable, got {}",
+            s
+        );
     }
 
     #[test]
@@ -85,6 +117,10 @@ mod tests {
     #[test]
     fn test_similarity_matrix_symmetric() {
         let m = IsotopicHdcEncoder::new().similarity_matrix(&IsotopicSignature::references());
-        for i in 0..5 { for j in 0..5 { assert!((m[i][j] - m[j][i]).abs() < 1e-6); } }
+        for i in 0..5 {
+            for j in 0..5 {
+                assert!((m[i][j] - m[j][i]).abs() < 1e-6);
+            }
+        }
     }
 }

@@ -13,11 +13,11 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 /// Fission prediction horizons (seconds): 0.1s → 1s → 10s → 100s → 1day.
 pub const FISSION_HORIZONS: &[f32] = &[
-    0.1,       // 0.1s — prompt neutron response
-    1.0,       // 1s — delayed neutron dynamics
-    10.0,      // 10s — xenon poisoning onset
-    100.0,     // 100s — thermal hydraulic transient
-    86_400.0,  // 1 day — fuel burnup
+    0.1,      // 0.1s — prompt neutron response
+    1.0,      // 1s — delayed neutron dynamics
+    10.0,     // 10s — xenon poisoning onset
+    100.0,    // 100s — thermal hydraulic transient
+    86_400.0, // 1 day — fuel burnup
 ];
 
 pub const FISSION_HORIZON_LABELS: &[&str] = &[

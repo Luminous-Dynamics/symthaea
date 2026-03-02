@@ -381,7 +381,8 @@ pub mod causal;
 #[cfg(feature = "identity")]
 pub mod identity;
 
-// GUI bridge (enabled - 0 errors)
+// GUI bridge — only needed by symthaea-gui binary
+#[cfg(feature = "gui")]
 pub mod gui_bridge;
 
 // Physics: tokamak plasma encoding, C-Mod adapter, Phi-based control loops

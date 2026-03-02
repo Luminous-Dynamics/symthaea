@@ -200,8 +200,14 @@ fn test_cycle_metadata_floats_finite() {
             "consciousness_profile_composite",
         );
         assert_finite(m.synergy_enhanced_composite, "synergy_enhanced_composite");
-        assert_finite(m.harmonics.harmonic_field_coherence, "harmonic_field_coherence");
-        assert_finite(m.harmonics.harmonic_love_resonance, "harmonic_love_resonance");
+        assert_finite(
+            m.harmonics.harmonic_field_coherence,
+            "harmonic_field_coherence",
+        );
+        assert_finite(
+            m.harmonics.harmonic_love_resonance,
+            "harmonic_love_resonance",
+        );
         assert_finite_f32(m.reasoning_chain_confidence, "reasoning_chain_confidence");
         assert_finite(m.adaptive_reasoning_phi, "adaptive_reasoning_phi");
         assert_finite(m.causal_avg_confidence, "causal_avg_confidence");
@@ -210,9 +216,15 @@ fn test_cycle_metadata_floats_finite() {
         assert_finite(m.epistemic_quality, "epistemic_quality");
         assert_finite(m.phi_validation_correlation, "phi_validation_correlation");
         assert_finite(m.quality.dissipative_health, "dissipative_health");
-        assert_finite(m.quality.dissipative_entropy_rate, "dissipative_entropy_rate");
+        assert_finite(
+            m.quality.dissipative_entropy_rate,
+            "dissipative_entropy_rate",
+        );
         assert_finite(m.quality.epistemic_phi_eff, "epistemic_phi_eff");
-        assert_finite(m.quality.equation_v2_consciousness, "equation_v2_consciousness");
+        assert_finite(
+            m.quality.equation_v2_consciousness,
+            "equation_v2_consciousness",
+        );
         assert_finite_f32(m.quality.hierarchical_ltc_phi, "hierarchical_ltc_phi");
         assert_finite(m.holographic_unity, "holographic_unity");
         assert_finite(m.holographic_binding, "holographic_binding");

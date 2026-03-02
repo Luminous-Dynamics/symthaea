@@ -5,9 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::{
-    CellState, CellType, CultureEnvironment, ReprogrammingStage, YamanakaFactors,
-};
+use crate::types::{CellState, CellType, CultureEnvironment, ReprogrammingStage, YamanakaFactors};
 
 /// iPSC reprogramming protocol state machine.
 ///

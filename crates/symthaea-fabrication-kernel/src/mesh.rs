@@ -35,7 +35,8 @@ impl TriangleMesh {
         self.vertices.extend_from_slice(&other.vertices);
         self.normals.extend_from_slice(&other.normals);
         for tri in &other.indices {
-            self.indices.push([tri[0] + offset, tri[1] + offset, tri[2] + offset]);
+            self.indices
+                .push([tri[0] + offset, tri[1] + offset, tri[2] + offset]);
         }
     }
 
@@ -104,35 +105,81 @@ fn tessellate_cube() -> TriangleMesh {
     let h = 0.5;
     let vertices = vec![
         // Front face
-        [-h, -h,  h], [ h, -h,  h], [ h,  h,  h], [-h,  h,  h],
+        [-h, -h, h],
+        [h, -h, h],
+        [h, h, h],
+        [-h, h, h],
         // Back face
-        [ h, -h, -h], [-h, -h, -h], [-h,  h, -h], [ h,  h, -h],
+        [h, -h, -h],
+        [-h, -h, -h],
+        [-h, h, -h],
+        [h, h, -h],
         // Top face
-        [-h,  h,  h], [ h,  h,  h], [ h,  h, -h], [-h,  h, -h],
+        [-h, h, h],
+        [h, h, h],
+        [h, h, -h],
+        [-h, h, -h],
         // Bottom face
-        [-h, -h, -h], [ h, -h, -h], [ h, -h,  h], [-h, -h,  h],
+        [-h, -h, -h],
+        [h, -h, -h],
+        [h, -h, h],
+        [-h, -h, h],
         // Right face
-        [ h, -h,  h], [ h, -h, -h], [ h,  h, -h], [ h,  h,  h],
+        [h, -h, h],
+        [h, -h, -h],
+        [h, h, -h],
+        [h, h, h],
         // Left face
-        [-h, -h, -h], [-h, -h,  h], [-h,  h,  h], [-h,  h, -h],
+        [-h, -h, -h],
+        [-h, -h, h],
+        [-h, h, h],
+        [-h, h, -h],
     ];
     let normals = vec![
-        [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0], [0.0, 0.0, 1.0],
-        [0.0, 0.0,-1.0], [0.0, 0.0,-1.0], [0.0, 0.0,-1.0], [0.0, 0.0,-1.0],
-        [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0],
-        [0.0,-1.0, 0.0], [0.0,-1.0, 0.0], [0.0,-1.0, 0.0], [0.0,-1.0, 0.0],
-        [1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0], [1.0, 0.0, 0.0],
-        [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0], [-1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, -1.0],
+        [0.0, 0.0, -1.0],
+        [0.0, 0.0, -1.0],
+        [0.0, 0.0, -1.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, -1.0, 0.0],
+        [0.0, -1.0, 0.0],
+        [0.0, -1.0, 0.0],
+        [0.0, -1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [-1.0, 0.0, 0.0],
+        [-1.0, 0.0, 0.0],
+        [-1.0, 0.0, 0.0],
+        [-1.0, 0.0, 0.0],
     ];
     let indices = vec![
-        [0, 1, 2], [0, 2, 3],       // Front
-        [4, 5, 6], [4, 6, 7],       // Back
-        [8, 9, 10], [8, 10, 11],    // Top
-        [12, 13, 14], [12, 14, 15], // Bottom
-        [16, 17, 18], [16, 18, 19], // Right
-        [20, 21, 22], [20, 22, 23], // Left
+        [0, 1, 2],
+        [0, 2, 3], // Front
+        [4, 5, 6],
+        [4, 6, 7], // Back
+        [8, 9, 10],
+        [8, 10, 11], // Top
+        [12, 13, 14],
+        [12, 14, 15], // Bottom
+        [16, 17, 18],
+        [16, 18, 19], // Right
+        [20, 21, 22],
+        [20, 22, 23], // Left
     ];
-    TriangleMesh { vertices, normals, indices }
+    TriangleMesh {
+        vertices,
+        normals,
+        indices,
+    }
 }
 
 fn tessellate_cylinder(segments: usize) -> TriangleMesh {
@@ -153,14 +200,18 @@ fn tessellate_cylinder(segments: usize) -> TriangleMesh {
         vertices.extend_from_slice(&[
             [r * c0, r * s0, -h],
             [r * c1, r * s1, -h],
-            [r * c1, r * s1,  h],
-            [r * c0, r * s0,  h],
+            [r * c1, r * s1, h],
+            [r * c0, r * s0, h],
         ]);
-        let nx0 = c0; let ny0 = s0;
-        let nx1 = c1; let ny1 = s1;
+        let nx0 = c0;
+        let ny0 = s0;
+        let nx1 = c1;
+        let ny1 = s1;
         normals.extend_from_slice(&[
-            [nx0, ny0, 0.0], [nx1, ny1, 0.0],
-            [nx1, ny1, 0.0], [nx0, ny0, 0.0],
+            [nx0, ny0, 0.0],
+            [nx1, ny1, 0.0],
+            [nx1, ny1, 0.0],
+            [nx0, ny0, 0.0],
         ]);
         indices.push([base, base + 1, base + 2]);
         indices.push([base, base + 2, base + 3]);
@@ -178,7 +229,11 @@ fn tessellate_cylinder(segments: usize) -> TriangleMesh {
     }
     for i in 0..segments {
         let next = (i + 1) % segments;
-        indices.push([center_top, center_top + 1 + i as u32, center_top + 1 + next as u32]);
+        indices.push([
+            center_top,
+            center_top + 1 + i as u32,
+            center_top + 1 + next as u32,
+        ]);
     }
 
     // Bottom cap
@@ -193,10 +248,18 @@ fn tessellate_cylinder(segments: usize) -> TriangleMesh {
     }
     for i in 0..segments {
         let next = (i + 1) % segments;
-        indices.push([center_bot, center_bot + 1 + next as u32, center_bot + 1 + i as u32]);
+        indices.push([
+            center_bot,
+            center_bot + 1 + next as u32,
+            center_bot + 1 + i as u32,
+        ]);
     }
 
-    TriangleMesh { vertices, normals, indices }
+    TriangleMesh {
+        vertices,
+        normals,
+        indices,
+    }
 }
 
 fn tessellate_sphere(lon_segments: usize, lat_segments: usize) -> TriangleMesh {
@@ -228,7 +291,11 @@ fn tessellate_sphere(lon_segments: usize, lat_segments: usize) -> TriangleMesh {
         }
     }
 
-    TriangleMesh { vertices, normals, indices }
+    TriangleMesh {
+        vertices,
+        normals,
+        indices,
+    }
 }
 
 fn tessellate_cone(segments: usize) -> TriangleMesh {
@@ -249,12 +316,16 @@ fn tessellate_cone(segments: usize) -> TriangleMesh {
 
         let base = vertices.len() as u32;
         vertices.extend_from_slice(&[
-            [0.0, 0.0, h],           // Apex
-            [r * c0, r * s0, 0.0],   // Base edge 0
-            [r * c1, r * s1, 0.0],   // Base edge 1
+            [0.0, 0.0, h],         // Apex
+            [r * c0, r * s0, 0.0], // Base edge 0
+            [r * c1, r * s1, 0.0], // Base edge 1
         ]);
         normals.extend_from_slice(&[
-            [height_comp * (c0 + c1) / 2.0, height_comp * (s0 + s1) / 2.0, slope],
+            [
+                height_comp * (c0 + c1) / 2.0,
+                height_comp * (s0 + s1) / 2.0,
+                slope,
+            ],
             [height_comp * c0, height_comp * s0, slope],
             [height_comp * c1, height_comp * s1, slope],
         ]);
@@ -276,7 +347,11 @@ fn tessellate_cone(segments: usize) -> TriangleMesh {
         indices.push([center, center + 1 + next as u32, center + 1 + i as u32]);
     }
 
-    TriangleMesh { vertices, normals, indices }
+    TriangleMesh {
+        vertices,
+        normals,
+        indices,
+    }
 }
 
 fn tessellate_torus(major_segments: usize, minor_segments: usize) -> TriangleMesh {
@@ -314,7 +389,11 @@ fn tessellate_torus(major_segments: usize, minor_segments: usize) -> TriangleMes
         }
     }
 
-    TriangleMesh { vertices, normals, indices }
+    TriangleMesh {
+        vertices,
+        normals,
+        indices,
+    }
 }
 
 #[cfg(test)]

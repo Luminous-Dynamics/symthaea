@@ -62,7 +62,11 @@ fn main() {
         let ratio = *time_1000tau as f64 / (*time_tau).max(1) as f64;
         println!(
             "  {:?} (tau={:.0e}s): 1τ={:.0}ns, 1000τ={:.0}ns, ratio={:.2}",
-            scale, tau, *time_tau as f64 / 100.0, *time_1000tau as f64 / 100.0, ratio
+            scale,
+            tau,
+            *time_tau as f64 / 100.0,
+            *time_1000tau as f64 / 100.0,
+            ratio
         );
     }
 

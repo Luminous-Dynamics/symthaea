@@ -56,8 +56,8 @@ use super::training::AsyncTrainerHandle;
 use super::{
     ActiveInferenceBridge, AdaptiveBehavior, ClosedLearningLoop, CognitiveDepth,
     CognitiveLoopConfig, CognitiveLoopService, CuriosityDrive, EmotionContagion,
-    EpisodicMemoryBridge, FlowState, GoalSystemBridge, LoopStats, TemporalBackend,
-    ThalamicRouter, WorldModelBridge,
+    EpisodicMemoryBridge, FlowState, GoalSystemBridge, LoopStats, TemporalBackend, ThalamicRouter,
+    WorldModelBridge,
 };
 
 impl CognitiveLoopService {
@@ -390,18 +390,36 @@ impl CognitiveLoopService {
         // Read config flags before `config` is moved into Self
         let enable_primitive_consciousness = config.enable_primitive_consciousness;
 
-        // Pre-compute substrate feasibility from config.substrate_type.
-        let substrate_feasibility = {
+        // Pre-compute substrate feasibility from config.substrate_composition or substrate_type.
+        let substrate_feasibility = if let Some(ref comp) = config.substrate_composition {
+            comp.feasibility()
+        } else {
             use symthaea_core::hdc::substrate_independence::SubstrateRequirements;
             let req = match config.substrate_type.canonical() {
-                super::config::SubstrateType::BiologicalNeurons => SubstrateRequirements::biological_neurons(),
-                super::config::SubstrateType::SiliconDigital => SubstrateRequirements::silicon_digital(),
-                super::config::SubstrateType::QuantumComputer => SubstrateRequirements::quantum_computer(),
-                super::config::SubstrateType::PhotonicProcessor => SubstrateRequirements::photonic_processor(),
-                super::config::SubstrateType::NeuromorphicChip => SubstrateRequirements::neuromorphic_chip(),
-                super::config::SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
-                super::config::SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
-                super::config::SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+                super::config::SubstrateType::BiologicalNeurons => {
+                    SubstrateRequirements::biological_neurons()
+                }
+                super::config::SubstrateType::SiliconDigital => {
+                    SubstrateRequirements::silicon_digital()
+                }
+                super::config::SubstrateType::QuantumComputer => {
+                    SubstrateRequirements::quantum_computer()
+                }
+                super::config::SubstrateType::PhotonicProcessor => {
+                    SubstrateRequirements::photonic_processor()
+                }
+                super::config::SubstrateType::NeuromorphicChip => {
+                    SubstrateRequirements::neuromorphic_chip()
+                }
+                super::config::SubstrateType::BiochemicalComputer => {
+                    SubstrateRequirements::biochemical_computer()
+                }
+                super::config::SubstrateType::HybridSystem => {
+                    SubstrateRequirements::hybrid_system()
+                }
+                super::config::SubstrateType::ExoticSubstrate => {
+                    SubstrateRequirements::exotic_substrate()
+                }
                 _ => SubstrateRequirements::silicon_digital(),
             };
             req.consciousness_feasibility()

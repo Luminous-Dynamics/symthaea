@@ -60,7 +60,10 @@ fn parse_primitive(name: &str) -> Result<Primitive, String> {
         "sphere" => Ok(Primitive::Sphere),
         "cone" => Ok(Primitive::Cone),
         "torus" => Ok(Primitive::Torus),
-        _ => Err(format!("Unknown primitive: '{}'. Use: cube, cylinder, sphere, cone, torus", name)),
+        _ => Err(format!(
+            "Unknown primitive: '{}'. Use: cube, cylinder, sphere, cone, torus",
+            name
+        )),
     }
 }
 
@@ -92,9 +95,18 @@ fn main() {
         println!("  Vertices: {}", mesh.vertices.len());
         println!("  Watertight: {}", report.is_watertight);
         println!("  Boundary edges: {}", report.boundary_edges);
-        println!("  Degenerate triangles: {}", report.degenerate_triangles.len());
-        println!("  Inconsistent normals: {}", report.inconsistent_normals.len());
-        println!("  Out-of-bounds indices: {}", report.out_of_bounds_indices.len());
+        println!(
+            "  Degenerate triangles: {}",
+            report.degenerate_triangles.len()
+        );
+        println!(
+            "  Inconsistent normals: {}",
+            report.inconsistent_normals.len()
+        );
+        println!(
+            "  Out-of-bounds indices: {}",
+            report.out_of_bounds_indices.len()
+        );
         println!("  Signed volume: {:.6}", report.signed_volume);
         println!("  Valid: {}", report.is_valid());
         println!("  Printable: {}", report.is_printable());
@@ -125,15 +137,24 @@ fn main() {
             match args[i].as_str() {
                 "--scale" => {
                     i += 1;
-                    scale = parse_vec3(&args[i]).unwrap_or_else(|e| { eprintln!("{}", e); process::exit(1); });
+                    scale = parse_vec3(&args[i]).unwrap_or_else(|e| {
+                        eprintln!("{}", e);
+                        process::exit(1);
+                    });
                 }
                 "--rotate" => {
                     i += 1;
-                    rotate = parse_vec3(&args[i]).unwrap_or_else(|e| { eprintln!("{}", e); process::exit(1); });
+                    rotate = parse_vec3(&args[i]).unwrap_or_else(|e| {
+                        eprintln!("{}", e);
+                        process::exit(1);
+                    });
                 }
                 "--translate" => {
                     i += 1;
-                    translate = parse_vec3(&args[i]).unwrap_or_else(|e| { eprintln!("{}", e); process::exit(1); });
+                    translate = parse_vec3(&args[i]).unwrap_or_else(|e| {
+                        eprintln!("{}", e);
+                        process::exit(1);
+                    });
                 }
                 "-o" | "--output" => {
                     i += 1;
@@ -149,7 +170,11 @@ fn main() {
 
         let node = CSGNode::Transform {
             node: Box::new(CSGNode::Primitive(prim)),
-            transform: Transform3D { scale, rotate, translate },
+            transform: Transform3D {
+                scale,
+                rotate,
+                translate,
+            },
         };
         let mesh = resolve_to_mesh(&node);
         let stl_data = export_stl(&mesh);
@@ -158,8 +183,13 @@ fn main() {
             process::exit(1);
         });
         let report = validate_mesh(&mesh);
-        println!("Generated: {} ({} triangles, {} bytes, valid: {})",
-            output_path, mesh.triangle_count(), stl_data.len(), report.is_valid());
+        println!(
+            "Generated: {} ({} triangles, {} bytes, valid: {})",
+            output_path,
+            mesh.triangle_count(),
+            stl_data.len(),
+            report.is_valid()
+        );
         return;
     }
 
@@ -188,8 +218,17 @@ fn main() {
     });
 
     let report = validate_mesh(&mesh);
-    println!("Resolved CSG → {} ({} triangles, {} bytes)", args[2], mesh.triangle_count(), stl_data.len());
-    println!("  Valid: {}, Printable: {}", report.is_valid(), report.is_printable());
+    println!(
+        "Resolved CSG → {} ({} triangles, {} bytes)",
+        args[2],
+        mesh.triangle_count(),
+        stl_data.len()
+    );
+    println!(
+        "  Valid: {}, Printable: {}",
+        report.is_valid(),
+        report.is_printable()
+    );
 }
 
 #[cfg(test)]

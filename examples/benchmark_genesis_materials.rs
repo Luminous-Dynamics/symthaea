@@ -53,8 +53,10 @@ fn main() {
         let elapsed = start.elapsed();
         println!(
             "  {:>10}: {:.1}µs/prediction",
-            symthaea_materials::AGING_HORIZON_LABELS
-                [symthaea_materials::AGING_HORIZONS.iter().position(|&h| h == horizon).unwrap()],
+            symthaea_materials::AGING_HORIZON_LABELS[symthaea_materials::AGING_HORIZONS
+                .iter()
+                .position(|&h| h == horizon)
+                .unwrap()],
             elapsed.as_micros() as f64 / 1000.0
         );
     }
@@ -64,7 +66,10 @@ fn main() {
     let db = MaterialDatabase::with_presets();
     let results = db.constrained_search(
         &MaterialProperty::titanium_ti6al4v(),
-        |m| m.category == symthaea_materials::MaterialCategory::Metal && m.yield_strength_mpa > 200.0,
+        |m| {
+            m.category == symthaea_materials::MaterialCategory::Metal
+                && m.yield_strength_mpa > 200.0
+        },
         10,
     );
     for r in &results {

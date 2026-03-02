@@ -122,17 +122,12 @@ impl SafetyAuditReport {
         md.push_str(&format!("# {}\n\n", self.title));
         md.push_str(&format!("**Generated**: {}\n\n", self.generated_at));
         md.push_str("## Summary\n\n");
-        md.push_str(&format!(
-            "| Metric | Value |\n|--------|-------|\n"
-        ));
+        md.push_str(&format!("| Metric | Value |\n|--------|-------|\n"));
         md.push_str(&format!(
             "| Total Assessments | {} |\n",
             self.total_assessments
         ));
-        md.push_str(&format!(
-            "| Peak Level | {} |\n",
-            self.peak_level.label()
-        ));
+        md.push_str(&format!("| Peak Level | {} |\n", self.peak_level.label()));
         md.push_str(&format!(
             "| Mean Consciousness | {:.3} |\n",
             self.mean_consciousness

@@ -18,9 +18,7 @@ pub fn assess_quality(cell: &CellState, epigenetics: &EpigeneticProfile) -> Qual
     let epigenetic_score = epigenetic_quality_score(epigenetics);
 
     // Overall pass requires all critical checks
-    let marker_pass = pluripotency_markers
-        .iter()
-        .all(|(_, score)| *score > 0.5);
+    let marker_pass = pluripotency_markers.iter().all(|(_, score)| *score > 0.5);
     let overall_pass = karyotype_normal
         && marker_pass
         && viability > 0.7
@@ -92,7 +90,10 @@ fn check_contamination(cell: &CellState) -> bool {
         let mean: f64 =
             cell.gene_expression.iter().sum::<f64>() / cell.gene_expression.len() as f64;
         // If all genes are at extreme values, something is wrong
-        let all_extreme = cell.gene_expression.iter().all(|&x| !(0.05..=0.95).contains(&x));
+        let all_extreme = cell
+            .gene_expression
+            .iter()
+            .all(|&x| !(0.05..=0.95).contains(&x));
         if all_extreme && cell.gene_expression.len() > 5 {
             return false;
         }

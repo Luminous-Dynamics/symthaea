@@ -926,7 +926,11 @@ impl CrossModalNSMGrounding {
     }
 
     /// Query modalities by semantic similarity
-    pub(crate) fn query_modalities(&self, query: &BinaryHV, threshold: f32) -> Vec<(&Modality, f32)> {
+    pub(crate) fn query_modalities(
+        &self,
+        query: &BinaryHV,
+        threshold: f32,
+    ) -> Vec<(&Modality, f32)> {
         let mut results: Vec<_> = self
             .modalities
             .iter()
@@ -938,7 +942,11 @@ impl CrossModalNSMGrounding {
     }
 
     /// Query convergence levels by semantic similarity
-    pub(crate) fn query_levels(&self, query: &BinaryHV, threshold: f32) -> Vec<(&ConvergenceLevel, f32)> {
+    pub(crate) fn query_levels(
+        &self,
+        query: &BinaryHV,
+        threshold: f32,
+    ) -> Vec<(&ConvergenceLevel, f32)> {
         let mut results: Vec<_> = self
             .convergence_levels
             .iter()

@@ -10,7 +10,9 @@
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
 use super::gate::{safety_gate, SafetyGateResult};
-use symthaea_physics::accelerator::{AcceleratorFepAction, AcceleratorOutput, AcceleratorSafetyLevel};
+use symthaea_physics::accelerator::{
+    AcceleratorFepAction, AcceleratorOutput, AcceleratorSafetyLevel,
+};
 
 /// Adapter that translates Accelerator outputs into Safety Agent inputs.
 pub struct AcceleratorSafetyAdapter {
@@ -86,7 +88,11 @@ pub fn accelerator_safety_to_level(level: AcceleratorSafetyLevel) -> SafetyLevel
 mod tests {
     use super::*;
 
-    fn mock_output(free_energy: f64, safety: AcceleratorSafetyLevel, action: AcceleratorFepAction) -> AcceleratorOutput {
+    fn mock_output(
+        free_energy: f64,
+        safety: AcceleratorSafetyLevel,
+        action: AcceleratorFepAction,
+    ) -> AcceleratorOutput {
         AcceleratorOutput {
             free_energy,
             recommended_action: action,
@@ -98,23 +104,43 @@ mod tests {
     #[test]
     fn test_healthy_accelerator_maps_to_green() {
         let mut adapter = AcceleratorSafetyAdapter::new();
-        let output = mock_output(0.05, AcceleratorSafetyLevel::Green, AcceleratorFepAction::MaintainBeam);
+        let output = mock_output(
+            0.05,
+            AcceleratorSafetyLevel::Green,
+            AcceleratorFepAction::MaintainBeam,
+        );
         let assessment = adapter.assess(&output);
         assert_eq!(assessment.level, SafetyLevel::Green);
     }
 
     #[test]
     fn test_accelerator_safety_to_level_mapping() {
-        assert_eq!(accelerator_safety_to_level(AcceleratorSafetyLevel::Green), SafetyLevel::Green);
-        assert_eq!(accelerator_safety_to_level(AcceleratorSafetyLevel::Yellow), SafetyLevel::Yellow);
-        assert_eq!(accelerator_safety_to_level(AcceleratorSafetyLevel::Orange), SafetyLevel::Orange);
-        assert_eq!(accelerator_safety_to_level(AcceleratorSafetyLevel::Red), SafetyLevel::Red);
+        assert_eq!(
+            accelerator_safety_to_level(AcceleratorSafetyLevel::Green),
+            SafetyLevel::Green
+        );
+        assert_eq!(
+            accelerator_safety_to_level(AcceleratorSafetyLevel::Yellow),
+            SafetyLevel::Yellow
+        );
+        assert_eq!(
+            accelerator_safety_to_level(AcceleratorSafetyLevel::Orange),
+            SafetyLevel::Orange
+        );
+        assert_eq!(
+            accelerator_safety_to_level(AcceleratorSafetyLevel::Red),
+            SafetyLevel::Red
+        );
     }
 
     #[test]
     fn test_gate_blocks_risky_at_orange() {
         let adapter = AcceleratorSafetyAdapter::new();
-        let output = mock_output(0.6, AcceleratorSafetyLevel::Orange, AcceleratorFepAction::ReduceIntensity);
+        let output = mock_output(
+            0.6,
+            AcceleratorSafetyLevel::Orange,
+            AcceleratorFepAction::ReduceIntensity,
+        );
         assert!(!adapter.gate_operation(&output, true).is_ok());
         assert!(adapter.gate_operation(&output, false).is_ok());
     }
@@ -122,7 +148,11 @@ mod tests {
     #[test]
     fn test_gate_blocks_all_at_red() {
         let adapter = AcceleratorSafetyAdapter::new();
-        let output = mock_output(0.9, AcceleratorSafetyLevel::Red, AcceleratorFepAction::BeamDump);
+        let output = mock_output(
+            0.9,
+            AcceleratorSafetyLevel::Red,
+            AcceleratorFepAction::BeamDump,
+        );
         assert!(!adapter.gate_operation(&output, false).is_ok());
         assert!(!adapter.gate_operation(&output, true).is_ok());
     }

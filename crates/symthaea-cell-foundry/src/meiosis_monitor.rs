@@ -23,10 +23,14 @@ impl MeiosisMonitor {
         let expr_diversity = if cell.gene_expression.is_empty() {
             0.5
         } else {
-            let mean: f64 = cell.gene_expression.iter().sum::<f64>() / cell.gene_expression.len() as f64;
-            let variance: f64 = cell.gene_expression.iter()
+            let mean: f64 =
+                cell.gene_expression.iter().sum::<f64>() / cell.gene_expression.len() as f64;
+            let variance: f64 = cell
+                .gene_expression
+                .iter()
                 .map(|x| (x - mean).powi(2))
-                .sum::<f64>() / cell.gene_expression.len() as f64;
+                .sum::<f64>()
+                / cell.gene_expression.len() as f64;
             (variance.sqrt()).clamp(0.0, 1.0)
         };
 
@@ -87,11 +91,17 @@ impl MeiosisMonitor {
             let mut comparisons = 0;
             for i in 0..post.len() {
                 for j in (i + 1)..post.len() {
-                    let min_len = post[i].gene_expression.len().min(post[j].gene_expression.len());
+                    let min_len = post[i]
+                        .gene_expression
+                        .len()
+                        .min(post[j].gene_expression.len());
                     if min_len > 0 {
                         let diff: f64 = (0..min_len)
-                            .map(|k| (post[i].gene_expression[k] - post[j].gene_expression[k]).abs())
-                            .sum::<f64>() / min_len as f64;
+                            .map(|k| {
+                                (post[i].gene_expression[k] - post[j].gene_expression[k]).abs()
+                            })
+                            .sum::<f64>()
+                            / min_len as f64;
                         total_diff += diff;
                         comparisons += 1;
                     }
@@ -153,7 +163,7 @@ mod tests {
         let mut cell = CellState::new_somatic();
         cell.viability = 0.9;
         cell.pluripotency_score = 0.2; // Low pluripotency = differentiated toward germ
-        // Add some gene expression diversity
+                                       // Add some gene expression diversity
         cell.gene_expression = (0..DEFAULT_GENE_EXPR_LEN)
             .map(|i| i as f64 / DEFAULT_GENE_EXPR_LEN as f64)
             .collect();
@@ -164,7 +174,11 @@ mod tests {
     fn test_synapsis_pass() {
         let cell = make_cell_for_synapsis();
         let (passed, score) = MeiosisMonitor::verify_synapsis(&cell);
-        assert!(passed, "Healthy differentiated cell should pass synapsis, score={}", score);
+        assert!(
+            passed,
+            "Healthy differentiated cell should pass synapsis, score={}",
+            score
+        );
         assert!(score > 0.4);
     }
 
@@ -174,7 +188,11 @@ mod tests {
         cell.viability = 0.05;
         cell.pluripotency_score = 0.5;
         let (passed, score) = MeiosisMonitor::verify_synapsis(&cell);
-        assert!(!passed, "Low viability should fail synapsis, score={}", score);
+        assert!(
+            !passed,
+            "Low viability should fail synapsis, score={}",
+            score
+        );
     }
 
     #[test]
@@ -186,7 +204,11 @@ mod tests {
             .map(|i| if i % 2 == 0 { 0.9 } else { 0.1 })
             .collect();
         let (passed, score) = MeiosisMonitor::verify_crossover(&cell, 1);
-        assert!(passed, "Heterogeneous expression should pass crossover, score={}", score);
+        assert!(
+            passed,
+            "Heterogeneous expression should pass crossover, score={}",
+            score
+        );
     }
 
     #[test]
@@ -206,7 +228,11 @@ mod tests {
         daughter1.gene_expression = vec![0.9; DEFAULT_GENE_EXPR_LEN];
         daughter2.gene_expression = vec![0.1; DEFAULT_GENE_EXPR_LEN];
         let (passed, score) = MeiosisMonitor::verify_segregation(&pre, &[daughter1, daughter2]);
-        assert!(passed, "Complementary daughters should pass segregation, score={}", score);
+        assert!(
+            passed,
+            "Complementary daughters should pass segregation, score={}",
+            score
+        );
     }
 
     #[test]
@@ -231,7 +257,11 @@ mod tests {
             (MeiosisCheckpoint::SegregationII, true, 0.7),
         ];
         let quality = MeiosisMonitor::overall_quality(&checkpoints);
-        assert!(quality > 0.7, "All pass with high scores should give high quality: {}", quality);
+        assert!(
+            quality > 0.7,
+            "All pass with high scores should give high quality: {}",
+            quality
+        );
     }
 
     #[test]
@@ -242,7 +272,11 @@ mod tests {
         ];
         let quality = MeiosisMonitor::overall_quality(&checkpoints);
         // Failed crossover should drag quality down
-        assert!(quality < 0.8, "Partial failure should reduce quality: {}", quality);
+        assert!(
+            quality < 0.8,
+            "Partial failure should reduce quality: {}",
+            quality
+        );
     }
 
     #[test]

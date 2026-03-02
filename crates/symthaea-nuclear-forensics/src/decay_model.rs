@@ -6,14 +6,20 @@ use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 /// Backdating horizons in seconds: 1 day, 1 month, 1 year, 10 years, 50 years.
-pub const DECAY_HORIZONS: &[f32] = &[86_400.0, 2_592_000.0, 31_536_000.0, 315_360_000.0, 1_576_800_000.0];
+pub const DECAY_HORIZONS: &[f32] = &[
+    86_400.0,
+    2_592_000.0,
+    31_536_000.0,
+    315_360_000.0,
+    1_576_800_000.0,
+];
 /// Human-readable labels matching [`DECAY_HORIZONS`] in order.
 pub const DECAY_HORIZON_LABELS: &[&str] = &["1 day", "1 month", "1 year", "10 years", "50 years"];
 
 /// Half-lives in seconds for key isotopes.
-const PU241_HALF_LIFE: f64 = 4.544e8;   // 14.4 years
-const CS137_HALF_LIFE: f64 = 9.467e8;   // 30.0 years
-const SR90_HALF_LIFE:  f64 = 9.119e8;   // 28.9 years
+const PU241_HALF_LIFE: f64 = 4.544e8; // 14.4 years
+const CS137_HALF_LIFE: f64 = 9.467e8; // 30.0 years
+const SR90_HALF_LIFE: f64 = 9.119e8; // 28.9 years
 
 /// Result of a single temporal backdating (or forward prediction) operation.
 #[derive(Debug, Clone)]
@@ -81,22 +87,36 @@ impl IsotopeDecayModel {
         neuron_copy.evolve_closed_form(-horizon_seconds, &current_hv);
         let backdated = neuron_copy.state().clone();
         let state_drift = 1.0 - current_hv.similarity(&backdated);
-        let label = DECAY_HORIZONS.iter().position(|&h| (h - horizon_seconds).abs() < 1.0)
+        let label = DECAY_HORIZONS
+            .iter()
+            .position(|&h| (h - horizon_seconds).abs() < 1.0)
             .map(|i| DECAY_HORIZON_LABELS[i].to_string())
             .unwrap_or_else(|| format!("{:.0}s", horizon_seconds));
-        BackdatedResult { horizon_seconds, horizon_label: label, backdated_state: backdated, state_drift }
+        BackdatedResult {
+            horizon_seconds,
+            horizon_label: label,
+            backdated_state: backdated,
+            state_drift,
+        }
     }
 
     /// Backdate at all standard horizons.
     pub fn backdate_all_horizons(&self, sig: &IsotopicSignature) -> Vec<BackdatedResult> {
-        DECAY_HORIZONS.iter().map(|&h| self.backdate(sig, h)).collect()
+        DECAY_HORIZONS
+            .iter()
+            .map(|&h| self.backdate(sig, h))
+            .collect()
     }
 
     /// O(1) temporal prediction — preferred alias for [`Self::backdate`].
     ///
     /// This name aligns with the cross-domain [`TemporalPredictor`] trait and
     /// the materials/hydrology crates.
-    pub fn predict_at_horizon(&self, sig: &IsotopicSignature, horizon_seconds: f32) -> BackdatedResult {
+    pub fn predict_at_horizon(
+        &self,
+        sig: &IsotopicSignature,
+        horizon_seconds: f32,
+    ) -> BackdatedResult {
         self.backdate(sig, horizon_seconds)
     }
 
@@ -136,21 +156,32 @@ impl IsotopeDecayModel {
         }
 
         if estimates.is_empty() {
-            AgeEstimate { estimated_age_seconds: 0.0, confidence: 0.0 }
+            AgeEstimate {
+                estimated_age_seconds: 0.0,
+                confidence: 0.0,
+            }
         } else {
             let mean = estimates.iter().sum::<f64>() / estimates.len() as f64;
             let confidence = if estimates.len() > 1 {
-                let variance = estimates.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / estimates.len() as f64;
+                let variance = estimates.iter().map(|e| (e - mean).powi(2)).sum::<f64>()
+                    / estimates.len() as f64;
                 (1.0 / (1.0 + (variance.sqrt() / mean.max(1.0)))) as f32
             } else {
                 0.5
             };
-            AgeEstimate { estimated_age_seconds: mean as f32, confidence }
+            AgeEstimate {
+                estimated_age_seconds: mean as f32,
+                confidence,
+            }
         }
     }
 }
 
-impl Default for IsotopeDecayModel { fn default() -> Self { Self::new() } }
+impl Default for IsotopeDecayModel {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl symthaea_core::temporal::TemporalPredictor for IsotopeDecayModel {
     fn predict_at(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
@@ -184,11 +215,25 @@ impl symthaea_core::temporal::TemporalPredictor for IsotopeDecayModel {
 mod tests {
     use super::*;
 
-    #[test] fn test_decay_horizons_ordered() { for i in 1..DECAY_HORIZONS.len() { assert!(DECAY_HORIZONS[i] > DECAY_HORIZONS[i - 1]); } }
+    #[test]
+    fn test_decay_horizons_ordered() {
+        for i in 1..DECAY_HORIZONS.len() {
+            assert!(DECAY_HORIZONS[i] > DECAY_HORIZONS[i - 1]);
+        }
+    }
 
-    #[test] fn test_pu241_half_life() { assert!(PU241_HALF_LIFE > 4e8 && PU241_HALF_LIFE < 5e8); }
-    #[test] fn test_cs137_half_life() { assert!(CS137_HALF_LIFE > 9e8 && CS137_HALF_LIFE < 1e9); }
-    #[test] fn test_sr90_half_life() { assert!(SR90_HALF_LIFE > 8e8 && SR90_HALF_LIFE < 1e9); }
+    #[test]
+    fn test_pu241_half_life() {
+        assert!(PU241_HALF_LIFE > 4e8 && PU241_HALF_LIFE < 5e8);
+    }
+    #[test]
+    fn test_cs137_half_life() {
+        assert!(CS137_HALF_LIFE > 9e8 && CS137_HALF_LIFE < 1e9);
+    }
+    #[test]
+    fn test_sr90_half_life() {
+        assert!(SR90_HALF_LIFE > 8e8 && SR90_HALF_LIFE < 1e9);
+    }
 
     #[test]
     fn test_backdate_dimension() {
@@ -198,7 +243,12 @@ mod tests {
 
     #[test]
     fn test_backdate_all_horizons_count() {
-        assert_eq!(IsotopeDecayModel::new().backdate_all_horizons(&IsotopicSignature::spent_fuel()).len(), DECAY_HORIZONS.len());
+        assert_eq!(
+            IsotopeDecayModel::new()
+                .backdate_all_horizons(&IsotopicSignature::spent_fuel())
+                .len(),
+            DECAY_HORIZONS.len()
+        );
     }
 
     #[test]
@@ -213,13 +263,23 @@ mod tests {
         let m = IsotopeDecayModel::new();
         let s = IsotopicSignature::spent_fuel();
         let t1 = std::time::Instant::now();
-        for _ in 0..100 { let _ = m.backdate(&s, 86_400.0); }
+        for _ in 0..100 {
+            let _ = m.backdate(&s, 86_400.0);
+        }
         let d1 = t1.elapsed();
         let t2 = std::time::Instant::now();
-        for _ in 0..100 { let _ = m.backdate(&s, 1_576_800_000.0); }
+        for _ in 0..100 {
+            let _ = m.backdate(&s, 1_576_800_000.0);
+        }
         let d2 = t2.elapsed();
         let ratio = d2.as_nanos() as f64 / d1.as_nanos().max(1) as f64;
-        assert!(ratio < 5.0 && ratio > 0.2, "O(1): 1d={:?}, 50y={:?}, ratio={}", d1, d2, ratio);
+        assert!(
+            ratio < 5.0 && ratio > 0.2,
+            "O(1): 1d={:?}, 50y={:?}, ratio={}",
+            d1,
+            d2,
+            ratio
+        );
     }
 
     // ── Track B: failure-path tests ──────────────────────────────────────
@@ -259,8 +319,16 @@ mod tests {
         let model = IsotopeDecayModel::new();
         for sig in &IsotopicSignature::references() {
             let age = model.estimate_age(sig);
-            assert!(age.estimated_age_seconds.is_finite(), "NaN age for {}", sig.name);
-            assert!(age.confidence.is_finite(), "NaN confidence for {}", sig.name);
+            assert!(
+                age.estimated_age_seconds.is_finite(),
+                "NaN age for {}",
+                sig.name
+            );
+            assert!(
+                age.confidence.is_finite(),
+                "NaN confidence for {}",
+                sig.name
+            );
             assert!(age.confidence >= 0.0 && age.confidence <= 1.0);
         }
     }
@@ -300,7 +368,11 @@ mod tests {
         let after = m.predict_at(&seed, 86_400.0);
         // After observing, internal state changed → different prediction
         let sim = before.similarity(&after);
-        assert!(sim < 1.0, "observe() should change predictions, sim={}", sim);
+        assert!(
+            sim < 1.0,
+            "observe() should change predictions, sim={}",
+            sim
+        );
     }
 
     #[test]

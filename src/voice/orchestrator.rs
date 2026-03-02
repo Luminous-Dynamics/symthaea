@@ -266,12 +266,8 @@ impl VoiceOrchestrator {
 
             let phoneme_name = phoneme_id_to_name(id);
             for _ in 0..frames_per_phoneme {
-                let frame = pipeline.tick_phoneme(
-                    cognitive_state,
-                    None,
-                    base_dt,
-                    Some(phoneme_name),
-                );
+                let frame =
+                    pipeline.tick_phoneme(cognitive_state, None, base_dt, Some(phoneme_name));
                 frames.push(frame);
             }
         }
@@ -302,16 +298,16 @@ impl Default for VoiceOrchestrator {
 #[cfg(feature = "vocal-tract")]
 fn phoneme_id_to_name(id: u32) -> &'static str {
     match id {
-        0 => "EY",  // FACE
-        1 => "AY",  // PRICE
-        2 => "AW",  // MOUTH
-        3 => "OY",  // CHOICE
-        4 => "OW",  // GOAT
+        0 => "EY", // FACE
+        1 => "AY", // PRICE
+        2 => "AW", // MOUTH
+        3 => "OY", // CHOICE
+        4 => "OW", // GOAT
         5 => "B",
         6 => "D",
         7 => "F",
         8 => "HH",
-        10 => "Y",  // j/y glide
+        10 => "Y", // j/y glide
         11 => "K",
         12 => "L",
         13 => "M",

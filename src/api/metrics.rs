@@ -440,7 +440,10 @@ pub fn register_bath_metrics(registry: &MetricsRegistry) {
     registry.register_gauge("bath_allostatic_load", "Allostatic stress load");
     registry.register_gauge("bath_ei_ratio", "Excitatory/inhibitory balance ratio");
     registry.register_gauge("bath_sleep_pressure", "Adenosine-based sleep pressure");
-    registry.register_gauge("bath_active_injection_count", "Active pharmacological injections");
+    registry.register_gauge(
+        "bath_active_injection_count",
+        "Active pharmacological injections",
+    );
     registry.register_gauge("bath_entropy", "Bath phase space entropy");
 }
 
@@ -559,7 +562,10 @@ pub fn update_timing_metrics(
             + timings.consciousness_engine_pipeline
             + timings.consciousness_engine_multimodal
     };
-    registry.set_gauge("symthaea_timing_consciousness_engine_us", cons_engine as f64);
+    registry.set_gauge(
+        "symthaea_timing_consciousness_engine_us",
+        cons_engine as f64,
+    );
     // Ethics engine: sum of sub-components if engine total is 0
     let ethics_engine = if timings.ethics_engine > 0 {
         timings.ethics_engine
@@ -584,10 +590,7 @@ pub fn update_timing_metrics(
         "symthaea_timing_moral_topology_us",
         timings.moral_topology as f64,
     );
-    registry.set_gauge(
-        "symthaea_timing_homeostasis_us",
-        timings.homeostasis as f64,
-    );
+    registry.set_gauge("symthaea_timing_homeostasis_us", timings.homeostasis as f64);
     registry.set_gauge(
         "symthaea_timing_metadata_assembly_us",
         timings.metadata_assembly as f64,
@@ -596,10 +599,7 @@ pub fn update_timing_metrics(
         "symthaea_timing_parallel_postprocess_us",
         timings.core_parallel_postprocess as f64,
     );
-    registry.set_gauge(
-        "symthaea_timing_dream_cycle_us",
-        timings.dream_cycle as f64,
-    );
+    registry.set_gauge("symthaea_timing_dream_cycle_us", timings.dream_cycle as f64);
     registry.set_gauge("symthaea_timing_total_cycle_us", cycle_duration_us as f64);
 }
 
@@ -746,7 +746,9 @@ mod tests {
         assert!(registry.get("symthaea_timing_core_hdc_encode_us").is_some());
         assert!(registry.get("symthaea_timing_core_cfc_step_us").is_some());
         assert!(registry.get("symthaea_timing_core_training_us").is_some());
-        assert!(registry.get("symthaea_timing_consciousness_engine_us").is_some());
+        assert!(registry
+            .get("symthaea_timing_consciousness_engine_us")
+            .is_some());
         assert!(registry.get("symthaea_timing_ethics_engine_us").is_some());
         assert!(registry.get("symthaea_timing_total_cycle_us").is_some());
     }
@@ -762,11 +764,20 @@ mod tests {
         timings.ethics_engine_value = 80;
         timings.ethics_engine_harmonies = 70;
         update_timing_metrics(&registry, &timings, 5000);
-        assert_eq!(registry.get("symthaea_timing_core_hdc_encode_us"), Some(150.0));
-        assert_eq!(registry.get("symthaea_timing_core_cfc_step_us"), Some(300.0));
+        assert_eq!(
+            registry.get("symthaea_timing_core_hdc_encode_us"),
+            Some(150.0)
+        );
+        assert_eq!(
+            registry.get("symthaea_timing_core_cfc_step_us"),
+            Some(300.0)
+        );
         assert_eq!(registry.get("symthaea_timing_gwt_us"), Some(50.0));
         // Ethics engine sums sub-components when engine total is 0
-        assert_eq!(registry.get("symthaea_timing_ethics_engine_us"), Some(250.0));
+        assert_eq!(
+            registry.get("symthaea_timing_ethics_engine_us"),
+            Some(250.0)
+        );
         assert_eq!(registry.get("symthaea_timing_total_cycle_us"), Some(5000.0));
     }
 

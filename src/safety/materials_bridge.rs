@@ -72,11 +72,7 @@ impl MaterialSafetyAdapter {
     /// Check whether a structural operation should proceed given predicted aging.
     ///
     /// Maps remaining_strength to safety level, then applies the safety gate.
-    pub fn gate_operation(
-        &self,
-        prediction: &AgingPrediction,
-        is_risky: bool,
-    ) -> SafetyGateResult {
+    pub fn gate_operation(&self, prediction: &AgingPrediction, is_risky: bool) -> SafetyGateResult {
         let level = remaining_strength_to_safety_level(prediction.remaining_strength);
         safety_gate(level, is_risky)
     }
@@ -159,13 +155,19 @@ mod tests {
     fn test_remaining_strength_to_safety_level() {
         assert_eq!(remaining_strength_to_safety_level(0.9), SafetyLevel::Green);
         assert_eq!(remaining_strength_to_safety_level(0.5), SafetyLevel::Yellow);
-        assert_eq!(remaining_strength_to_safety_level(0.25), SafetyLevel::Orange);
+        assert_eq!(
+            remaining_strength_to_safety_level(0.25),
+            SafetyLevel::Orange
+        );
         assert_eq!(remaining_strength_to_safety_level(0.1), SafetyLevel::Red);
     }
 
     #[test]
     fn test_remaining_strength_nan_maps_to_red() {
-        assert_eq!(remaining_strength_to_safety_level(f32::NAN), SafetyLevel::Red);
+        assert_eq!(
+            remaining_strength_to_safety_level(f32::NAN),
+            SafetyLevel::Red
+        );
     }
 
     #[test]
@@ -185,8 +187,12 @@ mod tests {
 
     #[test]
     fn test_is_critical() {
-        assert!(MaterialSafetyAdapter::is_critical(&mock_prediction(0.2, 0.3)));
-        assert!(!MaterialSafetyAdapter::is_critical(&mock_prediction(0.5, 0.7)));
+        assert!(MaterialSafetyAdapter::is_critical(&mock_prediction(
+            0.2, 0.3
+        )));
+        assert!(!MaterialSafetyAdapter::is_critical(&mock_prediction(
+            0.5, 0.7
+        )));
     }
 
     #[test]

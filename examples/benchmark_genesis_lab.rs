@@ -8,9 +8,7 @@
 fn main() {
     println!("=== Genesis Mission Challenge 10: Autonomous Lab Controller ===\n");
 
-    use symthaea::symthaea_cell_foundry::{
-        EthicsGate, LabController, LabProtocol, MockInstrument,
-    };
+    use symthaea::symthaea_cell_foundry::{EthicsGate, LabController, LabProtocol, MockInstrument};
 
     // 1. Run with ethics approval
     println!("--- Protocol with Ethics Approval ---");
@@ -19,7 +17,11 @@ fn main() {
     let mut controller = LabController::new(mock, ethics);
 
     let protocol = LabProtocol::ipsc_reprogramming();
-    println!("Protocol: {} ({} steps)", protocol.name, protocol.steps.len());
+    println!(
+        "Protocol: {} ({} steps)",
+        protocol.name,
+        protocol.steps.len()
+    );
 
     let result = controller.run_protocol(&protocol);
     for step in &result.step_results {
@@ -28,7 +30,10 @@ fn main() {
             step.step_index, step.step_name, step.selected_action, step.action_executed
         );
     }
-    println!("  Success: {}, Steps completed: {}", result.success, result.steps_completed);
+    println!(
+        "  Success: {}, Steps completed: {}",
+        result.success, result.steps_completed
+    );
 
     // 2. Run without ethics approval (should fail)
     println!("\n--- Protocol without Ethics Approval ---");

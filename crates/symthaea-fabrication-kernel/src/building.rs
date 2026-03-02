@@ -452,7 +452,11 @@ mod tests {
         let mut twin = BuildingTwin::new();
         let output = twin.step(&reading, 3600.0);
         let (consciousness, error, coherence) = output.to_safety_tuple();
-        assert!((0.0..=1.0).contains(&consciousness), "consciousness={}", consciousness);
+        assert!(
+            (0.0..=1.0).contains(&consciousness),
+            "consciousness={}",
+            consciousness
+        );
         assert!((0.0..=1.0).contains(&error), "error={}", error);
         assert!(coherence.is_finite(), "coherence must be finite");
     }

@@ -655,7 +655,11 @@ mod tests {
         snap.predictions_trustworthy = false;
         snap.in_flow = true;
         let actions = snap.recommended_actions();
-        assert!(actions.len() >= 4, "expected >= 4 actions, got: {:?}", actions);
+        assert!(
+            actions.len() >= 4,
+            "expected >= 4 actions, got: {:?}",
+            actions
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -666,8 +670,7 @@ mod tests {
     fn snapshot_serialization_roundtrip() {
         let snap = baseline_snapshot();
         let json = serde_json::to_string(&snap).expect("serialize");
-        let deserialized: ConsciousnessSnapshot =
-            serde_json::from_str(&json).expect("deserialize");
+        let deserialized: ConsciousnessSnapshot = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deserialized.cycle, snap.cycle);
         assert_eq!(deserialized.pattern, snap.pattern);
         assert_eq!(deserialized.self_assessment, snap.self_assessment);

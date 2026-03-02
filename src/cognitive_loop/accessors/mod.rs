@@ -26,11 +26,11 @@ macro_rules! cognitive_accessors {
     };
 }
 
-mod system;
-mod neuromodulation;
 mod behavior;
 mod consciousness;
 mod memory;
+mod neuromodulation;
+mod system;
 
 #[cfg(test)]
 mod tests {

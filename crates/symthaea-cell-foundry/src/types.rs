@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 
 /// Biological prediction horizons (seconds)
 pub const BIO_HORIZONS: &[f32] = &[
-    3_600.0,       // 1 hour (metabolic)
-    86_400.0,      // 1 day (cell division)
-    604_800.0,     // 1 week (differentiation)
-    2_592_000.0,   // 1 month (tissue formation)
-    7_776_000.0,   // 3 months (organ development)
-    23_328_000.0,  // 9 months (gestation)
+    3_600.0,      // 1 hour (metabolic)
+    86_400.0,     // 1 day (cell division)
+    604_800.0,    // 1 week (differentiation)
+    2_592_000.0,  // 1 month (tissue formation)
+    7_776_000.0,  // 3 months (organ development)
+    23_328_000.0, // 9 months (gestation)
 ];
 
 /// Default gene expression profile length
@@ -21,9 +21,9 @@ pub enum CellType {
     /// Adult somatic (differentiated) cell, suitable as iPSC or SCNT donor.
     Somatic,
     /// Induced pluripotent stem cell (iPSC) — fully reprogrammed.
-    Pluripotent,     // iPSC
+    Pluripotent, // iPSC
     /// Primordial germ cell-like cell (PGC-LC) — output of PGC induction.
-    PrimordialGerm,  // PGC-LC
+    PrimordialGerm, // PGC-LC
     /// Oogonium stage in the female germline.
     Oogonium,
     /// Mature oocyte — used as SCNT recipient or IVG endpoint.
@@ -61,15 +61,15 @@ pub struct CellState {
     /// Identity / lineage of the cell.
     pub cell_type: CellType,
     /// Proportion of living, intact cells (0–1).
-    pub viability: f64,           // 0-1
+    pub viability: f64, // 0-1
     /// Degree of pluripotency; 1.0 = fully pluripotent iPSC.
-    pub pluripotency_score: f64,  // 0-1 (1 = fully pluripotent)
+    pub pluripotency_score: f64, // 0-1 (1 = fully pluripotent)
     /// Number of cell divisions accumulated since culture start.
     pub division_count: u32,
     /// Time in culture since seeding (hours).
     pub age_hours: f64,
     /// Global DNA methylation level (0 = fully demethylated, 1 = fully methylated).
-    pub methylation_score: f64,   // Global methylation level 0-1
+    pub methylation_score: f64, // Global methylation level 0-1
     /// Simplified per-gene expression profile (each value 0–1).
     pub gene_expression: Vec<f64>, // Simplified expression profile
 }
@@ -121,13 +121,13 @@ pub struct CultureEnvironment {
     /// Incubator temperature in °C (target ≈ 37.0).
     pub temperature_celsius: f64, // target ~37.0
     /// CO₂ concentration in percent (target ≈ 5.0).
-    pub co2_percent: f64,         // target ~5.0
+    pub co2_percent: f64, // target ~5.0
     /// O₂ concentration in percent (target ≈ 20.0, or 5.0 for hypoxic culture).
-    pub o2_percent: f64,          // target ~20.0 (or 5.0 for hypoxic)
+    pub o2_percent: f64, // target ~20.0 (or 5.0 for hypoxic)
     /// Media pH (target ≈ 7.4).
-    pub ph: f64,                  // target ~7.4
+    pub ph: f64, // target ~7.4
     /// Relative humidity in percent (target ≈ 95.0).
-    pub humidity_percent: f64,    // target ~95.0
+    pub humidity_percent: f64, // target ~95.0
     /// Volume of culture media in the vessel (mL).
     pub media_volume_ml: f64,
     /// Number of times the culture has been passaged (subcultured).
@@ -164,7 +164,8 @@ impl CultureEnvironment {
     /// Compute deviation from standard conditions (sum of squared fractional errors).
     pub fn deviation_from_standard(&self) -> f64 {
         let std = CultureEnvironment::standard();
-        let temp_err = (self.temperature_celsius - std.temperature_celsius) / std.temperature_celsius;
+        let temp_err =
+            (self.temperature_celsius - std.temperature_celsius) / std.temperature_celsius;
         let co2_err = (self.co2_percent - std.co2_percent) / std.co2_percent;
         let ph_err = (self.ph - std.ph) / std.ph;
         let humidity_err = (self.humidity_percent - std.humidity_percent) / std.humidity_percent;
@@ -176,17 +177,17 @@ impl CultureEnvironment {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReprogrammingStage {
     /// Day 0: Yamanaka factor delivery initiated.
-    Initial,          // Day 0: factor delivery
+    Initial, // Day 0: factor delivery
     /// Days 1–3: Mesenchymal-to-Epithelial Transition (MET) begins.
-    EarlyResponse,    // Day 1-3: MET begins
+    EarlyResponse, // Day 1-3: MET begins
     /// Days 4–10: Epigenetic remodeling and chromatin opening.
     MidReprogramming, // Day 4-10: epigenetic remodeling
     /// Days 11–20: Pluripotency gene network activation.
     LateReprogramming, // Day 11-20: pluripotency activation
     /// Days 21–28: Stable iPSC colony formation and expansion.
-    Stabilization,    // Day 21-28: stable iPSC colonies
+    Stabilization, // Day 21-28: stable iPSC colonies
     /// Protocol finished; iPSC identity validated.
-    Complete,         // Validated iPSC
+    Complete, // Validated iPSC
     /// Protocol terminated due to cell death or quality failure.
     Failed,
 }
@@ -197,11 +198,11 @@ pub enum GermCellStage {
     /// Starting iPSC that feeds into the IVG pipeline.
     Ipsc,
     /// Primordial germ cell-like (PGC-LC) induction phase.
-    PgcInduction,   // PGC-like cell induction
+    PgcInduction, // PGC-like cell induction
     /// Early germ cell after PGC induction.
-    EarlyGerm,      // Early germ cell
+    EarlyGerm, // Early germ cell
     /// Cell is transitioning into meiotic prophase I.
-    MeioticEntry,   // Entering meiosis
+    MeioticEntry, // Entering meiosis
     /// Meiosis I (reductional division) in progress.
     MeiosisI,
     /// Meiosis II (equational division) in progress.
@@ -216,13 +217,13 @@ pub enum GermCellStage {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MeiosisCheckpoint {
     /// Homologous chromosome synapsis (pairing) in prophase I.
-    Synapsis,       // Homolog pairing
+    Synapsis, // Homolog pairing
     /// Crossover / recombination event count verification.
-    Crossover,      // Recombination
+    Crossover, // Recombination
     /// Chromosome segregation quality after meiosis I.
-    SegregationI,   // First division
+    SegregationI, // First division
     /// Chromatid segregation quality after meiosis II.
-    SegregationII,  // Second division
+    SegregationII, // Second division
 }
 
 /// Stage of a Somatic Cell Nuclear Transfer (SCNT) protocol.
@@ -453,6 +454,9 @@ mod tests {
         let json = serde_json::to_string(&report).unwrap();
         let deser: QualityReport = serde_json::from_str(&json).unwrap();
         assert_eq!(report.karyotype_normal, deser.karyotype_normal);
-        assert_eq!(report.pluripotency_markers.len(), deser.pluripotency_markers.len());
+        assert_eq!(
+            report.pluripotency_markers.len(),
+            deser.pluripotency_markers.len()
+        );
     }
 }

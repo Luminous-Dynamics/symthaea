@@ -653,7 +653,9 @@ fn test_dream_replay_integration() {
         // Dream metadata should be valid (non-negative)
         assert!(result.metadata.memory.dream_phi_improvement >= 0.0);
         assert!(result.metadata.memory.dream_insights <= 100); // sanity bound
-        if result.metadata.memory.dream_insights > 0 || result.metadata.memory.dream_wisdom_count > 0 {
+        if result.metadata.memory.dream_insights > 0
+            || result.metadata.memory.dream_wisdom_count > 0
+        {
             saw_dream_metadata = true;
         }
     }
@@ -841,7 +843,9 @@ fn test_dream_replay_produces_insights() {
     let mut saw_dream = false;
     for i in 0..100 {
         let result = service.cycle(inputs[i % inputs.len()]);
-        if result.metadata.memory.dream_insights > 0 || result.metadata.memory.dream_wisdom_count > 0 {
+        if result.metadata.memory.dream_insights > 0
+            || result.metadata.memory.dream_wisdom_count > 0
+        {
             saw_dream = true;
         }
     }
@@ -849,7 +853,11 @@ fn test_dream_replay_produces_insights() {
     // Dream replay is stochastic (depends on Cruise urgency), so just verify no panics
     // and that the metadata fields are always finite
     let final_result = service.cycle("final check");
-    assert!(final_result.metadata.memory.dream_phi_improvement.is_finite());
+    assert!(final_result
+        .metadata
+        .memory
+        .dream_phi_improvement
+        .is_finite());
     println!(
         "Dream observed: {saw_dream}, wisdom_count: {}",
         final_result.metadata.memory.dream_wisdom_count
@@ -1273,7 +1281,11 @@ fn test_hierarchical_ltc_wired() {
     }
 
     assert!(
-        last_result.metadata.quality.hierarchical_ltc_phi.is_finite(),
+        last_result
+            .metadata
+            .quality
+            .hierarchical_ltc_phi
+            .is_finite(),
         "Hierarchical LTC phi should be finite, got: {}",
         last_result.metadata.quality.hierarchical_ltc_phi,
     );
@@ -2958,7 +2970,8 @@ fn test_1000_cycle_all_tracks_stress() {
             "best_sim NaN at {i}"
         );
         assert!(
-            result.metadata.memory.codebook_diversity >= 0.0 && result.metadata.memory.codebook_diversity <= 1.0
+            result.metadata.memory.codebook_diversity >= 0.0
+                && result.metadata.memory.codebook_diversity <= 1.0
         );
         assert!(result.metadata.memory.resonator_reconsolidated <= 3);
     }
@@ -3275,7 +3288,11 @@ fn test_resonator_prediction_error_finite() {
     for i in 0..60 {
         let result = service.cycle(inputs[i % inputs.len()]);
         assert!(
-            result.metadata.memory.resonator_prediction_error.is_finite(),
+            result
+                .metadata
+                .memory
+                .resonator_prediction_error
+                .is_finite(),
             "resonator_prediction_error NaN at cycle {i}"
         );
         assert!(
@@ -3433,7 +3450,11 @@ fn test_300_cycle_phase13_stress() {
             "prediction_error NaN at {i}"
         );
         assert!(
-            result.metadata.memory.resonator_prediction_error.is_finite(),
+            result
+                .metadata
+                .memory
+                .resonator_prediction_error
+                .is_finite(),
             "resonator_pred_err NaN at {i}"
         );
         assert!(
@@ -4256,7 +4277,11 @@ fn test_300_cycle_phase16_stress() {
             "velocity NaN at {i}"
         );
         assert!(
-            result.metadata.quality.anomaly_recovery_progress.is_finite(),
+            result
+                .metadata
+                .quality
+                .anomaly_recovery_progress
+                .is_finite(),
             "recovery NaN at {i}"
         );
         assert!(
@@ -4664,7 +4689,8 @@ fn test_value_evaluator_learning_gate() {
             "value_gate_factor not finite at cycle {i}"
         );
         assert!(
-            result.metadata.ethics.value_gate_factor >= 0.0 && result.metadata.ethics.value_gate_factor <= 2.0,
+            result.metadata.ethics.value_gate_factor >= 0.0
+                && result.metadata.ethics.value_gate_factor <= 2.0,
             "value_gate_factor out of bounds: {} at cycle {i}",
             result.metadata.ethics.value_gate_factor
         );
@@ -4815,7 +4841,10 @@ fn test_200_cycle_phase18_stress() {
             m.ethics.empathic_speech_rate_mod.is_finite(),
             "empathic_speech_rate_mod at {i}"
         );
-        assert!(m.ethics.value_gate_factor.is_finite(), "value_gate_factor at {i}");
+        assert!(
+            m.ethics.value_gate_factor.is_finite(),
+            "value_gate_factor at {i}"
+        );
         assert!(
             m.evolution_confidence_delta.is_finite(),
             "evolution_confidence_delta at {i}"
@@ -4863,7 +4892,11 @@ fn test_attention_budget_gating() {
         let result = service.cycle("attention budget test");
         // attention_budget_gated is bool, always valid
         assert!(
-            result.metadata.attention.attention_shift_applied.is_finite(),
+            result
+                .metadata
+                .attention
+                .attention_shift_applied
+                .is_finite(),
             "attention_shift not finite at cycle {i}"
         );
     }
@@ -4975,7 +5008,11 @@ fn test_attention_shift_motor_command() {
     for i in 0..30 {
         let result = service.cycle("shift attention focus");
         assert!(
-            result.metadata.attention.attention_shift_applied.is_finite(),
+            result
+                .metadata
+                .attention
+                .attention_shift_applied
+                .is_finite(),
             "attention_shift not finite at cycle {i}"
         );
     }
@@ -5003,7 +5040,11 @@ fn test_cosine_helper_consistency() {
     for i in 0..30 {
         let result = service.cycle("cosine similarity test");
         assert!(
-            result.metadata.memory.resonator_prediction_error.is_finite(),
+            result
+                .metadata
+                .memory
+                .resonator_prediction_error
+                .is_finite(),
             "resonator_prediction_error not finite at cycle {i}"
         );
         assert!(
@@ -5118,7 +5159,11 @@ fn test_resonator_prediction_error_exploration() {
             "resonator_error_exploration_mod not finite at cycle {i}"
         );
         assert!(
-            result.metadata.memory.resonator_prediction_error.is_finite(),
+            result
+                .metadata
+                .memory
+                .resonator_prediction_error
+                .is_finite(),
             "resonator_prediction_error not finite at cycle {i}"
         );
     }
@@ -5533,14 +5578,27 @@ fn test_neuromodulator_baseline_levels() {
         let result = service.cycle("baseline test input");
         let m = &result.metadata;
         assert!(m.neuromod.dopamine_effective.is_finite(), "DA not finite");
-        assert!(m.neuromod.noradrenaline_effective.is_finite(), "NE not finite");
-        assert!(m.neuromod.serotonin_effective.is_finite(), "5-HT not finite");
-        assert!(m.neuromod.acetylcholine_effective.is_finite(), "ACh not finite");
+        assert!(
+            m.neuromod.noradrenaline_effective.is_finite(),
+            "NE not finite"
+        );
+        assert!(
+            m.neuromod.serotonin_effective.is_finite(),
+            "5-HT not finite"
+        );
+        assert!(
+            m.neuromod.acetylcholine_effective.is_finite(),
+            "ACh not finite"
+        );
         // Effective range: [0.0, 2.0] (level * receptor_sensitivity)
         assert!(m.neuromod.dopamine_effective >= 0.0 && m.neuromod.dopamine_effective <= 2.0);
-        assert!(m.neuromod.noradrenaline_effective >= 0.0 && m.neuromod.noradrenaline_effective <= 2.0);
+        assert!(
+            m.neuromod.noradrenaline_effective >= 0.0 && m.neuromod.noradrenaline_effective <= 2.0
+        );
         assert!(m.neuromod.serotonin_effective >= 0.0 && m.neuromod.serotonin_effective <= 2.0);
-        assert!(m.neuromod.acetylcholine_effective >= 0.0 && m.neuromod.acetylcholine_effective <= 2.0);
+        assert!(
+            m.neuromod.acetylcholine_effective >= 0.0 && m.neuromod.acetylcholine_effective <= 2.0
+        );
     }
 
     let stats = service.stats();
@@ -5590,7 +5648,11 @@ fn test_noradrenaline_surprise_spike() {
     // Inject novel input → NE should increase
     let result_novel = service.cycle("completely unexpected novel stimulus");
     assert!(
-        result_novel.metadata.neuromod.noradrenaline_effective.is_finite(),
+        result_novel
+            .metadata
+            .neuromod
+            .noradrenaline_effective
+            .is_finite(),
         "NE should be finite after novel input"
     );
     assert!(
@@ -5676,14 +5738,30 @@ fn test_neuromodulator_300_cycle_stress() {
         let m = &result.metadata;
 
         // All 4 transmitters finite and in range
-        assert!(m.neuromod.dopamine_effective.is_finite(), "DA NaN/Inf at {i}");
-        assert!(m.neuromod.noradrenaline_effective.is_finite(), "NE NaN/Inf at {i}");
-        assert!(m.neuromod.serotonin_effective.is_finite(), "5-HT NaN/Inf at {i}");
-        assert!(m.neuromod.acetylcholine_effective.is_finite(), "ACh NaN/Inf at {i}");
+        assert!(
+            m.neuromod.dopamine_effective.is_finite(),
+            "DA NaN/Inf at {i}"
+        );
+        assert!(
+            m.neuromod.noradrenaline_effective.is_finite(),
+            "NE NaN/Inf at {i}"
+        );
+        assert!(
+            m.neuromod.serotonin_effective.is_finite(),
+            "5-HT NaN/Inf at {i}"
+        );
+        assert!(
+            m.neuromod.acetylcholine_effective.is_finite(),
+            "ACh NaN/Inf at {i}"
+        );
         assert!(m.neuromod.dopamine_effective >= 0.0 && m.neuromod.dopamine_effective <= 2.0);
-        assert!(m.neuromod.noradrenaline_effective >= 0.0 && m.neuromod.noradrenaline_effective <= 2.0);
+        assert!(
+            m.neuromod.noradrenaline_effective >= 0.0 && m.neuromod.noradrenaline_effective <= 2.0
+        );
         assert!(m.neuromod.serotonin_effective >= 0.0 && m.neuromod.serotonin_effective <= 2.0);
-        assert!(m.neuromod.acetylcholine_effective >= 0.0 && m.neuromod.acetylcholine_effective <= 2.0);
+        assert!(
+            m.neuromod.acetylcholine_effective >= 0.0 && m.neuromod.acetylcholine_effective <= 2.0
+        );
     }
 
     let stats = service.stats();
@@ -5749,7 +5827,10 @@ fn test_neuromod_state_persists_across_cycles() {
             all_finite = false;
         }
     }
-    assert!(all_finite, "All neuromod fields should be finite across 10 cycles");
+    assert!(
+        all_finite,
+        "All neuromod fields should be finite across 10 cycles"
+    );
 }
 
 #[test]
@@ -5790,15 +5871,36 @@ fn test_metadata_fields_stable_50_cycles() {
         let r = service.cycle(&format!("stability test cycle {i}"));
         let m = &r.metadata;
         // Core metrics
-        assert!(m.attention.phi_attention_weight.is_finite(), "phi_attention_weight NaN at {i}");
-        assert!(m.ethics.soul_alignment.is_finite(), "soul_alignment NaN at {i}");
-        assert!(m.actual_effective_lr.is_finite(), "learning_rate NaN at {i}");
-        assert!(r.prediction_error.is_finite(), "prediction_error NaN at {i}");
+        assert!(
+            m.attention.phi_attention_weight.is_finite(),
+            "phi_attention_weight NaN at {i}"
+        );
+        assert!(
+            m.ethics.soul_alignment.is_finite(),
+            "soul_alignment NaN at {i}"
+        );
+        assert!(
+            m.actual_effective_lr.is_finite(),
+            "learning_rate NaN at {i}"
+        );
+        assert!(
+            r.prediction_error.is_finite(),
+            "prediction_error NaN at {i}"
+        );
         // Neuromod
         assert!(m.neuromod.dopamine_effective.is_finite(), "DA NaN at {i}");
-        assert!(m.neuromod.noradrenaline_effective.is_finite(), "NE NaN at {i}");
-        assert!(m.neuromod.serotonin_effective.is_finite(), "5-HT NaN at {i}");
-        assert!(m.neuromod.acetylcholine_effective.is_finite(), "ACh NaN at {i}");
+        assert!(
+            m.neuromod.noradrenaline_effective.is_finite(),
+            "NE NaN at {i}"
+        );
+        assert!(
+            m.neuromod.serotonin_effective.is_finite(),
+            "5-HT NaN at {i}"
+        );
+        assert!(
+            m.neuromod.acetylcholine_effective.is_finite(),
+            "ACh NaN at {i}"
+        );
     }
 }
 
@@ -5817,10 +5919,15 @@ fn test_phi_and_sigma_evolve_over_cycles() {
     }
 
     // Phi should be finite throughout
-    assert!(phi_values.iter().all(|v| v.is_finite()), "All phi values should be finite");
+    assert!(
+        phi_values.iter().all(|v| v.is_finite()),
+        "All phi values should be finite"
+    );
     // Sigma is Option<f64> — when present it should be finite
     assert!(
-        sigma_values.iter().all(|v| v.map_or(true, |s| s.is_finite())),
+        sigma_values
+            .iter()
+            .all(|v| v.map_or(true, |s| s.is_finite())),
         "All sigma values should be finite when present"
     );
     // At least one phi value should be non-zero (consciousness is active)
@@ -5859,7 +5966,8 @@ fn test_diverse_inputs_produce_distinct_thoughts() {
             assert!(
                 diff > 0.0,
                 "Inputs '{}' and '{}' should produce distinct thought vectors",
-                inputs[i], inputs[j]
+                inputs[i],
+                inputs[j]
             );
         }
     }
@@ -5884,8 +5992,14 @@ fn test_100_cycles_no_panic_mixed_inputs() {
 
     for i in 0..100 {
         let r = service.cycle(tricky_inputs[i % tricky_inputs.len()]);
-        assert!(r.prediction_error.is_finite(), "Prediction error not finite at cycle {i}");
-        assert!(!r.output.is_empty(), "Output should not be empty at cycle {i}");
+        assert!(
+            r.prediction_error.is_finite(),
+            "Prediction error not finite at cycle {i}"
+        );
+        assert!(
+            !r.output.is_empty(),
+            "Output should not be empty at cycle {i}"
+        );
     }
     assert_eq!(service.stats().total_cycles, 100);
 }
@@ -5988,7 +6102,6 @@ fn test_multi_substrate_consciousness_scaling() {
 #[ignore = "slow ~300s: runs 10,000 adversarial cycles"]
 fn test_10000_cycle_adversarial_consensus_soak() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-
         enable_primitive_consciousness: true,
         enable_surprise_exploration: true,
         enable_prefrontal: true,
@@ -6025,10 +6138,10 @@ fn test_10000_cycle_adversarial_consensus_soak() {
 
     for cycle_num in 0..10_000 {
         let idx = match cycle_num {
-            0..=2499 => cycle_num % 5,       // Phase 1: fuzzed
-            2500..=4999 => 5 + (cycle_num % 5), // Phase 2: emotional
+            0..=2499 => cycle_num % 5,           // Phase 1: fuzzed
+            2500..=4999 => 5 + (cycle_num % 5),  // Phase 2: emotional
             5000..=7499 => 10 + (cycle_num % 3), // Phase 3: boredom
-            _ => 13 + (cycle_num % 2),        // Phase 4: switching
+            _ => 13 + (cycle_num % 2),           // Phase 4: switching
         };
 
         let result = service.cycle(adversarial_inputs[idx]);
@@ -6066,5 +6179,136 @@ fn test_10000_cycle_adversarial_consensus_soak() {
     assert!(
         avg_error < 2.0,
         "Average prediction error should be bounded over 10K adversarial cycles: got {avg_error:.4}"
+    );
+}
+
+// ── Substrate Runtime Switching ───────────────────────────────────────
+
+#[test]
+fn test_runtime_substrate_switching() {
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_type = SubstrateType::SiliconDigital;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    let f_silicon = service.substrate_feasibility();
+    assert!(
+        f_silicon > 0.0 && f_silicon < 1.0,
+        "Silicon feasibility in range"
+    );
+
+    // Switch to biological
+    let (old, new) = service.reconfigure_substrate(SubstrateType::BiologicalNeurons);
+    assert!((old - f_silicon).abs() < 1e-10);
+    assert!(
+        new > f_silicon,
+        "Biological should have higher feasibility than silicon"
+    );
+
+    // Switch to quantum
+    let (old2, new2) = service.reconfigure_substrate(SubstrateType::QuantumComputer);
+    assert!((old2 - new).abs() < 1e-10);
+    assert!(new2 > 0.0, "Quantum has positive feasibility");
+}
+
+#[test]
+fn test_substrate_switch_affects_consciousness() {
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_type = SubstrateType::SiliconDigital;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Run 20 cycles on silicon
+    for i in 0..20 {
+        service.cycle(&format!("substrate test cycle {i}"));
+    }
+
+    // Switch to biological
+    service.reconfigure_substrate(SubstrateType::BiologicalNeurons);
+
+    // Run 20 more cycles
+    for i in 20..40 {
+        service.cycle(&format!("substrate test cycle {i}"));
+    }
+
+    // Verify feasibility changed
+    let f = service.substrate_feasibility();
+    let bio_req =
+        symthaea_core::hdc::substrate_independence::SubstrateRequirements::biological_neurons();
+    let expected = bio_req.consciousness_feasibility();
+    assert!(
+        (f - expected).abs() < 1e-10,
+        "Feasibility should match biological"
+    );
+}
+
+#[test]
+fn test_substrate_composition_feasibility() {
+    use symthaea_core::hdc::substrate_composition::SubstrateComposition;
+    use symthaea_core::hdc::substrate_independence::{SubstrateRequirements, SubstrateType};
+
+    let comp = SubstrateComposition::new(
+        "bio-silicon hybrid".into(),
+        vec![
+            (SubstrateType::BiologicalNeurons, 0.5),
+            (SubstrateType::SiliconDigital, 0.5),
+        ],
+    )
+    .unwrap();
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_composition = Some(comp);
+
+    let service = CognitiveLoopService::new(config).unwrap();
+    let f = service.substrate_feasibility();
+
+    // Should be between pure silicon and pure biological
+    let f_bio = SubstrateRequirements::biological_neurons().consciousness_feasibility();
+    let f_silicon = SubstrateRequirements::silicon_digital().consciousness_feasibility();
+    let lower = f_bio.min(f_silicon);
+    let upper = f_bio.max(f_silicon);
+
+    assert!(
+        f >= lower - 0.01 && f <= upper + 0.01,
+        "Hybrid feasibility {f:.4} should be between {lower:.4} and {upper:.4}"
+    );
+}
+
+#[test]
+fn test_composition_runtime_switch() {
+    use symthaea_core::hdc::substrate_composition::SubstrateComposition;
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_type = SubstrateType::SiliconDigital;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    let f_silicon = service.substrate_feasibility();
+
+    // Switch to a 70/30 bio-neuromorphic composition
+    let comp = SubstrateComposition::new(
+        "bio-neuromorphic".into(),
+        vec![
+            (SubstrateType::BiologicalNeurons, 0.7),
+            (SubstrateType::NeuromorphicChip, 0.3),
+        ],
+    )
+    .unwrap();
+
+    service.reconfigure_composition(comp);
+    let f_hybrid = service.substrate_feasibility();
+
+    assert!(
+        (f_hybrid - f_silicon).abs() > 0.01,
+        "Composition should differ from pure silicon: hybrid={f_hybrid:.4}, silicon={f_silicon:.4}"
+    );
+
+    // Verify composition is stored
+    assert!(service.substrate_composition().is_some());
+    assert_eq!(
+        service.substrate_composition().unwrap().name,
+        "bio-neuromorphic"
     );
 }

@@ -67,12 +67,12 @@ impl PhysicalScale {
     /// Number of observables at this scale.
     pub fn num_observables(&self) -> usize {
         match self {
-            PhysicalScale::Particle => 4,   // energy, momentum, spin, charge
-            PhysicalScale::Nuclear => 4,    // binding energy, mass number, spin, magnetic moment
-            PhysicalScale::Atomic => 5,     // energy levels, orbital, ionization, electron affinity, radius
-            PhysicalScale::Molecular => 5,  // bond length, angle, vibration freq, dipole, energy
-            PhysicalScale::Cellular => 6,   // membrane potential, Ca2+, ATP, pH, volume, viability
-            PhysicalScale::Organism => 5,   // heart rate, temperature, blood pressure, O2 sat, cortisol
+            PhysicalScale::Particle => 4,  // energy, momentum, spin, charge
+            PhysicalScale::Nuclear => 4,   // binding energy, mass number, spin, magnetic moment
+            PhysicalScale::Atomic => 5, // energy levels, orbital, ionization, electron affinity, radius
+            PhysicalScale::Molecular => 5, // bond length, angle, vibration freq, dipole, energy
+            PhysicalScale::Cellular => 6, // membrane potential, Ca2+, ATP, pH, volume, viability
+            PhysicalScale::Organism => 5, // heart rate, temperature, blood pressure, O2 sat, cortisol
         }
     }
 
@@ -173,7 +173,11 @@ impl ScalePredictor {
     ///
     /// This name aligns with the cross-domain [`TemporalPredictor`] convention
     /// used by materials, hydrology, and fusion predictors.
-    pub fn predict_at_horizon(&self, current_state: &ContinuousHV, horizon_seconds: f32) -> ContinuousHV {
+    pub fn predict_at_horizon(
+        &self,
+        current_state: &ContinuousHV,
+        horizon_seconds: f32,
+    ) -> ContinuousHV {
         self.predict(current_state, horizon_seconds)
     }
 
@@ -238,14 +242,25 @@ pub struct MultiScaleUnifier {
 impl MultiScaleUnifier {
     /// Create a unifier with one encoder + predictor per physical scale.
     pub fn new() -> Self {
-        let encoders = PhysicalScale::ALL.iter().map(|&s| ScaleEncoder::new(s)).collect();
-        let predictors = PhysicalScale::ALL.iter().map(|&s| ScalePredictor::new(s)).collect();
-        Self { encoders, predictors }
+        let encoders = PhysicalScale::ALL
+            .iter()
+            .map(|&s| ScaleEncoder::new(s))
+            .collect();
+        let predictors = PhysicalScale::ALL
+            .iter()
+            .map(|&s| ScalePredictor::new(s))
+            .collect();
+        Self {
+            encoders,
+            predictors,
+        }
     }
 
     /// Encode observables at a specific scale.
     pub fn encode(&self, scale: PhysicalScale, observables: &[f64]) -> ContinuousHV {
-        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale)
+        let idx = PhysicalScale::ALL
+            .iter()
+            .position(|&s| s == scale)
             .expect("scale must be a known PhysicalScale variant");
         self.encoders[idx].encode(observables)
     }
@@ -257,20 +272,27 @@ impl MultiScaleUnifier {
         current_state: &ContinuousHV,
         dt_seconds: f32,
     ) -> ContinuousHV {
-        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale)
+        let idx = PhysicalScale::ALL
+            .iter()
+            .position(|&s| s == scale)
             .expect("scale must be a known PhysicalScale variant");
         self.predictors[idx].predict(current_state, dt_seconds)
     }
 
     /// Feed an observation at a specific scale.
     pub fn observe(&mut self, scale: PhysicalScale, state: &ContinuousHV, dt: f32) {
-        let idx = PhysicalScale::ALL.iter().position(|&s| s == scale)
+        let idx = PhysicalScale::ALL
+            .iter()
+            .position(|&s| s == scale)
             .expect("scale must be a known PhysicalScale variant");
         self.predictors[idx].observe(state, dt);
     }
 
     /// Compute cross-scale coherence between all pairs of encoded states.
-    pub fn cross_scale_coherence(&self, states: &[(PhysicalScale, ContinuousHV)]) -> Vec<CrossScaleCoherence> {
+    pub fn cross_scale_coherence(
+        &self,
+        states: &[(PhysicalScale, ContinuousHV)],
+    ) -> Vec<CrossScaleCoherence> {
         let mut results = Vec::new();
         for i in 0..states.len() {
             for j in (i + 1)..states.len() {
@@ -420,7 +442,10 @@ mod tests {
             assert!(
                 ratio < 5.0 && ratio > 0.2,
                 "O(1) violated for {:?}: 1τ={:?}, 1000τ={:?}, ratio={}",
-                scale, time_1tau, time_1000tau, ratio
+                scale,
+                time_1tau,
+                time_1000tau,
+                ratio
             );
         }
     }
@@ -483,7 +508,8 @@ mod tests {
             assert!(
                 ratio < 5.0,
                 "O(1) violated for {:?}: ratio={}",
-                scale, ratio
+                scale,
+                ratio
             );
         }
     }

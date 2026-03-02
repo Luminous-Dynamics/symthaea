@@ -204,9 +204,7 @@ impl VoiceOutputMetrics {
 
         // Speech rate estimate: frames * dt → syllables/sec (rough: ~5 frames per syllable at 200Hz)
         let total_duration = match (frames.first(), frames.last()) {
-            (Some(first), Some(last)) if frames.len() >= 2 => {
-                (last.time - first.time).abs()
-            }
+            (Some(first), Some(last)) if frames.len() >= 2 => (last.time - first.time).abs(),
             _ => 0.1,
         };
         let speech_rate = if total_duration > 0.01 {

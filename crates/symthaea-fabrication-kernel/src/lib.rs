@@ -4,27 +4,27 @@
 //! CSG boolean operations, triangle mesh tessellation, STL/3MF export,
 //! and physics simulation abstraction layer.
 
-pub mod primitives;
-pub mod csg;
-pub mod mesh;
-pub mod bsp;
-pub mod export;
-pub mod import;
-pub mod validate;
-pub mod thought;
-pub mod simulator;
-pub mod manufacturing;
-pub mod building;
-pub mod design_loop;
 #[cfg(feature = "analytical")]
 pub mod analytical;
+pub mod bsp;
+pub mod building;
+pub mod csg;
+pub mod design_loop;
+pub mod export;
+pub mod import;
+pub mod manufacturing;
+pub mod mesh;
+pub mod primitives;
+pub mod simulator;
+pub mod thought;
+pub mod validate;
 
-pub use primitives::*;
-pub use csg::{CSGNode, BooleanOp, Primitive, Transform3D};
+pub use bsp::{csg_intersect, csg_subtract};
+pub use csg::{BooleanOp, CSGNode, Primitive, Transform3D};
+pub use export::{export_3mf, export_stl};
+pub use import::{parse_ascii_stl, parse_binary_stl, parse_stl, StlError};
 pub use mesh::TriangleMesh;
-pub use bsp::{csg_subtract, csg_intersect};
-pub use export::{export_stl, export_3mf};
-pub use import::{parse_stl, parse_binary_stl, parse_ascii_stl, StlError};
-pub use validate::{validate_mesh, ValidationReport};
+pub use primitives::*;
+pub use simulator::{ForceHV, PhysicsBackend, SimState};
 pub use thought::GeometricThought;
-pub use simulator::{PhysicsBackend, ForceHV, SimState};
+pub use validate::{validate_mesh, ValidationReport};

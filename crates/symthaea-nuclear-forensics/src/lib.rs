@@ -15,7 +15,9 @@ pub mod isotope;
 pub mod safeguards;
 
 pub use attribution::{AttributionResult, NuclearAttributionAgent};
-pub use decay_model::{AgeEstimate, BackdatedResult, IsotopeDecayModel, DECAY_HORIZONS, DECAY_HORIZON_LABELS};
+pub use decay_model::{
+    AgeEstimate, BackdatedResult, IsotopeDecayModel, DECAY_HORIZONS, DECAY_HORIZON_LABELS,
+};
 pub use encoder::IsotopicHdcEncoder;
 pub use isotope::{IsotopicSignature, NuclearSource};
 pub use safeguards::{

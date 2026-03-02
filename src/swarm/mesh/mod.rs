@@ -949,12 +949,7 @@ pub const AEAD_TAG_SIZE: usize = 16;
 ///   restart nonce reuse under the same key.
 /// - **sequence** is per-type monotonic (wraps safely at 2^32 ≈ 2.7 years at 50Hz).
 #[cfg(feature = "mesh-encryption")]
-pub fn build_nonce(
-    source_id: &[u8; 8],
-    payload_type: u8,
-    epoch: u8,
-    sequence: u32,
-) -> [u8; 12] {
+pub fn build_nonce(source_id: &[u8; 8], payload_type: u8, epoch: u8, sequence: u32) -> [u8; 12] {
     let mut nonce = [0u8; 12];
     nonce[..6].copy_from_slice(&source_id[..6]);
     nonce[6] = payload_type;
@@ -1058,7 +1053,7 @@ pub const XCHACHA_NONCE_SIZE: usize = 24;
 /// Returns `[nonce (24 bytes) | ciphertext+tag]`.
 #[cfg(feature = "mesh-encryption")]
 pub fn encrypt_packet_xchacha(envelope: &[u8], key: &[u8; 32]) -> Vec<u8> {
-    use chacha20poly1305::{aead::Aead, XChaCha20Poly1305, KeyInit, XNonce};
+    use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305, XNonce};
     let cipher = XChaCha20Poly1305::new(key.into());
     let mut nonce_bytes = [0u8; 24];
     rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce_bytes);
@@ -1077,7 +1072,7 @@ pub fn encrypt_packet_xchacha(envelope: &[u8], key: &[u8; 32]) -> Vec<u8> {
 /// Returns `None` if decryption/authentication fails.
 #[cfg(feature = "mesh-encryption")]
 pub fn decrypt_packet_xchacha(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
-    use chacha20poly1305::{aead::Aead, XChaCha20Poly1305, KeyInit, XNonce};
+    use chacha20poly1305::{aead::Aead, KeyInit, XChaCha20Poly1305, XNonce};
     if data.len() < XCHACHA_NONCE_SIZE + AEAD_TAG_SIZE {
         return None;
     }
@@ -1108,7 +1103,7 @@ pub struct RotatingKeyPair {
     /// Current (primary) encryption key — used for all outbound packets.
     current: [u8; 32],
     /// Previous key — accepted for inbound during grace period, then discarded.
-    #[zeroize(skip)]
+    /// NOT skipped by zeroize — key material must be wiped on drop.
     previous: Option<[u8; 32]>,
     /// Tick at which the previous key expires (absolute tick count).
     #[zeroize(skip)]
@@ -2533,8 +2528,7 @@ mod tests {
         assert!(!frags.is_empty());
 
         // Reassemble
-        let mut assembler =
-            FragmentAssembler::new(thought_id, frags.len() as u8, envelope.len());
+        let mut assembler = FragmentAssembler::new(thought_id, frags.len() as u8, envelope.len());
         let mut buf = [0u8; LORA_MTU];
         for frag in &frags {
             let len = frag.to_bytes(&mut buf);
@@ -2545,8 +2539,8 @@ mod tests {
         let reassembled_envelope = assembler.assemble().expect("assembly should succeed");
 
         // Decompress
-        let decompressed = decompress_packet(&reassembled_envelope)
-            .expect("decompression should succeed");
+        let decompressed =
+            decompress_packet(&reassembled_envelope).expect("decompression should succeed");
 
         assert_eq!(
             decompressed, original_bytes,
@@ -2577,8 +2571,7 @@ mod tests {
         assert!(total >= 2, "Need at least 2 fragments for FEC test");
 
         // Drop the 2nd data fragment (index 1) — FEC should recover
-        let mut assembler =
-            FragmentAssembler::new(thought_id, total as u8, envelope.len());
+        let mut assembler = FragmentAssembler::new(thought_id, total as u8, envelope.len());
         let mut buf = [0u8; LORA_MTU];
         for (i, frag) in frags.iter().enumerate() {
             if i == 1 {
@@ -2589,12 +2582,21 @@ mod tests {
             assembler.feed(&decoded);
         }
 
-        assert!(assembler.is_complete(), "FEC should recover 1 lost fragment");
-        assert!(assembler.used_fec_recovery(), "Should have used FEC recovery");
+        assert!(
+            assembler.is_complete(),
+            "FEC should recover 1 lost fragment"
+        );
+        assert!(
+            assembler.used_fec_recovery(),
+            "Should have used FEC recovery"
+        );
         let reassembled_envelope = assembler.assemble().expect("assembly should succeed");
-        let decompressed = decompress_packet(&reassembled_envelope)
-            .expect("decompression should succeed");
-        assert_eq!(decompressed, original_bytes, "FEC-recovered roundtrip should match original");
+        let decompressed =
+            decompress_packet(&reassembled_envelope).expect("decompression should succeed");
+        assert_eq!(
+            decompressed, original_bytes,
+            "FEC-recovered roundtrip should match original"
+        );
     }
 
     #[test]
@@ -2617,8 +2619,7 @@ mod tests {
         let thought_id = packet.thought_id();
         let frags = fragment(thought_id, &envelope);
 
-        let mut assembler =
-            FragmentAssembler::new(thought_id, frags.len() as u8, envelope.len());
+        let mut assembler = FragmentAssembler::new(thought_id, frags.len() as u8, envelope.len());
         let mut buf = [0u8; LORA_MTU];
         for frag in &frags {
             let len = frag.to_bytes(&mut buf);
@@ -2626,10 +2627,15 @@ mod tests {
             assembler.feed(&decoded);
         }
         assert!(assembler.is_complete());
-        let reassembled_envelope = assembler.assemble().expect("heartbeat assembly should succeed");
+        let reassembled_envelope = assembler
+            .assemble()
+            .expect("heartbeat assembly should succeed");
         let decompressed = decompress_packet(&reassembled_envelope)
             .expect("heartbeat decompression should succeed");
-        assert_eq!(decompressed, original_bytes, "Heartbeat roundtrip should match");
+        assert_eq!(
+            decompressed, original_bytes,
+            "Heartbeat roundtrip should match"
+        );
     }
 
     // ====================================================================
@@ -2698,10 +2704,7 @@ mod tests {
             0
         );
         // With zero timeout, everything is stale
-        assert_eq!(
-            registry.stale_peer_count(std::time::Duration::ZERO),
-            1
-        );
+        assert_eq!(registry.stale_peer_count(std::time::Duration::ZERO), 1);
     }
 
     // ====================================================================
@@ -2907,14 +2910,26 @@ mod tests {
         let ct_new = pair.encrypt(plaintext, &source, 2);
 
         // During grace: both old and new ciphertext decrypt
-        assert!(pair.decrypt(&ct_old).is_some(), "Old ciphertext should decrypt during grace");
-        assert!(pair.decrypt(&ct_new).is_some(), "New ciphertext should decrypt during grace");
+        assert!(
+            pair.decrypt(&ct_old).is_some(),
+            "Old ciphertext should decrypt during grace"
+        );
+        assert!(
+            pair.decrypt(&ct_new).is_some(),
+            "New ciphertext should decrypt during grace"
+        );
 
         // After grace expires: old key is discarded
         pair.tick(150); // past grace_expires_at=150
         assert!(!pair.is_rotating());
-        assert!(pair.decrypt(&ct_old).is_none(), "Old ciphertext should fail after grace");
-        assert!(pair.decrypt(&ct_new).is_some(), "New ciphertext should still work");
+        assert!(
+            pair.decrypt(&ct_old).is_none(),
+            "Old ciphertext should fail after grace"
+        );
+        assert!(
+            pair.decrypt(&ct_new).is_some(),
+            "New ciphertext should still work"
+        );
     }
 
     #[cfg(feature = "mesh-encryption")]
@@ -3009,7 +3024,10 @@ mod tests {
         store_a2.agree(source_c, &pub_c);
         let wrong_key = store_a2.peer_key(&source_c).unwrap();
 
-        assert!(decrypt_packet(&ct, wrong_key).is_none(), "Wrong peer key must fail");
+        assert!(
+            decrypt_packet(&ct, wrong_key).is_none(),
+            "Wrong peer key must fail"
+        );
     }
 
     #[cfg(feature = "mesh-key-exchange")]
@@ -3035,7 +3053,10 @@ mod tests {
         let payload = b"fragment payload data here";
 
         let ct = encrypt_fragment(payload, &key, &source, 42, 3);
-        assert!(ct.len() > payload.len(), "Ciphertext should include overhead");
+        assert!(
+            ct.len() > payload.len(),
+            "Ciphertext should include overhead"
+        );
 
         let pt = decrypt_fragment(&ct, &key).expect("should decrypt");
         assert_eq!(&pt, payload);
@@ -3052,7 +3073,10 @@ mod tests {
         let ct1 = encrypt_fragment(payload, &key, &source, 1, 1);
 
         // Different nonces (different fragment_index) → different ciphertext
-        assert_ne!(ct0, ct1, "Different fragment indices must produce different ciphertext");
+        assert_ne!(
+            ct0, ct1,
+            "Different fragment indices must produce different ciphertext"
+        );
 
         // Both decrypt correctly
         assert_eq!(decrypt_fragment(&ct0, &key).unwrap(), payload);
@@ -3071,7 +3095,10 @@ mod tests {
         if ct.len() > AEAD_NONCE_SIZE + 1 {
             ct[AEAD_NONCE_SIZE + 1] ^= 0xFF;
         }
-        assert!(decrypt_fragment(&ct, &key).is_none(), "Tampered fragment must be rejected");
+        assert!(
+            decrypt_fragment(&ct, &key).is_none(),
+            "Tampered fragment must be rejected"
+        );
     }
 
     #[cfg(feature = "mesh-encryption")]
@@ -3081,7 +3108,10 @@ mod tests {
         let key_b = [0x22u8; 32];
         let source = [0x33; 8];
         let ct = encrypt_fragment(b"secret", &key_a, &source, 1, 0);
-        assert!(decrypt_fragment(&ct, &key_b).is_none(), "Wrong key must fail");
+        assert!(
+            decrypt_fragment(&ct, &key_b).is_none(),
+            "Wrong key must fail"
+        );
     }
 }
 
@@ -3104,14 +3134,14 @@ mod proptests {
 
     fn arb_wisdom_packet() -> impl Strategy<Value = WisdomPacket> {
         (
-            any::<[u8; 8]>(),   // source_id
-            any::<u32>(),       // sequence
-            any::<f32>(),       // phi
+            any::<[u8; 8]>(), // source_id
+            any::<u32>(),     // sequence
+            any::<f32>(),     // phi
             arb_urgency(),
-            any::<u32>(),       // timestamp_s
+            any::<u32>(), // timestamp_s
             arb_payload_type(),
-            any::<u8>(),        // auth_mac
-            1u8..=10,           // ttl
+            any::<u8>(), // auth_mac
+            1u8..=10,    // ttl
         )
             .prop_map(|(sid, seq, phi, urg, ts, pt, mac, ttl)| {
                 let phi = if phi.is_nan() || phi.is_infinite() {

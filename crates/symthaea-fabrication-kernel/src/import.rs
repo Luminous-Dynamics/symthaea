@@ -58,12 +58,17 @@ pub fn parse_binary_stl(data: &[u8]) -> Result<TriangleMesh, StlError> {
         indices.push([idx, idx + 1, idx + 2]);
     }
 
-    Ok(TriangleMesh { vertices, normals, indices })
+    Ok(TriangleMesh {
+        vertices,
+        normals,
+        indices,
+    })
 }
 
 /// Detect whether data looks like ASCII STL (starts with "solid")
 pub fn is_ascii_stl(data: &[u8]) -> bool {
-    data.len() > 6 && data[..6].eq_ignore_ascii_case(b"solid ")
+    data.len() > 6
+        && data[..6].eq_ignore_ascii_case(b"solid ")
         && !data[6..data.len().min(84)].contains(&0)
 }
 
@@ -81,9 +86,15 @@ pub fn parse_ascii_stl(text: &str) -> Result<TriangleMesh, StlError> {
             if parts.len() < 4 {
                 return Err(StlError::ParseError("bad vertex line".into()));
             }
-            let x: f32 = parts[1].parse().map_err(|_| StlError::ParseError("bad x".into()))?;
-            let y: f32 = parts[2].parse().map_err(|_| StlError::ParseError("bad y".into()))?;
-            let z: f32 = parts[3].parse().map_err(|_| StlError::ParseError("bad z".into()))?;
+            let x: f32 = parts[1]
+                .parse()
+                .map_err(|_| StlError::ParseError("bad x".into()))?;
+            let y: f32 = parts[2]
+                .parse()
+                .map_err(|_| StlError::ParseError("bad y".into()))?;
+            let z: f32 = parts[3]
+                .parse()
+                .map_err(|_| StlError::ParseError("bad z".into()))?;
             if !x.is_finite() || !y.is_finite() || !z.is_finite() {
                 return Err(StlError::NonFiniteCoordinate(indices.len()));
             }
@@ -104,14 +115,18 @@ pub fn parse_ascii_stl(text: &str) -> Result<TriangleMesh, StlError> {
         return Err(StlError::ParseError("no triangles found".into()));
     }
 
-    Ok(TriangleMesh { vertices, normals, indices })
+    Ok(TriangleMesh {
+        vertices,
+        normals,
+        indices,
+    })
 }
 
 /// Auto-detect format and parse
 pub fn parse_stl(data: &[u8]) -> Result<TriangleMesh, StlError> {
     if is_ascii_stl(data) {
-        let text = std::str::from_utf8(data)
-            .map_err(|_| StlError::ParseError("invalid UTF-8".into()))?;
+        let text =
+            std::str::from_utf8(data).map_err(|_| StlError::ParseError("invalid UTF-8".into()))?;
         parse_ascii_stl(text)
     } else {
         parse_binary_stl(data)
@@ -120,9 +135,24 @@ pub fn parse_stl(data: &[u8]) -> Result<TriangleMesh, StlError> {
 
 fn read_vertex(data: &[u8], offset: usize) -> [f32; 3] {
     [
-        f32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]),
-        f32::from_le_bytes([data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]]),
-        f32::from_le_bytes([data[offset + 8], data[offset + 9], data[offset + 10], data[offset + 11]]),
+        f32::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]),
+        f32::from_le_bytes([
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]),
+        f32::from_le_bytes([
+            data[offset + 8],
+            data[offset + 9],
+            data[offset + 10],
+            data[offset + 11],
+        ]),
     ]
 }
 
@@ -152,9 +182,14 @@ impl std::fmt::Display for StlError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::TooShort(n) => write!(f, "STL data too short: {} bytes", n),
-            Self::TruncatedData { expected, actual } =>
-                write!(f, "STL truncated: expected {} bytes, got {}", expected, actual),
-            Self::NonFiniteCoordinate(tri) => write!(f, "non-finite coordinate in triangle {}", tri),
+            Self::TruncatedData { expected, actual } => write!(
+                f,
+                "STL truncated: expected {} bytes, got {}",
+                expected, actual
+            ),
+            Self::NonFiniteCoordinate(tri) => {
+                write!(f, "non-finite coordinate in triangle {}", tri)
+            }
             Self::ParseError(msg) => write!(f, "STL parse error: {}", msg),
         }
     }

@@ -130,13 +130,26 @@ fn is_vowel_char(c: char) -> bool {
 /// Demote a stressed vowel phoneme to unstressed (e.g., "AE1" → "AE0").
 fn demote_stress(ph: &str) -> &str {
     match ph {
-        "AE1" => "AE0", "AH1" => "AH0", "AA1" => "AA0", "AO1" => "AO0",
-        "AW1" => "AW0", "AY1" => "AY0", "EH1" => "EH0", "ER1" => "ER0",
-        "EY1" => "EY0", "IH1" => "IH0", "IY1" => "IY0", "OW1" => "OW0",
-        "OY1" => "OY0", "UH1" => "UH0", "UW1" => "UW0",
+        "AE1" => "AE0",
+        "AH1" => "AH0",
+        "AA1" => "AA0",
+        "AO1" => "AO0",
+        "AW1" => "AW0",
+        "AY1" => "AY0",
+        "EH1" => "EH0",
+        "ER1" => "ER0",
+        "EY1" => "EY0",
+        "IH1" => "IH0",
+        "IY1" => "IY0",
+        "OW1" => "OW0",
+        "OY1" => "OY0",
+        "UH1" => "UH0",
+        "UW1" => "UW0",
         other => {
             // If it already ends in 0, return as-is
-            if other.ends_with('0') { return other; }
+            if other.ends_with('0') {
+                return other;
+            }
             // Fallback: can't demote, return original static ref
             "AH0"
         }
@@ -146,12 +159,25 @@ fn demote_stress(ph: &str) -> &str {
 /// Promote an unstressed vowel phoneme to primary stress (e.g., "AE0" → "AE1").
 fn promote_stress(ph: &str) -> &str {
     match ph {
-        "AE0" => "AE1", "AH0" => "AH1", "AA0" => "AA1", "AO0" => "AO1",
-        "AW0" => "AW1", "AY0" => "AY1", "EH0" => "EH1", "ER0" => "ER1",
-        "EY0" => "EY1", "IH0" => "IH1", "IY0" => "IY1", "OW0" => "OW1",
-        "OY0" => "OY1", "UH0" => "UH1", "UW0" => "UW1",
+        "AE0" => "AE1",
+        "AH0" => "AH1",
+        "AA0" => "AA1",
+        "AO0" => "AO1",
+        "AW0" => "AW1",
+        "AY0" => "AY1",
+        "EH0" => "EH1",
+        "ER0" => "ER1",
+        "EY0" => "EY1",
+        "IH0" => "IH1",
+        "IY0" => "IY1",
+        "OW0" => "OW1",
+        "OY0" => "OY1",
+        "UH0" => "UH1",
+        "UW0" => "UW1",
         other => {
-            if other.ends_with('1') { return other; }
+            if other.ends_with('1') {
+                return other;
+            }
             "AH1"
         }
     }
@@ -1200,7 +1226,12 @@ impl SimpleG2P {
             let next = chars.get(i + 1).copied();
 
             // Silent-e rule: vowel + consonant + 'e' at word end
-            if is_vowel_char(c) && i + 2 < len && !is_vowel_char(chars[i + 1]) && chars.get(i + 2) == Some(&'e') && i + 3 == len {
+            if is_vowel_char(c)
+                && i + 2 < len
+                && !is_vowel_char(chars[i + 1])
+                && chars.get(i + 2) == Some(&'e')
+                && i + 3 == len
+            {
                 let long_vowel = match c {
                     'a' => "EY1",
                     'i' => "AY1",
@@ -1219,10 +1250,26 @@ impl SimpleG2P {
             // Word-initial consonant clusters
             if i == 0 {
                 match (c, next) {
-                    ('w', Some('r')) => { phonemes.push("R"); i += 2; continue; }
-                    ('k', Some('n')) => { phonemes.push("N"); i += 2; continue; }
-                    ('g', Some('n')) => { phonemes.push("N"); i += 2; continue; }
-                    ('w', Some('h')) => { phonemes.push("W"); i += 2; continue; }
+                    ('w', Some('r')) => {
+                        phonemes.push("R");
+                        i += 2;
+                        continue;
+                    }
+                    ('k', Some('n')) => {
+                        phonemes.push("N");
+                        i += 2;
+                        continue;
+                    }
+                    ('g', Some('n')) => {
+                        phonemes.push("N");
+                        i += 2;
+                        continue;
+                    }
+                    ('w', Some('h')) => {
+                        phonemes.push("W");
+                        i += 2;
+                        continue;
+                    }
                     _ => {}
                 }
             }
@@ -1247,17 +1294,51 @@ impl SimpleG2P {
             }
 
             // Handle digraphs that consumed an extra character
-            if matches!((c, next),
-                ('a', Some('i')) | ('a', Some('y')) | ('a', Some('u')) | ('a', Some('w')) | ('a', Some('e')) |
-                ('e', Some('e')) | ('e', Some('a')) | ('e', Some('i')) | ('e', Some('y')) |
-                ('i', Some('e')) |
-                ('o', Some('o')) | ('o', Some('u')) | ('o', Some('w')) | ('o', Some('i')) | ('o', Some('y')) |
-                ('u', Some('e')) |
-                ('c', Some('h')) | ('n', Some('g')) | ('p', Some('h')) | ('s', Some('h')) | ('t', Some('h'))
-            ) && ph != "IH1" && ph != "AE1" && ph != "EH1" && ph != "AA1" && ph != "AH1"
-                && ph != "B" && ph != "D" && ph != "F" && ph != "G" && ph != "HH" && ph != "JH"
-                && ph != "K" && ph != "L" && ph != "M" && ph != "N" && ph != "P" && ph != "R"
-                && ph != "S" && ph != "T" && ph != "V" && ph != "W" && ph != "Z"
+            if matches!(
+                (c, next),
+                ('a', Some('i'))
+                    | ('a', Some('y'))
+                    | ('a', Some('u'))
+                    | ('a', Some('w'))
+                    | ('a', Some('e'))
+                    | ('e', Some('e'))
+                    | ('e', Some('a'))
+                    | ('e', Some('i'))
+                    | ('e', Some('y'))
+                    | ('i', Some('e'))
+                    | ('o', Some('o'))
+                    | ('o', Some('u'))
+                    | ('o', Some('w'))
+                    | ('o', Some('i'))
+                    | ('o', Some('y'))
+                    | ('u', Some('e'))
+                    | ('c', Some('h'))
+                    | ('n', Some('g'))
+                    | ('p', Some('h'))
+                    | ('s', Some('h'))
+                    | ('t', Some('h'))
+            ) && ph != "IH1"
+                && ph != "AE1"
+                && ph != "EH1"
+                && ph != "AA1"
+                && ph != "AH1"
+                && ph != "B"
+                && ph != "D"
+                && ph != "F"
+                && ph != "G"
+                && ph != "HH"
+                && ph != "JH"
+                && ph != "K"
+                && ph != "L"
+                && ph != "M"
+                && ph != "N"
+                && ph != "P"
+                && ph != "R"
+                && ph != "S"
+                && ph != "T"
+                && ph != "V"
+                && ph != "W"
+                && ph != "Z"
             {
                 // Digraph consumed: skip extra char
                 if c == 'x' {
@@ -1285,12 +1366,15 @@ impl SimpleG2P {
         // Auto-stress: first vowel in multi-syllable words gets stress=1
         // unless common unstressed prefix (be-, re-, de-, un-)
         if vowel_count > 1 {
-            let has_prefix = word.starts_with("be") || word.starts_with("re")
-                || word.starts_with("de") || word.starts_with("un");
+            let has_prefix = word.starts_with("be")
+                || word.starts_with("re")
+                || word.starts_with("de")
+                || word.starts_with("un");
 
             let mut found_first = false;
             for ph in phonemes.iter_mut() {
-                let is_vowel_ph = ph.len() >= 2 && (ph.ends_with('0') || ph.ends_with('1') || ph.ends_with('2'));
+                let is_vowel_ph =
+                    ph.len() >= 2 && (ph.ends_with('0') || ph.ends_with('1') || ph.ends_with('2'));
                 if is_vowel_ph && !found_first {
                     if has_prefix {
                         // Demote first vowel to unstressed
@@ -1315,11 +1399,28 @@ impl SimpleG2P {
     /// Map a single consonant letter to its ARPABET phoneme.
     fn consonant_phoneme(c: char, _next: Option<char>) -> &'static str {
         match c {
-            'b' => "B", 'c' => "K", 'd' => "D", 'f' => "F", 'g' => "G",
-            'h' => "HH", 'j' => "JH", 'k' => "K", 'l' => "L", 'm' => "M",
-            'n' => "N", 'p' => "P", 'q' => "K", 'r' => "R", 's' => "S",
-            't' => "T", 'v' => "V", 'w' => "W", 'x' => "K", 'y' => "Y",
-            'z' => "Z", _ => "AH0",
+            'b' => "B",
+            'c' => "K",
+            'd' => "D",
+            'f' => "F",
+            'g' => "G",
+            'h' => "HH",
+            'j' => "JH",
+            'k' => "K",
+            'l' => "L",
+            'm' => "M",
+            'n' => "N",
+            'p' => "P",
+            'q' => "K",
+            'r' => "R",
+            's' => "S",
+            't' => "T",
+            'v' => "V",
+            'w' => "W",
+            'x' => "K",
+            'y' => "Y",
+            'z' => "Z",
+            _ => "AH0",
         }
     }
 
@@ -1391,7 +1492,13 @@ impl SimpleG2P {
             'v' => "V",
             'w' => "W",
             'x' => "S", // K already pushed by caller
-            'y' => if i == 0 { "Y" } else { "IY0" },
+            'y' => {
+                if i == 0 {
+                    "Y"
+                } else {
+                    "IY0"
+                }
+            }
             'z' => "Z",
             _ => "AH0",
         }
@@ -1689,26 +1796,20 @@ pub struct TextAnalyzer;
 /// ~100 common English function words.
 const FUNCTION_WORDS: &[&str] = &[
     // Articles
-    "a", "an", "the",
-    // Prepositions
-    "to", "of", "in", "for", "on", "with", "at", "by", "from", "up", "into",
-    "over", "after", "about", "between", "through", "during", "before", "under",
-    "around", "among",
+    "a", "an", "the", // Prepositions
+    "to", "of", "in", "for", "on", "with", "at", "by", "from", "up", "into", "over", "after",
+    "about", "between", "through", "during", "before", "under", "around", "among",
     // Pronouns
-    "i", "me", "my", "mine", "you", "your", "yours", "he", "him", "his", "she",
-    "her", "hers", "it", "its", "we", "us", "our", "ours", "they", "them",
-    "their", "theirs", "who", "whom", "whose", "which", "that",
-    // Auxiliaries
-    "am", "is", "are", "was", "were", "be", "been", "being", "have", "has",
-    "had", "do", "does", "did", "will", "would", "can", "could", "shall",
-    "should", "may", "might", "must",
+    "i", "me", "my", "mine", "you", "your", "yours", "he", "him", "his", "she", "her", "hers", "it",
+    "its", "we", "us", "our", "ours", "they", "them", "their", "theirs", "who", "whom", "whose",
+    "which", "that", // Auxiliaries
+    "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does",
+    "did", "will", "would", "can", "could", "shall", "should", "may", "might", "must",
     // Conjunctions
-    "and", "or", "but", "if", "than", "because", "while", "although", "though",
-    "when", "where", "so", "yet", "nor",
-    // Determiners / other
-    "this", "these", "those", "some", "any", "each", "every", "no", "all",
-    "both", "few", "more", "most", "other", "such", "not", "only", "very",
-    "just", "too", "also",
+    "and", "or", "but", "if", "than", "because", "while", "although", "though", "when", "where",
+    "so", "yet", "nor", // Determiners / other
+    "this", "these", "those", "some", "any", "each", "every", "no", "all", "both", "few", "more",
+    "most", "other", "such", "not", "only", "very", "just", "too", "also",
 ];
 
 use symthaea_vocal_tract::pipeline::Intonation;
@@ -1767,9 +1868,7 @@ impl TextAnalyzer {
     fn strip_trailing_punct(token: &str) -> (&str, Option<char>) {
         let last = token.chars().last();
         match last {
-            Some(c) if c == '.' || c == ',' || c == '!' || c == '?'
-                || c == ';' || c == ':' =>
-            {
+            Some(c) if c == '.' || c == ',' || c == '!' || c == '?' || c == ';' || c == ':' => {
                 (&token[..token.len() - c.len_utf8()], Some(c))
             }
             _ => (token, Option::None),
@@ -2216,13 +2315,11 @@ impl ReplVoiceOutput {
                     word_idx += 1;
                 }
             } else {
-                phoneme_word_idx.push(
-                    if word_idx < analyzed_words.len() {
-                        Some(word_idx)
-                    } else {
-                        analyzed_words.len().checked_sub(1)
-                    },
-                );
+                phoneme_word_idx.push(if word_idx < analyzed_words.len() {
+                    Some(word_idx)
+                } else {
+                    analyzed_words.len().checked_sub(1)
+                });
             }
         }
 
@@ -2311,7 +2408,10 @@ impl ReplVoiceOutput {
 
                 // Pitch accent from TextAnalyzer: focus words get RiseHigh, stressed content words get High
                 let pitch_accent = if let Some(wi) = phoneme_word_idx[ph_idx] {
-                    if wi < analyzed_words.len() && analyzed_words[wi].is_focus && timed_phoneme.stress >= 1 {
+                    if wi < analyzed_words.len()
+                        && analyzed_words[wi].is_focus
+                        && timed_phoneme.stress >= 1
+                    {
                         super::vocal_tract_fep::PitchAccent::RiseHigh
                     } else if timed_phoneme.stress == 1 {
                         super::vocal_tract_fep::PitchAccent::High
@@ -2413,7 +2513,9 @@ impl ReplVoiceOutput {
         let quality_vec = vec![voice_quality; all_frames.len()];
 
         // Convert formants → audio via vocoder with voice quality modulation
-        let samples = self.vocoder.synthesize_with_quality(&all_frames, &quality_vec);
+        let samples = self
+            .vocoder
+            .synthesize_with_quality(&all_frames, &quality_vec);
         let scaled: Vec<f32> = samples.iter().map(|s| s * self.config.volume).collect();
 
         Ok(scaled)
@@ -3044,7 +3146,8 @@ mod tests {
         let focus_word = words.iter().find(|w| w.is_focus);
         assert!(focus_word.is_some(), "Should have a focus word");
         assert_eq!(
-            focus_word.unwrap().word, "fast",
+            focus_word.unwrap().word,
+            "fast",
             "Last content word before boundary should be focus"
         );
     }
