@@ -71,6 +71,12 @@ pub struct LoopTrialResult {
     /// Social coherence factor from oxytocin/trust (0.8–1.3).
     #[serde(default)]
     pub social_coherence: f32,
+    /// Structural micro Phi from this cycle.
+    #[serde(default)]
+    pub structural_micro_phi: f64,
+    /// Structural emergence ratio from this cycle.
+    #[serde(default)]
+    pub structural_emergence_ratio: f64,
 }
 
 /// Aggregate result from running a benchmark through the loop.
@@ -113,6 +119,12 @@ pub struct LoopBenchmarkResult {
     /// Mean social coherence factor.
     #[serde(default)]
     pub mean_social_coherence: f64,
+    /// Mean structural micro Phi across trials.
+    #[serde(default)]
+    pub mean_structural_micro_phi: f64,
+    /// Mean structural emergence ratio across trials.
+    #[serde(default)]
+    pub mean_structural_emergence_ratio: f64,
     /// Total wall-clock time in milliseconds.
     pub elapsed_ms: u64,
 }
@@ -167,6 +179,30 @@ impl CognitiveLoopBenchmarkRunner {
         let warmup_hv = ContinuousHV::random(dim, 0xDEAD_BEEF);
         for _ in 0..self.warmup_cycles {
             let _ = self.service.cycle_with_hv(&warmup_hv);
+        }
+    }
+
+    /// Snapshot structural Phi from a warmup cycle as RuntimeConsciousnessData.
+    pub fn snapshot_runtime_consciousness(
+        &mut self,
+    ) -> Option<crate::benchmarks::butlin::report::RuntimeConsciousnessData> {
+        let dim = self.service.state_dim();
+        let hv = ContinuousHV::random(dim, 0xBEEF_CAFE);
+        let result = self.service.cycle_with_hv(&hv);
+        let md = &result.metadata;
+        if md.structural_micro_phi > 0.0 || md.structural_macro_phi > 0.0 {
+            Some(
+                crate::benchmarks::butlin::report::RuntimeConsciousnessData::from_structural(
+                    md.structural_micro_phi,
+                    md.structural_meso_phi,
+                    md.structural_macro_phi,
+                    md.structural_bottleneck,
+                    md.structural_emergence_ratio,
+                    md.structural_num_clusters,
+                ),
+            )
+        } else {
+            None
         }
     }
 
@@ -227,6 +263,8 @@ impl CognitiveLoopBenchmarkRunner {
                 allostatic_load: result.metadata.neuromod.neuromod_allostatic_load,
                 consciousness_mod: result.metadata.neuromod.neuromod_consciousness_mod,
                 social_coherence: result.metadata.neuromod.neuromod_social_coherence,
+                structural_micro_phi: result.metadata.structural_micro_phi,
+                structural_emergence_ratio: result.metadata.structural_emergence_ratio,
             });
         }
 
@@ -257,6 +295,10 @@ impl CognitiveLoopBenchmarkRunner {
             trials.iter().map(|t| t.consciousness_mod as f64).sum::<f64>() / n.max(1.0);
         let mean_social_coherence =
             trials.iter().map(|t| t.social_coherence as f64).sum::<f64>() / n.max(1.0);
+        let mean_structural_micro_phi =
+            trials.iter().map(|t| t.structural_micro_phi).sum::<f64>() / n.max(1.0);
+        let mean_structural_emergence_ratio =
+            trials.iter().map(|t| t.structural_emergence_ratio).sum::<f64>() / n.max(1.0);
 
         LoopBenchmarkResult {
             benchmark: bench.loop_name().to_string(),
@@ -274,6 +316,8 @@ impl CognitiveLoopBenchmarkRunner {
             mean_allostatic_load,
             mean_consciousness_mod,
             mean_social_coherence,
+            mean_structural_micro_phi,
+            mean_structural_emergence_ratio,
             elapsed_ms: start.elapsed().as_millis() as u64,
         }
     }
@@ -785,6 +829,8 @@ mod tests {
             allostatic_load: 0.1,
             consciousness_mod: 1.0,
             social_coherence: 1.0,
+            structural_micro_phi: 0.0,
+            structural_emergence_ratio: 0.0,
         };
         let json = serde_json::to_string(&result).unwrap();
         assert!(json.contains("\"correct\":true"));
@@ -808,6 +854,8 @@ mod tests {
             mean_allostatic_load: 0.1,
             mean_consciousness_mod: 1.0,
             mean_social_coherence: 1.0,
+            mean_structural_micro_phi: 0.0,
+            mean_structural_emergence_ratio: 0.0,
             elapsed_ms: 100,
         };
         assert!((result.accuracy - 0.85).abs() < 1e-10);
@@ -833,6 +881,8 @@ mod tests {
             mean_allostatic_load: 0.0,
             mean_consciousness_mod: 0.0,
             mean_social_coherence: 0.0,
+            mean_structural_micro_phi: 0.0,
+            mean_structural_emergence_ratio: 0.0,
             elapsed_ms: 0,
         };
         assert_eq!(result.benchmark, "cosine_test");
@@ -858,6 +908,8 @@ mod tests {
             allostatic_load: 0.0,
             consciousness_mod: 0.0,
             social_coherence: 0.0,
+            structural_micro_phi: 0.0,
+            structural_emergence_ratio: 0.0,
         };
         assert_eq!(result.oxytocin, 0.0);
         assert_eq!(result.moral_score, 0.0);
@@ -871,5 +923,45 @@ mod tests {
     fn test_loop_drivable_trait_exists() {
         // Verify the trait can be used as trait object
         fn _takes_loop_drivable(_b: &dyn LoopDrivable) {}
+    }
+
+    #[test]
+    fn test_loop_trial_result_structural_fields() {
+        let result = LoopTrialResult {
+            response_idx: 0,
+            correct: true,
+            prediction_error: 0.1,
+            da: 0.5,
+            ne: 0.5,
+            sht: 0.5,
+            ach: 0.5,
+            psi: 0.3,
+            cycle_time_us: 1000,
+            learning_occurred: false,
+            reward: 0.0,
+            oxytocin: 0.0,
+            moral_score: 0.0,
+            bath_entropy: 0.0,
+            allostatic_load: 0.0,
+            consciousness_mod: 0.0,
+            social_coherence: 0.0,
+            structural_micro_phi: 0.15,
+            structural_emergence_ratio: 1.3,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let restored: LoopTrialResult = serde_json::from_str(&json).unwrap();
+        assert!((restored.structural_micro_phi - 0.15).abs() < 1e-10);
+        assert!((restored.structural_emergence_ratio - 1.3).abs() < 1e-10);
+
+        // Also verify serde(default) works: deserializing without the fields
+        let old_json = r#"{"response_idx":0,"correct":true,"prediction_error":0.1,
+            "da":0.5,"ne":0.5,"sht":0.5,"ach":0.5,"psi":0.3,
+            "cycle_time_us":1000,"learning_occurred":false,
+            "reward":0.0,"oxytocin":0.0,"moral_score":0.0,
+            "bath_entropy":0.0,"allostatic_load":0.0,
+            "consciousness_mod":0.0,"social_coherence":0.0}"#;
+        let from_old: LoopTrialResult = serde_json::from_str(old_json).unwrap();
+        assert_eq!(from_old.structural_micro_phi, 0.0);
+        assert_eq!(from_old.structural_emergence_ratio, 0.0);
     }
 }

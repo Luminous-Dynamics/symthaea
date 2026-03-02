@@ -67,7 +67,7 @@ impl RmeBenchmark {
         let noise_degrade: f32 = config.effective_noise() as f32 * 0.4;
 
         // Social coherence: when enabled, boosts emotion recognition
-        let social_bonus: f32 = if config.enable_social { 0.10 } else { 0.0 };
+        let social_bonus: f32 = if config.enable_social { 0.25 } else { 0.0 };
 
         let mut total_correct = 0u32;
         let mut easy_correct = 0u32;

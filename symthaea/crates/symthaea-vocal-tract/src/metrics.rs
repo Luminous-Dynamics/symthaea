@@ -221,6 +221,8 @@ mod tests {
             is_voiced: true,
             duration_ms: 80.0,
             manner: crate::types::SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
 
         // Frames close to target
@@ -290,6 +292,8 @@ mod tests {
             is_voiced: true,
             duration_ms: 80.0,
             manner: crate::types::SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
         let frame = FormantFrame {
             f1: 520.0,
@@ -318,6 +322,8 @@ mod tests {
             is_voiced: true,
             duration_ms: 80.0,
             manner: crate::types::SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
 
         // Small error
@@ -357,6 +363,8 @@ mod tests {
             is_voiced: true,
             duration_ms: 80.0,
             manner: crate::types::SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
 
         let frames: Vec<FormantFrame> = (0..10)

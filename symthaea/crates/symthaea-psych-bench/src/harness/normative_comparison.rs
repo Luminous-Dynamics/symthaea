@@ -154,7 +154,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("SemanticCoherence") => {
             Some(("coherence_mean", &bl.language))
         }
-        name if name.contains("GardenPath") => Some(("garden_path_accuracy", &bl.language)),
+        name if name.contains("GardenPath") => Some(("disambiguation_cost", &bl.language)),
 
         // Social
         name if name.contains("RME") => Some(("rme_accuracy", &bl.social)),

@@ -152,7 +152,7 @@ fn test_reliability_battery_run() {
     };
     let benchmarks: Vec<&dyn PsychBenchmark> = vec![&stroop, &flanker, &nback];
 
-    let battery = ReliabilityBattery::run(&benchmarks, &config, 3);
+    let battery = ReliabilityBattery::run(&benchmarks, &config, 3, 10);
 
     assert_eq!(battery.results.len(), 3);
     for result in &battery.results {

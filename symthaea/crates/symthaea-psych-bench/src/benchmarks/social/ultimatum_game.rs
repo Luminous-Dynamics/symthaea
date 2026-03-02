@@ -56,7 +56,7 @@ impl UltimatumGameBenchmark {
         let threshold_shift: f32 = config.time_pressure as f32 * 0.10; // lower acceptance threshold
 
         // Social cognition: empathy reduces rejection of low offers
-        let social_bonus: f32 = if config.enable_social { 0.05 } else { 0.0 };
+        let social_bonus: f32 = if config.enable_social { 0.20 } else { 0.0 };
 
         // Offer levels: 10%, 20%, 30%, 40%, 50%
         let offer_levels = [0.10f32, 0.20, 0.30, 0.40, 0.50];

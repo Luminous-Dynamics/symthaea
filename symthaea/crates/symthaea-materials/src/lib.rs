@@ -11,9 +11,19 @@
 pub mod aging;
 pub mod database;
 pub mod encoder;
+pub mod mining;
 pub mod properties;
+pub mod strategic;
 
 pub use aging::{AgingPrediction, MaterialAgingModel, AGING_HORIZONS, AGING_HORIZON_LABELS};
 pub use database::{MaterialDatabase, MaterialSearchResult};
 pub use encoder::MaterialHdcEncoder;
+pub use mining::{
+    MiningFepAction, MiningFepAgent, MiningHdcEncoder, MiningPredictor, MiningReading,
+    MINING_HORIZONS, MINING_HORIZON_LABELS,
+};
 pub use properties::{MaterialCategory, MaterialProperty};
+pub use strategic::{
+    StrategicFepAction, StrategicFepAgent, StrategicHdcEncoder, StrategicPredictor,
+    StrategicReading, STRATEGIC_HORIZONS, STRATEGIC_HORIZON_LABELS,
+};

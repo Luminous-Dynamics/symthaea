@@ -66,6 +66,10 @@ pub struct FormantFrame {
     pub time: f32,
     /// Source excitation type (manner of articulation for vocoder).
     pub source_type: SourceType,
+    /// Nasal anti-formant (zero) frequency (Hz). 0.0 = no nasal zero.
+    pub nasal_zero_freq: f32,
+    /// Nasal anti-formant bandwidth (Hz). 0.0 = default 200 Hz.
+    pub nasal_zero_bw: f32,
 }
 
 impl FormantFrame {
@@ -83,6 +87,8 @@ impl FormantFrame {
             voicing: 0.0,
             time,
             source_type: SourceType::Silent,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         }
     }
 
@@ -100,6 +106,8 @@ impl FormantFrame {
             voicing: if target.is_voiced { 1.0 } else { 0.0 },
             time,
             source_type: target.manner,
+            nasal_zero_freq: target.nasal_zero_freq,
+            nasal_zero_bw: target.nasal_zero_bw,
         }
     }
 
@@ -122,13 +130,30 @@ impl FormantFrame {
             } else {
                 other.source_type
             },
+            nasal_zero_freq: self.nasal_zero_freq
+                + (other.nasal_zero_freq - self.nasal_zero_freq) * t,
+            nasal_zero_bw: self.nasal_zero_bw + (other.nasal_zero_bw - self.nasal_zero_bw) * t,
         }
     }
 }
 
 impl Default for FormantFrame {
     fn default() -> Self {
-        Self::silent(0.0)
+        Self {
+            f1: 0.0,
+            f2: 0.0,
+            f3: 0.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 0.0,
+            energy: 0.0,
+            voicing: 0.0,
+            time: 0.0,
+            source_type: SourceType::Silent,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
+        }
     }
 }
 
@@ -159,6 +184,10 @@ pub struct FormantTarget {
     pub is_voiced: bool,
     /// Manner of articulation (determines vocoder source type).
     pub manner: SourceType,
+    /// Nasal anti-formant (zero) frequency (Hz). 0.0 = no nasal zero.
+    pub nasal_zero_freq: f32,
+    /// Nasal anti-formant bandwidth (Hz). 0.0 = default 200 Hz.
+    pub nasal_zero_bw: f32,
 }
 
 impl FormantTarget {
@@ -175,6 +204,8 @@ impl FormantTarget {
             is_vowel: true,
             is_voiced: true,
             manner: SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         }
     }
 
@@ -191,6 +222,8 @@ impl FormantTarget {
             is_vowel: false,
             is_voiced: true,
             manner: SourceType::Liquid,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         }
     }
 
@@ -207,12 +240,38 @@ impl FormantTarget {
             is_vowel: false,
             is_voiced: false,
             manner: SourceType::Fricative,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         }
     }
 
     /// Override the manner of articulation (builder pattern).
     pub const fn with_manner(mut self, manner: SourceType) -> Self {
         self.manner = manner;
+        self
+    }
+
+    /// Override formant bandwidths (builder pattern).
+    ///
+    /// Based on Klatt (1980) and Hawks & Miller (1995):
+    /// high/close vowels have narrower bandwidths, open vowels wider.
+    pub const fn with_bandwidths(mut self, b1: f32, b2: f32, b3: f32) -> Self {
+        self.b1 = b1;
+        self.b2 = b2;
+        self.b3 = b3;
+        self
+    }
+
+    /// Set nasal anti-formant (zero) frequency and bandwidth (builder pattern).
+    ///
+    /// For nasal consonants, the oral cavity produces a zero (anti-resonance)
+    /// whose frequency depends on the place of articulation:
+    /// - M (bilabial): ~750 Hz
+    /// - N (alveolar): ~1450 Hz
+    /// - NG (velar): ~3000 Hz
+    pub const fn with_nasal_zero(mut self, freq: f32, bw: f32) -> Self {
+        self.nasal_zero_freq = freq;
+        self.nasal_zero_bw = bw;
         self
     }
 
@@ -238,6 +297,9 @@ impl FormantTarget {
                 other.is_voiced
             },
             manner: if t < 0.5 { self.manner } else { other.manner },
+            nasal_zero_freq: self.nasal_zero_freq
+                + (other.nasal_zero_freq - self.nasal_zero_freq) * t,
+            nasal_zero_bw: self.nasal_zero_bw + (other.nasal_zero_bw - self.nasal_zero_bw) * t,
         }
     }
 

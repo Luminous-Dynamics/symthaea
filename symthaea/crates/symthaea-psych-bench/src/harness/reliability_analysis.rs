@@ -255,9 +255,10 @@ impl ReliabilityBattery {
         benchmarks: &[&dyn PsychBenchmark],
         base_config: &BenchmarkConfig,
         n_sessions: usize,
+        n_subjects: usize,
     ) -> Self {
         let n_sessions = n_sessions.max(2);
-        let n_subjects = 10; // Number of independent "subjects" (seed families)
+        let n_subjects = n_subjects.max(3); // Minimum 3 subjects for ICC
         let mut results = Vec::new();
 
         for bench in benchmarks {
@@ -272,7 +273,7 @@ impl ReliabilityBattery {
                 let family_base = base_config.seed + k as u64 * 1000;
                 for s in 0..n_sessions {
                     let config = BenchmarkConfig {
-                        seed: family_base + s as u64,
+                        seed: family_base + s as u64 * 100,
                         ..base_config.clone()
                     };
                     let result = bench.run(&config);
@@ -500,7 +501,7 @@ mod tests {
             ..Default::default()
         };
 
-        let battery = ReliabilityBattery::run(&[&StroopBenchmark], &config, 2);
+        let battery = ReliabilityBattery::run(&[&StroopBenchmark], &config, 2, 10);
         assert_eq!(battery.results.len(), 1);
 
         let result = &battery.results[0];
@@ -529,7 +530,7 @@ mod tests {
         };
 
         let benchmarks: Vec<&dyn PsychBenchmark> = vec![&StroopBenchmark, &FlankerBenchmark];
-        let battery = ReliabilityBattery::run(&benchmarks, &config, 3);
+        let battery = ReliabilityBattery::run(&benchmarks, &config, 3, 10);
 
         assert_eq!(battery.results.len(), 2);
 

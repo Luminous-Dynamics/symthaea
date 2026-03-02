@@ -48,6 +48,8 @@ pub mod model;
 pub mod safetensors_loader;
 #[cfg(feature = "burn-hub")]
 pub mod hub;
+#[cfg(feature = "ort-embed")]
+pub mod onnx;
 
 #[cfg(feature = "burn")]
 use burn::backend::NdArray;
@@ -646,6 +648,10 @@ pub struct Qwen3Embedder {
     /// Tokenizer for text→token conversion
     #[cfg(feature = "burn")]
     tokenizer: Option<tokenizers::Tokenizer>,
+
+    /// On-disk persistent cache (survives process restarts).
+    #[cfg(feature = "persistent-cache")]
+    persistent_cache: Option<crate::cache::PersistentCache>,
 }
 
 /// Statistics for the embedder
@@ -669,6 +675,22 @@ impl Qwen3Embedder {
     pub fn new(config: Qwen3Config) -> Result<Self> {
         let cache_cap = std::num::NonZeroUsize::new(config.cache_capacity)
             .unwrap_or(std::num::NonZeroUsize::new(10_000).unwrap());
+        #[cfg(feature = "persistent-cache")]
+        let persistent_cache = {
+            let pc_config = crate::cache::PersistentCacheConfig {
+                path: None, // default: ~/.cache/symthaea/embeddings.redb
+                model_name: config.model_path.clone().unwrap_or_else(|| "simulated".into()),
+                dimension: config.embedding_dim,
+            };
+            match crate::cache::PersistentCache::open(pc_config) {
+                Ok(pc) => Some(pc),
+                Err(e) => {
+                    eprintln!("Warning: persistent cache init failed: {e}");
+                    None
+                }
+            }
+        };
+
         let mut embedder = Self {
             config,
             model_loaded: false,
@@ -678,6 +700,8 @@ impl Qwen3Embedder {
             inference: None,
             #[cfg(feature = "burn")]
             tokenizer: None,
+            #[cfg(feature = "persistent-cache")]
+            persistent_cache,
         };
 
         // Try to load Burn model if path is specified and not in simulation mode
@@ -883,6 +907,17 @@ impl Qwen3Embedder {
             return Ok(EmbeddingResult::new(cached.clone(), "qwen3-cached"));
         }
 
+        // Check persistent cache (on-disk, survives restarts)
+        #[cfg(feature = "persistent-cache")]
+        if let Some(ref pcache) = self.persistent_cache {
+            if let Ok(Some(cached)) = pcache.get(text) {
+                // Promote to LRU cache for fast subsequent access
+                self.cache.put(text.to_string(), cached.clone());
+                self.stats.cache_hits += 1;
+                return Ok(EmbeddingResult::new(cached, "qwen3-persistent-cached"));
+            }
+        }
+
         // Generate embedding
         let embedding = if self.config.use_simulated {
             self.simulate_embedding(text)
@@ -907,6 +942,12 @@ impl Qwen3Embedder {
 
         // Cache the result (LRU — oldest evicted when at capacity)
         self.cache.put(text.to_string(), embedding.clone());
+
+        // Best-effort store to persistent cache
+        #[cfg(feature = "persistent-cache")]
+        if let Some(ref pcache) = self.persistent_cache {
+            let _ = pcache.put(text, &embedding);
+        }
 
         let mut result = EmbeddingResult::new(embedding, "qwen3-embedding").with_time(elapsed);
 

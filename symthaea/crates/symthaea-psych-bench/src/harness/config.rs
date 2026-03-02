@@ -127,6 +127,12 @@ impl BenchmarkConfig {
         h ^ (trial as u64).wrapping_mul(0x9E3779B97F4A7C15)
     }
 
+    /// Attach runtime consciousness data for Butlin indicator blending.
+    pub fn with_runtime_consciousness(mut self, data: RuntimeConsciousnessData) -> Self {
+        self.runtime_consciousness = Some(data);
+        self
+    }
+
     /// Compute effective encoding noise combining `encoding_noise` and `time_pressure`.
     ///
     /// Both ablation (encoding_noise) and speed-accuracy tradeoff (time_pressure)
@@ -196,29 +202,29 @@ impl AblationPreset {
             AblationPreset::CfcOnly => {
                 base.enable_fep = false;
                 base.enable_social = false;
-                base.encoding_noise = 0.15;
+                base.encoding_noise = 0.35;
                 "CfC Only"
             }
             AblationPreset::NoFep => {
                 base.enable_fep = false;
-                base.encoding_noise = 0.10;
+                base.encoding_noise = 0.25;
                 "No FEP"
             }
             AblationPreset::NoSocial => {
                 base.enable_social = false;
-                base.encoding_noise = 0.05;
+                base.encoding_noise = 0.15;
                 "No Social"
             }
             AblationPreset::ReducedWm => {
                 base.working_memory_capacity = 3;
-                base.encoding_noise = 0.12;
+                base.encoding_noise = 0.30;
                 "Reduced WM (K=3)"
             }
             AblationPreset::HdcOnly => {
                 base.enable_fep = false;
                 base.enable_social = false;
                 base.working_memory_capacity = 3;
-                base.encoding_noise = 0.25;
+                base.encoding_noise = 0.50;
                 "HDC Only"
             }
         };
@@ -252,5 +258,15 @@ mod tests {
     #[test]
     fn test_ablation_presets_count() {
         assert_eq!(AblationPreset::all().len(), 6);
+    }
+
+    #[test]
+    fn test_benchmark_config_with_runtime() {
+        let data = RuntimeConsciousnessData::from_structural(0.1, 0.2, 0.3, 0.05, 1.5, 4);
+        let config = BenchmarkConfig::default().with_runtime_consciousness(data.clone());
+        assert!(config.runtime_consciousness.is_some());
+        let rc = config.runtime_consciousness.unwrap();
+        assert!((rc.micro_phi - 0.1).abs() < f64::EPSILON);
+        assert_eq!(rc.num_clusters, 4);
     }
 }

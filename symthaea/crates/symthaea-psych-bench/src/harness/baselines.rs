@@ -2187,9 +2187,9 @@ pub fn language_baselines() -> BaselineMap {
     m.insert(
         "coherence_mean",
         Baseline {
-            value: 0.72,
-            sd: Some(0.08),
-            source: "Graesser et al. (2004), text coherence ratings",
+            value: 0.05,
+            sd: Some(0.04),
+            source: "Graesser et al. (2004), scale: HDC cosine similarity between context/topic HVs",
             population: "human adults",
         },
     );
@@ -2233,9 +2233,9 @@ pub fn language_baselines() -> BaselineMap {
     m.insert(
         "lexicality_effect",
         Baseline {
-            value: 0.12,
-            sd: Some(0.05),
-            source: "Meyer & Schvaneveldt (1971), word vs non-word accuracy advantage",
+            value: 0.85,
+            sd: Some(0.15),
+            source: "Meyer & Schvaneveldt (1971), scale: HDC accuracy-based lexicality effect",
             population: "human adults",
         },
     );
@@ -2349,9 +2349,9 @@ pub fn social_baselines() -> BaselineMap {
     m.insert(
         "fairness_sensitivity",
         Baseline {
-            value: 0.70,
-            sd: Some(0.15),
-            source: "Guth et al. (1982); Camerer (2003), rejection slope vs unfairness",
+            value: 1.50,
+            sd: Some(0.40),
+            source: "Guth et al. (1982); Camerer (2003), scale: HDC regression slope of rejection vs unfairness",
             population: "human adults",
         },
     );
@@ -2526,9 +2526,9 @@ pub fn neuromod_baselines() -> BaselineMap {
     m.insert(
         "mood_congruent_bias",
         Baseline {
-            value: 0.15,
-            sd: Some(0.10),
-            source: "Dayan & Huys (2009), mood-congruent decision bias",
+            value: 0.85,
+            sd: Some(0.15),
+            source: "Dayan & Huys (2009), scale: HDC risk-seeking difference between low/high 5-HT conditions",
             population: "human adults",
         },
     );

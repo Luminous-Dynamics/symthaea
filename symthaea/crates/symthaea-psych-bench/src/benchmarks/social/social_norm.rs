@@ -70,7 +70,7 @@ impl SocialNormBenchmark {
         // Time pressure and social config
         let noise_level: f32 = (0.20 + config.time_pressure as f32 * 0.15)
             * diff_model.interference_multiplier(config.difficulty) as f32;
-        let social_boost: f32 = if config.enable_social { 0.10 } else { 0.0 };
+        let social_boost: f32 = if config.enable_social { 0.25 } else { 0.0 };
 
         let n_items = 40; // 20 congruent + 20 violations
         let mut hits = 0u32; // correct violation detection

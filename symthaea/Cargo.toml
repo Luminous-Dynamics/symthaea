@@ -187,6 +187,7 @@ symthaea-nurture = { path = "crates/symthaea-nurture", optional = true }
 symthaea-population = { path = "crates/symthaea-population", optional = true }
 symthaea-materials = { path = "crates/symthaea-materials", optional = true }
 symthaea-nuclear-forensics = { path = "crates/symthaea-nuclear-forensics", optional = true }
+symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", optional = true }
 
 # Symthaea Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
 symthaea-vision-manifold = { path = "crates/symthaea-vision-manifold", optional = true }
@@ -315,7 +316,9 @@ ringbuf = { version = "0.4", optional = true }    # Lock-free ring buffer (live-
 hound = { workspace = true, optional = true }
 lz4_flex = { version = "0.11", default-features = false, optional = true }
 chacha20poly1305 = { version = "0.10", optional = true }
+zeroize = { version = "1.8", features = ["derive"], optional = true }
 x25519-dalek = { version = "2.0", features = ["static_secrets"], optional = true }
+hkdf = { version = "0.12", optional = true }
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
 espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
 
@@ -389,8 +392,8 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 # ── Distributed / Network ──────────────────────────────────────────
 mesh = []                                   # Physical mesh radio (LoRa + B.A.T.M.A.N. + Yggdrasil)
 lz4_compression = ["mesh", "dep:lz4_flex"]  # LZ4 packet compression for mesh radio
-mesh-encryption = ["mesh", "dep:chacha20poly1305"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
-mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek"]  # X25519 Diffie-Hellman per-peer key agreement
+mesh-encryption = ["mesh", "dep:chacha20poly1305", "dep:zeroize"]  # ChaCha20-Poly1305 AEAD encryption for mesh packets
+mesh-key-exchange = ["mesh-encryption", "dep:x25519-dalek", "dep:hkdf", "dep:sha2"]  # X25519 Diffie-Hellman per-peer key agreement
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix SDK integration
@@ -399,7 +402,7 @@ mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]                  # Enabled Mycelix 
 notifications = ["zbus"]                    # D-Bus desktop notifications
 nix-mind = ["symthaea-nix"]                 # Conscious NixOS mind with HDC world model + active inference
 # Note: nix-cli/nix-tui/nix-daemon removed — use `cargo build -p symthaea-nix --features cli/tui/daemon` directly
-identity = ["ed25519-dalek", "sha2"]        # Ed25519 signatures, capability gating
+identity = ["ed25519-dalek", "dep:sha2"]        # Ed25519 signatures, capability gating
 physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
 flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control via FEP Active Inference
 flight-mujoco = ["flight", "symthaea-flight/mujoco"]   # Flight control with MuJoCo physics
@@ -459,7 +462,26 @@ materials = ["dep:symthaea-materials"]
 nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
 water-prediction = ["cell-foundry"]
 physics-unification = ["physics"]
-genesis-missions = ["fusion-twin", "safety-agents", "lab-controller", "materials", "nuclear-forensics", "water-prediction", "physics-unification"]
+grid-scaling = ["physics"]
+fission-reactor = ["physics"]
+accelerator = ["physics"]
+threat-assessment = ["physics"]
+datacenter = ["physics"]
+experiment-planner = ["cell-foundry"]
+strategic-materials = ["materials"]
+critical-minerals = ["materials"]
+advanced-manufacturing = ["dep:symthaea-fabrication-kernel"]
+building-systems = ["dep:symthaea-fabrication-kernel"]
+design-production = ["dep:symthaea-fabrication-kernel"]
+proliferation-safeguards = ["nuclear-forensics"]
+genesis-missions = [
+    "fusion-twin", "safety-agents", "lab-controller", "materials",
+    "nuclear-forensics", "water-prediction", "physics-unification",
+    "grid-scaling", "fission-reactor", "accelerator", "threat-assessment",
+    "datacenter", "experiment-planner", "strategic-materials",
+    "critical-minerals", "advanced-manufacturing", "building-systems",
+    "design-production", "proliferation-safeguards"
+]
 
 
 # ── Convenience bundles ───────────────────────────────────────────
@@ -1014,6 +1036,62 @@ required-features = ["physics-unification"]
 
 [[example]]
 name = "benchmark_genesis_temporal_unified"
+required-features = ["genesis-missions"]
+
+[[example]]
+name = "benchmark_genesis_grid"
+required-features = ["grid-scaling"]
+
+[[example]]
+name = "benchmark_genesis_fission"
+required-features = ["fission-reactor"]
+
+[[example]]
+name = "benchmark_genesis_accelerator"
+required-features = ["accelerator"]
+
+[[example]]
+name = "benchmark_genesis_threat"
+required-features = ["threat-assessment"]
+
+[[example]]
+name = "benchmark_genesis_datacenter"
+required-features = ["datacenter"]
+
+[[example]]
+name = "benchmark_genesis_experiment"
+required-features = ["experiment-planner"]
+
+[[example]]
+name = "benchmark_genesis_strategic_materials"
+required-features = ["strategic-materials"]
+
+[[example]]
+name = "benchmark_genesis_mining"
+required-features = ["critical-minerals"]
+
+[[example]]
+name = "benchmark_genesis_manufacturing"
+required-features = ["genesis-missions"]
+
+[[example]]
+name = "benchmark_genesis_building"
+required-features = ["genesis-missions"]
+
+[[example]]
+name = "benchmark_genesis_design_loop"
+required-features = ["genesis-missions"]
+
+[[example]]
+name = "benchmark_genesis_safeguards"
+required-features = ["proliferation-safeguards"]
+
+[[example]]
+name = "benchmark_genesis_suite"
+required-features = ["genesis-missions"]
+
+[[example]]
+name = "benchmark_genesis_safety_dashboard"
 required-features = ["genesis-missions"]
 
 [[example]]

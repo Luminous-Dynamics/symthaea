@@ -244,6 +244,8 @@ mod tests {
                 allostatic_load: 0.1,
                 consciousness_mod: 1.0,
                 social_coherence: 1.0,
+                structural_micro_phi: 0.0,
+                structural_emergence_ratio: 0.0,
             })
             .collect()
     }

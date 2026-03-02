@@ -1,6 +1,6 @@
 //! Generate CSV data files for the Psych-Bench BRM paper.
 //!
-//! Runs the full benchmark suite and produces 7 CSV files consumed
+//! Runs the full benchmark suite and produces 8 CSV files consumed
 //! by `pgfplotstableread` in `papers/latex/psych_bench_paper.tex`.
 //!
 //! Usage:
@@ -476,7 +476,7 @@ fn main() {
             .iter()
             .map(|b| b.as_ref() as &dyn PsychBenchmark)
             .collect();
-        let reliability = ReliabilityBattery::run(&rel_refs, &config, 3);
+        let reliability = ReliabilityBattery::run(&rel_refs, &config, 5, 30);
 
         let path = out.join("reliability.csv");
         let mut f = fs::File::create(&path).unwrap();
@@ -614,6 +614,329 @@ fn main() {
             )
             .unwrap();
         }
+
+        eprintln!("  Wrote {}", path.display());
+    }
+
+    // ── CSV 8: neuromod_curves.csv (Figure 6 panels) ──────────────
+    eprintln!("\nGenerating neuromod_curves.csv...");
+    {
+        use symthaea_core::hdc::ContinuousHV;
+        use symthaea_neuromodulators::{NeuromodulatorBath, NeuromodulatorInputs};
+
+        let path = out.join("neuromod_curves.csv");
+        let mut f = fs::File::create(&path).unwrap();
+        writeln!(f, "panel,x_var,x_value,y_var,y_value").unwrap();
+
+        // ── Panel (a): Yerkes-Dodson NE sweep ──
+        // Replicate the inverted-U sweep for simple and complex tasks
+        let dim = 512usize;
+        let ne_levels: Vec<f64> = (1..=9).map(|i| i as f64 * 0.1).collect();
+        let n_runs = 10; // average over multiple runs
+
+        for &ne in &ne_levels {
+            let mut simple_accs = Vec::new();
+            let mut complex_accs = Vec::new();
+
+            for run in 0..n_runs {
+                let base_seed = 42u64.wrapping_add(run * 7919);
+                let mut rng = base_seed ^ 0x9E3779B97F4A7C15;
+                let mut next = |s: &mut u64| -> u64 {
+                    *s ^= *s << 13;
+                    *s ^= *s >> 7;
+                    *s ^= *s << 17;
+                    *s
+                };
+
+                // Simple task
+                let target = ContinuousHV::random(dim, next(&mut rng));
+                let distractor = ContinuousHV::random(dim, next(&mut rng));
+                let mut correct = 0usize;
+                let trials = 20;
+                for _ in 0..trials {
+                    let stimulus = ContinuousHV::random(dim, next(&mut rng));
+                    let noise_scale = 1.0 - (1.0 - (ne - 0.6_f64).powi(2) * 4.0).max(0.0);
+                    let noise_weight = (noise_scale * 0.3) as f32;
+                    let noise_hv = ContinuousHV::random(dim, next(&mut rng));
+                    let noisy = ContinuousHV::weighted_bundle(
+                        &[&stimulus, &target, &noise_hv],
+                        &[0.3, (0.7 - noise_weight).max(0.1), noise_weight],
+                    );
+                    if noisy.similarity(&target) > noisy.similarity(&distractor) {
+                        correct += 1;
+                    }
+                }
+                simple_accs.push(correct as f64 / trials as f64);
+
+                // Complex task
+                let protos: Vec<ContinuousHV> = (0..4)
+                    .map(|_| ContinuousHV::random(dim, next(&mut rng)))
+                    .collect();
+                let mut correct = 0usize;
+                for _ in 0..trials {
+                    let ci = (next(&mut rng) % 4) as usize;
+                    let stimulus = ContinuousHV::random(dim, next(&mut rng));
+                    let noise_scale = 1.0 - (1.0 - (ne - 0.45_f64).powi(2) * 5.0).max(0.0);
+                    let noise_weight = (noise_scale * 0.4) as f32;
+                    let noise_hv = ContinuousHV::random(dim, next(&mut rng));
+                    let noisy = ContinuousHV::weighted_bundle(
+                        &[&stimulus, &protos[ci], &noise_hv],
+                        &[0.3, (0.7 - noise_weight).max(0.1), noise_weight],
+                    );
+                    let best = protos
+                        .iter()
+                        .enumerate()
+                        .max_by(|(_, a), (_, b)| noisy.similarity(a).total_cmp(&noisy.similarity(b)))
+                        .map(|(i, _)| i)
+                        .unwrap_or(0);
+                    if best == ci {
+                        correct += 1;
+                    }
+                }
+                complex_accs.push(correct as f64 / trials as f64);
+            }
+
+            let simple_mean = simple_accs.iter().sum::<f64>() / n_runs as f64;
+            let complex_mean = complex_accs.iter().sum::<f64>() / n_runs as f64;
+            writeln!(f, "yerkes_dodson,ne,{ne:.2},simple_accuracy,{simple_mean:.6}").unwrap();
+            writeln!(f, "yerkes_dodson,ne,{ne:.2},complex_accuracy,{complex_mean:.6}").unwrap();
+        }
+        eprintln!("  Panel (a): Yerkes-Dodson NE sweep done");
+
+        // ── Panel (b): DA Reward Learning RPE per block ──
+        // Track Q-value divergence across 8 blocks of 10 trials
+        let n_runs = 20;
+        let blocks = 8;
+        let trials_per_block = 10;
+        let lr = 0.15_f64;
+        let temp = 0.3_f64;
+
+        let mut block_rpes: Vec<Vec<f64>> = vec![Vec::new(); blocks];
+        let mut block_q_diffs: Vec<Vec<f64>> = vec![Vec::new(); blocks];
+
+        for run in 0..n_runs {
+            let base_seed = 42u64.wrapping_add(run * 3571);
+            let mut rng = base_seed ^ 0x9E3779B97F4A7C15;
+            let mut next = |s: &mut u64| -> u64 {
+                *s ^= *s << 13;
+                *s ^= *s >> 7;
+                *s ^= *s << 17;
+                *s
+            };
+
+            let mut q = [0.5_f64, 0.5];
+
+            for block in 0..blocks {
+                let mut block_rpe_sum = 0.0_f64;
+                let in_reversal = block >= 4; // phase 2 starts at block 4
+
+                for _ in 0..trials_per_block {
+                    // Softmax choice
+                    let max_q = q[0].max(q[1]);
+                    let e0 = ((q[0] - max_q) / temp).exp();
+                    let e1 = ((q[1] - max_q) / temp).exp();
+                    let p0 = e0 / (e0 + e1);
+                    let r = (next(&mut rng) % 10000) as f64 / 10000.0;
+                    let choice = if r < p0 { 0 } else { 1 };
+
+                    let reward = if !in_reversal {
+                        if choice == 0 { 1.0 } else { 0.0 }
+                    } else {
+                        if choice == 1 { 1.0 } else { 0.0 }
+                    };
+
+                    let rpe = reward - q[choice];
+                    q[choice] = (q[choice] + lr * rpe).clamp(0.0, 1.0);
+                    block_rpe_sum += rpe.abs();
+                }
+
+                block_rpes[block].push(block_rpe_sum / trials_per_block as f64);
+                block_q_diffs[block].push(q[1] - q[0]);
+            }
+        }
+
+        for block in 0..blocks {
+            let rpe_mean = block_rpes[block].iter().sum::<f64>() / n_runs as f64;
+            let q_diff_mean = block_q_diffs[block].iter().sum::<f64>() / n_runs as f64;
+            let block_label = block + 1;
+            writeln!(
+                f,
+                "reward_learning,block,{block_label},mean_abs_rpe,{rpe_mean:.6}"
+            )
+            .unwrap();
+            writeln!(
+                f,
+                "reward_learning,block,{block_label},q_value_diff,{q_diff_mean:.6}"
+            )
+            .unwrap();
+        }
+        eprintln!("  Panel (b): DA Reward Learning RPE done");
+
+        // ── Panel (c): ACh Attention Network decomposition ──
+        // Run ANT benchmark at different ACh-orienting boost levels
+        // (replicating the ANT logic with parametric orienting weight)
+        let ach_levels: Vec<f64> = (0..=10).map(|i| i as f64 * 0.05).collect(); // 0.0 to 0.5
+        let n_runs = 10;
+
+        for &ach_boost in &ach_levels {
+            let mut alerting_effs = Vec::new();
+            let mut orienting_effs = Vec::new();
+            let mut conflict_effs = Vec::new();
+
+            for run in 0..n_runs {
+                let base_seed = 42u64.wrapping_add(run * 6151);
+                let mut rng = base_seed ^ 0x9E3779B97F4A7C15;
+                let mut next = |s: &mut u64| -> u64 {
+                    *s ^= *s << 13;
+                    *s ^= *s >> 7;
+                    *s ^= *s << 17;
+                    *s
+                };
+
+                let left_p = ContinuousHV::random(dim, next(&mut rng));
+                let right_p = ContinuousHV::random(dim, next(&mut rng));
+                let alert_p = ContinuousHV::random(dim, next(&mut rng));
+                let loc_p = ContinuousHV::random(dim, next(&mut rng));
+
+                // 8 conditions: alert × orient × congruent
+                let mut mean_rts = [0.0_f64; 8];
+                let trials_per = 15;
+
+                for ci in 0..8 {
+                    let alert_cue = ci >= 4;
+                    let orient_cue = (ci / 2) % 2 == 1;
+                    let congruent = ci % 2 == 0;
+                    let mut rt_sum = 0.0_f64;
+
+                    for _ in 0..trials_per {
+                        let is_left = next(&mut rng) % 2 == 0;
+                        let tp = if is_left { &left_p } else { &right_p };
+
+                        let mut comps: Vec<&ContinuousHV> = vec![tp];
+                        let mut ws: Vec<f32> = vec![0.5];
+
+                        if alert_cue {
+                            comps.push(&alert_p);
+                            ws.push(0.15);
+                            ws[0] -= 0.05;
+                        }
+                        if orient_cue {
+                            comps.push(&loc_p);
+                            ws.push(ach_boost as f32); // parametric ACh boost
+                            ws[0] -= (ach_boost as f32 * 0.33).min(ws[0] - 0.1);
+                        }
+                        if !congruent {
+                            let opp = if is_left { &right_p } else { &left_p };
+                            comps.push(opp);
+                            ws.push(0.25);
+                            ws[0] -= 0.1;
+                        }
+                        let total: f32 = ws.iter().sum();
+                        let nw: Vec<f32> = ws.iter().map(|w| w / total).collect();
+                        let stim = ContinuousHV::weighted_bundle(&comps, &nw);
+                        let margin =
+                            (stim.similarity(&left_p) as f64 - stim.similarity(&right_p) as f64)
+                                .abs();
+                        rt_sum += 5.0 + (1.0 - margin.min(1.0)) * 8.0;
+                    }
+                    mean_rts[ci] = rt_sum / trials_per as f64;
+                }
+
+                let no_alert = (mean_rts[0] + mean_rts[1] + mean_rts[2] + mean_rts[3]) / 4.0;
+                let alert = (mean_rts[4] + mean_rts[5] + mean_rts[6] + mean_rts[7]) / 4.0;
+                let no_orient = (mean_rts[0] + mean_rts[1] + mean_rts[4] + mean_rts[5]) / 4.0;
+                let orient = (mean_rts[2] + mean_rts[3] + mean_rts[6] + mean_rts[7]) / 4.0;
+                let cong = (mean_rts[0] + mean_rts[2] + mean_rts[4] + mean_rts[6]) / 4.0;
+                let incong = (mean_rts[1] + mean_rts[3] + mean_rts[5] + mean_rts[7]) / 4.0;
+
+                alerting_effs.push(no_alert - alert);
+                orienting_effs.push(no_orient - orient);
+                conflict_effs.push(incong - cong);
+            }
+
+            let ale_mean = alerting_effs.iter().sum::<f64>() / n_runs as f64;
+            let ori_mean = orienting_effs.iter().sum::<f64>() / n_runs as f64;
+            let con_mean = conflict_effs.iter().sum::<f64>() / n_runs as f64;
+            writeln!(
+                f,
+                "attention_network,ach_boost,{ach_boost:.2},alerting_effect,{ale_mean:.6}"
+            )
+            .unwrap();
+            writeln!(
+                f,
+                "attention_network,ach_boost,{ach_boost:.2},orienting_effect,{ori_mean:.6}"
+            )
+            .unwrap();
+            writeln!(
+                f,
+                "attention_network,ach_boost,{ach_boost:.2},conflict_effect,{con_mean:.6}"
+            )
+            .unwrap();
+        }
+        eprintln!("  Panel (c): ACh Attention Network done");
+
+        // ── Panel (d): Dose-Response monotonicity curves ──
+        // Replicate dose_sweep for all 5 transmitters
+        let doses = [0.1_f32, 0.2, 0.3, 0.5, 0.8];
+        let warmup = 10;
+        let observe = 30;
+        let neutral_inputs = NeuromodulatorInputs {
+            prediction_error: 0.2,
+            surprise: false,
+            reward_signal: 0.0,
+            coherence: 0.6,
+            arousal: 0.4,
+            binding_strength: 0.5,
+            epistemic_confidence: 0.5,
+            flow_active: false,
+            consciousness_level: None,
+            moral_signal: None,
+        };
+
+        let transmitters: &[(&str, fn(&NeuromodulatorBath) -> f32)] = &[
+            ("da", |b: &NeuromodulatorBath| b.learning_rate_factor()),
+            ("ne", |b: &NeuromodulatorBath| b.exploration_delta()),
+            ("sht", |b: &NeuromodulatorBath| b.confidence_delta()),
+            ("ach", |b: &NeuromodulatorBath| b.attention_factor()),
+            ("gaba", |b: &NeuromodulatorBath| b.global_inhibition()),
+        ];
+
+        for &(name, metric_fn) in transmitters {
+            for &dose in &doses {
+                let mut bath = NeuromodulatorBath::default();
+                for _ in 0..warmup {
+                    bath.update(&neutral_inputs);
+                    match name {
+                        "da" => bath.clamp_all_levels(Some(dose), None, None, None, None, None, None),
+                        "ne" => bath.clamp_all_levels(None, Some(dose), None, None, None, None, None),
+                        "sht" => bath.clamp_all_levels(None, None, Some(dose), None, None, None, None),
+                        "ach" => bath.clamp_all_levels(None, None, None, Some(dose), None, None, None),
+                        "gaba" => bath.clamp_all_levels(None, None, None, None, Some(dose), None, None),
+                        _ => {}
+                    }
+                }
+                let mut sum = 0.0_f64;
+                for _ in 0..observe {
+                    bath.update(&neutral_inputs);
+                    match name {
+                        "da" => bath.clamp_all_levels(Some(dose), None, None, None, None, None, None),
+                        "ne" => bath.clamp_all_levels(None, Some(dose), None, None, None, None, None),
+                        "sht" => bath.clamp_all_levels(None, None, Some(dose), None, None, None, None),
+                        "ach" => bath.clamp_all_levels(None, None, None, Some(dose), None, None, None),
+                        "gaba" => bath.clamp_all_levels(None, None, None, None, Some(dose), None, None),
+                        _ => {}
+                    }
+                    sum += metric_fn(&bath) as f64;
+                }
+                let mean_val = sum / observe as f64;
+                writeln!(
+                    f,
+                    "dose_response,dose,{dose:.2},{name}_output,{mean_val:.6}"
+                )
+                .unwrap();
+            }
+        }
+        eprintln!("  Panel (d): Dose-Response curves done");
 
         eprintln!("  Wrote {}", path.display());
     }
