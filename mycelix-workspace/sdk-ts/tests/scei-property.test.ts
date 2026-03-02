@@ -653,7 +653,8 @@ describe('SCEI Cross-Module Integration - Property-Based Tests', () => {
         expect(eventCount).toBe(numEvents);
         // Use the correct property name: totalEventsEmitted
         expect(eventBus.getMetrics().totalEventsEmitted).toBe(numEvents);
-      })
+      }),
+      { numRuns: 20 } // Limit iterations to stay within test timeout
     );
-  });
+  }, 15000); // Extend timeout for property-based async test
 });

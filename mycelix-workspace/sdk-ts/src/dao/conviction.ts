@@ -4,7 +4,7 @@
  * Time-weighted voting for continuous funding proposals.
  */
 
-import { type ActionHash, type Record } from '@holochain/client';
+import { type ActionHash, type AgentPubKey, type Record } from '@holochain/client';
 
 import type { DAOClient } from './client';
 import type { ConvictionVote, ConvictionSummary } from './types';
@@ -182,6 +182,26 @@ export class ConvictionClient {
       days: hours / 24,
       willPass: hours < Infinity,
     };
+  }
+
+  /**
+   * Get all active convictions for the current agent
+   */
+  async getMyConvictions(): Promise<ConvictionVote[]> {
+    const myPubKey = await this.client.getMyPubKey();
+    return this.getConvictionsFrom(myPubKey);
+  }
+
+  /**
+   * Get all active convictions for a given agent
+   */
+  async getConvictionsFrom(agent: AgentPubKey): Promise<ConvictionVote[]> {
+    const records = await this.client.callZome<Record[]>(
+      this.zome,
+      'get_voter_convictions',
+      agent
+    );
+    return records.map((r) => this.decodeConviction(r));
   }
 
   private decodeConviction(record: Record): ConvictionVote {

@@ -224,7 +224,7 @@ export class DAOClient {
       myProposals,
       activeProposals,
       myDelegations,
-      myConvictions: [], // TODO: Implement
+      myConvictions: await this.conviction.getMyConvictions(),
       crossHappReputation,
     };
   }
