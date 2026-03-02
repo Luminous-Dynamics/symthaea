@@ -543,6 +543,10 @@ impl CognitiveLoopService {
         }
         let spectral_mip_phi = consciousness_output.spectral_mip_phi;
         let sigma = consciousness_output.sigma;
+        let eq_v2_limiting_component = consciousness_output
+            .limiting_component
+            .map(|c| format!("{c:?}"))
+            .unwrap_or_default();
         self.carryover.quality.last_pipeline_consciousness =
             consciousness_output.pipeline_consciousness;
         module_timings.spectral_mip = consciousness_output.spectral_mip_us;
@@ -744,6 +748,7 @@ impl CognitiveLoopService {
             epistemic_phi_eff,
             epistemic_conflict_count,
             equation_v2_consciousness,
+            eq_v2_limiting_component,
             // Subsystem metrics pass-through
             hierarchical_ltc_phi,
             evolution_generation,

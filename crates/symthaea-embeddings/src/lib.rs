@@ -50,6 +50,9 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 // Re-export qwen3 types at module level
 pub use qwen3::{Qwen3Config, Qwen3Embedder, QWEN3_FULL_DIMENSION};
 
+#[cfg(feature = "async-embed")]
+pub use qwen3::AsyncQwen3Embedder;
+
 /// Standard Qwen3 embedding dimension (1024D)
 pub const QWEN3_DIMENSION: usize = 1024;
 

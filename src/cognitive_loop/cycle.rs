@@ -162,6 +162,7 @@ pub(super) struct FeedbackPhaseResult {
     pub(super) epistemic_phi_eff: f64,
     pub(super) epistemic_conflict_count: usize,
     pub(super) equation_v2_consciousness: f64,
+    pub(super) eq_v2_limiting_component: String,
     // ── Subsystem metrics pass-through ──
     pub(super) hierarchical_ltc_phi: f32,
     pub(super) evolution_generation: usize,

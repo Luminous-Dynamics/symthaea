@@ -208,6 +208,7 @@ impl CognitiveLoopService {
             holographic_binding: feedback.holographic_binding,
             consciousness_gradient_magnitude: feedback.consciousness_gradient_magnitude,
             consciousness_limiting_component: feedback.consciousness_limiting_component.clone(),
+            eq_v2_limiting_component: feedback.eq_v2_limiting_component.clone(),
             affect_consciousness_valence: feedback.affect_cons_valence,
             affect_consciousness_arousal: feedback.affect_cons_arousal,
             pipeline_consciousness: feedback.pipeline_consciousness,
