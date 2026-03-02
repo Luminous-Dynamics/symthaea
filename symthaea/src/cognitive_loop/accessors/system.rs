@@ -57,8 +57,8 @@ impl CognitiveLoopService {
         // PREDICTION CONFIDENCE
         // ═══════════════════════════════════════════════════════════════════
 
-        /// Get current prediction confidence
-        pub fn prediction_confidence(&self) -> f32 { self.prediction_confidence }
+        /// Get current prediction confidence (returned as f32 for API stability).
+        pub fn prediction_confidence(&self) -> f32 { self.prediction_confidence as f32 }
 
         /// Check if predictions should be trusted
         pub fn predictions_trustworthy(&self) -> bool { self.prediction_confidence > 0.4 }
@@ -84,6 +84,16 @@ impl CognitiveLoopService {
     /// Access the ethics engine for moral topology, harmony coordinates, etc.
     pub(crate) fn ethics_engine(&self) -> &super::super::ethics_engine::EthicsEngine {
         &self.ethics_engine
+    }
+
+    /// Get a compact summary of the current moral topology state.
+    ///
+    /// Returns the cached summary from the last `analyze()` call. Before any
+    /// cycles have run, `scenario_count == 0` and all fields are default.
+    /// Useful for mesh gossip: peers can share topology summaries to detect
+    /// cross-agent moral drift.
+    pub fn moral_topology_summary(&self) -> crate::hdc::moral_topology::MoralTopologySummary {
+        self.ethics_engine.moral_topology().last_summary().clone()
     }
 
     /// Get the current inferred user state (if user state inference is enabled).

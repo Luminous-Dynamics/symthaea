@@ -295,6 +295,20 @@ header h1 {
     color: var(--text-primary);
 }
 
+/* --- Sparkline --- */
+
+.sparkline-container {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+#sparklineDrift {
+    width: 120px;
+    height: 40px;
+    vertical-align: middle;
+}
+
 @media (max-width: 768px) {
     .dashboard { grid-template-columns: 1fr; }
     .metrics-grid { grid-template-columns: 1fr 1fr; }

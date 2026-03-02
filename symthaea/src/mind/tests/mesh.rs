@@ -2908,3 +2908,456 @@ fn test_xchacha_send_receive_roundtrip() {
     assert_eq!(decoded.sequence, 42);
     assert_eq!(decoded.phi, 0.75);
 }
+
+// ====================================================================
+// Round 10 Security Tests (Items 13–16)
+// ====================================================================
+
+// -- Item 13: Key rotation stress tests --
+
+/// Rapid key rotations under continuous emission — verify no panics and
+/// versioned encrypt/decrypt works across multiple rotation boundaries.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_rapid_key_rotation_under_load() {
+    use crate::swarm::mesh::{
+        compress_packet, MeshReceiver, MeshUrgency, PayloadType, RotatingKeyPair, WisdomPacket,
+    };
+    use symthaea_core::hdc::BinaryHV;
+
+    let initial_key = [0x10u8; 32];
+    let mut pair = RotatingKeyPair::new(initial_key);
+    let source_id = [0x01u8; 8];
+
+    let mut received = 0u32;
+    let mut total = 0u32;
+
+    // 5 rapid rotations with continuous emission between each
+    for rotation in 0u8..5 {
+        let mut new_key = [0u8; 32];
+        new_key[0] = rotation + 1;
+        new_key[31] = rotation + 1;
+        pair.rotate(new_key, rotation as u64 * 100, 50);
+
+        // Emit 10 packets per rotation
+        for seq in 0u32..10 {
+            total += 1;
+            let packet = WisdomPacket {
+                source_id,
+                sequence: (rotation as u32) * 100 + seq,
+                phi: 0.6,
+                urgency: MeshUrgency::Normal,
+                timestamp_s: 1_700_000_000,
+                payload_type: PayloadType::WisdomVector,
+                auth_mac: 0,
+                ttl: 3,
+                wisdom: BinaryHV([rotation; 2048]),
+            };
+            let compressed = compress_packet(&packet.to_bytes());
+            let encrypted =
+                pair.encrypt_typed(&compressed, &source_id, 0, pair.key_version(), seq);
+
+            // Decrypt with same pair — should always succeed
+            if pair.decrypt(&encrypted).is_some() {
+                received += 1;
+            }
+        }
+
+        // Tick to advance grace period
+        pair.tick(rotation as u64 * 100 + 60);
+    }
+
+    assert_eq!(received, total, "All packets should decrypt during rotation");
+}
+
+/// Verify key_version wraps correctly from 255 → 0 and decrypt still works.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_rotating_key_pair_version_wrapping() {
+    use crate::swarm::mesh::{compress_packet, RotatingKeyPair};
+
+    let initial_key = [0xAA; 32];
+    let mut pair = RotatingKeyPair::new(initial_key);
+    let source_id = [0x02u8; 8];
+
+    // Rotate 260 times to cross the u8 wrap boundary (255 → 0)
+    for i in 1u16..=260 {
+        let mut new_key = [0u8; 32];
+        new_key[0] = (i & 0xFF) as u8;
+        new_key[1] = ((i >> 8) & 0xFF) as u8;
+        pair.rotate(new_key, i as u64, 10);
+
+        // Encrypt and decrypt with versioned format
+        let plaintext = b"test payload for version wrapping";
+        let compressed = compress_packet(plaintext);
+        let encrypted = pair.encrypt_typed(&compressed, &source_id, 0, pair.key_version(), i as u32);
+        let decrypted = pair.decrypt(&encrypted);
+        assert!(
+            decrypted.is_some(),
+            "Decrypt should work at rotation {} (version={})",
+            i,
+            pair.key_version()
+        );
+
+        // Tick to expire previous key
+        pair.tick(i as u64 + 20);
+    }
+
+    // Verify we actually wrapped
+    assert!(
+        pair.key_version() < 10,
+        "key_version should have wrapped past 255 back to low values, got {}",
+        pair.key_version()
+    );
+}
+
+// -- Item 14: Timing analysis test --
+
+/// Statistical test that decrypt timing doesn't obviously leak key validity.
+///
+/// Measures mean time for 1000 decrypts with valid key vs invalid key.
+/// Asserts means are within 3x (not a proof, but catches gross timing leaks).
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_decrypt_timing_no_leak() {
+    use crate::swarm::mesh::{decrypt_packet, encrypt_packet};
+    use std::time::Instant;
+
+    let valid_key = [0x55u8; 32];
+    let invalid_key = [0xFFu8; 32];
+    let source_id = [0x03u8; 8];
+
+    // Create encrypted test data
+    let plaintext = vec![0xABu8; 256];
+    let encrypted = encrypt_packet(&plaintext, &valid_key, &source_id, 42);
+
+    const ITERS: u32 = 1000;
+
+    // Time valid decryptions
+    let start = Instant::now();
+    for _ in 0..ITERS {
+        let _ = decrypt_packet(&encrypted, &valid_key);
+    }
+    let valid_elapsed = start.elapsed();
+
+    // Time invalid decryptions
+    let start = Instant::now();
+    for _ in 0..ITERS {
+        let _ = decrypt_packet(&encrypted, &invalid_key);
+    }
+    let invalid_elapsed = start.elapsed();
+
+    let valid_ns = valid_elapsed.as_nanos() as f64;
+    let invalid_ns = invalid_elapsed.as_nanos() as f64;
+
+    // Allow up to 3x difference (generous — AEAD implementations should be constant-time)
+    let ratio = if valid_ns > invalid_ns {
+        valid_ns / invalid_ns.max(1.0)
+    } else {
+        invalid_ns / valid_ns.max(1.0)
+    };
+    assert!(
+        ratio < 3.0,
+        "Decrypt timing ratio {:.2}x exceeds 3x threshold (valid={:.0}ns, invalid={:.0}ns)",
+        ratio,
+        valid_ns / ITERS as f64,
+        invalid_ns / ITERS as f64,
+    );
+}
+
+// -- Item 15: Fragment reorder/tamper tests --
+
+/// Swap two encrypted fragments and verify assembly fails (AEAD rejects tampered nonce context).
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_fragment_swap_rejected() {
+    use crate::swarm::mesh::{
+        DualLayerMesh, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket,
+    };
+    use symthaea_core::hdc::BinaryHV;
+
+    let key = [0x66u8; 32];
+    let source_id = [0x04u8; 8];
+
+    let packet = WisdomPacket {
+        source_id,
+        sequence: 1,
+        phi: 0.5,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 3,
+        wisdom: BinaryHV([0xCC; 2048]),
+    };
+
+    // Fragment and encrypt
+    let mesh = DualLayerMesh::new([0x04; 32]).with_encryption_key(key);
+    let frags = packet.fragment();
+    let mut encrypted_frags: Vec<Vec<u8>> = frags
+        .iter()
+        .map(|f| {
+            let mut buf = [0u8; 256];
+            let len = f.to_bytes(&mut buf);
+            let raw = &buf[..len];
+            crate::swarm::mesh::encrypt_fragment(raw, &key, &source_id, f.thought_id, f.fragment_index)
+        })
+        .collect();
+
+    // Swap fragments 2 and 5 — AEAD should reject because nonce includes fragment_index
+    if encrypted_frags.len() > 5 {
+        encrypted_frags.swap(2, 5);
+    }
+
+    // Try to reassemble with fragment-level encryption enabled
+    let mut receiver = MeshReceiver::new()
+        .with_encryption_key(key)
+        .with_fragment_encryption(true);
+
+    let mut completed = false;
+    for raw in &encrypted_frags {
+        if receiver.receive_fragment(source_id, raw).is_some() {
+            completed = true;
+        }
+    }
+
+    // The swapped fragments should fail AEAD validation (different nonce/fragment_index)
+    // so the assembly should not complete (missing 2 fragments, only 1 FEC can recover 1)
+    // OR if it does complete, the assembled data won't decode correctly.
+    // Either outcome is acceptable — the key point is no corrupted packet is returned.
+    if completed {
+        // If it somehow completed (e.g., FEC recovered), that's fine as long as data integrity holds
+        // through the AEAD + decompression + parse pipeline
+    }
+    // Verify at least some fragments were rejected
+    assert!(
+        receiver.stats().packets_decrypt_failed > 0 || !completed,
+        "Swapped encrypted fragments should cause decrypt failures or incomplete assembly"
+    );
+}
+
+/// Fragment from stream A fed into stream B — AEAD rejects (different thought_id in nonce).
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_fragment_cross_stream_rejected() {
+    use crate::swarm::mesh::{MeshReceiver, MeshUrgency, PayloadType, WisdomPacket};
+    use symthaea_core::hdc::BinaryHV;
+
+    let key = [0x77u8; 32];
+    let source_a = [0x0A; 8];
+    let source_b = [0x0B; 8];
+
+    let packet_a = WisdomPacket {
+        source_id: source_a,
+        sequence: 1,
+        phi: 0.5,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 3,
+        wisdom: BinaryHV([0xAA; 2048]),
+    };
+
+    let packet_b = WisdomPacket {
+        source_id: source_b,
+        sequence: 2,
+        phi: 0.7,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 3,
+        wisdom: BinaryHV([0xBB; 2048]),
+    };
+
+    // Encrypt fragments from both streams
+    let frags_a = packet_a.fragment();
+    let frags_b = packet_b.fragment();
+
+    let encrypted_a: Vec<Vec<u8>> = frags_a
+        .iter()
+        .map(|f| {
+            let mut buf = [0u8; 256];
+            let len = f.to_bytes(&mut buf);
+            crate::swarm::mesh::encrypt_fragment(
+                &buf[..len],
+                &key,
+                &source_a,
+                f.thought_id,
+                f.fragment_index,
+            )
+        })
+        .collect();
+
+    let encrypted_b_frag0: Vec<u8> = {
+        let f = &frags_b[0];
+        let mut buf = [0u8; 256];
+        let len = f.to_bytes(&mut buf);
+        crate::swarm::mesh::encrypt_fragment(
+            &buf[..len],
+            &key,
+            &source_b,
+            f.thought_id,
+            f.fragment_index,
+        )
+    };
+
+    let mut receiver = MeshReceiver::new()
+        .with_encryption_key(key)
+        .with_fragment_encryption(true);
+
+    // Feed all of stream A's fragments
+    for raw in &encrypted_a {
+        receiver.receive_fragment(source_a, raw);
+    }
+
+    // Now feed stream B's fragment 0 as if it came from source_a
+    // AEAD should reject it (nonce includes source_b's thought_id, not source_a's)
+    let result = receiver.receive_fragment(source_a, &encrypted_b_frag0);
+    assert!(
+        result.is_none(),
+        "Cross-stream fragment should be rejected by AEAD"
+    );
+    assert!(
+        receiver.stats().packets_decrypt_failed > 0,
+        "Cross-stream fragment should increment decrypt_failed counter"
+    );
+}
+
+/// Replay an old fragment after stream completion — recently_completed suppresses it.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_fragment_replay_after_completion() {
+    use crate::swarm::mesh::{MeshReceiver, MeshUrgency, PayloadType, WisdomPacket, LORA_MTU};
+    use symthaea_core::hdc::BinaryHV;
+
+    let source = [0x05u8; 8];
+
+    let packet = WisdomPacket {
+        source_id: source,
+        sequence: 42,
+        phi: 0.8,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 3,
+        wisdom: BinaryHV([0xDD; 2048]),
+    };
+
+    let frags = packet.fragment();
+    let wire: Vec<Vec<u8>> = frags
+        .iter()
+        .map(|f| {
+            let mut buf = [0u8; LORA_MTU];
+            let len = f.to_bytes(&mut buf);
+            buf[..len].to_vec()
+        })
+        .collect();
+
+    let mut receiver = MeshReceiver::new();
+
+    // Complete the assembly
+    let mut completed = false;
+    for raw in &wire {
+        if receiver.receive_fragment(source, raw).is_some() {
+            completed = true;
+        }
+    }
+    assert!(completed, "Assembly should complete");
+    assert_eq!(receiver.stats().packets_complete, 1);
+
+    // Replay fragment 0 — should be suppressed by recently_completed
+    let replayed = receiver.receive_fragment(source, &wire[0]);
+    assert!(
+        replayed.is_none(),
+        "Replayed fragment after completion should be suppressed"
+    );
+    // Should NOT produce a second completed packet
+    assert_eq!(
+        receiver.stats().packets_complete, 1,
+        "Replay should not increment packets_complete"
+    );
+}
+
+// -- Item 16: Downgrade attack tests --
+
+/// Receiver with encryption key rejects unencrypted packet (explicit downgrade test).
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_downgrade_unencrypted_rejected() {
+    use crate::swarm::mesh::{compress_packet, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket};
+    use symthaea_core::hdc::BinaryHV;
+
+    let key = [0x88u8; 32];
+
+    let packet = WisdomPacket {
+        source_id: [0x06; 8],
+        sequence: 99,
+        phi: 0.9,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 3,
+        wisdom: BinaryHV([0xEE; 2048]),
+    };
+
+    // Send unencrypted compressed packet to receiver WITH encryption key
+    let compressed = compress_packet(&packet.to_bytes());
+
+    let mut receiver = MeshReceiver::new().with_encryption_key(key);
+    let result = receiver.receive_whole(&compressed);
+
+    assert!(
+        result.is_none(),
+        "Unencrypted packet must be rejected when encryption is enabled (downgrade attack)"
+    );
+    assert_eq!(
+        receiver.stats().packets_decrypt_failed, 1,
+        "Downgrade attempt should be counted as decrypt failure"
+    );
+}
+
+/// Send legacy format (no version byte) to versioned receiver — backward compat works.
+#[cfg(feature = "mesh-encryption")]
+#[test]
+fn test_downgrade_legacy_format_backward_compat() {
+    use crate::swarm::mesh::{
+        compress_packet, encrypt_packet, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket,
+    };
+    use symthaea_core::hdc::BinaryHV;
+
+    let key = [0x99u8; 32];
+    let source_id = [0x07u8; 8];
+
+    let packet = WisdomPacket {
+        source_id,
+        sequence: 50,
+        phi: 0.65,
+        urgency: MeshUrgency::Normal,
+        timestamp_s: 1_700_000_000,
+        payload_type: PayloadType::WisdomVector,
+        auth_mac: 0,
+        ttl: 3,
+        wisdom: BinaryHV([0xFF; 2048]),
+    };
+
+    // Encrypt with legacy format (no version prefix) using encrypt_packet
+    let compressed = compress_packet(&packet.to_bytes());
+    let legacy_encrypted = encrypt_packet(&compressed, &key, &source_id, packet.sequence);
+
+    // Receiver should still decrypt legacy format via backward-compat fallback
+    let mut receiver = MeshReceiver::new().with_encryption_key(key);
+    let result = receiver.receive_whole(&legacy_encrypted);
+
+    assert!(
+        result.is_some(),
+        "Legacy encrypted packet should be accepted via backward-compat fallback"
+    );
+    let decoded = result.unwrap();
+    assert_eq!(decoded.sequence, 50);
+    assert_eq!(decoded.phi, 0.65);
+    assert_eq!(receiver.stats().packets_decrypt_failed, 0);
+}

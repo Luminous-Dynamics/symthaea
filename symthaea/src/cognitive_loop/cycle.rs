@@ -254,6 +254,16 @@ pub(super) struct FeedbackPhaseResult {
     pub(super) support_alert_fired: bool,
     pub(super) support_federation_graduated: usize,
     pub(super) support_efe: f64,
+    // ── Structural Phi decomposition ──
+    pub(super) structural_micro_phi: f64,
+    pub(super) structural_meso_phi: f64,
+    pub(super) structural_macro_phi: f64,
+    pub(super) structural_bottleneck: f64,
+    pub(super) structural_emergence_ratio: f64,
+    pub(super) structural_num_clusters: usize,
+    // ── Dynamic consciousness weights ──
+    pub(super) consciousness_weights: [f64; 4],
+    pub(super) consciousness_weight_variance: f64,
 }
 
 impl CognitiveLoopService {

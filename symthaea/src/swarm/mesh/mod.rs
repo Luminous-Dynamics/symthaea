@@ -1004,6 +1004,28 @@ pub fn encrypt_packet_typed(
     out
 }
 
+/// Encrypt with a 1-byte key version prefix for versioned decrypt.
+///
+/// Wire format: `[key_version (1) | nonce (12) | ciphertext+tag]`
+/// The version byte lets the receiver select the correct key without
+/// blind trial decryption during key rotation grace periods.
+#[cfg(feature = "mesh-encryption")]
+pub fn encrypt_packet_versioned(
+    envelope: &[u8],
+    key: &[u8; 32],
+    key_version: u8,
+    source_id: &[u8; 8],
+    payload_type: u8,
+    epoch: u8,
+    sequence: u32,
+) -> Vec<u8> {
+    let inner = encrypt_packet_typed(envelope, key, source_id, payload_type, epoch, sequence);
+    let mut out = Vec::with_capacity(1 + inner.len());
+    out.push(key_version);
+    out.extend_from_slice(&inner);
+    out
+}
+
 /// Decrypt a packet encrypted with `encrypt_packet`.
 ///
 /// Returns `None` if decryption/authentication fails.
@@ -1081,14 +1103,23 @@ pub fn decrypt_packet_xchacha(data: &[u8], key: &[u8; 32]) -> Option<Vec<u8>> {
 ///   │                                          └── only new_key accepted
 /// ```
 #[cfg(feature = "mesh-encryption")]
-#[derive(Clone)]
+#[derive(Clone, zeroize::ZeroizeOnDrop)]
 pub struct RotatingKeyPair {
     /// Current (primary) encryption key — used for all outbound packets.
     current: [u8; 32],
     /// Previous key — accepted for inbound during grace period, then discarded.
+    #[zeroize(skip)]
     previous: Option<[u8; 32]>,
     /// Tick at which the previous key expires (absolute tick count).
+    #[zeroize(skip)]
     grace_expires_at: u64,
+    /// Key version — incremented on every rotation, embedded in ciphertext header.
+    /// Wraps at u8::MAX. Prevents nonce reuse across key rotations.
+    #[zeroize(skip)]
+    key_version: u8,
+    /// Version of the previous key (for versioned decrypt hints).
+    #[zeroize(skip)]
+    previous_version: u8,
 }
 
 #[cfg(feature = "mesh-encryption")]
@@ -1099,17 +1130,27 @@ impl RotatingKeyPair {
             current: key,
             previous: None,
             grace_expires_at: 0,
+            key_version: 0,
+            previous_version: 0,
         }
     }
 
     /// Rotate to a new key. The old key remains valid for `grace_ticks` cycles.
     ///
     /// Outbound packets immediately use the new key. Inbound packets accept
-    /// either key until the grace period expires.
+    /// either key until the grace period expires. The key version is incremented
+    /// to prevent nonce reuse across rotations.
     pub fn rotate(&mut self, new_key: [u8; 32], current_tick: u64, grace_ticks: u64) {
         self.previous = Some(self.current);
+        self.previous_version = self.key_version;
+        self.key_version = self.key_version.wrapping_add(1);
         self.current = new_key;
         self.grace_expires_at = current_tick.saturating_add(grace_ticks);
+    }
+
+    /// The current key version (embedded in ciphertext header).
+    pub fn key_version(&self) -> u8 {
+        self.key_version
     }
 
     /// Expire the old key if the grace period has elapsed.
@@ -1137,6 +1178,8 @@ impl RotatingKeyPair {
     }
 
     /// Encrypt with the current key, using typed nonce for cross-type safety.
+    ///
+    /// Prepends a 1-byte key version header for versioned decrypt hints.
     pub fn encrypt_typed(
         &self,
         envelope: &[u8],
@@ -1145,13 +1188,45 @@ impl RotatingKeyPair {
         epoch: u8,
         sequence: u32,
     ) -> Vec<u8> {
-        encrypt_packet_typed(envelope, &self.current, source_id, payload_type, epoch, sequence)
+        encrypt_packet_versioned(
+            envelope,
+            &self.current,
+            self.key_version,
+            source_id,
+            payload_type,
+            epoch,
+            sequence,
+        )
     }
 
-    /// Decrypt trying the current key first, then the previous key during grace.
+    /// Decrypt trying versioned format first, then unversioned for backward compat.
     ///
-    /// Returns `None` if neither key succeeds.
+    /// Versioned format: `[key_version (1) | nonce (12) | ciphertext+tag]`
+    /// - If version matches current → try current key only
+    /// - If version matches previous → try previous key only
+    /// - Otherwise → try both (backward compat with pre-versioned packets)
     pub fn decrypt(&self, data: &[u8]) -> Option<Vec<u8>> {
+        // Need at least 1 (version) + 12 (nonce) + 16 (tag) = 29 bytes for versioned
+        if data.len() >= 1 + AEAD_NONCE_SIZE + AEAD_TAG_SIZE {
+            let version_hint = data[0];
+            let inner = &data[1..];
+
+            if version_hint == self.key_version {
+                // Matches current — try only current key
+                if let Some(pt) = decrypt_packet(inner, &self.current) {
+                    return Some(pt);
+                }
+            } else if version_hint == self.previous_version {
+                // Matches previous — try only previous key
+                if let Some(ref prev) = self.previous {
+                    if let Some(pt) = decrypt_packet(inner, prev) {
+                        return Some(pt);
+                    }
+                }
+            }
+        }
+
+        // Fall back to unversioned (backward compat with pre-versioned packets)
         if let Some(plaintext) = decrypt_packet(data, &self.current) {
             return Some(plaintext);
         }
@@ -1190,6 +1265,8 @@ pub struct PeerKeyStore {
     public: x25519_dalek::PublicKey,
     /// Derived symmetric keys per peer, keyed by source_id.
     peer_keys: std::collections::HashMap<[u8; 8], [u8; 32]>,
+    /// Derived authentication keys per peer (separate from encryption keys).
+    peer_auth_keys: std::collections::HashMap<[u8; 8], [u8; 32]>,
 }
 
 #[cfg(feature = "mesh-key-exchange")]
@@ -1202,6 +1279,7 @@ impl PeerKeyStore {
             secret,
             public,
             peer_keys: std::collections::HashMap::new(),
+            peer_auth_keys: std::collections::HashMap::new(),
         }
     }
 
@@ -1212,21 +1290,29 @@ impl PeerKeyStore {
 
     /// Perform DH key agreement with a peer's public key.
     ///
-    /// Derives a ChaCha20 symmetric key via BLAKE3 KDF and stores it.
-    /// Returns the derived key.
+    /// Derives two symmetric keys via HKDF-SHA256:
+    /// - Encryption key (info: `symthaea-mesh-chacha20-v1`)
+    /// - Authentication key (info: `symthaea-mesh-auth-v1`)
+    ///
+    /// Returns the encryption key.
     pub fn agree(&mut self, peer_source_id: [u8; 8], peer_public: &[u8; 32]) -> [u8; 32] {
         let peer_pk = x25519_dalek::PublicKey::from(*peer_public);
         let shared_secret = self.secret.diffie_hellman(&peer_pk);
 
-        // KDF: BLAKE3 keyed hash of shared secret with context
-        let mut kdf_input = Vec::with_capacity(64);
-        kdf_input.extend_from_slice(shared_secret.as_bytes());
-        kdf_input.extend_from_slice(b"symthaea-mesh-chacha20-v1");
-        let derived = blake3::hash(&kdf_input);
-        let key: [u8; 32] = *derived.as_bytes();
+        // KDF: HKDF-SHA256 with domain-separated info strings
+        let hk = hkdf::Hkdf::<sha2::Sha256>::new(None, shared_secret.as_bytes());
 
-        self.peer_keys.insert(peer_source_id, key);
-        key
+        let mut chacha_key = [0u8; 32];
+        hk.expand(b"symthaea-mesh-chacha20-v1", &mut chacha_key)
+            .expect("32-byte output is valid for HKDF-SHA256");
+
+        let mut auth_key = [0u8; 32];
+        hk.expand(b"symthaea-mesh-auth-v1", &mut auth_key)
+            .expect("32-byte output is valid for HKDF-SHA256");
+
+        self.peer_keys.insert(peer_source_id, chacha_key);
+        self.peer_auth_keys.insert(peer_source_id, auth_key);
+        chacha_key
     }
 
     /// Get the derived symmetric key for a peer (if agreement has been done).
@@ -1234,14 +1320,33 @@ impl PeerKeyStore {
         self.peer_keys.get(source_id)
     }
 
+    /// Get the derived authentication key for a peer.
+    pub fn peer_auth_key(&self, source_id: &[u8; 8]) -> Option<&[u8; 32]> {
+        self.peer_auth_keys.get(source_id)
+    }
+
     /// Number of peers with established keys.
     pub fn peer_count(&self) -> usize {
         self.peer_keys.len()
     }
 
-    /// Remove a peer's key (e.g., on expiry).
+    /// Remove a peer's keys (both encryption and auth).
     pub fn remove_peer(&mut self, source_id: &[u8; 8]) {
         self.peer_keys.remove(source_id);
+        self.peer_auth_keys.remove(source_id);
+    }
+}
+
+#[cfg(feature = "mesh-key-exchange")]
+impl Drop for PeerKeyStore {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        for key in self.peer_keys.values_mut() {
+            key.zeroize();
+        }
+        for key in self.peer_auth_keys.values_mut() {
+            key.zeroize();
+        }
     }
 }
 

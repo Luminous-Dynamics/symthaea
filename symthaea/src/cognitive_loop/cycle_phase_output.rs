@@ -30,10 +30,7 @@ impl CognitiveLoopService {
         let selected_strategy_str = perception.selected_strategy.as_str();
 
         let _t = Instant::now();
-        let moral_anomaly_report = {
-            let summary = self.ethics_engine.moral_topology().last_summary().clone();
-            self.ethics_engine.moral_topology().detect_anomalies(&summary)
-        };
+        let moral_anomaly_report = self.ethics_engine.last_anomaly_report().clone();
         let mut metadata = super::CycleMetadata {
             surprise_triggered: perception.surprise_triggered,
             prefrontal_veto: feedback.prefrontal_veto,
@@ -185,6 +182,10 @@ impl CognitiveLoopService {
                 moral_anomaly_score: moral_anomaly_report.anomaly_score,
                 moral_value_inversion: moral_anomaly_report.value_inversion,
                 moral_free_energy_spike: moral_anomaly_report.free_energy_spike,
+                moral_drift_alert: moral_anomaly_report.drift_alert,
+                moral_fragmentation_increase: moral_anomaly_report.fragmentation_increase,
+                moral_anomaly_response_applied: self.config.enable_moral_anomaly_response
+                    && moral_anomaly_report.anomaly_score > 0.0,
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
             consciousness_profile_composite: feedback.consciousness_profile_composite,
@@ -246,6 +247,16 @@ impl CognitiveLoopService {
                 .last_hierarchical_mip_phi
                 .map(|_| 3usize)
                 .unwrap_or(0),
+            // Structural Phi decomposition
+            structural_micro_phi: feedback.structural_micro_phi,
+            structural_meso_phi: feedback.structural_meso_phi,
+            structural_macro_phi: feedback.structural_macro_phi,
+            structural_bottleneck: feedback.structural_bottleneck,
+            structural_emergence_ratio: feedback.structural_emergence_ratio,
+            structural_num_clusters: feedback.structural_num_clusters,
+            // Dynamic consciousness weights
+            consciousness_weights: feedback.consciousness_weights,
+            consciousness_weight_variance: feedback.consciousness_weight_variance,
             module_timings_us: {
                 module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
                 module_timings.clone()
@@ -414,7 +425,7 @@ impl CognitiveLoopService {
         let assurance_level = self.mfdi_bridge.assurance_level();
 
         // ── Phase 2.2: End feedback proposal collection ──────────────────
-        let feedback_divergence = self.feedback_state.end_cycle(
+        let feedback_consensus = self.feedback_state.end_cycle(
             self.prediction_confidence as f64,
             self.fep_lr_boost as f64,
             self.curiosity_drive.exploration_urge as f64,
@@ -422,27 +433,9 @@ impl CognitiveLoopService {
         );
 
         // Store consensus-smoothed values for application at the next cycle start.
-        // Routing through `store_consensus_for_next_cycle` + `apply_pending_consensus`
-        // ensures the divergence tracker sees the writeback as a Set proposal rather
-        // than an out-of-band mutation.
-        if self.config.consensus_feedback {
-            self.feedback_state
-                .store_consensus_for_next_cycle(&feedback_divergence);
-        }
-
-        if feedback_divergence.confidence > 0.01
-            || feedback_divergence.learning_rate > 0.01
-            || feedback_divergence.exploration > 0.01
-            || feedback_divergence.threshold > 0.01
-        {
-            tracing::trace!(
-                conf_div = feedback_divergence.confidence,
-                lr_div = feedback_divergence.learning_rate,
-                explore_div = feedback_divergence.exploration,
-                thresh_div = feedback_divergence.threshold,
-                "Feedback divergence >1%"
-            );
-        }
+        // Applied via helpers at next cycle start by `apply_pending_consensus`.
+        self.feedback_state
+            .store_consensus_for_next_cycle(&feedback_consensus);
 
         // ── Phase 2.3: Integrate subsystem outputs ─────────────
         let integrated = self.subsystem_collector.integrate();

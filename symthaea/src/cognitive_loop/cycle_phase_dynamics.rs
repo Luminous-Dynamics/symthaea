@@ -16,11 +16,20 @@ use super::cycle::{DynamicsPhaseResult, PerceptionPhaseResult};
 use super::helpers;
 use super::training::TrainingSample;
 use super::thresholds::{
-    ATTENTION_BUDGET_US, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE,
-    DOMINANCE_FLOW_SCALE, MEMORY_RECALL_TOP_K, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW,
-    POLICY_SOFT_THRESHOLD, POLICY_TEMP_BASE, POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE,
-    QUANTUM_COHERENCE_BOOST_SCALE, QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER,
-    RESONANCE_TAU_SCALE,
+    ATTENTION_BUDGET_US, BINDING_CONFIDENCE_THRESHOLD, BINDING_LOW_THRESHOLD,
+    BINDING_STRONG_CONFIDENCE_SCALE, BINDING_STRONG_RELIEF_SCALE, BINDING_WEAK_CAUTION_SCALE,
+    BINDING_WEAK_CONFIDENCE_SCALE, COHERENCE_CONFIDENCE_BOOST, COHERENCE_HIGH_THRESHOLD,
+    COHERENCE_LOW_DAMPEN_SCALE, COHERENCE_LOW_THRESHOLD, COHERENCE_PREDICTION_EMA,
+    DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE, DOMINANCE_FLOW_SCALE,
+    MEMORY_RECALL_TOP_K, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD,
+    POLICY_TEMP_BASE, POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, QUANTUM_COHERENCE_BOOST_SCALE,
+    QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER, RESONANCE_TAU_SCALE,
+    RESONATOR_ERROR_CONFIDENCE_DAMPEN, RESONATOR_ERROR_EXPLORATION_SCALE,
+    RESONATOR_ERROR_EXPLORATION_THRESHOLD, RESONATOR_LOW_ERROR_CONFIDENCE_SCALE,
+    RESONATOR_LOW_ERROR_THRESHOLD, SELF_MODEL_ACCURACY_EMA, SELF_MODEL_HIGH_THRESHOLD,
+    SELF_MODEL_HIGH_TRUST_BOOST, SELF_MODEL_LOW_CONFIDENCE_SCALE, SELF_MODEL_LOW_THRESHOLD,
+    THALAMIC_DEEP_SALIENCE, THALAMIC_REFLEX_SALIENCE, WORLD_MODEL_SPONGINESS_THRESHOLD,
+    WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, TrainingMethod,
@@ -54,7 +63,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let cycle_snapshot = super::subsystem_trait::CycleSnapshot::build(
             self.stats.total_cycles as u64,
-            self.prediction_confidence,
+            self.prediction_confidence as f32,
             self.fep_lr_boost,
             prediction_error,
             self.coherence_bridge.smoothed_coherence(),
@@ -116,18 +125,25 @@ impl CognitiveLoopService {
                 let confidence_error = (self.prediction_confidence - pred_confidence).abs();
                 let urgency_match = if urgency == pred_urgency { 1.0f32 } else { 0.0 };
                 let accuracy = (1.0 - confidence_error) * 0.7 + urgency_match * 0.3;
-                self.carryover.learning.self_model_accuracy =
-                    self.carryover.learning.self_model_accuracy * 0.9 + accuracy * 0.1;
+                self.carryover.learning.self_model_accuracy = self
+                    .carryover
+                    .learning
+                    .self_model_accuracy
+                    * SELF_MODEL_ACCURACY_EMA
+                    + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
                 self.stats.self_model_predictions_validated += 1;
-                self.stats.avg_self_model_accuracy =
-                    self.stats.avg_self_model_accuracy * 0.9 + accuracy * 0.1;
+                self.stats.avg_self_model_accuracy = self.stats.avg_self_model_accuracy
+                    * SELF_MODEL_ACCURACY_EMA
+                    + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
 
-                if self.carryover.learning.self_model_accuracy > 0.7 {
-                    let trust_boost = (self.carryover.learning.self_model_accuracy - 0.7) * 0.03;
+                if self.carryover.learning.self_model_accuracy > SELF_MODEL_HIGH_THRESHOLD {
+                    let trust_boost = (self.carryover.learning.self_model_accuracy
+                        - SELF_MODEL_HIGH_THRESHOLD)
+                        * SELF_MODEL_HIGH_TRUST_BOOST;
                     self.adjust_confidence("self_model_trust", trust_boost);
                 }
-                if self.carryover.learning.self_model_accuracy < 0.3 {
-                    self.scale_confidence("self_model_low_acc", 0.98);
+                if self.carryover.learning.self_model_accuracy < SELF_MODEL_LOW_THRESHOLD {
+                    self.scale_confidence("self_model_low_acc", SELF_MODEL_LOW_CONFIDENCE_SCALE);
                 }
             } else {
                 self.carryover.history.self_model_prediction =
@@ -171,34 +187,45 @@ impl CognitiveLoopService {
             };
 
         // ── Phase 20: Resonator prediction error → exploration/confidence ────
-        let resonator_error_exploration_mod =
-            if resonator_prediction_error > 0.5 && self.stats.total_cycles > 5 {
-                let boost = (resonator_prediction_error - 0.5) * 0.08;
-                self.adjust_exploration("resonator_error_high", boost);
-                self.adjust_confidence("resonator_error_high", -boost * 0.5);
-                self.stats.resonator_error_exploration_count += 1;
-                boost
-            } else if resonator_prediction_error < 0.2 && resonator_prediction_error > 0.0 {
-                let confidence_boost = (0.2 - resonator_prediction_error) * 0.03;
-                self.adjust_confidence("resonator_error_low", confidence_boost);
-                self.stats.resonator_error_exploration_count += 1;
-                -confidence_boost
-            } else {
-                0.0
-            };
+        let resonator_error_exploration_mod = if resonator_prediction_error
+            > RESONATOR_ERROR_EXPLORATION_THRESHOLD
+            && self.stats.total_cycles > 5
+        {
+            let boost = (resonator_prediction_error - RESONATOR_ERROR_EXPLORATION_THRESHOLD)
+                * RESONATOR_ERROR_EXPLORATION_SCALE;
+            self.adjust_exploration("resonator_error_high", boost);
+            self.adjust_confidence(
+                "resonator_error_high",
+                -boost * RESONATOR_ERROR_CONFIDENCE_DAMPEN,
+            );
+            self.stats.resonator_error_exploration_count += 1;
+            boost
+        } else if resonator_prediction_error < RESONATOR_LOW_ERROR_THRESHOLD
+            && resonator_prediction_error > 0.0
+        {
+            let confidence_boost = (RESONATOR_LOW_ERROR_THRESHOLD - resonator_prediction_error)
+                * RESONATOR_LOW_ERROR_CONFIDENCE_SCALE;
+            self.adjust_confidence("resonator_error_low", confidence_boost);
+            self.stats.resonator_error_exploration_count += 1;
+            -confidence_boost
+        } else {
+            0.0
+        };
 
         // ── Phase 17: Coherence memoization — cache pre-update value ─────
         let pre_update_coherence = self.coherence_bridge.smoothed_coherence();
 
         // ── Phase 20: Phenomenal binding → threshold gating ──────────────────
         let cached_binding = self.carryover.quality.last_phenomenal_binding as f32;
-        let binding_threshold_mod = if cached_binding > 0.7 {
-            let relief = (cached_binding - 0.7) * 0.3;
+        let binding_threshold_mod = if cached_binding > BINDING_CONFIDENCE_THRESHOLD {
+            let relief =
+                (cached_binding - BINDING_CONFIDENCE_THRESHOLD) * BINDING_STRONG_RELIEF_SCALE;
             self.scale_threshold("binding_strong_relief", 1.0 - relief);
             self.stats.binding_threshold_mod_count += 1;
             -relief
-        } else if cached_binding < 0.3 && cached_binding > 0.0 {
-            let caution = (0.3 - cached_binding) * 0.2;
+        } else if cached_binding < BINDING_LOW_THRESHOLD && cached_binding > 0.0 {
+            let caution =
+                (BINDING_LOW_THRESHOLD - cached_binding) * BINDING_WEAK_CAUTION_SCALE;
             self.scale_threshold("binding_weak_caution", 1.0 + caution);
             self.stats.binding_threshold_mod_count += 1;
             caution
@@ -207,13 +234,15 @@ impl CognitiveLoopService {
         };
 
         // ── Phase 21: Phenomenal binding → prediction confidence ─────────
-        let binding_confidence_mod = if cached_binding > 0.7 {
-            let conf_boost = (cached_binding - 0.7) * 0.1;
+        let binding_confidence_mod = if cached_binding > BINDING_CONFIDENCE_THRESHOLD {
+            let conf_boost =
+                (cached_binding - BINDING_CONFIDENCE_THRESHOLD) * BINDING_STRONG_CONFIDENCE_SCALE;
             self.adjust_confidence("binding_strong", conf_boost);
             self.stats.binding_confidence_mod_count += 1;
             conf_boost
-        } else if cached_binding < 0.3 && cached_binding > 0.0 {
-            let conf_dampen = (0.3 - cached_binding) * 0.15;
+        } else if cached_binding < BINDING_LOW_THRESHOLD && cached_binding > 0.0 {
+            let conf_dampen =
+                (BINDING_LOW_THRESHOLD - cached_binding) * BINDING_WEAK_CONFIDENCE_SCALE;
             self.adjust_confidence("binding_weak", -conf_dampen);
             self.stats.binding_confidence_mod_count += 1;
             -conf_dampen
@@ -502,14 +531,15 @@ impl CognitiveLoopService {
 
         let prediction_coherence = if self.stats.total_cycles % 11 == 0 {
             let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
-            self.stats.avg_prediction_coherence =
-                self.stats.avg_prediction_coherence * 0.9 + coh * 0.1;
-            if coh < 0.5 {
-                let coh_dampen = (0.5 - coh) * 0.04;
+            self.stats.avg_prediction_coherence = self.stats.avg_prediction_coherence
+                * COHERENCE_PREDICTION_EMA
+                + coh * (1.0 - COHERENCE_PREDICTION_EMA);
+            if coh < COHERENCE_LOW_THRESHOLD {
+                let coh_dampen = (COHERENCE_LOW_THRESHOLD - coh) * COHERENCE_LOW_DAMPEN_SCALE;
                 self.scale_confidence("pred_coherence_low", 1.0 - coh_dampen);
             }
-            if coh > 0.8 {
-                let coh_boost = (coh - 0.8) * 0.02;
+            if coh > COHERENCE_HIGH_THRESHOLD {
+                let coh_boost = (coh - COHERENCE_HIGH_THRESHOLD) * COHERENCE_CONFIDENCE_BOOST;
                 self.adjust_confidence("pred_coherence_high", coh_boost);
             }
             coh
@@ -533,11 +563,13 @@ impl CognitiveLoopService {
 
         let wm_stiffness = self.world_model.avg_error.clamp(0.0, 1.0);
         if self.stats.total_cycles > 20 {
-            if wm_stiffness > 0.5 {
-                let stiffness_nudge = (wm_stiffness - 0.5) * 0.05;
+            if wm_stiffness > WORLD_MODEL_STIFFNESS_THRESHOLD {
+                let stiffness_nudge =
+                    (wm_stiffness - WORLD_MODEL_STIFFNESS_THRESHOLD) * WORLD_MODEL_STIFFNESS_LR_SCALE;
                 self.adjust_lr("wm_stiff", stiffness_nudge);
-            } else if wm_stiffness < 0.2 {
-                let spongy_dampen = (0.2 - wm_stiffness) * 0.15;
+            } else if wm_stiffness < WORLD_MODEL_SPONGINESS_THRESHOLD {
+                let spongy_dampen = (WORLD_MODEL_SPONGINESS_THRESHOLD - wm_stiffness)
+                    * WORLD_MODEL_SPONGY_LR_SCALE;
                 self.scale_lr("wm_spongy", 1.0 - spongy_dampen);
             }
         }
@@ -1298,9 +1330,9 @@ impl CognitiveLoopService {
         let pp_smoothed_coh = coherence as f64;
         let pp_wm_importance_boost = self.world_model.avg_error.clamp(0.0, 1.0) * 0.3;
         let pp_thalamic_salience = match self.cognitive_depth {
-            super::CognitiveDepth::DeepThought => 0.2f32,
+            super::CognitiveDepth::DeepThought => THALAMIC_DEEP_SALIENCE,
             super::CognitiveDepth::Cortical => 0.0,
-            super::CognitiveDepth::Reflex => -0.1,
+            super::CognitiveDepth::Reflex => THALAMIC_REFLEX_SALIENCE,
         };
         let pp_learning_threshold = self.config.learning_threshold;
 

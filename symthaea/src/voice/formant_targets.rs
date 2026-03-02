@@ -42,67 +42,79 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     // VOWELS (Monophthongs)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    // Front vowels
+    // Front vowels — bandwidths from Klatt (1980) / Hawks & Miller (1995)
     db.insert(
         "IY".into(),
-        FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0),
-    ); // "beat"
+        FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0)
+            .with_bandwidths(40.0, 70.0, 130.0),
+    ); // "beat" — high tongue, tight coupling
     db.insert(
         "IH".into(),
-        FormantTarget::vowel(390.0, 1990.0, 2550.0, 80.0),
+        FormantTarget::vowel(390.0, 1990.0, 2550.0, 80.0)
+            .with_bandwidths(50.0, 80.0, 140.0),
     ); // "bit"
     db.insert(
         "EY".into(),
-        FormantTarget::vowel(476.0, 2089.0, 2691.0, 120.0),
+        FormantTarget::vowel(476.0, 2089.0, 2691.0, 120.0)
+            .with_bandwidths(50.0, 80.0, 140.0),
     ); // "bait" (diphthong start)
     db.insert(
         "EH".into(),
         FormantTarget::vowel(530.0, 1840.0, 2480.0, 80.0),
-    ); // "bet"
+    ); // "bet" — mid (default 60/90/150)
     db.insert(
         "AE".into(),
-        FormantTarget::vowel(660.0, 1720.0, 2410.0, 100.0),
-    ); // "bat"
+        FormantTarget::vowel(660.0, 1720.0, 2410.0, 100.0)
+            .with_bandwidths(80.0, 100.0, 160.0),
+    ); // "bat" — lower tongue, wider
 
     // Central vowels
     db.insert(
         "AH".into(),
-        FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0),
+        FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0)
+            .with_bandwidths(70.0, 90.0, 150.0),
     ); // "but" (stressed)
     db.insert(
         "AX".into(),
         FormantTarget::vowel(500.0, 1500.0, 2500.0, 60.0),
-    ); // schwa (unstressed)
+    ); // schwa (unchanged)
     db.insert(
         "ER".into(),
-        FormantTarget::vowel(490.0, 1350.0, 1690.0, 100.0),
-    ); // "bird" (r-colored)
+        FormantTarget::vowel(490.0, 1350.0, 1690.0, 100.0)
+            .with_bandwidths(70.0, 100.0, 200.0),
+    ); // "bird" — R-coloring widens B3
     db.insert(
         "AXR".into(),
-        FormantTarget::vowel(500.0, 1400.0, 1750.0, 80.0),
+        FormantTarget::vowel(500.0, 1400.0, 1750.0, 80.0)
+            .with_bandwidths(70.0, 100.0, 200.0),
     ); // unstressed r-colored
 
     // Back vowels
     db.insert(
         "AA".into(),
-        FormantTarget::vowel(730.0, 1090.0, 2440.0, 100.0),
-    ); // "bot"
+        FormantTarget::vowel(730.0, 1090.0, 2440.0, 100.0)
+            .with_bandwidths(100.0, 110.0, 170.0),
+    ); // "bot" — open, loose coupling
     db.insert(
         "AO".into(),
-        FormantTarget::vowel(570.0, 840.0, 2410.0, 100.0),
+        FormantTarget::vowel(570.0, 840.0, 2410.0, 100.0)
+            .with_bandwidths(90.0, 100.0, 160.0),
     ); // "bought"
     db.insert(
         "OW".into(),
-        FormantTarget::vowel(497.0, 910.0, 2459.0, 120.0),
+        FormantTarget::vowel(497.0, 910.0, 2459.0, 120.0)
+            .with_bandwidths(80.0, 90.0, 150.0),
     ); // "boat" (diphthong)
     db.insert(
         "UH".into(),
-        FormantTarget::vowel(440.0, 1020.0, 2240.0, 80.0),
-    ); // "book"
+        FormantTarget::vowel(440.0, 1020.0, 2240.0, 80.0)
+            .with_bandwidths(60.0, 80.0, 140.0),
+    ); // "book" — tight rounding
     db.insert(
         "UW".into(),
-        FormantTarget::vowel(300.0, 870.0, 2240.0, 100.0),
-    ); // "boot"
+        FormantTarget::vowel(300.0, 870.0, 2240.0, 100.0)
+            .with_bandwidths(45.0, 75.0, 135.0),
+    ); // "boot" — very tight rounding
 
     // Diphthongs
     db.insert(
@@ -233,16 +245,22 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
 
     db.insert(
         "M".into(),
-        FormantTarget::voiced_consonant(280.0, 1000.0, 2200.0, 70.0).with_manner(SourceType::Nasal),
-    );
+        FormantTarget::voiced_consonant(280.0, 1000.0, 2200.0, 70.0)
+            .with_manner(SourceType::Nasal)
+            .with_nasal_zero(750.0, 200.0),
+    ); // Bilabial — zero from oral cavity
     db.insert(
         "N".into(),
-        FormantTarget::voiced_consonant(280.0, 1500.0, 2500.0, 70.0).with_manner(SourceType::Nasal),
-    );
+        FormantTarget::voiced_consonant(280.0, 1500.0, 2500.0, 70.0)
+            .with_manner(SourceType::Nasal)
+            .with_nasal_zero(1450.0, 250.0),
+    ); // Alveolar — zero near F2
     db.insert(
         "NG".into(),
-        FormantTarget::voiced_consonant(280.0, 1900.0, 2600.0, 70.0).with_manner(SourceType::Nasal),
-    );
+        FormantTarget::voiced_consonant(280.0, 1900.0, 2600.0, 70.0)
+            .with_manner(SourceType::Nasal)
+            .with_nasal_zero(3000.0, 300.0),
+    ); // Velar — zero in F3 region
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSONANTS - Liquids
@@ -288,6 +306,8 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
             is_vowel: false,
             is_voiced: false,
             manner: SourceType::Silent,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         },
     );
 
@@ -305,6 +325,8 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
             is_vowel: false,
             is_voiced: false,
             manner: SourceType::Silent,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         },
     );
 
@@ -376,6 +398,7 @@ impl FormantDatabase {
                     b1: target.b1 * scale,
                     b2: target.b2 * scale,
                     b3: target.b3 * scale,
+                    nasal_zero_freq: target.nasal_zero_freq * scale,
                     manner: target.manner,
                     ..*target
                 },
@@ -490,5 +513,130 @@ mod tests {
         // Formants should shift up, but less than pitch
         assert!(higher.f1 > target.f1);
         assert!(higher.f1 < target.f1 * 2.0); // Less than octave
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Item 4: Bandwidth training tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_bandwidth_database_variety() {
+        let db = FormantDatabase::new();
+        // Not all vowels should have B1=60 (default)
+        let iy = db.lookup("IY").unwrap();
+        let aa = db.lookup("AA").unwrap();
+        assert_ne!(
+            iy.b1 as u32, aa.b1 as u32,
+            "IY and AA should have different B1: IY={}, AA={}",
+            iy.b1, aa.b1
+        );
+    }
+
+    #[test]
+    fn test_bandwidth_iy_narrow() {
+        let db = FormantDatabase::new();
+        let iy = db.lookup("IY").unwrap();
+        assert!(
+            iy.b1 < 50.0,
+            "IY B1 should be narrow (high tongue): B1={}",
+            iy.b1
+        );
+    }
+
+    #[test]
+    fn test_bandwidth_aa_wide() {
+        let db = FormantDatabase::new();
+        let aa = db.lookup("AA").unwrap();
+        assert!(
+            aa.b1 > 90.0,
+            "AA B1 should be wide (open vowel): B1={}",
+            aa.b1
+        );
+    }
+
+    #[test]
+    fn test_backward_compat_vowel_constructor() {
+        // FormantTarget::vowel() still produces default bandwidths
+        let target = FormantTarget::vowel(500.0, 1500.0, 2500.0, 100.0);
+        assert!(
+            (target.b1 - 60.0).abs() < 0.01,
+            "vowel() default B1 should be 60: {}",
+            target.b1
+        );
+        assert!(
+            (target.b2 - 90.0).abs() < 0.01,
+            "vowel() default B2 should be 90: {}",
+            target.b2
+        );
+        assert!(
+            (target.b3 - 150.0).abs() < 0.01,
+            "vowel() default B3 should be 150: {}",
+            target.b3
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Item 5: Nasal pole-zero tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_nasal_m_vs_n_differ() {
+        let db = FormantDatabase::new();
+        let m = db.lookup("M").unwrap();
+        let n = db.lookup("N").unwrap();
+        assert!(
+            (m.nasal_zero_freq - n.nasal_zero_freq).abs() > 100.0,
+            "M and N should have different zero freqs: M={}, N={}",
+            m.nasal_zero_freq, n.nasal_zero_freq
+        );
+    }
+
+    #[test]
+    fn test_nasal_backward_compat() {
+        // Non-nasal phonemes should have nasal_zero_freq=0.0
+        let db = FormantDatabase::new();
+        let iy = db.lookup("IY").unwrap();
+        assert!(
+            iy.nasal_zero_freq == 0.0,
+            "Non-nasal phoneme should have zero nasal freq: {}",
+            iy.nasal_zero_freq
+        );
+    }
+
+    #[test]
+    fn test_nasal_zero_freq_from_target() {
+        use symthaea_vocal_tract::types::FormantFrame;
+        let db = FormantDatabase::new();
+        let m = db.lookup("M").unwrap();
+        let frame = FormantFrame::from_target(m, 120.0, 0.7, 0.0);
+        assert!(
+            frame.nasal_zero_freq > 0.0,
+            "FormantFrame should carry nasal zero freq from target: {}",
+            frame.nasal_zero_freq
+        );
+        assert!(
+            (frame.nasal_zero_freq - 750.0).abs() < 1.0,
+            "M nasal zero should be ~750 Hz: {}",
+            frame.nasal_zero_freq
+        );
+    }
+
+    #[test]
+    fn test_nasal_interpolation() {
+        use symthaea_vocal_tract::types::FormantFrame;
+        let db = FormantDatabase::new();
+        let m = db.lookup("M").unwrap();
+        let iy = db.lookup("IY").unwrap();
+
+        let frame_m = FormantFrame::from_target(m, 120.0, 0.7, 0.0);
+        let frame_iy = FormantFrame::from_target(iy, 120.0, 0.7, 0.1);
+
+        let mid = frame_m.lerp(&frame_iy, 0.5);
+        // Should interpolate: M has 750 Hz, IY has 0 Hz → mid ~375
+        assert!(
+            mid.nasal_zero_freq > 0.0 && mid.nasal_zero_freq < frame_m.nasal_zero_freq,
+            "Interpolated nasal zero should be between M and IY: {}",
+            mid.nasal_zero_freq
+        );
     }
 }

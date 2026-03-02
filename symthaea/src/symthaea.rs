@@ -2356,6 +2356,20 @@ impl Symthaea {
         &mut self.mind
     }
 
+    /// Inject a peer's moral topology summary into the mesh gossip cache.
+    ///
+    /// Mesh peers call this after receiving a topology summary from another agent.
+    /// The cached summary is included in outgoing mesh telemetry, enabling
+    /// cross-agent moral drift detection.
+    ///
+    /// Pattern: Same as `set_relational_psi()` — external signal → Mind → mesh cache.
+    pub fn inject_moral_topology(
+        &mut self,
+        summary: crate::hdc::moral_topology::MoralTopologySummary,
+    ) {
+        self.mind.set_cached_moral_topology(summary);
+    }
+
     /// Extract current social signals (trust, cooperation_rate) from Mind's SocialCoherence.
     /// Returns (0.5, 0.0) if social coherence is disabled.
     ///

@@ -534,7 +534,7 @@ impl CognitiveLoopService {
         self.stats.adaptive_speech_rate = self.adaptive_behavior.speech_rate_multiplier;
 
         // Prediction confidence stats
-        self.stats.prediction_confidence = self.prediction_confidence;
+        self.stats.prediction_confidence = self.prediction_confidence as f32;
         // Decay rate: higher when in uncertain states
         self.stats.confidence_decay_rate = match self.adaptive_behavior.action_hint {
             ActionHint::Stabilize | ActionHint::SeekInput => 0.05,

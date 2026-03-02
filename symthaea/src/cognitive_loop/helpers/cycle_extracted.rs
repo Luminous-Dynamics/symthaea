@@ -410,7 +410,7 @@ impl CognitiveLoopService {
         learning_threshold: f32,
     ) -> f32 {
         let internal_reward = if prediction_error < learning_threshold {
-            REWARD_GOOD_BASE + REWARD_GOOD_CONFIDENCE_SCALE * self.prediction_confidence
+            REWARD_GOOD_BASE + REWARD_GOOD_CONFIDENCE_SCALE * self.prediction_confidence as f32
         } else if prediction_error > 0.5 {
             REWARD_BAD_BASE + REWARD_BAD_SCALE * (prediction_error - 0.5)
         } else {
@@ -859,7 +859,7 @@ impl CognitiveLoopService {
             pattern,
             prediction_error,
             coherence,
-            self.prediction_confidence,
+            self.prediction_confidence as f32,
             adapted_thresholds.flow_error,
             adapted_thresholds.flow_coherence,
         );

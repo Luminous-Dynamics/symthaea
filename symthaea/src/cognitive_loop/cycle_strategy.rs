@@ -256,6 +256,22 @@ impl CognitiveLoopService {
         if ethics_output.lr_factor != 1.0 {
             self.scale_lr("ethics_engine", ethics_output.lr_factor);
         }
+        // Anomaly response: corrective feedback when moral anomalies detected (opt-in)
+        if self.config.enable_moral_anomaly_response {
+            let report = &ethics_output.anomaly_report;
+            if report.value_inversion {
+                self.scale_lr("moral_anomaly_inversion", 1.2);
+            }
+            if report.free_energy_spike {
+                self.adjust_exploration("moral_anomaly_fe", -0.1);
+            }
+            if report.fragmentation_increase {
+                self.adjust_confidence("moral_anomaly_frag", 0.05);
+            }
+            if report.drift_alert {
+                self.scale_lr("moral_anomaly_drift", 0.8);
+            }
+        }
         self.carryover.quality.last_value_score = ethics_output.value_score;
         if ethics_output.value_gate_factor != 1.0 {
             self.stats.value_gate_applied_count += 1;

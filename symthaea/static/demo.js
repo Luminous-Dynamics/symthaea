@@ -31,6 +31,12 @@ const HARMONY_LABELS = [
     'Evolutionary Progression',
 ];
 
+const HARMONY_COLORS = ['#06b6d4', '#f43f5e', '#a855f7', '#f59e0b', '#22c55e', '#3b82f6', '#14b8a6'];
+
+// Drift sparkline rolling buffer
+const driftHistory = [];
+const SPARKLINE_SIZE = 20;
+
 // --- Chart Setup ---
 const chartOptions = (yMin, yMax) => ({
     responsive: true,
@@ -200,7 +206,23 @@ const chartPersistence = new Chart(document.getElementById('chartPersistence'), 
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 0 },
-        plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 9 } } } },
+        plugins: {
+            legend: { display: true, labels: { color: '#9ca3af', font: { size: 9 } } },
+            tooltip: {
+                callbacks: {
+                    label(ctx) {
+                        if (ctx.datasetIndex === 3) return null; // Diagonal line — no tooltip
+                        const types = ['Component', 'Cycle', 'Void'];
+                        return [
+                            `Type: ${types[ctx.datasetIndex]}`,
+                            `Birth: ${ctx.parsed.x.toFixed(3)}`,
+                            `Death: ${ctx.parsed.y.toFixed(3)}`,
+                            `Persistence: ${(ctx.parsed.y - ctx.parsed.x).toFixed(3)}`,
+                        ];
+                    },
+                },
+            },
+        },
         scales: {
             x: {
                 title: { display: true, text: 'Birth', color: '#6b7280', font: { size: 9 } },
@@ -217,6 +239,44 @@ const chartPersistence = new Chart(document.getElementById('chartPersistence'), 
         },
     },
 });
+
+// --- Drift Sparkline (tiny chart, no axes) ---
+const sparklineDrift = new Chart(document.getElementById('sparklineDrift'), {
+    type: 'line',
+    data: {
+        labels: Array(SPARKLINE_SIZE).fill(''),
+        datasets: [{
+            data: [],
+            borderColor: '#f59e0b',
+            backgroundColor: 'rgba(245,158,11,0.15)',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: true,
+        }],
+    },
+    options: {
+        responsive: false,
+        animation: { duration: 0 },
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: {
+            x: { display: false },
+            y: { display: false, min: 0 },
+        },
+    },
+});
+
+// --- Utility: hex color interpolation ---
+function lerpColor(a, b, t) {
+    const ah = parseInt(a.slice(1), 16);
+    const bh = parseInt(b.slice(1), 16);
+    const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
+    const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
+    const rr = Math.round(ar + (br - ar) * t);
+    const rg = Math.round(ag + (bg - ag) * t);
+    const rb = Math.round(ab + (bb - ab) * t);
+    return `#${((rr << 16) | (rg << 8) | rb).toString(16).padStart(6, '0')}`;
+}
 
 // --- WebSocket ---
 function connect() {
@@ -338,11 +398,37 @@ function connect() {
         const harmonyNames = data.harmony_labels || HARMONY_LABELS;
         const domIdx = data.moral_dominant_harmony || 0;
         const domEl = document.getElementById('dominantHarmony');
-        if (domEl) domEl.textContent = harmonyNames[domIdx] || '--';
+        if (domEl) {
+            domEl.textContent = harmonyNames[domIdx] || '--';
+            domEl.style.color = HARMONY_COLORS[domIdx] || HARMONY_COLORS[0];
+        }
         const anomEl = document.getElementById('anomalyScore');
         if (anomEl) anomEl.textContent = (data.moral_anomaly_score || 0).toFixed(2);
         const driftEl = document.getElementById('driftValue');
         if (driftEl) driftEl.textContent = (data.moral_drift || 0).toFixed(3);
+
+        // Radar color modulation: cyan → rose when anomaly_score > 0.5
+        const anomalyScore = data.moral_anomaly_score || 0;
+        if (anomalyScore > 0.5) {
+            const t = Math.min((anomalyScore - 0.5) * 2, 1.0); // 0.5→0, 1.0→1
+            const borderCol = lerpColor('#06b6d4', '#f43f5e', t);
+            chartHarmony.data.datasets[0].borderColor = borderCol;
+            chartHarmony.data.datasets[0].pointBackgroundColor = borderCol;
+            chartHarmony.data.datasets[0].backgroundColor = borderCol + '26';
+        } else {
+            chartHarmony.data.datasets[0].borderColor = '#06b6d4';
+            chartHarmony.data.datasets[0].pointBackgroundColor = '#06b6d4';
+            chartHarmony.data.datasets[0].backgroundColor = 'rgba(6,182,212,0.15)';
+        }
+        chartHarmony.update('none');
+
+        // Drift sparkline update
+        const currentDrift = data.moral_drift || 0;
+        driftHistory.push(currentDrift);
+        if (driftHistory.length > SPARKLINE_SIZE) driftHistory.shift();
+        sparklineDrift.data.labels = Array(driftHistory.length).fill('');
+        sparklineDrift.data.datasets[0].data = [...driftHistory];
+        sparklineDrift.update('none');
 
         // Update metrics
         document.getElementById('metricCycle').textContent = data.cycle;

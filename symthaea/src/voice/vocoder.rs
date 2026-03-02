@@ -415,8 +415,10 @@ pub struct FormantVocoder {
     tilt_state: f32,
     /// Current shimmer factor for this glottal cycle (1.0 ± shimmer)
     shimmer_factor: f32,
-    /// Nasal anti-resonator (~300 Hz / 100 Hz BW) — subtracted for nasal phonemes.
+    /// Nasal anti-resonator — subtracted for nasal phonemes. Phoneme-specific zero freq.
     nasal_antires: Resonator,
+    /// Nasal pole resonator (fixed 250 Hz / 100 Hz BW) — adds characteristic nasal resonance.
+    nasal_pole: Resonator,
     /// Ornstein-Uhlenbeck process for F0 jitter (temporally correlated pitch perturbation).
     ou_jitter: OrnsteinUhlenbeck,
     /// Ornstein-Uhlenbeck process for amplitude shimmer (temporally correlated energy perturbation).
@@ -454,6 +456,9 @@ impl FormantVocoder {
         let mut nasal_antires = Resonator::new();
         nasal_antires.set_params(300.0, 100.0, config.sample_rate as f32);
 
+        let mut nasal_pole = Resonator::new();
+        nasal_pole.set_params(250.0, 100.0, config.sample_rate as f32);
+
         // OU parameters tuned for biological voice quality.
         // Continuous-time OU: dx = θ(μ−x)dt + σ√dt dW
         // Stationary stddev = σ / √(2θ), so σ = desired_stddev × √(2θ).
@@ -484,6 +489,7 @@ impl FormantVocoder {
             tilt_state: 0.0,
             shimmer_factor: 1.0,
             nasal_antires,
+            nasal_pole,
             ou_jitter,
             ou_shimmer,
             radiation_prev: 0.0,
@@ -501,6 +507,7 @@ impl FormantVocoder {
         }
         self.lowpass.reset();
         self.nasal_antires.reset();
+        self.nasal_pole.reset();
         self.ou_jitter.reset();
         self.ou_shimmer.reset();
         self.frame_idx = 0;
@@ -555,8 +562,14 @@ impl FormantVocoder {
                     + self.tilt_state * self.config.spectral_tilt;
                 self.tilt_state = source;
 
-                // Formant filtering + nasal anti-resonance
-                let filtered = self.apply_filters(source, current.source_type, current.f0);
+                // Formant filtering + nasal pole/anti-resonance
+                let filtered = self.apply_filters(
+                    source,
+                    current.source_type,
+                    current.f0,
+                    current.nasal_zero_freq,
+                    current.nasal_zero_bw,
+                );
 
                 // Lip radiation: first-difference filter (6dB/octave HF boost)
                 let radiated = filtered - self.radiation_prev;
@@ -689,12 +702,19 @@ impl FormantVocoder {
         }
     }
 
-    /// Apply formant filtering + optional nasal anti-resonance.
+    /// Apply formant filtering + optional nasal pole/anti-resonance.
     ///
     /// Uses frequency-dependent amplitude correction based on Klatt (1980):
     /// higher formants get compensating gain to counteract glottal source
     /// spectral rolloff (~12dB/octave from the LF model).
-    fn apply_filters(&mut self, source: f32, source_type: SourceType, f0: f32) -> f32 {
+    fn apply_filters(
+        &mut self,
+        source: f32,
+        source_type: SourceType,
+        f0: f32,
+        nasal_zero_freq: f32,
+        nasal_zero_bw: f32,
+    ) -> f32 {
         let mut filtered = 0.0;
         if self.resonators.len() >= 3 {
             let a1 = formant_amplitude_correction(self.current_f1, f0);
@@ -716,8 +736,24 @@ impl FormantVocoder {
             filtered += self.resonators[4].process(source) * 0.05;
         }
 
-        // Nasal anti-resonance: subtract anti-formant for nasal phonemes
+        // Nasal resonance: pole (low-frequency nasal murmur) + anti-formant (zero)
         if source_type == SourceType::Nasal {
+            // Nasal pole: characteristic low-frequency nasal resonance at ~250 Hz
+            filtered += self.nasal_pole.process(source) * 0.3;
+
+            // Anti-formant: phoneme-specific zero (from FormantFrame.nasal_zero_freq)
+            let sr = self.config.sample_rate as f32;
+            let zero_freq = if nasal_zero_freq > 0.0 {
+                nasal_zero_freq
+            } else {
+                300.0
+            };
+            let zero_bw = if nasal_zero_bw > 0.0 {
+                nasal_zero_bw
+            } else {
+                200.0
+            };
+            self.nasal_antires.set_params(zero_freq, zero_bw, sr);
             filtered -= self.nasal_antires.process(source) * 0.4;
         }
 
@@ -772,8 +808,14 @@ impl FormantVocoder {
                 + self.tilt_state * self.config.spectral_tilt;
             self.tilt_state = source;
 
-            // Formant filtering + nasal anti-resonance
-            let filtered = self.apply_filters(source, frame.source_type, frame.f0);
+            // Formant filtering + nasal pole/anti-resonance
+            let filtered = self.apply_filters(
+                source,
+                frame.source_type,
+                frame.f0,
+                frame.nasal_zero_freq,
+                frame.nasal_zero_bw,
+            );
 
             // Lip radiation: first-difference filter (6dB/octave HF boost)
             let radiated = filtered - self.radiation_prev;
@@ -907,6 +949,8 @@ mod tests {
                 voicing: 1.0,
                 time: 0.0,
                 source_type: SourceType::Vowel,
+                nasal_zero_freq: 0.0,
+                nasal_zero_bw: 0.0,
             },
             FormantFrame {
                 f1: 500.0,
@@ -920,6 +964,8 @@ mod tests {
                 voicing: 1.0,
                 time: 0.1,
                 source_type: SourceType::Vowel,
+                nasal_zero_freq: 0.0,
+                nasal_zero_bw: 0.0,
             },
         ];
 
@@ -959,6 +1005,8 @@ mod tests {
                 voicing: 1.0,
                 time: 0.0,
                 source_type: SourceType::Vowel,
+                nasal_zero_freq: 0.0,
+                nasal_zero_bw: 0.0,
             },
             FormantFrame {
                 f1: 730.0,
@@ -972,6 +1020,8 @@ mod tests {
                 voicing: 1.0,
                 time: 0.1,
                 source_type: SourceType::Vowel,
+                nasal_zero_freq: 0.0,
+                nasal_zero_bw: 0.0,
             },
         ];
 
@@ -1034,6 +1084,8 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
 
         // Synthesize with aspiration
@@ -1079,6 +1131,8 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
 
         // No tilt
@@ -1126,6 +1180,8 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
 
         // No jitter
@@ -1171,6 +1227,8 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
 
         // No shimmer
@@ -1315,6 +1373,8 @@ mod tests {
             voicing: 1.0,
             time: 0.0,
             source_type: SourceType::Vowel,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
         };
 
         let config = VocoderConfig {
@@ -1506,6 +1566,63 @@ mod tests {
         assert!(
             hf_sib > hf_non,
             "Sibilant should have more HF energy: sib={hf_sib:.4}, non={hf_non:.4}"
+        );
+    }
+
+    #[test]
+    fn test_nasal_pole_adds_low_resonance() {
+        let config = VocoderConfig {
+            jitter: 0.0,
+            shimmer: 0.0,
+            spectral_tilt: 0.0,
+            ..VocoderConfig::default()
+        };
+
+        // Nasal frame with pole-zero
+        let mut vocoder_nasal = FormantVocoder::with_config(config.clone());
+        let frame_nasal = FormantFrame {
+            f1: 280.0,
+            f2: 1000.0,
+            f3: 2200.0,
+            b1: 80.0,
+            b2: 120.0,
+            b3: 200.0,
+            f0: 120.0,
+            energy: 0.7,
+            voicing: 1.0,
+            source_type: SourceType::Nasal,
+            nasal_zero_freq: 750.0,
+            nasal_zero_bw: 200.0,
+            ..Default::default()
+        };
+        let audio_nasal = vocoder_nasal.synthesize_frame(&frame_nasal, 2400);
+
+        // Vowel frame (same formants)
+        let mut vocoder_vowel = FormantVocoder::with_config(config);
+        let frame_vowel = FormantFrame {
+            f1: 280.0,
+            f2: 1000.0,
+            f3: 2200.0,
+            b1: 80.0,
+            b2: 120.0,
+            b3: 200.0,
+            f0: 120.0,
+            energy: 0.7,
+            voicing: 1.0,
+            source_type: SourceType::Vowel,
+            ..Default::default()
+        };
+        let audio_vowel = vocoder_vowel.synthesize_frame(&frame_vowel, 2400);
+
+        // Nasal should differ from vowel (pole + anti-resonance change the spectrum)
+        let diff: f32 = audio_nasal
+            .iter()
+            .zip(&audio_vowel)
+            .map(|(a, b)| (a - b).powi(2))
+            .sum();
+        assert!(
+            diff > 0.01,
+            "Nasal pole/zero should change the spectrum vs vowel: diff={diff:.4}"
         );
     }
 }

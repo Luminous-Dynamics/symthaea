@@ -381,6 +381,8 @@ impl ArticulatorySynthesizer {
                 voicing: if effective_target.is_voiced { 1.0 } else { 0.0 },
                 time,
                 source_type: effective_target.manner,
+                nasal_zero_freq: 0.0,
+                nasal_zero_bw: 0.0,
             });
 
             time_in_phoneme += frame_duration;

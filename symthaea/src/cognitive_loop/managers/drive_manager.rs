@@ -49,8 +49,6 @@ pub struct DriveManager {
     // ── Exploration state ─────────────────────────────────────────────
     /// Adaptive exploration threshold (surprise must exceed this)
     exploration_threshold: f32,
-    /// EMA of exploration urge
-    exploration_urge: f32,
 }
 
 impl Default for DriveManager {
@@ -65,7 +63,6 @@ impl Default for DriveManager {
             in_flow: false,
             flow_intensity: 0.0,
             exploration_threshold: 0.3,
-            exploration_urge: 0.0,
         }
     }
 }
@@ -214,11 +211,7 @@ impl CognitiveSubsystem for DriveManager {
         // Clamp threshold to sensible range
         self.exploration_threshold = self.exploration_threshold.clamp(0.05, 0.8);
 
-        // ── 5. EMA smooth the exploration urge ────────────────────────────
-        let proposed_exploration = output.exploration_delta as f32;
-        self.exploration_urge = self.exploration_urge * 0.8 + proposed_exploration * 0.2;
-
-        // ── 6. Emotional homeostasis contribution ─────────────────────────
+        // ── 5. Emotional homeostasis contribution ─────────────────────────
         // Pull valence toward neutral when no strong drive signal
         if !self.in_flow && self.boredom < 0.2 && surprise_signal.abs() < 0.1 {
             // Gentle pull toward neutral valence
@@ -240,11 +233,13 @@ impl CognitiveSubsystem for DriveManager {
         // Serialize drive state for checkpoint/migration
         let mut data = Vec::with_capacity(128);
         // Format: [boredom:f32][flow_intensity:f32][exploration_threshold:f32]
-        //         [exploration_urge:f32][in_flow:u8][low_error_streak:u32][flow_streak:u32]
+        //         [_reserved:f32][in_flow:u8][low_error_streak:u32][flow_streak:u32]
+        // Note: _reserved (bytes 12..16) was exploration_urge, kept as zero padding
+        // for backward-compatible deserialization of existing checkpoints.
         data.extend_from_slice(&self.boredom.to_le_bytes());
         data.extend_from_slice(&self.flow_intensity.to_le_bytes());
         data.extend_from_slice(&self.exploration_threshold.to_le_bytes());
-        data.extend_from_slice(&self.exploration_urge.to_le_bytes());
+        data.extend_from_slice(&0.0f32.to_le_bytes()); // reserved (was exploration_urge)
         data.push(self.in_flow as u8);
         data.extend_from_slice(&self.low_error_streak.to_le_bytes());
         data.extend_from_slice(&self.flow_streak.to_le_bytes());
@@ -273,11 +268,7 @@ impl CognitiveSubsystem for DriveManager {
                 .try_into()
                 .map_err(|_| "DriveManager: corrupt checkpoint bytes [8..12]".to_string())?,
         );
-        self.exploration_urge = f32::from_le_bytes(
-            data[12..16]
-                .try_into()
-                .map_err(|_| "DriveManager: corrupt checkpoint bytes [12..16]".to_string())?,
-        );
+        // bytes [12..16] reserved (was exploration_urge) — skip
         self.in_flow = data[16] != 0;
         self.low_error_streak = u32::from_le_bytes(
             data[17..21]
@@ -515,7 +506,6 @@ mod tests {
             boredom: 0.42,
             flow_intensity: 0.73,
             exploration_threshold: 0.55,
-            exploration_urge: 0.12,
             in_flow: true,
             low_error_streak: 15,
             flow_streak: 8,
@@ -529,7 +519,6 @@ mod tests {
         assert!((dm2.boredom - 0.42).abs() < 1e-6);
         assert!((dm2.flow_intensity - 0.73).abs() < 1e-6);
         assert!((dm2.exploration_threshold - 0.55).abs() < 1e-6);
-        assert!((dm2.exploration_urge - 0.12).abs() < 1e-6);
         assert!(dm2.in_flow);
         assert_eq!(dm2.low_error_streak, 15);
         assert_eq!(dm2.flow_streak, 8);

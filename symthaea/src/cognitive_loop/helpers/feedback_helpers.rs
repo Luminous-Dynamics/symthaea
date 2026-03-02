@@ -1,48 +1,46 @@
 //! Helper methods for attributed feedback variable mutations.
 //!
-//! These methods both record proposals (for Phase 2.2 attribution tracking)
-//! AND apply the direct mutation (preserving exact current behavior).
-//!
-//! When Phase 2.3 (staged computation) is ready, the direct mutations will
-//! be removed and `FeedbackState::integrate()` will become the sole authority.
+//! These methods both record proposals (for attribution tracking)
+//! AND apply the direct mutation. The proposal system provides
+//! consensus-smoothed alternatives at cycle end.
 
 use super::super::feedback_state::FeedbackProposal;
 
 impl super::super::CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
-    // CONFIDENCE HELPERS
+    // CONFIDENCE HELPERS (f64)
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Record and apply an additive delta to prediction_confidence.
     ///
     /// Usage: `self.adjust_confidence("subsystem_name", delta);`
-    /// Equivalent to: `self.prediction_confidence = (self.prediction_confidence + delta).clamp(0.01, 0.99);`
     #[inline]
     pub(in crate::cognitive_loop) fn adjust_confidence(
         &mut self,
         source: &'static str,
         delta: f32,
     ) {
+        let delta64 = delta as f64;
         self.feedback_state
             .confidence
-            .propose(source, FeedbackProposal::Add(delta as f64));
-        self.prediction_confidence = (self.prediction_confidence + delta).clamp(0.01, 0.99);
+            .propose(source, FeedbackProposal::Add(delta64));
+        self.prediction_confidence = (self.prediction_confidence + delta64).clamp(0.01, 0.99);
     }
 
     /// Record and apply a multiplicative scale factor to prediction_confidence.
     ///
     /// Usage: `self.scale_confidence("subsystem_name", 0.98);`
-    /// Equivalent to: `self.prediction_confidence = (self.prediction_confidence * factor).clamp(0.01, 0.99);`
     #[inline]
     pub(in crate::cognitive_loop) fn scale_confidence(
         &mut self,
         source: &'static str,
         factor: f32,
     ) {
+        let factor64 = factor as f64;
         self.feedback_state
             .confidence
-            .propose(source, FeedbackProposal::Scale(factor as f64));
-        self.prediction_confidence = (self.prediction_confidence * factor).clamp(0.01, 0.99);
+            .propose(source, FeedbackProposal::Scale(factor64));
+        self.prediction_confidence = (self.prediction_confidence * factor64).clamp(0.01, 0.99);
     }
 
     /// Record and apply a hard set of prediction_confidence.
@@ -50,10 +48,11 @@ impl super::super::CognitiveLoopService {
     /// Used sparingly (inference mode init, confidence reset).
     #[inline]
     pub(in crate::cognitive_loop) fn set_confidence(&mut self, source: &'static str, value: f32) {
+        let value64 = value as f64;
         self.feedback_state
             .confidence
-            .propose(source, FeedbackProposal::Set(value as f64));
-        self.prediction_confidence = value.clamp(0.01, 0.99);
+            .propose(source, FeedbackProposal::Set(value64));
+        self.prediction_confidence = value64.clamp(0.01, 0.99);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -162,5 +161,20 @@ impl super::super::CognitiveLoopService {
             .propose(source, FeedbackProposal::Scale(factor as f64));
         self.carryover.learning.adaptive_threshold_scale =
             (self.carryover.learning.adaptive_threshold_scale * factor).clamp(0.5, 2.0);
+    }
+
+    /// Record and apply a hard set of adaptive_threshold_scale.
+    ///
+    /// Used for consensus writeback at cycle start.
+    #[inline]
+    pub(in crate::cognitive_loop) fn set_threshold(
+        &mut self,
+        source: &'static str,
+        value: f32,
+    ) {
+        self.feedback_state
+            .threshold
+            .propose(source, FeedbackProposal::Set(value as f64));
+        self.carryover.learning.adaptive_threshold_scale = value.clamp(0.5, 2.0);
     }
 }

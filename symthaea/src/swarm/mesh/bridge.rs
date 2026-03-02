@@ -31,6 +31,13 @@ type SharedEncryptionKey = Arc<std::sync::Mutex<Option<[u8; 32]>>>;
 #[cfg(feature = "mesh-encryption")]
 type SharedEpoch = Arc<std::sync::atomic::AtomicU8>;
 
+/// Generation counter for atomic key+epoch propagation.
+///
+/// Incremented by the handle on each `set_encryption_key()` call.
+/// The actor polls this to detect changes without comparing key bytes.
+#[cfg(feature = "mesh-encryption")]
+type SharedKeyGeneration = Arc<std::sync::atomic::AtomicU64>;
+
 // ============================================================================
 // MeshOutbound — envelope for outgoing mesh packets
 // ============================================================================
@@ -71,6 +78,9 @@ pub struct MeshBridgeHandle {
     /// Shared encryption epoch.
     #[cfg(feature = "mesh-encryption")]
     shared_epoch: SharedEpoch,
+    /// Generation counter — incremented on each key update.
+    #[cfg(feature = "mesh-encryption")]
+    shared_generation: SharedKeyGeneration,
 }
 
 impl MeshBridgeHandle {
@@ -87,6 +97,9 @@ impl MeshBridgeHandle {
         let shared_key: SharedEncryptionKey = Arc::new(std::sync::Mutex::new(None));
         #[cfg(feature = "mesh-encryption")]
         let shared_epoch: SharedEpoch = Arc::new(std::sync::atomic::AtomicU8::new(0));
+        #[cfg(feature = "mesh-encryption")]
+        let shared_generation: SharedKeyGeneration =
+            Arc::new(std::sync::atomic::AtomicU64::new(0));
 
         let handle = Self {
             outbound_tx,
@@ -96,6 +109,8 @@ impl MeshBridgeHandle {
             shared_key: shared_key.clone(),
             #[cfg(feature = "mesh-encryption")]
             shared_epoch: shared_epoch.clone(),
+            #[cfg(feature = "mesh-encryption")]
+            shared_generation: shared_generation.clone(),
         };
 
         let actor = MeshBridgeActor {
@@ -106,6 +121,8 @@ impl MeshBridgeHandle {
             shared_key,
             #[cfg(feature = "mesh-encryption")]
             shared_epoch,
+            #[cfg(feature = "mesh-encryption")]
+            shared_generation,
         };
 
         (handle, actor)
@@ -142,6 +159,8 @@ impl MeshBridgeHandle {
     #[cfg(feature = "mesh-encryption")]
     pub fn set_encryption_key(&self, key: Option<[u8; 32]>) {
         *self.shared_key.lock().unwrap() = key;
+        self.shared_generation
+            .fetch_add(1, Ordering::Release);
     }
 
     /// Set the encryption epoch byte.
@@ -191,6 +210,9 @@ pub struct MeshBridgeActor {
     /// Shared encryption epoch.
     #[cfg(feature = "mesh-encryption")]
     shared_epoch: SharedEpoch,
+    /// Generation counter — polls for changes instead of comparing key bytes.
+    #[cfg(feature = "mesh-encryption")]
+    shared_generation: SharedKeyGeneration,
 }
 
 impl MeshBridgeActor {
@@ -221,7 +243,7 @@ impl MeshBridgeActor {
         }
 
         #[cfg(feature = "mesh-encryption")]
-        let mut last_key: Option<[u8; 32]> = *self.shared_key.lock().unwrap();
+        let mut last_generation: u64 = self.shared_generation.load(Ordering::Acquire);
 
         tracing::info!("MeshBridgeActor started");
 
@@ -257,17 +279,23 @@ impl MeshBridgeActor {
                 }
                 // Branch 2: Poll for incoming radio data + key updates
                 _ = poll_interval.tick() => {
-                    // Check for encryption key updates from the Mind
+                    // Check for encryption key updates from the Mind via generation counter.
+                    // Only acquires the mutex when generation has changed, ensuring
+                    // key + epoch are applied atomically without comparing key bytes.
                     #[cfg(feature = "mesh-encryption")]
                     {
-                        let current_key = *self.shared_key.lock().unwrap();
-                        if current_key != last_key {
+                        let current_gen = self.shared_generation.load(Ordering::Acquire);
+                        if current_gen != last_generation {
+                            let current_key = *self.shared_key.lock().unwrap();
+                            let epoch = self.shared_epoch.load(Ordering::Relaxed);
                             mesh.set_encryption_key(current_key);
                             receiver.set_encryption_key(current_key);
-                            let epoch = self.shared_epoch.load(Ordering::Relaxed);
                             mesh.set_encryption_epoch(epoch);
-                            last_key = current_key;
-                            tracing::info!("MeshBridgeActor: encryption key updated");
+                            last_generation = current_gen;
+                            tracing::info!(
+                                generation = current_gen,
+                                "MeshBridgeActor: encryption key updated"
+                            );
                         }
                     }
 
