@@ -252,6 +252,7 @@ impl ManifoldTrainer {
     }
 
     /// Dispatch training step based on configured method.
+    #[allow(clippy::too_many_arguments)]
     pub fn train_step(
         &mut self,
         weight_hv: &ContinuousHV,
