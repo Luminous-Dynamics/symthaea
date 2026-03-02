@@ -208,6 +208,7 @@ impl Default for EthicsEngineCache {
     }
 }
 
+#[allow(dead_code)]
 impl EthicsEngine {
     /// Create a new ethics engine from its component systems.
     ///

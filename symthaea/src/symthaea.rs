@@ -2363,6 +2363,7 @@ impl Symthaea {
     /// cross-agent moral drift detection.
     ///
     /// Pattern: Same as `set_relational_psi()` — external signal → Mind → mesh cache.
+    #[cfg(feature = "mesh")]
     pub fn inject_moral_topology(
         &mut self,
         summary: crate::hdc::moral_topology::MoralTopologySummary,

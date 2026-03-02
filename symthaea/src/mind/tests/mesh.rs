@@ -3071,9 +3071,7 @@ fn test_decrypt_timing_no_leak() {
 #[cfg(feature = "mesh-encryption")]
 #[test]
 fn test_fragment_swap_rejected() {
-    use crate::swarm::mesh::{
-        DualLayerMesh, MeshReceiver, MeshUrgency, PayloadType, WisdomPacket,
-    };
+    use crate::swarm::mesh::{MeshReceiver, MeshUrgency, PayloadType, WisdomPacket};
     use symthaea_core::hdc::BinaryHV;
 
     let key = [0x66u8; 32];
@@ -3090,9 +3088,6 @@ fn test_fragment_swap_rejected() {
         ttl: 3,
         wisdom: BinaryHV([0xCC; 2048]),
     };
-
-    // Fragment and encrypt
-    let mesh = DualLayerMesh::new([0x04; 32]).with_encryption_key(key);
     let frags = packet.fragment();
     let mut encrypted_frags: Vec<Vec<u8>> = frags
         .iter()

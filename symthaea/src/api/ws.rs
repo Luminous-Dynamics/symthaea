@@ -166,6 +166,38 @@ pub struct DemoCycleData {
     /// True when free energy exceeds 2σ of rolling mean.
     #[serde(default)]
     pub moral_free_energy_spike: bool,
+
+    // ── Vision Manifold Telemetry ──
+    /// Whether the vision manifold is active this cycle.
+    #[serde(default)]
+    pub vision_active: bool,
+    /// Vision manifold prediction error (1 - cos_sim).
+    #[serde(default)]
+    pub vision_prediction_error: f32,
+    /// Vision manifold coherence (state-frame alignment).
+    #[serde(default)]
+    pub vision_coherence: f32,
+    /// Vision attention entropy (surprise distribution).
+    #[serde(default)]
+    pub vision_attention_entropy: f32,
+    /// Number of salient (surprising) patches.
+    #[serde(default)]
+    pub vision_salient_patches: usize,
+    /// Vision frame sequence number.
+    #[serde(default)]
+    pub vision_frame_sequence: u64,
+    /// Multi-horizon prediction errors [next_frame, short, medium, scene_scale].
+    #[serde(default)]
+    pub vision_horizon_errors: Vec<f32>,
+    /// Vision encode time in microseconds.
+    #[serde(default)]
+    pub vision_encode_us: u64,
+    /// Vision evolve time in microseconds.
+    #[serde(default)]
+    pub vision_evolve_us: u64,
+    /// Whether vision training was triggered this cycle.
+    #[serde(default)]
+    pub vision_training_triggered: bool,
 }
 
 /// Client message format.
@@ -175,6 +207,8 @@ pub enum ClientMessage {
     TextInput { text: String },
     Thermodynamics { load: f32 },
     Command { command: String },
+    /// Toggle vision manifold: `{"vision": true}` / `{"vision": false}`
+    Vision { vision: bool },
 }
 
 /// WebSocket upgrade handler.
@@ -244,6 +278,19 @@ async fn handle_socket(mut socket: WebSocket, runner: Arc<Mutex<DemoRunner>>) {
                                         }
                                         _ => {}
                                     }
+                                }
+                                #[cfg(feature = "vision-manifold")]
+                                ClientMessage::Vision { vision } => {
+                                    let mut r = runner.lock().await;
+                                    if vision {
+                                        r.enable_vision(64, 64);
+                                    } else {
+                                        r.disable_vision();
+                                    }
+                                }
+                                #[cfg(not(feature = "vision-manifold"))]
+                                ClientMessage::Vision { .. } => {
+                                    // Vision not compiled in, ignore
                                 }
                             }
                         }

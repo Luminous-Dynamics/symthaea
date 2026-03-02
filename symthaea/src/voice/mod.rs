@@ -93,7 +93,7 @@ pub use articulatory_synthesizer::{
 };
 pub use formant_targets::{FormantDatabase, FormantTarget};
 pub use phoneme_hdc::{AcousticParams, Manner, PhonemeHdcCodec, PhonemeSpec, PitchContour, Place};
-pub use vocoder::{FormantVocoder, VocoderConfig};
+pub use vocoder::{cognitive_state_to_voice_quality, FormantVocoder, VocoderConfig, VoiceQuality};
 
 // Re-export cognitive bridge types
 pub use cognitive_bridge::{
@@ -139,7 +139,9 @@ pub use rap::{
 pub use rhyme_hdc::{RhymeEncoder, RhymeScheme, RhymeScore, RhymeType};
 
 // Re-export REPL voice types
-pub use repl_voice::{ReplVoiceConfig, ReplVoiceOutput, SimpleG2P};
+pub use repl_voice::{
+    AnalyzedWord, PhraseBoundary, ReplVoiceConfig, ReplVoiceOutput, SimpleG2P, TextAnalyzer,
+};
 
 // Re-export Kokoro TTS types
 pub use g2p::G2PConverter;

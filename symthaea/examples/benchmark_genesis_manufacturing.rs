@@ -1,7 +1,7 @@
 //! Genesis Mission Challenge 15: Advanced Manufacturing
 //!
-//! Demonstrates HDC + CfC + FEP digital twin for manufacturing process monitoring.
-//! O(1) prediction cost proof across 5 orders of magnitude.
+//! Demonstrates HDC + CfC + FEP manufacturing monitoring with
+//! O(1) prediction cost from 0.1s to 1 day.
 
 fn main() {
     println!("=== Genesis Mission Challenge 15: Advanced Manufacturing ===\n");
@@ -10,48 +10,46 @@ fn main() {
         ManufacturingReading, ManufacturingTwin, MANUFACTURING_HORIZONS,
     };
 
-    // 1. Create healthy manufacturing reading
-    let reading = ManufacturingReading {
+    let healthy = ManufacturingReading {
         tolerance: 0.95,
         surface_quality: 0.9,
         throughput: 0.8,
         energy_cost: 0.3,
     };
 
-    // 2. Initialize twin with healthy reference
     let mut twin = ManufacturingTwin::new();
-    twin.set_reference(&reading);
+    twin.set_reference(&healthy);
 
-    // 3. Run a few steps
-    for i in 0..3 {
-        let output = twin.step(&reading, 1.0);
+    println!("--- Manufacturing Quality Timeline ---");
+    for i in 0..10 {
+        let output = twin.step(&healthy, 1.0);
+        if i % 3 == 0 {
+            println!(
+                "Step {:>3}: {:?} | FE={:.3} | Action={:?}",
+                i, output.safety_level, output.free_energy, output.recommended_action
+            );
+        }
+    }
+
+    println!("\n--- O(1) Prediction Cost Proof ---");
+    let predictor = twin.predictor();
+    let input = symthaea_core::hdc::unified_hv::ContinuousHV::random(
+        symthaea_core::hdc::unified_hv::HDC_DIMENSION,
+        42,
+    );
+    for &horizon in MANUFACTURING_HORIZONS {
+        let start = std::time::Instant::now();
+        for _ in 0..1000 {
+            let _ = predictor.predict_at_horizon(&input, horizon);
+        }
+        let elapsed = start.elapsed();
         println!(
-            "Step {}: FE={:.3} | Action={:?} | Safety={:?}",
-            i + 1, output.free_energy, output.recommended_action, output.safety_level
+            "  Horizon {:>12.1}s: {:.1}µs/prediction",
+            horizon,
+            elapsed.as_micros() as f64 / 1000.0
         );
     }
 
-    // 4. O(1) cost proof
-    println!("\n--- O(1) Prediction Cost Proof ---");
-    let predictor = twin.predictor();
-    let input = symthaea::symthaea_core::hdc::unified_hv::ContinuousHV::random(
-        symthaea::symthaea_core::hdc::unified_hv::HDC_DIMENSION, 42,
-    );
-
-    let short_h = MANUFACTURING_HORIZONS[0];
-    let long_h = MANUFACTURING_HORIZONS[MANUFACTURING_HORIZONS.len() - 1];
-
-    let t1 = std::time::Instant::now();
-    for _ in 0..1000 { let _ = predictor.predict_at_horizon(&input, short_h); }
-    let short_us = t1.elapsed().as_micros() as f64 / 1000.0;
-
-    let t2 = std::time::Instant::now();
-    for _ in 0..1000 { let _ = predictor.predict_at_horizon(&input, long_h); }
-    let long_us = t2.elapsed().as_micros() as f64 / 1000.0;
-
-    println!("  Short ({:.1}s):  {:.1}us/pred", short_h, short_us);
-    println!("  Long  ({:.0}s): {:.1}us/pred", long_h, long_us);
-    println!("  Ratio: {:.2}", long_us / short_us.max(0.001));
-
-    println!("\nPASS: Advanced Manufacturing operational");
+    println!("\nTotal cycles processed: {}", twin.cycle_count());
+    println!("PASS: Advanced Manufacturing operational");
 }

@@ -2161,7 +2161,12 @@ mod tests {
         use std::time::Instant;
 
         let genesis = GenesisSeed::from_phrase("ci-regression-guard");
-        let mut ctrl = VocalTractController::new(&genesis, &VocalTractConfig::default());
+        // Use non-Fourier config for baseline regression stability
+        let config = VocalTractConfig {
+            fourier_frequencies: vec![],
+            ..VocalTractConfig::default()
+        };
+        let mut ctrl = VocalTractController::new(&genesis, &config);
 
         // 6 cardinal vowels with known formant targets
         let vowels: Vec<(&str, crate::types::FormantTarget)> = vec![

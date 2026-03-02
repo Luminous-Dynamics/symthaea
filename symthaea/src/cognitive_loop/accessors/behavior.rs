@@ -222,7 +222,7 @@ impl CognitiveLoopService {
         let (_, pattern_confidence) = self.temporal_signature_encoder.classify_state();
         let consciousness_level =
             super::super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
-                self.prediction_confidence,
+                self.prediction_confidence as f32,
                 self.coherence_bridge.smoothed_coherence(),
                 self.flow_state.intensity,
                 pattern_confidence,

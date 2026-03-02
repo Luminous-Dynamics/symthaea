@@ -269,7 +269,7 @@ impl CognitiveLoopService {
                     let signals = super::virtual_body::CognitiveSignals {
                         prediction_error: ctx.prediction_error,
                         coherence: ctx.coherence,
-                        prediction_confidence: self.prediction_confidence,
+                        prediction_confidence: self.prediction_confidence as f32,
                         unified_psi: ctx.unified_psi,
                         flow_intensity: self.flow_state.intensity,
                         in_flow: self.flow_state.in_flow,
@@ -690,7 +690,7 @@ impl CognitiveLoopService {
                     self.adaptive_behavior.attention_sensitivity as f64,
                     (self.stats.total_cycles.min(100) as f64 / 100.0),
                     late.body_psi_modulation,
-                    self.prediction_confidence as f64,
+                    self.prediction_confidence,
                 ];
                 let state = resonance.analyze(dims);
                 state.dominant_frequency
@@ -748,7 +748,7 @@ impl CognitiveLoopService {
                         self.adaptive_behavior.attention_sensitivity as f64,
                         (self.stats.total_cycles.min(100) as f64 / 100.0),
                         late.body_psi_modulation,
-                        self.prediction_confidence as f64,
+                        self.prediction_confidence,
                     ];
                     binding.observe_all(&dims);
                     let strength = binding.phenomenal_binding_strength();
@@ -886,7 +886,7 @@ impl CognitiveLoopService {
                         self.adaptive_behavior.attention_sensitivity as f64,
                         (self.stats.total_cycles.min(100) as f64 / 100.0),
                         late.body_psi_modulation,
-                        self.prediction_confidence as f64,
+                        self.prediction_confidence,
                     ];
                     let state = thermo.analyze(dims);
                     // FEEDBACK: Phase-dependent exploration modulation (Kelso 1995)
@@ -1120,7 +1120,7 @@ impl CognitiveLoopService {
                 attention: ctx.peak_attention as f64,
                 recurrence: (self.stats.total_cycles.min(100) as f64 / 100.0), // ramp up over 100 cycles
                 embodiment: late.body_psi_modulation, // virtual body provides embodiment
-                knowledge: self.prediction_confidence as f64,
+                knowledge: self.prediction_confidence,
                 synchrony: (0.3 + self.flow_state.intensity as f64 * 0.7).clamp(0.1, 1.0),
             };
             let level = self.master_equation.compute(&inputs).consciousness_level;

@@ -536,7 +536,7 @@ impl CognitiveLoopService {
         let fep_obs = Observation::from_consciousness_state(
             prediction_error as f64,
             coherence as f64,
-            self.prediction_confidence as f64,
+            self.prediction_confidence,
             effective_lr as f64,
         );
         let _perception = self.fep_agent.perceive(&fep_obs);

@@ -119,6 +119,45 @@ impl ReplVoiceConfig {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// G2P HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Check if a character is a vowel.
+fn is_vowel_char(c: char) -> bool {
+    matches!(c, 'a' | 'e' | 'i' | 'o' | 'u')
+}
+
+/// Demote a stressed vowel phoneme to unstressed (e.g., "AE1" → "AE0").
+fn demote_stress(ph: &str) -> &str {
+    match ph {
+        "AE1" => "AE0", "AH1" => "AH0", "AA1" => "AA0", "AO1" => "AO0",
+        "AW1" => "AW0", "AY1" => "AY0", "EH1" => "EH0", "ER1" => "ER0",
+        "EY1" => "EY0", "IH1" => "IH0", "IY1" => "IY0", "OW1" => "OW0",
+        "OY1" => "OY0", "UH1" => "UH0", "UW1" => "UW0",
+        other => {
+            // If it already ends in 0, return as-is
+            if other.ends_with('0') { return other; }
+            // Fallback: can't demote, return original static ref
+            "AH0"
+        }
+    }
+}
+
+/// Promote an unstressed vowel phoneme to primary stress (e.g., "AE0" → "AE1").
+fn promote_stress(ph: &str) -> &str {
+    match ph {
+        "AE0" => "AE1", "AH0" => "AH1", "AA0" => "AA1", "AO0" => "AO1",
+        "AW0" => "AW1", "AY0" => "AY1", "EH0" => "EH1", "ER0" => "ER1",
+        "EY0" => "EY1", "IH0" => "IH1", "IY0" => "IY1", "OW0" => "OW1",
+        "OY0" => "OY1", "UH0" => "UH1", "UW0" => "UW1",
+        other => {
+            if other.ends_with('1') { return other; }
+            "AH1"
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // SIMPLE TEXT TO PHONEME CONVERTER
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1079,11 +1118,287 @@ impl SimpleG2P {
             return phonemes.clone();
         }
 
-        // Fallback: simple letter-to-phoneme rules
-        self.simple_g2p(&clean)
+        // Fallback: rule-based G2P with longest-match patterns
+        self.apply_letter_rules(&clean)
     }
 
-    /// Simple fallback G2P for unknown words
+    /// Rule-based G2P with longest-match sliding window.
+    ///
+    /// Handles consonant clusters, vowel patterns, silent letters, and the
+    /// silent-e rule for better pronunciation of unknown words.
+    fn apply_letter_rules(&self, word: &str) -> Vec<&'static str> {
+        let chars: Vec<char> = word.chars().collect();
+        let len = chars.len();
+        let mut phonemes: Vec<&'static str> = Vec::new();
+        let mut i = 0;
+        let mut vowel_count = 0u32;
+
+        while i < len {
+            // === Longest-match patterns (4 chars) ===
+            if i + 4 <= len {
+                let quad: String = chars[i..i + 4].iter().collect();
+                match quad.as_str() {
+                    "tion" => {
+                        phonemes.extend_from_slice(&["SH", "AH0", "N"]);
+                        i += 4;
+                        vowel_count += 1;
+                        continue;
+                    }
+                    "sion" => {
+                        phonemes.extend_from_slice(&["ZH", "AH0", "N"]);
+                        i += 4;
+                        vowel_count += 1;
+                        continue;
+                    }
+                    "ment" if i + 4 == len => {
+                        phonemes.extend_from_slice(&["M", "AH0", "N", "T"]);
+                        i += 4;
+                        vowel_count += 1;
+                        continue;
+                    }
+                    "ness" if i + 4 == len => {
+                        phonemes.extend_from_slice(&["N", "AH0", "S"]);
+                        i += 4;
+                        vowel_count += 1;
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+
+            if i + 3 <= len {
+                let tri: String = chars[i..i + 3].iter().collect();
+                match tri.as_str() {
+                    "igh" => {
+                        phonemes.push("AY1");
+                        i += 3;
+                        vowel_count += 1;
+                        continue;
+                    }
+                    "ght" => {
+                        phonemes.push("T");
+                        i += 3;
+                        continue;
+                    }
+                    "ous" if i + 3 == len => {
+                        phonemes.extend_from_slice(&["AH0", "S"]);
+                        i += 3;
+                        vowel_count += 1;
+                        continue;
+                    }
+                    "ful" if i + 3 == len => {
+                        phonemes.extend_from_slice(&["F", "AH0", "L"]);
+                        i += 3;
+                        vowel_count += 1;
+                        continue;
+                    }
+                    _ => {}
+                }
+            }
+
+            let c = chars[i];
+            let next = chars.get(i + 1).copied();
+
+            // Silent-e rule: vowel + consonant + 'e' at word end
+            if is_vowel_char(c) && i + 2 < len && !is_vowel_char(chars[i + 1]) && chars.get(i + 2) == Some(&'e') && i + 3 == len {
+                let long_vowel = match c {
+                    'a' => "EY1",
+                    'i' => "AY1",
+                    'o' => "OW1",
+                    'u' => "UW1",
+                    'e' => "IY1",
+                    _ => "AH1",
+                };
+                phonemes.push(long_vowel);
+                phonemes.push(Self::consonant_phoneme(chars[i + 1], None));
+                vowel_count += 1;
+                i += 3; // skip vowel + consonant + silent e
+                continue;
+            }
+
+            // Word-initial consonant clusters
+            if i == 0 {
+                match (c, next) {
+                    ('w', Some('r')) => { phonemes.push("R"); i += 2; continue; }
+                    ('k', Some('n')) => { phonemes.push("N"); i += 2; continue; }
+                    ('g', Some('n')) => { phonemes.push("N"); i += 2; continue; }
+                    ('w', Some('h')) => { phonemes.push("W"); i += 2; continue; }
+                    _ => {}
+                }
+            }
+
+            // Word-final clusters
+            if c == 'm' && next == Some('b') && i + 2 == len {
+                phonemes.push("M");
+                i += 2;
+                continue;
+            }
+            if c == 'c' && next == Some('k') {
+                phonemes.push("K");
+                i += 2;
+                continue;
+            }
+
+            // Basic letter rules (same as original simple_g2p)
+            let ph: &'static str = Self::letter_to_phoneme(c, next, &chars, i);
+
+            if is_vowel_char(c) {
+                vowel_count += 1;
+            }
+
+            // Handle digraphs that consumed an extra character
+            if matches!((c, next),
+                ('a', Some('i')) | ('a', Some('y')) | ('a', Some('u')) | ('a', Some('w')) | ('a', Some('e')) |
+                ('e', Some('e')) | ('e', Some('a')) | ('e', Some('i')) | ('e', Some('y')) |
+                ('i', Some('e')) |
+                ('o', Some('o')) | ('o', Some('u')) | ('o', Some('w')) | ('o', Some('i')) | ('o', Some('y')) |
+                ('u', Some('e')) |
+                ('c', Some('h')) | ('n', Some('g')) | ('p', Some('h')) | ('s', Some('h')) | ('t', Some('h'))
+            ) && ph != "IH1" && ph != "AE1" && ph != "EH1" && ph != "AA1" && ph != "AH1"
+                && ph != "B" && ph != "D" && ph != "F" && ph != "G" && ph != "HH" && ph != "JH"
+                && ph != "K" && ph != "L" && ph != "M" && ph != "N" && ph != "P" && ph != "R"
+                && ph != "S" && ph != "T" && ph != "V" && ph != "W" && ph != "Z"
+            {
+                // Digraph consumed: skip extra char
+                if c == 'x' {
+                    phonemes.push("K");
+                }
+                phonemes.push(ph);
+                i += 2;
+                continue;
+            }
+
+            if c == 'x' {
+                phonemes.push("K");
+            }
+
+            // Skip silent final 'e' when we already have vowels
+            if c == 'e' && i + 1 == len && vowel_count > 0 {
+                i += 1;
+                continue;
+            }
+
+            phonemes.push(ph);
+            i += 1;
+        }
+
+        // Auto-stress: first vowel in multi-syllable words gets stress=1
+        // unless common unstressed prefix (be-, re-, de-, un-)
+        if vowel_count > 1 {
+            let has_prefix = word.starts_with("be") || word.starts_with("re")
+                || word.starts_with("de") || word.starts_with("un");
+
+            let mut found_first = false;
+            for ph in phonemes.iter_mut() {
+                let is_vowel_ph = ph.len() >= 2 && (ph.ends_with('0') || ph.ends_with('1') || ph.ends_with('2'));
+                if is_vowel_ph && !found_first {
+                    if has_prefix {
+                        // Demote first vowel to unstressed
+                        *ph = demote_stress(ph);
+                    }
+                    found_first = true;
+                } else if is_vowel_ph && found_first && has_prefix {
+                    // Promote second vowel if first was demoted
+                    *ph = promote_stress(ph);
+                    break;
+                }
+            }
+        }
+
+        if phonemes.is_empty() {
+            vec!["AH0"]
+        } else {
+            phonemes
+        }
+    }
+
+    /// Map a single consonant letter to its ARPABET phoneme.
+    fn consonant_phoneme(c: char, _next: Option<char>) -> &'static str {
+        match c {
+            'b' => "B", 'c' => "K", 'd' => "D", 'f' => "F", 'g' => "G",
+            'h' => "HH", 'j' => "JH", 'k' => "K", 'l' => "L", 'm' => "M",
+            'n' => "N", 'p' => "P", 'q' => "K", 'r' => "R", 's' => "S",
+            't' => "T", 'v' => "V", 'w' => "W", 'x' => "K", 'y' => "Y",
+            'z' => "Z", _ => "AH0",
+        }
+    }
+
+    /// Map a letter (with context) to its phoneme using basic rules.
+    fn letter_to_phoneme(c: char, next: Option<char>, chars: &[char], i: usize) -> &'static str {
+        match c {
+            'a' => match next {
+                Some('i') | Some('y') => "EY1",
+                Some('u') | Some('w') => "AO1",
+                Some('e') => "EY1",
+                _ => "AE1",
+            },
+            'e' => match next {
+                Some('e') | Some('a') => "IY1",
+                Some('i') | Some('y') => "EY1",
+                _ => "EH1",
+            },
+            'i' => match next {
+                Some('e') => "IY1",
+                Some('g') if chars.get(i + 2) == Some(&'h') => "AY1",
+                _ => "IH1",
+            },
+            'o' => match next {
+                Some('o') => "UW1",
+                Some('u') | Some('w') => "AW1",
+                Some('i') | Some('y') => "OY1",
+                _ => "AA1",
+            },
+            'u' => match next {
+                Some('e') => "UW1",
+                _ => "AH1",
+            },
+            'b' => "B",
+            'c' => match next {
+                Some('h') => "CH",
+                Some('i') | Some('e') | Some('y') => "S",
+                _ => "K",
+            },
+            'd' => "D",
+            'f' => "F",
+            'g' => match next {
+                Some('e') | Some('i') | Some('y') => "JH",
+                _ => "G",
+            },
+            'h' => "HH",
+            'j' => "JH",
+            'k' => "K",
+            'l' => "L",
+            'm' => "M",
+            'n' => match next {
+                Some('g') => "NG",
+                _ => "N",
+            },
+            'p' => match next {
+                Some('h') => "F",
+                _ => "P",
+            },
+            'q' => "K",
+            'r' => "R",
+            's' => match next {
+                Some('h') => "SH",
+                _ => "S",
+            },
+            't' => match next {
+                Some('h') => "TH",
+                Some('i') if chars.get(i + 2) == Some(&'o') => "SH",
+                _ => "T",
+            },
+            'v' => "V",
+            'w' => "W",
+            'x' => "S", // K already pushed by caller
+            'y' => if i == 0 { "Y" } else { "IY0" },
+            'z' => "Z",
+            _ => "AH0",
+        }
+    }
+
+    /// Legacy simple fallback G2P for unknown words
+    #[allow(dead_code)]
     fn simple_g2p(&self, word: &str) -> Vec<&'static str> {
         let mut phonemes = Vec::new();
         let chars: Vec<char> = word.chars().collect();
@@ -1328,6 +1643,161 @@ impl SimpleG2P {
 impl Default for SimpleG2P {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEXT ANALYZER — PROSODIC PHRASING FROM TEXT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Phrase boundary type (ToBI break indices, simplified).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PhraseBoundary {
+    /// No boundary.
+    #[default]
+    None,
+    /// Intermediate phrase boundary (comma, semicolon, colon, dash).
+    Intermediate,
+    /// Intonational phrase boundary (period, question mark, exclamation).
+    Intonational,
+}
+
+/// A word analyzed for prosodic features.
+#[derive(Debug, Clone)]
+pub struct AnalyzedWord {
+    /// The original word text (lowercased, punctuation stripped).
+    pub word: String,
+    /// Whether this is a content word (noun, verb, adj, adv) vs function word.
+    pub is_content_word: bool,
+    /// Phrase boundary after this word.
+    pub boundary_after: PhraseBoundary,
+    /// Whether this word receives narrow focus (pitch accent).
+    pub is_focus: bool,
+    /// Stress level: 1 = content word, 0 = function word.
+    pub stress_level: u8,
+    /// Intonation contour for the phrase this word ends.
+    pub intonation: Intonation,
+}
+
+/// Text-level prosodic analyzer.
+///
+/// Determines content/function word status, phrase boundaries, focus assignment,
+/// and intonation from punctuation. Designed to feed into the LTC pipeline for
+/// more natural prosody than hardcoded stress rules.
+pub struct TextAnalyzer;
+
+/// ~100 common English function words.
+const FUNCTION_WORDS: &[&str] = &[
+    // Articles
+    "a", "an", "the",
+    // Prepositions
+    "to", "of", "in", "for", "on", "with", "at", "by", "from", "up", "into",
+    "over", "after", "about", "between", "through", "during", "before", "under",
+    "around", "among",
+    // Pronouns
+    "i", "me", "my", "mine", "you", "your", "yours", "he", "him", "his", "she",
+    "her", "hers", "it", "its", "we", "us", "our", "ours", "they", "them",
+    "their", "theirs", "who", "whom", "whose", "which", "that",
+    // Auxiliaries
+    "am", "is", "are", "was", "were", "be", "been", "being", "have", "has",
+    "had", "do", "does", "did", "will", "would", "can", "could", "shall",
+    "should", "may", "might", "must",
+    // Conjunctions
+    "and", "or", "but", "if", "than", "because", "while", "although", "though",
+    "when", "where", "so", "yet", "nor",
+    // Determiners / other
+    "this", "these", "those", "some", "any", "each", "every", "no", "all",
+    "both", "few", "more", "most", "other", "such", "not", "only", "very",
+    "just", "too", "also",
+];
+
+use symthaea_vocal_tract::pipeline::Intonation;
+
+impl TextAnalyzer {
+    /// Analyze a text string into prosodically-annotated words.
+    pub fn analyze(text: &str) -> Vec<AnalyzedWord> {
+        let mut words = Vec::new();
+
+        // Split into tokens, preserving trailing punctuation
+        for token in text.split_whitespace() {
+            let (word_part, punct) = Self::strip_trailing_punct(token);
+            if word_part.is_empty() {
+                continue;
+            }
+
+            let lower = word_part.to_lowercase();
+            let is_content = !FUNCTION_WORDS.contains(&lower.as_str());
+
+            let boundary = match punct {
+                Some(',') | Some(';') | Some(':') => PhraseBoundary::Intermediate,
+                Some('.') | Some('?') | Some('!') => PhraseBoundary::Intonational,
+                _ => {
+                    // Check for em-dash
+                    if token.contains("--") || token.contains('\u{2014}') {
+                        PhraseBoundary::Intermediate
+                    } else {
+                        PhraseBoundary::None
+                    }
+                }
+            };
+
+            let intonation = match punct {
+                Some('?') => Intonation::Question,
+                Some('!') => Intonation::Exclamation,
+                _ => Intonation::Statement,
+            };
+
+            words.push(AnalyzedWord {
+                word: lower,
+                is_content_word: is_content,
+                boundary_after: boundary,
+                is_focus: false, // assigned in second pass
+                stress_level: if is_content { 1 } else { 0 },
+                intonation,
+            });
+        }
+
+        // Focus assignment: last content word before each phrase boundary gets focus
+        Self::assign_focus(&mut words);
+
+        words
+    }
+
+    /// Strip trailing punctuation from a token, returning (word, punct).
+    fn strip_trailing_punct(token: &str) -> (&str, Option<char>) {
+        let last = token.chars().last();
+        match last {
+            Some(c) if c == '.' || c == ',' || c == '!' || c == '?'
+                || c == ';' || c == ':' =>
+            {
+                (&token[..token.len() - c.len_utf8()], Some(c))
+            }
+            _ => (token, Option::None),
+        }
+    }
+
+    /// Assign focus to the last content word before each phrase boundary.
+    fn assign_focus(words: &mut [AnalyzedWord]) {
+        let mut last_content_idx: Option<usize> = Option::None;
+
+        for i in 0..words.len() {
+            if words[i].is_content_word {
+                last_content_idx = Some(i);
+            }
+
+            if words[i].boundary_after != PhraseBoundary::None {
+                // Mark last content word before this boundary as focus
+                if let Some(idx) = last_content_idx {
+                    words[idx].is_focus = true;
+                }
+                last_content_idx = Option::None;
+            }
+        }
+
+        // Handle final phrase (no trailing punctuation)
+        if let Some(idx) = last_content_idx {
+            words[idx].is_focus = true;
+        }
     }
 }
 
@@ -1724,6 +2194,9 @@ impl ReplVoiceOutput {
             .as_mut()
             .ok_or_else(|| anyhow::anyhow!("LTC pipeline not initialized"))?;
 
+        // Text-level prosodic analysis
+        let analyzed_words = TextAnalyzer::analyze(text);
+
         // Convert text → phonemes
         let base_duration = self.config.phoneme_duration_base / self.current_pacing.rate;
         let phonemes = self.g2p.text_to_phonemes(text, base_duration);
@@ -1731,9 +2204,57 @@ impl ReplVoiceOutput {
             return Ok(Vec::new());
         }
 
-        if phonemes.is_empty() {
-            return Ok(Vec::new());
+        // Build word→phoneme mapping: for each phoneme, find which analyzed word it belongs to.
+        // Strategy: track word index, advancing when we hit SIL boundaries.
+        let mut phoneme_word_idx: Vec<Option<usize>> = Vec::with_capacity(phonemes.len());
+        let mut word_idx = 0usize;
+        for tp in &phonemes {
+            if tp.phoneme == "SIL" || tp.phoneme == "SP" {
+                phoneme_word_idx.push(None);
+                // SIL after a word boundary → advance to next analyzed word
+                if word_idx < analyzed_words.len() {
+                    word_idx += 1;
+                }
+            } else {
+                phoneme_word_idx.push(
+                    if word_idx < analyzed_words.len() {
+                        Some(word_idx)
+                    } else {
+                        analyzed_words.len().checked_sub(1)
+                    },
+                );
+            }
         }
+
+        // Build a map: for each phoneme, what intonation applies to its phrase.
+        // Scan analyzed_words to find phrase-final intonation, then map onto phoneme stream.
+        let phoneme_intonation: Vec<Intonation> = {
+            let mut result = vec![Intonation::Statement; phonemes.len()];
+            // Collect (phrase_word_count, intonation) for each phrase
+            let mut phrase_starts: Vec<(usize, Intonation)> = vec![(0, Intonation::Statement)];
+            for aw in &analyzed_words {
+                if aw.boundary_after == PhraseBoundary::Intonational {
+                    phrase_starts.last_mut().unwrap().1 = aw.intonation;
+                    phrase_starts.push((phrase_starts.len(), Intonation::Statement));
+                }
+            }
+            // Map phonemes to their phrase intonation via SIL boundary counting
+            let mut current_phrase = 0usize;
+            let mut words_seen = 0usize;
+            for (pi, tp) in phonemes.iter().enumerate() {
+                if tp.phoneme == "SIL" || tp.phoneme == "SP" {
+                    words_seen += 1;
+                    if current_phrase + 1 < phrase_starts.len()
+                        && words_seen >= phrase_starts[current_phrase + 1].0
+                    {
+                        current_phrase += 1;
+                    }
+                }
+                let idx = current_phrase.min(phrase_starts.len() - 1);
+                result[pi] = phrase_starts[idx].1;
+            }
+            result
+        };
 
         let dt = 1.0 / 200.0; // 200Hz frame rate
         let mut all_frames = Vec::new();
@@ -1788,12 +2309,36 @@ impl ReplVoiceOutput {
                     .find(|p| p.phoneme != "SIL" && p.phoneme != "SP")
                     .map(|p| p.phoneme.as_str());
 
-                // Pitch accent: primary-stressed vowels get H* accent
-                let pitch_accent = if timed_phoneme.stress == 1 {
+                // Pitch accent from TextAnalyzer: focus words get RiseHigh, stressed content words get High
+                let pitch_accent = if let Some(wi) = phoneme_word_idx[ph_idx] {
+                    if wi < analyzed_words.len() && analyzed_words[wi].is_focus && timed_phoneme.stress >= 1 {
+                        super::vocal_tract_fep::PitchAccent::RiseHigh
+                    } else if timed_phoneme.stress == 1 {
+                        super::vocal_tract_fep::PitchAccent::High
+                    } else {
+                        super::vocal_tract_fep::PitchAccent::None
+                    }
+                } else if timed_phoneme.stress == 1 {
                     super::vocal_tract_fep::PitchAccent::High
                 } else {
                     super::vocal_tract_fep::PitchAccent::None
                 };
+
+                // Stress from TextAnalyzer: content words keep stress, function words get 0
+                let stress = if let Some(wi) = phoneme_word_idx[ph_idx] {
+                    if wi < analyzed_words.len() && analyzed_words[wi].is_content_word {
+                        timed_phoneme.stress
+                    } else {
+                        0 // Function words: no stress
+                    }
+                } else {
+                    timed_phoneme.stress
+                };
+
+                // Focus flag from TextAnalyzer
+                let is_focus = phoneme_word_idx[ph_idx]
+                    .and_then(|wi| analyzed_words.get(wi))
+                    .map_or(false, |aw| aw.is_focus);
 
                 for frame_i in 0..n_frames {
                     let phoneme_progress = frame_i as f32 / n_frames as f32;
@@ -1808,11 +2353,13 @@ impl ReplVoiceOutput {
                     let prosody = super::vocal_tract_fep::ProsodyContext {
                         utterance_progress,
                         phoneme_progress,
-                        stress: timed_phoneme.stress,
+                        stress,
                         base_f0,
                         arousal,
                         phrase_progress: utterance_progress,
                         pitch_accent,
+                        intonation: phoneme_intonation[ph_idx],
+                        is_focus,
                         ..Default::default()
                     };
 
@@ -1857,8 +2404,16 @@ impl ReplVoiceOutput {
             super::voice_feedback::VoiceOutputMetrics::from_formant_frames(&all_frames, None);
         self.last_voice_metrics = Some(metrics);
 
-        // Convert formants → audio via vocoder
-        let samples = self.vocoder.synthesize(&all_frames);
+        // Emotional voice quality from cognitive state
+        let voice_quality = super::vocoder::cognitive_state_to_voice_quality(
+            self.current_pacing.emotional_valence,
+            self.current_pacing.arousal,
+            cognitive_state.consciousness_level,
+        );
+        let quality_vec = vec![voice_quality; all_frames.len()];
+
+        // Convert formants → audio via vocoder with voice quality modulation
+        let samples = self.vocoder.synthesize_with_quality(&all_frames, &quality_vec);
         let scaled: Vec<f32> = samples.iter().map(|s| s * self.config.volume).collect();
 
         Ok(scaled)
@@ -2394,5 +2949,159 @@ mod tests {
         // If audio device is available, live_voice will be Some; otherwise None.
         // Either way, ReplVoiceOutput should be functional.
         assert!(voice.total_utterances == 0);
+    }
+
+    // ── G2P Rule Tests (Item 2) ──────────────────────────────────────────────
+
+    #[test]
+    fn test_g2p_silent_letters() {
+        let g2p = SimpleG2P::new();
+        let phonemes = g2p.word_to_phonemes("knight");
+        // "knight" → kn (skip k) + igh (AY1) + t → N AY1 T
+        assert!(
+            phonemes.contains(&"N"),
+            "knight should start with N: {:?}",
+            phonemes
+        );
+        assert!(
+            phonemes.contains(&"AY1"),
+            "knight should contain AY1: {:?}",
+            phonemes
+        );
+        assert!(
+            phonemes.contains(&"T"),
+            "knight should end with T: {:?}",
+            phonemes
+        );
+    }
+
+    #[test]
+    fn test_g2p_consonant_clusters() {
+        let g2p = SimpleG2P::new();
+        let phonemes = g2p.word_to_phonemes("wrong");
+        // "wrong" → wr (skip w, produce R) + ...
+        assert_eq!(
+            phonemes[0], "R",
+            "wrong should start with R: {:?}",
+            phonemes
+        );
+    }
+
+    #[test]
+    fn test_g2p_tion_suffix() {
+        let g2p = SimpleG2P::new();
+        let phonemes = g2p.word_to_phonemes("nation");
+        // "nation" should contain SH AH0 N from the -tion suffix
+        let joined = phonemes.join(" ");
+        assert!(
+            joined.contains("SH") && joined.contains("AH0") && joined.contains("N"),
+            "nation should contain SH AH0 N: {:?}",
+            phonemes
+        );
+    }
+
+    #[test]
+    fn test_g2p_silent_e() {
+        let g2p = SimpleG2P::new();
+        let phonemes = g2p.word_to_phonemes("cake");
+        // "cake" → c=K, a_e=EY1, k=K → K EY1 K
+        assert!(
+            phonemes.contains(&"EY1"),
+            "cake should contain EY1 (long a): {:?}",
+            phonemes
+        );
+    }
+
+    #[test]
+    fn test_g2p_stress_prefixes() {
+        let g2p = SimpleG2P::new();
+        let phonemes = g2p.word_to_phonemes("become");
+        // "become" has prefix "be-" → first vowel should be demoted
+        // Second vowel should be promoted (stressed)
+        let has_stressed_second = phonemes.iter().skip(1).any(|p| p.ends_with('1'));
+        assert!(
+            has_stressed_second,
+            "become should stress second syllable: {:?}",
+            phonemes
+        );
+    }
+
+    // ── TextAnalyzer Tests (Item 3) ──────────────────────────────────────────
+
+    #[test]
+    fn test_text_analyzer_content_words() {
+        let words = TextAnalyzer::analyze("the big dog");
+        assert_eq!(words.len(), 3);
+        assert!(!words[0].is_content_word, "'the' is a function word");
+        assert!(words[1].is_content_word, "'big' is a content word");
+        assert!(words[2].is_content_word, "'dog' is a content word");
+    }
+
+    #[test]
+    fn test_text_analyzer_focus() {
+        let words = TextAnalyzer::analyze("the dog ran fast.");
+        // Last content word before the period boundary should be focus
+        let focus_word = words.iter().find(|w| w.is_focus);
+        assert!(focus_word.is_some(), "Should have a focus word");
+        assert_eq!(
+            focus_word.unwrap().word, "fast",
+            "Last content word before boundary should be focus"
+        );
+    }
+
+    #[test]
+    fn test_text_analyzer_question() {
+        let words = TextAnalyzer::analyze("is it raining?");
+        let last = words.last().unwrap();
+        assert_eq!(
+            last.intonation,
+            Intonation::Question,
+            "Question mark should produce Question intonation"
+        );
+    }
+
+    #[test]
+    fn test_text_analyzer_phrase_boundaries() {
+        let words = TextAnalyzer::analyze("hello, world.");
+        assert_eq!(words.len(), 2);
+        assert_eq!(
+            words[0].boundary_after,
+            PhraseBoundary::Intermediate,
+            "Comma should produce Intermediate boundary"
+        );
+        assert_eq!(
+            words[1].boundary_after,
+            PhraseBoundary::Intonational,
+            "Period should produce Intonational boundary"
+        );
+    }
+
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_prosody_integration() {
+        // Full pipeline: TextAnalyzer → synthesize_ltc_pipeline → correct prosody
+        let config = ReplVoiceConfig {
+            use_ltc_pipeline: true,
+            ..Default::default()
+        };
+        let mut voice = ReplVoiceOutput::new(config).unwrap();
+
+        // A sentence with clear content/function words and punctuation
+        let samples = voice.synthesize("The cat sat on the mat.").unwrap();
+        assert!(
+            !samples.is_empty(),
+            "TextAnalyzer-driven synthesis should produce audio"
+        );
+
+        // Verify TextAnalyzer assigns correct prosody
+        let analyzed = TextAnalyzer::analyze("The cat sat on the mat.");
+        let content_count = analyzed.iter().filter(|w| w.is_content_word).count();
+        let function_count = analyzed.iter().filter(|w| !w.is_content_word).count();
+        assert_eq!(content_count, 3, "cat, sat, mat are content words");
+        assert_eq!(function_count, 3, "the, on, the are function words");
+        assert!(
+            analyzed.iter().any(|w| w.is_focus),
+            "Should have at least one focus word"
+        );
     }
 }

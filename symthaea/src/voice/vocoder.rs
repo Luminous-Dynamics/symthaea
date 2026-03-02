@@ -87,6 +87,80 @@ impl Default for VocoderConfig {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VOICE QUALITY — EMOTIONAL MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Per-frame voice quality parameters driven by emotional/cognitive state.
+///
+/// Maps emotional valence, arousal, and consciousness level to concrete vocal
+/// parameters: glottal shape (Rd), jitter/shimmer perturbation, bandwidth
+/// scaling, and spectral tilt override.
+#[derive(Debug, Clone, Copy)]
+pub struct VoiceQuality {
+    /// Glottal shape override (Rd: 0.3 = pressed, 1.0 = modal, 2.7 = breathy).
+    /// `None` uses the vocoder config default.
+    pub rd: Option<f32>,
+    /// Jitter scale (1.0 = default, >1 = more pitch perturbation).
+    pub jitter_scale: f32,
+    /// Shimmer scale (1.0 = default, >1 = more amplitude perturbation).
+    pub shimmer_scale: f32,
+    /// Bandwidth scale (1.0 = default, <1 = tighter formants, >1 = wider).
+    pub bandwidth_scale: f32,
+    /// Spectral tilt override (0.0–0.7). `None` uses config default.
+    pub spectral_tilt: Option<f32>,
+}
+
+impl Default for VoiceQuality {
+    fn default() -> Self {
+        Self {
+            rd: None,
+            jitter_scale: 1.0,
+            shimmer_scale: 1.0,
+            bandwidth_scale: 1.0,
+            spectral_tilt: None,
+        }
+    }
+}
+
+/// Map cognitive state dimensions to voice quality parameters.
+///
+/// - **Valence → Rd**: Negative = pressed (0.5), neutral = modal (1.0), positive = breathy (2.0)
+/// - **Arousal → perturbation**: High = tense (more jitter), low = relaxed (less)
+/// - **Consciousness → register**: Low = creaky (pressed Rd), high = modal
+pub fn cognitive_state_to_voice_quality(
+    emotional_valence: f32,
+    emotional_arousal: f32,
+    consciousness_level: f32,
+) -> VoiceQuality {
+    // Valence → Rd: negative=pressed(0.5), neutral=modal(1.0), positive=breathy(2.0)
+    let rd = 1.0 + emotional_valence; // [-1,1] → [0.0, 2.0]
+
+    // Arousal → perturbation: high arousal = tense (more jitter), low = relaxed
+    let jitter_scale = 0.5 + emotional_arousal;    // [0,1] → [0.5, 1.5]
+    let shimmer_scale = 0.5 + emotional_arousal;
+
+    // Arousal → bandwidth: high arousal = tight (narrow BW), low = relaxed (wider)
+    let bandwidth_scale = 1.2 - emotional_arousal * 0.4; // [0,1] → [1.2, 0.8]
+
+    // Consciousness → register: low consciousness = creaky (pressed Rd)
+    let rd_adj = if consciousness_level < 0.3 {
+        rd.min(0.6)
+    } else {
+        rd
+    };
+
+    let tilt = 0.3 + consciousness_level * 0.3; // [0,1] → [0.3, 0.6]
+
+    VoiceQuality {
+        rd: Some(rd_adj.clamp(0.3, 2.7)),
+        jitter_scale,
+        shimmer_scale,
+        bandwidth_scale,
+        spectral_tilt: Some(tilt),
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // BIQUAD RESONATOR FILTER
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -587,6 +661,121 @@ impl FormantVocoder {
         }
 
         audio
+    }
+
+    /// Synthesize audio with per-frame voice quality modulation.
+    ///
+    /// Like `synthesize()` but applies `VoiceQuality` overrides per frame:
+    /// Rd (glottal shape), jitter/shimmer scaling, bandwidth scaling, spectral tilt.
+    /// If `quality` is shorter than `frames`, the last quality entry is repeated.
+    pub fn synthesize_with_quality(
+        &mut self,
+        frames: &[FormantFrame],
+        quality: &[VoiceQuality],
+    ) -> Vec<f32> {
+        if frames.is_empty() {
+            return Vec::new();
+        }
+
+        self.reset();
+
+        let total_duration = frames.last().unwrap().time - frames.first().unwrap().time;
+        let frame_duration = if frames.len() > 1 {
+            total_duration / (frames.len() - 1) as f32
+        } else {
+            0.1
+        };
+        let samples_per_frame = (frame_duration * self.config.sample_rate as f32) as usize;
+        let default_quality = VoiceQuality::default();
+
+        let mut audio = Vec::with_capacity(samples_per_frame * frames.len());
+
+        for (i, frame) in frames.iter().enumerate() {
+            let next_frame = frames.get(i + 1).unwrap_or(frame);
+            let vq = quality.get(i).unwrap_or_else(|| quality.last().unwrap_or(&default_quality));
+
+            // Apply bandwidth scaling to resonators
+            let mut scaled_frame = *frame;
+            scaled_frame.b1 *= vq.bandwidth_scale;
+            scaled_frame.b2 *= vq.bandwidth_scale;
+            scaled_frame.b3 *= vq.bandwidth_scale;
+            self.update_resonators(&scaled_frame);
+
+            let tilt = vq.spectral_tilt.unwrap_or(self.config.spectral_tilt);
+            let jitter = self.config.jitter * vq.jitter_scale;
+            let shimmer = self.config.shimmer * vq.shimmer_scale;
+
+            for j in 0..samples_per_frame {
+                let t = j as f32 / samples_per_frame as f32;
+                let current = frame.lerp(next_frame, t);
+
+                // Override Rd if quality specifies it
+                let rd_override = vq.rd.unwrap_or(self.config.glottal_shape);
+
+                // Source excitation with quality-modulated Rd
+                let raw_source = if let Some(_rd) = vq.rd {
+                    // Use quality-specified Rd for source generation
+                    self.generate_source_with_rd(&current, t, rd_override)
+                } else {
+                    self.generate_source(&current, t)
+                };
+
+                // Spectral tilt with quality override
+                let source = raw_source * (1.0 - tilt) + self.tilt_state * tilt;
+                self.tilt_state = source;
+
+                // Formant filtering
+                let filtered = self.apply_filters(
+                    source,
+                    current.source_type,
+                    current.f0,
+                    current.nasal_zero_freq,
+                    current.nasal_zero_bw,
+                );
+
+                // Lip radiation
+                let radiated = filtered - self.radiation_prev;
+                self.radiation_prev = filtered;
+
+                // Apply shimmer-scaled energy
+                let dt = 1.0 / self.config.sample_rate as f32;
+                let shimmer_ou = self.ou_shimmer.step(dt, shimmer);
+                let shimmer_factor = (1.0 + shimmer_ou).clamp(0.5, 1.5);
+
+                let output = radiated * current.energy * shimmer_factor * self.config.volume;
+                let smoothed = self.lowpass.process(output);
+                audio.push(soft_clip(smoothed));
+            }
+        }
+
+        audio
+    }
+
+    /// Generate source excitation with explicit Rd override (for voice quality modulation).
+    fn generate_source_with_rd(&mut self, current: &FormantFrame, progress: f32, rd: f32) -> f32 {
+        match current.source_type {
+            SourceType::Vowel | SourceType::Liquid => {
+                let dt = 1.0 / self.config.sample_rate as f32;
+                let jitter_offset = self.ou_jitter.step(dt, self.config.jitter);
+                let f0_jittered = current.f0 * (1.0 + jitter_offset);
+                let glottal = self.glottal.next_sample(f0_jittered, self.config.sample_rate, rd);
+                let noise_amp = self.config.aspiration_level * self.glottal.aspiration_envelope();
+                let noise = self.noise.next_white() * noise_amp;
+                glottal + noise
+            }
+            SourceType::Nasal => {
+                let dt = 1.0 / self.config.sample_rate as f32;
+                let jitter_offset = self.ou_jitter.step(dt, self.config.jitter);
+                let f0_jittered = current.f0 * (1.0 + jitter_offset);
+                let glottal = self.glottal.next_sample(f0_jittered, self.config.sample_rate, rd);
+                let noise = self.noise.next_white() * self.config.aspiration_level * 0.5;
+                glottal + noise
+            }
+            _ => {
+                // For non-voiced types, delegate to standard source
+                self.generate_source(current, progress)
+            }
+        }
     }
 
     /// Compute per-source-type glottal shape (Rd) for voice quality variation.
@@ -1623,6 +1812,91 @@ mod tests {
         assert!(
             diff > 0.01,
             "Nasal pole/zero should change the spectrum vs vowel: diff={diff:.4}"
+        );
+    }
+
+    // ── Voice Quality Tests (Item 6) ─────────────────────────────────────
+
+    #[test]
+    fn test_voice_quality_default_neutral() {
+        let vq = VoiceQuality::default();
+        assert!(vq.rd.is_none());
+        assert!((vq.jitter_scale - 1.0).abs() < f32::EPSILON);
+        assert!((vq.shimmer_scale - 1.0).abs() < f32::EPSILON);
+        assert!((vq.bandwidth_scale - 1.0).abs() < f32::EPSILON);
+        assert!(vq.spectral_tilt.is_none());
+    }
+
+    #[test]
+    fn test_voice_quality_negative_pressed() {
+        // Negative valence → lower Rd (pressed voice)
+        let vq = cognitive_state_to_voice_quality(-0.8, 0.5, 0.6);
+        let rd = vq.rd.unwrap();
+        assert!(
+            rd < 0.5,
+            "Negative valence should produce pressed (low Rd): {rd}"
+        );
+    }
+
+    #[test]
+    fn test_voice_quality_positive_breathy() {
+        // Positive valence → higher Rd (breathy voice)
+        let vq = cognitive_state_to_voice_quality(0.8, 0.5, 0.6);
+        let rd = vq.rd.unwrap();
+        assert!(rd > 1.5, "Positive valence should produce breathy (high Rd): {rd}");
+    }
+
+    #[test]
+    fn test_voice_quality_high_arousal_jitter() {
+        let vq = cognitive_state_to_voice_quality(0.0, 0.9, 0.6);
+        assert!(
+            vq.jitter_scale > 1.2,
+            "High arousal should increase jitter: {}",
+            vq.jitter_scale
+        );
+        assert!(
+            vq.shimmer_scale > 1.2,
+            "High arousal should increase shimmer: {}",
+            vq.shimmer_scale
+        );
+    }
+
+    #[test]
+    fn test_voice_quality_low_consciousness_creaky() {
+        // Low consciousness → forced pressed Rd
+        let vq = cognitive_state_to_voice_quality(0.5, 0.5, 0.1);
+        let rd = vq.rd.unwrap();
+        assert!(
+            rd <= 0.6,
+            "Low consciousness should force pressed Rd: {rd}"
+        );
+    }
+
+    #[test]
+    fn test_synthesize_with_quality_produces_audio() {
+        let mut vocoder = FormantVocoder::new(VocoderConfig::default());
+        let frames: Vec<FormantFrame> = (0..20)
+            .map(|i| FormantFrame {
+                f1: 500.0,
+                f2: 1500.0,
+                f3: 2500.0,
+                b1: 60.0,
+                b2: 90.0,
+                b3: 150.0,
+                f0: 120.0,
+                energy: 0.5,
+                voicing: 1.0,
+                time: i as f32 * 0.005,
+                source_type: SourceType::Vowel,
+                ..Default::default()
+            })
+            .collect();
+        let quality = vec![VoiceQuality::default(); frames.len()];
+        let samples = vocoder.synthesize_with_quality(&frames, &quality);
+        assert!(!samples.is_empty(), "Should produce audio");
+        assert!(
+            samples.iter().all(|s| s.is_finite()),
+            "All samples should be finite"
         );
     }
 }

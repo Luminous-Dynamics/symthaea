@@ -1,9 +1,14 @@
 //! Demo runner wrapping CognitiveLoopService for the WebSocket demo.
 //!
 //! Manages cycle execution and input state for the live demo.
+//! When the `vision-manifold` feature is enabled, also provides an optional
+//! vision pipeline that feeds camera frames through the cognitive loop.
 
 use crate::api::ws::DemoCycleData;
 use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+#[cfg(feature = "vision-manifold")]
+use symthaea_vision_manifold::{CameraManifold, VisionConfig};
 
 /// Demo runner that wraps a CognitiveLoopService.
 pub struct DemoRunner {
@@ -13,6 +18,12 @@ pub struct DemoRunner {
     /// When true, sensitive vector fields are zeroed before sending over WebSocket.
     /// Scalar aggregates (consciousness_level, mesh_health_score, etc.) are kept.
     pub redact_telemetry: bool,
+    /// Optional vision manifold for visual input processing.
+    #[cfg(feature = "vision-manifold")]
+    vision: Option<CameraManifold>,
+    /// Whether to run vision manifold each cycle.
+    #[cfg(feature = "vision-manifold")]
+    pub vision_enabled: bool,
 }
 
 impl DemoRunner {
@@ -26,7 +37,25 @@ impl DemoRunner {
             current_input: "consciousness emerges from integrated information".to_string(),
             cycle_count: 0,
             redact_telemetry: false,
+            #[cfg(feature = "vision-manifold")]
+            vision: None,
+            #[cfg(feature = "vision-manifold")]
+            vision_enabled: false,
         })
+    }
+
+    /// Enable the vision manifold with a mock camera source.
+    #[cfg(feature = "vision-manifold")]
+    pub fn enable_vision(&mut self, width: u32, height: u32) {
+        let cfg = VisionConfig::default();
+        self.vision = Some(CameraManifold::with_mock(cfg, width, height));
+        self.vision_enabled = true;
+    }
+
+    /// Disable the vision manifold.
+    #[cfg(feature = "vision-manifold")]
+    pub fn disable_vision(&mut self) {
+        self.vision_enabled = false;
     }
 
     /// Set the text input for the next cycle.
@@ -41,8 +70,31 @@ impl DemoRunner {
     }
 
     /// Run one cognitive cycle and return compact telemetry.
+    ///
+    /// When vision is enabled, also ticks the camera manifold and feeds
+    /// its state HV through `cycle_with_hv()` alongside the text cycle.
     pub fn run_cycle(&mut self) -> DemoCycleData {
         self.cycle_count += 1;
+
+        // Optionally run vision manifold and feed through cognitive loop
+        #[cfg(feature = "vision-manifold")]
+        let vision_tel = if self.vision_enabled {
+            if let Some(ref mut cam) = self.vision {
+                if let Ok(tel) = cam.tick() {
+                    // Feed the vision state into the cognitive loop's fast path
+                    let state = cam.manifold().state().clone();
+                    let _ = self.service.cycle_with_hv(&state);
+                    let horizons = cam.manifold().evaluate_horizons();
+                    Some((tel, horizons))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         let result = self.service.cycle(&self.current_input);
         let m = &result.metadata;
@@ -159,7 +211,33 @@ impl DemoRunner {
             moral_anomaly_score: m.ethics.moral_anomaly_score,
             moral_value_inversion: m.ethics.moral_value_inversion,
             moral_free_energy_spike: m.ethics.moral_free_energy_spike,
+            // Vision manifold telemetry (defaults, overwritten below if active)
+            vision_active: false,
+            vision_prediction_error: 0.0,
+            vision_coherence: 0.0,
+            vision_attention_entropy: 0.0,
+            vision_salient_patches: 0,
+            vision_frame_sequence: 0,
+            vision_horizon_errors: vec![],
+            vision_encode_us: 0,
+            vision_evolve_us: 0,
+            vision_training_triggered: false,
         };
+
+        // Populate vision telemetry if active
+        #[cfg(feature = "vision-manifold")]
+        if let Some((ref tel, ref horizons)) = vision_tel {
+            data.vision_active = true;
+            data.vision_prediction_error = tel.prediction_error;
+            data.vision_coherence = tel.manifold_coherence;
+            data.vision_attention_entropy = tel.attention_entropy;
+            data.vision_salient_patches = tel.num_salient_patches;
+            data.vision_frame_sequence = tel.frame_sequence;
+            data.vision_horizon_errors = horizons.errors.clone();
+            data.vision_encode_us = tel.encode_time_us;
+            data.vision_evolve_us = tel.evolve_time_us;
+            data.vision_training_triggered = tel.training_triggered;
+        }
 
         // Redact sensitive vector fields if requested (Item 3: telemetry protection).
         // Keeps scalar aggregates (consciousness_level, mesh_health_score, etc.) intact.
@@ -180,6 +258,10 @@ impl DemoRunner {
             self.service = service;
             self.cycle_count = 0;
             self.current_input = "consciousness emerges from integrated information".to_string();
+        }
+        #[cfg(feature = "vision-manifold")]
+        if let Some(ref mut cam) = self.vision {
+            cam.reset();
         }
     }
 }

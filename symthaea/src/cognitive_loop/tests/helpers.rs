@@ -456,7 +456,7 @@ fn test_compute_temporal_primitives_confidence_stable_without_analyzer() {
     let _ = service.compute_temporal_primitives_phase(hv, 0.5, 0.7, &mut timings);
     // Without analyzer, no feedback → confidence unchanged
     assert!(
-        (service.prediction_confidence - initial_conf).abs() < f32::EPSILON,
+        (service.prediction_confidence - initial_conf).abs() < f64::EPSILON,
         "Confidence changed without analyzer"
     );
 }
@@ -480,7 +480,7 @@ fn test_compute_dissipative_confidence_stable_without_dc() {
     let _ = service.compute_dissipative_phase(0.3, 0.6, 0.5, &mut timings);
     // Without DC, no feedback → confidence unchanged
     assert!(
-        (service.prediction_confidence - initial_conf).abs() < f32::EPSILON,
+        (service.prediction_confidence - initial_conf).abs() < f64::EPSILON,
         "Confidence changed without DC"
     );
 }
@@ -573,7 +573,7 @@ fn test_compute_fiduciary_harmonics_confidence_stable_without_field() {
     let initial_conf = service.prediction_confidence;
     let _ = service.compute_fiduciary_harmonics_phase(0.7, 0.3, 0.5, &mut timings);
     assert!(
-        (service.prediction_confidence - initial_conf).abs() < f32::EPSILON,
+        (service.prediction_confidence - initial_conf).abs() < f64::EPSILON,
         "Confidence changed without harmonic field"
     );
 }

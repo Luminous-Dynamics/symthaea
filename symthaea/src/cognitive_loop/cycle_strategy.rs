@@ -281,7 +281,7 @@ impl CognitiveLoopService {
         // 1.2 Adaptive Learning Threshold + Urgency
         // ═══════════════════════════════════════════════════════════════════════
         // Science: Friston (2010) — precision (inverse uncertainty) modulates PE weighting.
-        let confidence_scale = 1.0 + (self.prediction_confidence - 0.5) * 0.4;
+        let confidence_scale = (1.0 + (self.prediction_confidence - 0.5) * 0.4) as f32;
         let exploration_scale = 1.0 - (self.curiosity_drive.exploration_urge - 0.5) * 0.2;
         let effective_threshold = self.config.learning_threshold
             * self.carryover.learning.adaptive_threshold_scale

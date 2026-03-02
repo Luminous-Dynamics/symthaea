@@ -4,7 +4,7 @@
 //! embedding dimension changes. Uses blake3 content hashing for keys.
 
 use anyhow::Result;
-use redb::{Database, ReadableTable, TableDefinition};
+use redb::{Database, ReadableTable, ReadableTableMetadata, TableDefinition};
 use std::path::PathBuf;
 
 const EMBEDDINGS_TABLE: TableDefinition<&[u8], &[u8]> = TableDefinition::new("embeddings");
