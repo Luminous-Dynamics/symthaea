@@ -20,13 +20,34 @@ pub struct VisionConfig {
     /// Enable color features (mean_cb, mean_cr from YCbCr). Default: true.
     pub enable_color: bool,
     /// Base time constant for CfC dynamics in seconds (default: 0.5).
+    ///
+    /// Valid range: (0.001, 100.0). Controls how quickly the manifold state
+    /// responds to new input vs retaining memory of past states.
     pub tau_base: f32,
     /// Surprise threshold for spatial attention (default: 0.3).
+    ///
+    /// Valid range: (0.0, 1.0]. Patches with surprise above this threshold
+    /// are considered salient and trigger attention-guided processing.
     pub surprise_threshold: f32,
     /// Exponential decay for surprise history (default: 0.9).
+    ///
+    /// Valid range: (0.0, 1.0). Higher values = longer surprise memory.
+    /// Steady-state max surprise ≈ 1.0 / (1.0 - decay).
     pub surprise_decay: f32,
     /// Seed for deterministic basis vector generation.
     pub seed: u64,
+    /// Weight of current observation in CfC equilibrium (default: 0.7).
+    ///
+    /// State blend is derived as `1.0 - input_blend`. Higher values (e.g. 0.9)
+    /// favor responsiveness to new input; lower values (e.g. 0.3) increase
+    /// temporal persistence/memory. Valid range: [0.1, 0.9].
+    pub input_blend: f32,
+    /// Enable the predictive coding hierarchy in `observe_frame()` (default: false).
+    ///
+    /// When enabled, a two-level predictive coding hierarchy (Rao & Ballard 1999)
+    /// processes each frame: coarse scale predicts fine scale, and prediction errors
+    /// modulate the surprise map. Adds ~2x compute cost per frame.
+    pub enable_predictive_hierarchy: bool,
     /// Learning configuration for adaptive encoding weights.
     pub learning: LearningConfig,
     /// Multi-scale configuration for spatial pyramid encoding.
@@ -47,6 +68,72 @@ impl VisionConfig {
         }
         n
     }
+
+    /// Validate config parameters. Returns `Err` with a descriptive message on invalid config.
+    ///
+    /// Called automatically by `VisionManifold::new()`.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.hdc_dim == 0 || self.hdc_dim < 256 {
+            return Err(format!("hdc_dim must be >= 256, got {}", self.hdc_dim));
+        }
+        if self.patch_size == 0 || self.patch_size > 64 {
+            return Err(format!("patch_size must be in [1, 64], got {}", self.patch_size));
+        }
+        if self.tau_base <= 0.001 || self.tau_base >= 100.0 {
+            return Err(format!("tau_base must be in (0.001, 100.0), got {}", self.tau_base));
+        }
+        if self.surprise_threshold <= 0.0 || self.surprise_threshold > 1.0 {
+            return Err(format!(
+                "surprise_threshold must be in (0.0, 1.0], got {}",
+                self.surprise_threshold
+            ));
+        }
+        if self.surprise_decay <= 0.0 || self.surprise_decay >= 1.0 {
+            return Err(format!(
+                "surprise_decay must be in (0.0, 1.0), got {}",
+                self.surprise_decay
+            ));
+        }
+        if self.training.error_threshold <= 0.0 || self.training.error_threshold > 1.0 {
+            return Err(format!(
+                "training.error_threshold must be in (0.0, 1.0], got {}",
+                self.training.error_threshold
+            ));
+        }
+        if self.input_blend < 0.1 || self.input_blend > 0.9 {
+            return Err(format!(
+                "input_blend must be in [0.1, 0.9], got {}",
+                self.input_blend
+            ));
+        }
+        if self.training.learning_rate <= 0.0 || self.training.learning_rate > 1.0 {
+            return Err(format!(
+                "training.learning_rate must be in (0.0, 1.0], got {}",
+                self.training.learning_rate
+            ));
+        }
+        if self.training.grad_clip <= 0.0 {
+            return Err(format!(
+                "training.grad_clip must be > 0.0, got {}",
+                self.training.grad_clip
+            ));
+        }
+        if self.num_features < 3 || self.num_features > 20 {
+            return Err(format!(
+                "num_features must be in [3, 20], got {}",
+                self.num_features
+            ));
+        }
+        if self.multi_scale.scales.is_empty() {
+            return Err("multi_scale.scales must be non-empty".to_string());
+        }
+        for &s in &self.multi_scale.scales {
+            if s == 0 {
+                return Err("multi_scale.scales must all be > 0".to_string());
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Default for VisionConfig {
@@ -62,6 +149,8 @@ impl Default for VisionConfig {
             surprise_threshold: 0.3,
             surprise_decay: 0.9,
             seed: 42_000,
+            input_blend: 0.7,
+            enable_predictive_hierarchy: false,
             learning: LearningConfig::default(),
             multi_scale: MultiScaleConfig::default(),
             training: TrainingConfig::default(),
@@ -208,6 +297,8 @@ pub struct VisionTelemetry {
     pub output_hv_norm: f32,
     /// Attention boost applied (bridge diagnostic).
     pub attention_boost_applied: f32,
+    /// Cross-scale prediction error from the predictive coding hierarchy (if enabled).
+    pub cross_scale_prediction_error: f32,
 }
 
 /// Per-patch spatial attention/surprise map.
@@ -264,10 +355,44 @@ impl AttentionMap {
     }
 }
 
+/// A salient region identified by the dorsal stream with pixel coordinates.
+///
+/// Used by the foveation bridge to know where to crop high-res regions
+/// for ventral stream analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SalientRegion {
+    /// Grid row in the PatchGrid.
+    pub grid_row: usize,
+    /// Grid col in the PatchGrid.
+    pub grid_col: usize,
+    /// Surprise value (higher = more unexpected).
+    pub surprise: f32,
+    /// Pixel X coordinate of the region's top-left corner.
+    pub pixel_x: usize,
+    /// Pixel Y coordinate of the region's top-left corner.
+    pub pixel_y: usize,
+    /// Width in pixels.
+    pub pixel_w: usize,
+    /// Height in pixels.
+    pub pixel_h: usize,
+}
+
 /// Serializable snapshot of the manifold's learned state.
 ///
 /// Captures everything needed to resume from a trained checkpoint:
-/// weight_hv, tau_base, feature_weights, and training step count.
+/// weight_hv, tau_base, feature_weights, training step count, error_ema,
+/// prediction_error, frame_count, and optionally scene memory.
+///
+/// # Example: round-trip checkpoint/resume
+///
+/// ```ignore
+/// let saved = manifold.save_state();
+/// let json = serde_json::to_string(&saved).unwrap();
+/// // ... persist to disk ...
+/// let loaded: ManifoldState = serde_json::from_str(&json).unwrap();
+/// manifold2.load_state(&loaded).unwrap();
+/// // manifold2 now has the same learned weights, tau, error_ema, and frame count
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ManifoldState {
     /// Learned CfC weight hypervector.
@@ -282,6 +407,32 @@ pub struct ManifoldState {
     pub hdc_dim: usize,
     /// Number of base features.
     pub num_features: usize,
+    /// Exponential moving average of prediction error (for adaptive training trigger).
+    #[serde(default)]
+    pub error_ema: f32,
+    /// Current prediction error state.
+    #[serde(default)]
+    pub prediction_error: f32,
+    /// Frame count to resume numbering.
+    #[serde(default)]
+    pub frame_count: u64,
+    /// Previous patch luminances for motion field on first frame after load.
+    #[serde(default)]
+    pub prev_patch_lum: Option<Vec<f32>>,
+    /// Scene memory snapshot (if any).
+    #[serde(default)]
+    pub scene_memory: Option<SceneMemoryState>,
+}
+
+/// Serializable snapshot of scene memory landmarks.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SceneMemoryState {
+    /// Stored landmarks: (hv_values, stored_at_frame).
+    pub landmarks: Vec<(Vec<f32>, u64)>,
+    /// Maximum capacity.
+    pub capacity: usize,
+    /// Recognition similarity threshold.
+    pub threshold: f32,
 }
 
 /// Result of a scene recognition query against stored landmarks.
@@ -353,6 +504,62 @@ mod tests {
         assert!(cfg.enable_motion);
         assert!(cfg.enable_color);
         assert_eq!(cfg.total_features(), 9); // 5 base + 2 motion + 2 color
+        assert!((cfg.input_blend - 0.7).abs() < 1e-6);
+        assert!(!cfg.enable_predictive_hierarchy);
+    }
+
+    #[test]
+    fn test_config_validate_default_passes() {
+        let cfg = VisionConfig::default();
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_config_validate_catches_invalid() {
+        let mut cfg = VisionConfig::default();
+
+        cfg.hdc_dim = 0;
+        assert!(cfg.validate().unwrap_err().contains("hdc_dim"));
+        cfg.hdc_dim = 16_384;
+
+        cfg.patch_size = 0;
+        assert!(cfg.validate().unwrap_err().contains("patch_size"));
+        cfg.patch_size = 8;
+
+        cfg.tau_base = 0.0;
+        assert!(cfg.validate().unwrap_err().contains("tau_base"));
+        cfg.tau_base = 0.5;
+
+        cfg.surprise_threshold = 0.0;
+        assert!(cfg.validate().unwrap_err().contains("surprise_threshold"));
+        cfg.surprise_threshold = 0.3;
+
+        cfg.surprise_decay = 1.0;
+        assert!(cfg.validate().unwrap_err().contains("surprise_decay"));
+        cfg.surprise_decay = 0.9;
+
+        cfg.input_blend = 0.05;
+        assert!(cfg.validate().unwrap_err().contains("input_blend"));
+        cfg.input_blend = 0.7;
+
+        cfg.training.learning_rate = 0.0;
+        assert!(cfg.validate().unwrap_err().contains("learning_rate"));
+        cfg.training.learning_rate = 0.001;
+
+        cfg.training.grad_clip = -1.0;
+        assert!(cfg.validate().unwrap_err().contains("grad_clip"));
+        cfg.training.grad_clip = 1.0;
+
+        cfg.num_features = 2;
+        assert!(cfg.validate().unwrap_err().contains("num_features"));
+        cfg.num_features = 5;
+
+        cfg.multi_scale.scales = vec![];
+        assert!(cfg.validate().unwrap_err().contains("scales"));
+        cfg.multi_scale.scales = vec![8, 32];
+
+        cfg.multi_scale.scales = vec![0];
+        assert!(cfg.validate().unwrap_err().contains("scales"));
     }
 
     #[test]

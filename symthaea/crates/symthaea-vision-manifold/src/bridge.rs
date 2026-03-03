@@ -12,7 +12,7 @@ use std::time::Instant;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::manifold::VisionManifold;
-use crate::types::{VisionConfig, VisionTelemetry};
+use crate::types::{SalientRegion, VisionConfig, VisionTelemetry};
 
 /// Bridge from vision manifold output to cognitive loop input.
 ///
@@ -150,6 +150,30 @@ impl VisionBridge {
         ContinuousHV::from_vec(boosted).normalize()
     }
 
+    /// Get salient patches with their pixel-space bounding boxes.
+    ///
+    /// Maps `SurpriseMap::salient_patches()` to pixel coordinates using
+    /// the current PatchGrid. Used by the foveation bridge to know where
+    /// to crop high-res regions for ventral analysis.
+    pub fn salient_regions(&self) -> Vec<SalientRegion> {
+        let surprise_map = self.manifold.surprise_map();
+        let grid = surprise_map.grid();
+        let patches = surprise_map.salient_patches();
+
+        patches
+            .iter()
+            .map(|&(r, c, s)| SalientRegion {
+                grid_row: r,
+                grid_col: c,
+                surprise: s,
+                pixel_x: c * grid.patch_size,
+                pixel_y: r * grid.patch_size,
+                pixel_w: grid.patch_size,
+                pixel_h: grid.patch_size,
+            })
+            .collect()
+    }
+
     /// Access the underlying manifold.
     pub fn manifold(&self) -> &VisionManifold {
         &self.manifold
@@ -168,6 +192,21 @@ impl VisionBridge {
     /// Reset the bridge (and underlying manifold) to initial state.
     pub fn reset(&mut self) {
         self.manifold.reset();
+    }
+
+    /// Prediction confidence: `1.0 - prediction_error`.
+    ///
+    /// Returns a value in [0.0, 1.0] where 1.0 means the manifold perfectly
+    /// predicted this frame. Useful for gating downstream processing.
+    pub fn prediction_confidence(&self) -> f32 {
+        (1.0 - self.manifold.prediction_error()).clamp(0.0, 1.0)
+    }
+
+    /// Count patches where surprise exceeds the configured threshold.
+    ///
+    /// Returns `(active, total)`. Delegates to the underlying manifold.
+    pub fn active_patch_count(&self) -> (usize, usize) {
+        self.manifold.active_patch_count()
     }
 }
 
@@ -556,5 +595,37 @@ mod tests {
             sim < 0.99,
             "Red and blue should produce different pipeline outputs: sim={sim}"
         );
+    }
+
+    #[test]
+    fn test_prediction_confidence() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+
+        // Before any frame, prediction_error is 0 → confidence = 1.0
+        assert!((bridge.prediction_confidence() - 1.0).abs() < 1e-6);
+
+        // After frames, confidence should be in valid range
+        let frame = gradient_frame(64, 64);
+        for _ in 0..5 {
+            bridge.process_frame(&frame, 64, 64, 1, 0.033);
+        }
+        let conf = bridge.prediction_confidence();
+        assert!(conf >= 0.0 && conf <= 1.0, "Confidence should be in [0, 1]: {conf}");
+    }
+
+    #[test]
+    fn test_bridge_active_patch_count() {
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+
+        let (active, total) = bridge.active_patch_count();
+        assert_eq!(active, 0);
+        assert!(total > 0);
+
+        let frame = gradient_frame(64, 64);
+        bridge.process_frame(&frame, 64, 64, 1, 0.033);
+        let (_active2, total2) = bridge.active_patch_count();
+        assert_eq!(total2, total);
     }
 }

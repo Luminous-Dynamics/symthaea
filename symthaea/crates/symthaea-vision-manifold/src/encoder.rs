@@ -298,6 +298,7 @@ impl PatchHdcEncoder {
         let mut sum_cr = 0.0f32;
 
         for dy in 0..ps {
+            let mut prev_lum_cached = 0.0f32;
             for dx in 0..ps {
                 let y = patch_y + dy;
                 let x = patch_x + dx;
@@ -333,19 +334,11 @@ impl PatchHdcEncoder {
                 }
 
                 // Horizontal gradient magnitude for edge detection
+                // Cache previous luminance to avoid redundant pixel re-read
                 if dx > 0 {
-                    let prev_offset = y * stride + (x - 1) * channels.max(1);
-                    if prev_offset + channels.max(1) <= pixels.len() {
-                        let prev_lum_pixel = if channels >= 3 {
-                            0.299 * pixels[prev_offset] as f32
-                                + 0.587 * pixels[prev_offset + 1] as f32
-                                + 0.114 * pixels[prev_offset + 2] as f32
-                        } else {
-                            pixels[prev_offset] as f32
-                        };
-                        edge_sum += (lum - prev_lum_pixel).abs();
-                    }
+                    edge_sum += (lum - prev_lum_cached).abs();
                 }
+                prev_lum_cached = lum;
 
                 count += 1.0;
             }
