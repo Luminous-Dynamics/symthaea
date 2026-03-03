@@ -314,6 +314,19 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Merge a batch of peer calibration profiles (from Mind's pending_peer_calibrations).
+    ///
+    /// Convenience method for external bridges: drains a Vec of profiles and merges
+    /// each one using oxytocin-modulated weight.
+    pub fn merge_peer_calibrations_batch(
+        &mut self,
+        profiles: Vec<super::super::calibration::SharedCalibrationProfile>,
+    ) {
+        for profile in &profiles {
+            self.merge_peer_calibration(profile);
+        }
+    }
+
     /// Spawn calibration battery as async subprocess during Night phase onset.
     ///
     /// Non-blocking: spawns the child process and stores the handle. Call
@@ -372,7 +385,11 @@ impl CognitiveLoopService {
         match child.try_wait() {
             Ok(Some(status)) => {
                 // Process finished — take ownership to read stdout
-                let mut child = self.neuromod.calibration_battery_child.take().unwrap();
+                let Some(mut child) = self.neuromod.calibration_battery_child.take() else {
+                    tracing::warn!("calibration_battery_child was None despite try_wait Ok(Some)");
+                    self.neuromod.calibration_battery_spawned_at.take();
+                    return false;
+                };
                 self.neuromod.calibration_battery_spawned_at.take();
                 if status.success() {
                     use std::io::Read;
