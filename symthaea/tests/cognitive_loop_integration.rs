@@ -6605,3 +6605,167 @@ fn test_speed_modulation_telemetry_populated() {
         result.metadata.substrate_scale_pressure
     );
 }
+
+// ── Bug-fix coverage tests ────────────────────────────────────────────
+
+/// Bug 1 fix: substrates not in the validation framework (photonic, neuromorphic,
+/// biochemical, exotic) should get THEORETICAL_CONFIDENCE (0.10), not 0.0.
+#[test]
+fn test_unknown_substrate_gets_theoretical_confidence() {
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    for substrate in [
+        SubstrateType::PhotonicProcessor,
+        SubstrateType::NeuromorphicChip,
+        SubstrateType::BiochemicalComputer,
+        SubstrateType::ExoticSubstrate,
+    ] {
+        let mut config = CognitiveLoopConfig::default();
+        config.substrate_type = substrate;
+        config.enable_validation_overlay = true;
+        config.validation_skepticism_floor = 0.5;
+        let service = CognitiveLoopService::new(config).unwrap();
+
+        let confidence = service.substrate_honest_confidence();
+        assert!(
+            (confidence - 0.10).abs() < 1e-6,
+            "{:?} should get THEORETICAL_CONFIDENCE (0.10), got {confidence:.6}",
+            substrate
+        );
+
+        // Effective should be raw × (0.5 + 0.5 × 0.10) = raw × 0.55
+        let raw = service.substrate_feasibility();
+        let effective = service.substrate_effective_feasibility();
+        let expected = raw * 0.55;
+        assert!(
+            (effective - expected).abs() < 1e-6,
+            "{:?} effective={effective:.6} should ≈ raw×0.55={expected:.6}",
+            substrate
+        );
+    }
+}
+
+/// Bug 2 fix: composition + validation overlay should weight-blend honest
+/// confidence from components, not use the stale config.substrate_type.
+#[test]
+fn test_composition_validation_overlay_blends_confidence() {
+    use symthaea_core::hdc::substrate_composition::SubstrateComposition;
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let comp = SubstrateComposition::new(
+        "bio-silicon 50/50".into(),
+        vec![
+            (SubstrateType::BiologicalNeurons, 0.5),
+            (SubstrateType::SiliconDigital, 0.5),
+        ],
+    )
+    .unwrap();
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_composition = Some(comp);
+    config.enable_validation_overlay = true;
+    config.validation_skepticism_floor = 0.5;
+    let service = CognitiveLoopService::new(config).unwrap();
+
+    // Expected: 0.5 × bio_confidence(0.95) + 0.5 × silicon_confidence(0.10) = 0.525
+    let confidence = service.substrate_honest_confidence();
+    assert!(
+        (confidence - 0.525).abs() < 0.05,
+        "Blended confidence should ≈ 0.525, got {confidence:.4}"
+    );
+    // Must differ from pure silicon (0.10) and pure biological (0.95)
+    assert!(confidence > 0.15 && confidence < 0.90);
+}
+
+/// Bug 3 fix: composition + speed modulation should weight-blend speed/scale
+/// from components, not use the stale config.substrate_type.
+#[test]
+fn test_composition_speed_modulation_blends_properties() {
+    use symthaea_core::hdc::substrate_composition::SubstrateComposition;
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    // Pure silicon
+    let mut config_si = CognitiveLoopConfig::default();
+    config_si.substrate_type = SubstrateType::SiliconDigital;
+    config_si.enable_substrate_speed_modulation = true;
+    let service_si = CognitiveLoopService::new(config_si).unwrap();
+    let tau_si = service_si.substrate_tau_factor();
+
+    // Pure biological
+    let mut config_bio = CognitiveLoopConfig::default();
+    config_bio.substrate_type = SubstrateType::BiologicalNeurons;
+    config_bio.enable_substrate_speed_modulation = true;
+    let service_bio = CognitiveLoopService::new(config_bio).unwrap();
+    let tau_bio = service_bio.substrate_tau_factor();
+
+    // 50/50 composition — tau should be between pure bio and pure silicon
+    let comp = SubstrateComposition::new(
+        "bio-silicon 50/50".into(),
+        vec![
+            (SubstrateType::BiologicalNeurons, 0.5),
+            (SubstrateType::SiliconDigital, 0.5),
+        ],
+    )
+    .unwrap();
+    let mut config_comp = CognitiveLoopConfig::default();
+    config_comp.substrate_composition = Some(comp);
+    config_comp.enable_substrate_speed_modulation = true;
+    let service_comp = CognitiveLoopService::new(config_comp).unwrap();
+    let tau_comp = service_comp.substrate_tau_factor();
+
+    // Blended tau should sit between pure bio (1.0) and pure silicon (>1.0)
+    assert!(
+        tau_bio <= tau_comp && tau_comp <= tau_si,
+        "Blended tau ({tau_comp}) should be between bio ({tau_bio}) and silicon ({tau_si})"
+    );
+    // Must not be exactly equal to either pure substrate
+    assert!(
+        (tau_comp - tau_bio).abs() > 0.001,
+        "Blended tau should differ from pure bio"
+    );
+}
+
+/// Bug 4 fix: reconfigure_substrate() should clear any stale composition,
+/// so subsequent recompute methods use the new single substrate type.
+#[test]
+fn test_reconfigure_substrate_clears_composition() {
+    use symthaea_core::hdc::substrate_composition::SubstrateComposition;
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_type = SubstrateType::SiliconDigital;
+    config.enable_validation_overlay = true;
+    config.validation_skepticism_floor = 0.5;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Set a composition
+    let comp = SubstrateComposition::new(
+        "bio-silicon".into(),
+        vec![
+            (SubstrateType::BiologicalNeurons, 0.5),
+            (SubstrateType::SiliconDigital, 0.5),
+        ],
+    )
+    .unwrap();
+    service.reconfigure_composition(comp);
+    assert!(service.substrate_composition().is_some());
+    let blended_conf = service.substrate_honest_confidence();
+
+    // Now switch to pure biological — composition should be cleared
+    service.reconfigure_substrate(SubstrateType::BiologicalNeurons);
+    assert!(
+        service.substrate_composition().is_none(),
+        "Composition should be cleared after reconfigure_substrate()"
+    );
+
+    // Honest confidence should now be pure biological (0.95), not blended
+    let bio_conf = service.substrate_honest_confidence();
+    assert!(
+        bio_conf > blended_conf,
+        "Pure bio confidence ({bio_conf:.4}) should exceed blended ({blended_conf:.4})"
+    );
+    assert!(
+        (bio_conf - 0.95).abs() < 0.05,
+        "Pure bio confidence should ≈ 0.95, got {bio_conf:.4}"
+    );
+}

@@ -222,24 +222,38 @@ impl CognitiveLoopService {
             // Record in history before applying (captures the intended adjustment)
             self.neuromod.calibration_history.record(&cal, self.stats.total_cycles as u64);
 
-            // Check for systematic drift and warn
-            let drifters = self.neuromod.calibration_history.systematic_drift_transmitters();
-            if !drifters.is_empty() {
-                for (transmitter, direction) in &drifters {
-                    tracing::warn!(
+            // Check for systematic drift and auto-adjust baselines.
+            // McEwen (1998): allostatic overload from persistent one-directional
+            // correction → nudge the tonic baseline to reduce corrective load.
+            let nudges = self.neuromod.calibration_history.compute_baseline_nudges();
+            for (transmitter, nudge) in &nudges {
+                let applied = match transmitter.as_str() {
+                    "DA" => { self.neuromod.bath.dopamine.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "NE" | "NE-alpha" | "NE-beta" => { self.neuromod.bath.noradrenaline.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "5-HT" => { self.neuromod.bath.serotonin.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "ACh" => { self.neuromod.bath.acetylcholine.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "GABA" | "GABA-A" | "GABA-B" => { self.neuromod.bath.gaba.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "Oxytocin" => { self.neuromod.bath.oxytocin.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "Glutamate" => { self.neuromod.bath.glutamate.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "Adenosine" => { self.neuromod.bath.adenosine.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "Endocannabinoid" => { self.neuromod.bath.endocannabinoid.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    _ => false,
+                };
+                if applied {
+                    tracing::info!(
                         %transmitter,
-                        direction = %format!("{direction:+.4}"),
+                        nudge = %format!("{nudge:+.4}"),
                         history_len = self.neuromod.calibration_history.len(),
-                        "Systematic calibration drift detected — consider adjusting baseline"
+                        "Auto-adjusted baseline from systematic drift"
                     );
                 }
             }
 
             cal.apply(&mut self.neuromod.bath);
-            // Apply confidence delta (routed through feedback proposal system)
+            // Apply confidence delta (routed through feedback proposal system).
+            // Note: adjust_confidence clamps to [0.01, 0.99], so the 0.01 floor
+            // is inherently preserved — no separate .max(0.01) bypass needed.
             self.adjust_confidence("neuromod_calibration", cal.confidence_delta);
-            // Preserve 0.01 floor from calibration path (avoid zero-confidence)
-            self.prediction_confidence = self.prediction_confidence.max(0.01);
             let summary = cal.summary();
             tracing::info!(%summary, "Neuromod calibration applied");
             self.neuromod.last_calibration_summary = Some(summary);
@@ -319,6 +333,7 @@ impl CognitiveLoopService {
             Ok(child) => {
                 tracing::info!(pid = child.id(), "Spawned async calibration battery");
                 self.neuromod.calibration_battery_child = Some(child);
+                self.neuromod.calibration_battery_spawned_at = Some(std::time::Instant::now());
             }
             Err(e) => {
                 tracing::debug!(?e, "calibration_battery not available on PATH");
@@ -329,6 +344,7 @@ impl CognitiveLoopService {
     /// Poll the running calibration battery for completion (non-blocking).
     ///
     /// Returns `true` if the battery finished and results were ingested.
+    /// Kills the subprocess if it exceeds 30 seconds (hung process protection).
     /// Call this once per cycle during the neuromod phase.
     pub fn poll_calibration_battery(&mut self) -> bool {
         let child = match self.neuromod.calibration_battery_child.as_mut() {
@@ -336,11 +352,28 @@ impl CognitiveLoopService {
             None => return false,
         };
 
+        // Timeout protection: kill hung subprocess after 30 seconds
+        const BATTERY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+        if let Some(spawned_at) = self.neuromod.calibration_battery_spawned_at {
+            if spawned_at.elapsed() > BATTERY_TIMEOUT {
+                tracing::warn!(
+                    elapsed_secs = spawned_at.elapsed().as_secs(),
+                    "Calibration battery timed out — killing subprocess"
+                );
+                let _ = child.kill();
+                let _ = child.wait(); // reap zombie
+                self.neuromod.calibration_battery_child.take();
+                self.neuromod.calibration_battery_spawned_at.take();
+                return false;
+            }
+        }
+
         // Non-blocking check: try_wait returns Ok(Some(status)) if done
         match child.try_wait() {
             Ok(Some(status)) => {
                 // Process finished — take ownership to read stdout
                 let mut child = self.neuromod.calibration_battery_child.take().unwrap();
+                self.neuromod.calibration_battery_spawned_at.take();
                 if status.success() {
                     use std::io::Read;
                     let mut stdout = String::new();
@@ -371,6 +404,7 @@ impl CognitiveLoopService {
             Err(e) => {
                 tracing::warn!(?e, "Error polling calibration battery");
                 self.neuromod.calibration_battery_child.take();
+                self.neuromod.calibration_battery_spawned_at.take();
                 false
             }
         }

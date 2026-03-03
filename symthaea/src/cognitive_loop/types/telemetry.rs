@@ -500,7 +500,9 @@ pub struct CycleMetadata {
     pub consciousness_weight_variance: f64,
 
     // ── Substrate & Convergence Telemetry ──────────────────────────────
-    /// Substrate feasibility [0,1] used in consciousness equation.
+    /// Effective substrate feasibility [0,1] used in consciousness equation.
+    /// Legacy field — identical to `substrate_effective_feasibility`.
+    /// Use `substrate_feasibility_raw` for the pre-overlay value.
     pub substrate_feasibility: f64,
     /// Weight convergence state label (Initializing/Converging/Converged/Oscillating).
     pub weight_convergence_state: String,

@@ -1,4 +1,5 @@
     use super::*;
+    use super::types::{ConsciousnessWeights, WeightConvergenceState};
     use symthaea_core::consciousness_metrics::{SpectralMIPConfig, SpectralMIPFinder, StructuralPhiResult};
     use symthaea_core::hdc::{BinaryHV, ContinuousHV};
     use crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2;

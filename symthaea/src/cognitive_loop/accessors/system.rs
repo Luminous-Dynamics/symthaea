@@ -127,39 +127,14 @@ impl CognitiveLoopService {
         &mut self,
         substrate: symthaea_core::hdc::substrate_independence::SubstrateType,
     ) -> (f64, f64) {
-        use symthaea_core::hdc::substrate_independence::SubstrateRequirements;
         let old = self.substrate_feasibility;
         let old_type = self.config.substrate_type;
         let canonical = substrate.canonical();
-        let req = match canonical {
-            super::super::config::SubstrateType::BiologicalNeurons => {
-                SubstrateRequirements::biological_neurons()
-            }
-            super::super::config::SubstrateType::SiliconDigital => {
-                SubstrateRequirements::silicon_digital()
-            }
-            super::super::config::SubstrateType::QuantumComputer => {
-                SubstrateRequirements::quantum_computer()
-            }
-            super::super::config::SubstrateType::PhotonicProcessor => {
-                SubstrateRequirements::photonic_processor()
-            }
-            super::super::config::SubstrateType::NeuromorphicChip => {
-                SubstrateRequirements::neuromorphic_chip()
-            }
-            super::super::config::SubstrateType::BiochemicalComputer => {
-                SubstrateRequirements::biochemical_computer()
-            }
-            super::super::config::SubstrateType::HybridSystem => {
-                SubstrateRequirements::hybrid_system()
-            }
-            super::super::config::SubstrateType::ExoticSubstrate => {
-                SubstrateRequirements::exotic_substrate()
-            }
-            _ => SubstrateRequirements::silicon_digital(),
-        };
-        self.substrate_feasibility = req.consciousness_feasibility();
+        self.substrate_feasibility =
+            Self::requirements_for(&canonical).consciousness_feasibility();
         self.config.substrate_type = canonical;
+        // Clear any stale composition — single-substrate mode now.
+        self.config.substrate_composition = None;
         self.pending_substrate_transition = Some(format!(
             "{:?} -> {:?} ({:.3} -> {:.3})",
             old_type, canonical, old, self.substrate_feasibility
@@ -292,6 +267,25 @@ impl CognitiveLoopService {
         self.substrate_tau_factor = (1.0 + 0.5 * log_ratio / 9.0).clamp(0.5, 2.0) as f32;
 
         self.substrate_scale_pressure = (sub_scale / bio_scale).log10() as f32;
+    }
+
+    /// Map a canonical SubstrateType to its pre-built SubstrateRequirements profile.
+    /// Unknown/future variants fall back to silicon_digital().
+    pub(crate) fn requirements_for(
+        substrate: &symthaea_core::hdc::substrate_independence::SubstrateType,
+    ) -> symthaea_core::hdc::substrate_independence::SubstrateRequirements {
+        use symthaea_core::hdc::substrate_independence::{SubstrateRequirements, SubstrateType};
+        match substrate.canonical() {
+            SubstrateType::BiologicalNeurons => SubstrateRequirements::biological_neurons(),
+            SubstrateType::SiliconDigital => SubstrateRequirements::silicon_digital(),
+            SubstrateType::QuantumComputer => SubstrateRequirements::quantum_computer(),
+            SubstrateType::PhotonicProcessor => SubstrateRequirements::photonic_processor(),
+            SubstrateType::NeuromorphicChip => SubstrateRequirements::neuromorphic_chip(),
+            SubstrateType::BiochemicalComputer => SubstrateRequirements::biochemical_computer(),
+            SubstrateType::HybridSystem => SubstrateRequirements::hybrid_system(),
+            SubstrateType::ExoticSubstrate => SubstrateRequirements::exotic_substrate(),
+            _ => SubstrateRequirements::silicon_digital(),
+        }
     }
 
     /// Map SubstrateType to validation framework key string.

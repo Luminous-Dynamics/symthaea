@@ -14669,6 +14669,7 @@ dependencies = [
 name = "symthaea-vision-manifold"
 version = "0.1.0"
 dependencies = [
+ "criterion",
  "serde",
  "serde_json",
  "symthaea-core",

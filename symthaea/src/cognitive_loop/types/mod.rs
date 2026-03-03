@@ -14,7 +14,7 @@ pub use output::*;
 
 // Re-export crate-visible types
 pub(crate) use carryover::{
-    ConsciousnessCache, CycleCarryover, CycleHistory, LearningState, QualityMetrics, UrgencyState,
+    ConsciousnessCache, CycleCarryover, LearningState, QualityMetrics, UrgencyState,
 };
 pub(crate) use scheduling::CycleState;
 

@@ -430,3 +430,56 @@ fn test_sleep_quality_gate_sufficient_sleep() {
     assert!(result.prediction_error.is_finite());
     assert!(result.metadata.neuromod.dopamine_effective > 0.0);
 }
+
+// ── Test 11: Behavioral validation — PE doesn't worsen post-calibration ──
+
+#[test]
+fn test_behavioral_validation_post_calibration() {
+    // Validates that calibration doesn't degrade system performance:
+    // 1. Run 200 pre-calibration cycles to establish baseline PE
+    // 2. Apply multi-transmitter calibration
+    // 3. Run 200 post-calibration cycles
+    // 4. Verify PE doesn't dramatically worsen
+    //
+    // This is a behavioral smoke test — calibration adjustments are modest
+    // (±5%/σ clamped to [0.85, 1.15]) so PE should remain stable.
+    let mut service = make_service();
+
+    // Pre-calibration: 200 cycles of steady-state
+    let mut pre_pe_sum = 0.0f32;
+    for _ in 0..200 {
+        let r = service.cycle("behavioral baseline steady state");
+        pre_pe_sum += r.prediction_error;
+    }
+    let pre_pe_avg = pre_pe_sum / 200.0;
+
+    // Inject well-targeted multi-transmitter calibration
+    service.ingest_calibration(&[
+        ("Executive::Stroop", "stroop_effect", -1.0),
+        ("WorM::N-back", "nback_2::accuracy", -0.8),
+        ("SustainedAttention::CPT", "dprime", -1.0),
+    ]);
+    service.apply_pending_calibration();
+
+    // Post-calibration: 200 cycles of the same input
+    let mut post_pe_sum = 0.0f32;
+    for _ in 0..200 {
+        let r = service.cycle("behavioral baseline steady state");
+        post_pe_sum += r.prediction_error;
+    }
+    let post_pe_avg = post_pe_sum / 200.0;
+
+    // Post-calibration PE should not be dramatically worse.
+    // Allow 50% increase + small absolute tolerance for near-zero baselines.
+    assert!(
+        post_pe_avg < pre_pe_avg * 1.5 + 0.01,
+        "Post-calibration PE should not be dramatically worse: pre={pre_pe_avg:.4}, post={post_pe_avg:.4}"
+    );
+
+    // System should remain healthy
+    let final_result = service.cycle("final health check");
+    assert!(final_result.prediction_error.is_finite());
+    assert!(final_result.metadata.neuromod.dopamine_effective > 0.0);
+    assert!(final_result.metadata.neuromod.serotonin_effective > 0.0);
+    assert!(final_result.metadata.neuromod.acetylcholine_effective > 0.0);
+}

@@ -380,6 +380,7 @@ pub mod consciousness_evaluator; // Consciousness evaluation
 pub mod consciousness_integration; // Complete consciousness pipeline
 pub mod substrate_composition; // Weighted substrate mixtures for hybrid analysis
 pub mod substrate_independence; // Substrate type definitions // Real-time consciousness monitoring
+pub mod substrate_validation; // Validation framework with evidence levels and feasibility gaps
 
 // Track 6: Language module dependencies
 pub mod full_stack_consciousness; // Full stack: Understanding + ActiveInference + Memory + Counterfactuals

@@ -308,10 +308,16 @@ impl EthicsEngine {
                 .moral_parser
                 .parse_and_encode(input.input, &self.moral_algebra);
 
-            // Feed action HV into moral topology sliding window
-            if let Some(ref hv) = encoded.action_hv {
-                self.moral_topology.add_scenario(hv.clone());
-            }
+            // Feed action HV into moral topology sliding window.
+            // When the parser extracts a full agent-action-patient structure,
+            // use the precise action_hv. Otherwise, fall back to encoding
+            // the raw input text as an action — lower quality but ensures the
+            // topology always gets data to analyze.
+            let scenario_hv = encoded
+                .action_hv
+                .clone()
+                .unwrap_or_else(|| self.moral_algebra.encode_action(input.input));
+            self.moral_topology.add_scenario(scenario_hv);
 
             let (verdict_str, good_sim, bad_sim) =
                 if let Some(judgment) = encoded.judge(&self.moral_algebra) {

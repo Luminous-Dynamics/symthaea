@@ -25,7 +25,7 @@ use super::demo_runner::DemoRunner;
 /// Compact telemetry payload streamed per cycle.
 ///
 /// A small subset of CycleMetadata fields chosen for visualization.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct DemoCycleData {
     pub cycle: usize,
     pub prediction_error: f32,
@@ -198,6 +198,28 @@ pub struct DemoCycleData {
     /// Whether vision training was triggered this cycle.
     #[serde(default)]
     pub vision_training_triggered: bool,
+
+    // ── Consciousness Engine Telemetry ──
+    #[serde(default)]
+    pub consciousness_weights: [f64; 4],
+    #[serde(default)]
+    pub consciousness_weight_variance: f64,
+    #[serde(default)]
+    pub weight_convergence_state: String,
+
+    // ── Structural Phi Decomposition ──
+    #[serde(default)]
+    pub structural_micro_phi: f64,
+    #[serde(default)]
+    pub structural_meso_phi: f64,
+    #[serde(default)]
+    pub structural_macro_phi: f64,
+    #[serde(default)]
+    pub structural_emergence_ratio: f64,
+
+    // ── Substrate ──
+    #[serde(default)]
+    pub substrate_feasibility: f64,
 }
 
 /// Client message format.
@@ -308,5 +330,37 @@ async fn handle_socket(mut socket: WebSocket, runner: Arc<Mutex<DemoRunner>>) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_demo_cycle_data_serializes() {
+        let data = DemoCycleData {
+            cycle: 42,
+            consciousness_level: 0.75,
+            consciousness_weights: [0.35, 0.25, 0.25, 0.15],
+            consciousness_weight_variance: 0.003,
+            weight_convergence_state: "Converging".to_string(),
+            structural_micro_phi: 0.1,
+            structural_meso_phi: 0.2,
+            structural_macro_phi: 0.4,
+            structural_emergence_ratio: 2.0,
+            substrate_feasibility: 0.71,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&data).expect("serialization should not panic");
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        // New fields present
+        assert_eq!(v["consciousness_weights"][0], 0.35);
+        assert_eq!(v["weight_convergence_state"], "Converging");
+        assert!(v["structural_micro_phi"].as_f64().unwrap() > 0.0);
+        assert!(v["substrate_feasibility"].as_f64().unwrap() > 0.0);
+        // Core fields
+        assert_eq!(v["cycle"], 42);
+        assert_eq!(v["consciousness_level"], 0.75);
     }
 }

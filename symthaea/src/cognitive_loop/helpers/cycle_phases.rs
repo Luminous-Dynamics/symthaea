@@ -1118,17 +1118,30 @@ impl CognitiveLoopService {
                 self.neuromod.bath.apply_sleep_recovery(quality);
 
                 // ── Psych-bench calibration: receptor sensitivity tuning ──
-                // Apply any pending calibration during sleep→wake, mirroring
-                // synaptic homeostasis (Tononi & Cirelli 2006): receptor
-                // sensitivities adjust during sleep to correct performance drift.
+                // Apply pending calibration during sleep→wake with gradual confidence
+                // scaling based on sleep quality. Longer sleep = stronger calibration.
                 //
-                // Gate: require minimum sleep duration for calibration to take effect.
-                // Too-short sleep doesn't provide enough homeostatic consolidation.
-                // Science: Tononi & Cirelli (2006) — synaptic homeostasis hypothesis.
-                const MIN_SLEEP_FOR_CALIBRATION: u32 = 50; // ~1s at 50Hz
+                // Science: Walker & Stickgold (2006) — sleep-dependent consolidation
+                //   scales with duration. Tononi & Cirelli (2006) — synaptic homeostasis.
+                const MIN_SLEEP_FOR_CALIBRATION: u32 = 10; // absolute minimum (~200ms at 50Hz)
+                const OPTIMAL_SLEEP_FOR_CALIBRATION: u32 = 50; // full-strength (~1s at 50Hz)
                 let recovery_cycles = self.neuromod.bath.allostatic_recovery_cycles;
                 if self.neuromod.pending_calibration.is_some() {
                     if recovery_cycles >= MIN_SLEEP_FOR_CALIBRATION {
+                        // Scale calibration strength by sleep quality
+                        let sleep_quality = (recovery_cycles as f32
+                            / OPTIMAL_SLEEP_FOR_CALIBRATION as f32)
+                            .clamp(0.0, 1.0);
+                        if sleep_quality < 1.0 {
+                            tracing::info!(
+                                recovery_cycles,
+                                sleep_quality,
+                                "Partial sleep — scaling calibration strength"
+                            );
+                        }
+                        if let Some(ref mut cal) = self.neuromod.pending_calibration {
+                            cal.scale_by_sleep_quality(sleep_quality);
+                        }
                         self.apply_pending_calibration();
                         // Reset self-assessment cooldown: external calibration supersedes
                         self.neuromod.self_assessment.reset_after_calibration();
