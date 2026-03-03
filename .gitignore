@@ -86,6 +86,7 @@ LibriSpeech-Alignments.zip
 
 # Benchmark output
 *_output.txt
+benchmark_output/
 
 # LaTeX byproducts
 papers/latex/*.aux
