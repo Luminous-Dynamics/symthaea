@@ -680,6 +680,11 @@ impl MoralTopology {
         };
 
         // ── Derived scores ──────────────────────────────────────────────
+        debug_assert!(
+            betti.beta_0 >= 1,
+            "beta_0 must be >= 1 for non-empty simplicial complex, got {}",
+            betti.beta_0
+        );
         let unity = 1.0 / (betti.beta_0.max(1) as f64);
         let circularity = {
             let cycle_count = persistent_features
