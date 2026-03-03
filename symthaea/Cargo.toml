@@ -376,6 +376,7 @@ voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt cr
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
 vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory synthesis pipeline + WAV output
 neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)
+neural-vocoder-gpu = ["neural-vocoder"]                  # GPU-accelerated neural vocoder (CUDA/CoreML execution providers)
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
