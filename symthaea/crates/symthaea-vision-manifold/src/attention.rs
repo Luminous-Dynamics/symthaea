@@ -150,7 +150,7 @@ mod tests {
             .surprise
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap();
         assert_eq!(max_idx, 5, "Changed patch should have highest surprise");
