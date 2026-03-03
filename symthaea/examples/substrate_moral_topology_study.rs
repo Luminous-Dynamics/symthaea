@@ -196,6 +196,7 @@ fn run_substrate(
     let config = CognitiveLoopConfig {
         substrate_type: substrate,
         enable_moral_anomaly_response: true,
+        enable_primitive_consciousness: true,
         moral_anomaly_config: MoralAnomalyConfig {
             adaptive_enabled: true,
             adaptive_warmup: 10,
