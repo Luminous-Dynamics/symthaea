@@ -1094,6 +1094,81 @@ impl VocalTractController {
 
         last_epoch_loss
     }
+
+    /// Evaluate mean formant error (Hz) across phoneme targets.
+    ///
+    /// For each phoneme: encode HV, warmup, evolve, decode, compute F1+F2+F3 error.
+    pub fn evaluate_formant_error(
+        &mut self,
+        genesis: &GenesisSeed,
+        phoneme_targets: &[(&str, &crate::types::FormantTarget)],
+    ) -> f32 {
+        if phoneme_targets.is_empty() {
+            return 0.0;
+        }
+        let mut total_error = 0.0;
+        for (name, target) in phoneme_targets {
+            let hv = genesis.hv(&format!("phoneme::{name}"), HDC_DIMENSION);
+            self.reset();
+            for _ in 0..20 {
+                self.forward(&hv, 0.005);
+            }
+            let pred = self.forward(&hv, 0.005);
+            total_error += (pred.f1 - target.f1).abs()
+                + (pred.f2 - target.f2).abs()
+                + (pred.f3 - target.f3).abs();
+        }
+        total_error / phoneme_targets.len() as f32
+    }
+
+    /// Optimize Fourier frequencies via coordinate descent.
+    ///
+    /// For each frequency, tries +/-step_hz perturbations and keeps the best.
+    /// Returns the optimized frequency vector.
+    pub fn optimize_fourier_frequencies(
+        &mut self,
+        genesis: &GenesisSeed,
+        phoneme_targets: &[(&str, &crate::types::FormantTarget)],
+        rounds: usize,
+        step_hz: f32,
+    ) -> Vec<f32> {
+        let mut freqs = self.config.fourier_frequencies.clone();
+        if freqs.is_empty() {
+            return freqs;
+        }
+
+        let mut best_error = self.evaluate_formant_error(genesis, phoneme_targets);
+
+        for _ in 0..rounds {
+            for i in 0..freqs.len() {
+                let original = freqs[i];
+
+                // Try +step
+                freqs[i] = (original + step_hz).max(0.5);
+                self.network.update_fourier_frequencies(&freqs);
+                let err_plus = self.evaluate_formant_error(genesis, phoneme_targets);
+
+                // Try -step
+                freqs[i] = (original - step_hz).max(0.5);
+                self.network.update_fourier_frequencies(&freqs);
+                let err_minus = self.evaluate_formant_error(genesis, phoneme_targets);
+
+                // Keep best
+                if err_plus < best_error && err_plus <= err_minus {
+                    freqs[i] = (original + step_hz).max(0.5);
+                    best_error = err_plus;
+                } else if err_minus < best_error {
+                    freqs[i] = (original - step_hz).max(0.5);
+                    best_error = err_minus;
+                } else {
+                    freqs[i] = original;
+                }
+                self.network.update_fourier_frequencies(&freqs);
+            }
+        }
+        self.config.fourier_frequencies = freqs.clone();
+        freqs
+    }
 }
 
 /// Perceptually weighted mean squared error between two FormantFrames.
@@ -2185,6 +2260,9 @@ mod tests {
                     manner: crate::types::SourceType::Vowel,
                     nasal_zero_freq: 0.0,
                     nasal_zero_bw: 0.0,
+                    f1_offset: 0.0,
+                    f2_offset: 0.0,
+                    f3_offset: 0.0,
                 },
             ),
             (
@@ -2202,6 +2280,9 @@ mod tests {
                     manner: crate::types::SourceType::Vowel,
                     nasal_zero_freq: 0.0,
                     nasal_zero_bw: 0.0,
+                    f1_offset: 0.0,
+                    f2_offset: 0.0,
+                    f3_offset: 0.0,
                 },
             ),
             (
@@ -2219,6 +2300,9 @@ mod tests {
                     manner: crate::types::SourceType::Vowel,
                     nasal_zero_freq: 0.0,
                     nasal_zero_bw: 0.0,
+                    f1_offset: 0.0,
+                    f2_offset: 0.0,
+                    f3_offset: 0.0,
                 },
             ),
             (
@@ -2236,6 +2320,9 @@ mod tests {
                     manner: crate::types::SourceType::Vowel,
                     nasal_zero_freq: 0.0,
                     nasal_zero_bw: 0.0,
+                    f1_offset: 0.0,
+                    f2_offset: 0.0,
+                    f3_offset: 0.0,
                 },
             ),
             (
@@ -2253,6 +2340,9 @@ mod tests {
                     manner: crate::types::SourceType::Vowel,
                     nasal_zero_freq: 0.0,
                     nasal_zero_bw: 0.0,
+                    f1_offset: 0.0,
+                    f2_offset: 0.0,
+                    f3_offset: 0.0,
                 },
             ),
             (
@@ -2270,6 +2360,9 @@ mod tests {
                     manner: crate::types::SourceType::Vowel,
                     nasal_zero_freq: 0.0,
                     nasal_zero_bw: 0.0,
+                    f1_offset: 0.0,
+                    f2_offset: 0.0,
+                    f3_offset: 0.0,
                 },
             ),
         ];
@@ -2502,5 +2595,90 @@ mod tests {
 
         // Both controllers created successfully — Fourier doesn't break anything
         let _ = (ctrl_baseline, ctrl_fourier);
+    }
+
+    #[test]
+    fn test_optimize_fourier_improves_or_matches() {
+        use crate::types::FormantTarget;
+        let genesis = GenesisSeed::from_phrase("fourier_optimize");
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+
+        let targets: Vec<(&str, FormantTarget)> = vec![
+            ("AA", FormantTarget::vowel(730.0, 1090.0, 2440.0, 100.0)),
+            ("IY", FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0)),
+        ];
+        let target_refs: Vec<(&str, &FormantTarget)> =
+            targets.iter().map(|(n, t)| (*n, t)).collect();
+
+        let error_before = ctrl.evaluate_formant_error(&genesis, &target_refs);
+        let _optimized = ctrl.optimize_fourier_frequencies(&genesis, &target_refs, 2, 0.5);
+        let error_after = ctrl.evaluate_formant_error(&genesis, &target_refs);
+
+        assert!(
+            error_after <= error_before + 1.0,
+            "Error after optimization ({:.1}) should be <= error before ({:.1}) + 1 Hz tolerance",
+            error_after,
+            error_before
+        );
+    }
+
+    #[test]
+    fn test_optimize_fourier_empty_noop() {
+        let genesis = GenesisSeed::from_phrase("fourier_empty");
+        let mut config = VocalTractConfig::default();
+        config.fourier_frequencies = vec![];
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+
+        let result = ctrl.optimize_fourier_frequencies(&genesis, &[], 3, 0.5);
+        assert!(result.is_empty(), "Empty frequencies should return empty");
+    }
+
+    #[test]
+    fn test_evaluate_formant_error_empty_targets() {
+        let genesis = GenesisSeed::from_phrase("formant_error_empty");
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let err = ctrl.evaluate_formant_error(&genesis, &[]);
+        assert_eq!(err, 0.0, "Empty targets should produce zero error");
+    }
+
+    #[test]
+    fn test_evaluate_formant_error_single_phoneme() {
+        let genesis = GenesisSeed::from_phrase("formant_error_single");
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let target = FormantTarget::vowel(500.0, 1500.0, 2500.0, 100.0);
+        let err = ctrl.evaluate_formant_error(&genesis, &[("AH", &target)]);
+        assert!(err.is_finite(), "Error should be finite for single phoneme");
+        assert!(err >= 0.0, "Error should be non-negative");
+    }
+
+    #[test]
+    fn test_optimize_fourier_zero_rounds() {
+        let genesis = GenesisSeed::from_phrase("fourier_zero_rounds");
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let original = ctrl.config.fourier_frequencies.clone();
+        let result = ctrl.optimize_fourier_frequencies(&genesis, &[], 0, 0.5);
+        assert_eq!(
+            result, original,
+            "Zero rounds should return original frequencies"
+        );
+    }
+
+    #[test]
+    fn test_optimize_fourier_frequencies_bounded() {
+        let genesis = GenesisSeed::from_phrase("fourier_bounded");
+        let config = VocalTractConfig {
+            fourier_frequencies: vec![0.5, 1.0, 2.0],
+            ..VocalTractConfig::default()
+        };
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let target = FormantTarget::vowel(500.0, 1500.0, 2500.0, 100.0);
+        let result = ctrl.optimize_fourier_frequencies(&genesis, &[("AH", &target)], 3, 1.0);
+        for freq in &result {
+            assert!(*freq >= 0.5, "Frequency {} should be >= 0.5 Hz", freq);
+        }
     }
 }

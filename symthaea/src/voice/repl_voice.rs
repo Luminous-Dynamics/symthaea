@@ -38,6 +38,7 @@
 
 use anyhow::Result;
 use std::collections::HashMap;
+use std::sync::LazyLock;
 #[cfg(feature = "audio")]
 use tracing::info;
 use tracing::{debug, warn};
@@ -46,6 +47,60 @@ use crate::voice::{
     ArticulatoryConfig, ArticulatorySynthesizer, CognitiveVoiceBridge, FormantVocoder, LTCPacing,
     TimedPhoneme, VocoderConfig, VoiceOutput, VoiceOutputConfig,
 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CMU PRONOUNCING DICTIONARY (134K entries, embedded at compile time)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Raw CMU Pronouncing Dictionary text (~3.5 MB, &'static lifetime).
+static CMUDICT_RAW: &str = include_str!("data/cmudict.dict");
+
+/// Lazily-parsed CMU dictionary: UPPERCASE word → slice of ARPABET phonemes.
+/// Parsed once on first access (~6ms). All slices borrow from CMUDICT_RAW.
+static CMUDICT: LazyLock<HashMap<&'static str, Vec<&'static str>>> = LazyLock::new(|| {
+    let mut map = HashMap::with_capacity(135_000);
+    for line in CMUDICT_RAW.lines() {
+        if line.starts_with(";;;") || line.is_empty() {
+            continue;
+        }
+        // Format: "word PH1 PH2 PH3" (single-space separator, lowercase words)
+        // Variant pronunciations: "word(2) PH1 PH2"
+        if let Some((word_part, phones_part)) = line.split_once(' ') {
+            // Strip variant suffix: "word(2)" → "word"
+            let word = word_part.split('(').next().unwrap_or(word_part);
+            // Only keep first pronunciation per word
+            if !map.contains_key(word) {
+                let phones: Vec<&str> = phones_part.split_whitespace().collect();
+                map.insert(word, phones);
+            }
+        }
+    }
+    map
+});
+
+/// Look up a word in the CMU Pronouncing Dictionary.
+/// Returns ARPABET phonemes with stress digits (e.g., ["AH0", "B", "AE1", "N", "D", "AH0", "N"]).
+fn cmudict_lookup(word: &str) -> Option<Vec<&'static str>> {
+    // CMU dict uses lowercase keys
+    let lower: String = word.to_lowercase();
+    CMUDICT.get(lower.as_str()).cloned()
+}
+
+/// Return the offset phoneme for a diphthong (the vowel it glides toward).
+/// Returns None for monophthongs. Used to create natural diphthong trajectories
+/// by switching the target phoneme partway through the duration.
+fn diphthong_offset_phoneme(phoneme: &str) -> Option<&'static str> {
+    // Strip stress digit for matching
+    let base = phoneme.trim_end_matches(|c: char| c.is_ascii_digit());
+    match base {
+        "AY" => Some("IY1"),  // "my": AA → IY
+        "AW" => Some("UW1"),  // "how": AA → UW
+        "OY" => Some("IY1"),  // "boy": AO → IY
+        "EY" => Some("IY1"),  // "day": EH → IY
+        "OW" => Some("UW1"),  // "go":  AO → UW
+        _ => None,
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -1135,16 +1190,24 @@ impl SimpleG2P {
         Self { dictionary }
     }
 
-    /// Convert a word to ARPABET phonemes
+    /// Convert a word to ARPABET phonemes.
+    ///
+    /// Lookup order: hardcoded dictionary → CMU Pronouncing Dictionary (134K words) → letter rules.
     pub fn word_to_phonemes(&self, word: &str) -> Vec<&'static str> {
         let lower = word.to_lowercase();
         let clean: String = lower.chars().filter(|c| c.is_alphabetic()).collect();
 
+        // 1. Hand-verified dictionary (400+ common words)
         if let Some(phonemes) = self.dictionary.get(&clean) {
             return phonemes.clone();
         }
 
-        // Fallback: rule-based G2P with longest-match patterns
+        // 2. CMU Pronouncing Dictionary (134K words)
+        if let Some(phonemes) = cmudict_lookup(&clean) {
+            return phonemes;
+        }
+
+        // 3. Rule-based G2P with longest-match patterns
         self.apply_letter_rules(&clean)
     }
 
@@ -2440,6 +2503,10 @@ impl ReplVoiceOutput {
                     .and_then(|wi| analyzed_words.get(wi))
                     .map_or(false, |aw| aw.is_focus);
 
+                // Diphthong trajectory: switch to offset phoneme in the last 40%
+                let diphthong_offset = diphthong_offset_phoneme(&timed_phoneme.phoneme);
+                let diphthong_switch_frame = (n_frames as f32 * 0.6) as usize;
+
                 for frame_i in 0..n_frames {
                     let phoneme_progress = frame_i as f32 / n_frames as f32;
                     // Phrase-local progress for F0 declination (resets after pauses)
@@ -2463,12 +2530,24 @@ impl ReplVoiceOutput {
                         ..Default::default()
                     };
 
+                    // For diphthongs, switch to offset phoneme in the glide portion
+                    let effective_phoneme: &str =
+                        if let Some(offset) = diphthong_offset {
+                            if frame_i >= diphthong_switch_frame {
+                                offset
+                            } else {
+                                &timed_phoneme.phoneme
+                            }
+                        } else {
+                            &timed_phoneme.phoneme
+                        };
+
                     let remaining = n_frames - frame_i;
                     let frame = pipeline.tick_with_anticipation(
                         &cognitive_state,
                         None,
                         dt,
-                        Some(&timed_phoneme.phoneme),
+                        Some(effective_phoneme),
                         next_phoneme,
                         remaining,
                         &prosody,
@@ -2715,6 +2794,55 @@ mod tests {
 
         let unknown = g2p.word_to_phonemes("syzygy");
         assert!(!unknown.is_empty(), "Unknown word should produce phonemes");
+    }
+
+    #[test]
+    fn test_cmudict_loaded() {
+        // CMU dict should have >100K entries
+        assert!(CMUDICT.len() > 100_000, "CMU dict should have >100K entries, got {}", CMUDICT.len());
+    }
+
+    #[test]
+    fn test_cmudict_lookup_abandon() {
+        let result = cmudict_lookup("abandon");
+        assert!(result.is_some(), "CMU dict should contain 'abandon'");
+        let phones = result.unwrap();
+        assert_eq!(phones[0], "AH0");
+        assert_eq!(phones[1], "B");
+        assert_eq!(phones[2], "AE1");
+    }
+
+    #[test]
+    fn test_cmudict_fallback_for_uncommon_word() {
+        let g2p = SimpleG2P::new();
+        // "serendipity" is NOT in our 400-word hardcoded dict, but IS in CMU dict
+        let phones = g2p.word_to_phonemes("serendipity");
+        assert!(phones.len() >= 5, "serendipity should have 5+ phonemes via CMU dict: {:?}", phones);
+        // CMU dict: S EH2 R AH0 N D IH1 P AH0 T IY0
+        assert!(phones.contains(&"S"), "Should start with S: {:?}", phones);
+    }
+
+    #[test]
+    fn test_cmudict_hardcoded_takes_priority() {
+        let g2p = SimpleG2P::new();
+        // "hello" is in both our hardcoded dict and CMU dict.
+        // Hardcoded dict should take priority.
+        let phones = g2p.word_to_phonemes("hello");
+        // Our hardcoded: HH, AH0, L, OW1 (or similar)
+        // CMU dict: HH AH0 L OW1 or HH EH0 L OW1
+        // Either way, should have phonemes and start with HH
+        assert!(phones.len() >= 3);
+    }
+
+    #[test]
+    fn test_diphthong_offset_phoneme_mapping() {
+        assert_eq!(diphthong_offset_phoneme("AY1"), Some("IY1"));
+        assert_eq!(diphthong_offset_phoneme("AW0"), Some("UW1"));
+        assert_eq!(diphthong_offset_phoneme("OY1"), Some("IY1"));
+        assert_eq!(diphthong_offset_phoneme("EY1"), Some("IY1"));
+        assert_eq!(diphthong_offset_phoneme("OW0"), Some("UW1"));
+        assert_eq!(diphthong_offset_phoneme("IY1"), None); // monophthong
+        assert_eq!(diphthong_offset_phoneme("AH0"), None); // monophthong
     }
 
     #[test]

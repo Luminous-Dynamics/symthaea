@@ -53,8 +53,10 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     ); // "bit"
     db.insert(
         "EY".into(),
-        FormantTarget::vowel(476.0, 2089.0, 2691.0, 120.0).with_bandwidths(50.0, 80.0, 140.0),
-    ); // "bait" (diphthong start)
+        FormantTarget::vowel(530.0, 1840.0, 2480.0, 130.0)
+            .with_bandwidths(50.0, 80.0, 140.0)
+            .with_diphthong_offset(270.0, 2290.0, 3010.0),
+    ); // "day" — onset ~EH, offset ~IY
     db.insert(
         "EH".into(),
         FormantTarget::vowel(530.0, 1840.0, 2480.0, 80.0),
@@ -93,8 +95,10 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     ); // "bought"
     db.insert(
         "OW".into(),
-        FormantTarget::vowel(497.0, 910.0, 2459.0, 120.0).with_bandwidths(80.0, 90.0, 150.0),
-    ); // "boat" (diphthong)
+        FormantTarget::vowel(570.0, 840.0, 2410.0, 130.0)
+            .with_bandwidths(80.0, 90.0, 150.0)
+            .with_diphthong_offset(300.0, 870.0, 2240.0),
+    ); // "go" — onset ~AO, offset ~UW
     db.insert(
         "UH".into(),
         FormantTarget::vowel(440.0, 1020.0, 2240.0, 80.0).with_bandwidths(60.0, 80.0, 140.0),
@@ -107,16 +111,22 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     // Diphthongs
     db.insert(
         "AY".into(),
-        FormantTarget::vowel(710.0, 1100.0, 2540.0, 150.0),
-    ); // "bite" (start)
+        FormantTarget::vowel(730.0, 1090.0, 2440.0, 150.0)
+            .with_bandwidths(80.0, 90.0, 150.0)
+            .with_diphthong_offset(270.0, 2290.0, 3010.0),
+    ); // "my" — onset ~AA, offset ~IY
     db.insert(
         "AW".into(),
-        FormantTarget::vowel(698.0, 1109.0, 2459.0, 150.0),
-    ); // "bout" (start)
+        FormantTarget::vowel(730.0, 1090.0, 2440.0, 150.0)
+            .with_bandwidths(80.0, 90.0, 150.0)
+            .with_diphthong_offset(300.0, 870.0, 2240.0),
+    ); // "how" — onset ~AA, offset ~UW
     db.insert(
         "OY".into(),
-        FormantTarget::vowel(570.0, 840.0, 2410.0, 150.0),
-    ); // "boy" (start)
+        FormantTarget::vowel(570.0, 840.0, 2410.0, 150.0)
+            .with_bandwidths(80.0, 90.0, 150.0)
+            .with_diphthong_offset(270.0, 2290.0, 3010.0),
+    ); // "boy" — onset ~AO, offset ~IY
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSONANTS - Stops
@@ -296,6 +306,9 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
             manner: SourceType::Silent,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         },
     );
 
@@ -315,6 +328,9 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
             manner: SourceType::Silent,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         },
     );
 
@@ -387,6 +403,9 @@ impl FormantDatabase {
                     b2: target.b2 * scale,
                     b3: target.b3 * scale,
                     nasal_zero_freq: target.nasal_zero_freq * scale,
+                    f1_offset: target.f1_offset * scale,
+                    f2_offset: target.f2_offset * scale,
+                    f3_offset: target.f3_offset * scale,
                     manner: target.manner,
                     ..*target
                 },
@@ -627,5 +646,52 @@ mod tests {
             "Interpolated nasal zero should be between M and IY: {}",
             mid.nasal_zero_freq
         );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Diphthong trajectory tests
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_diphthong_ay_has_offset() {
+        let db = FormantDatabase::new();
+        let ay = db.lookup("AY").unwrap();
+        assert!(ay.is_diphthong(), "AY should be a diphthong");
+        assert!(ay.f1_offset > 0.0, "AY should have offset F1");
+        // AY onset is near AA, offset is near IY
+        assert!(ay.f1 > 600.0, "AY onset F1 should be high (AA-like)");
+        assert!(
+            ay.f1_offset < 350.0,
+            "AY offset F1 should be low (IY-like)"
+        );
+    }
+
+    #[test]
+    fn test_diphthong_offset_f2_movement() {
+        let db = FormantDatabase::new();
+        let ay = db.lookup("AY").unwrap();
+        // AY has large F2 movement (low->high)
+        let f2_delta = (ay.f2_offset - ay.f2).abs();
+        assert!(
+            f2_delta > 500.0,
+            "AY should have >500Hz F2 movement, got {f2_delta}"
+        );
+    }
+
+    #[test]
+    fn test_monophthong_not_diphthong() {
+        let db = FormantDatabase::new();
+        let iy = db.lookup("IY").unwrap();
+        assert!(!iy.is_diphthong(), "IY should not be a diphthong");
+        assert_eq!(iy.f1_offset, 0.0);
+    }
+
+    #[test]
+    fn test_all_diphthongs_have_offsets() {
+        let db = FormantDatabase::new();
+        for ph in &["AY", "AW", "OY", "EY", "OW"] {
+            let target = db.lookup(ph).expect(ph);
+            assert!(target.is_diphthong(), "{ph} should be a diphthong");
+        }
     }
 }

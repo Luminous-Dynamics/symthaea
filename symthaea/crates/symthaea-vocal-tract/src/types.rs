@@ -188,6 +188,12 @@ pub struct FormantTarget {
     pub nasal_zero_freq: f32,
     /// Nasal anti-formant bandwidth (Hz). 0.0 = default 200 Hz.
     pub nasal_zero_bw: f32,
+    /// Diphthong offset F1 (Hz). 0.0 = not a diphthong.
+    pub f1_offset: f32,
+    /// Diphthong offset F2 (Hz). 0.0 = not a diphthong.
+    pub f2_offset: f32,
+    /// Diphthong offset F3 (Hz). 0.0 = not a diphthong.
+    pub f3_offset: f32,
 }
 
 impl FormantTarget {
@@ -206,6 +212,9 @@ impl FormantTarget {
             manner: SourceType::Vowel,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         }
     }
 
@@ -224,6 +233,9 @@ impl FormantTarget {
             manner: SourceType::Liquid,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         }
     }
 
@@ -242,6 +254,9 @@ impl FormantTarget {
             manner: SourceType::Fricative,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         }
     }
 
@@ -275,6 +290,26 @@ impl FormantTarget {
         self
     }
 
+    /// Create a diphthong target with onset and offset formant values.
+    /// The offset frequencies represent the end-point of the diphthong glide.
+    /// `f1_offset`, `f2_offset`, `f3_offset` are the endpoint formant frequencies.
+    pub const fn with_diphthong_offset(
+        mut self,
+        f1_offset: f32,
+        f2_offset: f32,
+        f3_offset: f32,
+    ) -> Self {
+        self.f1_offset = f1_offset;
+        self.f2_offset = f2_offset;
+        self.f3_offset = f3_offset;
+        self
+    }
+
+    /// Whether this target represents a diphthong (has offset formants).
+    pub fn is_diphthong(&self) -> bool {
+        self.f1_offset > 0.0
+    }
+
     /// Interpolate between two formant targets
     pub fn lerp(&self, other: &Self, t: f32) -> Self {
         let t = t.clamp(0.0, 1.0);
@@ -300,6 +335,9 @@ impl FormantTarget {
             nasal_zero_freq: self.nasal_zero_freq
                 + (other.nasal_zero_freq - self.nasal_zero_freq) * t,
             nasal_zero_bw: self.nasal_zero_bw + (other.nasal_zero_bw - self.nasal_zero_bw) * t,
+            f1_offset: self.f1_offset + (other.f1_offset - self.f1_offset) * t,
+            f2_offset: self.f2_offset + (other.f2_offset - self.f2_offset) * t,
+            f3_offset: self.f3_offset + (other.f3_offset - self.f3_offset) * t,
         }
     }
 
