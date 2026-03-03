@@ -30,6 +30,12 @@ pub struct NeuralVocoderConfig {
     pub sample_rate: u32,
     /// Number of mel bins (must match model input).
     pub n_mels: usize,
+    /// Number of mel frames of overlap context to prepend from the previous chunk.
+    /// Reduces boundary artifacts in streaming mode. Set to 0 to disable.
+    pub overlap_context: usize,
+    /// Whether to attempt GPU acceleration (CUDA/CoreML) via ONNX execution providers.
+    /// Requires `neural-vocoder-gpu` feature. Falls back to CPU if GPU unavailable.
+    pub use_gpu: bool,
 }
 
 impl Default for NeuralVocoderConfig {
@@ -40,6 +46,22 @@ impl Default for NeuralVocoderConfig {
             channel_depth: 4,
             sample_rate: 24000,
             n_mels: 100,
+            overlap_context: 4,
+            use_gpu: false,
+        }
+    }
+}
+
+impl NeuralVocoderConfig {
+    /// Create a low-latency streaming configuration.
+    ///
+    /// Uses smaller buffer (16 frames ≈ 170ms) with 4-frame overlap context
+    /// for ~170ms first-audio latency.
+    pub fn low_latency() -> Self {
+        Self {
+            mel_buffer_size: 16,
+            overlap_context: 4,
+            ..Default::default()
         }
     }
 }
@@ -52,6 +74,8 @@ impl Default for NeuralVocoderConfig {
 struct VocoderRequest {
     /// Mel frames: each inner Vec has `n_mels` elements.
     mel_frames: Vec<Vec<f32>>,
+    /// Number of overlap context frames prepended (to be trimmed from output audio).
+    overlap_frames: usize,
     /// Response channel for the generated audio.
     response_tx: mpsc::SyncSender<VocoderResponse>,
 }
@@ -86,6 +110,7 @@ impl NeuralVocoderChannel {
     #[cfg(feature = "neural-vocoder")]
     pub fn spawn(config: NeuralVocoderConfig) -> Option<Self> {
         let model_path = config.model_path.clone();
+        let _use_gpu = config.use_gpu;
 
         // Check model file exists before spawning thread
         if !Path::new(&model_path).exists() {
@@ -100,14 +125,40 @@ impl NeuralVocoderChannel {
 
         let (request_tx, request_rx) = mpsc::sync_channel::<VocoderRequest>(config.channel_depth);
         let n_mels = config.n_mels;
+        let hop_length = 256usize; // BigVGAN hop length for overlap trimming
 
         std::thread::Builder::new()
             .name("symthaea-neural-vocoder".into())
             .spawn(move || {
-                // Create ONNX session on the background thread
-                let session = match ort::session::Session::builder()
-                    .and_then(|builder| builder.with_model_from_file(&model_path))
-                {
+                // Build ONNX session — optionally with GPU execution provider
+                let builder = match ort::session::Session::builder() {
+                    Ok(b) => b,
+                    Err(e) => {
+                        warn!("Failed to create session builder: {}. Thread exiting.", e);
+                        return;
+                    }
+                };
+
+                // GPU acceleration (improvement #7)
+                #[cfg(feature = "neural-vocoder-gpu")]
+                let builder = if _use_gpu {
+                    info!("Attempting GPU acceleration for BigVGAN...");
+                    // Try CUDA first, then CoreML, fall back to CPU
+                    builder
+                        .with_execution_providers([
+                            ort::execution_providers::CUDAExecutionProvider::default().build(),
+                            #[cfg(target_os = "macos")]
+                            ort::execution_providers::CoreMLExecutionProvider::default().build(),
+                        ])
+                        .unwrap_or_else(|e| {
+                            warn!("GPU EP registration failed ({}), using CPU", e);
+                            ort::session::Session::builder().expect("session builder")
+                        })
+                } else {
+                    builder
+                };
+
+                let session = match builder.with_model_from_file(&model_path) {
                     Ok(session) => session,
                     Err(e) => {
                         warn!(
@@ -122,9 +173,17 @@ impl NeuralVocoderChannel {
 
                 while let Ok(req) = request_rx.recv() {
                     let audio = run_bigvgan_inference(&session, &req.mel_frames, n_mels);
-                    let response = VocoderResponse {
-                        audio: audio.unwrap_or_default(),
-                    };
+                    let mut audio = audio.unwrap_or_default();
+
+                    // Trim overlap context from output audio (improvement #6)
+                    if req.overlap_frames > 0 && !audio.is_empty() {
+                        let trim_samples = req.overlap_frames * hop_length;
+                        if trim_samples < audio.len() {
+                            audio = audio[trim_samples..].to_vec();
+                        }
+                    }
+
+                    let response = VocoderResponse { audio };
                     // If receiver was dropped, discard
                     let _ = req.response_tx.try_send(response);
                 }
@@ -144,16 +203,21 @@ impl NeuralVocoderChannel {
 
     /// Submit a mel spectrogram chunk for neural vocoding.
     ///
+    /// `overlap_frames` is the number of context frames prepended from the previous chunk.
+    /// The background thread will trim the corresponding output audio samples.
+    ///
     /// Returns a `Receiver` for the audio result. Non-blocking — returns `Err`
     /// if the channel is full (backpressure) or the thread has exited.
     pub fn submit(
         &self,
         mel_frames: Vec<Vec<f32>>,
+        overlap_frames: usize,
     ) -> Result<mpsc::Receiver<VocoderResponse>, mpsc::TrySendError<()>> {
         let (response_tx, response_rx) = mpsc::sync_channel(1);
 
         let req = VocoderRequest {
             mel_frames,
+            overlap_frames,
             response_tx,
         };
 

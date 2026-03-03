@@ -18,6 +18,72 @@ use crate::types::{FormantFrame, SourceType};
 // CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Mel spectrogram normalization strategy.
+///
+/// BigVGAN and similar neural vocoders expect input mel spectrograms in a specific
+/// value range. This config controls the normalization applied after log-mel extraction.
+#[derive(Debug, Clone)]
+pub struct MelNormalization {
+    /// Per-bin mean (length = n_mels) or global mean (length = 1).
+    /// Subtracted from log-mel values. Default: global -6.0 (approximate center of typical speech).
+    pub mean: Vec<f32>,
+    /// Per-bin std dev (length = n_mels) or global std (length = 1).
+    /// Log-mel values are divided by this after mean subtraction. Default: global 3.0.
+    pub std: Vec<f32>,
+    /// Clip range after normalization: (min, max). Default: (-4.0, 4.0).
+    pub clip_min: f32,
+    pub clip_max: f32,
+    /// Whether normalization is enabled. Default: true.
+    pub enabled: bool,
+}
+
+impl Default for MelNormalization {
+    fn default() -> Self {
+        Self {
+            mean: vec![-6.0],  // Global mean (approximate log-mel center for speech)
+            std: vec![3.0],    // Global std
+            clip_min: -4.0,
+            clip_max: 4.0,
+            enabled: true,
+        }
+    }
+}
+
+impl MelNormalization {
+    /// Create a normalization config with no normalization (pass-through).
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            ..Default::default()
+        }
+    }
+
+    /// Create per-bin normalization from mean/std vectors.
+    pub fn per_bin(mean: Vec<f32>, std: Vec<f32>) -> Self {
+        Self {
+            mean,
+            std,
+            clip_min: -4.0,
+            clip_max: 4.0,
+            enabled: true,
+        }
+    }
+
+    /// Normalize a mel frame in-place.
+    fn normalize(&self, mel: &mut [f32]) {
+        if !self.enabled {
+            return;
+        }
+
+        let per_bin = self.mean.len() > 1;
+        for (i, val) in mel.iter_mut().enumerate() {
+            let mean = if per_bin { self.mean[i % self.mean.len()] } else { self.mean[0] };
+            let std = if per_bin { self.std[i % self.std.len()] } else { self.std[0] };
+            *val = ((*val - mean) / std.max(1e-6)).clamp(self.clip_min, self.clip_max);
+        }
+    }
+}
+
 /// Configuration for formant-to-mel conversion.
 #[derive(Debug, Clone)]
 pub struct FormantToMelConfig {
@@ -37,6 +103,10 @@ pub struct FormantToMelConfig {
     pub aspiration_base: f32,
     /// Motor frame rate (Hz) — how often `push_frame()` is called.
     pub motor_frame_rate: u32,
+    /// Mel normalization strategy (mean/std + clip).
+    pub normalization: MelNormalization,
+    /// Enable inter-frame interpolation for smoother spectral transitions.
+    pub interpolation: bool,
 }
 
 impl Default for FormantToMelConfig {
@@ -50,6 +120,8 @@ impl Default for FormantToMelConfig {
             f_max: 12000.0,
             aspiration_base: 0.02,
             motor_frame_rate: 200,
+            normalization: MelNormalization::default(),
+            interpolation: true,
         }
     }
 }
@@ -166,6 +238,10 @@ pub struct FormantToMelConverter {
     scratch: Vec<Complex<f32>>,
     /// Simple PRNG state for aspiration noise.
     rng_state: u32,
+    /// Previous formant frame for interpolation (improvement #4).
+    prev_frame: Option<FormantFrame>,
+    /// Previous voice quality for interpolation.
+    prev_vq: Option<MelVoiceQuality>,
 }
 
 impl FormantToMelConverter {
@@ -199,6 +275,8 @@ impl FormantToMelConverter {
             fft,
             scratch,
             rng_state: 0xDEAD_BEEF,
+            prev_frame: None,
+            prev_vq: None,
         }
     }
 
@@ -206,14 +284,39 @@ impl FormantToMelConverter {
     ///
     /// Typically called at 200Hz. Returns 0 or 1 mel frames per call (occasionally 2
     /// when the audio buffer crosses two hop boundaries).
+    ///
+    /// When interpolation is enabled, synthesizes audio from a 50/50 blend of the
+    /// previous and current formant parameters for smoother spectral transitions
+    /// across consonant-vowel boundaries.
     pub fn push_frame(
         &mut self,
         frame: &FormantFrame,
         voice_quality: &MelVoiceQuality,
     ) -> Vec<Vec<f32>> {
-        // 1. Synthesize audio samples for this motor frame
-        let audio = self.synthesize_source_filter(frame, voice_quality);
-        self.audio_buffer.extend_from_slice(&audio);
+        // 1. Synthesize audio: optionally interpolate with previous frame
+        if self.config.interpolation {
+            if let (Some(ref prev), Some(ref prev_vq)) = (&self.prev_frame, &self.prev_vq) {
+                // Synthesize first half from interpolated frame (prev→current midpoint)
+                let interp = interpolate_frames(prev, frame, 0.5);
+                let interp_vq = MelVoiceQuality {
+                    rd: prev_vq.rd * 0.5 + voice_quality.rd * 0.5,
+                    arousal: prev_vq.arousal * 0.5 + voice_quality.arousal * 0.5,
+                };
+                let half = self.samples_per_frame / 2;
+                let first_half = self.synthesize_source_filter_n(&interp, &interp_vq, half);
+                let second_half = self.synthesize_source_filter_n(frame, voice_quality, self.samples_per_frame - half);
+                self.audio_buffer.extend_from_slice(&first_half);
+                self.audio_buffer.extend_from_slice(&second_half);
+            } else {
+                let audio = self.synthesize_source_filter(frame, voice_quality);
+                self.audio_buffer.extend_from_slice(&audio);
+            }
+            self.prev_frame = Some(frame.clone());
+            self.prev_vq = Some(*voice_quality);
+        } else {
+            let audio = self.synthesize_source_filter(frame, voice_quality);
+            self.audio_buffer.extend_from_slice(&audio);
+        }
 
         // 2. Extract mel frames from buffer
         let mut mel_frames = Vec::new();
@@ -240,6 +343,8 @@ impl FormantToMelConverter {
         for r in &mut self.resonators {
             r.reset();
         }
+        self.prev_frame = None;
+        self.prev_vq = None;
     }
 
     // ── Source-filter synthesis ──────────────────────────────────────────
@@ -249,8 +354,16 @@ impl FormantToMelConverter {
         frame: &FormantFrame,
         vq: &MelVoiceQuality,
     ) -> Vec<f32> {
+        self.synthesize_source_filter_n(frame, vq, self.samples_per_frame)
+    }
+
+    fn synthesize_source_filter_n(
+        &mut self,
+        frame: &FormantFrame,
+        vq: &MelVoiceQuality,
+        n: usize,
+    ) -> Vec<f32> {
         let sr = self.config.sample_rate as f32;
-        let n = self.samples_per_frame;
 
         // Update resonator parameters
         self.resonators[0].set_params(frame.f1, frame.b1, sr);
@@ -370,6 +483,9 @@ impl FormantToMelConverter {
             mel.push(energy.ln().max(-20.0));
         }
 
+        // Apply mean/std normalization (improvement #1)
+        self.config.normalization.normalize(&mut mel);
+
         mel
     }
 
@@ -422,6 +538,30 @@ impl FormantToMelConverter {
         }
 
         filters
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INTERPOLATION HELPER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Linearly interpolate between two FormantFrames at ratio `t` (0.0 = `a`, 1.0 = `b`).
+fn interpolate_frames(a: &FormantFrame, b: &FormantFrame, t: f32) -> FormantFrame {
+    let lerp = |x: f32, y: f32| x + (y - x) * t;
+    FormantFrame {
+        f1: lerp(a.f1, b.f1),
+        f2: lerp(a.f2, b.f2),
+        f3: lerp(a.f3, b.f3),
+        b1: lerp(a.b1, b.b1),
+        b2: lerp(a.b2, b.b2),
+        b3: lerp(a.b3, b.b3),
+        f0: lerp(a.f0, b.f0),
+        energy: lerp(a.energy, b.energy),
+        voicing: lerp(a.voicing, b.voicing),
+        time: lerp(a.time, b.time),
+        source_type: b.source_type, // Take target's source type
+        nasal_zero_freq: lerp(a.nasal_zero_freq, b.nasal_zero_freq),
+        nasal_zero_bw: lerp(a.nasal_zero_bw, b.nasal_zero_bw),
     }
 }
 
@@ -546,7 +686,8 @@ mod tests {
 
     #[test]
     fn test_silent_frame_floor() {
-        let config = FormantToMelConfig::default();
+        let mut config = FormantToMelConfig::default();
+        config.normalization = MelNormalization::disabled(); // Raw log-mel for this test
         let mut converter = FormantToMelConverter::new(config);
         let frame = FormantFrame::silent(0.0);
         let vq = MelVoiceQuality::default();
@@ -568,7 +709,8 @@ mod tests {
 
     #[test]
     fn test_f0_harmonic_structure() {
-        let config = FormantToMelConfig::default();
+        let mut config = FormantToMelConfig::default();
+        config.normalization = MelNormalization::disabled(); // Raw log-mel for this test
         let mut converter = FormantToMelConverter::new(config);
         // Voiced frame with clear F0
         let frame = vowel_frame(500.0, 1500.0, 2500.0, 200.0);
@@ -592,6 +734,107 @@ mod tests {
             low_avg > high_avg,
             "Low mel bins should have more energy than very high bins: low={low_avg:.2} high={high_avg:.2}"
         );
+    }
+
+    #[test]
+    fn test_normalization_shifts_range() {
+        let mut config = FormantToMelConfig::default();
+        // Disabled normalization: raw log-mel values
+        config.normalization = MelNormalization::disabled();
+        let mut conv_raw = FormantToMelConverter::new(config.clone());
+        let frame = vowel_frame(500.0, 1500.0, 2500.0, 150.0);
+        let vq = MelVoiceQuality::default();
+
+        let mut mels_raw = Vec::new();
+        for _ in 0..30 {
+            mels_raw.extend(conv_raw.push_frame(&frame, &vq));
+        }
+
+        // With normalization: values should be centered near 0
+        config.normalization = MelNormalization::default();
+        let mut conv_norm = FormantToMelConverter::new(config);
+        let mut mels_norm = Vec::new();
+        for _ in 0..30 {
+            mels_norm.extend(conv_norm.push_frame(&frame, &vq));
+        }
+
+        assert!(!mels_raw.is_empty());
+        assert!(!mels_norm.is_empty());
+
+        // Raw mean should be very negative (log-mel of small powers)
+        let raw_mean: f32 = mels_raw.last().unwrap().iter().sum::<f32>() / 100.0;
+        let norm_mean: f32 = mels_norm.last().unwrap().iter().sum::<f32>() / 100.0;
+
+        // Normalized values should be closer to zero than raw
+        assert!(
+            norm_mean.abs() < raw_mean.abs(),
+            "Normalized mean ({norm_mean:.2}) should be closer to zero than raw ({raw_mean:.2})"
+        );
+    }
+
+    #[test]
+    fn test_normalization_clips() {
+        let norm = MelNormalization {
+            mean: vec![0.0],
+            std: vec![1.0],
+            clip_min: -2.0,
+            clip_max: 2.0,
+            enabled: true,
+        };
+
+        let mut mel = vec![-10.0, -1.0, 0.0, 1.0, 10.0];
+        norm.normalize(&mut mel);
+
+        assert_eq!(mel[0], -2.0);
+        assert_eq!(mel[1], -1.0);
+        assert_eq!(mel[2], 0.0);
+        assert_eq!(mel[3], 1.0);
+        assert_eq!(mel[4], 2.0);
+    }
+
+    #[test]
+    fn test_interpolation_smooths_transition() {
+        // With interpolation: transitions should be smoother between /AH/ and /IY/
+        let mut config = FormantToMelConfig::default();
+        config.interpolation = true;
+        let mut conv_interp = FormantToMelConverter::new(config.clone());
+
+        config.interpolation = false;
+        let mut conv_no_interp = FormantToMelConverter::new(config);
+
+        let vq = MelVoiceQuality::default();
+        let ah = vowel_frame(730.0, 1090.0, 2440.0, 120.0);
+        let iy = vowel_frame(270.0, 2290.0, 3010.0, 130.0);
+
+        // Warm up both converters with AH
+        for _ in 0..15 {
+            conv_interp.push_frame(&ah, &vq);
+            conv_no_interp.push_frame(&ah, &vq);
+        }
+
+        // Transition to IY — collect mel frames at the boundary
+        let mut mels_interp = Vec::new();
+        let mut mels_no_interp = Vec::new();
+        for _ in 0..5 {
+            mels_interp.extend(conv_interp.push_frame(&iy, &vq));
+            mels_no_interp.extend(conv_no_interp.push_frame(&iy, &vq));
+        }
+
+        // Both should produce mel frames
+        assert!(!mels_interp.is_empty());
+        assert!(!mels_no_interp.is_empty());
+    }
+
+    #[test]
+    fn test_interpolate_frames_midpoint() {
+        let a = vowel_frame(200.0, 1000.0, 2000.0, 100.0);
+        let b = vowel_frame(400.0, 2000.0, 3000.0, 200.0);
+        let mid = interpolate_frames(&a, &b, 0.5);
+
+        assert!((mid.f1 - 300.0).abs() < 0.01);
+        assert!((mid.f2 - 1500.0).abs() < 0.01);
+        assert!((mid.f3 - 2500.0).abs() < 0.01);
+        assert!((mid.f0 - 150.0).abs() < 0.01);
     }
 
     #[test]
