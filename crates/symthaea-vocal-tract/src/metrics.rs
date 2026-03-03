@@ -420,6 +420,9 @@ mod tests {
             manner: crate::types::SourceType::Vowel,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         };
 
         // Frames close to target
@@ -491,6 +494,9 @@ mod tests {
             manner: crate::types::SourceType::Vowel,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         };
         let frame = FormantFrame {
             f1: 520.0,
@@ -521,6 +527,9 @@ mod tests {
             manner: crate::types::SourceType::Vowel,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         };
 
         // Small error
@@ -562,6 +571,9 @@ mod tests {
             manner: crate::types::SourceType::Vowel,
             nasal_zero_freq: 0.0,
             nasal_zero_bw: 0.0,
+            f1_offset: 0.0,
+            f2_offset: 0.0,
+            f3_offset: 0.0,
         };
 
         let frames: Vec<FormantFrame> = (0..10)

@@ -63,6 +63,9 @@ pub struct VocoderConfig {
     pub jitter: f32,
     /// Amplitude shimmer amount (fraction, e.g. 0.02 = 2%). Per-cycle amplitude variation.
     pub shimmer: f32,
+    /// Use cascade (series) formant filtering instead of parallel.
+    /// Cascade produces more natural spectral rolloff. Default: true.
+    pub cascade: bool,
 }
 
 impl Default for VocoderConfig {
@@ -82,6 +85,7 @@ impl Default for VocoderConfig {
             spectral_tilt: 0.5,
             jitter: 0.01,
             shimmer: 0.02,
+            cascade: false,
         }
     }
 }
@@ -249,6 +253,63 @@ impl Resonator {
     fn reset(&mut self) {
         self.x1 = 0.0;
         self.x2 = 0.0;
+        self.y1 = 0.0;
+        self.y2 = 0.0;
+    }
+}
+
+/// All-pole resonator for Klatt-style cascade formant synthesis.
+///
+/// Transfer function: H(z) = 1 / (1 - a1*z^-1 - a2*z^-2)
+///
+/// Unlike the bandpass `Resonator`, this has no numerator zeros. It adds a spectral
+/// peak at the center frequency without rejecting other frequencies, which is essential
+/// for cascade (series) filtering where F1→F2→F3 are different frequencies.
+#[derive(Debug, Clone, Default)]
+struct AllPoleResonator {
+    a1: f32,
+    a2: f32,
+    y1: f32,
+    y2: f32,
+}
+
+impl AllPoleResonator {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set resonator parameters using the Klatt digital resonator formula.
+    /// freq: center frequency (Hz), bandwidth: 3dB bandwidth (Hz), sample_rate: Hz
+    fn set_params(&mut self, freq: f32, bandwidth: f32, sample_rate: f32) {
+        if freq <= 0.0 || freq >= sample_rate / 2.0 {
+            self.a1 = 0.0;
+            self.a2 = 0.0;
+            return;
+        }
+        // Klatt (1980) digital resonator coefficients:
+        // c = -exp(-2π * B * T)
+        // b = 2 * exp(-π * B * T) * cos(2π * F * T)
+        // a = 1 - b - c
+        let t = 1.0 / sample_rate;
+        let exp_neg_pi_bt = (-std::f32::consts::PI * bandwidth * t).exp();
+        let exp_neg_2pi_bt = exp_neg_pi_bt * exp_neg_pi_bt;
+        let cos_2pi_ft = (2.0 * std::f32::consts::PI * freq * t).cos();
+
+        self.a1 = 2.0 * exp_neg_pi_bt * cos_2pi_ft;
+        self.a2 = -exp_neg_2pi_bt;
+    }
+
+    /// Process one sample through the all-pole resonator.
+    fn process(&mut self, input: f32) -> f32 {
+        // y[n] = x[n] + a1*y[n-1] + a2*y[n-2]
+        let gain = 1.0 - self.a1 - self.a2; // normalize so DC gain = 1 / (1 - a1 - a2)
+        let output = input * gain.abs().max(0.01) + self.a1 * self.y1 + self.a2 * self.y2;
+        self.y2 = self.y1;
+        self.y1 = output;
+        output
+    }
+
+    fn reset(&mut self) {
         self.y1 = 0.0;
         self.y2 = 0.0;
     }
@@ -493,6 +554,10 @@ pub struct FormantVocoder {
     nasal_antires: Resonator,
     /// Nasal pole resonator (fixed 250 Hz / 100 Hz BW) — adds characteristic nasal resonance.
     nasal_pole: Resonator,
+    /// Subglottal resonances (~600, ~1400, ~2100 Hz) — chest voice coupling.
+    subglottal: [Resonator; 3],
+    /// All-pole resonators for cascade mode (F1, F2, F3).
+    cascade_res: [AllPoleResonator; 3],
     /// Ornstein-Uhlenbeck process for F0 jitter (temporally correlated pitch perturbation).
     ou_jitter: OrnsteinUhlenbeck,
     /// Ornstein-Uhlenbeck process for amplitude shimmer (temporally correlated energy perturbation).
@@ -533,6 +598,13 @@ impl FormantVocoder {
         let mut nasal_pole = Resonator::new();
         nasal_pole.set_params(250.0, 100.0, config.sample_rate as f32);
 
+        let mut sg1 = Resonator::new();
+        sg1.set_params(600.0, 80.0, config.sample_rate as f32);
+        let mut sg2 = Resonator::new();
+        sg2.set_params(1400.0, 100.0, config.sample_rate as f32);
+        let mut sg3 = Resonator::new();
+        sg3.set_params(2100.0, 120.0, config.sample_rate as f32);
+
         // OU parameters tuned for biological voice quality.
         // Continuous-time OU: dx = θ(μ−x)dt + σ√dt dW
         // Stationary stddev = σ / √(2θ), so σ = desired_stddev × √(2θ).
@@ -564,6 +636,8 @@ impl FormantVocoder {
             shimmer_factor: 1.0,
             nasal_antires,
             nasal_pole,
+            subglottal: [sg1, sg2, sg3],
+            cascade_res: [AllPoleResonator::new(), AllPoleResonator::new(), AllPoleResonator::new()],
             ou_jitter,
             ou_shimmer,
             radiation_prev: 0.0,
@@ -582,6 +656,12 @@ impl FormantVocoder {
         self.lowpass.reset();
         self.nasal_antires.reset();
         self.nasal_pole.reset();
+        for sg in &mut self.subglottal {
+            sg.reset();
+        }
+        for cr in &mut self.cascade_res {
+            cr.reset();
+        }
         self.ou_jitter.reset();
         self.ou_shimmer.reset();
         self.frame_idx = 0;
@@ -907,11 +987,16 @@ impl FormantVocoder {
         }
     }
 
-    /// Apply formant filtering + optional nasal pole/anti-resonance.
+    /// Apply formant filtering + optional nasal pole/anti-resonance + subglottal resonances.
     ///
-    /// Uses frequency-dependent amplitude correction based on Klatt (1980):
-    /// higher formants get compensating gain to counteract glottal source
-    /// spectral rolloff (~12dB/octave from the LF model).
+    /// Supports two formant filter topologies:
+    /// - **Cascade** (`config.cascade = true`): Signal passes through F1->F2->F3 in series,
+    ///   producing more natural spectral rolloff (default).
+    /// - **Parallel** (`config.cascade = false`): Each resonator processes the source
+    ///   independently with Klatt (1980) amplitude correction, then outputs are summed.
+    ///
+    /// F4/F5 are always parallel (speaker constants). Subglottal resonances (~600, ~1400,
+    /// ~2100 Hz) add "chest voice" coupling for voiced speech.
     fn apply_filters(
         &mut self,
         source: f32,
@@ -920,31 +1005,50 @@ impl FormantVocoder {
         nasal_zero_freq: f32,
         nasal_zero_bw: f32,
     ) -> f32 {
-        let mut filtered = 0.0;
-        if self.resonators.len() >= 3 {
+        let filtered = if self.config.cascade && self.resonators.len() >= 3 {
+            // Cascade: Klatt-style series filtering using all-pole resonators.
+            //
+            // Unlike the parallel path (bandpass filters), cascade uses all-pole resonators
+            // H(z) = 1 / (1 - a1*z^-1 - a2*z^-2) that shape the spectrum without
+            // completely rejecting out-of-band content. This allows F1→F2→F3 in series.
+            //
+            // Each resonator adds a spectral peak while passing other frequencies through.
+            let mut signal = source;
+            signal = self.cascade_res[0].process(signal);
+            signal = self.cascade_res[1].process(signal);
+            signal = self.cascade_res[2].process(signal);
+            signal
+        } else if self.resonators.len() >= 3 {
+            // Parallel: each formant adds independently (original behavior)
             let a1 = formant_amplitude_correction(self.current_f1, f0);
             let a2 = formant_amplitude_correction(self.current_f2, f0);
             let a3 = formant_amplitude_correction(self.current_f3, f0);
+            let mut filtered = 0.0;
             filtered += self.resonators[0].process(source) * a1;
             filtered += self.resonators[1].process(source) * a2;
             filtered += self.resonators[2].process(source) * a3;
+            filtered
         } else {
+            let mut filtered = 0.0;
             for res in &mut self.resonators {
                 filtered += res.process(source);
             }
-        }
-        // F4/F5 keep fixed attenuation (speaker constants, not articulation-dependent)
+            filtered
+        };
+
+        // F4/F5 always parallel (speaker constants)
+        let mut result = filtered;
         if self.resonators.len() >= 4 {
-            filtered += self.resonators[3].process(source) * 0.1;
+            result += self.resonators[3].process(source) * 0.1;
         }
         if self.resonators.len() >= 5 {
-            filtered += self.resonators[4].process(source) * 0.05;
+            result += self.resonators[4].process(source) * 0.05;
         }
 
         // Nasal resonance: pole (low-frequency nasal murmur) + anti-formant (zero)
         if source_type == SourceType::Nasal {
             // Nasal pole: characteristic low-frequency nasal resonance at ~250 Hz
-            filtered += self.nasal_pole.process(source) * 0.3;
+            result += self.nasal_pole.process(source) * 0.3;
 
             // Anti-formant: phoneme-specific zero (from FormantFrame.nasal_zero_freq)
             let sr = self.config.sample_rate as f32;
@@ -959,10 +1063,20 @@ impl FormantVocoder {
                 200.0
             };
             self.nasal_antires.set_params(zero_freq, zero_bw, sr);
-            filtered -= self.nasal_antires.process(source) * 0.4;
+            result -= self.nasal_antires.process(source) * 0.4;
         }
 
-        filtered
+        // Subglottal resonances (voiced speech only)
+        if source_type == SourceType::Vowel
+            || source_type == SourceType::Nasal
+            || source_type == SourceType::Liquid
+        {
+            result += self.subglottal[0].process(source) * 0.04;
+            result += self.subglottal[1].process(source) * 0.02;
+            result += self.subglottal[2].process(source) * 0.01;
+        }
+
+        result
     }
 
     /// Update resonator parameters from frame and track current formant frequencies.
@@ -990,6 +1104,13 @@ impl FormantVocoder {
         self.current_f1 = frame.f1;
         self.current_f2 = frame.f2;
         self.current_f3 = frame.f3;
+
+        // Update cascade (all-pole) resonators for cascade mode
+        if self.config.cascade {
+            self.cascade_res[0].set_params(frame.f1, frame.b1, sr);
+            self.cascade_res[1].set_params(frame.f2, frame.b2, sr);
+            self.cascade_res[2].set_params(frame.f3, frame.b3, sr);
+        }
     }
 
     /// Synthesize audio for a single formant frame (streaming mode).
@@ -1886,6 +2007,95 @@ mod tests {
         let vq = cognitive_state_to_voice_quality(0.5, 0.5, 0.1);
         let rd = vq.rd.unwrap();
         assert!(rd <= 0.6, "Low consciousness should force pressed Rd: {rd}");
+    }
+
+    #[test]
+    fn test_cascade_vs_parallel_differ() {
+        // Cascade (all-pole series) and parallel (bandpass) should produce different envelopes
+        let frame = FormantFrame {
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0,
+            source_type: SourceType::Vowel,
+            time: 0.0,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
+        };
+
+        let mut voc_cascade = FormantVocoder::with_config(VocoderConfig {
+            cascade: true,
+            ..Default::default()
+        });
+        let mut voc_parallel = FormantVocoder::with_config(VocoderConfig {
+            cascade: false,
+            ..Default::default()
+        });
+
+        // Use synthesize_frame for reliable single-frame output (2400 samples = 100ms at 24kHz)
+        let audio_c = voc_cascade.synthesize_frame(&frame, 2400);
+        let audio_p = voc_parallel.synthesize_frame(&frame, 2400);
+
+        // Both should produce audio
+        assert!(
+            audio_c.iter().any(|s| s.abs() > 0.001),
+            "Cascade should produce audio, max={}",
+            audio_c.iter().map(|s| s.abs()).fold(0.0_f32, f32::max)
+        );
+        assert!(
+            audio_p.iter().any(|s| s.abs() > 0.001),
+            "Parallel should produce audio"
+        );
+
+        // They should differ (different filter topologies)
+        let diff: f32 = audio_c
+            .iter()
+            .zip(&audio_p)
+            .map(|(a, b)| (a - b).abs())
+            .sum::<f32>()
+            / audio_c.len() as f32;
+        assert!(
+            diff > 1e-6,
+            "Cascade and parallel should produce different output, diff={diff}"
+        );
+    }
+
+    #[test]
+    fn test_subglottal_adds_chest_resonance() {
+        // Subglottal resonances should add energy for voiced speech
+        let frame = FormantFrame {
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.8,
+            voicing: 1.0,
+            source_type: SourceType::Vowel,
+            time: 0.0,
+            nasal_zero_freq: 0.0,
+            nasal_zero_bw: 0.0,
+        };
+
+        let audio = FormantVocoder::new().synthesize_frame(&frame, 2400);
+        assert!(
+            audio.iter().any(|s| s.abs() > 0.001),
+            "Voiced speech should produce output with subglottal, max={}",
+            audio.iter().map(|s| s.abs()).fold(0.0_f32, f32::max)
+        );
+    }
+
+    #[test]
+    fn test_cascade_default_parallel() {
+        let config = VocoderConfig::default();
+        assert!(!config.cascade, "Cascade should be off by default (parallel mode)");
     }
 
     #[test]

@@ -637,15 +637,16 @@ fn main() {
         let f0 = 120.0;
         let n_frames = 200; // 1 second at 200Hz
         let dt = 1.0 / 200.0;
+        let cognitive_state = symthaea_vocal_tract::encoder::VoiceCognitiveState::default();
         let mut frames = Vec::with_capacity(n_frames);
-        for i in 0..n_frames {
-            let frame = pipeline.tick(&cognitive_state, None, dt, Some("AH"));
+        for _i in 0..n_frames {
+            let frame = pipeline.tick_phoneme(&cognitive_state, None, dt, Some("AH"));
             frames.push(frame);
         }
 
         // Convert to audio
         let mut vocoder =
-            symthaea::voice::FormantVocoder::new(symthaea::voice::VocoderConfig::default());
+            symthaea::voice::FormantVocoder::new();
         // Set time stamps
         for (i, f) in frames.iter_mut().enumerate() {
             f.time = i as f32 * dt;
