@@ -309,7 +309,7 @@ impl CognitiveLoopService {
 
         // Effective threshold matches cycle() behavior (adaptive scaling)
         let effective_threshold =
-            self.config.learning_threshold * self.carryover.learning.adaptive_threshold_scale;
+            self.config.learning_threshold * self.carryover.learning.adaptive_threshold_scale as f32;
 
         // 9. Learn if error is significant
         let (learning_occurred, training_loss) = if prediction_error > effective_threshold {
@@ -560,7 +560,7 @@ impl CognitiveLoopService {
         // Curiosity drive stats
         self.stats.boredom = self.curiosity_drive.boredom;
         self.stats.curiosity = self.curiosity_drive.curiosity;
-        self.stats.exploration_urge = self.curiosity_drive.exploration_urge;
+        self.stats.exploration_urge = self.curiosity_drive.exploration_urge as f32;
         self.stats.curiosity_exploring = self.curiosity_drive.should_explore();
         self.stats.novelty_bonus = self.curiosity_drive.novelty_bonus;
 

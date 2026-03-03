@@ -503,7 +503,7 @@ fn test_compute_equation_v2_exploration_unaffected_at_zero() {
     // Score=0.0, low-consciousness feedback (0.0 < 0.3) doesn't apply since eq is exactly 0.0
     // and condition is `> 0.0 && < 0.3`
     assert!(
-        (service.curiosity_drive.exploration_urge - initial_explore).abs() < f32::EPSILON,
+        (service.curiosity_drive.exploration_urge - initial_explore).abs() < f64::EPSILON,
         "Exploration changed at score=0.0"
     );
 }

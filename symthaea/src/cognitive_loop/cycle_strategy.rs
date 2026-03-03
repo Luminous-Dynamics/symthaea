@@ -152,6 +152,34 @@ impl CognitiveLoopService {
         let hv16_cached = real_hv_to_hv16(&encoding_result.hdv);
         module_timings.core_compress = _t_core.elapsed().as_micros() as u64;
 
+        // ── Semantic Encoder: collect previous cycle's result, submit current ───
+        #[cfg(feature = "semantic-encoder")]
+        {
+            // Check previous cycle's result (non-blocking)
+            if let Ok(mut guard) = self.pending_semantic_rx.lock() {
+                if let Some(rx) = guard.take() {
+                    if let Ok(response) = rx.try_recv() {
+                        if let Ok(emb_result) = response.result {
+                            if let Some(ref bridge) = self.semantic_hdc_bridge {
+                                let semantic_hv = bridge.project(&emb_result.embedding);
+                                let sim = hv16_cached.similarity(&semantic_hv);
+                                self.stats.semantic_encoder_similarity = sim;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Submit current input for next cycle (non-blocking)
+            if let Some(ref channel) = self.semantic_embedding_channel {
+                if let Ok(rx) = channel.request(input) {
+                    if let Ok(mut guard) = self.pending_semantic_rx.lock() {
+                        *guard = Some(rx);
+                    }
+                }
+            }
+        }
+
         // Soul value alignment
         let soul_alignment = if let Some(ref soul) = self.soul {
             let alignment = soul.evaluate_alignment(&encoding_result.hdv);
@@ -278,9 +306,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // Science: Friston (2010) — precision (inverse uncertainty) modulates PE weighting.
         let confidence_scale = (1.0 + (self.prediction_confidence - 0.5) * 0.4) as f32;
-        let exploration_scale = 1.0 - (self.curiosity_drive.exploration_urge - 0.5) * 0.2;
+        let exploration_scale =
+            (1.0 - (self.curiosity_drive.exploration_urge - 0.5) * 0.2) as f32;
         let effective_threshold = self.config.learning_threshold
-            * self.carryover.learning.adaptive_threshold_scale
+            * self.carryover.learning.adaptive_threshold_scale as f32
             * confidence_scale
             * exploration_scale;
         let urgency_result = self.compute_urgency_and_error_pattern(

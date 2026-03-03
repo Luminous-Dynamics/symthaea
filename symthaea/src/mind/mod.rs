@@ -142,6 +142,9 @@ pub struct ContinuousMind {
     /// Monotonic sequence number for outgoing gradient packets.
     #[cfg(feature = "mesh")]
     mesh_gradient_sequence: u32,
+    /// Tick counter for last moral topology emission.
+    #[cfg(feature = "mesh")]
+    mesh_moral_topology_last_tick: u64,
     /// Tick counter for last affective emission.
     #[cfg(feature = "mesh")]
     mesh_affective_last_tick: u64,
@@ -278,6 +281,8 @@ impl ContinuousMind {
             mesh_heartbeat_sequence: 0,
             #[cfg(feature = "mesh")]
             mesh_gradient_sequence: 0,
+            #[cfg(feature = "mesh")]
+            mesh_moral_topology_last_tick: 0,
             #[cfg(feature = "mesh")]
             mesh_affective_last_tick: 0,
             #[cfg(feature = "mesh")]

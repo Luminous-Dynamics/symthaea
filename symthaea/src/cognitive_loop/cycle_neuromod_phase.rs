@@ -67,7 +67,7 @@ impl CognitiveLoopService {
         let flex_scale = self.neuromod.bath.behavioral_flexibility();
         self.set_exploration(
             "d2_flexibility",
-            0.5 + (self.curiosity_drive.exploration_urge - 0.5) * flex_scale,
+            (0.5 + (self.curiosity_drive.exploration_urge - 0.5) * flex_scale as f64) as f32,
         );
 
         // 5-HT → confidence
@@ -119,8 +119,8 @@ impl CognitiveLoopService {
             let drain = (self.curiosity_drive.exploration_urge - 0.5) * 0.03;
             self.neuromod
                 .bath
-                .apply_exploration_cost(self.curiosity_drive.exploration_urge);
-            drain
+                .apply_exploration_cost(self.curiosity_drive.exploration_urge as f32);
+            drain as f32
         } else {
             0.0
         };
@@ -182,7 +182,7 @@ impl CognitiveLoopService {
                 uncertainty: (1.0 - self.prediction_confidence) as f32,
                 coherence: coherence.clamp(0.0, 1.0),
                 confidence: self.prediction_confidence as f32,
-                salience: self.curiosity_drive.exploration_urge,
+                salience: self.curiosity_drive.exploration_urge as f32,
                 phi_monitor: unified_psi as f32,
             };
             bus.update_wisdom_from_signals();

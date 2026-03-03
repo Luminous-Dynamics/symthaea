@@ -106,6 +106,8 @@ pub struct MeshStats {
     pub affective_sent: u64,
     /// Gradient packets emitted to mesh.
     pub gradients_sent: u64,
+    /// Moral topology packets emitted to mesh.
+    pub moral_topology_sent: u64,
     /// Wisdom vectors received from mesh peers.
     pub wisdom_received: u64,
     /// Heartbeat packets received from mesh peers.
@@ -114,6 +116,8 @@ pub struct MeshStats {
     pub affective_received: u64,
     /// Gradient packets received from mesh peers.
     pub gradients_received: u64,
+    /// Moral topology packets received from mesh peers.
+    pub moral_topology_received: u64,
     /// Number of peers removed by expiry.
     pub peers_expired: u64,
     /// Total bytes sent over mesh (estimated from packet count × WISDOM_PACKET_SIZE).
@@ -155,7 +159,11 @@ pub struct MeshStats {
 impl MeshStats {
     /// Total packets sent across all types.
     fn total_sent(&self) -> u64 {
-        self.wisdom_sent + self.heartbeats_sent + self.affective_sent + self.gradients_sent
+        self.wisdom_sent
+            + self.heartbeats_sent
+            + self.affective_sent
+            + self.gradients_sent
+            + self.moral_topology_sent
     }
 
     /// Total packets received across all types.
@@ -164,6 +172,7 @@ impl MeshStats {
             + self.heartbeats_received
             + self.affective_received
             + self.gradients_received
+            + self.moral_topology_received
     }
 
     /// Returns the compression ratio (0.0–1.0, lower is better).
@@ -284,6 +293,8 @@ pub enum PayloadType {
     Heartbeat = 2,
     /// Federated gradient fragment.
     Gradient = 3,
+    /// Moral topology summary for cross-agent coherence.
+    MoralTopology = 4,
 }
 
 impl PayloadType {
@@ -293,17 +304,20 @@ impl PayloadType {
             0 => Self::WisdomVector,
             1 => Self::Affective,
             2 => Self::Heartbeat,
-            _ => Self::Gradient,
+            3 => Self::Gradient,
+            4 => Self::MoralTopology,
+            _ => Self::Heartbeat, // unknown types become heartbeats (safe no-op)
         }
     }
 
     /// Backpressure priority: higher values are retained first when inbox is full.
-    /// Heartbeat(3) > Wisdom(2) > Affective(1) > Gradient(0).
+    /// Heartbeat(3) > Wisdom(2) > MoralTopology/Affective(1) > Gradient(0).
     pub fn priority(&self) -> u8 {
         match self {
             Self::Heartbeat => 3,
             Self::WisdomVector => 2,
             Self::Affective => 1,
+            Self::MoralTopology => 1,
             Self::Gradient => 0,
         }
     }
@@ -624,6 +638,48 @@ impl WisdomPacket {
             ttl: MESH_DEFAULT_TTL,
             wisdom: BinaryHV(bytes),
         })
+    }
+
+    /// Create a moral topology gossip packet.
+    ///
+    /// Encodes the MoralTopologySummary as JSON in the first N bytes of the wisdom field.
+    /// The remainder is zero-padded. Compact: ~150 bytes JSON << 2,048 byte wisdom field.
+    pub fn from_moral_topology(
+        source_id: [u8; 8],
+        sequence: u32,
+        phi: f32,
+        summary: &crate::hdc::moral_topology::MoralTopologySummary,
+    ) -> Self {
+        let json = serde_json::to_vec(summary).unwrap_or_default();
+        let mut wisdom_bytes = [0u8; 2048];
+        let copy_len = json.len().min(2048);
+        wisdom_bytes[..copy_len].copy_from_slice(&json[..copy_len]);
+        Self {
+            source_id,
+            sequence,
+            phi,
+            urgency: MeshUrgency::Cruise,
+            timestamp_s: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as u32,
+            payload_type: PayloadType::MoralTopology,
+            auth_mac: 0,
+            ttl: 2,
+            wisdom: BinaryHV(wisdom_bytes),
+        }
+    }
+
+    /// Extract a moral topology summary from a MoralTopology packet.
+    pub fn extract_moral_topology(
+        &self,
+    ) -> Option<crate::hdc::moral_topology::MoralTopologySummary> {
+        if self.payload_type != PayloadType::MoralTopology {
+            return None;
+        }
+        // Find the end of JSON data (first null byte or end of buffer)
+        let end = self.wisdom.0.iter().position(|&b| b == 0).unwrap_or(2048);
+        serde_json::from_slice(&self.wisdom.0[..end]).ok()
     }
 
     /// Derive a `thought_id` for LoRa fragmentation.

@@ -65,7 +65,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let cycle_snapshot = super::subsystem_trait::CycleSnapshot::build(
             self.stats.total_cycles as u64,
-            self.prediction_confidence as f32,
+            self.prediction_confidence,
             self.fep_lr_boost,
             prediction_error,
             self.coherence_bridge.smoothed_coherence(),
@@ -516,7 +516,8 @@ impl CognitiveLoopService {
             * self
                 .somatic_bridge
                 .to_interoceptive_signals()
-                .tau_slowdown_factor as f32;
+                .tau_slowdown_factor as f32
+            * self.substrate_tau_factor;
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");
@@ -1496,6 +1497,73 @@ impl CognitiveLoopService {
             sht_crash_dip,
             exploration_sht_drain,
             phasic_da_replay_boost: 0, // set during feedback phase
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn dynamics_produces_finite_cfc_output() {
+        let mut svc = make_service();
+        let result = svc.cycle("dynamics finite check");
+        for (i, &v) in result.output.iter().enumerate() {
+            assert!(v.is_finite(), "CfC output[{i}] is not finite: {v}");
+        }
+    }
+
+    #[test]
+    fn dynamics_prediction_error_finite_non_nan() {
+        let mut svc = make_service();
+        let result = svc.cycle("prediction error check");
+        assert!(result.prediction_error.is_finite());
+        assert!(!result.prediction_error.is_nan());
+    }
+
+    #[test]
+    fn dynamics_reasoning_gate_not_blocked_when_engine_absent() {
+        let mut svc = make_service();
+        let result = svc.cycle("reasoning gate test");
+        // reasoning_engine is disabled by default, so the gate never fires
+        assert!(!result.metadata.reasoning_gate_blocked);
+    }
+
+    #[test]
+    fn dynamics_fep_fields_populated() {
+        let mut svc = make_service();
+        let result = svc.cycle("fep check");
+        assert!(result.metadata.fep.fep_accuracy.is_finite());
+        assert!(result.metadata.fep.fep_complexity.is_finite());
+        assert!(result.metadata.fep.fep_surprise.is_finite());
+    }
+
+    #[test]
+    fn dynamics_learning_occurred_flag_consistent() {
+        let mut svc = make_service();
+        let result = svc.cycle("learning flag");
+        if result.learning_occurred {
+            // training_loss is None when async_training=true (default)
+            if let Some(loss) = result.training_loss {
+                assert!(loss.is_finite());
+            }
+        }
+    }
+
+    #[test]
+    fn dynamics_actual_effective_lr_zero_when_no_learning() {
+        let mut cfg = CognitiveLoopConfig::default();
+        // Max valid threshold (1.0) — PE rarely exceeds this on first cycle
+        cfg.learning_threshold = 1.0;
+        let mut svc = CognitiveLoopService::new(cfg).unwrap();
+        let result = svc.cycle("no learning");
+        if !result.learning_occurred {
+            assert_eq!(result.metadata.actual_effective_lr, 0.0);
         }
     }
 }

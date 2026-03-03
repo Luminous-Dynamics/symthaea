@@ -293,6 +293,7 @@ impl ConsciousnessSnapshot {
             ActionHint::Explore => actions.push("Introduce novel inputs"),
             ActionHint::SeekInput => actions.push("System needs more input"),
             ActionHint::Continue => {}
+            ActionHint::Inhibit => actions.push("Inhibit current action"),
         }
 
         if self.boredom > 0.5 && !self.exploring {

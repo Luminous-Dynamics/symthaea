@@ -403,6 +403,32 @@ pub struct CognitiveLoopConfig {
     /// Default: false (telemetry-only).
     pub enable_moral_anomaly_response: bool,
 
+    /// Enable the semantic encoder channel.
+    /// When true, spawns a background Qwen3 embedding thread that runs alongside
+    /// the trigram encoder, projecting embeddings to HDC space via HdcBridge.
+    /// Records cosine similarity between trigram and semantic encodings as telemetry.
+    /// Default: false.
+    #[cfg(feature = "semantic-encoder")]
+    pub enable_semantic_encoder: bool,
+
+    /// Enable validation overlay: scales substrate feasibility by honest evidence confidence.
+    /// When enabled, effective_feasibility = raw × (floor + (1 − floor) × honest_confidence).
+    /// Default: false (raw feasibility used as-is).
+    /// Science: epistemic humility — hypothetical feasibility ≠ validated feasibility.
+    pub enable_validation_overlay: bool,
+
+    /// Skepticism floor for validation overlay (0.0–1.0).
+    /// Higher floor = less aggressive scaling. At 1.0, validation overlay has no effect.
+    /// At 0.0, effective_feasibility = raw × honest_confidence (maximally skeptical).
+    /// Default: 0.5.
+    pub validation_skepticism_floor: f64,
+
+    /// Enable substrate speed modulation of CfC tau (temporal dynamics).
+    /// When enabled, faster substrates get larger tau (more temporal integration),
+    /// slower substrates get smaller tau (reduced temporal span).
+    /// Default: false.
+    pub enable_substrate_speed_modulation: bool,
+
     /// Substrate type for consciousness feasibility calculation.
     /// Determines how substrate-specific requirements (causality, integration,
     /// binding, workspace) affect the Consciousness Equation V2 output.
@@ -448,7 +474,7 @@ impl Default for CognitiveLoopConfig {
             enable_virtual_body: true,
             enable_predictive_self: false,
             enable_attention_schema: false,
-            enable_gwt: false,
+            enable_gwt: true,
             enable_resonance: false,
             enable_quantum_coherence: false,
             enable_temporal_consciousness: false,
@@ -480,6 +506,11 @@ impl Default for CognitiveLoopConfig {
             enable_nurture_attachment: false,
             moral_anomaly_config: MoralAnomalyConfig::default(),
             enable_moral_anomaly_response: false,
+            #[cfg(feature = "semantic-encoder")]
+            enable_semantic_encoder: false,
+            enable_validation_overlay: false,
+            validation_skepticism_floor: 0.5,
+            enable_substrate_speed_modulation: false,
             substrate_type: SubstrateType::SiliconDigital,
             substrate_composition: None,
         }

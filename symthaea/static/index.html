@@ -136,6 +136,40 @@
             </div>
         </div>
 
+        <!-- Consciousness Weights -->
+        <div class="card">
+            <h2>Consciousness Weights</h2>
+            <div class="chart-container">
+                <canvas id="chartWeights"></canvas>
+            </div>
+            <div class="topo-info" style="margin-top:8px;">
+                <span>Convergence: <strong id="convergenceState">--</strong></span>
+                <span>Variance: <strong id="weightVariance">0.000</strong></span>
+            </div>
+        </div>
+
+        <!-- Structural Phi Decomposition -->
+        <div class="card">
+            <h2>Structural Phi</h2>
+            <div class="chart-container">
+                <canvas id="chartPhiDecomp"></canvas>
+            </div>
+            <div class="topo-info" style="margin-top:8px;">
+                <span>Emergence: <strong id="emergenceRatio">0.00</strong></span>
+            </div>
+        </div>
+
+        <!-- Substrate Feasibility -->
+        <div class="card moral-card">
+            <h2>Substrate</h2>
+            <div class="betti-row">
+                <div class="betti-badge cyan" id="substrateBadge">
+                    <div class="betti-value" id="substrateFeasibility">0.00</div>
+                    <div class="betti-label">Feasibility</div>
+                </div>
+            </div>
+        </div>
+
         <!-- State Flags -->
         <div class="card state-panel">
             <h2>System State</h2>

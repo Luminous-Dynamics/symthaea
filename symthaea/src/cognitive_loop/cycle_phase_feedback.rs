@@ -477,6 +477,7 @@ impl CognitiveLoopService {
         let psi_attention_avg = late_result.psi_attention_avg;
 
         let gwt_broadcast = integration_result.gwt_broadcast;
+        let gwt_coalition_size = integration_result.gwt_coalition_size;
         let cross_modal_binding_strength = integration_result.cross_modal_binding_strength;
         let cross_modal_psi = integration_result.cross_modal_psi;
         let resonance_frequency = integration_result.resonance_frequency;
@@ -535,7 +536,7 @@ impl CognitiveLoopService {
                 attractor_detected: self.neuromod.phase_tracker.detect_attractor().is_some(),
                 sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
                 gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
-                substrate_feasibility: self.substrate_feasibility,
+                substrate_feasibility: self.substrate_effective_feasibility,
                 // Moral topology → consciousness coupling
                 moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
                 moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
@@ -598,6 +599,7 @@ impl CognitiveLoopService {
             };
         let consciousness_weights = consciousness_output.current_weights;
         let consciousness_weight_variance = consciousness_output.weight_variance;
+        let convergence_state = format!("{:?}", consciousness_output.convergence_state);
 
         // ── EqV2 limiting component → targeted boost ─────────────────────
         // Complements Phase 19 gradient-based boost with equation-level
@@ -863,6 +865,7 @@ impl CognitiveLoopService {
             attention_schema_focus,
             psi_attention_avg,
             gwt_broadcast,
+            gwt_coalition_size,
             cross_modal_binding_strength,
             cross_modal_psi,
             resonance_frequency,
@@ -916,6 +919,67 @@ impl CognitiveLoopService {
             // Dynamic consciousness weights
             consciousness_weights,
             consciousness_weight_variance,
+            // Weight convergence
+            convergence_state,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn feedback_consciousness_level_in_range() {
+        let mut svc = make_service();
+        let result = svc.cycle("consciousness level");
+        assert!(
+            result.metadata.consciousness_level >= 0.0
+                && result.metadata.consciousness_level <= 1.0
+        );
+    }
+
+    #[test]
+    fn feedback_quality_diagnostics_populated() {
+        let mut svc = make_service();
+        let result = svc.cycle("quality diag");
+        assert!(result.metadata.quality.dissipative_health.is_finite());
+        assert!(result.metadata.quality.meta_cognitive_accuracy.is_finite());
+        assert!(result.metadata.quality.unified_quality_score.is_finite());
+    }
+
+    #[test]
+    fn feedback_epistemic_gate_fields_populated() {
+        let mut svc = make_service();
+        let result = svc.cycle("epistemic gate");
+        assert!(result.metadata.epistemic_gate_confidence.is_finite());
+        let _ = result.metadata.epistemic_gate_approved;
+    }
+
+    #[test]
+    fn feedback_sigma_finite() {
+        let mut svc = make_service();
+        let result = svc.cycle("sigma test");
+        if let Some(sigma) = result.metadata.sigma {
+            assert!(sigma.is_finite());
+        }
+    }
+
+    #[test]
+    fn feedback_pipeline_consciousness_finite() {
+        let mut svc = make_service();
+        let result = svc.cycle("pipeline test");
+        assert!(result.metadata.pipeline_consciousness.is_finite());
+    }
+
+    #[test]
+    fn feedback_cross_module_agreement_finite() {
+        let mut svc = make_service();
+        let result = svc.cycle("agreement test");
+        assert!(result.metadata.cross_module_agreement.is_finite());
     }
 }

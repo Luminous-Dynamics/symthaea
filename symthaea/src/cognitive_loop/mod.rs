@@ -371,7 +371,7 @@ pub struct CognitiveLoopService {
     fep_learning_signal: f32,
 
     /// FEP-driven learning rate boost (applied during CfC training step)
-    fep_lr_boost: f32,
+    fep_lr_boost: f64,
 
     /// Decoupled feedback state: attributed proposals for prediction_confidence
     /// and fep_lr_boost (Phase 2.2 Great Refactor).
@@ -409,6 +409,24 @@ pub struct CognitiveLoopService {
     /// probe weights exist on disk.
     #[cfg(feature = "neural-bridge")]
     neural_bridge: Option<NeuralBridge>,
+
+    /// Background embedding channel for Qwen3 semantic encoding.
+    /// Runs a dedicated thread that produces 1024D embeddings, projected
+    /// to BinaryHV via HdcBridge. Non-blocking: submits current input,
+    /// collects previous cycle's result.
+    #[cfg(feature = "semantic-encoder")]
+    semantic_embedding_channel: Option<symthaea_embeddings::channel::EmbeddingChannel>,
+
+    /// JL projection bridge for semantic embeddings → BinaryHV.
+    #[cfg(feature = "semantic-encoder")]
+    semantic_hdc_bridge: Option<symthaea_embeddings::HdcBridge>,
+
+    /// Pending response receiver from the semantic embedding channel.
+    /// Swapped each cycle: previous cycle's rx is consumed, new rx installed.
+    /// Wrapped in Mutex to satisfy Sync bound (MetricsProvider).
+    #[cfg(feature = "semantic-encoder")]
+    pending_semantic_rx:
+        std::sync::Mutex<Option<std::sync::mpsc::Receiver<symthaea_embeddings::channel::EmbedResponse>>>,
 
     /// Background training thread handle (when `config.async_training` is true
     /// and the backend is CfC).  `None` for synchronous training or HdcLtc backend.
@@ -708,6 +726,31 @@ pub struct CognitiveLoopService {
     /// Pre-computed substrate feasibility [0,1] from config.substrate_type.
     /// Scales Equation V2 consciousness to reflect substrate limitations.
     substrate_feasibility: f64,
+
+    /// Pending substrate transition description for telemetry.
+    /// Populated by `reconfigure_substrate()`/`reconfigure_composition()`,
+    /// drained into `CycleMetadata.substrate_transition` once per cycle.
+    pending_substrate_transition: Option<String>,
+
+    /// Honest evidence confidence for the current substrate (0.0–0.95).
+    /// From SubstrateValidationFramework: biological=0.95, silicon=0.10, etc.
+    substrate_honest_confidence: f64,
+
+    /// Effective feasibility after validation overlay blending.
+    /// When overlay disabled: equals substrate_feasibility.
+    /// When enabled: substrate_feasibility × (floor + (1 − floor) × honest_confidence).
+    substrate_effective_feasibility: f64,
+
+    /// CfC tau factor from substrate speed modulation [0.5, 2.0].
+    /// 1.0 when speed modulation is disabled.
+    substrate_tau_factor: f32,
+
+    /// Scale pressure: log10(substrate_max_scale / bio_max_scale).
+    /// Telemetry-only. 0.0 when speed modulation is disabled.
+    substrate_scale_pressure: f32,
+
+    /// Cycle at which consciousness weights first converged (0 = not yet).
+    convergence_cycle: usize,
 
     /// Unified Ethics Engine: wraps MoralParser + MoralAlgebra + ValueEvaluator + Harmonies
     /// into a single `evaluate()` call per cycle with co-prime interval scheduling.

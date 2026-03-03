@@ -262,7 +262,7 @@ pub(crate) struct CuriosityDrive {
 
     /// Exploration urge (0.0 to 1.0)
     /// Direct measure of desire to explore new patterns
-    pub exploration_urge: f32,
+    pub exploration_urge: f64,
 
     /// Novelty bonus for learning rate
     /// Higher when exploring new territory
@@ -343,7 +343,7 @@ impl CuriosityDrive {
         // Novelty bonus: higher when exploring after boredom
         // Reads current exploration_urge (set by feedback system in previous cycle)
         if self.exploration_urge > 0.3 {
-            self.novelty_bonus = 1.0 + (Self::MAX_NOVELTY_BONUS - 1.0) * self.exploration_urge;
+            self.novelty_bonus = 1.0 + (Self::MAX_NOVELTY_BONUS - 1.0) * self.exploration_urge as f32;
         } else if prediction_error > 0.5 {
             // High error = novel situation, boost learning
             self.novelty_bonus = 1.0 + 0.3 * (prediction_error - 0.5);
@@ -362,10 +362,10 @@ impl CuriosityDrive {
     pub fn apply_exploration_update(&mut self, update: ExplorationUpdate) {
         match update {
             ExplorationUpdate::Set(val) => {
-                self.exploration_urge = val.clamp(0.0, 1.0);
+                self.exploration_urge = (val as f64).clamp(0.0, 1.0);
             }
             ExplorationUpdate::Scale(factor) => {
-                self.exploration_urge = (self.exploration_urge * factor).clamp(0.0, 1.0);
+                self.exploration_urge = (self.exploration_urge * factor as f64).clamp(0.0, 1.0);
             }
         }
     }

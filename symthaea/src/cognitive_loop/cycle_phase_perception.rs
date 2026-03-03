@@ -17,14 +17,17 @@ impl CognitiveLoopService {
     /// strategy selection, HDC encoding, surprise exploration, input memoization,
     /// ethics engine, urgency computation.
     ///
-    /// Returns `Ok(PerceptionPhaseResult)` on success, or `Err(CycleResult)` if the
+    /// Returns `Ok(PerceptionPhaseResult)` on success, or `Err(Box<CycleResult>)` if the
     /// safety gateway blocks the input (early return).
+    ///
+    /// The Err variant is boxed because `CycleResult` is ~4KB (contains `BinaryHV`),
+    /// which would bloat the `Result` on the stack even though the error path is rare.
     pub(super) fn phase_perception(
         &mut self,
         input: &str,
         cycle_start: Instant,
         module_timings: &mut ModuleTimings,
-    ) -> Result<PerceptionPhaseResult, CycleResult> {
+    ) -> Result<PerceptionPhaseResult, Box<CycleResult>> {
         // ── Cycle init: startup suppression, biorhythm, nociception, neuromod bath ──
         let init = self.run_cycle_init(module_timings);
         let exploration_urge_start = init.exploration_urge_start;
@@ -35,7 +38,7 @@ impl CognitiveLoopService {
         // PHASE 0.1: Safety Pre-check (fast amygdala veto)
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(blocked) = self.safety_precheck(input, cycle_start) {
-            return Err(blocked);
+            return Err(Box::new(blocked));
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -114,5 +117,81 @@ impl CognitiveLoopService {
             effective_threshold: encoding.effective_threshold,
             memo_threshold: encoding.memo_threshold,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cognitive_loop::CognitiveLoopConfig;
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn perception_returns_ok_for_normal_input() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+        let result = svc.phase_perception("hello world", Instant::now(), &mut timings);
+        assert!(result.is_ok(), "phase_perception should return Ok for normal input");
+    }
+
+    #[test]
+    fn perception_result_has_finite_fields() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+        let result = svc
+            .phase_perception("test input", Instant::now(), &mut timings)
+            .unwrap();
+        assert!(result.moral_score.is_finite());
+        assert!(result.phi_attention_weight.is_finite());
+        assert!(result.prediction_error.is_finite());
+        assert!(result.soul_alignment.is_finite());
+        assert!(result.negation_detected.is_finite());
+        assert!(result.exploration_urge_start.is_finite());
+        assert!(result.effective_threshold.is_finite());
+    }
+
+    #[test]
+    fn perception_encoding_result_populated() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+        let result = svc
+            .phase_perception("encoding check", Instant::now(), &mut timings)
+            .unwrap();
+        assert!(!result.encoding_result.hdv.values.is_empty());
+        assert!(result.encoding_result.peak_attention.is_finite());
+    }
+
+    #[test]
+    fn perception_phi_dyad_ring_buffer_caps_at_4() {
+        let mut cfg = CognitiveLoopConfig::default();
+        cfg.enable_primitive_consciousness = true;
+        let mut svc = CognitiveLoopService::new(cfg).unwrap();
+        let mut timings = ModuleTimings::default();
+        for i in 0..6 {
+            let _ = svc.phase_perception(&format!("input {i}"), Instant::now(), &mut timings);
+        }
+        assert!(svc.recent_ai_hvs.len() <= 4);
+        assert!(svc.recent_input_hvs.len() <= 4);
+    }
+
+    #[test]
+    fn perception_moral_timing_recorded() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+        let _ = svc.phase_perception("moral timing", Instant::now(), &mut timings);
+        assert!(timings.moral_algebra < 10_000_000);
+    }
+
+    #[test]
+    fn perception_startup_warmup_on_first_cycle() {
+        let mut svc = make_service();
+        let mut timings = ModuleTimings::default();
+        let result = svc
+            .phase_perception("first cycle", Instant::now(), &mut timings)
+            .unwrap();
+        assert!(result.startup_warmup_progress >= 0.0 && result.startup_warmup_progress <= 1.0);
     }
 }

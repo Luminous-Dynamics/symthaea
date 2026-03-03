@@ -51,6 +51,7 @@ pub(super) struct LateConsciousnessResult {
 /// Results from the consciousness integration phase (GWT through master consciousness equation).
 pub(super) struct ConsciousnessIntegrationResult {
     pub gwt_broadcast: bool,
+    pub gwt_coalition_size: u32,
     pub cross_modal_binding_strength: f32,
     pub cross_modal_psi: f64,
     pub resonance_frequency: f64,
@@ -203,7 +204,7 @@ impl CognitiveLoopService {
         // exploration=0, learning=0. Soften both to allow partial recovery.
         if ctx.reasoning_gate_blocked && prefrontal_veto {
             self.set_exploration("dual_veto_freeze", 0.3);
-            self.set_lr("dual_veto_freeze", self.fep_lr_boost.max(1.0));
+            self.set_lr("dual_veto_freeze", self.fep_lr_boost.max(1.0) as f32);
             tracing::debug!(
                 cycle = self.stats.total_cycles,
                 "Dual-veto freeze detected: softening both gates for recovery"
@@ -634,23 +635,43 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let gwt_broadcast = if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-            if let Some(ref mut gwt) = self.gwt {
-                let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
-                gwt.submit_strategy(
-                    "cognitive_loop",
-                    activation,
-                    vec![ctx.hv16_cached],
-                    vec!["encoder".to_string()],
-                );
-                let result = gwt.process();
-                result.broadcast_occurred
+        let (gwt_broadcast, gwt_coalition_size) =
+            if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+                if let Some(ref mut gwt) = self.gwt {
+                    let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                    // Submit current encoding with activation-weighted salience
+                    gwt.submit_strategy(
+                        "cognitive_loop",
+                        activation,
+                        vec![ctx.hv16_cached],
+                        vec!["encoder".to_string()],
+                    );
+                    // If previous cycle's subsystems requested broadcast, boost salience
+                    if self.carryover.gwt_broadcast_occurred {
+                        gwt.submit_strategy(
+                            "cross_domain_priming",
+                            activation * 1.2, // Slightly higher salience for primed content
+                            vec![ctx.hv16_cached],
+                            vec!["priming".to_string()],
+                        );
+                    }
+                    let result = gwt.process();
+                    let coalition_size = result
+                        .winning_coalition
+                        .as_ref()
+                        .map(|c| c.members.len() as u32)
+                        .unwrap_or(0);
+                    (result.broadcast_occurred, coalition_size)
+                } else {
+                    (false, 0)
+                }
             } else {
-                false
-            }
-        } else {
-            false
-        };
+                (false, 0)
+            };
+
+        // Store GWT state in carryover for cross-domain coupling (next cycle)
+        self.carryover.gwt_broadcast_occurred = gwt_broadcast;
+        self.carryover.gwt_coalition_size = gwt_coalition_size;
 
         // FEEDBACK: GWT broadcast boosts confidence (conscious access moment)
         // Science: Baars (1988) — broadcast = conscious access, should amplify integration
@@ -825,11 +846,7 @@ impl CognitiveLoopService {
         } else {
             // Slowly return toward baseline (homeostasis drift toward 1.0)
             let drift = (1.0 - self.carryover.learning.adaptive_threshold_scale) * 0.02;
-            self.feedback_state.threshold.propose(
-                "homeostasis_drift",
-                super::feedback_state::FeedbackProposal::Add(drift as f64),
-            );
-            self.carryover.learning.adaptive_threshold_scale += drift;
+            self.adjust_threshold("homeostasis_drift", drift as f32);
         }
 
         // ── Phase 21: Temporal discontinuity recovery cascade ────────────
@@ -1165,6 +1182,7 @@ impl CognitiveLoopService {
 
         ConsciousnessIntegrationResult {
             gwt_broadcast,
+            gwt_coalition_size,
             cross_modal_binding_strength,
             cross_modal_psi,
             resonance_frequency,

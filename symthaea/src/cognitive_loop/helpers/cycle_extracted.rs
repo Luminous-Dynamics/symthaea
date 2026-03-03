@@ -157,7 +157,7 @@ impl CognitiveLoopService {
         (self
             .curiosity_drive
             .effective_learning_rate(semantic_modulated_lr)
-            * self.fep_lr_boost
+            * self.fep_lr_boost as f32
             * (1.0 + self.carryover.learning.mce_lr_boost)
             * subsystem_lr)
             .clamp(0.0, 0.01)
@@ -692,8 +692,6 @@ impl CognitiveLoopService {
     /// - Phase 2 (recover, cycles 5–10): gradual LR dampening + exploration boost
     /// - Phase 3 (escape, cycles >10): forced exploration=1.0, confidence×0.9, reset
     /// - Low arousal (<0.3): consolidation LR boost (Steriade 1996)
-    ///
-    /// Note: 4 emergency exploration bypasses elsewhere are intentional (direct mutations).
     pub(in crate::cognitive_loop) fn manage_arousal_trap(&mut self, affective_arousal: f32) {
         if affective_arousal > 0.7 {
             // Attenuated 50%: DA learning_rate_factor() already scales LR via the bath

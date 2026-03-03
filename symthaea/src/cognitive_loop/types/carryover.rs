@@ -1,0 +1,314 @@
+//! Carryover types — state that crosses cycle boundaries.
+
+use super::scheduling::CycleUrgency;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CYCLE CARRYOVER — state that crosses cycle boundaries
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cached consciousness integration scores carried between cycles.
+#[derive(Debug, Clone)]
+pub(crate) struct ConsciousnessCache {
+    /// Predictive processing phi modulation (1.0 = neutral)
+    pub(crate) predictive_phi_modulation: f64,
+    /// Cross-modal Phi (fed back into confidence)
+    pub(crate) cross_modal_psi: f64,
+    /// Body phi modulation (fed back into unified_psi)
+    pub(crate) body_phi_modulation: f64,
+    /// Embodied cognition phi modulation (fed back into unified_psi)
+    pub(crate) embodied_phi_modulation: f64,
+    /// Quantum coherence level (fed back into exploration boost)
+    pub(crate) quantum_coherence: f64,
+    /// Last computed Σ (Sigma) — cached for inter-cycle use.
+    pub(crate) last_sigma: Option<f64>,
+    /// Last spectral MIP Phi — cached for inter-cycle use.
+    pub(crate) last_spectral_mip_phi: Option<f64>,
+    /// Last harmonic field coherence (cached, updated every 10 cycles).
+    pub(crate) last_harmonic_coherence: f64,
+    /// Last holographic unity score (0.0–1.0, cached from last analyze).
+    pub(crate) last_holographic_unity: f64,
+    /// Last multi-modal integrated phi (cached).
+    pub(crate) last_multimodal_phi: f64,
+    /// Last consciousness equation v2 result (cached, updated every 25 cycles).
+    pub(crate) last_equation_v2_consciousness: f64,
+    /// Last hierarchical spectral MIP Phi (cached, updated every 100 cycles).
+    pub(crate) last_hierarchical_mip_phi: Option<f64>,
+    // ── Phase 21: Consciousness-Grounded Control ─────────────────────
+    /// Last embodied agency score (cached for strategy modulation).
+    pub(crate) last_embodied_agency: f64,
+    /// Last predictive free energy (cached for surprise amplitude scaling).
+    pub(crate) last_predictive_free_energy: f64,
+    // ── Structural Phi persistence ──────────────────────────────────
+    /// Last structural Phi result (updated every 194 cycles by consciousness engine).
+    pub(crate) last_structural_phi:
+        Option<symthaea_core::consciousness_metrics::StructuralPhiResult>,
+}
+
+impl Default for ConsciousnessCache {
+    fn default() -> Self {
+        Self {
+            predictive_phi_modulation: 1.0,
+            cross_modal_psi: 0.0,
+            body_phi_modulation: 1.0,
+            embodied_phi_modulation: 1.0,
+            quantum_coherence: 0.0,
+            last_sigma: None,
+            last_spectral_mip_phi: None,
+            last_harmonic_coherence: 0.0,
+            last_holographic_unity: 0.0,
+            last_multimodal_phi: 0.0,
+            last_equation_v2_consciousness: 0.0,
+            last_hierarchical_mip_phi: None,
+            last_embodied_agency: 0.5,
+            last_predictive_free_energy: 0.0,
+            last_structural_phi: None,
+        }
+    }
+}
+
+/// Urgency state for adaptive subsystem scheduling.
+#[derive(Debug, Clone)]
+pub(crate) struct UrgencyState {
+    /// Urgency level (hysteresis — prevents jitter)
+    pub(crate) urgency: CycleUrgency,
+    /// Consecutive cycles with error below threshold (Cruise mode trigger)
+    pub(crate) consecutive_low_error: u32,
+    /// Consecutive high-arousal cycles (Yerkes-Dodson trap detection)
+    pub(crate) arousal_trap_counter: u32,
+    /// Consecutive cycles since last metacognitive anomaly (for recovery ramp)
+    pub(crate) anomaly_recovery_counter: u32,
+    /// Whether an anomaly was active in the previous cycle
+    pub(crate) anomaly_was_active: bool,
+    // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
+    /// Mode transition confidence (0.0 = just switched, 1.0 = fully settled)
+    pub(crate) mode_confidence: f32,
+    /// Previous urgency for transition smoothing
+    pub(crate) prev_urgency: CycleUrgency,
+    /// Cycles since last urgency mode change
+    pub(crate) mode_stability_counter: u32,
+    /// Consecutive temporal discontinuity cycles (Phase 21 recovery cascade).
+    pub(crate) discontinuity_streak: u32,
+    /// Remaining cycles of anomaly drift recovery (0 = not active).
+    /// Science: Turrigiano (2008) — homeostatic plasticity engages for fixed duration.
+    pub(crate) anomaly_drift_recovery: u32,
+}
+
+impl Default for UrgencyState {
+    fn default() -> Self {
+        Self {
+            urgency: CycleUrgency::Normal,
+            consecutive_low_error: 0,
+            arousal_trap_counter: 0,
+            anomaly_recovery_counter: 0,
+            anomaly_was_active: false,
+            mode_confidence: 1.0,
+            prev_urgency: CycleUrgency::Normal,
+            mode_stability_counter: 0,
+            discontinuity_streak: 0,
+            anomaly_drift_recovery: 0,
+        }
+    }
+}
+
+/// Learning rate modulation state.
+#[derive(Debug, Clone)]
+pub(crate) struct LearningState {
+    /// Prediction confidence snapshot at cycle start (drift clamping)
+    pub(crate) prediction_confidence: f64,
+    /// MCE consciousness-level LR boost (decays 10%/cycle between MCE firings)
+    pub(crate) mce_lr_boost: f32,
+    /// Adaptive learning threshold multiplier (1.0 = config value as-is)
+    pub(crate) adaptive_threshold_scale: f64,
+    /// Subsystem LR modulation factor (accumulated post-training, consumed next cycle).
+    pub(crate) subsystem_lr_factor: f32,
+    // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
+    /// Self-model accuracy EMA (how well past predictions matched outcomes)
+    pub(crate) self_model_accuracy: f32,
+}
+
+impl Default for LearningState {
+    fn default() -> Self {
+        Self {
+            prediction_confidence: 0.5_f64,
+            mce_lr_boost: 0.0,
+            adaptive_threshold_scale: 1.0,
+            subsystem_lr_factor: 1.0,
+            self_model_accuracy: 0.5,
+        }
+    }
+}
+
+/// Cached quality and diagnostic metrics.
+#[derive(Debug, Clone)]
+pub(crate) struct QualityMetrics {
+    /// Number of detected causal chains (cached from last analysis, every 50 cycles).
+    pub(crate) causal_chain_count: usize,
+    /// Temporal continuity ratio (0.0–1.0, cached from last analysis, every 100 cycles).
+    pub(crate) temporal_continuity: f64,
+    /// Last value evaluator overall score (cached, updated every 20 cycles).
+    pub(crate) last_value_score: f64,
+    /// Last epistemic quality score (cached, updated every 50 cycles).
+    pub(crate) last_epistemic_quality: f64,
+    /// Last dissipative consciousness health score (0.0–1.0, cached from last update).
+    pub(crate) last_dissipative_health: f64,
+    /// Last Φ_eff from epistemic conflict (cached, updated every 50 cycles).
+    pub(crate) last_phi_eff: f64,
+    /// Last differentiable consciousness gradient magnitude (cached).
+    pub(crate) last_gradient_magnitude: f64,
+    /// Last affective valence (cached from last process_stimulus).
+    pub(crate) last_affective_valence: f32,
+    /// Last detected consciousness state type (cached, updated every 100 cycles).
+    pub(crate) last_consciousness_state: String,
+    /// Last epistemic confidence (cached from gate evaluation).
+    pub(crate) last_epistemic_confidence: f32,
+    /// Last unified pipeline consciousness score (cached).
+    pub(crate) last_pipeline_consciousness: f64,
+    /// Whether narrative-GWT vetoed the previous cycle (suppresses learning)
+    pub(crate) narrative_veto_active: bool,
+    /// Cached prefrontal veto (reused on skip cycles when amortized)
+    pub(crate) cached_prefrontal_veto: bool,
+    /// Smoothed coherence from previous cycle (for velocity computation)
+    pub(crate) last_coherence: f32,
+    /// Coherence velocity (rate of change, updated every 5 cycles)
+    pub(crate) coherence_velocity: f32,
+    /// Cached phi validation correlation (updated every 500 cycles)
+    pub(crate) phi_validation_correlation: f64,
+    /// Adjusted spectral weight for unified Psi (from phi validation)
+    pub(crate) phi_spectral_weight: f32,
+    /// Cached phenomenal binding strength (from late consciousness)
+    pub(crate) last_phenomenal_binding: f64,
+    /// Last epistemic conflict count (cached for reasoning override).
+    pub(crate) last_epistemic_conflict_count: usize,
+    /// Whether epistemic conflicts should force adaptive reasoning on next cycle.
+    pub(crate) epistemic_reasoning_override: bool,
+    /// Last grid encoding norm (cached between amortization cycles).
+    pub(crate) last_grid_norm: f32,
+    /// Last grid spatial complexity (cached between amortization cycles).
+    pub(crate) last_grid_complexity: f32,
+    /// Previous cycle's prediction confidence (for crash detection).
+    /// Science: Cools et al. (2008) — rapid confidence drop triggers serotonergic dip.
+    pub(crate) prev_confidence_for_crash: f64,
+    /// Last moral score from perception phase (cached for neuromod feedback).
+    /// Science: Zak (2012) — moral sentiment drives oxytocin/DA pathways.
+    pub(crate) last_moral_score: f32,
+}
+
+impl Default for QualityMetrics {
+    fn default() -> Self {
+        Self {
+            causal_chain_count: 0,
+            temporal_continuity: 0.0,
+            last_value_score: 0.0,
+            last_epistemic_quality: 0.0,
+            last_dissipative_health: 0.0,
+            last_phi_eff: 0.0,
+            last_gradient_magnitude: 0.0,
+            last_affective_valence: 0.0,
+            last_consciousness_state: String::new(),
+            last_epistemic_confidence: 0.5,
+            last_pipeline_consciousness: 0.0,
+            narrative_veto_active: false,
+            cached_prefrontal_veto: false,
+            last_coherence: 0.5,
+            coherence_velocity: 0.0,
+            phi_validation_correlation: 0.0,
+            phi_spectral_weight: 0.6,
+            last_phenomenal_binding: 0.5,
+            last_epistemic_conflict_count: 0,
+            epistemic_reasoning_override: false,
+            last_grid_norm: 0.0,
+            last_grid_complexity: 0.0,
+            prev_confidence_for_crash: 0.5,
+            last_moral_score: 0.0,
+        }
+    }
+}
+
+/// Historical state for cycle-to-cycle continuity.
+#[derive(Debug, Clone)]
+pub(crate) struct CycleHistory {
+    /// MCTS plan action (action_idx, confidence) for next cycle
+    pub(crate) mcts_plan: Option<(usize, f32)>,
+    /// Body arousal (fed back into CfC tau modulation)
+    pub(crate) body_arousal: f32,
+    /// Resonance frequency (fed back into delta_t modulation)
+    pub(crate) resonance_frequency: f64,
+    /// Last MCE consciousness level for learning gating
+    pub(crate) consciousness_level: f64,
+    /// Recent BinaryHV ring buffer for multi-component consciousness profile.
+    /// Capacity bound: 4 elements (evict-before-push via pop_front).
+    pub(crate) recent_hvs: std::collections::VecDeque<crate::hdc::BinaryHV>,
+    /// Cached causal relations count (avoids calling summarize_understanding every cycle).
+    pub(crate) last_causal_relations: usize,
+    /// Cached causal average confidence (avoids calling summarize_understanding every cycle).
+    pub(crate) last_causal_confidence: f64,
+    /// Cached consciousness profile composite (avoids computing every cycle).
+    pub(crate) last_profile_composite: f64,
+    /// Cached synergy-enhanced composite.
+    pub(crate) last_synergy_composite: f64,
+    /// Cached emergent properties count.
+    pub(crate) last_emergent_count: usize,
+    /// Whether an MCTS plan was applied this cycle (for post-hoc evaluation next cycle).
+    pub(crate) mcts_plan_applied: Option<(usize, f32, f32)>, // (action, confidence, prediction_error_at_time)
+    /// Previous cycle's compressed_state for input similarity memoization.
+    pub(crate) last_compressed_state: Option<Vec<f32>>,
+    /// Previous cycle's emotion_contagion valence (for homeostasis return-to-baseline).
+    pub(crate) last_emotion_valence: f32,
+    /// Previous cycle's emotion_contagion arousal (for homeostasis return-to-baseline).
+    pub(crate) last_emotion_arousal: f32,
+    // ── Phase 17: Predictive Self-Tuning ──────────────────────────────
+    /// Rolling window of recent prediction errors (last 16 cycles).
+    pub(crate) error_history: std::collections::VecDeque<f32>,
+    /// Self-model prediction: (cycle_made, predicted_confidence, predicted_urgency)
+    pub(crate) self_model_prediction: Option<(usize, f64, CycleUrgency)>,
+    /// Cached coherence value for this cycle (computed once, reused everywhere).
+    pub(crate) cached_coherence: Option<f32>,
+}
+
+impl Default for CycleHistory {
+    fn default() -> Self {
+        Self {
+            mcts_plan: None,
+            body_arousal: 0.5,
+            resonance_frequency: 0.0,
+            consciousness_level: 0.0,
+            recent_hvs: std::collections::VecDeque::with_capacity(4),
+            last_causal_relations: 0,
+            last_causal_confidence: 0.0,
+            last_profile_composite: 0.0,
+            last_synergy_composite: 0.0,
+            last_emergent_count: 0,
+            mcts_plan_applied: None,
+            last_compressed_state: None,
+            last_emotion_valence: 0.0,
+            last_emotion_arousal: 0.0,
+            error_history: std::collections::VecDeque::with_capacity(16),
+            self_model_prediction: None,
+            cached_coherence: None,
+        }
+    }
+}
+
+/// State carried over between consecutive cognitive cycles.
+///
+/// These fields represent the "memory" of the previous cycle that influences
+/// the next cycle's processing. All fields are reset to defaults by
+/// `CognitiveLoopService::reset()`.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CycleCarryover {
+    /// Cached consciousness integration scores
+    pub(crate) consciousness: ConsciousnessCache,
+    /// Urgency scheduling state
+    pub(crate) urgency: UrgencyState,
+    /// Learning rate modulation
+    pub(crate) learning: LearningState,
+    /// Cached quality/diagnostic metrics
+    pub(crate) quality: QualityMetrics,
+    /// Historical state for continuity
+    pub(crate) history: CycleHistory,
+    /// Whether GWT broadcast occurred in the previous cycle
+    pub(crate) gwt_broadcast_occurred: bool,
+    /// GWT winning coalition size from previous cycle (0 if no broadcast)
+    pub(crate) gwt_coalition_size: u32,
+}
+

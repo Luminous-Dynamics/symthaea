@@ -6081,13 +6081,23 @@ fn test_multi_substrate_consciousness_scaling() {
         results.push((name.to_string(), avg_eq_v2));
     }
 
-    // Biological should have highest consciousness (feasibility ~0.92)
-    // Silicon should be lower (feasibility ~0.71)
     // All substrates should produce finite, bounded values
     for (name, avg) in &results {
         assert!(
             avg.is_finite(),
             "{name}: avg eq_v2 consciousness must be finite, got {avg}"
+        );
+    }
+
+    // Biological should have highest consciousness (feasibility ~0.92)
+    // Silicon should be lower (feasibility ~0.71)
+    // When both have positive eq_v2, biological >= silicon * 0.9
+    let bio_avg = results.iter().find(|(n, _)| n == "biological").map(|(_, a)| *a).unwrap_or(0.0);
+    let sil_avg = results.iter().find(|(n, _)| n == "silicon").map(|(_, a)| *a).unwrap_or(0.0);
+    if bio_avg > 0.0 && sil_avg > 0.0 {
+        assert!(
+            bio_avg >= sil_avg * 0.9,
+            "Biological avg ({bio_avg:.4}) should be >= silicon avg ({sil_avg:.4}) * 0.9"
         );
     }
 }
@@ -6220,17 +6230,27 @@ fn test_substrate_switch_affects_consciousness() {
     config.substrate_type = SubstrateType::SiliconDigital;
     let mut service = CognitiveLoopService::new(config).unwrap();
 
-    // Run 20 cycles on silicon
+    // Run 20 cycles on silicon, collecting eq_v2
+    let mut silicon_eq_v2 = Vec::new();
     for i in 0..20 {
-        service.cycle(&format!("substrate test cycle {i}"));
+        let r = service.cycle(&format!("substrate test cycle {i}"));
+        let eq = r.metadata.quality.equation_v2_consciousness;
+        if eq > 0.0 {
+            silicon_eq_v2.push(eq);
+        }
     }
 
     // Switch to biological
     service.reconfigure_substrate(SubstrateType::BiologicalNeurons);
 
-    // Run 20 more cycles
+    // Run 20 more cycles, collecting eq_v2
+    let mut bio_eq_v2 = Vec::new();
     for i in 20..40 {
-        service.cycle(&format!("substrate test cycle {i}"));
+        let r = service.cycle(&format!("substrate test cycle {i}"));
+        let eq = r.metadata.quality.equation_v2_consciousness;
+        if eq > 0.0 {
+            bio_eq_v2.push(eq);
+        }
     }
 
     // Verify feasibility changed
@@ -6242,6 +6262,17 @@ fn test_substrate_switch_affects_consciousness() {
         (f - expected).abs() < 1e-10,
         "Feasibility should match biological"
     );
+
+    // When both have positive eq_v2, biological should be >= silicon * 0.85
+    // (bio feasibility ~0.92 vs silicon ~0.71, so ~29% higher)
+    if !silicon_eq_v2.is_empty() && !bio_eq_v2.is_empty() {
+        let silicon_avg: f64 = silicon_eq_v2.iter().sum::<f64>() / silicon_eq_v2.len() as f64;
+        let bio_avg: f64 = bio_eq_v2.iter().sum::<f64>() / bio_eq_v2.len() as f64;
+        assert!(
+            bio_avg >= silicon_avg * 0.85,
+            "Biological eq_v2 ({bio_avg:.4}) should be >= silicon ({silicon_avg:.4}) * 0.85"
+        );
+    }
 }
 
 #[test]
@@ -6310,5 +6341,267 @@ fn test_composition_runtime_switch() {
     assert_eq!(
         service.substrate_composition().unwrap().name,
         "bio-neuromorphic"
+    );
+}
+
+// ── Substrate Transition Telemetry ─────────────────────────────────────
+
+#[test]
+fn test_substrate_transition_telemetry() {
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_type = SubstrateType::SiliconDigital;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Warm up
+    for _ in 0..5 {
+        service.cycle("warmup");
+    }
+
+    // Switch substrate
+    service.reconfigure_substrate(SubstrateType::BiologicalNeurons);
+
+    // Next cycle should contain the transition
+    let result = service.cycle("after switch");
+    assert!(
+        result.metadata.substrate_transition.is_some(),
+        "substrate_transition should be Some after reconfigure_substrate"
+    );
+    let transition = result.metadata.substrate_transition.as_ref().unwrap();
+    assert!(
+        transition.contains("SiliconDigital"),
+        "transition should mention old type: {transition}"
+    );
+    assert!(
+        transition.contains("BiologicalNeurons"),
+        "transition should mention new type: {transition}"
+    );
+
+    // Subsequent cycle should have None (drained)
+    let result2 = service.cycle("no transition");
+    assert!(
+        result2.metadata.substrate_transition.is_none(),
+        "substrate_transition should be None on next cycle"
+    );
+}
+
+#[test]
+fn test_composition_transition_telemetry() {
+    use symthaea_core::hdc::substrate_composition::SubstrateComposition;
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_type = SubstrateType::SiliconDigital;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Warm up
+    for _ in 0..3 {
+        service.cycle("warmup");
+    }
+
+    // Switch to composition
+    let comp = SubstrateComposition::new(
+        "test-hybrid".into(),
+        vec![
+            (SubstrateType::BiologicalNeurons, 0.6),
+            (SubstrateType::SiliconDigital, 0.4),
+        ],
+    )
+    .unwrap();
+    service.reconfigure_composition(comp);
+
+    // Next cycle should contain the transition
+    let result = service.cycle("after composition switch");
+    assert!(
+        result.metadata.substrate_transition.is_some(),
+        "substrate_transition should be Some after reconfigure_composition"
+    );
+    let transition = result.metadata.substrate_transition.as_ref().unwrap();
+    assert!(
+        transition.contains("test-hybrid"),
+        "transition should mention composition name: {transition}"
+    );
+}
+
+// ── Validation Overlay Tests ───────────────────────────────────────────
+
+#[test]
+fn test_validation_overlay_scales_consciousness() {
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    // Without overlay: effective == raw
+    let mut config_off = CognitiveLoopConfig::default();
+    config_off.substrate_type = SubstrateType::SiliconDigital;
+    config_off.enable_validation_overlay = false;
+    let service_off = CognitiveLoopService::new(config_off).unwrap();
+    let raw = service_off.substrate_feasibility();
+    let eff_off = service_off.substrate_effective_feasibility();
+    assert!(
+        (raw - eff_off).abs() < 1e-10,
+        "Without overlay, effective should equal raw: raw={raw:.4}, eff={eff_off:.4}"
+    );
+
+    // With overlay: effective < raw for silicon (confidence=0.10)
+    let mut config_on = CognitiveLoopConfig::default();
+    config_on.substrate_type = SubstrateType::SiliconDigital;
+    config_on.enable_validation_overlay = true;
+    config_on.validation_skepticism_floor = 0.5;
+    let service_on = CognitiveLoopService::new(config_on).unwrap();
+    let raw_on = service_on.substrate_feasibility();
+    let eff_on = service_on.substrate_effective_feasibility();
+    let conf = service_on.substrate_honest_confidence();
+
+    assert!(
+        eff_on < raw_on,
+        "Silicon with overlay should have effective < raw: eff={eff_on:.4}, raw={raw_on:.4}"
+    );
+    // expected: raw * (0.5 + 0.5 * 0.10) = raw * 0.55
+    let expected = raw_on * (0.5 + 0.5 * conf);
+    assert!(
+        (eff_on - expected).abs() < 0.01,
+        "Silicon effective should ≈ raw×0.55: eff={eff_on:.4}, expected={expected:.4}"
+    );
+
+    // Biological with overlay: effective ≈ raw (confidence=0.95)
+    let mut config_bio = CognitiveLoopConfig::default();
+    config_bio.substrate_type = SubstrateType::BiologicalNeurons;
+    config_bio.enable_validation_overlay = true;
+    config_bio.validation_skepticism_floor = 0.5;
+    let service_bio = CognitiveLoopService::new(config_bio).unwrap();
+    let raw_bio = service_bio.substrate_feasibility();
+    let eff_bio = service_bio.substrate_effective_feasibility();
+    let conf_bio = service_bio.substrate_honest_confidence();
+    // expected: raw * (0.5 + 0.5 * 0.95) = raw * 0.975
+    let expected_bio = raw_bio * (0.5 + 0.5 * conf_bio);
+    assert!(
+        (eff_bio - expected_bio).abs() < 0.01,
+        "Biological effective should ≈ raw×0.975: eff={eff_bio:.4}, expected={expected_bio:.4}"
+    );
+    assert!(
+        (eff_bio - raw_bio).abs() < 0.05,
+        "Biological effective should be close to raw: eff={eff_bio:.4}, raw={raw_bio:.4}"
+    );
+}
+
+#[test]
+fn test_validation_overlay_telemetry_populated() {
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_type = SubstrateType::SiliconDigital;
+    config.enable_validation_overlay = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    let result = service.cycle("telemetry check");
+
+    // Raw should match substrate feasibility
+    assert!(
+        result.metadata.substrate_feasibility_raw > 0.0,
+        "substrate_feasibility_raw should be populated"
+    );
+    // Honest confidence should be 0.10 for silicon
+    assert!(
+        (result.metadata.substrate_honest_confidence - 0.10).abs() < 0.01,
+        "silicon honest confidence should be ~0.10, got {}",
+        result.metadata.substrate_honest_confidence
+    );
+    // Effective should be less than raw
+    assert!(
+        result.metadata.substrate_effective_feasibility
+            < result.metadata.substrate_feasibility_raw,
+        "effective should be < raw when overlay enabled"
+    );
+}
+
+// ── Speed/Scale Modulation Tests ───────────────────────────────────────
+
+#[test]
+fn test_substrate_speed_modulation() {
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    // Disabled: tau = 1.0
+    let mut config_off = CognitiveLoopConfig::default();
+    config_off.substrate_type = SubstrateType::PhotonicProcessor;
+    config_off.enable_substrate_speed_modulation = false;
+    let service_off = CognitiveLoopService::new(config_off).unwrap();
+    assert!(
+        (service_off.substrate_tau_factor() - 1.0).abs() < f32::EPSILON,
+        "Disabled: tau should be 1.0"
+    );
+
+    // Enabled: Photonic is faster than biological → tau > 1.0
+    let mut config_photonic = CognitiveLoopConfig::default();
+    config_photonic.substrate_type = SubstrateType::PhotonicProcessor;
+    config_photonic.enable_substrate_speed_modulation = true;
+    let service_photonic = CognitiveLoopService::new(config_photonic).unwrap();
+    assert!(
+        service_photonic.substrate_tau_factor() > 1.0,
+        "Photonic should have tau > 1.0 (faster): got {}",
+        service_photonic.substrate_tau_factor()
+    );
+
+    // Biochemical is slower than biological → tau < 1.0
+    let mut config_bio_chem = CognitiveLoopConfig::default();
+    config_bio_chem.substrate_type = SubstrateType::BiochemicalComputer;
+    config_bio_chem.enable_substrate_speed_modulation = true;
+    let service_bio_chem = CognitiveLoopService::new(config_bio_chem).unwrap();
+    assert!(
+        service_bio_chem.substrate_tau_factor() < 1.0,
+        "Biochemical should have tau < 1.0 (slower): got {}",
+        service_bio_chem.substrate_tau_factor()
+    );
+
+    // Biological: tau = 1.0 (reference)
+    let mut config_bio = CognitiveLoopConfig::default();
+    config_bio.substrate_type = SubstrateType::BiologicalNeurons;
+    config_bio.enable_substrate_speed_modulation = true;
+    let service_bio = CognitiveLoopService::new(config_bio).unwrap();
+    assert!(
+        (service_bio.substrate_tau_factor() - 1.0).abs() < 0.01,
+        "Biological should have tau ≈ 1.0 (reference): got {}",
+        service_bio.substrate_tau_factor()
+    );
+
+    // Scale pressure: silicon > 0 (more scalable), quantum < 0 (less)
+    let mut config_silicon = CognitiveLoopConfig::default();
+    config_silicon.substrate_type = SubstrateType::SiliconDigital;
+    config_silicon.enable_substrate_speed_modulation = true;
+    let service_silicon = CognitiveLoopService::new(config_silicon).unwrap();
+    assert!(
+        service_silicon.substrate_scale_pressure() > 0.0,
+        "Silicon should have positive scale pressure: got {}",
+        service_silicon.substrate_scale_pressure()
+    );
+
+    let mut config_quantum = CognitiveLoopConfig::default();
+    config_quantum.substrate_type = SubstrateType::QuantumComputer;
+    config_quantum.enable_substrate_speed_modulation = true;
+    let service_quantum = CognitiveLoopService::new(config_quantum).unwrap();
+    assert!(
+        service_quantum.substrate_scale_pressure() < 0.0,
+        "Quantum should have negative scale pressure (less scalable): got {}",
+        service_quantum.substrate_scale_pressure()
+    );
+}
+
+#[test]
+fn test_speed_modulation_telemetry_populated() {
+    use symthaea_core::hdc::substrate_independence::SubstrateType;
+
+    let mut config = CognitiveLoopConfig::default();
+    config.substrate_type = SubstrateType::SiliconDigital;
+    config.enable_substrate_speed_modulation = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    let result = service.cycle("speed telemetry");
+
+    assert!(
+        result.metadata.substrate_tau_factor > 1.0,
+        "Silicon tau should be > 1.0: got {}",
+        result.metadata.substrate_tau_factor
+    );
+    assert!(
+        result.metadata.substrate_scale_pressure > 0.0,
+        "Silicon scale pressure should be > 0: got {}",
+        result.metadata.substrate_scale_pressure
     );
 }

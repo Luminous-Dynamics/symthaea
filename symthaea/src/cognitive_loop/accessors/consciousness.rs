@@ -56,7 +56,7 @@ impl CognitiveLoopService {
             flow_learning_boost: self.flow_state.learning_boost,
             boredom: self.curiosity_drive.boredom,
             curiosity: self.curiosity_drive.curiosity,
-            exploration_urge: self.curiosity_drive.exploration_urge,
+            exploration_urge: self.curiosity_drive.exploration_urge as f32,
             exploring: self.curiosity_drive.should_explore(),
             novelty_bonus: self.curiosity_drive.novelty_bonus,
             emotional_valence: self.emotion_contagion.smoothed_valence(),

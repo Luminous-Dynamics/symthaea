@@ -207,6 +207,7 @@ pub(super) struct FeedbackPhaseResult {
     pub(super) attention_schema_focus: f32,
     pub(super) psi_attention_avg: f32,
     pub(super) gwt_broadcast: bool,
+    pub(super) gwt_coalition_size: u32,
     pub(super) cross_modal_binding_strength: f32,
     pub(super) cross_modal_psi: f64,
     pub(super) resonance_frequency: f64,
@@ -264,6 +265,8 @@ pub(super) struct FeedbackPhaseResult {
     // ── Dynamic consciousness weights ──
     pub(super) consciousness_weights: [f64; 4],
     pub(super) consciousness_weight_variance: f64,
+    // ── Weight convergence ──
+    pub(super) convergence_state: String,
 }
 
 impl CognitiveLoopService {
@@ -294,7 +297,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
         let perception = match self.phase_perception(input, cycle_start, &mut module_timings) {
             Ok(p) => p,
-            Err(blocked) => return blocked,
+            Err(blocked) => return *blocked,
         };
 
         // ═══════════════════════════════════════════════════════════════════
@@ -375,7 +378,7 @@ impl CognitiveLoopService {
         // FEP-modulated learning rate: precision × load × boost
         let fep_precision = self.fep_learning_signal.clamp(0.0, 1.0);
         let effective_lr =
-            0.001 * fep_precision * (1.0 - self.thermodynamic_load) * self.fep_lr_boost;
+            0.001 * fep_precision * (1.0 - self.thermodynamic_load) * self.fep_lr_boost as f32;
         if effective_lr < 1e-6 {
             return;
         }
