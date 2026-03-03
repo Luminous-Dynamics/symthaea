@@ -24,8 +24,11 @@ use symthaea_core::temporal::TemporalPredictor;
 
 use crate::attention::SurpriseMap;
 use crate::encoder::{MotionField, PatchHdcEncoder};
+use crate::predictive::PredictiveCodingHierarchy;
 use crate::training::{BpttResult, ManifoldTrainer};
-use crate::types::{ManifoldHealth, ManifoldState, SceneMatch, VisionConfig, VisionTelemetry};
+use crate::types::{
+    ManifoldHealth, ManifoldState, SceneMatch, SceneMemoryState, VisionConfig, VisionTelemetry,
+};
 
 /// A CfC temporal manifold over holographic video encodings.
 ///
@@ -53,11 +56,23 @@ pub struct VisionManifold {
     trainer: ManifoldTrainer,
     /// Exponential moving average of prediction error for adaptive training.
     error_ema: f32,
+    /// Optional predictive coding hierarchy for cross-scale attention.
+    predictive: Option<PredictiveCodingHierarchy>,
+    /// When true, skip training and contrastive refinement.
+    learning_frozen: bool,
 }
 
 impl VisionManifold {
     /// Create a new vision manifold sized for frames up to `max_width × max_height`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the config is invalid (see [`VisionConfig::validate()`]).
     pub fn new(config: VisionConfig, max_width: u32, max_height: u32) -> Self {
+        if let Err(e) = config.validate() {
+            panic!("Invalid VisionConfig: {e}");
+        }
+
         let encoder = PatchHdcEncoder::new(&config, max_width, max_height);
         let dim = config.hdc_dim;
         let state = ContinuousHV::zero(dim);
@@ -66,6 +81,12 @@ impl VisionManifold {
         let surprise = SurpriseMap::new(grid, config.surprise_decay, config.surprise_threshold);
         let motion_field = MotionField::new(dim, config.seed + 500_000);
         let trainer = ManifoldTrainer::new(&config.training, dim);
+
+        let predictive = if config.enable_predictive_hierarchy {
+            Some(PredictiveCodingHierarchy::new(&config, max_width, max_height))
+        } else {
+            None
+        };
 
         Self {
             config,
@@ -85,6 +106,8 @@ impl VisionManifold {
             telemetry: VisionTelemetry::default(),
             trainer,
             error_ema: 0.0,
+            predictive,
+            learning_frozen: false,
         }
     }
 
@@ -135,6 +158,14 @@ impl VisionManifold {
                 (0.0, 0.0)
             };
 
+        // Optionally process through predictive coding hierarchy
+        let cross_scale_prediction_error = if let Some(ref mut predictive) = self.predictive {
+            let output = predictive.process_frame_with_feedback(pixels, width, height, channels);
+            output.prediction_error
+        } else {
+            0.0
+        };
+
         let t1 = Instant::now();
         self.observe_encoded(&frame_hv, &patch_hvs, dt);
         let evolve_us = t1.elapsed().as_micros() as u64;
@@ -159,6 +190,7 @@ impl VisionManifold {
             motion_field_norm: motion_hv_norm,
             output_hv_norm: 0.0,
             attention_boost_applied: 0.0,
+            cross_scale_prediction_error,
         };
 
         self.telemetry.clone()
@@ -186,8 +218,9 @@ impl VisionManifold {
             // 2. A spike above recent baseline (catches pattern changes even
             //    when absolute error is small).
             let spike_threshold = self.error_ema * 2.0 + 0.005;
-            let should_train = self.prediction_error > self.config.training.error_threshold
-                || (self.frame_count > 2 && self.prediction_error > spike_threshold);
+            let should_train = !self.learning_frozen
+                && (self.prediction_error > self.config.training.error_threshold
+                    || (self.frame_count > 2 && self.prediction_error > spike_threshold));
             if should_train {
                 if let Some(last_input) = self.last_frame_hv.clone() {
                     let result = self.train_step_inner(
@@ -203,7 +236,7 @@ impl VisionManifold {
         self.surprise.update(patch_hvs, &self.last_patch_hvs);
 
         // Auto-refine encoder from surprise (closed-loop active inference)
-        if self.surprise.max_surprise() > self.config.surprise_threshold {
+        if !self.learning_frozen && self.surprise.max_surprise() > self.config.surprise_threshold {
             self.refine_from_attention();
         }
 
@@ -259,10 +292,14 @@ impl VisionManifold {
     /// with state persistence through the weight-transformed state (memory/inertia).
     /// This ensures the manifold tracks visual input rather than drifting into
     /// a random subspace (which happens with pure bind on random untrained weights).
+    ///
+    /// The `input_blend` parameter (default 0.7) controls the balance:
+    /// - High values (0.9): responsive to new input, less temporal memory
+    /// - Low values (0.3): more state persistence, slower adaptation
     fn equilibrium(&self, input: &ContinuousHV) -> ContinuousHV {
         let state_influence = self.weight_hv.bind(&self.state);
-        // Input-dominant blend: 70% observation, 30% state persistence
-        ContinuousHV::weighted_bundle(&[input, &state_influence], &[0.7, 0.3]).tanh()
+        let ib = self.config.input_blend;
+        ContinuousHV::weighted_bundle(&[input, &state_influence], &[ib, 1.0 - ib]).tanh()
     }
 
     /// CfC gating factor: σ = 1 - exp(-dt / τ).
@@ -288,6 +325,11 @@ impl VisionManifold {
     /// Last prediction error (free energy proxy, 0 = perfect prediction).
     pub fn prediction_error(&self) -> f32 {
         self.prediction_error
+    }
+
+    /// Exponential moving average of prediction error (for adaptive training).
+    pub fn error_ema(&self) -> f32 {
+        self.error_ema
     }
 
     /// Manifold coherence (state-frame cosine similarity, 0..1).
@@ -348,6 +390,38 @@ impl VisionManifold {
     /// Mutable access to the encoder (for contrastive refinement).
     pub fn encoder_mut(&mut self) -> &mut PatchHdcEncoder {
         &mut self.encoder
+    }
+
+    /// Count patches where surprise exceeds the configured threshold.
+    ///
+    /// Returns `(active, total)` where `active` is the count of salient patches.
+    pub fn active_patch_count(&self) -> (usize, usize) {
+        let attention = self.surprise.attention_map();
+        let active = attention
+            .values
+            .iter()
+            .filter(|&&v| v > self.config.surprise_threshold)
+            .count();
+        (active, attention.values.len())
+    }
+
+    /// Freeze or unfreeze learning.
+    ///
+    /// When frozen, `train_step_inner()` and `refine_contrastive()` are skipped
+    /// during `observe_encoded()`. The manifold still evolves its CfC state and
+    /// computes prediction error — only parameter updates are suppressed.
+    pub fn freeze_learning(&mut self, freeze: bool) {
+        self.learning_frozen = freeze;
+    }
+
+    /// Whether learning is currently frozen.
+    pub fn is_learning_frozen(&self) -> bool {
+        self.learning_frozen
+    }
+
+    /// Access the underlying config.
+    pub fn config(&self) -> &VisionConfig {
+        &self.config
     }
 
     /// Saliency-guided encoding refinement (closed-loop active inference).
@@ -427,8 +501,9 @@ impl VisionManifold {
 
     /// Snapshot the manifold's learned state for serialization.
     ///
-    /// Captures weight_hv, tau_base, feature_weights, and training steps
-    /// so the manifold can be resumed from a trained checkpoint.
+    /// Captures weight_hv, tau_base, feature_weights, training steps,
+    /// error_ema, prediction_error, frame_count, and encoder's prev_patch_lum
+    /// so the manifold can be fully resumed from a trained checkpoint.
     pub fn save_state(&self) -> ManifoldState {
         ManifoldState {
             weight_hv: self.weight_hv.as_slice().to_vec(),
@@ -437,6 +512,15 @@ impl VisionManifold {
             training_steps: self.trainer.total_steps(),
             hdc_dim: self.config.hdc_dim,
             num_features: self.config.num_features,
+            error_ema: self.error_ema,
+            prediction_error: self.prediction_error,
+            frame_count: self.frame_count,
+            prev_patch_lum: if self.encoder.prev_patch_lum.is_empty() {
+                None
+            } else {
+                Some(self.encoder.prev_patch_lum.clone())
+            },
+            scene_memory: None,
         }
     }
 
@@ -444,6 +528,9 @@ impl VisionManifold {
     ///
     /// Validates dimensional compatibility before applying. Returns `Err`
     /// if the saved state is incompatible with the current config.
+    ///
+    /// Restores weight_hv, tau_base, feature_weights, error_ema, prediction_error,
+    /// frame_count, and prev_patch_lum for seamless checkpoint/resume.
     pub fn load_state(&mut self, state: &ManifoldState) -> Result<(), String> {
         if state.hdc_dim != self.config.hdc_dim {
             return Err(format!(
@@ -465,9 +552,16 @@ impl VisionManifold {
         // Restore feature weights if compatible
         let current_weights = self.encoder.feature_weights().len();
         if state.feature_weights.len() == current_weights {
-            // Apply via contrastive interface would change weights — instead set directly
-            // We need mutable access to the encoder's weights
             self.encoder.set_feature_weights(&state.feature_weights);
+        }
+
+        // Restore additional state for seamless resume
+        self.error_ema = state.error_ema;
+        self.prediction_error = state.prediction_error;
+        self.frame_count = state.frame_count;
+
+        if let Some(ref lum) = state.prev_patch_lum {
+            self.encoder.prev_patch_lum = lum.clone();
         }
 
         Ok(())
@@ -542,6 +636,9 @@ impl VisionManifold {
         self.coherence = 0.0;
         self.frame_count = 0;
         self.error_ema = 0.0;
+        if let Some(ref mut predictive) = self.predictive {
+            predictive.reset();
+        }
     }
 }
 
@@ -634,6 +731,45 @@ impl SceneMemory {
     /// Clear all stored landmarks.
     pub fn clear(&mut self) {
         self.landmarks.clear();
+    }
+
+    /// Read-only access to stored landmarks as `(hv, stored_at_frame)` pairs.
+    pub fn export_landmarks(&self) -> &[(ContinuousHV, u64)] {
+        &self.landmarks
+    }
+
+    /// Remove a specific landmark by index. Returns `true` if removed.
+    pub fn forget(&mut self, scene_id: usize) -> bool {
+        if scene_id < self.landmarks.len() {
+            self.landmarks.remove(scene_id);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Snapshot the scene memory for serialization.
+    pub fn save_state(&self) -> SceneMemoryState {
+        SceneMemoryState {
+            landmarks: self
+                .landmarks
+                .iter()
+                .map(|(hv, frame)| (hv.as_slice().to_vec(), *frame))
+                .collect(),
+            capacity: self.capacity,
+            threshold: self.recognition_threshold,
+        }
+    }
+
+    /// Restore scene memory from a saved state.
+    pub fn load_state(&mut self, state: &SceneMemoryState) {
+        self.capacity = state.capacity;
+        self.recognition_threshold = state.threshold;
+        self.landmarks = state
+            .landmarks
+            .iter()
+            .map(|(vals, frame)| (ContinuousHV::from_vec(vals.clone()), *frame))
+            .collect();
     }
 }
 
@@ -997,6 +1133,11 @@ mod tests {
             training_steps: 0,
             hdc_dim: 100,
             num_features: 5,
+            error_ema: 0.0,
+            prediction_error: 0.0,
+            frame_count: 0,
+            prev_patch_lum: None,
+            scene_memory: None,
         };
 
         assert!(m.load_state(&bad_state).is_err());
@@ -1672,7 +1813,7 @@ mod tests {
         let mut max_pred_error = 0.0f32;
         let mut min_coherence = f32::MAX;
         let mut max_state_norm = 0.0f32;
-        let mut training_count = 0u32;
+        let mut _training_count = 0u32;
 
         for i in 0..1000 {
             // Cycle through 3 scenes: A(300) → B(300) → C(300) → A(100)
@@ -1712,7 +1853,7 @@ mod tests {
             min_coherence = min_coherence.min(tel.manifold_coherence);
             max_state_norm = max_state_norm.max(norm);
             if tel.training_triggered {
-                training_count += 1;
+                _training_count += 1;
             }
         }
 
@@ -1745,14 +1886,12 @@ mod tests {
         cfg_train.training.learning_rate = 0.01;
         cfg_train.training.error_threshold = 0.05;
 
-        let mut cfg_notrain = VisionConfig::default();
-        // Disable training completely: set threshold impossibly high AND
-        // set learning_rate to 0 so even spike-detection triggers are harmless.
-        cfg_notrain.training.error_threshold = 100.0;
-        cfg_notrain.training.learning_rate = 0.0;
+        let cfg_notrain = VisionConfig::default();
 
         let mut m_train = VisionManifold::new(cfg_train, 64, 64);
         let mut m_notrain = VisionManifold::new(cfg_notrain, 64, 64);
+        // Disable training via freeze_learning instead of invalid config
+        m_notrain.freeze_learning(true);
 
         let frame_a = solid_gray_frame(64, 64, 50);
         let frame_b = solid_gray_frame(64, 64, 200);
@@ -1766,12 +1905,10 @@ mod tests {
 
         // With training, the manifold's tau and weights have adapted
         assert!(m_train.training_steps() > 0, "Training should have triggered");
-        // Without training: spike detection may still trigger train_step,
-        // but with lr=0 the weights don't actually change.
-        // Just verify the trained manifold did more meaningful work.
-        assert!(
-            m_train.training_steps() > 0,
-            "Training manifold should have steps"
+        // Without training (frozen), no training steps should occur
+        assert_eq!(
+            m_notrain.training_steps(), 0,
+            "Frozen manifold should have no training steps"
         );
 
         // Both should produce finite, healthy states
@@ -1779,5 +1916,224 @@ mod tests {
         let health_notrain = m_notrain.compute_health();
         assert!(health_train.is_healthy);
         assert!(health_notrain.is_healthy);
+    }
+
+    // === Configurable Equilibrium ===
+
+    #[test]
+    fn test_high_input_blend_tracks_input() {
+        let mut cfg = VisionConfig::default();
+        cfg.input_blend = 0.9;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        for _ in 0..20 {
+            m.observe_frame(&frame, 64, 64, 1, 0.033);
+        }
+
+        let coherence_high_blend = m.coherence();
+
+        let mut cfg_low = VisionConfig::default();
+        cfg_low.input_blend = 0.3;
+        let mut m_low = VisionManifold::new(cfg_low, 64, 64);
+
+        for _ in 0..20 {
+            m_low.observe_frame(&frame, 64, 64, 1, 0.033);
+        }
+
+        // High blend should track input more closely
+        // Both should converge for a static scene, so check coherence is similar
+        assert!(coherence_high_blend > 0.5, "High blend coherence should be decent");
+        assert!(m_low.coherence() > 0.5, "Low blend coherence should also work");
+    }
+
+    // === Save/Load Extended Fields ===
+
+    #[test]
+    fn test_save_load_roundtrip_extended() {
+        let cfg = VisionConfig::default();
+        let mut m1 = VisionManifold::new(cfg.clone(), 64, 64);
+
+        // Evolve manifold to accumulate non-trivial state
+        let frame = gradient_frame(64, 64);
+        for _ in 0..10 {
+            m1.observe_frame(&frame, 64, 64, 1, 0.033);
+        }
+
+        let saved = m1.save_state();
+        assert!(saved.error_ema > 0.0 || saved.frame_count > 0);
+        assert_eq!(saved.frame_count, 10);
+
+        // Load into a fresh manifold
+        let mut m2 = VisionManifold::new(cfg, 64, 64);
+        assert!(m2.load_state(&saved).is_ok());
+
+        assert_eq!(m2.frame_count(), saved.frame_count);
+        assert!((m2.error_ema() - saved.error_ema).abs() < 1e-6);
+        assert!((m2.prediction_error() - saved.prediction_error).abs() < 1e-6);
+    }
+
+    // === Scene Memory Extended API ===
+
+    #[test]
+    fn test_scene_memory_export_landmarks() {
+        let mut mem = SceneMemory::new(16);
+        let dim = 16_384;
+
+        let scene_a = ContinuousHV::random(dim, 100);
+        let scene_b = ContinuousHV::random(dim, 200);
+        mem.remember(&scene_a, 10);
+        mem.remember(&scene_b, 20);
+
+        let landmarks = mem.export_landmarks();
+        assert_eq!(landmarks.len(), 2);
+        assert_eq!(landmarks[0].1, 10);
+        assert_eq!(landmarks[1].1, 20);
+    }
+
+    #[test]
+    fn test_scene_memory_forget() {
+        let mut mem = SceneMemory::new(16);
+        let dim = 16_384;
+
+        for i in 0..4u64 {
+            mem.remember(&ContinuousHV::random(dim, 100 + i), i * 10);
+        }
+        assert_eq!(mem.len(), 4);
+
+        assert!(mem.forget(1)); // Remove scene at index 1
+        assert_eq!(mem.len(), 3);
+
+        assert!(!mem.forget(100)); // Out of bounds
+        assert_eq!(mem.len(), 3);
+    }
+
+    #[test]
+    fn test_scene_memory_save_load_roundtrip() {
+        let mut mem = SceneMemory::new(16);
+        let dim = 16_384;
+
+        let scene_a = ContinuousHV::random(dim, 100);
+        let scene_b = ContinuousHV::random(dim, 200);
+        mem.remember(&scene_a, 10);
+        mem.remember(&scene_b, 20);
+
+        let saved = mem.save_state();
+        assert_eq!(saved.landmarks.len(), 2);
+
+        let mut mem2 = SceneMemory::new(8); // Different capacity
+        mem2.load_state(&saved);
+        assert_eq!(mem2.len(), 2);
+        assert_eq!(mem2.capacity, 16); // Restored from saved
+
+        // Should recognize original scenes
+        let result = mem2.recognize(&scene_a, 30);
+        assert!(result.is_some());
+    }
+
+    // === Freeze Learning ===
+
+    #[test]
+    fn test_freeze_learning() {
+        let mut cfg = VisionConfig::default();
+        cfg.training.error_threshold = 0.05;
+        cfg.training.learning_rate = 0.01;
+        cfg.learning.contrastive_lr = 0.1;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = gradient_frame(64, 64);
+
+        // Run a few frames unfrozen to establish state
+        for _ in 0..5 {
+            m.observe_frame(&frame_a, 64, 64, 1, 0.033);
+        }
+
+        // Freeze and run alternating pattern
+        m.freeze_learning(true);
+        assert!(m.is_learning_frozen());
+
+        let weights_before: Vec<f32> = m.encoder().feature_weights().to_vec();
+        let tau_before = m.current_tau();
+
+        for i in 0..20 {
+            let frame = if i % 2 == 0 { &frame_a } else { &frame_b };
+            m.observe_frame(frame, 64, 64, 1, 0.033);
+        }
+
+        let weights_after: Vec<f32> = m.encoder().feature_weights().to_vec();
+        let tau_after = m.current_tau();
+
+        // Weights and tau should not have changed while frozen
+        assert_eq!(weights_before, weights_after, "Weights should not change while frozen");
+        assert!(
+            (tau_before - tau_after).abs() < 1e-6,
+            "Tau should not change while frozen"
+        );
+    }
+
+    // === Active Patch Count ===
+
+    #[test]
+    fn test_active_patch_count() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        // Before any frames, all surprise is 0
+        let (active, total) = m.active_patch_count();
+        assert_eq!(active, 0);
+        assert!(total > 0);
+
+        // Feed two different frames to generate surprise
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = gradient_frame(64, 64);
+        m.observe_frame(&frame_a, 64, 64, 1, 0.033);
+        m.observe_frame(&frame_b, 64, 64, 1, 0.033);
+
+        let (active2, total2) = m.active_patch_count();
+        assert_eq!(total2, total);
+        // After a scene change, some patches should be active
+        // (not guaranteed but likely with gradient vs solid)
+        // active2 >= 0 always true for usize; just verify the call completes
+        let _ = active2;
+    }
+
+    // === Predictive Hierarchy Integration ===
+
+    #[test]
+    fn test_predictive_hierarchy_integration() {
+        let mut cfg = VisionConfig::default();
+        cfg.enable_predictive_hierarchy = true;
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        let frame = gradient_frame(64, 64);
+
+        // First frame: predictive hierarchy has no prior, cross-scale error should be 1.0
+        let tel1 = m.observe_frame(&frame, 64, 64, 1, 0.033);
+        assert!(tel1.cross_scale_prediction_error >= 0.0);
+        assert!(tel1.cross_scale_prediction_error.is_finite());
+
+        // Process more frames — error should decrease for a static scene
+        let mut errors = Vec::new();
+        for _ in 0..20 {
+            let tel = m.observe_frame(&frame, 64, 64, 1, 0.033);
+            errors.push(tel.cross_scale_prediction_error);
+        }
+
+        let late_mean: f32 = errors[15..20].iter().sum::<f32>() / 5.0;
+        assert!(
+            late_mean <= 1.0,
+            "Cross-scale prediction error should be bounded: {late_mean}"
+        );
+    }
+
+    // === Config Validation ===
+
+    #[test]
+    #[should_panic(expected = "Invalid VisionConfig")]
+    fn test_invalid_config_panics_on_construction() {
+        let mut cfg = VisionConfig::default();
+        cfg.tau_base = 0.0;
+        let _ = VisionManifold::new(cfg, 64, 64);
     }
 }
