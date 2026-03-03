@@ -13,6 +13,7 @@ use symthaea_psych_bench::benchmarks::executive::{DualTaskBenchmark, FlankerBenc
 use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
 use symthaea_psych_bench::benchmarks::social::{RmeBenchmark, UltimatumGameBenchmark};
 use symthaea_psych_bench::benchmarks::sustained_attention::{CptBenchmark, PvtBenchmark};
+use symthaea_psych_bench::benchmarks::worm::NBackBenchmark;
 use symthaea_psych_bench::harness::{
     BenchmarkConfig, BenchmarkReport, NormativeReport, PsychBenchmark,
 };
@@ -39,9 +40,9 @@ fn main() {
         ..Default::default()
     };
 
-    // The 9-benchmark calibration battery:
+    // The 10-benchmark calibration battery:
     // DA: Stroop + Flanker (interference)
-    // ACh: N-back is excluded (heavy) — covered by Stroop/Flanker secondarily
+    // ACh: N-back (working memory)
     // NE: StopSignal + GoNoGo (inhibition)
     // 5-HT: CPT (sustained attention)
     // GABA: DualTask (executive multitasking)
@@ -52,6 +53,7 @@ fn main() {
     let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
         Box::new(StroopBenchmark),
         Box::new(FlankerBenchmark),
+        Box::new(NBackBenchmark),
         Box::new(StopSignalBenchmark),
         Box::new(GoNoGoBenchmark),
         Box::new(CptBenchmark),

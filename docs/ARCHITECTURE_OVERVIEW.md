@@ -26,9 +26,9 @@ both systems, their integration points, and their current maturity — honestly.
 
 **How to read this document.** Every technical claim is tagged with a status
 marker. File paths use the format `path/to/file.rs:line` relative to the
-repository root. "Phi" is never used without a subscript — see Section 4 for
+repository root. "Phi" is never used without a subscript — see Section 3 for
 the full namespace registry. Governance terminology uses "operational coherence"
-in this document, with explicit mappings to code-level names in Section 7.1.
+in this document, with explicit mappings to code-level names in Section 6.1.
 
 ---
 
@@ -283,7 +283,7 @@ feedback from multiple subsystems safely:
 2. **IntegrationMode::Consensus** (default): Averages all proposals,
    providing noise-resistant integration. No single subsystem can cause
    a large swing.
-3. **FeedbackDivergence**: Monitors the spread between proposals. High
+3. **ConsensusResult**: Monitors the spread between proposals. High
    divergence triggers a stability flag in `CycleMetadata`.
 4. **Urgency-adaptive intervals**: Under Critical urgency, feedback runs
    every 3 cycles (vs. co-prime intervals in Normal mode).
@@ -298,7 +298,7 @@ to avoid phase-locking artifacts:
 | 1 | SpectralMIPFinder | 97 cycles | Tononi (2004) IIT | 0.35 |
 | 2 | MultiModalIntegrator | 13 cycles | Damasio (1994) binding | 0.15 |
 | 3 | ConsciousnessEquationV2 | 23 cycles | 7-theory synthesis | 0.25 |
-| 4 | UnifiedConsciousnessPipeline | 97 cycles | Dehaene (2011) GWT | 0.25 |
+| 4 | UnifiedConsciousnessPipeline | 97 cycles | Dehaene (2014) GWT | 0.25 |
 
 **Weighted consensus** (`consciousness_engine.rs:706`):
 
@@ -370,7 +370,7 @@ C(t) = σ(softmin(Φ, B, W, A, R, E, K; τ)) × [Σ(wᵢ × Cᵢ × γᵢ) / Σ(
 
 **File**: `symthaea/src/consciousness/measurement/consciousness_equation_v2.rs`
 
-### 4.4 Capability Maturity Table
+### 4.5 Capability Maturity Table
 
 | Capability | Status | Evidence |
 |------------|--------|----------|
@@ -394,7 +394,7 @@ C(t) = σ(softmin(Φ, B, W, A, R, E, K; τ)) × [Σ(wᵢ × Cᵢ × γᵢ) / Σ(
 | ZK consciousness attestations | [SC] | 183 LOC computation kernel, no prover circuit |
 | GPU/WGPU CfC | [SC] | API stub, `is_gpu_available()` returns false |
 
-### 4.5 Sub-Crate Map
+### 4.6 Sub-Crate Map
 
 46 extracted sub-crates in `symthaea/crates/`, grouped by domain:
 
@@ -588,7 +588,7 @@ pub struct ConsciousnessProfile {
 - engagement: 20%
 
 **None of these dimensions are Phi.** Φ_spectral MAY feed into the engagement
-dimension as one signal among many (see Section 9, Minimal Viable Bridge),
+dimension as one signal among many (see Section 8, Minimal Viable Bridge),
 but this mapping does not exist today.
 
 ### 6.3 Coherence Tiers and the "Right to Be Wrong"
@@ -702,7 +702,7 @@ transition probability matrices, not covariance).
 any Phi variant — for all access control decisions. Even if every Phi metric
 were completely meaningless, governance would function identically.
 
-The only planned integration point is the Minimal Viable Bridge (Section 9),
+The only planned integration point is the Minimal Viable Bridge (Section 8),
 where C_unified (the consciousness engine's weighted consensus) would feed
 into the engagement dimension — one of four dimensions, weighted at 20%.
 Even a worst-case Phi failure would affect at most 20% × 35% = 7%
@@ -911,7 +911,7 @@ have their contributions rejected entirely.
 | Paper | Focus | Status |
 |-------|-------|--------|
 | Psych-bench: Cognitive Benchmarking for Consciousness-First AI | 16-domain benchmark suite, normative scoring | Data quality pass complete; 8 CSVs regenerated [IT] |
-| Spectral MIP: Efficient Approximation of Integrated Information | Fiedler ordering + bordered Cholesky | Algorithm implemented [IT]; correlation with Φ_true unknown (λ₂ tier: r=-0.14) |
+| Spectral MIP: Efficient Approximation of Integrated Information | Fiedler ordering + bordered Cholesky | Algorithm implemented [IT]; MIP search validated (r=0.99, ρ=0.93); Gaussian MI vs TPM-based IIT unvalidated |
 | Substrate Independence for Artificial Consciousness | 8-substrate feasibility + validation framework | Core framework complete [IT]; dynamic integration planned [SC] |
 | Moral Algebra: HDC Representations of Ethical Reasoning | 4096D ContinuousHV moral primitives | Integrated in cognitive loop [IT]; no independent evaluation |
 | Neuromodulator Bath: Neurochemical Dynamics in AI | 9 transmitters, receptor subtypes, tolerance/withdrawal | 218 tests [IT]; psych-bench neuromod benchmarks added |

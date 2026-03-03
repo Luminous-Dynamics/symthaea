@@ -111,8 +111,8 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("DigitSpan") => Some(("digit_span_forward", &bl.worm)),
 
         // Sustained Attention
-        name if name.contains("PVT") => Some(("pvt_mean_rt", &bl.sustained_attention)),
-        name if name.contains("SART") => Some(("sart_d_prime", &bl.sustained_attention)),
+        name if name.contains("PVT") => Some(("vigilance_decrement", &bl.sustained_attention)),
+        name if name.contains("SART") => Some(("commission_errors", &bl.sustained_attention)),
         name if name.contains("CPT") => Some(("cpt_d_prime", &bl.sustained_attention)),
 
         // Metacognition
@@ -145,7 +145,7 @@ fn baseline_for_benchmark<'a>(
 
         // Motor
         name if name.contains("FittsLaw") => Some(("fitts_r_squared", &bl.motor)),
-        name if name.contains("SRTT") => Some(("srtt_sequence_rt_ticks", &bl.motor)),
+        name if name.contains("SRTT") => Some(("learning_effect", &bl.motor)),
         name if name.contains("Bimanual") => Some(("coordination_cost", &bl.motor)),
 
         // Language

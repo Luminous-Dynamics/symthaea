@@ -1269,9 +1269,9 @@ pub fn inhibition_baselines() -> BTreeMap<&'static str, Baseline> {
     m.insert(
         "ssrt_ticks",
         Baseline {
-            value: 4.0,
-            sd: Some(1.0),
-            source: "Logan (1994); Verbruggen & Logan (2008), SSRT ~200ms at 50ms/tick",
+            value: 0.10,
+            sd: Some(0.05),
+            source: "Logan (1994); Verbruggen & Logan (2008), HDC-scale SSRT from staircase SSD tracking",
             population: "human adults",
         },
     );
@@ -1394,9 +1394,9 @@ pub fn attention_baselines() -> BTreeMap<&'static str, Baseline> {
     m.insert(
         "search_asymmetry",
         Baseline {
-            value: 2.0,
-            sd: Some(0.5),
-            source: "Treisman & Gelade (1980), conjunction_slope - feature_slope",
+            value: 0.25,
+            sd: Some(0.10),
+            source: "Treisman & Gelade (1980), HDC-scale conjunction-feature slope difference",
             population: "human adults",
         },
     );
@@ -1946,9 +1946,9 @@ pub fn sustained_attention_baselines() -> BaselineMap {
     m.insert(
         "vigilance_decrement",
         Baseline {
-            value: 0.05,
-            sd: Some(0.02),
-            source: "Dinges & Powell (1985), RT slope per block",
+            value: 0.10,
+            sd: Some(0.05),
+            source: "Dinges & Powell (1985); Basner & Dinges (2011), HDC-scale RT slope per block",
             population: "human adults",
         },
     );
