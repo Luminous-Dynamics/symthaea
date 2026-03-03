@@ -10,6 +10,10 @@
 
 mod cycle_extracted;
 mod cycle_phases;
+mod cycle_phases_dream;
+mod cycle_phases_init_stats;
+mod cycle_phases_memory;
+mod cycle_phases_urgency;
 mod feedback_helpers;
 mod parallel;
 
@@ -706,7 +710,7 @@ impl CognitiveLoopService {
         self.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
         self.fep_agent = ActiveInferenceAgent::new(self.fep_agent.config.clone());
         self.coherence_tracker.reset();
-        self.social = super::SocialState::default();
+        self.social_coherence.social = super::SocialState::default();
         if let Some(ref mut usi) = self.user_state {
             usi.reset();
         }

@@ -13,9 +13,10 @@ pub use telemetry::*;
 pub use output::*;
 
 // Re-export crate-visible types
-pub(crate) use carryover::{
-    ConsciousnessCache, CycleCarryover, LearningState, QualityMetrics, UrgencyState,
-};
+pub(crate) use carryover::{ConsciousnessCache, CycleCarryover, QualityMetrics};
+// Used by test modules — gate to suppress unused-import warnings in lib builds
+#[cfg(test)]
+pub(crate) use carryover::{LearningState, UrgencyState};
 pub(crate) use scheduling::CycleState;
 
 #[cfg(test)]
