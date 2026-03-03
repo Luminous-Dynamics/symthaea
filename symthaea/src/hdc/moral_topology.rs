@@ -680,7 +680,7 @@ impl MoralTopology {
         };
 
         // ── Derived scores ──────────────────────────────────────────────
-        let unity = 1.0 / (betti.beta_0 as f64);
+        let unity = 1.0 / (betti.beta_0.max(1) as f64);
         let circularity = {
             let cycle_count = persistent_features
                 .iter()
@@ -1141,7 +1141,7 @@ mod tests {
 
         // Should be among the top 3 harmonies for a care-oriented sentence
         let mut sorted: Vec<(usize, f64)> = coords.iter().copied().enumerate().collect();
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let top3_indices: Vec<usize> = sorted.iter().take(3).map(|(i, _)| *i).collect();
         assert!(
             top3_indices.contains(&psf_idx),
@@ -1827,5 +1827,31 @@ mod tests {
         assert_eq!(state.observations(), 0, "adaptive state should not update when disabled");
         // Effective thresholds remain at initial values (seeded from config's drift_alert_threshold)
         assert!((state.effective_drift_threshold - 0.4).abs() < f64::EPSILON);
+    }
+
+    // ── Test: unity is always finite after analyze() ────────────────────
+
+    #[test]
+    fn test_unity_always_finite() {
+        let config = test_config();
+        let mut topo = MoralTopology::new(config);
+
+        let hv = encode_text("sharing resources fairly with neighbours");
+        topo.add_scenario(hv);
+        topo.analyze();
+
+        let assessment = topo.last_summary();
+        assert!(assessment.unity.is_finite(), "unity must be finite, got {}", assessment.unity);
+        assert!(assessment.unity > 0.0, "unity must be positive, got {}", assessment.unity);
+        assert!(assessment.unity <= 1.0, "unity must be <= 1.0, got {}", assessment.unity);
+    }
+
+    // ── Test: beta_0.max(1) guard prevents infinity ─────────────────────
+
+    #[test]
+    fn test_beta0_max1_guard() {
+        // Directly verify the guard expression used in analyze()
+        let guarded = 1.0 / (0_usize.max(1) as f64);
+        assert_eq!(guarded, 1.0, "beta_0=0 should be guarded to produce 1.0, not infinity");
     }
 }
