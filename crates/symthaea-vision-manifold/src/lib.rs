@@ -45,5 +45,5 @@ pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
     AttentionMap, LearningConfig, ManifoldHealth, ManifoldState, MultiScaleConfig, PatchGrid,
-    SceneMatch, TrainingConfig, TrainingMethod, VisionConfig, VisionTelemetry,
+    ScaleHealth, SceneMatch, TrainingConfig, TrainingMethod, VisionConfig, VisionTelemetry,
 };
