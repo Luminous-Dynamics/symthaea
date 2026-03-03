@@ -8,6 +8,13 @@
 
 use std::time::Instant;
 
+use super::thresholds::{
+    CAUSAL_BINDING_THRESHOLD, HARMONIC_FIELD_BOOST_FACTOR, HARMONIC_FIELD_BOOST_THRESHOLD,
+    PHI_VALIDATION_HIGH_THRESHOLD, PHI_VALIDATION_LOW_THRESHOLD, REASONING_CONFIDENCE_BOOST_FACTOR,
+    REASONING_CONFIDENCE_BOOST_THRESHOLD, SPECTRAL_WEIGHT_BASE, SPECTRAL_WEIGHT_SCALE,
+    TEMPORAL_CHAIN_BOOST_FACTOR, TEMPORAL_CONTINUITY_BOOST_FACTOR,
+    TEMPORAL_CONTINUITY_BOOST_THRESHOLD, TEMPORAL_REPLAY_TRIGGER,
+};
 use super::CognitiveLoopService;
 
 /// Values computed by the consciousness metrics phase.
@@ -305,8 +312,9 @@ impl CognitiveLoopService {
         module_timings.primitive_reasoning = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: High reasoning confidence → boost prediction confidence
-        if reasoning_chain_confidence > 0.7 {
-            let reason_boost = (reasoning_chain_confidence - 0.7) * 0.03; // up to +0.9%
+        if reasoning_chain_confidence > REASONING_CONFIDENCE_BOOST_THRESHOLD {
+            let reason_boost = (reasoning_chain_confidence - REASONING_CONFIDENCE_BOOST_THRESHOLD)
+                * REASONING_CONFIDENCE_BOOST_FACTOR; // up to +0.9%
             self.adjust_confidence("reasoning_chain", reason_boost);
         }
 
@@ -406,12 +414,18 @@ impl CognitiveLoopService {
                     // Adjust spectral weight based on validation quality:
                     // High correlation → trust spectral MIP more (boost weight)
                     // Low correlation → reduce spectral weight (trust eq_v2 more)
-                    if r > 0.7 {
+                    if r > PHI_VALIDATION_HIGH_THRESHOLD {
                         self.carryover.quality.phi_spectral_weight =
-                            (0.6 + (r - 0.7) as f32 * 0.67).clamp(0.4, 0.8);
-                    } else if r < 0.3 && r > 0.0 {
+                            (SPECTRAL_WEIGHT_BASE
+                                + (r - PHI_VALIDATION_HIGH_THRESHOLD) as f32
+                                    * SPECTRAL_WEIGHT_SCALE)
+                                .clamp(0.4, 0.8);
+                    } else if r < PHI_VALIDATION_LOW_THRESHOLD && r > 0.0 {
                         self.carryover.quality.phi_spectral_weight =
-                            (0.6 - (0.3 - r) as f32 * 0.67).clamp(0.4, 0.8);
+                            (SPECTRAL_WEIGHT_BASE
+                                - (PHI_VALIDATION_LOW_THRESHOLD - r) as f32
+                                    * SPECTRAL_WEIGHT_SCALE)
+                                .clamp(0.4, 0.8);
                     }
                     r
                 } else {
@@ -612,7 +626,7 @@ impl CognitiveLoopService {
                 // Track A: Build causal codebook entries by binding content BinaryHVs
                 let codebook_entries: Vec<(String, Vec<f32>)> = detected
                     .iter()
-                    .filter(|c| c.genuine_causation && c.causal_strength > 0.5)
+                    .filter(|c| c.genuine_causation && c.causal_strength > CAUSAL_BINDING_THRESHOLD as f64)
                     .filter_map(|c| {
                         let contents: Vec<&crate::hdc::binary_hv::BinaryHV> = c
                             .intervals
@@ -654,7 +668,9 @@ impl CognitiveLoopService {
                     let analysis = analyzer.analyze_continuity();
                     self.carryover.quality.temporal_continuity = analysis.continuity_score;
                     // Track A: Detect continuity gaps that warrant demand replay
-                    let replay_needed = analysis.continuity_score < 0.3 || analysis.gap_count > 5;
+                    let replay_needed =
+                        analysis.continuity_score < TEMPORAL_REPLAY_TRIGGER as f64
+                            || analysis.gap_count > 5;
                     (analysis.continuity_score, replay_needed)
                 } else {
                     (self.carryover.quality.temporal_continuity, false)
@@ -667,14 +683,16 @@ impl CognitiveLoopService {
         module_timings.temporal_analyzer = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Temporal continuity → prediction confidence (stable time-axis = reliable predictions)
-        if temporal_continuity > 0.7 {
-            let boost = ((temporal_continuity - 0.7) * 0.05) as f32; // up to +1.5%
+        if temporal_continuity > TEMPORAL_CONTINUITY_BOOST_THRESHOLD {
+            let boost = ((temporal_continuity - TEMPORAL_CONTINUITY_BOOST_THRESHOLD)
+                * TEMPORAL_CONTINUITY_BOOST_FACTOR) as f32; // up to +1.5%
             self.adjust_confidence("temporal_continuity", boost);
         }
 
         // FEEDBACK: Causal chain detection → confidence boost (the system found real structure)
         if temporal_causal_chains > 2 {
-            let chain_boost = (temporal_causal_chains.min(10) as f32 - 2.0) * 0.005; // +0.5% per chain, up to +4%
+            let chain_boost =
+                (temporal_causal_chains.min(10) as f32 - 2.0) * TEMPORAL_CHAIN_BOOST_FACTOR; // +0.5% per chain, up to +4%
             self.adjust_confidence("causal_chain_detect", chain_boost);
         }
 
@@ -950,8 +968,10 @@ impl CognitiveLoopService {
         module_timings.harmonics = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Harmonic coherence → LR stability (coherent values = stable learning)
-        if harmonic_field_coherence > 0.6 {
-            let harmony_boost = 1.0 + ((harmonic_field_coherence - 0.6) * 0.05) as f32; // up to +2%
+        if harmonic_field_coherence > HARMONIC_FIELD_BOOST_THRESHOLD as f64 {
+            let harmony_boost = 1.0
+                + ((harmonic_field_coherence - HARMONIC_FIELD_BOOST_THRESHOLD as f64)
+                    * HARMONIC_FIELD_BOOST_FACTOR as f64) as f32; // up to +2%
             self.carryover.learning.subsystem_lr_factor *= harmony_boost;
         }
         // FEEDBACK: Harmonic interferences → reduce confidence (value tensions = uncertainty)

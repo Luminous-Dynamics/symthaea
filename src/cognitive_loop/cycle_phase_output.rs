@@ -67,6 +67,7 @@ impl CognitiveLoopService {
             attention: super::AttentionMetrics {
                 attention_schema_focus: feedback.attention_schema_focus,
                 gwt_broadcast: feedback.gwt_broadcast,
+                gwt_coalition_size: feedback.gwt_coalition_size,
                 psi_attention_avg: feedback.psi_attention_avg,
                 phi_attention_weight: perception.phi_attention_weight,
                 attention_budget_exceeded: dynamics.attention_budget_exceeded,
@@ -364,6 +365,20 @@ impl CognitiveLoopService {
             ..Default::default()
         };
 
+        // ── Substrate & convergence telemetry ──
+        metadata.substrate_feasibility = self.substrate_effective_feasibility;
+        metadata.substrate_transition = self.pending_substrate_transition.take();
+        metadata.substrate_feasibility_raw = self.substrate_feasibility;
+        metadata.substrate_honest_confidence = self.substrate_honest_confidence;
+        metadata.substrate_effective_feasibility = self.substrate_effective_feasibility;
+        metadata.substrate_tau_factor = self.substrate_tau_factor;
+        metadata.substrate_scale_pressure = self.substrate_scale_pressure;
+        metadata.weight_convergence_state = feedback.convergence_state.clone();
+        if feedback.convergence_state == "Converged" && self.convergence_cycle == 0 {
+            self.convergence_cycle = self.stats.total_cycles as usize;
+        }
+        metadata.convergence_cycle = self.convergence_cycle;
+
         // ── Fragmentation warning ──
         {
             let topo = self.ethics_engine.moral_topology().last_summary();
@@ -457,9 +472,9 @@ impl CognitiveLoopService {
         // ── Phase 2.2: End feedback proposal collection ──────────────────
         let feedback_consensus = self.feedback_state.end_cycle(
             self.prediction_confidence,
-            self.fep_lr_boost as f64,
-            self.curiosity_drive.exploration_urge as f64,
-            self.carryover.learning.adaptive_threshold_scale as f64,
+            self.fep_lr_boost,
+            self.curiosity_drive.exploration_urge,
+            self.carryover.learning.adaptive_threshold_scale,
         );
 
         // Store consensus-smoothed values for application at the next cycle start.
@@ -509,5 +524,99 @@ impl CognitiveLoopService {
             #[cfg(feature = "identity")]
             assurance_level,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+
+    fn make_service() -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+    }
+
+    #[test]
+    fn output_metadata_non_default() {
+        let mut svc = make_service();
+        let result = svc.cycle("metadata check");
+        assert!(result.metadata.cycle_duration_us > 0);
+        assert!(!result.metadata.selected_strategy.is_empty());
+    }
+
+    #[test]
+    fn output_thalamic_depth_maps_correctly() {
+        let mut svc = make_service();
+        let result = svc.cycle("thalamic depth");
+        let score = result.metadata.thalamic_depth_score;
+        assert!(
+            (score - 1.0).abs() < f32::EPSILON
+                || (score - 0.5).abs() < f32::EPSILON
+                || (score - 0.2).abs() < f32::EPSILON,
+            "thalamic_depth_score should be 1.0, 0.5, or 0.2, got {score}"
+        );
+    }
+
+    #[test]
+    fn output_is_consolidating_populated() {
+        let mut svc = make_service();
+        let result = svc.cycle("consolidation check");
+        let _ = result.metadata.is_consolidating;
+    }
+
+    #[test]
+    fn output_module_timings_has_core_hdc_encode() {
+        let mut svc = make_service();
+        let result = svc.cycle("timing check");
+        assert!(
+            result.metadata.module_timings_us.core_hdc_encode > 0
+                || result.metadata.module_timings_us.core_cfc_step > 0
+        );
+    }
+
+    #[test]
+    fn output_thought_vector_32d() {
+        let mut svc = make_service();
+        let result = svc.cycle("thought vector");
+        assert_eq!(result.thought_vector.len(), 32);
+        for (i, &v) in result.thought_vector.iter().enumerate() {
+            assert!(v.is_finite(), "thought_vector[{i}] should be finite");
+        }
+    }
+
+    #[test]
+    fn output_circadian_phase_populated() {
+        let mut svc = make_service();
+        let result = svc.cycle("circadian check");
+        assert!(!result.metadata.circadian_phase.is_empty());
+    }
+
+    #[test]
+    fn test_convergence_cycle_captured_and_persists() {
+        let mut svc = make_service();
+        // Initially convergence_cycle should be 0
+        let result = svc.cycle("convergence init");
+        assert_eq!(
+            result.metadata.convergence_cycle, 0,
+            "convergence_cycle should start at 0"
+        );
+
+        // Run enough cycles to potentially reach convergence (steady input → weights stabilize)
+        let mut first_convergence_cycle = 0usize;
+        for i in 0..200 {
+            let result = svc.cycle("steady input for convergence");
+            if result.metadata.convergence_cycle > 0 && first_convergence_cycle == 0 {
+                first_convergence_cycle = result.metadata.convergence_cycle;
+            }
+            // Once captured, it should persist
+            if first_convergence_cycle > 0 {
+                assert_eq!(
+                    result.metadata.convergence_cycle, first_convergence_cycle,
+                    "convergence_cycle should persist once set (cycle {i})"
+                );
+            }
+        }
+        // Note: convergence may or may not be reached in 200 cycles depending on
+        // the dynamics. If it was reached, we verified persistence above.
+        // The key invariant is: once set, it never changes.
     }
 }

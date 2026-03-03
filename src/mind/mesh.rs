@@ -292,6 +292,69 @@ impl ContinuousMind {
         self.mesh_stats.bandwidth_budget_current = self.mesh_bandwidth_budget;
     }
 
+    /// Emit a moral topology gossip packet (every ~100 ticks).
+    ///
+    /// Shares this agent's moral topology summary with mesh peers,
+    /// enabling cross-agent moral drift detection.
+    pub(crate) fn emit_moral_topology(&mut self) {
+        if self.mesh_bridge.is_none() {
+            return;
+        }
+
+        let interval = 100u64;
+        if self
+            .state
+            .tick
+            .saturating_sub(self.mesh_moral_topology_last_tick)
+            < interval
+            && self.mesh_stats.moral_topology_sent > 0
+        {
+            return;
+        }
+
+        let summary = match &self.cached_moral_topology {
+            Some(s) if s.scenario_count > 0 => s.clone(),
+            _ => return, // Nothing to share yet
+        };
+
+        // Bandwidth budget check
+        if !self.mesh_bandwidth_check(crate::swarm::mesh::WISDOM_PACKET_SIZE as u64) {
+            return;
+        }
+
+        let source_id = self.mesh_source_id();
+
+        let mut packet = crate::swarm::mesh::WisdomPacket::from_moral_topology(
+            source_id,
+            self.mesh_sequence,
+            self.state.consciousness_level as f32,
+            &summary,
+        );
+
+        self.sign_mesh_packet(&mut packet);
+
+        self.mesh_stats.bytes_before_compression += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        self.mesh_stats.bytes_after_compression +=
+            crate::swarm::mesh::compress_packet(&packet.to_bytes()).len() as u64;
+
+        self.mesh_sequence = self.mesh_sequence.wrapping_add(1);
+        self.mesh_outbox
+            .push(crate::swarm::mesh::MeshOutbound { packet });
+        self.mesh_stats.moral_topology_sent += 1;
+        self.mesh_stats.bytes_sent += crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
+        self.mesh_moral_topology_last_tick = self.state.tick;
+        #[cfg(feature = "mesh-encryption")]
+        if self.mesh_encryption_key.is_some() {
+            self.mesh_stats.encrypted_packets_sent += 1;
+        }
+
+        tracing::trace!(
+            target: "symthaea::mind::mesh",
+            sequence = self.mesh_sequence.wrapping_sub(1),
+            "Emitted moral topology packet"
+        );
+    }
+
     /// Emit a lightweight heartbeat packet over the mesh network.
     ///
     /// Heartbeats fire every 100 ticks (~2s at 50Hz), keeping the mind

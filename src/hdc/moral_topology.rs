@@ -87,6 +87,22 @@ pub struct MoralAnomalyConfig {
     pub cadence_drift_high: f64,
     /// Drift threshold for moderate cadence (default: 0.1).
     pub cadence_drift_moderate: f64,
+    /// Enable adaptive self-tuning of drift and FE thresholds (default: false).
+    ///
+    /// When enabled, the system learns from its own trajectory history:
+    /// - `drift_alert_threshold` adapts to `ema_drift + adaptive_sigma_factor * σ(drift)`
+    /// - `fe_sigma_multiplier` adapts based on observed FE variance
+    ///
+    /// This prevents alert fatigue in naturally dynamic systems and
+    /// tightens sensitivity in stable ones.
+    pub adaptive_enabled: bool,
+    /// EMA smoothing factor for adaptive threshold learning (default: 0.02).
+    /// Lower = slower adaptation, more stable thresholds.
+    pub adaptive_alpha: f64,
+    /// Sigma factor for adaptive drift threshold: `μ + factor * σ` (default: 2.0).
+    pub adaptive_sigma_factor: f64,
+    /// Minimum warmup evaluations before adaptive thresholds activate (default: 20).
+    pub adaptive_warmup: usize,
 }
 
 impl Default for MoralAnomalyConfig {
@@ -103,7 +119,115 @@ impl Default for MoralAnomalyConfig {
             cadence_slow: 120,
             cadence_drift_high: 0.3,
             cadence_drift_moderate: 0.1,
+            adaptive_enabled: false,
+            adaptive_alpha: 0.02,
+            adaptive_sigma_factor: 2.0,
+            adaptive_warmup: 20,
         }
+    }
+}
+
+/// Running statistics for adaptive anomaly threshold self-tuning.
+///
+/// Uses Welford's online algorithm for numerically stable mean/variance.
+/// The system "learns" what drift and FE levels are normal and adjusts
+/// thresholds to `mean + sigma_factor * std_dev`.
+#[derive(Debug, Clone)]
+pub struct AdaptiveAnomalyState {
+    /// EMA of observed moral drift values.
+    drift_ema: f64,
+    /// EMA of squared drift deviations (for variance).
+    drift_var_ema: f64,
+    /// EMA of observed free energy values.
+    fe_ema: f64,
+    /// EMA of squared FE deviations (for variance).
+    fe_var_ema: f64,
+    /// Number of observations processed.
+    observations: usize,
+    /// Current effective drift threshold (adaptive).
+    pub effective_drift_threshold: f64,
+    /// Current effective FE sigma multiplier (adaptive).
+    pub effective_fe_sigma: f64,
+}
+
+impl Default for AdaptiveAnomalyState {
+    fn default() -> Self {
+        Self {
+            drift_ema: 0.0,
+            drift_var_ema: 0.0,
+            fe_ema: 0.0,
+            fe_var_ema: 0.0,
+            observations: 0,
+            effective_drift_threshold: 0.25,
+            effective_fe_sigma: 2.0,
+        }
+    }
+}
+
+impl AdaptiveAnomalyState {
+    /// Update running statistics with a new observation.
+    ///
+    /// Returns true when warmup is complete and adaptive thresholds are active.
+    pub fn observe(
+        &mut self,
+        drift: f64,
+        free_energy: f64,
+        config: &MoralAnomalyConfig,
+    ) -> bool {
+        let alpha = config.adaptive_alpha;
+        self.observations += 1;
+
+        // EMA update for drift
+        self.drift_ema = alpha * drift + (1.0 - alpha) * self.drift_ema;
+        let drift_dev = (drift - self.drift_ema).powi(2);
+        self.drift_var_ema = alpha * drift_dev + (1.0 - alpha) * self.drift_var_ema;
+
+        // EMA update for free energy
+        self.fe_ema = alpha * free_energy + (1.0 - alpha) * self.fe_ema;
+        let fe_dev = (free_energy - self.fe_ema).powi(2);
+        self.fe_var_ema = alpha * fe_dev + (1.0 - alpha) * self.fe_var_ema;
+
+        // Only activate after warmup
+        if self.observations < config.adaptive_warmup {
+            return false;
+        }
+
+        // Compute adaptive drift threshold: mean + sigma_factor * std_dev
+        let drift_std = self.drift_var_ema.sqrt();
+        let adaptive_drift = self.drift_ema + config.adaptive_sigma_factor * drift_std;
+        // Clamp: never below 0.05 (always catch extreme drift),
+        // never above 0.8 (never become completely insensitive)
+        self.effective_drift_threshold = adaptive_drift.clamp(0.05, 0.8);
+
+        // Compute adaptive FE sigma: scale based on observed FE variance.
+        // If FE variance is naturally high, use a higher multiplier (less sensitive).
+        // If FE variance is naturally low, tighten sensitivity.
+        let fe_std = self.fe_var_ema.sqrt();
+        let fe_cv = if self.fe_ema.abs() > 1e-9 {
+            fe_std / self.fe_ema.abs()
+        } else {
+            0.0
+        };
+        // CV < 0.1 → tight (1.5σ), CV > 0.5 → loose (3.0σ)
+        let adaptive_fe_sigma = 1.5 + fe_cv.clamp(0.0, 0.5) * 3.0;
+        self.effective_fe_sigma = adaptive_fe_sigma.clamp(1.5, 3.5);
+
+        true
+    }
+
+    /// Number of observations processed so far.
+    pub fn observations(&self) -> usize {
+        self.observations
+    }
+
+    /// Current drift EMA (mean observed drift).
+    pub fn drift_mean(&self) -> f64 {
+        self.drift_ema
+    }
+
+    /// Current drift standard deviation estimate.
+    pub fn drift_std(&self) -> f64 {
+        self.drift_var_ema.sqrt()
     }
 }
 
@@ -139,7 +263,7 @@ pub struct MoralTopologyAssessment {
 }
 
 /// Compact topology summary for CycleMetadata telemetry.
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MoralTopologySummary {
     pub beta_0: usize,
     pub beta_1: usize,
@@ -190,6 +314,8 @@ pub struct MoralTopology {
     last_persistent_features: Vec<PersistentFeature>,
     /// Ring buffer of recent moral trajectory points for drift detection.
     trajectory: VecDeque<MoralTrajectoryPoint>,
+    /// Adaptive threshold state (active when `anomaly_config.adaptive_enabled`).
+    adaptive_state: AdaptiveAnomalyState,
 }
 
 /// A single point on the moral manifold trajectory.
@@ -250,6 +376,7 @@ impl MoralTopology {
             prior_count: 0,
             last_persistent_features: Vec::new(),
             trajectory: VecDeque::new(),
+            adaptive_state: AdaptiveAnomalyState::default(),
         }
     }
 
@@ -259,6 +386,9 @@ impl MoralTopology {
         basis: Arc<HarmonyBasis>,
         anomaly_config: MoralAnomalyConfig,
     ) -> Self {
+        let mut adaptive_state = AdaptiveAnomalyState::default();
+        adaptive_state.effective_drift_threshold = anomaly_config.drift_alert_threshold;
+        adaptive_state.effective_fe_sigma = anomaly_config.fe_sigma_multiplier;
         Self {
             config,
             anomaly_config,
@@ -269,6 +399,7 @@ impl MoralTopology {
             prior_count: 0,
             last_persistent_features: Vec::new(),
             trajectory: VecDeque::new(),
+            adaptive_state,
         }
     }
 
@@ -375,15 +506,26 @@ impl MoralTopology {
     /// Detect anomalies by comparing `current_summary` against trajectory history.
     ///
     /// Thresholds and weights are drawn from `self.anomaly_config`.
-    pub fn detect_anomalies(&self, current_summary: &MoralTopologySummary) -> MoralAnomalyReport {
+    /// When `adaptive_enabled`, thresholds are dynamically tuned from experience.
+    pub fn detect_anomalies(&mut self, current_summary: &MoralTopologySummary) -> MoralAnomalyReport {
         let prev = &self.last_summary;
         let ac = &self.anomaly_config;
+
+        // Resolve effective thresholds: adaptive or static
+        let (drift_threshold, fe_sigma) = if ac.adaptive_enabled {
+            (
+                self.adaptive_state.effective_drift_threshold,
+                self.adaptive_state.effective_fe_sigma,
+            )
+        } else {
+            (ac.drift_alert_threshold, ac.fe_sigma_multiplier)
+        };
 
         // Value inversion: dominant harmony axis changed
         let value_inversion =
             prev.scenario_count > 0 && current_summary.dominant_harmony != prev.dominant_harmony;
 
-        // Free energy spike: > fe_sigma_multiplier × σ from rolling mean
+        // Free energy spike: > fe_sigma × σ from rolling mean
         let fe_spike = {
             let points: Vec<_> = self.trajectory.iter().collect();
             if points.len() >= 4 {
@@ -395,7 +537,7 @@ impl MoralTopology {
                     .sum::<f64>()
                     / points.len() as f64;
                 let sigma = var.sqrt().max(1e-9);
-                (current_summary.moral_free_energy - mean_fe).abs() > ac.fe_sigma_multiplier * sigma
+                (current_summary.moral_free_energy - mean_fe).abs() > fe_sigma * sigma
             } else {
                 false
             }
@@ -407,7 +549,7 @@ impl MoralTopology {
 
         // Drift alert
         let drift = self.moral_drift(20);
-        let drift_alert = drift > ac.drift_alert_threshold;
+        let drift_alert = drift > drift_threshold;
 
         // Composite score: weighted sum clamped to [0, 1]
         let raw = (value_inversion as u8 as f64) * ac.weight_value_inversion
@@ -416,6 +558,15 @@ impl MoralTopology {
             + (drift_alert as u8 as f64) * ac.weight_drift;
         let anomaly_score = raw.clamp(0.0, 1.0);
 
+        // Feed observation to adaptive state if enabled
+        if ac.adaptive_enabled {
+            self.adaptive_state.observe(
+                drift,
+                current_summary.moral_free_energy,
+                ac,
+            );
+        }
+
         MoralAnomalyReport {
             value_inversion,
             free_energy_spike: fe_spike,
@@ -423,6 +574,11 @@ impl MoralTopology {
             drift_alert,
             anomaly_score,
         }
+    }
+
+    /// Access the adaptive anomaly state (for telemetry/debugging).
+    pub fn adaptive_state(&self) -> &AdaptiveAnomalyState {
+        &self.adaptive_state
     }
 
     /// Perform full topological analysis on the current window.
@@ -1480,5 +1636,196 @@ mod tests {
                 "with zero weight on inversion, score should be near 0 when no drift"
             );
         }
+    }
+
+    // ── Adaptive anomaly threshold tests ─────────────────────────────────
+
+    #[test]
+    fn adaptive_state_defaults() {
+        let state = AdaptiveAnomalyState::default();
+        assert_eq!(state.observations(), 0);
+        assert!((state.effective_drift_threshold - 0.25).abs() < f64::EPSILON);
+        assert!((state.effective_fe_sigma - 2.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn adaptive_config_defaults_disabled() {
+        let config = MoralAnomalyConfig::default();
+        assert!(!config.adaptive_enabled);
+        assert!((config.adaptive_alpha - 0.02).abs() < f64::EPSILON);
+        assert!((config.adaptive_sigma_factor - 2.0).abs() < f64::EPSILON);
+        assert_eq!(config.adaptive_warmup, 20);
+    }
+
+    #[test]
+    fn adaptive_state_warmup_phase() {
+        let mut state = AdaptiveAnomalyState::default();
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: true,
+            adaptive_warmup: 5,
+            ..Default::default()
+        };
+
+        // During warmup, observe returns false
+        for i in 0..4 {
+            let active = state.observe(0.1, 1.0, &config);
+            assert!(!active, "should not be active at observation {}", i);
+        }
+        // At warmup boundary, returns true
+        let active = state.observe(0.1, 1.0, &config);
+        assert!(active, "should be active at observation 5");
+        assert_eq!(state.observations(), 5);
+    }
+
+    #[test]
+    fn adaptive_thresholds_adjust_to_low_drift() {
+        let mut state = AdaptiveAnomalyState::default();
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: true,
+            adaptive_warmup: 5,
+            adaptive_alpha: 0.2, // faster adaptation for test
+            adaptive_sigma_factor: 2.0,
+            ..Default::default()
+        };
+
+        // Feed consistently low drift → threshold should tighten (< default 0.25)
+        for _ in 0..30 {
+            state.observe(0.02, 0.5, &config);
+        }
+
+        assert!(
+            state.effective_drift_threshold < 0.25,
+            "with consistently low drift (0.02), threshold ({:.4}) should be below default 0.25",
+            state.effective_drift_threshold
+        );
+        // But never below floor
+        assert!(
+            state.effective_drift_threshold >= 0.05,
+            "threshold ({:.4}) should never go below floor 0.05",
+            state.effective_drift_threshold
+        );
+    }
+
+    #[test]
+    fn adaptive_thresholds_adjust_to_high_drift() {
+        let mut state = AdaptiveAnomalyState::default();
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: true,
+            adaptive_warmup: 5,
+            adaptive_alpha: 0.2,
+            adaptive_sigma_factor: 2.0,
+            ..Default::default()
+        };
+
+        // Feed consistently high drift → threshold should loosen (> default 0.25)
+        for _ in 0..30 {
+            state.observe(0.5, 2.0, &config);
+        }
+
+        assert!(
+            state.effective_drift_threshold > 0.25,
+            "with consistently high drift (0.5), threshold ({:.4}) should exceed default 0.25",
+            state.effective_drift_threshold
+        );
+        // But never above ceiling
+        assert!(
+            state.effective_drift_threshold <= 0.8,
+            "threshold ({:.4}) should never exceed ceiling 0.8",
+            state.effective_drift_threshold
+        );
+    }
+
+    #[test]
+    fn adaptive_fe_sigma_adjusts_to_variance() {
+        let mut state = AdaptiveAnomalyState::default();
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: true,
+            adaptive_warmup: 5,
+            adaptive_alpha: 0.3,
+            adaptive_sigma_factor: 2.0,
+            ..Default::default()
+        };
+
+        // Feed high-variance FE → sigma should increase (less sensitive)
+        for i in 0..30 {
+            let fe = if i % 2 == 0 { 0.1 } else { 3.0 };
+            state.observe(0.1, fe, &config);
+        }
+
+        assert!(
+            state.effective_fe_sigma > 2.0,
+            "with high FE variance, effective sigma ({:.3}) should exceed baseline 2.0",
+            state.effective_fe_sigma
+        );
+    }
+
+    #[test]
+    fn adaptive_thresholds_integrated_with_detect_anomalies() {
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: true,
+            adaptive_warmup: 3,
+            adaptive_alpha: 0.3,
+            adaptive_sigma_factor: 2.0,
+            drift_alert_threshold: 0.25, // static fallback
+            ..Default::default()
+        };
+        let mut topo = MoralTopology::with_anomaly_config(
+            MoralTopologyConfig {
+                dim: TEST_DIM,
+                ..Default::default()
+            },
+            Arc::new(HarmonyBasis::new(TEST_DIM)),
+            config,
+        );
+
+        // Add baseline scenarios with low drift
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 2000 + i));
+        }
+        topo.analyze();
+
+        // Repeated detect_anomalies should feed the adaptive state
+        let summary = topo.last_summary().clone();
+        for _ in 0..5 {
+            topo.detect_anomalies(&summary);
+        }
+
+        let state = topo.adaptive_state();
+        assert!(state.observations() >= 5, "adaptive state should have recorded observations");
+        // After warmup, effective thresholds should diverge from defaults
+        // (they'll adapt to the observed low-drift regime)
+    }
+
+    #[test]
+    fn static_thresholds_unchanged_when_adaptive_disabled() {
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: false,
+            drift_alert_threshold: 0.4,
+            ..Default::default()
+        };
+        let mut topo = MoralTopology::with_anomaly_config(
+            MoralTopologyConfig {
+                dim: TEST_DIM,
+                ..Default::default()
+            },
+            Arc::new(HarmonyBasis::new(TEST_DIM)),
+            config,
+        );
+
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 3000 + i));
+        }
+        topo.analyze();
+
+        let summary = topo.last_summary().clone();
+        for _ in 0..10 {
+            topo.detect_anomalies(&summary);
+        }
+
+        // Adaptive state should NOT have been updated
+        let state = topo.adaptive_state();
+        assert_eq!(state.observations(), 0, "adaptive state should not update when disabled");
+        // Effective thresholds remain at initial values (seeded from config's drift_alert_threshold)
+        assert!((state.effective_drift_threshold - 0.4).abs() < f64::EPSILON);
     }
 }

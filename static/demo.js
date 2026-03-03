@@ -19,6 +19,13 @@ const history = {
     moralFE: [],
     moralKL: [],
     moralEntropy: [],
+    weightSpectral: [],
+    weightEquation: [],
+    weightPipeline: [],
+    weightMultimodal: [],
+    microPhi: [],
+    mesoPhi: [],
+    macroPhi: [],
 };
 
 const HARMONY_LABELS = [
@@ -266,6 +273,53 @@ const sparklineDrift = new Chart(document.getElementById('sparklineDrift'), {
     },
 });
 
+// --- Consciousness Weights Chart ---
+const chartWeights = new Chart(document.getElementById('chartWeights'), {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            makeDataset('Spectral', '#06b6d4', history.weightSpectral),
+            makeDataset('Equation', '#a855f7', history.weightEquation),
+            makeDataset('Pipeline', '#22c55e', history.weightPipeline),
+            makeDataset('Multimodal', '#f59e0b', history.weightMultimodal),
+        ],
+    },
+    options: chartOptions(0, 1),
+});
+
+// --- Structural Phi Decomposition Chart ---
+const chartPhiDecomp = new Chart(document.getElementById('chartPhiDecomp'), {
+    type: 'bar',
+    data: {
+        labels: ['Micro', 'Meso', 'Macro'],
+        datasets: [{
+            label: 'Phi',
+            data: [0, 0, 0],
+            backgroundColor: ['#06b6d4', '#a855f7', '#22c55e'],
+            borderColor: ['#06b6d4', '#a855f7', '#22c55e'],
+            borderWidth: 1,
+        }],
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 0 },
+        plugins: { legend: { display: false } },
+        scales: {
+            x: {
+                ticks: { color: '#9ca3af', font: { size: 10 } },
+                grid: { color: '#1f2937' },
+            },
+            y: {
+                min: 0,
+                ticks: { color: '#6b7280', font: { size: 9 } },
+                grid: { color: '#1f2937' },
+            },
+        },
+    },
+});
+
 // --- Utility: hex color interpolation ---
 function lerpColor(a, b, t) {
     const ah = parseInt(a.slice(1), 16);
@@ -319,6 +373,18 @@ function connect() {
         push(history.moralKL, data.moral_kl_divergence || 0);
         push(history.moralEntropy, data.moral_entropy || 0);
 
+        // Consciousness weights history
+        const cw = data.consciousness_weights || [0, 0, 0, 0];
+        push(history.weightSpectral, cw[0]);
+        push(history.weightEquation, cw[1]);
+        push(history.weightPipeline, cw[2]);
+        push(history.weightMultimodal, cw[3]);
+
+        // Structural Phi history
+        push(history.microPhi, data.structural_micro_phi || 0);
+        push(history.mesoPhi, data.structural_meso_phi || 0);
+        push(history.macroPhi, data.structural_macro_phi || 0);
+
         // Update line charts
         const labels = history.cycles.map(String);
         chartPsi.data.labels = labels;
@@ -332,6 +398,18 @@ function connect() {
         chartAffect.update('none');
         chartCoherence.update('none');
         chartMoralFE.update('none');
+
+        // Update consciousness weights chart
+        chartWeights.data.labels = labels;
+        chartWeights.update('none');
+
+        // Update structural Phi bar chart
+        chartPhiDecomp.data.datasets[0].data = [
+            data.structural_micro_phi || 0,
+            data.structural_meso_phi || 0,
+            data.structural_macro_phi || 0,
+        ];
+        chartPhiDecomp.update('none');
 
         // Update harmony radar
         if (data.moral_scenario_distribution) {
@@ -437,6 +515,22 @@ function connect() {
         document.getElementById('metricMoral').textContent = data.moral_score.toFixed(3);
         document.getElementById('metricTime').textContent = data.cycle_time_us.toLocaleString();
         document.getElementById('metricReasoning').textContent = data.reasoning_confidence.toFixed(2);
+
+        // Consciousness engine telemetry DOM updates
+        const convEl = document.getElementById('convergenceState');
+        if (convEl) convEl.textContent = data.weight_convergence_state || '--';
+        const wvEl = document.getElementById('weightVariance');
+        if (wvEl) wvEl.textContent = (data.consciousness_weight_variance || 0).toFixed(3);
+        const erEl = document.getElementById('emergenceRatio');
+        if (erEl) erEl.textContent = (data.structural_emergence_ratio || 0).toFixed(2);
+        const sfEl = document.getElementById('substrateFeasibility');
+        if (sfEl) sfEl.textContent = (data.substrate_feasibility || 0).toFixed(2);
+        // Color-code substrate badge: green (>0.7), amber (0.3-0.7), rose (<0.3)
+        const sbEl = document.getElementById('substrateBadge');
+        if (sbEl) {
+            const sf = data.substrate_feasibility || 0;
+            sbEl.className = 'betti-badge ' + (sf > 0.7 ? 'green' : sf > 0.3 ? 'amber' : 'rose');
+        }
 
         // Update cycle info
         document.getElementById('cycleInfo').textContent =

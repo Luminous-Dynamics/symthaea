@@ -3369,3 +3369,84 @@ fn test_downgrade_legacy_format_backward_compat() {
     assert_eq!(decoded.phi, 0.65);
     assert_eq!(receiver.stats().packets_decrypt_failed, 0);
 }
+
+// ====================================================================
+// Moral Topology Gossip Tests
+// ====================================================================
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_moral_topology_packet_roundtrip() {
+    use crate::hdc::moral_topology::MoralTopologySummary;
+    use crate::swarm::mesh::{PayloadType, WisdomPacket};
+
+    let summary = MoralTopologySummary {
+        beta_0: 3,
+        beta_1: 1,
+        beta_2: 0,
+        unity: 0.85,
+        completeness: 0.72,
+        circularity: 0.15,
+        moral_free_energy: 0.042,
+        dominant_harmony: 2,
+        scenario_count: 15,
+    };
+
+    let packet = WisdomPacket::from_moral_topology([1, 2, 3, 4, 5, 6, 7, 8], 42, 0.65, &summary);
+
+    assert_eq!(packet.payload_type, PayloadType::MoralTopology);
+    assert_eq!(packet.source_id, [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert_eq!(packet.sequence, 42);
+
+    let extracted = packet
+        .extract_moral_topology()
+        .expect("should extract moral topology");
+    assert_eq!(extracted.beta_0, 3);
+    assert_eq!(extracted.beta_1, 1);
+    assert_eq!(extracted.beta_2, 0);
+    assert!((extracted.unity - 0.85).abs() < 1e-6);
+    assert!((extracted.completeness - 0.72).abs() < 1e-6);
+    assert!((extracted.moral_free_energy - 0.042).abs() < 1e-6);
+    assert_eq!(extracted.dominant_harmony, 2);
+    assert_eq!(extracted.scenario_count, 15);
+}
+
+#[cfg(feature = "mesh")]
+#[test]
+fn test_process_mesh_dispatches_moral_topology() {
+    use crate::swarm::mesh::WisdomPacket;
+
+    let mut mind = ContinuousMind::default();
+    mind.activate();
+
+    // Create a moral topology packet via the factory method
+    let summary = crate::hdc::moral_topology::MoralTopologySummary {
+        beta_0: 5,
+        unity: 0.9,
+        scenario_count: 10,
+        ..Default::default()
+    };
+    let packet = WisdomPacket::from_moral_topology(
+        [10, 20, 30, 40, 50, 60, 70, 80],
+        1,
+        0.5,
+        &summary,
+    );
+
+    mind.mesh_inbox.push(packet);
+    mind.tick();
+
+    // After processing, cached_moral_topology should be updated
+    let telemetry = mind.mesh_telemetry();
+    assert!(
+        telemetry.moral_topology.is_some(),
+        "moral topology should be cached after receiving packet"
+    );
+    let cached = telemetry.moral_topology.unwrap();
+    assert_eq!(cached.beta_0, 5);
+    assert!((cached.unity - 0.9).abs() < 1e-6);
+    assert_eq!(
+        mind.mesh_stats().moral_topology_received, 1,
+        "moral_topology_received counter should be 1"
+    );
+}

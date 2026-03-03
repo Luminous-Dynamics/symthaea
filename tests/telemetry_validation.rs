@@ -156,11 +156,11 @@ fn feedback_proposals_counted() {
 
     let total_conf: u32 = results
         .iter()
-        .map(|r| r.metadata.feedback_confidence_proposals)
+        .map(|r| r.metadata.feedback.feedback_confidence_proposals)
         .sum();
     let total_lr: u32 = results
         .iter()
-        .map(|r| r.metadata.feedback_lr_proposals)
+        .map(|r| r.metadata.feedback.feedback_lr_proposals)
         .sum();
 
     assert!(
@@ -366,11 +366,11 @@ fn profile_comparison_full_vs_default() {
     // Full profile should accumulate more feedback proposals
     let full_total_proposals: u32 = full_results
         .iter()
-        .map(|r| r.metadata.feedback_confidence_proposals)
+        .map(|r| r.metadata.feedback.feedback_confidence_proposals)
         .sum();
     let default_total_proposals: u32 = default_results
         .iter()
-        .map(|r| r.metadata.feedback_confidence_proposals)
+        .map(|r| r.metadata.feedback.feedback_confidence_proposals)
         .sum();
 
     assert!(

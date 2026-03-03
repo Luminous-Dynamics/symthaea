@@ -846,5 +846,52 @@ fn test_response_profile_in_json() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SEMANTIC ENCODER TESTS (feature = "semantic-encoder")
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "semantic-encoder")]
+#[test]
+fn test_semantic_encoder_construction() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_semantic_encoder = true;
+    let service = CognitiveLoopService::new(config);
+    assert!(service.is_ok(), "CognitiveLoopService with semantic-encoder should construct");
+}
+
+#[cfg(feature = "semantic-encoder")]
+#[test]
+fn test_semantic_encoder_cycle() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_semantic_encoder = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // First cycle: submits embedding request, no result yet
+    service.cycle("hello world");
+
+    // Second cycle: should collect first cycle's result
+    service.cycle("hello world again");
+
+    let sim = service.stats().semantic_encoder_similarity;
+    assert!(sim.is_finite(), "semantic_encoder_similarity should be finite, got {sim}");
+}
+
+#[cfg(feature = "semantic-encoder")]
+#[test]
+fn test_semantic_encoder_disabled_by_default() {
+    // Default config with feature on should NOT spawn the channel
+    let config = CognitiveLoopConfig::default();
+    assert!(!config.enable_semantic_encoder, "semantic encoder should be disabled by default");
+
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    // Run a cycle — similarity should stay at 0.0 since no channel is spawned
+    service.cycle("test input");
+    let sim = service.stats().semantic_encoder_similarity;
+    assert!(
+        (sim - 0.0).abs() < f32::EPSILON,
+        "With encoder disabled, similarity should remain 0.0, got {sim}"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // v0.6.1 FEEDBACK LOOP TESTS
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -505,6 +505,15 @@ pub struct LoopStats {
     /// Total Liquid-Mamba distillation steps.
     #[cfg(feature = "liquid-mamba")]
     pub liquid_mamba_generation_count: u32,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SEMANTIC ENCODER STATS (Background Qwen3 → HdcBridge telemetry)
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cosine similarity between trigram BinaryHV and semantic BinaryHV.
+    /// Updated each cycle when a semantic embedding result is available.
+    /// NaN when no result has been collected yet.
+    #[cfg(feature = "semantic-encoder")]
+    pub semantic_encoder_similarity: f32,
 }
 
 #[cfg(test)]

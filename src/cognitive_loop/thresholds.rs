@@ -458,6 +458,109 @@ pub const THALAMIC_DEEP_BUDGET_SCALE: f64 = 2.0;
 pub const THALAMIC_REFLEX_BUDGET_SCALE: f64 = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// REASONING CONFIDENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Reasoning chain confidence threshold for prediction confidence boost.
+/// Basis: Stanovich (2011) — analytic processing confidence reinforces rationality.
+pub const REASONING_CONFIDENCE_BOOST_THRESHOLD: f32 = 0.7;
+
+/// Reasoning chain confidence boost factor (multiplicative on delta).
+pub const REASONING_CONFIDENCE_BOOST_FACTOR: f32 = 0.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHI VALIDATION / SPECTRAL WEIGHT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// High Phi validation correlation threshold (trust spectral MIP more).
+/// Basis: Casali et al. (2013) — Phi estimation reliability.
+pub const PHI_VALIDATION_HIGH_THRESHOLD: f64 = 0.7;
+
+/// Low Phi validation correlation threshold (reduce spectral weight).
+pub const PHI_VALIDATION_LOW_THRESHOLD: f64 = 0.3;
+
+/// Base spectral weight (neutral correlation).
+pub const SPECTRAL_WEIGHT_BASE: f32 = 0.6;
+
+/// Spectral weight adjustment scale per unit correlation delta.
+pub const SPECTRAL_WEIGHT_SCALE: f32 = 0.67;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CAUSAL BINDING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum causal strength for codebook entry inclusion.
+/// Basis: Granger (1969) — causal strength filtering threshold.
+pub const CAUSAL_BINDING_THRESHOLD: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEMPORAL DYNAMICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Temporal continuity threshold below which replay is triggered.
+/// Basis: Tulving (2002) — continuity gaps signal memory consolidation need.
+pub const TEMPORAL_REPLAY_TRIGGER: f32 = 0.3;
+
+/// Temporal continuity threshold for prediction confidence boost.
+/// Basis: Buzsáki (2006) — temporal coherence enables reliable predictions.
+pub const TEMPORAL_CONTINUITY_BOOST_THRESHOLD: f64 = 0.7;
+
+/// Temporal continuity → confidence boost factor.
+pub const TEMPORAL_CONTINUITY_BOOST_FACTOR: f64 = 0.05;
+
+/// Per-chain confidence boost factor (causal chain detection).
+/// Basis: Pearl (2009) — causal chain detection → structural certainty.
+pub const TEMPORAL_CHAIN_BOOST_FACTOR: f32 = 0.005;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HARMONIC FIELD
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Harmonic field coherence threshold for LR stability boost.
+/// Basis: Schwartz (2012) — value coherence enables stable learning.
+pub const HARMONIC_FIELD_BOOST_THRESHOLD: f32 = 0.6;
+
+/// Harmonic field coherence → LR boost factor.
+pub const HARMONIC_FIELD_BOOST_FACTOR: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Q-LEARNING / STRATEGY SELECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Initial Q-value for all strategies (neutral prior).
+/// Basis: Watkins (1989) — unbiased Q-value initialization.
+pub const Q_VALUE_INITIAL: f32 = 0.5;
+
+/// Q-learning rate (α) for strategy updates.
+/// Basis: Watkins & Dayan (1992) — convergence requires α ∈ (0, 1).
+pub const Q_LEARNING_RATE: f32 = 0.1;
+
+/// Initial exploration rate (ε) for epsilon-greedy strategy.
+/// Basis: Sutton & Barto (2018) — moderate initial exploration.
+pub const EXPLORATION_RATE_INITIAL: f32 = 0.2;
+
+/// Phi threshold for integrative mode (favor Exploratory/Detailed).
+/// Basis: Tononi (2004) — high integration enables complex strategies.
+pub const PHI_INTEGRATIVE_THRESHOLD: f64 = 0.6;
+
+/// Phi threshold for reactive mode (favor Supportive/Concise).
+pub const PHI_REACTIVE_THRESHOLD: f64 = 0.3;
+
+/// Exploration rate decay per interaction (multiplicative).
+/// Basis: Tokic (2010) — gradual exploitation shift.
+pub const EXPLORATION_DECAY_RATE: f32 = 0.999;
+
+/// Minimum exploration rate floor.
+pub const EXPLORATION_RATE_MIN: f32 = 0.05;
+
+/// Reward threshold for "strong positive" (stick with strategy).
+/// Basis: Schultz (1997) — dopaminergic reward signal thresholds.
+pub const REWARD_POSITIVE_THRESHOLD: f32 = 0.5;
+
+/// Reward threshold for "negative" (try opposite strategy).
+pub const REWARD_NEGATIVE_THRESHOLD: f32 = -0.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // VALIDATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -603,6 +706,50 @@ pub fn validate() {
         "Psi weights sum ({}) must be <= 1.0",
         psi_total
     );
+
+    // 14. Phi validation ordering
+    assert!(
+        PHI_VALIDATION_LOW_THRESHOLD < PHI_VALIDATION_HIGH_THRESHOLD,
+        "PHI_VALIDATION_LOW_THRESHOLD ({}) must be < PHI_VALIDATION_HIGH_THRESHOLD ({})",
+        PHI_VALIDATION_LOW_THRESHOLD,
+        PHI_VALIDATION_HIGH_THRESHOLD
+    );
+
+    // 15. Phi gating ordering
+    assert!(
+        PHI_REACTIVE_THRESHOLD < PHI_INTEGRATIVE_THRESHOLD,
+        "PHI_REACTIVE_THRESHOLD ({}) must be < PHI_INTEGRATIVE_THRESHOLD ({})",
+        PHI_REACTIVE_THRESHOLD,
+        PHI_INTEGRATIVE_THRESHOLD
+    );
+
+    // 16. Exploration rate bounds
+    assert!(
+        EXPLORATION_RATE_MIN < EXPLORATION_RATE_INITIAL,
+        "EXPLORATION_RATE_MIN ({}) must be < EXPLORATION_RATE_INITIAL ({})",
+        EXPLORATION_RATE_MIN,
+        EXPLORATION_RATE_INITIAL
+    );
+    assert!(
+        (0.0..1.0).contains(&EXPLORATION_DECAY_RATE),
+        "EXPLORATION_DECAY_RATE must be in (0, 1): {}",
+        EXPLORATION_DECAY_RATE
+    );
+
+    // 17. Q-learning rate valid
+    assert!(
+        (0.0..=1.0).contains(&Q_LEARNING_RATE),
+        "Q_LEARNING_RATE must be in [0, 1]: {}",
+        Q_LEARNING_RATE
+    );
+
+    // 18. Reward threshold ordering
+    assert!(
+        REWARD_NEGATIVE_THRESHOLD < REWARD_POSITIVE_THRESHOLD,
+        "REWARD_NEGATIVE_THRESHOLD ({}) must be < REWARD_POSITIVE_THRESHOLD ({})",
+        REWARD_NEGATIVE_THRESHOLD,
+        REWARD_POSITIVE_THRESHOLD
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -691,5 +838,48 @@ mod tests {
         assert!(THALAMIC_DEEP_BUDGET_SCALE > 1.0);
         assert!(THALAMIC_REFLEX_LR_FACTOR < 1.0);
         assert!(THALAMIC_DEEP_LR_FACTOR > 1.0);
+    }
+
+    #[test]
+    fn test_phi_validation_ordering() {
+        assert!(PHI_VALIDATION_LOW_THRESHOLD < PHI_VALIDATION_HIGH_THRESHOLD);
+        assert!(PHI_VALIDATION_LOW_THRESHOLD > 0.0);
+        assert!(PHI_VALIDATION_HIGH_THRESHOLD < 1.0);
+    }
+
+    #[test]
+    fn test_phi_gating_ordering() {
+        assert!(PHI_REACTIVE_THRESHOLD < PHI_INTEGRATIVE_THRESHOLD);
+        assert!(PHI_REACTIVE_THRESHOLD > 0.0);
+        assert!(PHI_INTEGRATIVE_THRESHOLD < 1.0);
+    }
+
+    #[test]
+    fn test_q_learning_params() {
+        assert!((0.0..=1.0).contains(&Q_VALUE_INITIAL));
+        assert!((0.0..=1.0).contains(&Q_LEARNING_RATE));
+        assert!(EXPLORATION_RATE_MIN < EXPLORATION_RATE_INITIAL);
+        assert!((0.0..1.0).contains(&EXPLORATION_DECAY_RATE));
+    }
+
+    #[test]
+    fn test_reward_threshold_ordering() {
+        assert!(REWARD_NEGATIVE_THRESHOLD < 0.0);
+        assert!(REWARD_POSITIVE_THRESHOLD > 0.0);
+        assert!(REWARD_NEGATIVE_THRESHOLD < REWARD_POSITIVE_THRESHOLD);
+    }
+
+    #[test]
+    fn test_temporal_dynamics_params() {
+        assert!(TEMPORAL_REPLAY_TRIGGER > 0.0);
+        assert!(TEMPORAL_CONTINUITY_BOOST_THRESHOLD > 0.0);
+        assert!(TEMPORAL_CHAIN_BOOST_FACTOR > 0.0);
+    }
+
+    #[test]
+    fn test_harmonic_field_params() {
+        assert!(HARMONIC_FIELD_BOOST_THRESHOLD > 0.0);
+        assert!(HARMONIC_FIELD_BOOST_THRESHOLD < 1.0);
+        assert!(HARMONIC_FIELD_BOOST_FACTOR > 0.0);
     }
 }

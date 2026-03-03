@@ -403,7 +403,7 @@ impl SubstrateValidationFramework {
         for note in &self.methodology_notes {
             report.push_str(&format!("  • {}\n", note));
         }
-        report.push_str("\n");
+        report.push('\n');
 
         report.push_str("SUBSTRATE ASSESSMENTS:\n");
         report.push_str("───────────────────────────────────────────────────────────────\n\n");
@@ -428,7 +428,7 @@ impl SubstrateValidationFramework {
                 report.push_str(&format!("    ❌ {}\n", claim));
             }
 
-            report.push_str("\n");
+            report.push('\n');
         }
 
         report.push_str("═══════════════════════════════════════════════════════════════\n");

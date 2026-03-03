@@ -56,6 +56,7 @@ impl ContinuousMind {
             self.process_sensors();
             self.auto_emit_wisdom();
             self.emit_heartbeat();
+            self.emit_moral_topology();
             self.emit_gradients();
             self.emit_affective();
 
@@ -659,6 +660,8 @@ impl ContinuousMind {
                 affective_rx = t.stats.affective_received,
                 gradient_tx = t.stats.gradients_sent,
                 gradient_rx = t.stats.gradients_received,
+                moral_topology_tx = t.stats.moral_topology_sent,
+                moral_topology_rx = t.stats.moral_topology_received,
                 bytes_tx = t.stats.bytes_sent,
                 bytes_rx = t.stats.bytes_received,
                 compress_ratio = format!("{:.1}%", t.stats.compression_ratio() * 100.0),
@@ -678,6 +681,7 @@ impl ContinuousMind {
         let mut heartbeat_count = 0u64;
         let mut affective_count = 0u64;
         let mut gradient_count = 0u64;
+        let mut moral_topology_count = 0u64;
 
         for packet in &inbox {
             // Dedup check: skip if we've already seen this (source_id, sequence) pair
@@ -779,6 +783,12 @@ impl ContinuousMind {
                         self.federated_inbox.push(gradient_msg);
                     }
                 }
+                crate::swarm::mesh::PayloadType::MoralTopology => {
+                    if let Some(summary) = packet.extract_moral_topology() {
+                        self.cached_moral_topology = Some(summary);
+                        moral_topology_count += 1;
+                    }
+                }
             }
         }
 
@@ -787,6 +797,7 @@ impl ContinuousMind {
         self.mesh_stats.heartbeats_received += heartbeat_count;
         self.mesh_stats.affective_received += affective_count;
         self.mesh_stats.gradients_received += gradient_count;
+        self.mesh_stats.moral_topology_received += moral_topology_count;
         self.mesh_stats.bytes_received +=
             inbox.len() as u64 * crate::swarm::mesh::WISDOM_PACKET_SIZE as u64;
         #[cfg(feature = "mesh-encryption")]
@@ -801,6 +812,7 @@ impl ContinuousMind {
             heartbeat = heartbeat_count,
             affective = affective_count,
             gradient = gradient_count,
+            moral_topology = moral_topology_count,
             "Processed mesh wisdom packets"
         );
     }

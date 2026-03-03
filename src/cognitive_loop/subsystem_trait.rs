@@ -667,8 +667,8 @@ impl CycleSnapshot {
     #[allow(clippy::too_many_arguments)]
     pub fn build(
         cycle_number: u64,
-        prediction_confidence: f32,
-        fep_lr_boost: f32,
+        prediction_confidence: f64,
+        fep_lr_boost: f64,
         prediction_error: f32,
         coherence: f32,
         unified_psi: f64,
@@ -701,8 +701,8 @@ impl CycleSnapshot {
 
         Self {
             cycle_number,
-            prediction_confidence: prediction_confidence as f64,
-            fep_lr_boost: fep_lr_boost as f64,
+            prediction_confidence,
+            fep_lr_boost,
             prediction_error,
             coherence,
             unified_psi,

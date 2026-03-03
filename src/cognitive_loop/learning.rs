@@ -8,6 +8,11 @@ use serde::{Deserialize, Serialize};
 use symthaea_core::genesis::ShakeRng;
 
 use super::flow::ResponseStrategy;
+use super::thresholds::{
+    EXPLORATION_DECAY_RATE, EXPLORATION_RATE_INITIAL, EXPLORATION_RATE_MIN,
+    PHI_INTEGRATIVE_THRESHOLD, PHI_REACTIVE_THRESHOLD, Q_LEARNING_RATE, Q_VALUE_INITIAL,
+    REWARD_NEGATIVE_THRESHOLD, REWARD_POSITIVE_THRESHOLD,
+};
 
 /// Learning result from a cycle (for closed loop)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,9 +75,9 @@ impl Default for ClosedLearningLoop {
         Self {
             current_strategy: ResponseStrategy::default(),
             last_result: None,
-            q_values: [0.5; 5], // Start neutral
-            q_learning_rate: 0.1,
-            exploration_rate: 0.2,
+            q_values: [Q_VALUE_INITIAL; 5], // Start neutral
+            q_learning_rate: Q_LEARNING_RATE,
+            exploration_rate: EXPLORATION_RATE_INITIAL,
             total_interactions: 0,
             total_reward: 0.0,
             strategy_counts: [0; 5],
@@ -133,10 +138,10 @@ impl ClosedLearningLoop {
 
         // Step 2: Modify based on previous result
         let strategy = if let Some(ref last) = self.last_result {
-            if last.reward > 0.5 {
+            if last.reward > REWARD_POSITIVE_THRESHOLD {
                 // Strong positive - stick with what worked
                 last.strategy_used
-            } else if last.reward < -0.2 {
+            } else if last.reward < REWARD_NEGATIVE_THRESHOLD {
                 // Negative - try opposite strategy
                 last.strategy_used.opposite()
             } else {
@@ -147,14 +152,14 @@ impl ClosedLearningLoop {
         };
 
         // Step 3: Φ-gating (consciousness influences strategy)
-        let final_strategy = if phi >= 0.6 {
+        let final_strategy = if phi >= PHI_INTEGRATIVE_THRESHOLD {
             // Integrative mode - favor Exploratory/Detailed
             match strategy {
                 ResponseStrategy::Supportive => ResponseStrategy::Exploratory,
                 ResponseStrategy::Concise => ResponseStrategy::Detailed,
                 other => other,
             }
-        } else if phi < 0.3 {
+        } else if phi < PHI_REACTIVE_THRESHOLD {
             // Reactive mode - favor Supportive/Concise
             match strategy {
                 ResponseStrategy::Exploratory => ResponseStrategy::Supportive,
@@ -189,7 +194,8 @@ impl ClosedLearningLoop {
         self.last_result = Some(result);
 
         // Decay exploration rate over time (but keep minimum of 5%)
-        self.exploration_rate = (self.exploration_rate * 0.999).max(0.05);
+        self.exploration_rate =
+            (self.exploration_rate * EXPLORATION_DECAY_RATE).max(EXPLORATION_RATE_MIN);
     }
 
     /// Get strategy index for Q-value lookup
@@ -282,10 +288,10 @@ mod tests {
     #[test]
     fn test_default_values() {
         let cll = ClosedLearningLoop::default();
-        assert_eq!(cll.q_values, [0.5; 5], "default Q-values should be 0.5");
+        assert_eq!(cll.q_values, [Q_VALUE_INITIAL; 5], "default Q-values should be Q_VALUE_INITIAL");
         assert!(
-            (cll.exploration_rate() - 0.2).abs() < f32::EPSILON,
-            "default exploration_rate should be 0.2"
+            (cll.exploration_rate() - EXPLORATION_RATE_INITIAL).abs() < f32::EPSILON,
+            "default exploration_rate should be EXPLORATION_RATE_INITIAL"
         );
         assert_eq!(cll.total_interactions(), 0);
     }
@@ -294,7 +300,7 @@ mod tests {
     fn test_q_value_update() {
         let mut cll = ClosedLearningLoop::default();
         let old_q = cll.q_values()[0]; // Detailed index 0
-        assert!((old_q - 0.5).abs() < f32::EPSILON);
+        assert!((old_q - Q_VALUE_INITIAL).abs() < f32::EPSILON);
 
         // Give a strong positive reward for Detailed
         cll.update(make_result(ResponseStrategy::Detailed, 0.9));
@@ -315,7 +321,7 @@ mod tests {
     fn test_exploration_rate_decay() {
         let mut cll = ClosedLearningLoop::default();
         let initial_rate = cll.exploration_rate();
-        assert!((initial_rate - 0.2).abs() < f32::EPSILON);
+        assert!((initial_rate - EXPLORATION_RATE_INITIAL).abs() < f32::EPSILON);
 
         for _ in 0..100 {
             cll.update(make_result(ResponseStrategy::Supportive, 0.5));
@@ -327,8 +333,8 @@ mod tests {
             "exploration_rate should decay: {decayed} < {initial_rate}"
         );
         assert!(
-            decayed >= 0.05,
-            "exploration_rate should not drop below 0.05: {decayed}"
+            decayed >= EXPLORATION_RATE_MIN,
+            "exploration_rate should not drop below EXPLORATION_RATE_MIN: {decayed}"
         );
     }
 
@@ -460,15 +466,15 @@ mod tests {
             cll.update(make_result(ResponseStrategy::Exploratory, 0.9));
         }
         assert!(cll.total_interactions() > 0);
-        assert!(cll.q_values()[4] > 0.5);
+        assert!(cll.q_values()[4] > Q_VALUE_INITIAL);
 
         // Reset
         cll.reset();
 
-        assert_eq!(cll.q_values, [0.5; 5], "q_values should reset to 0.5");
+        assert_eq!(cll.q_values, [Q_VALUE_INITIAL; 5], "q_values should reset to Q_VALUE_INITIAL");
         assert!(
-            (cll.exploration_rate() - 0.2).abs() < f32::EPSILON,
-            "exploration_rate should reset to 0.2"
+            (cll.exploration_rate() - EXPLORATION_RATE_INITIAL).abs() < f32::EPSILON,
+            "exploration_rate should reset to EXPLORATION_RATE_INITIAL"
         );
         assert_eq!(
             cll.total_interactions(),

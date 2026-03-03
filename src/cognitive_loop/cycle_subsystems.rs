@@ -246,7 +246,7 @@ impl CognitiveLoopService {
                         core_values,
                         extended_values: HashMap::new(),
                         phase_coherence: HashMap::new(),
-                        substrate_feasibility: self.substrate_feasibility,
+                        substrate_feasibility: self.substrate_effective_feasibility,
                         timestamp: self.stats.total_cycles as u64,
                         context: String::new(),
                     };
