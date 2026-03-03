@@ -279,13 +279,13 @@ mod tests {
         let max_idx = coords
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(i, _)| i)
             .unwrap();
 
         // Allow the top-2 — keyword overlap between harmonies is expected
         let mut sorted: Vec<(usize, f64)> = coords.iter().copied().enumerate().collect();
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         let top_2: Vec<usize> = sorted.iter().take(2).map(|(i, _)| *i).collect();
 
         assert!(

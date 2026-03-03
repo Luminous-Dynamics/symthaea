@@ -796,7 +796,7 @@ impl VocalTractController {
         // Adaptive train steps: above-median distance gets outlier_steps, below gets base_steps
         let median_dist = {
             let mut sorted = distances.clone();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             sorted[sorted.len() / 2]
         };
         let adaptive_steps: Vec<usize> = distances
@@ -2680,5 +2680,17 @@ mod tests {
         for freq in &result {
             assert!(*freq >= 0.5, "Frequency {} should be >= 0.5 Hz", freq);
         }
+    }
+
+    #[test]
+    fn test_median_distance_sort_no_panic() {
+        let genesis = test_genesis();
+        let config = VocalTractConfig::default();
+        let mut ctrl = VocalTractController::new(&genesis, &config);
+        let targets = test_phoneme_targets();
+        let target_refs: Vec<(&str, &FormantTarget)> =
+            targets.iter().map(|(p, t)| (*p, t)).collect();
+        // Exercises the median-distance sort path (line 799) — must not panic on NaN
+        ctrl.train_on_phoneme_targets(&genesis, &target_refs, 10);
     }
 }

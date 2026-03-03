@@ -30,7 +30,9 @@ impl SurpriseMap {
     /// Update surprise from current vs previous per-patch HVs.
     ///
     /// Surprise at each patch = 1 - cosine_similarity(current, previous).
-    /// Accumulated with exponential decay.
+    /// Accumulated with exponential decay. Bounded to the theoretical
+    /// steady-state maximum of `1.0 / (1.0 - decay)` to prevent runaway
+    /// accumulation from pathological inputs while preserving normal dynamics.
     pub fn update(
         &mut self,
         current_patches: &[ContinuousHV],
@@ -49,10 +51,15 @@ impl SurpriseMap {
             .len()
             .min(previous_patches.len())
             .min(self.surprise.len());
+
+        // Soft cap at theoretical steady-state maximum
+        let max_surprise = 1.0 / (1.0 - self.decay).max(0.01);
+
         for i in 0..n {
             let sim = current_patches[i].similarity(&previous_patches[i]);
             let patch_surprise = (1.0 - sim).max(0.0);
             self.surprise[i] += patch_surprise;
+            self.surprise[i] = self.surprise[i].min(max_surprise);
         }
     }
 
@@ -80,6 +87,27 @@ impl SurpriseMap {
     /// Maximum surprise across all patches.
     pub fn max_surprise(&self) -> f32 {
         self.surprise.iter().copied().fold(0.0f32, f32::max)
+    }
+
+    /// Dampen surprise at a specific grid position by a multiplicative factor.
+    ///
+    /// Used for top-down priming: once a region has been recognized by the
+    /// ventral stream, its surprise is reduced so it won't trigger repeated
+    /// foveation (biological analog: you don't re-read "STOP" every frame).
+    ///
+    /// # Arguments
+    /// * `row`, `col` — Grid coordinates of the patch to dampen.
+    /// * `factor` — Multiplicative factor (0.0 = full suppression, 1.0 = no change).
+    pub fn dampen(&mut self, row: usize, col: usize, factor: f32) {
+        let idx = self.grid.patch_index(row, col);
+        if let Some(s) = self.surprise.get_mut(idx) {
+            *s *= factor.clamp(0.0, 1.0);
+        }
+    }
+
+    /// Access the underlying grid.
+    pub fn grid(&self) -> &PatchGrid {
+        &self.grid
     }
 
     /// Reset all surprise to zero.
@@ -188,5 +216,99 @@ mod tests {
 
         sm.reset();
         assert_eq!(sm.max_surprise(), 0.0);
+    }
+
+    #[test]
+    fn test_dampen_reduces_surprise() {
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+
+        let prev = random_patch_hvs(16, 1000);
+        let curr = random_patch_hvs(16, 2000);
+        sm.update(&curr, &prev);
+
+        let before = sm.surprise[5];
+        assert!(before > 0.0);
+
+        sm.dampen(1, 1, 0.5); // patch index 5 in 4×4 grid
+        let after = sm.surprise[5];
+        assert!(
+            (after - before * 0.5).abs() < 1e-6,
+            "Dampen(0.5) should halve surprise: before={before}, after={after}"
+        );
+    }
+
+    #[test]
+    fn test_dampen_full_suppression() {
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+
+        let prev = random_patch_hvs(16, 1000);
+        let curr = random_patch_hvs(16, 2000);
+        sm.update(&curr, &prev);
+        assert!(sm.surprise[0] > 0.0);
+
+        sm.dampen(0, 0, 0.0);
+        assert_eq!(sm.surprise[0], 0.0);
+    }
+
+    #[test]
+    fn test_dampen_clamps_factor() {
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+
+        let prev = random_patch_hvs(16, 1000);
+        let curr = random_patch_hvs(16, 2000);
+        sm.update(&curr, &prev);
+        let before = sm.surprise[3];
+
+        // Factor > 1.0 should be clamped to 1.0 (no change)
+        sm.dampen(0, 3, 2.0);
+        assert!((sm.surprise[3] - before).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_dampen_out_of_bounds_is_noop() {
+        let grid = make_grid();
+        let mut sm = SurpriseMap::new(grid, 0.9, 0.3);
+
+        let prev = random_patch_hvs(16, 1000);
+        let curr = random_patch_hvs(16, 2000);
+        sm.update(&curr, &prev);
+
+        // Out of bounds — should not panic
+        sm.dampen(100, 100, 0.5);
+    }
+
+    #[test]
+    fn test_grid_accessor() {
+        let grid = make_grid();
+        let sm = SurpriseMap::new(grid, 0.9, 0.3);
+        assert_eq!(sm.grid().cols, 4);
+        assert_eq!(sm.grid().rows, 4);
+        assert_eq!(sm.grid().patch_size, 8);
+    }
+
+    #[test]
+    fn test_surprise_bounded_under_constant_change() {
+        let grid = make_grid();
+        let decay = 0.9;
+        let mut sm = SurpriseMap::new(grid, decay, 0.3);
+        let max_surprise = 1.0 / (1.0 - decay);
+
+        // Feed 100 frames of maximally different patches
+        for i in 0..100u64 {
+            let prev = random_patch_hvs(16, 1000 + i * 100);
+            let curr = random_patch_hvs(16, 2000 + i * 100);
+            sm.update(&curr, &prev);
+        }
+
+        // All surprise values should be bounded
+        for &s in &sm.surprise {
+            assert!(
+                s <= max_surprise + 1e-6,
+                "Surprise {s} exceeds theoretical max {max_surprise}"
+            );
+        }
     }
 }
