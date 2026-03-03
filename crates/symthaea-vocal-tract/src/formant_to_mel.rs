@@ -69,6 +69,20 @@ impl MelNormalization {
         }
     }
 
+    /// Load per-bin normalization from JSON file produced by `calibrate_mel_normalization.py`.
+    ///
+    /// Expects JSON with `"per_bin_mean"` and `"per_bin_std"` arrays of floats.
+    /// Returns `None` if the file cannot be read or parsed.
+    pub fn from_json_file(path: &str) -> Option<Self> {
+        let data = std::fs::read_to_string(path).ok()?;
+        let mean = extract_json_array(&data, "per_bin_mean")?;
+        let std = extract_json_array(&data, "per_bin_std")?;
+        if mean.is_empty() || std.is_empty() {
+            return None;
+        }
+        Some(Self::per_bin(mean, std))
+    }
+
     /// Normalize a mel frame in-place.
     fn normalize(&self, mel: &mut [f32]) {
         if !self.enabled {
@@ -538,6 +552,30 @@ impl FormantToMelConverter {
         }
 
         filters
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JSON HELPER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimal JSON array extractor — finds `"key": [...]` and parses float values.
+/// No external JSON dependency needed for this simple format.
+fn extract_json_array(json: &str, key: &str) -> Option<Vec<f32>> {
+    let needle = format!("\"{}\"", key);
+    let start = json.find(&needle)?;
+    let after_key = &json[start + needle.len()..];
+    let bracket_start = after_key.find('[')?;
+    let bracket_end = after_key.find(']')?;
+    let array_str = &after_key[bracket_start + 1..bracket_end];
+    let values: Vec<f32> = array_str
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
+    if values.is_empty() {
+        None
+    } else {
+        Some(values)
     }
 }
 
