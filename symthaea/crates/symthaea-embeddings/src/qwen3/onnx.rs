@@ -37,6 +37,8 @@ pub struct OnnxEmbedderConfig {
     pub max_seq_length: usize,
     /// Number of intra-op threads.
     pub num_threads: usize,
+    /// Pooling strategy for extracting a single embedding from the hidden state sequence.
+    pub pooling: super::PoolingStrategy,
 }
 
 impl Default for OnnxEmbedderConfig {
@@ -47,6 +49,7 @@ impl Default for OnnxEmbedderConfig {
             embedding_dim: 1024,
             max_seq_length: 8192,
             num_threads: 4,
+            pooling: super::PoolingStrategy::LastTokenPooling,
         }
     }
 }
@@ -101,20 +104,19 @@ impl OnnxEmbedder {
         ])?;
 
         // Extract last_hidden_state [1, seq_len, hidden_dim]
-        // Shape derefs to [i64] so we index directly
         let (hidden_shape, hidden_data) = outputs[0].try_extract_tensor::<f32>()?;
         let hidden_dim = hidden_shape[2] as usize;
         let out_dim = self.config.embedding_dim.min(hidden_dim);
 
-        // Last-token pooling: find last real token
-        let last_idx = mask[..seq_len]
-            .iter()
-            .rposition(|&m| m == 1)
-            .unwrap_or(seq_len.saturating_sub(1));
-
-        // hidden_data layout: [batch=1, seq_len, hidden_dim] in row-major
-        let offset = last_idx * hidden_dim;
-        let mut embedding: Vec<f32> = hidden_data[offset..offset + out_dim].to_vec();
+        let mask_slice: Vec<u32> = mask[..seq_len].to_vec();
+        let mut embedding = Self::pool_sequence(
+            &hidden_data,
+            hidden_dim,
+            &mask_slice,
+            seq_len,
+            out_dim,
+            self.config.pooling,
+        );
 
         // L2 normalize
         let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -125,6 +127,174 @@ impl OnnxEmbedder {
         }
 
         Ok(embedding)
+    }
+
+    /// Run batch inference on multiple texts and return embedding vectors.
+    ///
+    /// Tokenizes all texts, pads to max sequence length with attention_mask=0,
+    /// runs a single `session.run()`, then extracts per-sequence embeddings
+    /// using the configured pooling strategy.
+    pub fn run_inference_batch(&mut self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Tokenize all texts
+        let encodings: Vec<_> = texts
+            .iter()
+            .map(|t| {
+                self.tokenizer
+                    .encode(*t, true)
+                    .map_err(|e| anyhow::anyhow!("Tokenization failed: {e}"))
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let max_seq = self.config.max_seq_length;
+        let batch_size = encodings.len();
+
+        // Determine padded sequence length
+        let max_len = encodings
+            .iter()
+            .map(|e| e.get_ids().len().min(max_seq))
+            .max()
+            .unwrap_or(0);
+
+        // Build flattened [batch_size * max_len] tensors with padding
+        let mut flat_ids = Vec::with_capacity(batch_size * max_len);
+        let mut flat_mask = Vec::with_capacity(batch_size * max_len);
+        let mut seq_lengths = Vec::with_capacity(batch_size);
+        let mut masks_per_seq: Vec<Vec<u32>> = Vec::with_capacity(batch_size);
+
+        for enc in &encodings {
+            let ids = enc.get_ids();
+            let mask = enc.get_attention_mask();
+            let seq_len = ids.len().min(max_seq);
+            seq_lengths.push(seq_len);
+
+            // Real tokens
+            flat_ids.extend(ids[..seq_len].iter().map(|&x| x as i64));
+            flat_mask.extend(mask[..seq_len].iter().map(|&x| x as i64));
+            masks_per_seq.push(mask[..seq_len].to_vec());
+
+            // Padding
+            for _ in seq_len..max_len {
+                flat_ids.push(0i64);
+                flat_mask.push(0i64);
+            }
+            // Pad mask for per-seq storage
+            let last = masks_per_seq.last_mut().unwrap();
+            last.resize(max_len, 0);
+        }
+
+        let shape = vec![batch_size as i64, max_len as i64];
+        let input_ids_tensor = Tensor::from_array((shape.clone(), flat_ids))?;
+        let attention_mask_tensor = Tensor::from_array((shape, flat_mask))?;
+
+        let outputs = self.session.run(ort::inputs![
+            "input_ids" => input_ids_tensor,
+            "attention_mask" => attention_mask_tensor,
+        ])?;
+
+        // Extract [batch_size, max_len, hidden_dim]
+        let (hidden_shape, hidden_data) = outputs[0].try_extract_tensor::<f32>()?;
+        let hidden_dim = hidden_shape[2] as usize;
+        let out_dim = self.config.embedding_dim.min(hidden_dim);
+
+        // Pool each sequence individually
+        let mut results = Vec::with_capacity(batch_size);
+        for i in 0..batch_size {
+            let offset = i * max_len * hidden_dim;
+            let seq_hidden = &hidden_data[offset..offset + max_len * hidden_dim];
+
+            let mut embedding = Self::pool_sequence(
+                seq_hidden,
+                hidden_dim,
+                &masks_per_seq[i],
+                seq_lengths[i],
+                out_dim,
+                self.config.pooling,
+            );
+
+            // L2 normalize
+            let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 1e-6 {
+                for x in embedding.iter_mut() {
+                    *x /= norm;
+                }
+            }
+            results.push(embedding);
+        }
+
+        Ok(results)
+    }
+
+    /// Extract a single embedding vector from a sequence hidden state using the given pooling strategy.
+    ///
+    /// `hidden_data`: row-major `[seq_len, hidden_dim]` slice
+    /// `mask`: attention mask for this sequence (1 = real, 0 = padding)
+    /// `seq_len`: number of tokens in this sequence (before padding)
+    /// `out_dim`: output embedding dimension (may be < hidden_dim for Matryoshka)
+    fn pool_sequence(
+        hidden_data: &[f32],
+        hidden_dim: usize,
+        mask: &[u32],
+        seq_len: usize,
+        out_dim: usize,
+        pooling: super::PoolingStrategy,
+    ) -> Vec<f32> {
+        match pooling {
+            super::PoolingStrategy::LastTokenPooling => {
+                let last_idx = mask[..seq_len]
+                    .iter()
+                    .rposition(|&m| m == 1)
+                    .unwrap_or(seq_len.saturating_sub(1));
+                let offset = last_idx * hidden_dim;
+                hidden_data[offset..offset + out_dim].to_vec()
+            }
+            super::PoolingStrategy::ClsToken => {
+                // First token (position 0)
+                hidden_data[..out_dim].to_vec()
+            }
+            super::PoolingStrategy::MeanPooling => {
+                let token_count = mask[..seq_len].iter().filter(|&&m| m == 1).count();
+                if token_count == 0 {
+                    return hidden_data[..out_dim].to_vec();
+                }
+                let mut mean = vec![0.0f32; out_dim];
+                for t in 0..seq_len {
+                    if mask[t] == 1 {
+                        let offset = t * hidden_dim;
+                        for d in 0..out_dim {
+                            mean[d] += hidden_data[offset + d];
+                        }
+                    }
+                }
+                for d in 0..out_dim {
+                    mean[d] /= token_count as f32;
+                }
+                mean
+            }
+            super::PoolingStrategy::MaxPooling => {
+                let mut maxes = vec![f32::NEG_INFINITY; out_dim];
+                for t in 0..seq_len {
+                    if mask[t] == 1 {
+                        let offset = t * hidden_dim;
+                        for d in 0..out_dim {
+                            if hidden_data[offset + d] > maxes[d] {
+                                maxes[d] = hidden_data[offset + d];
+                            }
+                        }
+                    }
+                }
+                // If no tokens had mask=1, fall back to zeros
+                for v in &mut maxes {
+                    if v.is_infinite() {
+                        *v = 0.0;
+                    }
+                }
+                maxes
+            }
+        }
     }
 
     /// Get config.
@@ -145,6 +315,21 @@ impl Embedder for OnnxEmbedder {
         Ok(EmbeddingResult::new(embedding, "qwen3-onnx").with_time(elapsed))
     }
 
+    fn embed_batch(&mut self, texts: &[&str]) -> Result<Vec<EmbeddingResult>> {
+        let start = std::time::Instant::now();
+        let embeddings = self.run_inference_batch(texts)?;
+        let elapsed = start.elapsed().as_secs_f32() * 1000.0;
+        let per_item = if texts.is_empty() {
+            0.0
+        } else {
+            elapsed / texts.len() as f32
+        };
+        Ok(embeddings
+            .into_iter()
+            .map(|emb| EmbeddingResult::new(emb, "qwen3-onnx").with_time(per_item))
+            .collect())
+    }
+
     fn model_name(&self) -> &str {
         "qwen3-onnx"
     }
@@ -162,6 +347,7 @@ mod tests {
             embedding_dim: 1024,
             max_seq_length: 8192,
             num_threads: 4,
+            pooling: super::super::PoolingStrategy::LastTokenPooling,
         };
         assert_eq!(config.embedding_dim, 1024);
         assert_eq!(config.num_threads, 4);
@@ -173,6 +359,43 @@ mod tests {
         assert_eq!(config.embedding_dim, 1024);
         assert_eq!(config.max_seq_length, 8192);
         assert_eq!(config.num_threads, 4);
+        assert_eq!(config.pooling, super::super::PoolingStrategy::LastTokenPooling);
+    }
+
+    #[test]
+    fn test_onnx_pooling_config() {
+        use super::super::PoolingStrategy;
+
+        let strategies = [
+            PoolingStrategy::LastTokenPooling,
+            PoolingStrategy::ClsToken,
+            PoolingStrategy::MeanPooling,
+            PoolingStrategy::MaxPooling,
+        ];
+        for strategy in strategies {
+            let config = OnnxEmbedderConfig {
+                pooling: strategy,
+                ..Default::default()
+            };
+            assert_eq!(config.pooling, strategy);
+        }
+    }
+
+    #[test]
+    fn test_onnx_default_is_last_token() {
+        let config = OnnxEmbedderConfig::default();
+        assert_eq!(config.pooling, super::super::PoolingStrategy::LastTokenPooling);
+    }
+
+    #[test]
+    fn test_onnx_batch_config_with_matryoshka() {
+        let config = OnnxEmbedderConfig {
+            embedding_dim: 256,
+            pooling: super::super::PoolingStrategy::MeanPooling,
+            ..Default::default()
+        };
+        assert_eq!(config.embedding_dim, 256);
+        assert_eq!(config.pooling, super::super::PoolingStrategy::MeanPooling);
     }
 
     #[test]
@@ -190,5 +413,41 @@ mod tests {
         };
         let embedder = OnnxEmbedder::new(config);
         assert!(embedder.is_ok(), "Should create ONNX session");
+    }
+
+    #[test]
+    #[ignore] // Requires ONNX model file
+    fn test_onnx_batch_matches_sequential() {
+        let model_path =
+            std::env::var("ONNX_MODEL_PATH").unwrap_or_else(|_| "/tmp/qwen3.onnx".into());
+        let tokenizer_path =
+            std::env::var("ONNX_TOKENIZER_PATH").unwrap_or_else(|_| "/tmp/tokenizer.json".into());
+
+        let config = OnnxEmbedderConfig {
+            model_path,
+            tokenizer_path,
+            ..Default::default()
+        };
+        let mut embedder = OnnxEmbedder::new(config).unwrap();
+
+        let texts = &["Hello world", "The quick brown fox", "Quantum computing"];
+
+        // Sequential
+        let sequential: Vec<Vec<f32>> = texts
+            .iter()
+            .map(|t| embedder.run_inference(t).unwrap())
+            .collect();
+
+        // Batch
+        let batch = embedder.run_inference_batch(texts).unwrap();
+        assert_eq!(batch.len(), sequential.len());
+
+        for (i, (s, b)) in sequential.iter().zip(batch.iter()).enumerate() {
+            let dot: f32 = s.iter().zip(b.iter()).map(|(a, b)| a * b).sum();
+            assert!(
+                dot > 0.999,
+                "Batch vs sequential mismatch at {i}: cosine={dot:.6}"
+            );
+        }
     }
 }

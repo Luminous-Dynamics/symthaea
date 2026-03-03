@@ -59,6 +59,7 @@ fn main() {
         temporal_smoothness_weight: opts.smoothness_weight,
         temporal_rank_reg_weight: opts.rank_reg_weight,
         temporal_learned_attention: opts.learned_attention,
+        temporal_e2e_loss: opts.e2e_loss,
         grad_clip: opts.grad_clip,
         // Disable runtime safety features during batch training:
         // - consciousness_gating: the PE > 0.8 gate in distill_step() blocks all
@@ -230,6 +231,7 @@ fn main() {
         temporal = opts.temporal_projection,
         learned_pos_enc = opts.learned_pos_enc,
         directional_loss = opts.directional_loss,
+        e2e_loss = opts.e2e_loss,
         "Starting projection training"
     );
 
@@ -270,7 +272,16 @@ fn main() {
             let result = gen.generate(&channels);
 
             // Distill step: update projection from reconstruction error
-            gen.distill_step(&channels, &result);
+            // When e2e loss is enabled, encode target text for Mamba's tokenizer
+            if opts.e2e_loss && !pair.target_text.is_empty() {
+                if let Ok(target_tokens) = gen.mamba().encode(&pair.target_text) {
+                    gen.distill_step_with_targets(&channels, &result, Some(&target_tokens));
+                } else {
+                    gen.distill_step(&channels, &result);
+                }
+            } else {
+                gen.distill_step(&channels, &result);
+            }
 
             epoch_semantic_pe += result.semantic_pe;
             epoch_coherence += result.final_coherence;
@@ -509,6 +520,7 @@ struct ProjectionTrainOpts {
     rank_reg_weight: f32,
     pos_enc_unfreeze_epoch: usize,
     learned_attention: bool,
+    e2e_loss: bool,
     max_gen_tokens: usize,
 }
 
@@ -540,6 +552,7 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         rank_reg_weight: 0.0,
         pos_enc_unfreeze_epoch: 0,
         learned_attention: false,
+        e2e_loss: false,
         max_gen_tokens: 16,
     };
 
@@ -676,6 +689,9 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             }
             "--learned-attention" => {
                 opts.learned_attention = true;
+            }
+            "--e2e-loss" => {
+                opts.e2e_loss = true;
             }
             "--pos-enc-unfreeze" => {
                 i += 1;

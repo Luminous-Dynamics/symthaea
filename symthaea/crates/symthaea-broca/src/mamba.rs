@@ -103,6 +103,26 @@ pub trait MambaBackend: Send {
     /// SSM state accumulates across the sequence, integrating all context.
     /// The sequence is typically 64 chunks of 768D from temporal projection.
     fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()>;
+
+    /// End-to-end token prediction loss with gradients w.r.t. input SSM tokens.
+    ///
+    /// 1. Injects `ssm_sequence` as continuous embeddings (like `inject_context_sequence`)
+    /// 2. Teacher-forces `target_tokens` through Mamba, collecting logits
+    /// 3. Computes cross-entropy loss between logits and next-token targets
+    /// 4. Backpropagates through Mamba's SSM layers via candle autograd
+    /// 5. Returns (loss_value, gradient_per_ssm_token) for chain rule through projection
+    ///
+    /// The returned gradients are `d_loss/d_ssm_token[i][j]` — one Vec<f32> per chunk.
+    /// These can be chained to projection weights via `compute_e2e_gradients()`.
+    fn compute_e2e_token_loss(
+        &mut self,
+        ssm_sequence: &[Vec<f32>],
+        target_tokens: &[u32],
+    ) -> Result<(f32, Vec<Vec<f32>>)> {
+        // Default: not supported
+        let _ = (ssm_sequence, target_tokens);
+        anyhow::bail!("End-to-end token loss not supported by this backend")
+    }
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
@@ -397,6 +417,86 @@ impl MambaWrapper {
         self.model.inject_sequence(&stacked, &mut self.state)?;
         Ok(())
     }
+
+    /// End-to-end token prediction loss with autograd gradients.
+    ///
+    /// Uses candle's `Var` to track gradients through Mamba's SSM layers:
+    /// 1. Creates input embeddings as a `Var` (leaf variable for autograd)
+    /// 2. Injects through all SSM layers (graph stays connected via state tensors)
+    /// 3. Teacher-forces target tokens, computing cross-entropy loss
+    /// 4. Calls `backward()` to get `d_loss/d_input_embeddings`
+    ///
+    /// Returns (loss_value, gradient_per_chunk) for projection chain rule.
+    pub fn compute_e2e_token_loss(
+        &mut self,
+        ssm_sequence: &[Vec<f32>],
+        target_tokens: &[u32],
+    ) -> Result<(f32, Vec<Vec<f32>>)> {
+        use candle_core::Var;
+
+        if target_tokens.len() < 2 {
+            anyhow::bail!("Need at least 2 target tokens for teacher forcing");
+        }
+
+        self.reset();
+        let d_model = self.config.d_model;
+        let seq_len = ssm_sequence.len();
+
+        // 1. Create input as Var for autograd tracking
+        let mut flat = Vec::with_capacity(seq_len * d_model);
+        for chunk in ssm_sequence {
+            assert_eq!(chunk.len(), d_model);
+            flat.extend_from_slice(chunk);
+        }
+        let input_var = Var::from_vec(flat, (seq_len, d_model), &self.device)
+            .context("Failed to create Var for e2e")?;
+        let input_tensor = input_var.as_tensor();
+
+        // 2. Warmstart conv1d from first chunk
+        if seq_len > 0 {
+            let summary = input_tensor.i(0)?.unsqueeze(0)?;
+            self.model
+                .warmstart_conv_history(&summary, &mut self.state)?;
+        }
+
+        // 3. Inject all SSM tokens (graph stays connected through state)
+        self.model.inject_sequence(input_tensor, &mut self.state)?;
+
+        // 4. Teacher-force target tokens, accumulating cross-entropy loss
+        let num_targets = target_tokens.len() - 1; // predict each next token
+        let mut total_loss = Tensor::zeros((), DType::F32, &self.device)?;
+        for i in 0..num_targets {
+            let input_id = Tensor::new(&[target_tokens[i]], &self.device)?;
+            let logits = self.model.forward(&input_id, &mut self.state)?;
+            // logits shape: (1, vocab_size) — squeeze to (vocab_size)
+            let logits_1d = logits.squeeze(0)?;
+            let target = Tensor::new(&[target_tokens[i + 1] as u32], &self.device)?
+                .to_dtype(DType::U32)?;
+            let loss = candle_nn::loss::cross_entropy(&logits_1d.unsqueeze(0)?, &target)?;
+            total_loss = (total_loss + loss)?;
+        }
+        // Average over tokens
+        let avg_loss = (total_loss / num_targets as f64)?;
+
+        // 5. Backward pass — compute d_loss/d_input_var
+        let loss_val = avg_loss.to_scalar::<f32>()?;
+        let grads = avg_loss.backward().context("Autograd backward failed")?;
+
+        // 6. Extract gradients for the input embeddings
+        let input_grad = grads
+            .get(input_var.as_tensor())
+            .context("No gradient for input Var — autograd graph may be disconnected")?;
+
+        // Reshape from (seq_len, d_model) to Vec<Vec<f32>>
+        let grad_flat: Vec<f32> = input_grad.flatten_all()?.to_vec1()?;
+        let mut ssm_grads = Vec::with_capacity(seq_len);
+        for i in 0..seq_len {
+            let start = i * d_model;
+            ssm_grads.push(grad_flat[start..start + d_model].to_vec());
+        }
+
+        Ok((loss_val, ssm_grads))
+    }
 }
 
 impl std::fmt::Debug for MambaWrapper {
@@ -460,6 +560,14 @@ impl MambaBackend for MambaWrapper {
 
     fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()> {
         MambaWrapper::inject_context_sequence(self, sequence)
+    }
+
+    fn compute_e2e_token_loss(
+        &mut self,
+        ssm_sequence: &[Vec<f32>],
+        target_tokens: &[u32],
+    ) -> Result<(f32, Vec<Vec<f32>>)> {
+        MambaWrapper::compute_e2e_token_loss(self, ssm_sequence, target_tokens)
     }
 }
 
@@ -623,6 +731,24 @@ pub(crate) mod tests {
                 / sequence.len().max(1) as f32;
             self.last_context_magnitude = avg_mag;
             Ok(())
+        }
+
+        fn compute_e2e_token_loss(
+            &mut self,
+            ssm_sequence: &[Vec<f32>],
+            target_tokens: &[u32],
+        ) -> Result<(f32, Vec<Vec<f32>>)> {
+            // Mock: return synthetic loss and gradients proportional to input magnitude
+            let d_model = if ssm_sequence.is_empty() { 768 } else { ssm_sequence[0].len() };
+            let loss = 5.0f32; // Synthetic loss
+            let grads: Vec<Vec<f32>> = ssm_sequence
+                .iter()
+                .map(|chunk| {
+                    chunk.iter().map(|&x| -0.01 * x).collect()
+                })
+                .collect();
+            let _ = (d_model, target_tokens);
+            Ok((loss, grads))
         }
     }
 

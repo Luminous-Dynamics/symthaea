@@ -726,50 +726,162 @@ impl TemporalProjection {
         }
     }
 
-    /// Apply accumulated gradients with learning rate and gradient clipping.
+    /// Accumulate gradients from end-to-end Mamba token prediction loss.
+    ///
+    /// Takes `d_loss/d_ssm_token[i]` (from candle autograd through Mamba) and chains
+    /// through the temporal projection to get `d_loss/d_w_chunk_up`:
+    ///
+    /// ```text
+    /// ssm_token[i] = LayerNorm(chunk[i]) × W_up + pos_enc[i]
+    /// d_loss/d_W_up[j,k] = Σ_i d_loss/d_ssm[i,j] × normed_chunk[i,k]
+    /// ```
+    ///
+    /// Also accumulates gradients for LayerNorm, pos_enc (if learned), and attention.
+    pub fn compute_e2e_gradients(&mut self, thought: &ContinuousHV, ssm_grads: &[Vec<f32>]) {
+        let dims = thought.dim();
+        let stride = if self.stride > 0 { self.stride } else { self.chunk_size };
+        let expected_chunks = if stride < self.chunk_size {
+            (dims.saturating_sub(self.chunk_size)) / stride + 1
+        } else {
+            self.num_chunks
+        };
+
+        if ssm_grads.len() != expected_chunks {
+            return; // Dimension mismatch, skip
+        }
+
+        let scale = 1.0 / expected_chunks as f32;
+
+        for (chunk_idx, ssm_grad) in ssm_grads.iter().enumerate() {
+            if ssm_grad.len() != self.ssm_dim {
+                continue;
+            }
+
+            // Extract and LayerNorm the chunk (same as forward path)
+            let chunk_start = chunk_idx * stride;
+            let chunk_end = (chunk_start + self.chunk_size).min(dims);
+            let raw_chunk = &thought.as_slice()[chunk_start..chunk_end];
+            let mut normed = vec![0.0f32; self.chunk_size];
+            if chunk_end - chunk_start < self.chunk_size {
+                normed[..chunk_end - chunk_start].copy_from_slice(raw_chunk);
+            } else {
+                normed.copy_from_slice(raw_chunk);
+            }
+
+            // LayerNorm forward
+            let mean: f32 = normed.iter().sum::<f32>() / self.chunk_size as f32;
+            let var: f32 = normed.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / self.chunk_size as f32;
+            let inv_std = 1.0 / (var + 1e-5).sqrt();
+            for k in 0..self.chunk_size {
+                normed[k] = (normed[k] - mean) * inv_std * self.ln_gamma[k] + self.ln_beta[k];
+            }
+
+            // Chain rule: d_loss/d_W_up[j,k] += ssm_grad[j] * normed[k] * scale
+            // (attention gate applied if learned)
+            let attn = if self.learned_attention {
+                sigmoid(self.chunk_attention[chunk_idx])
+            } else {
+                1.0
+            };
+
+            for j in 0..self.ssm_dim {
+                let grad_j = ssm_grad[j] * attn * scale;
+                let w_offset = j * self.chunk_size;
+                for k in 0..self.chunk_size {
+                    self.grad_chunk_up[w_offset + k] += grad_j * normed[k];
+                }
+            }
+
+            // Attention gradient: d_loss/d_attn[i] = Σ_j ssm_grad[j] * ssm_pre_attn[j]
+            if self.learned_attention && attn > 1e-10 {
+                // Recompute ssm_pre_attn (before attention scaling)
+                let mut ssm_pre = vec![0.0f32; self.ssm_dim];
+                for j in 0..self.ssm_dim {
+                    let w_offset = j * self.chunk_size;
+                    for k in 0..self.chunk_size {
+                        ssm_pre[j] += self.w_chunk_up[w_offset + k] * normed[k];
+                    }
+                    // Add pos_enc
+                    ssm_pre[j] += self.pos_enc[chunk_idx * self.ssm_dim + j];
+                }
+                let d_attn: f32 = ssm_grad.iter().zip(ssm_pre.iter())
+                    .map(|(g, s)| g * s)
+                    .sum::<f32>() * scale;
+                let sigmoid_grad = attn * (1.0 - attn);
+                self.grad_chunk_attention[chunk_idx] += d_attn * sigmoid_grad;
+            }
+
+            // Positional encoding gradient (if learned)
+            if self.learned_pos_enc {
+                for j in 0..self.ssm_dim {
+                    self.grad_pos_enc[chunk_idx * self.ssm_dim + j] += ssm_grad[j] * attn * scale;
+                }
+            }
+
+            // LayerNorm gradient (chain through normed → raw)
+            for k in 0..self.chunk_size {
+                let d_normed_k: f32 = (0..self.ssm_dim)
+                    .map(|j| ssm_grad[j] * attn * self.w_chunk_up[j * self.chunk_size + k])
+                    .sum::<f32>() * scale;
+                self.grad_ln_gamma[k] += d_normed_k * (raw_chunk.get(k).copied().unwrap_or(0.0) - mean) * inv_std;
+                self.grad_ln_beta[k] += d_normed_k;
+            }
+        }
+    }
+
+    /// Apply accumulated gradients with per-group gradient clipping.
+    ///
+    /// Each weight group (w_up, w_down, LayerNorm, pos_enc, attention) is clipped
+    /// independently to `grad_clip`. This prevents large gradients in one group
+    /// (e.g. w_down at norm ~300) from suppressing learning in other groups
+    /// (e.g. w_up at norm ~5) via shared clip scaling.
     pub fn apply_gradients(&mut self, lr: f32, grad_clip: f32) -> GradientStepMetrics {
         let norm_up = l2_norm(&self.grad_chunk_up);
         let norm_down = l2_norm(&self.grad_chunk_down);
         let norm_ln = (l2_norm(&self.grad_ln_gamma).powi(2) + l2_norm(&self.grad_ln_beta).powi(2)).sqrt();
         let norm_pos = if self.learned_pos_enc { l2_norm(&self.grad_pos_enc) } else { 0.0 };
         let norm_attn = if self.learned_attention { l2_norm(&self.grad_chunk_attention) } else { 0.0 };
-        let combined_norm = (norm_up.powi(2) + norm_down.powi(2) + norm_ln.powi(2)
-            + norm_pos.powi(2) + norm_attn.powi(2)).sqrt();
 
-        let was_clipped = combined_norm > grad_clip;
-        let clip_scale = if was_clipped {
-            grad_clip / combined_norm
-        } else {
-            1.0
-        };
+        // Per-group independent clipping: each group clips to grad_clip separately
+        let clip_up = if norm_up > grad_clip { grad_clip / norm_up } else { 1.0 };
+        let clip_down = if norm_down > grad_clip { grad_clip / norm_down } else { 1.0 };
+        let clip_ln = if norm_ln > grad_clip { grad_clip / norm_ln } else { 1.0 };
+        let clip_pos = if norm_pos > grad_clip { grad_clip / norm_pos } else { 1.0 };
+        let clip_attn = if norm_attn > grad_clip { grad_clip / norm_attn } else { 1.0 };
 
-        let effective_lr = lr * clip_scale;
+        let was_clipped = clip_up < 1.0 || clip_down < 1.0 || clip_ln < 1.0
+            || clip_pos < 1.0 || clip_attn < 1.0;
 
         // Apply to w_chunk_up
+        let lr_up = lr * clip_up;
         for (w, g) in self.w_chunk_up.iter_mut().zip(self.grad_chunk_up.iter()) {
-            *w -= effective_lr * g;
+            *w -= lr_up * g;
         }
         // Apply to w_chunk_down
+        let lr_down = lr * clip_down;
         for (w, g) in self.w_chunk_down.iter_mut().zip(self.grad_chunk_down.iter()) {
-            *w -= effective_lr * g;
+            *w -= lr_down * g;
         }
         // Apply to LayerNorm
+        let lr_ln = lr * clip_ln;
         for (w, g) in self.ln_gamma.iter_mut().zip(self.grad_ln_gamma.iter()) {
-            *w -= effective_lr * g;
+            *w -= lr_ln * g;
         }
         for (w, g) in self.ln_beta.iter_mut().zip(self.grad_ln_beta.iter()) {
-            *w -= effective_lr * g;
+            *w -= lr_ln * g;
         }
         // Apply to learned positional encoding
         if self.learned_pos_enc {
+            let lr_pos = lr * clip_pos;
             for (w, g) in self.pos_enc.iter_mut().zip(self.grad_pos_enc.iter()) {
-                *w -= effective_lr * g;
+                *w -= lr_pos * g;
             }
         }
         // Apply to learned chunk attention
         if self.learned_attention {
+            let lr_attn = lr * clip_attn;
             for (w, g) in self.chunk_attention.iter_mut().zip(self.grad_chunk_attention.iter()) {
-                *w -= effective_lr * g;
+                *w -= lr_attn * g;
             }
         }
 
