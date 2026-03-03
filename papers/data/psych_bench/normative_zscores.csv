@@ -38,9 +38,9 @@ Affect::EmotionalStroop,emotional_interference,0.058750,0.070000,0.040000,-0.281
 Creativity::RemoteAssociates,overall_accuracy,0.600000,0.500000,0.150000,0.666667,0.666667,74.750753,Average
 Creativity::AlternateUses,fluency,8.100000,8.000000,3.000000,0.033333,0.033333,51.329567,Average
 Inhibition::GoNoGo,nogo_accuracy,0.837387,0.820000,0.100000,0.173874,0.173874,56.901762,Average
-Inhibition::StopSignal,ssrt_ticks,0.088355,4.000000,1.000000,3.911645,3.000000,99.995415,Superior
+Inhibition::StopSignal,ssrt_ticks,0.088355,0.100000,0.050000,0.232906,0.232906,59.208281,Average
 Attention::AttentionalBlink,blink_magnitude,0.264000,0.300000,0.120000,0.300000,0.300000,61.791136,Average
-Attention::VisualSearch,search_asymmetry,0.243475,2.000000,0.500000,-3.513049,-3.000000,0.022154,Impaired
+Attention::VisualSearch,search_asymmetry,0.243475,0.250000,0.100000,-0.065247,-0.065247,47.398843,Average
 Reasoning::ArcFluid,transfer_accuracy,0.537500,0.800000,0.120000,-2.187500,-2.187500,1.435297,Impaired
 Reasoning::ArcCompositional,compositional_accuracy,0.583333,0.650000,0.150000,-0.444444,-0.444444,32.836067,Average
 Reasoning::ArcAnalogy,analogy_accuracy,0.550000,0.750000,0.120000,-1.666667,-1.666667,4.779033,Below average
@@ -52,14 +52,14 @@ Reasoning::ArcScaling,capacity_ratio,0.993750,0.900000,0.080000,1.171875,1.17187
 Reasoning::ArcRSA,rsa_correlation,0.438788,0.600000,0.150000,-1.074748,-1.074748,14.124382,Below average
 Reasoning::ArcAlgebra,algebra_score,0.824726,0.500000,0.150000,2.164839,2.164839,98.480006,Superior
 Reasoning::ArcStaircase,capacity_threshold,20.000000,10.000000,4.000000,2.500000,2.500000,99.379032,Superior
-SustainedAttention::SART,commission_errors,0.652520,2.500000,0.600000,3.079134,3.000000,99.896191,Superior
-SustainedAttention::PVT,vigilance_decrement,0.150264,5.000000,1.000000,4.849736,3.000000,99.999938,Superior
+SustainedAttention::SART,commission_errors,0.652520,0.300000,0.120000,-2.937664,-2.937664,0.165354,Impaired
+SustainedAttention::PVT,vigilance_decrement,0.150264,0.100000,0.050000,-1.005279,-1.005279,15.738134,Below average
 SustainedAttention::CPT,d_prime,4.653571,2.800000,0.600000,3.089284,3.000000,99.899674,Superior
-Motor::SRTT,learning_effect,0.019057,5.000000,1.000000,-4.980943,-3.000000,0.000032,Impaired
+Motor::SRTT,learning_effect,0.019057,0.150000,0.080000,-1.636794,-1.636794,5.083678,Below average
 Motor::FittsLaw,fitts_r_squared,0.998750,0.950000,0.030000,1.624984,1.624984,94.791706,Above average
 Motor::Bimanual,coordination_cost,0.000000,0.150000,0.060000,2.500000,2.500000,99.379032,Superior
-Language::GardenPath,disambiguation_cost,0.951077,0.850000,0.150000,-0.673846,-0.673846,25.020448,Average
-Language::SemanticCoherence,coherence_mean,-0.005019,0.050000,0.040000,-1.375466,-1.375466,8.449361,Below average
+Language::GardenPath,disambiguation_cost,0.739819,0.850000,0.150000,0.734538,0.734538,76.868957,Average
+Language::SemanticCoherence,coherence_mean,-0.005118,0.050000,0.040000,-1.377951,-1.377951,8.410928,Below average
 Language::LexicalDecision,lexicality_effect,0.972500,0.850000,0.150000,0.816667,0.816667,79.294059,Average
 Language::SemanticPriming,priming_effect,0.000000,0.100000,0.040000,-2.500000,-2.500000,0.620968,Impaired
 Social::RME,rme_accuracy,1.000000,0.720000,0.090000,3.111111,3.000000,99.906801,Superior
