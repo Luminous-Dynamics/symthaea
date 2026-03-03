@@ -89,6 +89,7 @@ fn cmudict_lookup(word: &str) -> Option<Vec<&'static str>> {
 /// Return the offset phoneme for a diphthong (the vowel it glides toward).
 /// Returns None for monophthongs. Used to create natural diphthong trajectories
 /// by switching the target phoneme partway through the duration.
+#[cfg(any(feature = "vocal-tract", test))]
 fn diphthong_offset_phoneme(phoneme: &str) -> Option<&'static str> {
     // Strip stress digit for matching
     let base = phoneme.trim_end_matches(|c: char| c.is_ascii_digit());
@@ -2078,6 +2079,13 @@ impl ReplVoiceOutput {
             );
             // Populate manner map for source_type propagation to vocoder
             super::vocal_tract_fep::populate_manner_map(&mut pipeline);
+            // Train CV/VC transitions (2 epochs for fast init)
+            super::vocal_tract_controller::train_controller_cv_vc_transitions(
+                &mut pipeline.controller,
+                &genesis,
+                &db,
+                2,
+            );
             Some(pipeline)
         } else {
             None

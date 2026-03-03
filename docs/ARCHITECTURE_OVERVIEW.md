@@ -75,10 +75,10 @@ make this explicit.
 
 ### Scale
 
-- **Symthaea**: ~985K lines of Rust (~778K code), 47 workspace members,
-  3,735+ tests, 46 extracted sub-crates
-- **Mycelix**: 3 cluster DNAs (Commons, Civic, Hearth), 90+ zomes,
-  6,200+ Rust unit tests, 33 SDK TypeScript integration tests
+- **Symthaea**: ~985K lines of Rust (~778K code), 49 workspace members,
+  3,735+ tests, 47 extracted sub-crates
+- **Mycelix**: 12+ domain clusters (Commons, Civic, Core, Climate, Attribution, ...),
+  140 coordinator zomes, 6,200+ Rust unit tests, 33 SDK TypeScript integration tests
 - **Bridge**: Shared types crate (`mycelix-bridge-common`), 3 bridge zomes,
   4-dimensional behavioral profile, tiered governance with audit logging
 
@@ -150,7 +150,7 @@ confusion for reviewers. This table is the canonical reference.
 
 | Symbol | Name | Computation | File | Status | Relation to IIT |
 |--------|------|-------------|------|--------|-----------------|
-| Φ_spectral | Spectral MIP | Fiedler-ordered MI Laplacian, bordered Cholesky sweep (O(n³)) | `symthaea/symthaea-core/src/consciousness_metrics/spectral_mip.rs:280` | [IT] | MIP search validated: r=0.99, ρ=0.93 vs exhaustive (see §3) |
+| Φ_spectral | Spectral MIP | Fiedler-ordered MI Laplacian, bordered Cholesky sweep (O(n³)) | `symthaea/symthaea-core/src/consciousness_metrics/spectral_mip.rs:280` | [IT] | MIP search validated: r=0.99, ρ=0.93 vs exhaustive (see §3 Honest Disclosure below) |
 | Φ_true | True IIT Phi | Exhaustive 2^n MIP partition search | `symthaea/symthaea-core/src/hdc/tiered_phi/core.rs` (Tier 3) | [IT], n≤15 | Definition (reference) |
 | Φ_heuristic | Heuristic Phi | 1 - avg_similarity, O(n) | `symthaea/symthaea-core/src/hdc/tiered_phi/core.rs` (Tier 1) | [IT] | Coarse approximation |
 | Φ_mm | Multimodal Binding | Σ(binding_strength × activation × zone_weight) / Σ(weights) | `symthaea/src/consciousness/integration/multi_modal_integration.rs:424` | [IT] | Not IIT; cross-modal heuristic |
@@ -528,7 +528,7 @@ infrastructure:
 - `ConsciousnessAwareByzantinePlugin`: Maps consciousness scores → Byzantine
   tolerance weights (0.1 veto, 0.3 dampen, 0.6 boost)
 - Proof-of-Gradient-Quality (PoGQ) aggregation
-- 100% detection at 45% adversarial ratio, 0% false positives (7 attack types)
+- 100% detection at 45% adversarial ratio, 0% false positives (7 attack types) [EX] (synthetic benchmarks only)
 - 62 tests [EX]
 
 ### 5.5 SDK Coverage
@@ -947,9 +947,9 @@ continuous covariance with discrete state transition models.
   response selection, `GridEncoder` for ARC tasks
 - **Neuromod integration**: `provide_reward(+0.8/-0.5)` per trial
 
-**Cognitive domains** (16):
+**Cognitive domains** (16, tests per domain are approximate — total verified by `cargo test`):
 
-| Domain | Example Benchmarks | Tests |
+| Domain | Example Benchmarks | Tests (approx) |
 |--------|-------------------|-------|
 | Working Memory | N-back (2-back, 3-back), digit span | ~40 |
 | Attention | CPT, Stroop interference, Flanker | ~50 |
