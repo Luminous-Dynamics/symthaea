@@ -45,6 +45,10 @@ pub use encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
 pub use fep::{VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation};
 pub use metrics::{compute_hnr, compute_spectral_tilt, PerceptualMetrics, VocalTractMetrics};
 pub use pipeline::{
-    predict_duration, Intonation, PitchAccent, ProsodyContext, VocalTractPipeline,
+    manner_energy_voicing, predict_duration, syllabify, Intonation, PitchAccent, ProsodyContext,
+    Syllable, VocalTractPipeline,
 };
 pub use types::{FormantFrame, FormantTarget};
+
+#[cfg(feature = "mel-conversion")]
+pub mod formant_to_mel;

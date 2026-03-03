@@ -83,6 +83,10 @@ pub use live_voice::LiveVoice;
 // REPL voice output (consciousness-modulated speech for interactive use)
 pub mod repl_voice;
 
+// BigVGAN neural vocoder (ONNX-based waveform generation)
+#[cfg(feature = "neural-vocoder")]
+pub mod neural_vocoder;
+
 // Kokoro TTS engine (ONNX-based neural TTS)
 pub mod g2p;
 pub mod kokoro_engine;
@@ -114,7 +118,8 @@ pub use synthesis_bridge::cycle_result_to_thought_channels;
 
 // Re-export vocal tract types (Phase 17)
 pub use vocal_tract_controller::{
-    refine_controller_ls, train_controller_on_phoneme_db, train_controller_transitions,
+    refine_controller_ls, train_controller_cv_vc_transitions, train_controller_on_phoneme_db,
+    train_controller_transitions,
 };
 pub use vocal_tract_controller::{
     ProsodyCorrection, ProsodyHead, SpeakerProfile, TrainingHyperparams, VocalTractConfig,

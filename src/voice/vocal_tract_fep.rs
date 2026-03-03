@@ -46,6 +46,11 @@ impl From<&VoiceOutputMetrics> for VocalTractObservation {
 ///
 /// Wraps `VocalTractPipeline` and `FormantVocoder` for interactive use.
 /// Each `tick()` call produces a small audio chunk (e.g., 120 samples at 24kHz/200Hz).
+///
+/// When the `neural-vocoder` feature is enabled and a BigVGAN ONNX model is available,
+/// formant frames are converted to mel spectrograms and fed to a background ONNX thread
+/// for ultra-realistic waveform generation. The DSP vocoder serves as immediate fallback
+/// during neural vocoder startup latency and whenever the neural path is unavailable.
 #[cfg(feature = "vocal-tract")]
 pub struct StreamingVocalTract {
     /// The vocal tract pipeline (encoder → controller → FEP).
@@ -54,11 +59,31 @@ pub struct StreamingVocalTract {
     pub vocoder: super::vocoder::FormantVocoder,
     /// Audio samples per motor frame (sample_rate / frame_rate).
     samples_per_frame: usize,
+
+    // ── Neural vocoder fields (feature-gated) ───────────────────────
+    /// Background neural vocoder channel (None = DSP-only mode).
+    #[cfg(feature = "neural-vocoder")]
+    neural_channel: Option<super::neural_vocoder::NeuralVocoderChannel>,
+    /// Formant-to-mel converter.
+    #[cfg(feature = "neural-vocoder")]
+    mel_converter: Option<symthaea_vocal_tract::formant_to_mel::FormantToMelConverter>,
+    /// Accumulated mel frames waiting to be submitted as a chunk.
+    #[cfg(feature = "neural-vocoder")]
+    mel_buffer: Vec<Vec<f32>>,
+    /// How many mel frames to buffer before submitting to neural vocoder.
+    #[cfg(feature = "neural-vocoder")]
+    mel_buffer_target: usize,
+    /// Pending neural audio response receiver.
+    #[cfg(feature = "neural-vocoder")]
+    pending_neural_audio: Option<std::sync::mpsc::Receiver<super::neural_vocoder::VocoderResponse>>,
+    /// Cache of neural audio samples ready to be returned.
+    #[cfg(feature = "neural-vocoder")]
+    neural_audio_cache: std::collections::VecDeque<f32>,
 }
 
 #[cfg(feature = "vocal-tract")]
 impl StreamingVocalTract {
-    /// Create a new streaming vocal tract.
+    /// Create a new streaming vocal tract (DSP-only mode).
     ///
     /// - `genesis`: seed for deterministic initialization
     /// - `sample_rate`: audio sample rate (e.g., 24000)
@@ -78,12 +103,67 @@ impl StreamingVocalTract {
             pipeline,
             vocoder: super::vocoder::FormantVocoder::with_config(vocoder_config),
             samples_per_frame: (sample_rate / frame_rate) as usize,
+            #[cfg(feature = "neural-vocoder")]
+            neural_channel: None,
+            #[cfg(feature = "neural-vocoder")]
+            mel_converter: None,
+            #[cfg(feature = "neural-vocoder")]
+            mel_buffer: Vec::new(),
+            #[cfg(feature = "neural-vocoder")]
+            mel_buffer_target: 32,
+            #[cfg(feature = "neural-vocoder")]
+            pending_neural_audio: None,
+            #[cfg(feature = "neural-vocoder")]
+            neural_audio_cache: std::collections::VecDeque::new(),
         }
+    }
+
+    /// Create a streaming vocal tract with neural vocoder support.
+    ///
+    /// Attempts to load the BigVGAN ONNX model on a background thread.
+    /// If the model is unavailable, falls back to DSP-only mode transparently.
+    #[cfg(feature = "neural-vocoder")]
+    pub fn with_neural_vocoder(
+        genesis: &symthaea_core::genesis::GenesisSeed,
+        sample_rate: u32,
+        frame_rate: u32,
+        neural_config: super::neural_vocoder::NeuralVocoderConfig,
+    ) -> Self {
+        let mel_buffer_target = neural_config.mel_buffer_size;
+        let n_mels = neural_config.n_mels;
+
+        let mel_config = symthaea_vocal_tract::formant_to_mel::FormantToMelConfig {
+            sample_rate,
+            n_mels,
+            motor_frame_rate: frame_rate,
+            ..Default::default()
+        };
+
+        let channel = super::neural_vocoder::NeuralVocoderChannel::spawn(neural_config);
+        let has_neural = channel.is_some();
+
+        let mut svt = Self::new(genesis, sample_rate, frame_rate);
+        svt.neural_channel = channel;
+        svt.mel_converter = if has_neural {
+            Some(symthaea_vocal_tract::formant_to_mel::FormantToMelConverter::new(mel_config))
+        } else {
+            None
+        };
+        svt.mel_buffer_target = mel_buffer_target;
+        svt
+    }
+
+    /// Whether the neural vocoder is active (model loaded, thread running).
+    #[cfg(feature = "neural-vocoder")]
+    pub fn has_neural_vocoder(&self) -> bool {
+        self.neural_channel.is_some()
     }
 
     /// Run one motor frame and produce audio samples.
     ///
     /// Returns a chunk of audio samples (length = sample_rate / frame_rate).
+    /// When neural vocoder is active, formant frames are converted to mel and
+    /// submitted for ONNX inference; DSP gap-fills until neural audio is ready.
     pub fn tick(
         &mut self,
         cognitive_state: &super::vocal_tract_encoder::VoiceCognitiveState,
@@ -94,6 +174,12 @@ impl StreamingVocalTract {
         let frame = self
             .pipeline
             .tick_phoneme(cognitive_state, metrics, dt, phoneme);
+
+        #[cfg(feature = "neural-vocoder")]
+        if self.neural_channel.is_some() {
+            return self.tick_neural(&frame, cognitive_state);
+        }
+
         self.vocoder
             .synthesize_frame(&frame, self.samples_per_frame)
     }
@@ -110,8 +196,73 @@ impl StreamingVocalTract {
         let frame = self
             .pipeline
             .tick_with_prosody(cognitive_state, metrics, dt, phoneme, prosody);
+
+        #[cfg(feature = "neural-vocoder")]
+        if self.neural_channel.is_some() {
+            return self.tick_neural(&frame, cognitive_state);
+        }
+
         self.vocoder
             .synthesize_frame(&frame, self.samples_per_frame)
+    }
+
+    /// Neural vocoder tick: mel conversion → buffer → submit → collect → gap-fill.
+    #[cfg(feature = "neural-vocoder")]
+    fn tick_neural(
+        &mut self,
+        frame: &symthaea_vocal_tract::types::FormantFrame,
+        cognitive_state: &super::vocal_tract_encoder::VoiceCognitiveState,
+    ) -> Vec<f32> {
+        use symthaea_vocal_tract::formant_to_mel::MelVoiceQuality;
+
+        // 1. Convert cognitive state to voice quality for breathiness modulation
+        let vq = MelVoiceQuality {
+            rd: 1.0 + cognitive_state.emotional_valence,
+            arousal: cognitive_state.emotional_arousal,
+        };
+
+        // 2. Push formant frame through mel converter
+        if let Some(ref mut converter) = self.mel_converter {
+            let mel_frames = converter.push_frame(frame, &vq);
+            self.mel_buffer.extend(mel_frames);
+        }
+
+        // 3. Submit mel buffer when full
+        if self.mel_buffer.len() >= self.mel_buffer_target {
+            if let Some(ref channel) = self.neural_channel {
+                let chunk: Vec<Vec<f32>> = self.mel_buffer.drain(..).collect();
+                match channel.submit(chunk) {
+                    Ok(rx) => {
+                        self.pending_neural_audio = Some(rx);
+                    }
+                    Err(_) => {
+                        // Channel full (backpressure) — drop this chunk, DSP will gap-fill
+                        tracing::debug!("Neural vocoder backpressure, DSP gap-fill");
+                    }
+                }
+            }
+        }
+
+        // 4. Try to collect completed neural audio
+        if let Some(ref rx) = self.pending_neural_audio {
+            if let Ok(response) = rx.try_recv() {
+                self.neural_audio_cache.extend(response.audio.iter());
+                self.pending_neural_audio = None;
+            }
+        }
+
+        // 5. Return neural audio if available, else DSP gap-fill
+        if self.neural_audio_cache.len() >= self.samples_per_frame {
+            let samples: Vec<f32> = self
+                .neural_audio_cache
+                .drain(..self.samples_per_frame)
+                .collect();
+            samples
+        } else {
+            // DSP gap-fill
+            self.vocoder
+                .synthesize_frame(frame, self.samples_per_frame)
+        }
     }
 
     /// Get the number of audio samples per motor frame.
@@ -123,13 +274,23 @@ impl StreamingVocalTract {
     pub fn reset(&mut self) {
         self.pipeline.reset();
         self.vocoder.reset();
+        #[cfg(feature = "neural-vocoder")]
+        {
+            if let Some(ref mut converter) = self.mel_converter {
+                converter.reset();
+            }
+            self.mel_buffer.clear();
+            self.pending_neural_audio = None;
+            self.neural_audio_cache.clear();
+        }
     }
 }
 
-/// Populate a pipeline's manner map from the ARPABET formant database.
+/// Populate a pipeline's manner and voicing maps from the ARPABET formant database.
 ///
 /// This wires phoneme names to their manner of articulation so `tick_phoneme()`
-/// can set `source_type` on output frames for proper vocoder excitation.
+/// can set `source_type` on output frames for proper vocoder excitation, and
+/// also populates the voicing map for manner-aware energy/voicing overrides.
 #[cfg(feature = "vocal-tract")]
 pub fn populate_manner_map(pipeline: &mut VocalTractPipeline) {
     let db = super::formant_targets::get_formant_database();
@@ -137,7 +298,12 @@ pub fn populate_manner_map(pipeline: &mut VocalTractPipeline) {
         .iter()
         .map(|(name, target)| (name.clone(), target.manner))
         .collect();
+    let voicing_map: std::collections::HashMap<String, bool> = db
+        .iter()
+        .map(|(name, target)| (name.clone(), target.is_voiced))
+        .collect();
     pipeline.set_manner_map(manner_map);
+    pipeline.set_voicing_map(voicing_map);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
