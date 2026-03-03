@@ -1366,6 +1366,17 @@ impl NeuromodulatorBath {
         self.gaba.effective() * self.gaba_subtypes.inhibitory
     }
 
+    /// Reactive inhibition strength (0.0–1.0).
+    /// Combines D2 NoGo pathway + NE-beta phasic brake + GABA global inhibition.
+    /// Science: Aron (2007) — hyperdirect STN pathway; Frank (2005) — D2 NoGo.
+    #[inline]
+    pub fn reactive_inhibition_strength(&self) -> f32 {
+        let d2_nogo = self.da_d2_effective() * 0.4; // D2 pathway (NoGo)
+        let ne_brake = self.ne_beta_effective() * 0.35; // Phasic emergency brake
+        let gaba_brake = self.gaba.effective() * 0.25; // Global inhibition
+        (d2_nogo + ne_brake + gaba_brake).clamp(0.0, 1.0)
+    }
+
     // ── Transmitter Index Access (for multi-agent coupling) ─────────
 
     /// Get transmitter reference by index (0=DA..8=ECB).
@@ -4081,6 +4092,40 @@ mod tests {
             "Sleep should raise GABA baseline: {}",
             bath.gaba.baseline_for_test()
         );
+    }
+
+    // ── Reactive inhibition strength ──────────────────────────────────
+
+    #[test]
+    fn test_reactive_inhibition_default() {
+        let bath = NeuromodulatorBath::default();
+        let inh = bath.reactive_inhibition_strength();
+        assert!(inh > 0.0, "Default inhibition should be > 0: {inh}");
+        assert!(inh < 1.0, "Default inhibition should be < 1: {inh}");
+        assert!(inh.is_finite());
+    }
+
+    #[test]
+    fn test_reactive_inhibition_high_gaba() {
+        let mut bath = NeuromodulatorBath::default();
+        let baseline = bath.reactive_inhibition_strength();
+        bath.gaba.level = 1.0;
+        let boosted = bath.reactive_inhibition_strength();
+        assert!(
+            boosted > baseline,
+            "High GABA should increase inhibition: base={baseline}, boosted={boosted}"
+        );
+    }
+
+    #[test]
+    fn test_reactive_inhibition_clamped() {
+        let mut bath = NeuromodulatorBath::default();
+        bath.dopamine.level = 2.0;
+        bath.noradrenaline.level = 2.0;
+        bath.noradrenaline.phasic = 2.0;
+        bath.gaba.level = 2.0;
+        let inh = bath.reactive_inhibition_strength();
+        assert!(inh <= 1.0, "Inhibition should be clamped to 1.0: {inh}");
     }
 
     // ── #12: Oxytocin production ─────────────────────────────────────

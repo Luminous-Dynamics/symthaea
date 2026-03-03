@@ -354,22 +354,6 @@ impl CuriosityDrive {
         exploration_update
     }
 
-    /// Apply an [`ExplorationUpdate`] directly to this drive's exploration_urge.
-    ///
-    /// Used by unit tests that validate CuriosityDrive in isolation.
-    /// Production code routes through `set_exploration`/`scale_exploration` helpers
-    /// which dual-write to the ProposalCollector for divergence tracking.
-    pub fn apply_exploration_update(&mut self, update: ExplorationUpdate) {
-        match update {
-            ExplorationUpdate::Set(val) => {
-                self.exploration_urge = (val as f64).clamp(0.0, 1.0);
-            }
-            ExplorationUpdate::Scale(factor) => {
-                self.exploration_urge = (self.exploration_urge * factor as f64).clamp(0.0, 1.0);
-            }
-        }
-    }
-
     /// Check if exploration should be triggered
     pub fn should_explore(&self) -> bool {
         self.exploration_urge > 0.4 || (self.boredom > 0.7 && self.curiosity > 0.6)
@@ -395,6 +379,24 @@ impl CuriosityDrive {
     /// Get current boredom threshold
     pub fn get_boredom_threshold(&self) -> f32 {
         self.boredom_threshold
+    }
+
+    /// Apply an exploration update directly (test-only).
+    ///
+    /// In production code, the feedback helper system routes ExplorationUpdate
+    /// through ProposalCollector. This method exists only for unit-testing
+    /// CuriosityDrive in isolation.
+    #[cfg(test)]
+    pub fn apply_exploration_update(&mut self, upd: ExplorationUpdate) {
+        match upd {
+            ExplorationUpdate::Set(val) => {
+                self.exploration_urge = (val as f64).clamp(0.0, 1.0);
+            }
+            ExplorationUpdate::Scale(factor) => {
+                self.exploration_urge = (self.exploration_urge * factor as f64).clamp(0.0, 1.0);
+            }
+        }
+        self.novelty_bonus = 1.0 + (Self::MAX_NOVELTY_BONUS - 1.0) * self.exploration_urge as f32;
     }
 }
 

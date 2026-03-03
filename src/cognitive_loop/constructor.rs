@@ -394,35 +394,7 @@ impl CognitiveLoopService {
         let substrate_feasibility = if let Some(ref comp) = config.substrate_composition {
             comp.feasibility()
         } else {
-            use symthaea_core::hdc::substrate_independence::SubstrateRequirements;
-            let req = match config.substrate_type.canonical() {
-                super::config::SubstrateType::BiologicalNeurons => {
-                    SubstrateRequirements::biological_neurons()
-                }
-                super::config::SubstrateType::SiliconDigital => {
-                    SubstrateRequirements::silicon_digital()
-                }
-                super::config::SubstrateType::QuantumComputer => {
-                    SubstrateRequirements::quantum_computer()
-                }
-                super::config::SubstrateType::PhotonicProcessor => {
-                    SubstrateRequirements::photonic_processor()
-                }
-                super::config::SubstrateType::NeuromorphicChip => {
-                    SubstrateRequirements::neuromorphic_chip()
-                }
-                super::config::SubstrateType::BiochemicalComputer => {
-                    SubstrateRequirements::biochemical_computer()
-                }
-                super::config::SubstrateType::HybridSystem => {
-                    SubstrateRequirements::hybrid_system()
-                }
-                super::config::SubstrateType::ExoticSubstrate => {
-                    SubstrateRequirements::exotic_substrate()
-                }
-                _ => SubstrateRequirements::silicon_digital(),
-            };
-            req.consciousness_feasibility()
+            Self::requirements_for(&config.substrate_type).consciousness_feasibility()
         };
 
         // Compute validation overlay + speed/scale modulation at startup.

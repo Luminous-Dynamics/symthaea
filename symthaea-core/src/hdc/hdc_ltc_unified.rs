@@ -974,6 +974,11 @@ impl HdcLtcUnifiedNeuron {
         self.state = state;
     }
 
+    /// Update the Fourier basis frequencies used in equilibrium modulation.
+    pub fn set_fourier_frequencies(&mut self, freqs: &[f32]) {
+        self.config.fourier_frequencies = freqs.to_vec();
+    }
+
     /// Reset state to zero
     pub fn reset(&mut self) {
         self.state = ContinuousHV::zero(self.config.dimension);
@@ -1681,6 +1686,16 @@ impl HdcLtcUnifiedNetwork {
             .unwrap_or_else(|| ContinuousHV::zero(self.config.neuron_config.dimension))
     }
 
+    /// Update Fourier basis frequencies for all neurons in the network.
+    pub fn update_fourier_frequencies(&mut self, freqs: &[f32]) {
+        for layer in &mut self.layers {
+            for neuron in layer {
+                neuron.set_fourier_frequencies(freqs);
+            }
+        }
+        self.config.neuron_config.fourier_frequencies = freqs.to_vec();
+    }
+
     /// Reset all neurons
     pub fn reset(&mut self) {
         for layer in &mut self.layers {
@@ -2371,5 +2386,18 @@ mod tests {
             "State should remain bounded after 100 steps, got {}",
             norm
         );
+    }
+
+    #[test]
+    fn test_set_fourier_frequencies_neuron() {
+        let config = UnifiedConfig {
+            fourier_frequencies: vec![1.0, 2.0],
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        assert_eq!(neuron.config().fourier_frequencies, vec![1.0, 2.0]);
+
+        neuron.set_fourier_frequencies(&[5.0, 10.0, 15.0]);
+        assert_eq!(neuron.config().fourier_frequencies, vec![5.0, 10.0, 15.0]);
     }
 }

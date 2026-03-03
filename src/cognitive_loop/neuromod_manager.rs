@@ -34,6 +34,9 @@ pub(crate) struct NeuromodManager {
     /// Running calibration battery subprocess (async, non-blocking).
     pub calibration_battery_child: Option<std::process::Child>,
 
+    /// When the calibration battery was spawned (for timeout detection).
+    pub calibration_battery_spawned_at: Option<std::time::Instant>,
+
     /// Calibration history for drift tracking (sliding window of last N profiles).
     pub calibration_history: super::calibration::CalibrationHistory,
 }
@@ -50,6 +53,7 @@ impl Default for NeuromodManager {
             self_assessment: calibration::SelfAssessmentMonitor::default(),
             phase_detector: neuromodulators::PhaseTransitionDetector::new(5),
             calibration_battery_child: None,
+            calibration_battery_spawned_at: None,
             calibration_history: super::calibration::CalibrationHistory::default(),
         }
     }

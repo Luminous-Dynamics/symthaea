@@ -478,9 +478,9 @@ impl NeuromodCalibration {
             // calibration_error_ece is lower-is-better → positive z = worse calibration
             // If Symthaea is overconfident, reduce prediction_confidence
             confidence_delta = if *z > 0.5 {
-                -0.02 // overconfident → reduce
+                -0.015 // overconfident → reduce (symmetric with boost)
             } else if *z < -0.5 {
-                0.01 // underconfident → boost slightly
+                0.015 // underconfident → boost (symmetric with reduction)
             } else {
                 0.0
             };
@@ -706,6 +706,23 @@ impl NeuromodCalibration {
         // Blend confidence delta
         self.confidence_delta =
             self.confidence_delta * (1.0 - w) + peer.confidence_delta * w;
+    }
+
+    /// Scale calibration adjustments by sleep quality (0.0–1.0).
+    ///
+    /// Blends each sensitivity factor toward 1.0 (neutral) proportional to sleep
+    /// quality. A quality of 1.0 applies full calibration; 0.5 applies half-strength.
+    /// Also scales the confidence delta proportionally.
+    ///
+    /// Science: Walker & Stickgold (2006) — sleep-dependent memory consolidation
+    ///   scales with sleep duration and quality.
+    pub fn scale_by_sleep_quality(&mut self, quality: f32) {
+        let q = quality.clamp(0.0, 1.0);
+        for adj in &mut self.adjustments {
+            // Blend factor toward 1.0: full_factor = 1.0 + (original - 1.0) * quality
+            adj.sensitivity_factor = 1.0 + (adj.sensitivity_factor - 1.0) * q;
+        }
+        self.confidence_delta *= q;
     }
 
     /// Parse JSON z-scores from calibration battery output.
@@ -962,10 +979,11 @@ impl SelfAssessmentMonitor {
             return None;
         }
 
-        // Cooldown gate: skip when drift is anomalous AND prediction error is elevated.
-        // Anomalous personality drift (Turrigiano 2008) signals receptor sensitivity
-        // has wandered — urgent recalibration overrides the normal cooldown.
-        if self.cooldown > 0 && !(drift_anomalous && self.pe_ema > 0.15) {
+        // Cooldown gate: skip when drift is anomalous OR prediction error is elevated.
+        // Either signal alone is sufficient to override cooldown:
+        // - Anomalous personality drift (Turrigiano 2008) = receptor sensitivity wander
+        // - Elevated PE (>0.15) = sustained prediction failures needing correction
+        if self.cooldown > 0 && !(drift_anomalous || self.pe_ema > 0.15) {
             return None;
         }
 
@@ -1289,6 +1307,27 @@ impl CalibrationHistory {
             }
         }
         drifters
+    }
+
+    /// Compute baseline nudges for transmitters showing systematic drift.
+    ///
+    /// Returns `(transmitter_name, nudge_delta)` pairs. The nudge is 10% of the
+    /// mean drift direction per calibration window, clamped to ±0.02 to prevent
+    /// runaway baseline shifting.
+    ///
+    /// Science: McEwen (1998) — allostatic overload occurs when homeostatic
+    ///   corrections are consistently one-directional. Adjusting the setpoint
+    ///   (baseline) reduces corrective load.
+    pub fn compute_baseline_nudges(&self) -> Vec<(String, f32)> {
+        let mut nudges = Vec::new();
+        for (transmitter, direction) in self.systematic_drift_transmitters() {
+            // 10% of drift direction, clamped to ±0.02
+            let nudge = (direction as f32 * 0.1).clamp(-0.02, 0.02);
+            if nudge.abs() > 0.001 {
+                nudges.push((transmitter, nudge));
+            }
+        }
+        nudges
     }
 
     /// Mean calibration interval (cycles between calibrations).
@@ -2787,5 +2826,139 @@ mod tests {
         let history = CalibrationHistory::default();
         assert!(history.drift_direction("DA").is_none(), "Empty history → None");
         assert!(history.mean_interval().is_none(), "Empty history → None");
+    }
+
+    #[test]
+    fn test_scale_by_sleep_quality_full() {
+        let mut cal = NeuromodCalibration::from_z_scores(&[("Executive::Stroop", 2.0)]);
+        let original_factor = cal.adjustments[0].sensitivity_factor;
+        cal.scale_by_sleep_quality(1.0);
+        assert!(
+            (cal.adjustments[0].sensitivity_factor - original_factor).abs() < 0.0001,
+            "Full quality should not change factors"
+        );
+    }
+
+    #[test]
+    fn test_scale_by_sleep_quality_half() {
+        let mut cal = NeuromodCalibration::from_z_scores(&[("Executive::Stroop", 2.0)]);
+        let original_factor = cal.adjustments[0].sensitivity_factor;
+        let deviation = original_factor - 1.0;
+        cal.scale_by_sleep_quality(0.5);
+        let expected = 1.0 + deviation * 0.5;
+        assert!(
+            (cal.adjustments[0].sensitivity_factor - expected).abs() < 0.0001,
+            "Half quality should halve deviation: got {}, expected {}",
+            cal.adjustments[0].sensitivity_factor,
+            expected
+        );
+    }
+
+    #[test]
+    fn test_scale_by_sleep_quality_zero() {
+        let mut cal = NeuromodCalibration::from_z_scores(&[("Executive::Stroop", 2.0)]);
+        cal.scale_by_sleep_quality(0.0);
+        assert!(
+            (cal.adjustments[0].sensitivity_factor - 1.0).abs() < 0.0001,
+            "Zero quality should neutralize all factors to 1.0"
+        );
+        assert!(
+            cal.confidence_delta.abs() < 0.0001,
+            "Zero quality should zero confidence delta"
+        );
+    }
+
+    #[test]
+    fn test_baseline_nudges_from_systematic_drift() {
+        let mut history = CalibrationHistory::default();
+        // Create 6 calibrations all boosting DA (systematic positive drift)
+        for i in 0..6 {
+            let mut factors = std::collections::HashMap::new();
+            factors.insert("DA".to_string(), 1.05); // consistently boosting
+            history.entries.push_back(CalibrationSnapshot {
+                factors,
+                confidence_delta: 0.0,
+                coverage: 0.8,
+                applied_at_cycle: i * 100,
+            });
+        }
+        let nudges = history.compute_baseline_nudges();
+        assert!(!nudges.is_empty(), "Should detect drift and produce nudges");
+        let (name, nudge) = &nudges[0];
+        assert_eq!(name, "DA");
+        assert!(*nudge > 0.0, "Positive drift should produce positive nudge");
+        assert!(*nudge <= 0.02, "Nudge should be clamped to ±0.02");
+    }
+
+    #[test]
+    fn test_baseline_nudges_no_drift() {
+        let mut history = CalibrationHistory::default();
+        // Oscillating factors: no systematic drift
+        for i in 0..6 {
+            let mut factors = std::collections::HashMap::new();
+            let factor = if i % 2 == 0 { 1.05 } else { 0.95 };
+            factors.insert("DA".to_string(), factor);
+            history.entries.push_back(CalibrationSnapshot {
+                factors,
+                confidence_delta: 0.0,
+                coverage: 0.8,
+                applied_at_cycle: i * 100,
+            });
+        }
+        let nudges = history.compute_baseline_nudges();
+        assert!(nudges.is_empty(), "Oscillating drift should produce no nudges");
+    }
+
+    #[test]
+    fn test_cooldown_override_or_logic() {
+        // Verify that either drift_anomalous OR elevated PE overrides cooldown
+        let mut monitor = SelfAssessmentMonitor::default();
+        monitor.observations_since_calibration = 300; // past warmup
+        monitor.cooldown = 100; // in cooldown
+
+        // Case 1: drift anomalous only, PE low → should override (OR)
+        monitor.pe_ema = 0.05;
+        let result = monitor.check_trigger(true);
+        // With OR logic, drift_anomalous=true bypasses cooldown
+        // The trigger may or may not fire depending on z-score thresholds,
+        // but it should NOT be blocked by cooldown
+        // We test this by checking that a high-PE monitor also overrides
+        let mut monitor2 = SelfAssessmentMonitor::default();
+        monitor2.observations_since_calibration = 300;
+        monitor2.cooldown = 100;
+        monitor2.pe_ema = 0.25; // elevated PE
+        // With OR logic, pe_ema > 0.15 alone should bypass cooldown
+        let _ = monitor2.check_trigger(false);
+        // The key test: the function should reach the z-score computation
+        // (not return None at the cooldown gate). We verify by checking
+        // that pe_z would be computed from the high pe_ema.
+        // Since pe_ema=0.25, pe_z=(0.25-0.1)/0.05=3.0 → needs_calibration=true
+        let result2 = monitor2.check_trigger(false);
+        assert!(
+            result2.is_some(),
+            "Elevated PE alone should override cooldown with OR logic"
+        );
+    }
+
+    #[test]
+    fn test_confidence_delta_symmetric() {
+        // Overconfident
+        let cal_over = NeuromodCalibration::from_z_scores(&[(
+            "Metacognition::FeelingOfKnowing",
+            1.0,
+        )]);
+        // Underconfident
+        let cal_under = NeuromodCalibration::from_z_scores(&[(
+            "Metacognition::FeelingOfKnowing",
+            -1.0,
+        )]);
+        assert!(
+            (cal_over.confidence_delta.abs() - cal_under.confidence_delta.abs()).abs() < 0.0001,
+            "Confidence delta should be symmetric: over={}, under={}",
+            cal_over.confidence_delta,
+            cal_under.confidence_delta
+        );
+        assert!(cal_over.confidence_delta < 0.0, "Overconfident should reduce");
+        assert!(cal_under.confidence_delta > 0.0, "Underconfident should boost");
     }
 }

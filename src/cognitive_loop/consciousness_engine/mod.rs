@@ -26,8 +26,7 @@ mod measure;
 mod helpers;
 
 pub(crate) use types::{
-    ConsciousnessEngineCache, ConsciousnessEngineInput, ConsciousnessEngineOutput,
-    ConsciousnessWeights, MoralConsciousnessCoupling, WeightConvergenceState,
+    ConsciousnessEngineCache, ConsciousnessEngineInput, MoralConsciousnessCoupling,
 };
 
 use symthaea_core::consciousness_metrics::SpectralMIPFinder;

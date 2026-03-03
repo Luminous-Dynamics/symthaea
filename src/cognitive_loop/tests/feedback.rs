@@ -1293,3 +1293,258 @@ fn test_consensus_divergence_bounded() {
         "learning rate should be finite and positive: {lr}"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FEEDBACK HELPER UNIT TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+// Tests for the 12 helper methods in feedback_helpers.rs.
+// Each helper must: (1) record a proposal, (2) mutate the field, (3) respect clamp bounds.
+
+fn make_helper_service() -> CognitiveLoopService {
+    CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap()
+}
+
+// ── Confidence helpers ──────────────────────────────────────────────────────
+
+#[test]
+fn helper_adjust_confidence_applies_delta_and_records_proposal() {
+    let mut svc = make_helper_service();
+    let before = svc.prediction_confidence;
+    svc.feedback_state.begin_cycle();
+    let delta: f32 = 0.1;
+    svc.adjust_confidence("test_source", delta);
+    assert!(
+        (svc.prediction_confidence - (before + delta as f64)).abs() < 1e-10,
+        "adjust_confidence should add delta: {} vs expected {}",
+        svc.prediction_confidence,
+        before + delta as f64
+    );
+    assert_eq!(svc.feedback_state.confidence.len(), 1);
+}
+
+#[test]
+fn helper_scale_confidence_applies_factor_and_records_proposal() {
+    let mut svc = make_helper_service();
+    let before = svc.prediction_confidence;
+    svc.feedback_state.begin_cycle();
+    let factor: f32 = 0.8;
+    svc.scale_confidence("test_source", factor);
+    assert!(
+        (svc.prediction_confidence - (before * factor as f64)).abs() < 1e-10,
+        "scale_confidence should multiply: {} vs expected {}",
+        svc.prediction_confidence,
+        before * factor as f64
+    );
+    assert_eq!(svc.feedback_state.confidence.len(), 1);
+}
+
+#[test]
+fn helper_set_confidence_overwrites_and_records_proposal() {
+    let mut svc = make_helper_service();
+    svc.feedback_state.begin_cycle();
+    svc.set_confidence("test_source", 0.75);
+    assert!(
+        (svc.prediction_confidence - 0.75_f32 as f64).abs() < 1e-10,
+        "set_confidence should set to 0.75: got {}",
+        svc.prediction_confidence
+    );
+    assert_eq!(svc.feedback_state.confidence.len(), 1);
+}
+
+#[test]
+fn helper_confidence_clamps_to_bounds() {
+    let mut svc = make_helper_service();
+    svc.feedback_state.begin_cycle();
+    // Try to go above upper bound
+    svc.set_confidence("test", 1.5);
+    assert!(
+        (svc.prediction_confidence - 0.99).abs() < 1e-7,
+        "confidence should clamp to 0.99: got {}",
+        svc.prediction_confidence
+    );
+    // Try to go below lower bound
+    svc.set_confidence("test", -0.5);
+    assert!(
+        (svc.prediction_confidence - 0.01).abs() < 1e-7,
+        "confidence should clamp to 0.01: got {}",
+        svc.prediction_confidence
+    );
+}
+
+// ── Learning rate helpers ───────────────────────────────────────────────────
+
+#[test]
+fn helper_adjust_lr_applies_delta_and_records_proposal() {
+    let mut svc = make_helper_service();
+    let before = svc.fep_lr_boost;
+    svc.feedback_state.begin_cycle();
+    let delta: f32 = 0.5;
+    svc.adjust_lr("test_source", delta);
+    assert!(
+        (svc.fep_lr_boost - (before + delta as f64)).abs() < 1e-10,
+        "adjust_lr should add delta: {} vs expected {}",
+        svc.fep_lr_boost,
+        before + delta as f64
+    );
+    assert_eq!(svc.feedback_state.learning_rate.len(), 1);
+}
+
+#[test]
+fn helper_scale_lr_applies_factor() {
+    let mut svc = make_helper_service();
+    let before = svc.fep_lr_boost;
+    svc.feedback_state.begin_cycle();
+    let factor: f32 = 1.5;
+    svc.scale_lr("test_source", factor);
+    assert!(
+        (svc.fep_lr_boost - (before * factor as f64)).abs() < 1e-10,
+        "scale_lr should multiply: {} vs expected {}",
+        svc.fep_lr_boost,
+        before * factor as f64
+    );
+}
+
+#[test]
+fn helper_lr_clamps_to_bounds() {
+    let mut svc = make_helper_service();
+    svc.feedback_state.begin_cycle();
+    svc.set_lr("test", 10.0);
+    assert!(
+        (svc.fep_lr_boost - 3.0).abs() < 1e-7,
+        "lr should clamp to 3.0: got {}",
+        svc.fep_lr_boost
+    );
+    svc.set_lr("test", 0.0);
+    assert!(
+        (svc.fep_lr_boost - 1.0).abs() < 1e-7,
+        "lr should clamp to 1.0: got {}",
+        svc.fep_lr_boost
+    );
+}
+
+// ── Exploration helpers ─────────────────────────────────────────────────────
+
+#[test]
+fn helper_adjust_exploration_applies_delta_and_records_proposal() {
+    let mut svc = make_helper_service();
+    svc.curiosity_drive.exploration_urge = 0.5;
+    svc.feedback_state.begin_cycle();
+    let delta: f32 = 0.2;
+    svc.adjust_exploration("test_source", delta);
+    assert!(
+        (svc.curiosity_drive.exploration_urge - (0.5 + delta as f64)).abs() < 1e-10,
+        "adjust_exploration should add delta: got {}",
+        svc.curiosity_drive.exploration_urge
+    );
+    assert_eq!(svc.feedback_state.exploration.len(), 1);
+}
+
+#[test]
+fn helper_scale_exploration_applies_factor() {
+    let mut svc = make_helper_service();
+    svc.curiosity_drive.exploration_urge = 0.8;
+    svc.feedback_state.begin_cycle();
+    let factor: f32 = 0.5;
+    svc.scale_exploration("test_source", factor);
+    assert!(
+        (svc.curiosity_drive.exploration_urge - (0.8 * factor as f64)).abs() < 1e-10,
+        "scale_exploration should multiply: got {}",
+        svc.curiosity_drive.exploration_urge
+    );
+}
+
+#[test]
+fn helper_exploration_clamps_to_bounds() {
+    let mut svc = make_helper_service();
+    svc.feedback_state.begin_cycle();
+    svc.set_exploration("test", 2.0);
+    assert!(
+        (svc.curiosity_drive.exploration_urge - 1.0).abs() < 1e-7,
+        "exploration should clamp to 1.0: got {}",
+        svc.curiosity_drive.exploration_urge
+    );
+    svc.set_exploration("test", -1.0);
+    assert!(
+        (svc.curiosity_drive.exploration_urge - 0.0).abs() < 1e-7,
+        "exploration should clamp to 0.0: got {}",
+        svc.curiosity_drive.exploration_urge
+    );
+}
+
+// ── Threshold helpers ───────────────────────────────────────────────────────
+
+#[test]
+fn helper_adjust_threshold_applies_delta_and_records_proposal() {
+    let mut svc = make_helper_service();
+    let before = svc.carryover.learning.adaptive_threshold_scale;
+    svc.feedback_state.begin_cycle();
+    let delta: f32 = 0.3;
+    svc.adjust_threshold("test_source", delta);
+    assert!(
+        (svc.carryover.learning.adaptive_threshold_scale - (before + delta as f64)).abs() < 1e-10,
+        "adjust_threshold should add delta: {} vs expected {}",
+        svc.carryover.learning.adaptive_threshold_scale,
+        before + delta as f64
+    );
+    assert_eq!(svc.feedback_state.threshold.len(), 1);
+}
+
+#[test]
+fn helper_scale_threshold_applies_factor() {
+    let mut svc = make_helper_service();
+    let before = svc.carryover.learning.adaptive_threshold_scale;
+    svc.feedback_state.begin_cycle();
+    let factor: f32 = 1.5;
+    svc.scale_threshold("test_source", factor);
+    assert!(
+        (svc.carryover.learning.adaptive_threshold_scale - (before * factor as f64)).abs() < 1e-10,
+        "scale_threshold should multiply: {} vs expected {}",
+        svc.carryover.learning.adaptive_threshold_scale,
+        before * factor as f64
+    );
+}
+
+#[test]
+fn helper_threshold_clamps_to_bounds() {
+    let mut svc = make_helper_service();
+    svc.feedback_state.begin_cycle();
+    svc.set_threshold("test", 10.0);
+    assert!(
+        (svc.carryover.learning.adaptive_threshold_scale - 2.0).abs() < 1e-7,
+        "threshold should clamp to 2.0: got {}",
+        svc.carryover.learning.adaptive_threshold_scale
+    );
+    svc.set_threshold("test", 0.0);
+    assert!(
+        (svc.carryover.learning.adaptive_threshold_scale - 0.5).abs() < 1e-7,
+        "threshold should clamp to 0.5: got {}",
+        svc.carryover.learning.adaptive_threshold_scale
+    );
+}
+
+// ── Cross-variable: multiple proposals accumulate ───────────────────────────
+
+#[test]
+fn helper_multiple_proposals_accumulate_within_cycle() {
+    let mut svc = make_helper_service();
+    svc.feedback_state.begin_cycle();
+    let d1: f32 = 0.05;
+    let d2: f32 = -0.03;
+    let f1: f32 = 0.98;
+    svc.adjust_confidence("source_a", d1);
+    svc.adjust_confidence("source_b", d2);
+    svc.scale_confidence("source_c", f1);
+    assert_eq!(
+        svc.feedback_state.confidence.len(),
+        3,
+        "3 proposals should accumulate"
+    );
+    // Field should reflect all 3 mutations applied sequentially (using f32→f64 path)
+    let expected = ((0.5 + d1 as f64) + d2 as f64) * f1 as f64;
+    assert!(
+        (svc.prediction_confidence - expected).abs() < 1e-10,
+        "sequential mutations: got {} expected {}",
+        svc.prediction_confidence,
+        expected
+    );
+}

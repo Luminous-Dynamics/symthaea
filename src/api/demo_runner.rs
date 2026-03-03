@@ -226,6 +226,17 @@ impl DemoRunner {
             vision_encode_us: 0,
             vision_evolve_us: 0,
             vision_training_triggered: false,
+            // Consciousness engine telemetry
+            consciousness_weights: m.consciousness_weights,
+            consciousness_weight_variance: m.consciousness_weight_variance,
+            weight_convergence_state: m.weight_convergence_state.clone(),
+            // Structural Phi decomposition
+            structural_micro_phi: m.structural_micro_phi,
+            structural_meso_phi: m.structural_meso_phi,
+            structural_macro_phi: m.structural_macro_phi,
+            structural_emergence_ratio: m.structural_emergence_ratio,
+            // Substrate
+            substrate_feasibility: m.substrate_feasibility,
         };
 
         // Populate vision telemetry if active
