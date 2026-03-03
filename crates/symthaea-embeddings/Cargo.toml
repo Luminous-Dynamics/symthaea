@@ -54,7 +54,7 @@ burn-wgpu = ["burn", "burn/wgpu"]
 burn-hub = ["burn", "dep:hf-hub"]
 async-embed = ["dep:tokio"]
 parallel = ["dep:rayon"]
-persistent-cache = ["dep:redb", "dep:blake3", "dep:dirs"]
+persistent-cache = ["dep:redb", "dep:blake3", "dep:dirs", "dep:half"]
 embed-channel = []
 ort-embed = ["dep:ort", "dep:tokenizers"]
 

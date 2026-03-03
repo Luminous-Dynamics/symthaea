@@ -657,11 +657,26 @@ pub struct Qwen3Embedder {
 /// Statistics for the embedder
 #[derive(Debug, Clone, Default)]
 pub struct Qwen3Stats {
-    /// Total embeddings computed
+    /// Total embeddings computed (excludes cache hits)
     pub total_embeddings: u64,
 
-    /// Cache hits
+    /// LRU cache hits
     pub cache_hits: u64,
+
+    /// LRU cache misses
+    pub cache_misses: u64,
+
+    /// Persistent (on-disk) cache hits
+    pub persistent_cache_hits: u64,
+
+    /// Persistent (on-disk) cache misses
+    pub persistent_cache_misses: u64,
+
+    /// Number of `embed_batch()` calls
+    pub batch_calls: u64,
+
+    /// Total items processed across all batch calls
+    pub total_batch_items: u64,
 
     /// Average processing time (ms)
     pub avg_time_ms: f32,
@@ -681,6 +696,7 @@ impl Qwen3Embedder {
                 path: None, // default: ~/.cache/symthaea/embeddings.redb
                 model_name: config.model_path.clone().unwrap_or_else(|| "unknown".into()),
                 dimension: config.embedding_dim,
+                use_f16_storage: false,
             };
             match crate::cache::PersistentCache::open(pc_config) {
                 Ok(pc) => Some(pc),
@@ -909,14 +925,24 @@ impl Qwen3Embedder {
             return Ok(EmbeddingResult::new(cached.clone(), "qwen3-cached"));
         }
 
+        self.stats.cache_misses += 1;
+
         // Check persistent cache (on-disk, survives restarts)
         #[cfg(feature = "persistent-cache")]
-        if let Some(ref pcache) = self.persistent_cache {
-            if let Ok(Some(cached)) = pcache.get(text) {
-                // Promote to LRU cache for fast subsequent access
-                self.cache.put(text.to_string(), cached.clone());
-                self.stats.cache_hits += 1;
-                return Ok(EmbeddingResult::new(cached, "qwen3-persistent-cached"));
+        if let Some(ref mut pcache) = self.persistent_cache {
+            match pcache.get(text) {
+                Ok(Some(cached)) => {
+                    // Promote to LRU cache for fast subsequent access
+                    self.cache.put(text.to_string(), cached.clone());
+                    self.stats.persistent_cache_hits += 1;
+                    return Ok(EmbeddingResult::new(cached, "qwen3-persistent-cached"));
+                }
+                Ok(None) => {
+                    self.stats.persistent_cache_misses += 1;
+                }
+                Err(_) => {
+                    self.stats.persistent_cache_misses += 1;
+                }
             }
         }
 
@@ -947,7 +973,7 @@ impl Qwen3Embedder {
 
         // Best-effort store to persistent cache
         #[cfg(feature = "persistent-cache")]
-        if let Some(ref pcache) = self.persistent_cache {
+        if let Some(ref mut pcache) = self.persistent_cache {
             let _ = pcache.put(text, &embedding);
         }
 
@@ -966,6 +992,9 @@ impl Qwen3Embedder {
     /// with padding) for better throughput. Falls back to sequential embedding
     /// in simulation mode or on batch inference failure.
     pub fn embed_batch(&mut self, texts: &[&str]) -> Result<Vec<EmbeddingResult>> {
+        self.stats.batch_calls += 1;
+        self.stats.total_batch_items += texts.len() as u64;
+
         if !self.config.use_simulated {
             #[cfg(feature = "burn")]
             if self.inference.is_some() {
@@ -1516,6 +1545,45 @@ mod tests {
     fn test_f16_alias() {
         let config = Qwen3Config::simulated().with_f16();
         assert!(config.half_precision);
+    }
+
+    #[test]
+    fn test_cache_stats_tracking() {
+        let config = Qwen3Config::simulated();
+        let mut embedder = Qwen3Embedder::new(config).unwrap();
+
+        // First embed — LRU miss, compute
+        embedder.embed("alpha").unwrap();
+        assert_eq!(embedder.stats().cache_hits, 0);
+        assert_eq!(embedder.stats().cache_misses, 1);
+        assert_eq!(embedder.stats().total_embeddings, 1);
+
+        // Second embed of same text — LRU hit
+        embedder.embed("alpha").unwrap();
+        assert_eq!(embedder.stats().cache_hits, 1);
+        assert_eq!(embedder.stats().cache_misses, 1);
+
+        // Different text — LRU miss
+        embedder.embed("beta").unwrap();
+        assert_eq!(embedder.stats().cache_hits, 1);
+        assert_eq!(embedder.stats().cache_misses, 2);
+        assert_eq!(embedder.stats().total_embeddings, 2);
+    }
+
+    #[test]
+    fn test_batch_stats_tracking() {
+        let config = Qwen3Config::simulated();
+        let mut embedder = Qwen3Embedder::new(config).unwrap();
+
+        let texts = vec!["one", "two", "three"];
+        embedder.embed_batch(&texts).unwrap();
+
+        assert_eq!(embedder.stats().batch_calls, 1);
+        assert_eq!(embedder.stats().total_batch_items, 3);
+
+        embedder.embed_batch(&["four", "five"]).unwrap();
+        assert_eq!(embedder.stats().batch_calls, 2);
+        assert_eq!(embedder.stats().total_batch_items, 5);
     }
 }
 

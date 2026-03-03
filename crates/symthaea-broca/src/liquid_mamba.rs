@@ -153,6 +153,12 @@ pub struct LiquidMambaConfig {
     /// Each chunk gets a trainable importance weight (sigmoid-gated).
     #[serde(default)]
     pub temporal_learned_attention: bool,
+    /// Enable end-to-end token prediction loss for temporal projection.
+    /// Uses candle autograd to backprop Mamba's cross-entropy loss through SSM layers
+    /// to get gradients on the projected SSM tokens, then chains to projection weights.
+    /// Requires real Mamba backend (not MockMamba).
+    #[serde(default)]
+    pub temporal_e2e_loss: bool,
     /// Surprise gradient scaling factor (0 = disabled, 0.5 = default).
     /// Gradients are scaled by `1 + alpha * semantic_pe` before application,
     /// amplifying gradients for surprising/difficult examples.
@@ -249,6 +255,7 @@ impl Default for LiquidMambaConfig {
             temporal_rank_reg_weight: 0.0,
             temporal_chunk_budget: 0,
             temporal_learned_attention: false,
+            temporal_e2e_loss: false,
             surprise_gradient_alpha: 0.5,
             grad_clip: 1.0,
             token_pe_sim_threshold: 0.3,
@@ -983,6 +990,21 @@ impl LiquidMambaGenerator {
     /// - Gradient accumulation (apply every accumulation_steps)
     /// - Contrastive loss (push different thoughts' projections apart)
     pub fn distill_step(&mut self, channels: &ThoughtChannels, result: &GenerationResult) {
+        self.distill_step_with_targets(channels, result, None);
+    }
+
+    /// Distillation step with optional target tokens for end-to-end loss.
+    ///
+    /// When `target_tokens` is `Some`, and `temporal_e2e_loss` is enabled,
+    /// uses Mamba's cross-entropy loss as the training signal instead of
+    /// roundtrip autoencoder loss. This aligns the projection with what
+    /// Mamba actually needs to generate correct text.
+    pub fn distill_step_with_targets(
+        &mut self,
+        channels: &ThoughtChannels,
+        result: &GenerationResult,
+        target_tokens: Option<&[u32]>,
+    ) {
         self.generation_count += 1;
 
         // Periodic projection health check (every 50 generations).
@@ -1048,7 +1070,25 @@ impl LiquidMambaGenerator {
             // When Mamba output is meaningful (PE < 0.5), we boost the gradient
             // magnitude proportional to output quality.
             let tp = self.temporal_proj.as_mut().unwrap();
-            if self.config.temporal_directional_loss {
+
+            // End-to-end loss: backprop Mamba's token prediction loss through projection
+            if self.config.temporal_e2e_loss {
+                if let Some(tokens) = target_tokens {
+                    let ssm_sequence = tp.project_to_ssm_sequence(&thought_hv);
+                    match self.mamba.compute_e2e_token_loss(&ssm_sequence, tokens) {
+                        Ok((_loss, ssm_grads)) => {
+                            tp.compute_e2e_gradients(&thought_hv, &ssm_grads);
+                        }
+                        Err(e) => {
+                            tracing::warn!("E2E loss failed, falling back to roundtrip: {e}");
+                            tp.compute_roundtrip_gradients(&thought_hv);
+                        }
+                    }
+                } else {
+                    // No target tokens available — fall back to roundtrip
+                    tp.compute_roundtrip_gradients(&thought_hv);
+                }
+            } else if self.config.temporal_directional_loss {
                 tp.compute_directional_gradients(&thought_hv, None);
             } else {
                 tp.compute_roundtrip_gradients(&thought_hv);
