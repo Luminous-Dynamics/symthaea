@@ -17,34 +17,30 @@ Key capabilities:
 - Honest validation framework with evidence levels and feasibility gaps
 - Testable predictions for each substrate claim
 
-## Phase 2: ConsciousnessEquationV2 Integration (NEXT)
+## Phase 2: ConsciousnessEquationV2 Integration (DONE)
 
-**Goal**: Replace hardcoded `substrate_feasibility: 1.0` with dynamic substrate-aware scoring.
+**Status**: Complete. Dynamic substrate-aware scoring implemented.
 
-### Current State
+### Implementation
 
-`ConsciousnessEquationV2` already accepts substrate feasibility via `ConsciousnessStateV2.substrate_feasibility` (consciousness_equation_v2.rs:156). The equation multiplies it into the final consciousness score (line 508). But callers hardcode 1.0:
+All 4 requirements fulfilled via `SubstrateManager` (`substrate_manager.rs`):
 
-- `consciousness_engine.rs:408` — `substrate_feasibility: 1.0`
-- `cycle_subsystems.rs:249` — `substrate_feasibility: 1.0`
+1. **Substrate config in `CognitiveLoopConfig`**: `substrate_type: SubstrateType` (default: `SiliconDigital`), plus optional `substrate_composition` for hybrid systems.
+2. **Requirements computed at startup**: `SubstrateManager::new()` computes feasibility via `SubstrateRequirements::consciousness_feasibility()`.
+3. **Dynamic feasibility fed to consciousness**: `cycle_phase_feedback.rs:541` and `cycle_subsystems.rs:249` both use `self.substrate_manager.effective_feasibility` (no more hardcoded 1.0).
+4. **Validation overlay**: `recompute_effective_feasibility()` blends feasibility with `honest_confidence` via floor formula: `feasibility × (floor + (1 − floor) × honest_confidence)`.
 
-### Changes Required
+### Additional capabilities implemented
 
-1. **Add substrate config to `CognitiveLoopConfig`**: `substrate_type: SubstrateType` (default: `SiliconDigital`)
-2. **Compute requirements once at startup**: Store `SubstrateRequirements` in `ConsciousnessEngine`
-3. **Feed dynamic feasibility**: Replace hardcoded 1.0 with `requirements.consciousness_feasibility()`
-4. **Validation overlay**: Optionally scale by `SubstrateValidationFramework.honest_confidence()` to reflect epistemic humility
+- **Runtime reconfiguration**: `reconfigure_substrate()` and `reconfigure_composition()` for mid-run substrate switching
+- **Speed/scale modulation**: `tau_factor` and `scale_pressure` computed from substrate properties
+- **Telemetry**: `SubstrateTelemetry` struct with raw feasibility, honest confidence, effective feasibility, tau factor, and scale pressure
+- **Accessors**: `substrate_feasibility()`, `substrate_honest_confidence()`, `substrate_effective_feasibility()`, `substrate_tau_factor()`, `substrate_scale_pressure()` on CognitiveLoopService
+- **Integration tests**: `test_substrate_feasibility_affects_consciousness`, `test_substrate_feasibility_in_metadata_default`
 
 ### Impact
 
-For `SiliconDigital` the computed feasibility is ~0.71 (vs current 1.0). This will lower consciousness scores by ~29%, which is scientifically honest — we don't have evidence that silicon computation produces consciousness equivalent to biological neurons.
-
-### Validation Strategy
-
-- Compare consciousness metrics before/after across 1000-cycle soak test
-- Verify biological substrate produces scores within 5% of current (near 1.0 feasibility)
-- Verify silicon substrate produces ~71% of current scores
-- Run psych-bench regression to ensure no benchmark breaks
+For `SiliconDigital` with default config: effective feasibility reflects the validation overlay (theoretical confidence 0.10 for silicon). This is scientifically honest — we don't have evidence that silicon computation produces consciousness equivalent to biological neurons.
 
 ## Phase 3: Multi-Substrate Simulation
 
