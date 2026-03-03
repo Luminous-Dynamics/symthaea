@@ -222,6 +222,104 @@ pub struct DemoCycleData {
     pub substrate_feasibility: f64,
 }
 
+impl DemoCycleData {
+    /// Replace any NaN or Infinity f32/f64 fields with 0.0 before JSON serialization.
+    ///
+    /// JSON has no representation for NaN/Infinity — `serde_json` will either
+    /// error or produce `null`, corrupting downstream consumers. This method
+    /// ensures all floating-point telemetry is wire-safe.
+    pub fn sanitize_finite(&mut self) {
+        fn sf64(v: &mut f64) {
+            if !v.is_finite() {
+                *v = 0.0;
+            }
+        }
+        fn sf32(v: &mut f32) {
+            if !v.is_finite() {
+                *v = 0.0;
+            }
+        }
+
+        // Scalar f32 fields
+        sf32(&mut self.prediction_error);
+        sf32(&mut self.valence);
+        sf32(&mut self.arousal);
+        sf32(&mut self.mood_temperature);
+        sf32(&mut self.thermodynamic_load);
+        sf32(&mut self.reasoning_confidence);
+        sf32(&mut self.bath_entropy);
+        sf32(&mut self.allostatic_load);
+        sf32(&mut self.ei_ratio);
+        sf32(&mut self.sleep_pressure);
+        sf32(&mut self.mesh_health_score);
+        sf32(&mut self.vision_prediction_error);
+        sf32(&mut self.vision_coherence);
+        sf32(&mut self.vision_attention_entropy);
+
+        // Scalar f64 fields
+        sf64(&mut self.consciousness_level);
+        sf64(&mut self.narrative_self_psi);
+        sf64(&mut self.moral_score);
+        sf64(&mut self.coherence);
+        sf64(&mut self.resonance_frequency);
+        sf64(&mut self.mesh_compression_ratio);
+        sf64(&mut self.moral_free_energy);
+        sf64(&mut self.moral_kl_divergence);
+        sf64(&mut self.moral_entropy);
+        sf64(&mut self.moral_surprise);
+        sf64(&mut self.moral_unity);
+        sf64(&mut self.moral_completeness);
+        sf64(&mut self.moral_circularity);
+        sf64(&mut self.moral_drift);
+        sf64(&mut self.moral_anomaly_score);
+        sf64(&mut self.consciousness_weight_variance);
+        sf64(&mut self.structural_micro_phi);
+        sf64(&mut self.structural_meso_phi);
+        sf64(&mut self.structural_macro_phi);
+        sf64(&mut self.structural_emergence_ratio);
+        sf64(&mut self.substrate_feasibility);
+
+        // Array f64 fields
+        for v in &mut self.harmony_coordinates {
+            sf64(v);
+        }
+        for v in &mut self.moral_scenario_distribution {
+            sf64(v);
+        }
+        for v in &mut self.moral_prior_distribution {
+            sf64(v);
+        }
+        for v in &mut self.consciousness_weights {
+            sf64(v);
+        }
+
+        // Vec<f32> fields
+        for v in &mut self.thought_vector {
+            sf32(v);
+        }
+        for v in &mut self.neuromod_state_vector {
+            sf32(v);
+        }
+        for v in &mut self.bath_centroid {
+            sf32(v);
+        }
+        for v in &mut self.bath_variance {
+            sf32(v);
+        }
+        for v in &mut self.bath_projection_2d {
+            sf32(v);
+        }
+        for v in &mut self.vision_horizon_errors {
+            sf32(v);
+        }
+        for row in &mut self.bath_trajectory {
+            for v in row {
+                sf32(v);
+            }
+        }
+    }
+}
+
 /// Client message format.
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
@@ -336,6 +434,51 @@ async fn handle_socket(mut socket: WebSocket, runner: Arc<Mutex<DemoRunner>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sanitize_finite_clears_nan_and_infinity() {
+        let mut data = DemoCycleData {
+            prediction_error: f32::NAN,
+            consciousness_level: f64::INFINITY,
+            moral_free_energy: f64::NEG_INFINITY,
+            valence: f32::NAN,
+            mesh_compression_ratio: f64::NAN,
+            harmony_coordinates: [1.0, f64::NAN, 0.5, f64::INFINITY, 0.3, 0.2, 0.1],
+            ..Default::default()
+        };
+        data.sanitize_finite();
+
+        assert_eq!(data.prediction_error, 0.0);
+        assert_eq!(data.consciousness_level, 0.0);
+        assert_eq!(data.moral_free_energy, 0.0);
+        assert_eq!(data.valence, 0.0);
+        assert_eq!(data.mesh_compression_ratio, 0.0);
+        assert_eq!(data.harmony_coordinates[1], 0.0); // was NaN
+        assert_eq!(data.harmony_coordinates[3], 0.0); // was Infinity
+        assert_eq!(data.harmony_coordinates[0], 1.0); // preserved
+
+        // Verify JSON serialization succeeds after sanitize
+        serde_json::to_string(&data).expect("sanitized data must serialize");
+    }
+
+    #[test]
+    fn test_sanitize_finite_preserves_valid_values() {
+        let mut data = DemoCycleData {
+            prediction_error: 0.42,
+            consciousness_level: 0.75,
+            moral_score: -0.5,
+            coherence: 1.0,
+            cycle: 100,
+            ..Default::default()
+        };
+        data.sanitize_finite();
+
+        assert_eq!(data.prediction_error, 0.42);
+        assert_eq!(data.consciousness_level, 0.75);
+        assert_eq!(data.moral_score, -0.5);
+        assert_eq!(data.coherence, 1.0);
+        assert_eq!(data.cycle, 100);
+    }
 
     #[test]
     fn test_demo_cycle_data_serializes() {

@@ -264,6 +264,10 @@ impl DemoRunner {
             data.bath_centroid = vec![];
         }
 
+        // Clamp any NaN/Infinity to 0.0 before JSON serialization — serde_json
+        // has no representation for non-finite floats and would error or produce null.
+        data.sanitize_finite();
+
         data
     }
 
