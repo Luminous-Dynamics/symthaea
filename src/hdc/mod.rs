@@ -401,3 +401,5 @@ pub mod narrative_algebra;
 pub mod proptest_hdc;
 #[cfg(test)]
 mod proptest_moral_algebra;
+#[cfg(test)]
+mod proptest_moral_topology;

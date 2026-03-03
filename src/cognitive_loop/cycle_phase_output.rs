@@ -344,7 +344,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
             // Partnership / Phi-Dyad
-            relational_psi: self.social.relational_psi,
+            relational_psi: self.social_coherence.social.relational_psi,
             // Resonant Speech: response profile from neuromod bath signals.
             response_profile: {
                 let user_state = crate::resonant_speech::UserState::from_neuromod(
@@ -366,13 +366,44 @@ impl CognitiveLoopService {
         };
 
         // ── Substrate & convergence telemetry ──
-        metadata.substrate_feasibility = self.substrate_effective_feasibility;
-        metadata.substrate_transition = self.pending_substrate_transition.take();
-        metadata.substrate_feasibility_raw = self.substrate_feasibility;
-        metadata.substrate_honest_confidence = self.substrate_honest_confidence;
-        metadata.substrate_effective_feasibility = self.substrate_effective_feasibility;
-        metadata.substrate_tau_factor = self.substrate_tau_factor;
-        metadata.substrate_scale_pressure = self.substrate_scale_pressure;
+        metadata.substrate = self.substrate_manager.telemetry();
+
+        // Physics bridge telemetry
+        #[cfg(feature = "physics-bridge")]
+        {
+            if let Some(ref mut physics) = self.physics_integration {
+                let pt = physics.telemetry();
+                metadata.physics_bridge = Some(super::types::telemetry::PhysicsBridgeTelemetry {
+                    catalog_size: pt.catalog_size,
+                    results_returned: pt.results_returned,
+                    top_match: pt.top_match,
+                    top_score: pt.top_score,
+                    query_count: pt.query_count,
+                    queried_this_cycle: pt.queried_this_cycle,
+                });
+            }
+        }
+
+        // Foveation bridge telemetry
+        #[cfg(feature = "foveation")]
+        {
+            if let Some(ref fov) = self.foveation_manager {
+                let ft = fov.telemetry();
+                metadata.foveation =
+                    Some(super::types::telemetry::FoveationBridgeTelemetry {
+                        pending_count: ft.pending_count,
+                        in_flight_count: ft.in_flight_count,
+                        ready_count: ft.ready_count,
+                        total_dispatched: ft.total_dispatched,
+                        total_completed: ft.total_completed,
+                        avg_processing_time_us: ft.avg_processing_time_us,
+                        last_confidence: ft.last_confidence,
+                        effective_surprise_threshold: fov.effective_surprise_threshold(),
+                        effective_max_concurrent: fov.effective_max_concurrent(),
+                    });
+            }
+        }
+
         metadata.weight_convergence_state = feedback.convergence_state.clone();
         if feedback.convergence_state == "Converged" && self.convergence_cycle == 0 {
             self.convergence_cycle = self.stats.total_cycles as usize;
@@ -427,7 +458,11 @@ impl CognitiveLoopService {
 
         // Project 16,384D HDC to 32D for visualization
         let thought_vector = {
-            let chunk_size = perception.encoding_result.hdv.values.len() / 32;
+            debug_assert!(
+                !perception.encoding_result.hdv.values.is_empty(),
+                "HDV must not be empty for thought_vector projection"
+            );
+            let chunk_size = (perception.encoding_result.hdv.values.len() / 32).max(1);
             perception
                 .encoding_result
                 .hdv

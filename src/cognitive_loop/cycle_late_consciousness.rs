@@ -136,18 +136,19 @@ impl CognitiveLoopService {
                                     .episodes
                                     .iter()
                                     .map(|ep| {
-                                        ep.hv
+                                        let dot: f32 = ep.hv
                                             .iter()
                                             .zip(projected.iter())
                                             .map(|(a, b)| a * b)
-                                            .sum::<f32>()
-                                            / (ep.hv.iter().map(|x| x * x).sum::<f32>().sqrt()
+                                            .sum();
+                                        let denom = (ep.hv.iter().map(|x| x * x).sum::<f32>().sqrt()
                                                 * projected
                                                     .iter()
                                                     .map(|x| x * x)
                                                     .sum::<f32>()
                                                     .sqrt())
-                                            .max(1e-8)
+                                            .max(1e-8);
+                                        dot / denom
                                     })
                                     .fold(0.0f32, f32::max);
                                 // High resonator match → boost importance (consolidation-worthy)
@@ -328,8 +329,8 @@ impl CognitiveLoopService {
                     ctx.surprise_triggered,
                     ctx.unified_psi,
                     moral_score,
-                    self.social.social_trust,
-                    self.social.social_cooperation_rate,
+                    self.social_coherence.social.social_trust,
+                    self.social_coherence.social.social_cooperation_rate,
                     0.0, // peer_valence: future — aggregate from social inbox
                 );
                 (affect.valence, affect.arousal)
@@ -1132,6 +1133,48 @@ impl CognitiveLoopService {
         // Attention, Recurrence, Embodiment, Knowledge, Synchrony.
         // Urgency-adaptive: Critical=every 5th, Normal=every 10th, Cruise=every 20th
         let consciousness_level = if ctx.urgency.should_run(self.stats.total_cycles, 5, 10, 20) {
+            // Wire embodiment factor from cognitive loop signals
+            // Science: Friston (2010) — low PE = good embodied prediction (sensorimotor accuracy)
+            // Science: Barrett (2017) — interoceptive coherence from allostatic regulation
+            self.master_equation.embodiment_factor.record_prediction(
+                1.0 - ctx.prediction_error as f64,
+                1.0 - ctx.prediction_error as f64,
+            );
+            // Fix 3a: Use allostatic load as direct interoceptive coherence signal.
+            // Low allostatic load = high body coherence (expected ≈ actual).
+            // Science: Barrett (2017) — interoceptive accuracy tracks allostatic regulation
+            {
+                let allostatic = self.neuromod.bath.allostatic_load;
+                let coherence = 1.0 - allostatic as f64;
+                self.master_equation.embodiment_factor.update_interoceptive(
+                    coherence, // expected = current body model
+                    coherence, // actual matches expected when body is coherent
+                );
+            }
+
+            // Wire narrative coherence with lightweight episodes (every 10 cycles)
+            // Science: Damasio (2010) — self emerges from autobiographical narrative continuity
+            if self.stats.total_cycles % 10 == 0 {
+                let valence = (1.0 - ctx.prediction_error as f64).clamp(-1.0, 1.0);
+                self.master_equation.narrative_coherence.add_episode(
+                    format!("cycle_{}", self.stats.total_cycles),
+                    valence,
+                );
+            }
+
+            // Fix 3b: Wire future scenarios from prediction confidence.
+            // add_future_scenario() drives future_simulation_depth in narrative factor.
+            // Science: Schacter et al. (2012) — prospection uses same networks as episodic memory
+            if self.stats.total_cycles % 50 == 0 {
+                let horizon = ((1.0 - ctx.prediction_error as f64) * 10.0).max(1.0) as usize;
+                self.master_equation.narrative_coherence.add_future_scenario(
+                    format!("prediction_horizon_{}", self.stats.total_cycles),
+                    horizon,
+                    self.prediction_confidence.clamp(0.0, 1.0),
+                    (1.0 - ctx.prediction_error as f64).clamp(-1.0, 1.0),
+                );
+            }
+
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
                 phi: ctx.unified_psi,
                 broadcast: ctx.coherence as f64, // coherence ~ global workspace broadcast
