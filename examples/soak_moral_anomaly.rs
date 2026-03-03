@@ -191,6 +191,7 @@ fn run_condition(
     let config = CognitiveLoopConfig {
         enable_moral_anomaly_response: enable_response,
         moral_anomaly_config: MoralAnomalyConfig::default(),
+        enable_primitive_consciousness: true,
         learning_threshold: 0.0,
         async_training: false,
         ..Default::default()
