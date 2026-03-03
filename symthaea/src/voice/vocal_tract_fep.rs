@@ -73,19 +73,19 @@ pub struct StreamingVocalTract {
     /// How many mel frames to buffer before submitting to neural vocoder.
     #[cfg(feature = "neural-vocoder")]
     mel_buffer_target: usize,
-    /// Double-buffered pending neural audio responses (improvement #3).
+    /// Double-buffered pending neural audio responses.
     #[cfg(feature = "neural-vocoder")]
     pending_neural_audio: std::collections::VecDeque<std::sync::mpsc::Receiver<super::neural_vocoder::VocoderResponse>>,
     /// Cache of neural audio samples ready to be returned.
     #[cfg(feature = "neural-vocoder")]
     neural_audio_cache: std::collections::VecDeque<f32>,
-    /// Overlap context: last N mel frames from previous chunk (improvement #6).
+    /// Overlap context: last N mel frames from previous chunk.
     #[cfg(feature = "neural-vocoder")]
     overlap_context: Vec<Vec<f32>>,
     /// Number of overlap context frames to prepend.
     #[cfg(feature = "neural-vocoder")]
     overlap_context_size: usize,
-    /// Crossfade state: samples remaining in the DSP→neural crossfade window (improvement #2).
+    /// Crossfade state: samples remaining in the DSP→neural crossfade window.
     #[cfg(feature = "neural-vocoder")]
     crossfade_remaining: usize,
     /// Crossfade window length in samples (~5ms at 24kHz = 120 samples).
@@ -94,6 +94,15 @@ pub struct StreamingVocalTract {
     /// Whether we've ever received neural audio (for crossfade triggering).
     #[cfg(feature = "neural-vocoder")]
     neural_audio_started: bool,
+    /// Maximum mel buffer target (configured value).
+    #[cfg(feature = "neural-vocoder")]
+    mel_buffer_max: usize,
+    /// Minimum mel buffer target (half of max, at least 8).
+    #[cfg(feature = "neural-vocoder")]
+    mel_buffer_min: usize,
+    /// Whether a speculative (partial) chunk is currently in flight.
+    #[cfg(feature = "neural-vocoder")]
+    speculative_pending: bool,
 }
 
 #[cfg(feature = "vocal-tract")]
@@ -140,6 +149,12 @@ impl StreamingVocalTract {
             crossfade_length: 120, // ~5ms at 24kHz
             #[cfg(feature = "neural-vocoder")]
             neural_audio_started: false,
+            #[cfg(feature = "neural-vocoder")]
+            mel_buffer_max: 32,
+            #[cfg(feature = "neural-vocoder")]
+            mel_buffer_min: 16, // half of default max
+            #[cfg(feature = "neural-vocoder")]
+            speculative_pending: false,
         }
     }
 
@@ -168,6 +183,7 @@ impl StreamingVocalTract {
         let channel = super::neural_vocoder::NeuralVocoderChannel::spawn(neural_config);
         let has_neural = channel.is_some();
 
+        let mel_buffer_min = (mel_buffer_target / 2).max(8);
         let mut svt = Self::new(genesis, sample_rate, frame_rate);
         svt.neural_channel = channel;
         svt.mel_converter = if has_neural {
@@ -175,7 +191,10 @@ impl StreamingVocalTract {
         } else {
             None
         };
-        svt.mel_buffer_target = mel_buffer_target;
+        svt.mel_buffer_max = mel_buffer_target;
+        svt.mel_buffer_min = mel_buffer_min;
+        // Start with small buffer for low initial latency; grows after first neural audio
+        svt.mel_buffer_target = mel_buffer_min;
         svt.overlap_context_size = overlap_context_size;
         // Crossfade window: ~5ms at given sample rate
         svt.crossfade_length = (sample_rate as f32 * 0.005) as usize;
@@ -237,10 +256,13 @@ impl StreamingVocalTract {
 
     /// Neural vocoder tick: mel conversion → buffer → submit → collect → crossfade/gap-fill.
     ///
-    /// Improvements applied:
-    /// - #2: Overlap-add crossfade at DSP→neural transition
-    /// - #3: Double-buffered pending responses (VecDeque)
-    /// - #6: Overlap context frames prepended from previous chunk
+    /// Features:
+    /// - Adaptive buffer sizing: starts small (mel_buffer_min), grows to mel_buffer_max
+    /// - Consciousness-modulated blending: dynamic DSP/neural mix based on consciousness + arousal
+    /// - Speculative inference: submits partial chunks when buffer is half full
+    /// - Overlap-add crossfade at DSP→neural transition
+    /// - Double-buffered pending responses (VecDeque)
+    /// - Overlap context frames prepended from previous chunk
     #[cfg(feature = "neural-vocoder")]
     fn tick_neural(
         &mut self,
@@ -261,35 +283,16 @@ impl StreamingVocalTract {
             self.mel_buffer.extend(mel_frames);
         }
 
-        // 3. Submit mel buffer when full (double-buffering: don't wait for previous)
+        // 3. Submit mel buffer when full
         if self.mel_buffer.len() >= self.mel_buffer_target {
-            if let Some(ref channel) = self.neural_channel {
-                // Build chunk with overlap context prepended (improvement #6)
-                let mut chunk = Vec::with_capacity(self.overlap_context.len() + self.mel_buffer.len());
-                let overlap_frames = self.overlap_context.len();
-                chunk.extend(self.overlap_context.iter().cloned());
-
-                let new_frames: Vec<Vec<f32>> = self.mel_buffer.drain(..).collect();
-
-                // Save last N frames as overlap context for next chunk
-                let ctx_size = self.overlap_context_size;
-                if ctx_size > 0 && !new_frames.is_empty() {
-                    let start = new_frames.len().saturating_sub(ctx_size);
-                    self.overlap_context = new_frames[start..].to_vec();
-                }
-
-                chunk.extend(new_frames);
-
-                match channel.submit(chunk, overlap_frames) {
-                    Ok(rx) => {
-                        // Double-buffering: push to queue (improvement #3)
-                        self.pending_neural_audio.push_back(rx);
-                    }
-                    Err(_) => {
-                        tracing::debug!("Neural vocoder backpressure, DSP gap-fill");
-                    }
-                }
-            }
+            self.submit_mel_chunk(false);
+        } else if self.mel_buffer.len() >= self.mel_buffer_target / 2
+            && !self.speculative_pending
+            && self.neural_audio_cache.len() < self.samples_per_frame * 2
+        {
+            // Speculative inference: submit partial chunk when buffer half full
+            // and we're running low on cached audio
+            self.submit_mel_chunk(true);
         }
 
         // 4. Collect completed neural audio from all pending responses (double-buffer)
@@ -297,37 +300,48 @@ impl StreamingVocalTract {
             match front.try_recv() {
                 Ok(response) => {
                     if !response.audio.is_empty() {
-                        // First neural audio arrival triggers crossfade (improvement #2)
+                        // First neural audio arrival triggers crossfade
                         if !self.neural_audio_started {
                             self.neural_audio_started = true;
                             self.crossfade_remaining = self.crossfade_length;
+                            // Adaptive: grow buffer target after first successful inference
+                            if self.mel_buffer_target < self.mel_buffer_max {
+                                self.mel_buffer_target = (self.mel_buffer_target + 4).min(self.mel_buffer_max);
+                            }
                         }
                         self.neural_audio_cache.extend(response.audio.iter());
+                        self.speculative_pending = false;
                     }
                     self.pending_neural_audio.pop_front();
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => break,
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.pending_neural_audio.pop_front();
+                    self.speculative_pending = false;
                 }
             }
         }
 
-        // 5. Return audio: neural with crossfade, or DSP gap-fill
+        // 5. Return audio: consciousness-modulated blend, crossfade, or DSP gap-fill
         if self.neural_audio_cache.len() >= self.samples_per_frame {
             let neural_samples: Vec<f32> = self
                 .neural_audio_cache
                 .drain(..self.samples_per_frame)
                 .collect();
 
-            // Apply crossfade from DSP→neural if we're in the transition window (#2)
+            // Consciousness-modulated blending:
+            // Higher consciousness → prefer neural (richer), high arousal → prefer DSP (lower latency)
+            let consciousness = cognitive_state.consciousness_level.clamp(0.0, 1.0);
+            let arousal = cognitive_state.emotional_arousal.clamp(0.0, 1.0);
+            let neural_preference = consciousness * (1.0 - 0.4 * arousal);
+
+            // Apply crossfade from DSP→neural if we're in the transition window
             if self.crossfade_remaining > 0 {
                 let dsp_samples = self.vocoder.synthesize_frame(frame, self.samples_per_frame);
                 let mut blended = Vec::with_capacity(self.samples_per_frame);
 
-                for (i, (&neural, &dsp)) in neural_samples.iter().zip(dsp_samples.iter()).enumerate() {
+                for (&neural, &dsp) in neural_samples.iter().zip(dsp_samples.iter()) {
                     if self.crossfade_remaining > 0 {
-                        // Raised-cosine crossfade: DSP fades out, neural fades in
                         let t = 1.0 - (self.crossfade_remaining as f32 / self.crossfade_length as f32);
                         let neural_weight = 0.5 * (1.0 - (std::f32::consts::PI * t).cos());
                         blended.push(dsp * (1.0 - neural_weight) + neural * neural_weight);
@@ -336,8 +350,15 @@ impl StreamingVocalTract {
                         blended.push(neural);
                     }
                 }
-
                 blended
+            } else if neural_preference < 0.95 {
+                // Continuous consciousness-modulated blend
+                let dsp_samples = self.vocoder.synthesize_frame(frame, self.samples_per_frame);
+                neural_samples
+                    .iter()
+                    .zip(dsp_samples.iter())
+                    .map(|(&n, &d)| n * neural_preference + d * (1.0 - neural_preference))
+                    .collect()
             } else {
                 neural_samples
             }
@@ -345,6 +366,48 @@ impl StreamingVocalTract {
             // DSP gap-fill
             self.vocoder
                 .synthesize_frame(frame, self.samples_per_frame)
+        }
+    }
+
+    /// Submit the current mel buffer to the neural vocoder channel.
+    ///
+    /// When `speculative` is true, submits a partial chunk without clearing the buffer
+    /// (the frames will be re-submitted as part of the next full chunk).
+    #[cfg(feature = "neural-vocoder")]
+    fn submit_mel_chunk(&mut self, speculative: bool) {
+        if let Some(ref channel) = self.neural_channel {
+            // Build chunk with overlap context prepended
+            let mut chunk = Vec::with_capacity(self.overlap_context.len() + self.mel_buffer.len());
+            let overlap_frames = self.overlap_context.len();
+            chunk.extend(self.overlap_context.iter().cloned());
+
+            let new_frames: Vec<Vec<f32>> = if speculative {
+                // Speculative: clone buffer but don't drain
+                self.mel_buffer.clone()
+            } else {
+                self.mel_buffer.drain(..).collect()
+            };
+
+            // Save last N frames as overlap context for next chunk
+            let ctx_size = self.overlap_context_size;
+            if ctx_size > 0 && !new_frames.is_empty() {
+                let start = new_frames.len().saturating_sub(ctx_size);
+                self.overlap_context = new_frames[start..].to_vec();
+            }
+
+            chunk.extend(new_frames);
+
+            match channel.submit(chunk, overlap_frames) {
+                Ok(rx) => {
+                    self.pending_neural_audio.push_back(rx);
+                    if speculative {
+                        self.speculative_pending = true;
+                    }
+                }
+                Err(_) => {
+                    tracing::debug!("Neural vocoder backpressure, DSP gap-fill");
+                }
+            }
         }
     }
 
@@ -368,6 +431,8 @@ impl StreamingVocalTract {
             self.overlap_context.clear();
             self.crossfade_remaining = 0;
             self.neural_audio_started = false;
+            self.mel_buffer_target = self.mel_buffer_min;
+            self.speculative_pending = false;
         }
     }
 }
