@@ -9,7 +9,7 @@ WorM::DigitSpan,forward_span,1.000000,1.000000,0.000000,Stable,0.000000,Excellen
 Attention::VisualSearch,search_asymmetry,0.198830,0.193793,0.010428,Stable,-0.712449,Poor
 ToMBench::FalseBelief,false_belief_accuracy,0.000000,0.000000,0.000000,Stable,0.000000,Poor
 Motor::SRTT,learning_effect,0.702429,0.730998,0.003190,Improvement,6.378995,Moderate
-Language::LexicalDecision,lexicality_effect,-0.265702,-0.272778,0.011335,Stable,0.223926,Poor
+Language::LexicalDecision,lexicality_effect,-0.190901,-0.198868,0.011533,Stable,0.206754,Poor
 Reasoning::ArcFluid,transfer_accuracy,0.284742,0.271284,0.019874,Stable,-0.181105,Poor
 CogBench::TwoStep,beta3_model_basedness,0.271318,0.281470,0.054269,Decline,-3.263926,Poor
 CogBench::BART,average_pumps,-0.131779,-0.152501,0.711825,Stable,0.092331,Poor
