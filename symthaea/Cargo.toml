@@ -375,6 +375,7 @@ voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + 
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
 vocal-tract = ["hound", "symthaea-vocal-tract/hound"]  # LTC-driven articulatory synthesis pipeline + WAV output
+neural-vocoder = ["ort", "vocal-tract", "symthaea-vocal-tract/mel-conversion"]  # BigVGAN ONNX neural vocoder (Path A)
 live-voice = ["cpal", "ringbuf", "vocal-tract"]         # Real-time speaker output (cpal + ringbuf + vocal tract pipeline)
 
 # ── Perception & Embeddings ─────────────────────────────────────────
@@ -982,6 +983,10 @@ required-features = ["vocal-tract"]
 [[example]]
 name = "vocal_tract_benchmark"
 required-features = ["vocal-tract"]
+
+[[example]]
+name = "neural_vocoder_benchmark"
+required-features = ["neural-vocoder"]
 
 [[example]]
 name = "awakening_demo"

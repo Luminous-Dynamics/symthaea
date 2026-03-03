@@ -16,7 +16,9 @@ symthaea-core = { path = "../../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
 serde = { workspace = true }
 hound = { workspace = true, optional = true }
+rustfft = { workspace = true, optional = true }
 
 [features]
 default = []
 hound = ["dep:hound"]
+mel-conversion = ["dep:rustfft"]
