@@ -200,6 +200,10 @@ pub struct VisionTelemetry {
     pub training_triggered: bool,
     /// Training loss after this cycle's training step (if any).
     pub training_loss: Option<f32>,
+    /// Maximum per-patch motion magnitude this frame (0 = no motion detected).
+    pub motion_surprise: f32,
+    /// Norm of the holographic motion field HV.
+    pub motion_field_norm: f32,
     /// Output HV norm (bridge diagnostic).
     pub output_hv_norm: f32,
     /// Attention boost applied (bridge diagnostic).
@@ -317,6 +321,23 @@ pub struct ManifoldHealth {
     pub total_training_steps: u64,
     /// Whether the manifold appears healthy (heuristic).
     pub is_healthy: bool,
+}
+
+/// Per-scale health metrics for multi-scale encoders.
+///
+/// Reports the state of each scale in a `MultiScaleEncoder`, including
+/// feature weight entropy and blend contribution.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ScaleHealth {
+    /// Patch size at this scale (in pixels).
+    pub patch_size: usize,
+    /// Number of patches at this scale.
+    pub num_patches: usize,
+    /// Shannon entropy of encoder feature weights at this scale.
+    /// Higher = more uniform weighting.
+    pub weight_entropy: f32,
+    /// This scale's blend weight in the multi-scale fusion.
+    pub blend_weight: f32,
 }
 
 #[cfg(test)]

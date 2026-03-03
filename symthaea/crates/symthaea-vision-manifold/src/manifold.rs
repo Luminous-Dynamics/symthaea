@@ -23,7 +23,7 @@ use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::temporal::TemporalPredictor;
 
 use crate::attention::SurpriseMap;
-use crate::encoder::PatchHdcEncoder;
+use crate::encoder::{MotionField, PatchHdcEncoder};
 use crate::training::{BpttResult, ManifoldTrainer};
 use crate::types::{ManifoldHealth, ManifoldState, SceneMatch, VisionConfig, VisionTelemetry};
 
@@ -41,6 +41,11 @@ pub struct VisionManifold {
     last_frame_hv: Option<ContinuousHV>,
     last_patch_hvs: Vec<ContinuousHV>,
     surprise: SurpriseMap,
+    motion_field: MotionField,
+    /// Per-patch motion magnitudes from the last frame.
+    motion_saliency: Vec<f32>,
+    /// Per-patch motion vectors `[dx, dy]` from the last frame.
+    last_motion_vectors: Vec<[f32; 2]>,
     prediction_error: f32,
     coherence: f32,
     frame_count: u64,
@@ -59,6 +64,7 @@ impl VisionManifold {
         let weight_hv = ContinuousHV::random(dim, config.seed + 300_000);
         let grid = encoder.grid_for(max_width, max_height);
         let surprise = SurpriseMap::new(grid, config.surprise_decay, config.surprise_threshold);
+        let motion_field = MotionField::new(dim, config.seed + 500_000);
         let trainer = ManifoldTrainer::new(&config.training, dim);
 
         Self {
@@ -70,6 +76,9 @@ impl VisionManifold {
             last_frame_hv: None,
             last_patch_hvs: Vec::new(),
             surprise,
+            motion_field,
+            motion_saliency: Vec::new(),
+            last_motion_vectors: Vec::new(),
             prediction_error: 0.0,
             coherence: 0.0,
             frame_count: 0,
@@ -91,8 +100,40 @@ impl VisionManifold {
         dt: f32,
     ) -> VisionTelemetry {
         let t0 = Instant::now();
+
+        // Save previous luminances before encoding overwrites them
+        let prev_lum = self.encoder.prev_patch_lum.clone();
+
         let (frame_hv, patch_hvs) = self.encoder.encode_frame(pixels, width, height, channels);
         let encode_us = t0.elapsed().as_micros() as u64;
+
+        // Compute motion field from luminance difference
+        let grid = self.encoder.grid_for(width, height);
+        let (motion_hv_norm, motion_max) =
+            if !prev_lum.is_empty() && grid.num_patches() > 0 {
+                let current_lum = &self.encoder.prev_patch_lum;
+                let (motion_hv, vectors) = self.motion_field.compute(
+                    current_lum,
+                    &prev_lum,
+                    grid.rows,
+                    grid.cols,
+                    self.encoder.row_basis(),
+                    self.encoder.col_basis(),
+                );
+                let magnitudes: Vec<f32> = vectors
+                    .iter()
+                    .map(|v| (v[0] * v[0] + v[1] * v[1]).sqrt())
+                    .collect();
+                let max_mag = magnitudes.iter().copied().fold(0.0f32, f32::max);
+                let norm = motion_hv.norm();
+                self.motion_saliency = magnitudes;
+                self.last_motion_vectors = vectors;
+                (norm, max_mag)
+            } else {
+                self.motion_saliency.clear();
+                self.last_motion_vectors.clear();
+                (0.0, 0.0)
+            };
 
         let t1 = Instant::now();
         self.observe_encoded(&frame_hv, &patch_hvs, dt);
@@ -114,6 +155,8 @@ impl VisionManifold {
             frame_sequence: self.frame_count,
             training_triggered,
             training_loss,
+            motion_surprise: motion_max,
+            motion_field_norm: motion_hv_norm,
             output_hv_norm: 0.0,
             attention_boost_applied: 0.0,
         };
@@ -285,6 +328,21 @@ impl VisionManifold {
     /// Total training steps performed.
     pub fn training_steps(&self) -> u64 {
         self.trainer.total_steps()
+    }
+
+    /// Per-patch motion magnitudes from the last frame.
+    ///
+    /// Each value is the Euclidean magnitude of the motion vector at that patch.
+    /// Empty before the second frame.
+    pub fn motion_saliency(&self) -> &[f32] {
+        &self.motion_saliency
+    }
+
+    /// Per-patch motion vectors `[dx, dy]` from the last frame.
+    ///
+    /// Empty before the second frame.
+    pub fn motion_vectors(&self) -> &[[f32; 2]] {
+        &self.last_motion_vectors
     }
 
     /// Mutable access to the encoder (for contrastive refinement).
@@ -478,6 +536,8 @@ impl VisionManifold {
         self.last_frame_hv = None;
         self.last_patch_hvs.clear();
         self.surprise.reset();
+        self.motion_saliency.clear();
+        self.last_motion_vectors.clear();
         self.prediction_error = 0.0;
         self.coherence = 0.0;
         self.frame_count = 0;
@@ -1512,6 +1572,169 @@ mod tests {
 
         // They should differ (unless surprise was exactly zero)
         // We don't assert inequality because attention boost depends on surprise > 0
+    }
+
+    // === Motion Saliency Integration ===
+
+    #[test]
+    fn test_motion_saliency_empty_before_second_frame() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        assert!(m.motion_saliency().is_empty());
+        assert!(m.motion_vectors().is_empty());
+
+        let frame = gradient_frame(64, 64);
+        let tel = m.observe_frame(&frame, 64, 64, 1, 0.033);
+        // After first frame, no previous luminance → no motion
+        assert_eq!(tel.motion_surprise, 0.0);
+    }
+
+    #[test]
+    fn test_motion_saliency_populated_after_two_frames() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = solid_gray_frame(64, 64, 200);
+
+        m.observe_frame(&frame_a, 64, 64, 1, 0.033);
+        let tel = m.observe_frame(&frame_b, 64, 64, 1, 0.033);
+
+        // After scene change, motion_saliency should be populated
+        assert!(!m.motion_saliency().is_empty());
+        assert!(!m.motion_vectors().is_empty());
+        // motion_field_norm should be non-negative
+        assert!(tel.motion_field_norm >= 0.0);
+    }
+
+    #[test]
+    fn test_motion_saliency_static_scene_low() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        let frame = gradient_frame(64, 64);
+
+        m.observe_frame(&frame, 64, 64, 1, 0.033);
+        let tel = m.observe_frame(&frame, 64, 64, 1, 0.033);
+
+        // Static scene: very low motion surprise
+        assert!(
+            tel.motion_surprise < 0.01,
+            "Static scene should have near-zero motion surprise: {}",
+            tel.motion_surprise
+        );
+    }
+
+    #[test]
+    fn test_motion_saliency_reset_clears() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = solid_gray_frame(64, 64, 200);
+
+        m.observe_frame(&frame_a, 64, 64, 1, 0.033);
+        m.observe_frame(&frame_b, 64, 64, 1, 0.033);
+        assert!(!m.motion_saliency().is_empty());
+
+        m.reset();
+        assert!(m.motion_saliency().is_empty());
+        assert!(m.motion_vectors().is_empty());
+    }
+
+    #[test]
+    fn test_motion_telemetry_in_bridge() {
+        use crate::bridge::VisionBridge;
+
+        let cfg = VisionConfig::default();
+        let mut bridge = VisionBridge::new(cfg, 64, 64);
+
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = gradient_frame(64, 64);
+
+        bridge.process_frame(&frame_a, 64, 64, 1, 0.033);
+        let (_, tel) = bridge.process_frame_with_telemetry(&frame_b, 64, 64, 1, 0.033);
+
+        // Motion telemetry should be populated
+        assert!(tel.motion_field_norm >= 0.0);
+        assert!(tel.motion_surprise >= 0.0);
+        assert!(tel.motion_surprise.is_finite());
+    }
+
+    // === 1000-Cycle Soak Test ===
+
+    #[test]
+    fn test_soak_1000_cycles_stability() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 64, 64);
+
+        let frame_a = solid_gray_frame(64, 64, 50);
+        let frame_b = gradient_frame(64, 64);
+        let frame_c = solid_gray_frame(64, 64, 200);
+
+        let mut max_pred_error = 0.0f32;
+        let mut min_coherence = f32::MAX;
+        let mut max_state_norm = 0.0f32;
+        let mut training_count = 0u32;
+
+        for i in 0..1000 {
+            // Cycle through 3 scenes: A(300) → B(300) → C(300) → A(100)
+            let frame = match i {
+                0..=299 => &frame_a,
+                300..=599 => &frame_b,
+                600..=899 => &frame_c,
+                _ => &frame_a,
+            };
+            let tel = m.observe_frame(frame, 64, 64, 1, 0.033);
+
+            // All values must be finite
+            assert!(
+                tel.prediction_error.is_finite(),
+                "Frame {i}: prediction error not finite"
+            );
+            assert!(
+                tel.manifold_coherence.is_finite(),
+                "Frame {i}: coherence not finite"
+            );
+            assert!(
+                tel.motion_surprise.is_finite(),
+                "Frame {i}: motion_surprise not finite"
+            );
+            assert!(
+                tel.motion_field_norm.is_finite(),
+                "Frame {i}: motion_field_norm not finite"
+            );
+
+            let norm = m.state().norm();
+            assert!(
+                norm.is_finite() && norm > 0.0,
+                "Frame {i}: state norm invalid: {norm}"
+            );
+
+            max_pred_error = max_pred_error.max(tel.prediction_error);
+            min_coherence = min_coherence.min(tel.manifold_coherence);
+            max_state_norm = max_state_norm.max(norm);
+            if tel.training_triggered {
+                training_count += 1;
+            }
+        }
+
+        // Verify bounds
+        assert!(
+            max_pred_error < 2.0,
+            "Max prediction error too high: {max_pred_error}"
+        );
+        assert!(
+            max_state_norm < 200.0,
+            "Max state norm too high: {max_state_norm}"
+        );
+
+        // Verify health after 1000 cycles
+        let health = m.compute_health();
+        assert_eq!(health.total_frames, 1000);
+        assert!(health.is_healthy, "Manifold unhealthy after 1000 frames");
+        assert!(
+            health.tau_value > 0.01 && health.tau_value < 10.0,
+            "Tau out of bounds: {}",
+            health.tau_value
+        );
     }
 
     #[test]

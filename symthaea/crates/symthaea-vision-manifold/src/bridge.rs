@@ -100,16 +100,24 @@ impl VisionBridge {
         (boosted_hv, telemetry)
     }
 
-    /// Apply attention boost to the manifold state based on the surprise map.
+    /// Apply attention boost to the manifold state based on combined surprise.
     ///
-    /// Scales the state HV so that dimensions corresponding to high-surprise
-    /// patches receive a boost of `1.0 + attention_boost * normalized_surprise`.
+    /// Combines appearance surprise (from the SurpriseMap) and motion saliency
+    /// (from the MotionField) via element-wise max, then scales the state HV
+    /// so that dimensions corresponding to high-signal patches receive a boost
+    /// of `1.0 + attention_boost * normalized_signal`.
     fn apply_attention_boost(&self) -> ContinuousHV {
         let state = self.manifold.state();
         let surprise_map = self.manifold.surprise_map();
+        let motion_saliency = self.manifold.motion_saliency();
         let max_surprise = surprise_map.max_surprise();
+        let max_motion = motion_saliency
+            .iter()
+            .copied()
+            .fold(0.0f32, f32::max);
+        let max_signal = max_surprise.max(max_motion);
 
-        if max_surprise < 1e-6 || self.attention_boost < 1e-6 {
+        if max_signal < 1e-6 || self.attention_boost < 1e-6 {
             return state.clone();
         }
 
@@ -121,14 +129,16 @@ impl VisionBridge {
             return state.clone();
         }
 
-        // Map patch-level surprise to HV dimensions via strided mapping.
-        // Each patch "owns" a contiguous block of dimensions.
+        // Map patch-level combined saliency to HV dimensions via strided mapping.
         let dims_per_patch = dim / num_patches.max(1);
         let state_slice = state.as_slice();
         let mut boosted = state_slice.to_vec();
 
-        for (patch_idx, &surprise) in attention.values.iter().enumerate() {
-            let normalized = surprise / max_surprise;
+        for (patch_idx, &appearance_surprise) in attention.values.iter().enumerate() {
+            // Combine appearance surprise and motion saliency (element-wise max)
+            let motion = motion_saliency.get(patch_idx).copied().unwrap_or(0.0);
+            let combined = appearance_surprise.max(motion);
+            let normalized = combined / max_signal;
             let scale = 1.0 + self.attention_boost * normalized;
             let start = patch_idx * dims_per_patch;
             let end = (start + dims_per_patch).min(dim);

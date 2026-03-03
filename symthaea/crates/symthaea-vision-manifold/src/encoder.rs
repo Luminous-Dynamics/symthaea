@@ -19,7 +19,7 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::types::{PatchGrid, VisionConfig};
+use crate::types::{PatchGrid, ScaleHealth, VisionConfig};
 
 /// Encodes video frames into 16,384-dimensional holographic hypervectors.
 pub struct PatchHdcEncoder {
@@ -611,6 +611,40 @@ impl MultiScaleEncoder {
             .map(|i| {
                 let t = i as f32 / (n - 1) as f32;
                 self.fine_weight * (1.0 - t) + (1.0 - self.fine_weight) * t
+            })
+            .collect()
+    }
+
+    /// Compute per-scale health metrics.
+    ///
+    /// Returns one `ScaleHealth` per scale, reporting feature weight entropy,
+    /// patch count, and blend contribution.
+    pub fn compute_scale_health(&self) -> Vec<ScaleHealth> {
+        let static_weights = self.static_weights();
+        self.encoders
+            .iter()
+            .enumerate()
+            .map(|(i, enc)| {
+                let weights = enc.feature_weights();
+                let sum: f32 = weights.iter().sum();
+                let weight_entropy = if sum > 0.0 {
+                    weights
+                        .iter()
+                        .filter(|&&w| w > 0.0)
+                        .map(|&w| {
+                            let p = w / sum;
+                            -p * p.ln()
+                        })
+                        .sum()
+                } else {
+                    0.0
+                };
+                ScaleHealth {
+                    patch_size: self.scales[i],
+                    num_patches: enc.max_rows() * enc.max_cols(),
+                    weight_entropy,
+                    blend_weight: static_weights.get(i).copied().unwrap_or(0.0),
+                }
             })
             .collect()
     }
@@ -1489,5 +1523,73 @@ mod tests {
         let (hv, scale_hvs, _) = ms.encode_frame(&frame, 32, 32, 1);
         assert_eq!(hv.dim(), cfg.hdc_dim);
         assert_eq!(scale_hvs.len(), 2);
+    }
+
+    // === Per-Scale Health ===
+
+    #[test]
+    fn test_scale_health_default_config() {
+        let cfg = VisionConfig::default();
+        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let health = ms.compute_scale_health();
+
+        assert_eq!(health.len(), 2); // 2 scales: [8, 32]
+        assert_eq!(health[0].patch_size, 8);
+        assert_eq!(health[1].patch_size, 32);
+
+        // Fine scale has more patches than coarse
+        assert!(health[0].num_patches > health[1].num_patches);
+
+        // Initial weights are uniform → max entropy
+        assert!(health[0].weight_entropy > 0.0);
+        assert!(health[1].weight_entropy > 0.0);
+
+        // Blend weights should sum to ~1
+        let sum: f32 = health.iter().map(|h| h.blend_weight).sum();
+        assert!(
+            (sum - 1.0).abs() < 0.01,
+            "Blend weights should sum to ~1: {sum}"
+        );
+    }
+
+    #[test]
+    fn test_scale_health_after_refinement() {
+        let cfg = VisionConfig::default();
+        let mut ms = MultiScaleEncoder::new(&cfg, 64, 64);
+
+        let health_before = ms.compute_scale_health();
+
+        // Refine fine-scale encoder weights
+        let positive = ContinuousHV::random(cfg.hdc_dim, 1000);
+        let negative = ContinuousHV::random(cfg.hdc_dim, 2000);
+        ms.encoder_at_mut(0)
+            .unwrap()
+            .refine_contrastive(&positive, &negative, 0.5);
+
+        let health_after = ms.compute_scale_health();
+
+        // Fine-scale entropy should have changed
+        assert!(
+            (health_before[0].weight_entropy - health_after[0].weight_entropy).abs() > 1e-6,
+            "Fine-scale entropy should change after refinement"
+        );
+
+        // Coarse-scale should be unaffected
+        assert!(
+            (health_before[1].weight_entropy - health_after[1].weight_entropy).abs() < 1e-6,
+            "Coarse-scale should not change"
+        );
+    }
+
+    #[test]
+    fn test_scale_health_single_scale() {
+        let mut cfg = VisionConfig::default();
+        cfg.multi_scale.scales = vec![16];
+        let ms = MultiScaleEncoder::new(&cfg, 64, 64);
+        let health = ms.compute_scale_health();
+
+        assert_eq!(health.len(), 1);
+        assert_eq!(health[0].patch_size, 16);
+        assert!((health[0].blend_weight - 1.0).abs() < 1e-6);
     }
 }
