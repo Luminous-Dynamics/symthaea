@@ -576,7 +576,7 @@ impl CognitiveLoopService {
                 .somatic_bridge
                 .to_interoceptive_signals()
                 .tau_slowdown_factor as f32
-            * self.substrate_tau_factor;
+            * self.substrate_manager.tau_factor;
         let _t_core = Instant::now();
         if let Err(e) = self.temporal_network.step(&input_array, delta_t) {
             tracing::warn!(error = %e, "CfC temporal step failed — continuing with stale state");

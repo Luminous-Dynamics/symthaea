@@ -412,66 +412,6 @@ impl CognitiveLoopService {
         // Read config flags before `config` is moved into Self
         let enable_primitive_consciousness = config.enable_primitive_consciousness;
 
-        // Pre-compute substrate feasibility from config.substrate_composition or substrate_type.
-        let substrate_feasibility = if let Some(ref comp) = config.substrate_composition {
-            comp.feasibility()
-        } else {
-            Self::requirements_for(&config.substrate_type).consciousness_feasibility()
-        };
-
-        // Compute validation overlay + speed/scale modulation at startup.
-        // Uses substrate_validation_key() for consistent mapping, with composition
-        // awareness: compositions weight-blend confidence/speed/scale from components.
-        let substrate_honest_confidence = {
-            let framework =
-                symthaea_core::hdc::substrate_validation::SubstrateValidationFramework::new();
-            if let Some(ref comp) = config.substrate_composition {
-                let mut blended = 0.0f64;
-                for (sub, &weight) in &comp.weights {
-                    let conf = match Self::substrate_validation_key(sub) {
-                        Some(k) => framework.honest_feasibility(k),
-                        None => Self::THEORETICAL_CONFIDENCE,
-                    };
-                    blended += conf * weight as f64;
-                }
-                blended
-            } else {
-                match Self::substrate_validation_key(&config.substrate_type) {
-                    Some(k) => framework.honest_feasibility(k),
-                    None => Self::THEORETICAL_CONFIDENCE,
-                }
-            }
-        };
-        let substrate_effective_feasibility = if config.enable_validation_overlay {
-            let floor = config.validation_skepticism_floor;
-            substrate_feasibility * (floor + (1.0 - floor) * substrate_honest_confidence)
-        } else {
-            substrate_feasibility
-        };
-        let (substrate_tau_factor, substrate_scale_pressure) =
-            if config.enable_substrate_speed_modulation {
-                use symthaea_core::hdc::substrate_independence::SubstrateType as ST;
-                let bio_speed = ST::BiologicalNeurons.operation_speed();
-                let bio_scale = ST::BiologicalNeurons.max_scale();
-                let (sub_speed, sub_scale) = if let Some(ref comp) = config.substrate_composition {
-                    let mut speed = 0.0f64;
-                    let mut scale = 0.0f64;
-                    for (sub, &weight) in &comp.weights {
-                        speed += sub.operation_speed() * weight as f64;
-                        scale += sub.max_scale() * weight as f64;
-                    }
-                    (speed, scale)
-                } else {
-                    (config.substrate_type.operation_speed(), config.substrate_type.max_scale())
-                };
-                let log_ratio = (bio_speed / sub_speed).log10();
-                let tau = (1.0 + 0.5 * log_ratio / 9.0).clamp(0.5, 2.0) as f32;
-                let scale_p = (sub_scale / bio_scale).log10() as f32;
-                (tau, scale_p)
-            } else {
-                (1.0f32, 0.0f32)
-            };
-
         let moral_anomaly_config = config.moral_anomaly_config.clone();
 
         #[cfg(feature = "semantic-encoder")]
@@ -872,12 +812,6 @@ impl CognitiveLoopService {
             substrate_manager,
             #[cfg(feature = "physics-bridge")]
             physics_integration,
-            substrate_feasibility,
-            pending_substrate_transition: None,
-            substrate_honest_confidence,
-            substrate_effective_feasibility,
-            substrate_tau_factor,
-            substrate_scale_pressure,
             convergence_cycle: 0,
             ethics_engine: {
                 let engine_mp = MoralParser::new();
