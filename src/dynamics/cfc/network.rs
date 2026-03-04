@@ -264,9 +264,12 @@ impl CfCNetwork {
         output
     }
 
-    /// Process a sequence of inputs
+    /// Process a sequence of inputs.
+    ///
+    /// If `inputs` and `dts` have different lengths, processes only up to the
+    /// shorter length (truncation is safer than panicking in a hot path).
     pub fn forward_sequence(&mut self, inputs: &[Array1<f32>], dts: &[f32]) -> Vec<Array1<f32>> {
-        assert_eq!(inputs.len(), dts.len());
+        debug_assert_eq!(inputs.len(), dts.len(), "inputs/dts length mismatch in forward_sequence");
 
         self.reset();
         inputs
@@ -491,8 +494,8 @@ impl CfCNetwork {
         dts: &[f32],
         learning_rate: f32,
     ) -> anyhow::Result<f32> {
-        assert_eq!(inputs.len(), targets.len());
-        assert_eq!(inputs.len(), dts.len());
+        anyhow::ensure!(inputs.len() == targets.len(), "inputs/targets length mismatch: {} vs {}", inputs.len(), targets.len());
+        anyhow::ensure!(inputs.len() == dts.len(), "inputs/dts length mismatch: {} vs {}", inputs.len(), dts.len());
 
         let mut total_loss = 0.0f32;
 
@@ -601,8 +604,8 @@ impl CfCNetwork {
         dts: &[f32],
         learning_rate: f32,
     ) -> anyhow::Result<f32> {
-        assert_eq!(inputs.len(), targets.len());
-        assert_eq!(inputs.len(), dts.len());
+        anyhow::ensure!(inputs.len() == targets.len(), "inputs/targets length mismatch: {} vs {}", inputs.len(), targets.len());
+        anyhow::ensure!(inputs.len() == dts.len(), "inputs/dts length mismatch: {} vs {}", inputs.len(), dts.len());
 
         let mut total_loss = 0.0f32;
 

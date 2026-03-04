@@ -581,9 +581,11 @@ impl CognitiveLoopService {
                 timestamp + 0.02,
             )
             .unwrap_or_else(|_| {
-                // Fallback: 0.0..0.02 is always valid (end > start)
+                // SAFETY: 0.0 < 0.02 is always valid — this cannot fail.
+                // Using expect() here is acceptable because the constants are
+                // compile-time verifiable (end > start).
                 TemporalInterval::new("c_fallback", 0.0, 0.02)
-                    .expect("hardcoded valid interval 0.0..0.02")
+                    .expect("hardcoded valid interval 0.0 < 0.02")
             });
             ti.phi = Some(unified_psi);
             let mut interval = ConsciousInterval::new(

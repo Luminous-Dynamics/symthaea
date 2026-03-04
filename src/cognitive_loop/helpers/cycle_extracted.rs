@@ -188,9 +188,17 @@ impl CognitiveLoopService {
             self.stats.moral_evaluations += 1;
             j
         } else {
-            self.last_moral_judgment
-                .clone()
-                .expect("last_moral_judgment guaranteed Some by map_or guard")
+            // The map_or guard above ensures last_moral_judgment is Some here,
+            // but we use unwrap_or_else for panic-freedom in the 50Hz hot path.
+            match self.last_moral_judgment.clone() {
+                Some(j) => j,
+                None => {
+                    // Should be unreachable — but if it is, re-evaluate rather than panic.
+                    let j = self.evaluate_moral_alignment(input);
+                    self.stats.moral_evaluations += 1;
+                    j
+                }
+            }
         };
 
         let moral_concern_detected = moral_judgment.moral_score < MORAL_CONCERN_THRESHOLD
