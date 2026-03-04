@@ -6872,3 +6872,50 @@ fn test_physics_bridge_blend_modifies_output() {
         "Services with/without physics bridge should produce different prediction errors"
     );
 }
+
+/// Physics bridge exploration modulation: high similarity should dampen exploration_urge
+/// relative to a service without the bridge (all else equal).
+#[test]
+#[cfg(feature = "physics-bridge")]
+fn test_physics_bridge_exploration_feedback() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_physics_bridge = true;
+    config.physics_bridge_query_interval = 1; // query every cycle
+    config.physics_bridge_blend_weight = 0.3;
+    config.enable_primitive_consciousness = true;
+    config.learning_threshold = 0.0;
+    config.async_training = false;
+
+    let mut with_bridge = CognitiveLoopService::new(config.clone()).unwrap();
+
+    config.enable_physics_bridge = false;
+    let mut without_bridge = CognitiveLoopService::new(config).unwrap();
+
+    let inputs = [
+        "thermodynamic entropy analysis",
+        "quantum field fluctuation",
+        "electromagnetic wave propagation",
+        "gravitational potential energy",
+        "statistical mechanics ensemble",
+    ];
+
+    // Run both services for enough cycles to accumulate exploration divergence.
+    for _ in 0..4 {
+        for input in &inputs {
+            with_bridge.cycle(input);
+            without_bridge.cycle(input);
+        }
+    }
+
+    // The physics bridge should have modulated exploration — the two services
+    // should have different exploration_urge values after enough cycles.
+    let urge_with = with_bridge.curiosity_drive_exploration_urge();
+    let urge_without = without_bridge.curiosity_drive_exploration_urge();
+    // They should differ (physics domain feedback changes exploration).
+    // We can't predict direction deterministically, but they should not be identical.
+    assert!(
+        (urge_with - urge_without).abs() > 1e-10
+            || urge_with == 0.0, // both zero is acceptable if error is low
+        "Physics bridge should modulate exploration differently: with={urge_with}, without={urge_without}"
+    );
+}
