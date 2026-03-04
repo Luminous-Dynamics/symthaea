@@ -979,11 +979,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "tau_min must be >= ")]
-    fn test_construction_panics_on_zero_tau() {
+    fn test_construction_clamps_zero_tau() {
         let mut config = small_config();
-        config.tau_range = (0.0, 10.0); // tau_min < MIN_TAU should panic
-        CfCCell::new(config);
+        config.tau_range = (0.0, 10.0); // tau_min < MIN_TAU gets clamped
+        let cell = CfCCell::new(config);
+        // Verify all tau values are at least MIN_TAU after clamping
+        for &t in cell.tau.iter() {
+            assert!(t >= MIN_TAU, "tau should be >= MIN_TAU after clamp: {t}");
+        }
     }
 
     #[test]

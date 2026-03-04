@@ -2071,8 +2071,9 @@ impl PersonalityDriftTracker {
         if self.history.len() < 2 {
             return 0.0;
         }
-        let first = self.history.front().unwrap();
-        let last = self.history.back().unwrap();
+        let (Some(first), Some(last)) = (self.history.front(), self.history.back()) else {
+            return 0.0;
+        };
         let n = (self.history.len() - 1) as f32;
         let deltas = [
             (last.novelty_seeking - first.novelty_seeking).abs() / n,

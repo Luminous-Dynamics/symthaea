@@ -58,9 +58,9 @@ impl SsmState {
     /// - `input` length must be `d_model`.
     /// - `output` length must be `d_model`.
     pub fn step(&mut self, input: &[f32], params: &SelectiveParams, output: &mut [f32]) {
-        debug_assert!(params.len_ok());
-        debug_assert_eq!(input.len(), self.d_model);
-        debug_assert_eq!(output.len(), self.d_model);
+        assert!(params.len_ok());
+        assert_eq!(input.len(), self.d_model);
+        assert_eq!(output.len(), self.d_model);
 
         let d_state = self.d_state;
         for i in 0..self.d_model {
