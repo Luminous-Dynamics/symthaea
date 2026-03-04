@@ -241,7 +241,7 @@ impl PersistentCache {
         bytes
             .chunks_exact(4)
             .map(|chunk| {
-                let arr: [u8; 4] = chunk.try_into().unwrap();
+                let arr: [u8; 4] = chunk.try_into().expect("chunks_exact(4) guarantees 4-byte slices");
                 f32::from_le_bytes(arr)
             })
             .collect()
@@ -264,7 +264,7 @@ impl PersistentCache {
         bytes
             .chunks_exact(2)
             .map(|chunk| {
-                let arr: [u8; 2] = chunk.try_into().unwrap();
+                let arr: [u8; 2] = chunk.try_into().expect("chunks_exact(2) guarantees 2-byte slices");
                 half::f16::from_le_bytes(arr).to_f32()
             })
             .collect()

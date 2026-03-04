@@ -721,7 +721,7 @@ mod impls {
                         alternatives: alternatives.clone(),
                         correct_idx,
                         condition: format!("offer_{:.0}pct", offer * 100.0),
-                        trial_idx: offer_levels.iter().position(|&o| o == offer).unwrap() * trials_per + rep,
+                        trial_idx: offer_levels.iter().position(|&o| o == offer).unwrap_or(0) * trials_per + rep,
                     });
                 }
             }

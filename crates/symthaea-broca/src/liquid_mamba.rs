@@ -153,12 +153,6 @@ pub struct LiquidMambaConfig {
     /// Each chunk gets a trainable importance weight (sigmoid-gated).
     #[serde(default)]
     pub temporal_learned_attention: bool,
-    /// Enable end-to-end token prediction loss for temporal projection.
-    /// Uses candle autograd to backprop Mamba's cross-entropy loss through SSM layers
-    /// to get gradients on the projected SSM tokens, then chains to projection weights.
-    /// Requires real Mamba backend (not MockMamba).
-    #[serde(default)]
-    pub temporal_e2e_loss: bool,
     /// Surprise gradient scaling factor (0 = disabled, 0.5 = default).
     /// Gradients are scaled by `1 + alpha * semantic_pe` before application,
     /// amplifying gradients for surprising/difficult examples.
@@ -187,6 +181,56 @@ pub struct LiquidMambaConfig {
     /// FEP low-surprise LR multiplier (default 0.7).
     #[serde(default = "default_fep_low_multiplier")]
     pub fep_low_multiplier: f32,
+
+    // ─── Improvement A-F config fields ───
+
+    /// Chunk dimension for temporal projection (default 256 = bottleneck_dim).
+    /// When non-zero, overrides bottleneck_dim for temporal chunk sizing.
+    #[serde(default)]
+    pub temporal_chunk_dim: usize,
+
+    /// Number of per-group up-projection matrices for temporal projection (default 1).
+    /// Each group of chunks shares its own W_up/W_down matrices.
+    /// E.g., num_groups=4 with 64 chunks → chunks 0-15 share group 0, 16-31 share group 1, etc.
+    #[serde(default = "default_temporal_num_groups")]
+    pub temporal_num_groups: usize,
+
+    /// Weight for anti-collapse regularization in temporal projection (default 0.0 = disabled).
+    /// Pushes chunk projections apart when their cosine similarity exceeds the threshold.
+    /// Good starting values: 0.01-0.1.
+    #[serde(default)]
+    pub temporal_anticollapse_weight: f32,
+
+    /// Cosine similarity threshold for anti-collapse regularization (default 0.9).
+    /// Pairs of chunk projections with similarity above this threshold receive a repulsive gradient.
+    #[serde(default = "default_temporal_anticollapse_threshold")]
+    pub temporal_anticollapse_threshold: f32,
+
+    /// Enable rotating grad-chunk position for temporal E2E loss (default true).
+    /// When true, computes E2E gradients at a single rotating position per step instead of all.
+    /// When false, uses the original behavior of processing all chunks.
+    #[serde(default = "default_true")]
+    pub temporal_rotate_grad_position: bool,
+
+    /// Enable adapter MLP after temporal up-projection (default false).
+    /// Adds a learnable residual MLP (d_ssm → d_ssm) after each chunk's up-projection.
+    #[serde(default)]
+    pub temporal_adapter: bool,
+
+    /// LoRA rank for Mamba layer adaptation (0 = disabled, default 0).
+    /// When > 0, adds low-rank adapters to Mamba's in_proj and out_proj layers.
+    #[serde(default)]
+    pub lora_rank: usize,
+
+    /// LoRA alpha scaling factor (default 1.0).
+    /// The LoRA contribution is scaled by alpha/rank.
+    #[serde(default = "default_lora_alpha")]
+    pub lora_alpha: f32,
+
+    /// LoRA learning rate (default 0.0001).
+    /// Separate LR for LoRA adapter updates (typically lower than projection LR).
+    #[serde(default = "default_lora_lr")]
+    pub lora_lr: f32,
 }
 
 fn default_grad_clip() -> f32 {
@@ -212,6 +256,21 @@ fn default_fep_high_multiplier() -> f32 {
 }
 fn default_fep_low_multiplier() -> f32 {
     0.7
+}
+fn default_temporal_num_groups() -> usize {
+    1
+}
+fn default_temporal_anticollapse_threshold() -> f32 {
+    0.9
+}
+fn default_true() -> bool {
+    true
+}
+fn default_lora_alpha() -> f32 {
+    1.0
+}
+fn default_lora_lr() -> f32 {
+    0.0001
 }
 
 impl Default for LiquidMambaConfig {
@@ -255,7 +314,6 @@ impl Default for LiquidMambaConfig {
             temporal_rank_reg_weight: 0.0,
             temporal_chunk_budget: 0,
             temporal_learned_attention: false,
-            temporal_e2e_loss: false,
             surprise_gradient_alpha: 0.5,
             grad_clip: 1.0,
             token_pe_sim_threshold: 0.3,
@@ -265,6 +323,15 @@ impl Default for LiquidMambaConfig {
             fep_low_threshold: 0.3,
             fep_high_multiplier: 1.5,
             fep_low_multiplier: 0.7,
+            temporal_chunk_dim: 0,
+            temporal_num_groups: 1,
+            temporal_anticollapse_weight: 0.0,
+            temporal_anticollapse_threshold: 0.9,
+            temporal_rotate_grad_position: true,
+            temporal_adapter: false,
+            lora_rank: 0,
+            lora_alpha: 1.0,
+            lora_lr: 0.0001,
         }
     }
 }
@@ -345,21 +412,34 @@ impl LiquidMambaGenerator {
         };
 
         let temporal_proj = if config.temporal_projection {
+            let chunk_dim = if config.temporal_chunk_dim > 0 {
+                config.temporal_chunk_dim
+            } else {
+                config.bottleneck_dim // default: 256
+            };
             let stride = if config.temporal_stride > 0 {
                 config.temporal_stride
             } else {
-                config.bottleneck_dim // default: no overlap
+                chunk_dim // default: no overlap
             };
             let mut tp = TemporalProjection::new_full(
                 genesis,
                 config.hdc_dim,
-                config.bottleneck_dim, // chunk_dim = 256
+                chunk_dim,
                 config.ssm_dim,
                 config.learned_pos_enc,
                 stride,
             );
             if config.temporal_learned_attention {
                 tp.set_learned_attention(true);
+            }
+            // Improvement C: per-group up-projection
+            if config.temporal_num_groups > 1 {
+                tp.set_num_groups(config.temporal_num_groups, genesis);
+            }
+            // Improvement E: adapter MLP
+            if config.temporal_adapter {
+                tp.enable_adapter(genesis);
             }
             Some(tp)
         } else {
@@ -402,6 +482,15 @@ impl LiquidMambaGenerator {
 
         if enable_ema {
             gen.projection.enable_ema(ema_decay);
+        }
+
+        // Improvement D: enable LoRA on Mamba layers
+        if gen.config.lora_rank > 0 {
+            gen.mamba.enable_lora(
+                gen.config.lora_rank,
+                gen.config.lora_alpha,
+                gen.config.lora_lr,
+            );
         }
 
         Ok(gen)
@@ -990,21 +1079,6 @@ impl LiquidMambaGenerator {
     /// - Gradient accumulation (apply every accumulation_steps)
     /// - Contrastive loss (push different thoughts' projections apart)
     pub fn distill_step(&mut self, channels: &ThoughtChannels, result: &GenerationResult) {
-        self.distill_step_with_targets(channels, result, None);
-    }
-
-    /// Distillation step with optional target tokens for end-to-end loss.
-    ///
-    /// When `target_tokens` is `Some`, and `temporal_e2e_loss` is enabled,
-    /// uses Mamba's cross-entropy loss as the training signal instead of
-    /// roundtrip autoencoder loss. This aligns the projection with what
-    /// Mamba actually needs to generate correct text.
-    pub fn distill_step_with_targets(
-        &mut self,
-        channels: &ThoughtChannels,
-        result: &GenerationResult,
-        target_tokens: Option<&[u32]>,
-    ) {
         self.generation_count += 1;
 
         // Periodic projection health check (every 50 generations).
@@ -1070,25 +1144,7 @@ impl LiquidMambaGenerator {
             // When Mamba output is meaningful (PE < 0.5), we boost the gradient
             // magnitude proportional to output quality.
             let tp = self.temporal_proj.as_mut().unwrap();
-
-            // End-to-end loss: backprop Mamba's token prediction loss through projection
-            if self.config.temporal_e2e_loss {
-                if let Some(tokens) = target_tokens {
-                    let ssm_sequence = tp.project_to_ssm_sequence(&thought_hv);
-                    match self.mamba.compute_e2e_token_loss(&ssm_sequence, tokens) {
-                        Ok((_loss, ssm_grads)) => {
-                            tp.compute_e2e_gradients(&thought_hv, &ssm_grads);
-                        }
-                        Err(e) => {
-                            tracing::warn!("E2E loss failed, falling back to roundtrip: {e}");
-                            tp.compute_roundtrip_gradients(&thought_hv);
-                        }
-                    }
-                } else {
-                    // No target tokens available — fall back to roundtrip
-                    tp.compute_roundtrip_gradients(&thought_hv);
-                }
-            } else if self.config.temporal_directional_loss {
+            if self.config.temporal_directional_loss {
                 tp.compute_directional_gradients(&thought_hv, None);
             } else {
                 tp.compute_roundtrip_gradients(&thought_hv);
@@ -1122,6 +1178,33 @@ impl LiquidMambaGenerator {
                     self.config.temporal_rank_reg_weight,
                     64, // sample 64 random pairs per step
                 );
+            }
+
+            // Improvement A: Anti-collapse regularization
+            if self.config.temporal_anticollapse_weight > 0.0 {
+                tp.compute_anticollapse_gradients(
+                    &thought_hv,
+                    self.config.temporal_anticollapse_weight,
+                    self.config.temporal_anticollapse_threshold,
+                );
+            }
+
+            // Improvement B: Rotating grad-chunk E2E loss
+            if self.config.temporal_rotate_grad_position && use_mamba_signal {
+                let num_chunks = tp.num_chunks();
+                let pos = self.generation_count % num_chunks;
+                let sequence = tp.project_to_ssm_sequence(&thought_hv);
+                let ssm_grads = self.mamba.compute_e2e_token_loss_at(
+                    &sequence,
+                    &result.token_ids,
+                    pos,
+                );
+                if let Ok(grad) = ssm_grads {
+                    // Build sparse gradient array: only position `pos` has a gradient
+                    let mut sparse: Vec<Option<Vec<f32>>> = vec![None; num_chunks];
+                    sparse[pos] = Some(grad);
+                    tp.compute_e2e_gradients(&thought_hv, &sparse);
+                }
             }
 
             self.distill_accumulator += 1;

@@ -367,13 +367,16 @@ impl MagiLoopRuntime {
     }
 
     /// Get a snapshot for monitoring (thread-safe)
+    ///
+    /// Lock ordering: pending → model → logs (consistent with resolve_pending
+    /// which acquires pending → model → bridge, preventing ABBA deadlock).
     pub fn snapshot(&self) -> RuntimeSnapshot {
+        let pending = self.pending.lock();
         let model = self.model.lock();
         let persistence = model.persistence();
         let current = persistence.current();
         let signals = self.signals.read().clone();
         let logs = self.logs.lock();
-        let pending = self.pending.lock();
 
         let tick_count = self.tick_count.load(Ordering::Relaxed);
         let total_us = self.total_tick_us.load(Ordering::Relaxed);
