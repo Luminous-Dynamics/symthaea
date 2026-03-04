@@ -504,6 +504,12 @@ pub struct CycleMetadata {
     /// Legacy field — identical to `substrate_effective_feasibility`.
     /// Use `substrate_feasibility_raw` for the pre-overlay value.
     pub substrate_feasibility: f64,
+
+    /// Substrate telemetry snapshot (from SubstrateManager::telemetry()).
+    /// Groups all substrate-related fields for batch assignment.
+    #[serde(default)]
+    pub substrate: super::SubstrateTelemetry,
+
     /// Weight convergence state label (Initializing/Converging/Converged/Oscillating).
     pub weight_convergence_state: String,
     /// Cycle at which weights converged (0 if not yet).
@@ -735,6 +741,57 @@ pub struct CycleMetadata {
     /// Set in prediction.rs when replay-driven consolidation is active.
     #[serde(default)]
     pub is_consolidating: bool,
+
+    // ── Voice Telemetry ─────────────────────────────────────────────────
+    /// Smoothed articulation quality from voice feedback bridge (0.0–1.0).
+    #[serde(default)]
+    pub voice_articulation_quality: f32,
+    /// Speech rate stability from voice feedback bridge (0.0–1.0).
+    #[serde(default)]
+    pub voice_rate_stability: f32,
+    /// Overall voice confidence: articulation × 0.6 + stability × 0.4.
+    #[serde(default)]
+    pub voice_confidence: f32,
+    /// Phi adjustment from voice quality (positive = understanding boost).
+    #[serde(default)]
+    pub voice_phi_adjustment: f32,
+
+    // ── GWT Handler Telemetry ───────────────────────────────────────────
+    /// Whether a GWT memory consolidation handler fired this cycle.
+    #[serde(default)]
+    pub gwt_memory_consolidation_requested: bool,
+    /// Number of GWT perception broadcasts consumed by handlers this cycle.
+    #[serde(default)]
+    pub gwt_perception_broadcasts: u32,
+
+    // ── Social Coherence Telemetry ──────────────────────────────────────
+    /// Current social trust level (0.0–1.0) from Mind module's SocialCoherence.
+    #[serde(default)]
+    pub social_trust_current: f32,
+    /// Current social cooperation rate (0.0–1.0).
+    #[serde(default)]
+    pub social_cooperation_current: f32,
+    /// Whether social trust biased strategy selection this cycle.
+    #[serde(default)]
+    pub social_strategy_bias_applied: bool,
+    /// Social learning rate factor applied this cycle (0.8–1.2).
+    #[serde(default = "default_one_f32")]
+    pub social_learning_rate_factor: f32,
+
+    // ── Vision Manifold Telemetry ───────────────────────────────────────
+    /// Vision manifold telemetry (None when vision-manifold feature disabled or not active).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vision: Option<VisionManifoldTelemetry>,
+
+    // ── Foveation Bridge Telemetry ──────────────────────────────────────
+    /// Foveation bridge telemetry (None when foveation feature disabled or not active).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub foveation: Option<FoveationBridgeTelemetry>,
+
+    // ── Physics Bridge Telemetry ────────────────────────────────────────
+    /// Physics bridge telemetry (None when physics-bridge feature disabled or not active).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physics_bridge: Option<PhysicsBridgeTelemetry>,
 }
 
 fn default_response_profile() -> String {
@@ -743,6 +800,73 @@ fn default_response_profile() -> String {
 
 fn default_one_f32() -> f32 {
     1.0
+}
+
+/// Vision manifold telemetry snapshot for CycleMetadata.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct VisionManifoldTelemetry {
+    /// Whether vision processing was active this cycle.
+    pub vision_active: bool,
+    /// Per-frame prediction error from the vision manifold CfC.
+    pub prediction_error: f32,
+    /// Manifold coherence (cosine similarity between state and frame encoding).
+    pub manifold_coherence: f32,
+    /// Shannon entropy of the attention/surprise map.
+    pub attention_entropy: f32,
+    /// Number of patches exceeding the surprise threshold.
+    pub num_salient_patches: usize,
+    /// Frame sequence number.
+    pub frame_sequence: u64,
+    /// Whether a training step was triggered this cycle.
+    pub training_triggered: bool,
+    /// Cosine similarity of the scene recognition match (0.0 if no match).
+    pub scene_recognition_similarity: f32,
+    /// Cross-manifold prediction error (vision→cognitive, 0.0 if predictor disabled).
+    pub cross_manifold_prediction_error: f32,
+}
+
+/// Foveation bridge telemetry snapshot for CycleMetadata.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FoveationBridgeTelemetry {
+    /// Number of pending foveation tasks.
+    pub pending_count: usize,
+    /// Number of in-flight foveation tasks.
+    pub in_flight_count: usize,
+    /// Number of ready (completed) foveation results.
+    pub ready_count: usize,
+    /// Total tasks dispatched since startup.
+    pub total_dispatched: u64,
+    /// Total tasks completed since startup.
+    pub total_completed: u64,
+    /// Average processing time in microseconds.
+    pub avg_processing_time_us: u64,
+    /// Confidence of the most recent recognition result.
+    pub last_confidence: f32,
+    /// Effective surprise threshold (after NE modulation).
+    pub effective_surprise_threshold: f32,
+    /// Effective max concurrent tasks (after DA modulation).
+    pub effective_max_concurrent: usize,
+    /// Number of recognition results this cycle.
+    pub recognition_count: usize,
+    /// Highest recognition confidence this cycle (0.0 if none).
+    pub top_recognition_confidence: f32,
+}
+
+/// Physics bridge telemetry snapshot for CycleMetadata.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PhysicsBridgeTelemetry {
+    /// Number of physics entries in catalog.
+    pub catalog_size: usize,
+    /// Number of results returned from last query.
+    pub results_returned: usize,
+    /// Top matching entry name (empty if no match).
+    pub top_match: String,
+    /// Top match score (0.0 if no match).
+    pub top_score: f32,
+    /// Total queries performed since startup.
+    pub query_count: u64,
+    /// Whether a query was performed this cycle.
+    pub queried_this_cycle: bool,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

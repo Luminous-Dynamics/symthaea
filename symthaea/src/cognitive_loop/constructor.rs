@@ -205,11 +205,33 @@ impl CognitiveLoopService {
         // Predictive self + attention schema now in SelfModelTierManager::new()
 
         // Build optional GWT integration
-        let gwt = if config.enable_gwt {
+        let mut gwt = if config.enable_gwt {
             Some(UnifiedGlobalWorkspace::new(UnifiedGWTConfig::default()))
         } else {
             None
         };
+
+        // Register GWT handlers for memory and perception broadcast consumption.
+        let gwt_memory_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let gwt_perception_count =
+            std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+
+        if let Some(ref mut workspace) = gwt {
+            let mf = gwt_memory_flag.clone();
+            workspace.register_handler(
+                "memory",
+                Box::new(move |_| {
+                    mf.store(true, std::sync::atomic::Ordering::Relaxed);
+                }),
+            );
+            let pc = gwt_perception_count.clone();
+            workspace.register_handler(
+                "perception",
+                Box::new(move |_| {
+                    pc.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }),
+            );
+        }
 
         // Build optional consciousness resonance monitor
         let consciousness_resonance = if config.enable_resonance {
@@ -455,6 +477,42 @@ impl CognitiveLoopService {
         #[cfg(feature = "semantic-encoder")]
         let enable_semantic_encoder = config.enable_semantic_encoder;
 
+        #[cfg(feature = "vision-manifold")]
+        let cross_manifold_predictor_init =
+            if config.enable_cross_manifold_predictor && config.enable_vision_manifold {
+                let cmp_seed = config
+                    .genesis_phrase
+                    .as_ref()
+                    .map(|p| {
+                        symthaea_core::genesis::GenesisSeed::from_phrase(p)
+                            .domain("cognitive_loop::cross_manifold")
+                            .gen::<u64>()
+                    })
+                    .unwrap_or(7_000_042);
+                Some(symthaea_vision_manifold::CrossManifoldPredictor::new(
+                    16_384,
+                    cmp_seed,
+                ))
+            } else {
+                None
+            };
+
+        let substrate_manager = super::substrate_manager::SubstrateManager::new(&config);
+
+        #[cfg(feature = "physics-bridge")]
+        let physics_integration = if config.enable_physics_bridge {
+            Some(super::physics_integration::PhysicsIntegration::new())
+        } else {
+            None
+        };
+
+        #[cfg(feature = "vision-manifold")]
+        let vision_frame_width = config.vision_frame_width;
+        #[cfg(feature = "vision-manifold")]
+        let vision_frame_height = config.vision_frame_height;
+        #[cfg(feature = "vision-manifold")]
+        let vision_manifold_enabled = config.enable_vision_manifold;
+
         Ok(Self {
             config,
             encoder,
@@ -683,6 +741,8 @@ impl CognitiveLoopService {
             prefrontal,
             self_model_tier,
             gwt,
+            gwt_memory_flag,
+            gwt_perception_count,
             consciousness_monitors: super::consciousness_monitor_tier::ConsciousnessMonitorTier {
                 resonance: consciousness_resonance,
                 quantum_coherence,
@@ -699,6 +759,7 @@ impl CognitiveLoopService {
             })),
             attention_visualizer: Some(crate::visualization::AttentionVisualizer::new()),
             social: super::SocialState::default(),
+            social_coherence: super::SocialCoherenceState::default(),
             phi_dyad: if enable_primitive_consciousness {
                 Some(crate::partnership::PhiDyadCalculator::new())
             } else {
@@ -722,6 +783,28 @@ impl CognitiveLoopService {
                 Some(super::nurture_bridge::NurtureAttachmentBridge::new())
             } else {
                 None
+            },
+            #[cfg(feature = "vision-manifold")]
+            vision_bridge: if vision_manifold_enabled {
+                let vm_config = symthaea_vision_manifold::VisionConfig::default();
+                Some(symthaea_vision_manifold::VisionBridge::new(
+                    vm_config,
+                    vision_frame_width,
+                    vision_frame_height,
+                ))
+            } else {
+                None
+            },
+            #[cfg(feature = "vision-manifold")]
+            vision_frame_buffer: None,
+            #[cfg(feature = "vision-manifold")]
+            cross_manifold_predictor: cross_manifold_predictor_init,
+            #[cfg(feature = "foveation")]
+            foveation_manager: {
+                let fov_config = symthaea_foveation::FoveationConfig::default();
+                Some(std::sync::Mutex::new(
+                    symthaea_foveation::FoveationManager::new(fov_config, 8),
+                ))
             },
             psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),
@@ -786,6 +869,9 @@ impl CognitiveLoopService {
                     engine_smf, engine_mmi, engine_eq, engine_ucp,
                 )
             },
+            substrate_manager,
+            #[cfg(feature = "physics-bridge")]
+            physics_integration,
             substrate_feasibility,
             pending_substrate_transition: None,
             substrate_honest_confidence,

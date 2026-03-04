@@ -206,12 +206,24 @@ impl CognitiveLoopService {
                     .moral_topology()
                     .last_summary()
                     .scenario_count,
-                moral_anomaly_score: moral_anomaly_report.anomaly_score,
-                moral_value_inversion: moral_anomaly_report.value_inversion,
-                moral_free_energy_spike: moral_anomaly_report.free_energy_spike,
-                moral_drift_alert: moral_anomaly_report.drift_alert,
-                moral_fragmentation_increase: moral_anomaly_report.fragmentation_increase,
+                // Gate anomaly flags on topology_fresh: between evaluations
+                // (cadence 30–120 cycles), report stale=false so dashboard/API
+                // consumers see clean transitions rather than sticky flags.
+                moral_anomaly_score: if self.ethics_engine.last_topology_fresh() {
+                    moral_anomaly_report.anomaly_score
+                } else {
+                    0.0
+                },
+                moral_value_inversion: self.ethics_engine.last_topology_fresh()
+                    && moral_anomaly_report.value_inversion,
+                moral_free_energy_spike: self.ethics_engine.last_topology_fresh()
+                    && moral_anomaly_report.free_energy_spike,
+                moral_drift_alert: self.ethics_engine.last_topology_fresh()
+                    && moral_anomaly_report.drift_alert,
+                moral_fragmentation_increase: self.ethics_engine.last_topology_fresh()
+                    && moral_anomaly_report.fragmentation_increase,
                 moral_anomaly_response_applied: self.config.enable_moral_anomaly_response
+                    && self.ethics_engine.last_topology_fresh()
                     && moral_anomaly_report.anomaly_score > 0.0,
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
@@ -365,15 +377,46 @@ impl CognitiveLoopService {
             ..Default::default()
         };
 
+        // ── Social coherence telemetry ──
+        metadata.social_trust_current = self.social.social_trust;
+        metadata.social_cooperation_current = self.social.social_cooperation_rate;
+        metadata.social_strategy_bias_applied = perception.social_strategy_bias;
+        metadata.social_learning_rate_factor = feedback.social_learning_rate_factor;
+
+        // ── GWT handler telemetry ──
+        metadata.gwt_memory_consolidation_requested = self
+            .gwt_memory_flag
+            .swap(false, std::sync::atomic::Ordering::Relaxed);
+        metadata.gwt_perception_broadcasts = self
+            .gwt_perception_count
+            .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
+
+        // ── Voice telemetry ──
+        {
+            let voice_summary = self.voice_feedback_bridge.summary();
+            metadata.voice_articulation_quality = self.voice_feedback_bridge.smoothed_articulation();
+            metadata.voice_rate_stability = self.voice_feedback_bridge.rate_stability();
+            metadata.voice_confidence = voice_summary.voice_confidence;
+            metadata.voice_phi_adjustment = self.voice_feedback_bridge.compute_phi_adjustment();
+        }
+
         // ── Substrate & convergence telemetry ──
         metadata.substrate = self.substrate_manager.telemetry();
+        // Populate flat substrate fields for backward-compatible access
+        metadata.substrate_transition = metadata.substrate.substrate_transition.clone();
+        metadata.substrate_feasibility_raw = metadata.substrate.substrate_feasibility_raw;
+        metadata.substrate_honest_confidence = metadata.substrate.substrate_honest_confidence;
+        metadata.substrate_effective_feasibility = metadata.substrate.substrate_effective_feasibility;
+        metadata.substrate_tau_factor = metadata.substrate.substrate_tau_factor;
+        metadata.substrate_scale_pressure = metadata.substrate.substrate_scale_pressure;
+        metadata.substrate_feasibility = metadata.substrate.substrate_effective_feasibility;
 
         // Physics bridge telemetry
         #[cfg(feature = "physics-bridge")]
         {
             if let Some(ref mut physics) = self.physics_integration {
                 let pt = physics.telemetry();
-                metadata.physics_bridge = Some(super::types::telemetry::PhysicsBridgeTelemetry {
+                metadata.physics_bridge = Some(super::PhysicsBridgeTelemetry {
                     catalog_size: pt.catalog_size,
                     results_returned: pt.results_returned,
                     top_match: pt.top_match,
@@ -384,23 +427,43 @@ impl CognitiveLoopService {
             }
         }
 
+        // Vision manifold telemetry
+        #[cfg(feature = "vision-manifold")]
+        if let Some(ref tel) = perception.vision_telemetry {
+            metadata.vision = Some(super::VisionManifoldTelemetry {
+                vision_active: true,
+                prediction_error: tel.prediction_error,
+                manifold_coherence: tel.manifold_coherence,
+                attention_entropy: tel.attention_entropy,
+                num_salient_patches: tel.num_salient_patches,
+                frame_sequence: tel.frame_sequence,
+                training_triggered: tel.training_triggered,
+                scene_recognition_similarity: tel.scene_recognition_similarity,
+                cross_manifold_prediction_error: perception.cross_manifold_prediction_error,
+            });
+        }
+
         // Foveation bridge telemetry
         #[cfg(feature = "foveation")]
         {
-            if let Some(ref fov) = self.foveation_manager {
-                let ft = fov.telemetry();
-                metadata.foveation =
-                    Some(super::types::telemetry::FoveationBridgeTelemetry {
-                        pending_count: ft.pending_count,
-                        in_flight_count: ft.in_flight_count,
-                        ready_count: ft.ready_count,
-                        total_dispatched: ft.total_dispatched,
-                        total_completed: ft.total_completed,
-                        avg_processing_time_us: ft.avg_processing_time_us,
-                        last_confidence: ft.last_confidence,
-                        effective_surprise_threshold: fov.effective_surprise_threshold(),
-                        effective_max_concurrent: fov.effective_max_concurrent(),
-                    });
+            if let Some(ref fov_mutex) = self.foveation_manager {
+                if let Ok(fov) = fov_mutex.lock() {
+                    let ft = fov.telemetry();
+                    metadata.foveation =
+                        Some(super::FoveationBridgeTelemetry {
+                            pending_count: ft.pending_count,
+                            in_flight_count: ft.in_flight_count,
+                            ready_count: ft.ready_count,
+                            total_dispatched: ft.total_dispatched,
+                            total_completed: ft.total_completed,
+                            avg_processing_time_us: ft.avg_processing_time_us as u64,
+                            last_confidence: ft.last_confidence,
+                            effective_surprise_threshold: fov.effective_surprise_threshold(),
+                            effective_max_concurrent: fov.effective_max_concurrent(),
+                            recognition_count: perception.foveation_recognition_count,
+                            top_recognition_confidence: perception.foveation_top_confidence,
+                        });
+                }
             }
         }
 
@@ -455,6 +518,12 @@ impl CognitiveLoopService {
             dynamics.sht_crash_dip,
             dynamics.exploration_sht_drain,
         );
+
+        // Cross-manifold predictor: observe actual cognitive state for Hebbian learning
+        #[cfg(feature = "vision-manifold")]
+        if let Some(ref mut pred) = self.cross_manifold_predictor {
+            pred.observe_cognitive(&perception.encoding_result.hdv);
+        }
 
         // Project 16,384D HDC to 32D for visualization
         let thought_vector = {

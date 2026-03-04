@@ -96,6 +96,16 @@ impl CognitiveLoopService {
         self.ethics_engine.moral_topology().last_summary().clone()
     }
 
+    /// Evaluate temporal prediction horizon accuracy from the vision manifold.
+    #[cfg(feature = "vision-manifold")]
+    pub fn vision_evaluate_horizons(
+        &self,
+    ) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
+        self.vision_bridge
+            .as_ref()
+            .map(|b| b.manifold().evaluate_horizons())
+    }
+
     /// Build a capability card from the current config and runtime stats.
     ///
     /// The card captures substrate type, cycle frequency, Phi, enabled features,
@@ -201,4 +211,12 @@ impl CognitiveLoopService {
     pub fn substrate_scale_pressure(&self) -> f32 {
         self.substrate_manager.scale_pressure
     }
+
+    /// Inject a raw frame buffer for the next vision manifold cycle.
+    /// The frame is consumed during the next `cycle()` call.
+    #[cfg(feature = "vision-manifold")]
+    pub fn inject_vision_frame(&mut self, frame: Vec<u8>) {
+        self.vision_frame_buffer = Some(frame);
+    }
+
 }
