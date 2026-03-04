@@ -69,6 +69,9 @@ impl CognitiveLoopService {
         /// Get curiosity drive reference
         pub(crate) fn curiosity_drive(&self) -> &CuriosityDrive { &self.curiosity_drive }
 
+        /// Get current exploration urge (0.0 to 1.0)
+        pub fn curiosity_drive_exploration_urge(&self) -> f64 { self.curiosity_drive.exploration_urge }
+
         /// Get novelty bonus for learning
         pub fn novelty_bonus(&self) -> f32 { self.curiosity_drive.novelty_bonus }
 

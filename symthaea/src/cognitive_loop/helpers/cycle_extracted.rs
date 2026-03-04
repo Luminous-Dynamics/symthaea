@@ -874,6 +874,22 @@ impl CognitiveLoopService {
             }
         }
 
+        // Physics-domain exploration modulation:
+        // High physics similarity → exploit (known territory), low → explore (uncharted).
+        #[cfg(feature = "physics-bridge")]
+        if let Some(ref physics) = self.physics_integration {
+            let score = physics.last_top_score;
+            if score > 0.5 {
+                // Known physics territory — dampen exploration (scale 0.85–0.95)
+                let factor = 1.0 - (score - 0.5) * 0.3; // 0.5→1.0, 1.0→0.85
+                self.scale_exploration("physics_domain_exploit", factor);
+            } else if score > 0.0 && score < 0.2 {
+                // Uncharted territory — boost exploration (scale 1.05–1.10)
+                let factor = 1.0 + (0.2 - score) * 0.5; // 0.0→1.10, 0.2→1.00
+                self.scale_exploration("physics_domain_explore", factor);
+            }
+        }
+
         // Self-reflection
         self.self_model_tier.self_reflection.record_cycle(
             prediction_error,

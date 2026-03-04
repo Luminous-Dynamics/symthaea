@@ -39,6 +39,10 @@ pub(crate) struct PhysicsIntegration {
     last_effective_blend: f32,
     pareto_context: Option<ParetoContext>,
     encoder: Option<crate::spark_physics_bridge::DesignPointEncoder>,
+    /// Top similarity score from last query (0.0 if no query yet).
+    pub(crate) last_top_score: f32,
+    /// Top domain from last query (empty if no query yet).
+    pub(crate) last_top_domain: String,
 }
 
 #[cfg(feature = "physics-bridge")]
@@ -50,6 +54,8 @@ impl std::fmt::Debug for PhysicsIntegration {
             .field("last_effective_interval", &self.last_effective_interval)
             .field("last_effective_blend", &self.last_effective_blend)
             .field("has_encoder", &self.encoder.is_some())
+            .field("last_top_score", &self.last_top_score)
+            .field("last_top_domain", &self.last_top_domain)
             .finish()
     }
 }
@@ -65,6 +71,8 @@ impl PhysicsIntegration {
             last_effective_blend: 0.0,
             pareto_context: None,
             encoder: None,
+            last_top_score: 0.0,
+            last_top_domain: String::new(),
         }
     }
 
@@ -175,10 +183,17 @@ impl PhysicsIntegration {
             None => return true, // queried but no usable result
         };
 
-        // Blend physics HV into compressed_state at low weight.
-        // compress_for_ltc stride-samples at indices 0, stride, 2*stride, ...
-        // so we must sample the physics HV at the same stride to align dimensions.
-        let w = effective_blend;
+        // Capture top result metadata for feedback loops.
+        if let Some(top) = self.bridge.last_results().first() {
+            self.last_top_score = top.score;
+            self.last_top_domain = format!("{:?}", top.domain);
+        }
+
+        // Blend physics HV into compressed_state, weighted by similarity score.
+        // Low-similarity results barely influence the state; high-similarity
+        // results blend at full effective weight.
+        let w = effective_blend * self.last_top_score.clamp(0.0, 1.0);
+        self.last_effective_blend = w; // update to reflect score-weighted value
         let physics_vals = &physics_hv.values;
         let stride = if physics_vals.len() > compressed_state.len() {
             physics_vals.len() / compressed_state.len()
@@ -243,8 +258,8 @@ mod tests {
 
     #[test]
     fn test_stride_alignment() {
-        // With blend_weight=1.0 the output should be exactly the stride-sampled
-        // physics HV, verifying that the blend reads the correct elements.
+        // With blend_weight=1.0, state[i] = top_score * physics_hv[i*stride]
+        // (score-weighted blend from zero initial state).
         let mut pi = PhysicsIntegration::new();
         let hv = symthaea_core::hdc::BinaryHV::random(42);
         let compressed_len = 256;
@@ -256,14 +271,17 @@ mod tests {
 
         // The physics HV is 16,384-D; compressed_state is 256-D.
         // stride = 16384 / 256 = 64
+        // effective weight = 1.0 * top_score (score-weighted blend)
+        let w = pi.last_effective_blend;
+        assert!(w > 0.0, "Blend weight should be > 0 after successful query");
         if let Some(phv) = pi.last_physics_hv() {
             let stride = phv.values.len() / compressed_len;
             assert_eq!(stride, 64, "Expected stride of 64 for 16384→256 compression");
             for i in 0..compressed_len {
-                let expected = phv.values[i * stride];
+                let expected = w * phv.values[i * stride];
                 assert!(
                     (state[i] - expected).abs() < 1e-6,
-                    "state[{i}] = {} but expected physics_hv[{}] = {expected}",
+                    "state[{i}] = {} but expected w*physics_hv[{}] = {expected} (w={w})",
                     state[i],
                     i * stride,
                 );
@@ -316,32 +334,43 @@ mod tests {
 
     #[test]
     fn test_tau_boosts_blend() {
-        let mut pi = PhysicsIntegration::new();
+        let mut pi_base = PhysicsIntegration::new();
+        let mut pi_fast = PhysicsIntegration::new();
         let hv = symthaea_core::hdc::BinaryHV::random(42);
-        let mut state = vec![0.5f32; 32];
+        let mut state_base = vec![0.5f32; 32];
+        let mut state_fast = vec![0.5f32; 32];
 
-        // base_blend=0.1, tau=2.0 → effective_blend = 0.1 * 2.0 * 1.0 = 0.2
-        pi.query_cycle(0, 1, 0.1, 2.0, 0.0, &hv, &mut state);
+        // tau=1.0 vs tau=2.0: faster substrate should blend more aggressively.
+        // Score-weighting (top_score) is identical for both since same query HV.
+        pi_base.query_cycle(0, 1, 0.1, 1.0, 0.0, &hv, &mut state_base);
+        pi_fast.query_cycle(0, 1, 0.1, 2.0, 0.0, &hv, &mut state_fast);
         assert!(
-            (pi.last_effective_blend - 0.2).abs() < 1e-6,
-            "tau=2.0 should double blend: expected 0.2, got {}",
-            pi.last_effective_blend,
+            pi_fast.last_effective_blend > pi_base.last_effective_blend,
+            "tau=2.0 should produce higher blend than tau=1.0: {} vs {}",
+            pi_fast.last_effective_blend, pi_base.last_effective_blend,
         );
+        // Both should be score-weighted (≤ substrate-modulated value)
+        assert!(pi_fast.last_effective_blend <= 0.2 + 1e-6,
+            "score-weighted blend should be ≤ substrate-modulated 0.2, got {}",
+            pi_fast.last_effective_blend);
     }
 
     #[test]
     fn test_scale_pressure_further_boosts_blend() {
-        let mut pi = PhysicsIntegration::new();
+        let mut pi_no_sp = PhysicsIntegration::new();
+        let mut pi_sp = PhysicsIntegration::new();
         let hv = symthaea_core::hdc::BinaryHV::random(42);
-        let mut state = vec![0.5f32; 32];
+        let mut state_no = vec![0.5f32; 32];
+        let mut state_sp = vec![0.5f32; 32];
 
-        // base_blend=0.1, tau=2.0, scale_pressure=1.0
-        // → effective_blend = 0.1 * 2.0 * (1.0 + 1.0 * 0.1) = 0.1 * 2.0 * 1.1 = 0.22
-        pi.query_cycle(0, 1, 0.1, 2.0, 1.0, &hv, &mut state);
+        // Same tau=2.0, but scale_pressure=0.0 vs 1.0:
+        // scale_pressure should further boost the blend.
+        pi_no_sp.query_cycle(0, 1, 0.1, 2.0, 0.0, &hv, &mut state_no);
+        pi_sp.query_cycle(0, 1, 0.1, 2.0, 1.0, &hv, &mut state_sp);
         assert!(
-            (pi.last_effective_blend - 0.22).abs() < 1e-4,
-            "scale_pressure=1.0 should further boost blend: expected 0.22, got {}",
-            pi.last_effective_blend,
+            pi_sp.last_effective_blend > pi_no_sp.last_effective_blend,
+            "scale_pressure=1.0 should boost blend beyond scale_pressure=0.0: {} vs {}",
+            pi_sp.last_effective_blend, pi_no_sp.last_effective_blend,
         );
     }
 
@@ -405,5 +434,43 @@ mod tests {
         let hv = result.unwrap();
         assert_eq!(hv.values.len(), 16_384);
         assert!(hv.values.iter().all(|v| v.is_finite()));
+    }
+
+    // ── Score-weighted blend tests ──
+
+    #[test]
+    fn test_score_weighted_blend_bounded() {
+        let mut pi = PhysicsIntegration::new();
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let mut state = vec![0.5f32; 32];
+
+        // Query with high blend weight — result should be ≤ effective_blend
+        // because top_score ∈ [0, 1] acts as a multiplier.
+        pi.query_cycle(0, 1, 0.9, 1.0, 0.0, &hv, &mut state);
+        assert!(
+            pi.last_effective_blend <= 0.9 + 1e-6,
+            "Score-weighted blend should be ≤ base blend: got {}",
+            pi.last_effective_blend,
+        );
+        assert!(
+            pi.last_effective_blend >= 0.0,
+            "Score-weighted blend should be ≥ 0: got {}",
+            pi.last_effective_blend,
+        );
+    }
+
+    #[test]
+    fn test_last_top_score_populated_after_query() {
+        let mut pi = PhysicsIntegration::new();
+        let hv = symthaea_core::hdc::BinaryHV::random(42);
+        let mut state = vec![0.5f32; 32];
+
+        assert_eq!(pi.last_top_score, 0.0, "top_score should be 0.0 before any query");
+        assert!(pi.last_top_domain.is_empty(), "top_domain should be empty before any query");
+
+        pi.query_cycle(0, 1, 0.1, 1.0, 0.0, &hv, &mut state);
+
+        assert!(pi.last_top_score > 0.0, "top_score should be > 0 after query");
+        assert!(!pi.last_top_domain.is_empty(), "top_domain should be non-empty after query");
     }
 }
