@@ -162,7 +162,7 @@ impl VideoSource for WebcamSource {
         // Generate synthetic frame data with some temporal variation
         let width = self.config.width;
         let height = self.config.height;
-        let size = (width * height * 3) as usize;
+        let size = (width as usize) * (height as usize) * 3;
 
         // Create a pattern that changes over time (for testing temporal detection)
         let phase = (self.sequence as f32 * 0.1).sin();
@@ -299,7 +299,7 @@ impl MockVideoSource {
     fn generate_frame(&mut self) -> Frame {
         let width = self.config.width;
         let height = self.config.height;
-        let size = (width * height * 3) as usize;
+        let size = (width as usize) * (height as usize) * 3;
         let seq = self.sequence;
 
         let fps = self.config.fps as f32;

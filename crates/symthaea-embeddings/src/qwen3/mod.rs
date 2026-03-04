@@ -349,7 +349,7 @@ fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
                             .max_dim(1)
                             .squeeze(1)
                     }
-                    PoolingStrategy::MeanPooling => unreachable!(),
+                    PoolingStrategy::MeanPooling => unreachable!("MeanPooling handled in vectorized batch path above"),
                 };
                 rows.push(row);
             }

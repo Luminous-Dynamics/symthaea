@@ -495,7 +495,11 @@ impl ConsciousnessTopology {
 
         // Calculate number of nodes
         // Geometric series: sum_{i=0}^{depth} branching^i = (branching^(depth+1) - 1) / (branching - 1)
-        let n_nodes = (branching.pow((depth + 1) as u32) - 1) / (branching - 1);
+        let n_nodes = branching
+            .checked_pow((depth + 1) as u32)
+            .and_then(|p| p.checked_sub(1))
+            .map(|v| v / (branching - 1))
+            .expect("Branching^(depth+1) overflows usize — reduce depth or branching");
 
         assert!(
             n_nodes <= 10000,

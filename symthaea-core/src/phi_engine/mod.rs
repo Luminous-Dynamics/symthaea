@@ -211,7 +211,7 @@ impl PhiEngine {
                 let result = calc.compute(&real_hvs);
                 (result.phi, "Resonator")
             }
-            PhiMethod::Auto => unreachable!(),
+            PhiMethod::Auto => unreachable!("Auto resolved to concrete method above"),
         };
 
         // Wrap in PhiResult with appropriate category
@@ -219,7 +219,7 @@ impl PhiEngine {
             PhiMethod::SpectralConnectivity => result::PhiCategory::SpectralConnectivity,
             PhiMethod::Tiered(_) => result::PhiCategory::IntegratedInformation,
             PhiMethod::Resonator => result::PhiCategory::SpectralConnectivity,
-            PhiMethod::Auto => unreachable!(),
+            PhiMethod::Auto => unreachable!("Auto resolved to concrete method above"),
         };
         result::PhiResult::new(phi_value, method_name, n_nodes).with_category(category)
     }
@@ -249,7 +249,7 @@ impl PhiEngine {
             }
             PhiMethod::Tiered(ApproximationTier::ExhaustivePartition) => {
                 // O(2^n) scaling: exponential
-                Duration::from_secs(2u64.pow(n_nodes as u32 - 8))
+                Duration::from_secs(2u64.saturating_pow((n_nodes as u32).saturating_sub(8)))
             }
             PhiMethod::Tiered(ApproximationTier::SpectralConnectivity) => {
                 // Similar to SpectralConnectivity
@@ -260,7 +260,7 @@ impl PhiEngine {
                 // Heuristic/Mock are fast
                 Duration::from_micros(100)
             }
-            PhiMethod::Auto => unreachable!(),
+            PhiMethod::Auto => unreachable!("Auto resolved to concrete method above"),
         }
     }
 }
