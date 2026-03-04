@@ -203,10 +203,15 @@ impl CognitiveLoopService {
         let mut learning_occurred = false;
         let mut training_loss = None;
         if self.config.enable_consolidation && self.stats.total_cycles % 50 == 0 {
-            if let Ok(loss) = self.consolidate() {
-                if loss > 0.0 {
-                    learning_occurred = true;
-                    training_loss = Some(loss);
+            match self.consolidate() {
+                Ok(loss) => {
+                    if loss > 0.0 {
+                        learning_occurred = true;
+                        training_loss = Some(loss);
+                    }
+                }
+                Err(e) => {
+                    tracing::debug!(error = %e, cycle = self.stats.total_cycles, "Consolidation failed");
                 }
             }
         }

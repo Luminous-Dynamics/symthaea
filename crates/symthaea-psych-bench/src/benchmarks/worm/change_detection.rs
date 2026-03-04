@@ -117,11 +117,11 @@ impl ChangeDetectionBenchmark {
         let probe_bundle = ContinuousHV::bundle_owned(&probe_hvs);
 
         // Compare original bundle (as remembered by WM) with probe
-        let contents = wm.contents();
+        let contents: Vec<_> = wm.contents().iter().cloned().collect();
         let wm_bundle = if contents.is_empty() {
             ContinuousHV::zero(dim)
         } else {
-            ContinuousHV::bundle_owned(contents)
+            ContinuousHV::bundle_owned(&contents)
         };
 
         // Encoding noise degrades WM representation fidelity

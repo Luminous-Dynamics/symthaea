@@ -3,6 +3,8 @@
 //! Provides memory encoding, recall, consolidation, and decay for cognitive cycles.
 //! Can be connected to the full HippocampusActor for persistence.
 
+use std::collections::VecDeque;
+
 use serde::{Deserialize, Serialize};
 
 /// Episodic memory trace for the cognitive loop
@@ -57,7 +59,7 @@ impl EpisodicMemory {
 #[derive(Debug, Clone)]
 pub struct EpisodicMemoryBridge {
     /// Short-term memory buffer (recent cycles)
-    short_term: Vec<EpisodicMemory>,
+    short_term: VecDeque<EpisodicMemory>,
     /// Long-term memory store
     long_term: Vec<EpisodicMemory>,
     /// Maximum short-term memories
@@ -84,7 +86,7 @@ pub struct MemoryBridgeStats {
 impl Default for EpisodicMemoryBridge {
     fn default() -> Self {
         Self {
-            short_term: Vec::with_capacity(100),
+            short_term: VecDeque::with_capacity(100),
             long_term: Vec::with_capacity(1000),
             max_short_term: 100,
             max_long_term: 1000,
@@ -122,7 +124,7 @@ impl EpisodicMemoryBridge {
         // Add to short-term
         if self.short_term.len() >= self.max_short_term {
             // Consolidate oldest to long-term if strong enough
-            if let Some(oldest) = self.short_term.first() {
+            if let Some(oldest) = self.short_term.front() {
                 if oldest.strength >= self.consolidation_threshold {
                     self.long_term.push(oldest.clone());
                     self.stats.consolidations += 1;
@@ -145,9 +147,9 @@ impl EpisodicMemoryBridge {
                     }
                 }
             }
-            self.short_term.remove(0);
+            self.short_term.pop_front();
         }
-        self.short_term.push(memory);
+        self.short_term.push_back(memory);
         self.stats.total_encoded += 1;
 
         id

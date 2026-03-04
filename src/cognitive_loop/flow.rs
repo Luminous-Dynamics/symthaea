@@ -180,7 +180,7 @@ impl FlowState {
                 // Start flow timer if just entering
                 if !was_in_flow {
                     self.flow_started_at = Some(Instant::now());
-                    self.flow_periods += 1;
+                    self.flow_periods = self.flow_periods.saturating_add(1);
                 }
 
                 // Intensity grows with streak (caps at 1.0)

@@ -3,6 +3,8 @@
 //! Determines cognitive depth (Reflex/Cortical/DeepThought) based on input
 //! characteristics, and tracks prediction-outcome coupling quality.
 
+use std::collections::VecDeque;
+
 use serde::{Deserialize, Serialize};
 
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
@@ -51,7 +53,7 @@ pub struct ThalamicRouter {
     pub familiarity_threshold: f32,
 
     /// Recent routing decisions for pattern analysis
-    routing_history: Vec<CognitiveDepth>,
+    routing_history: VecDeque<CognitiveDepth>,
 
     /// Maximum history size
     max_history: usize,
@@ -63,7 +65,7 @@ impl Default for ThalamicRouter {
             novelty_threshold: 0.7,
             urgency_threshold: 0.8,
             familiarity_threshold: 0.3,
-            routing_history: Vec::with_capacity(100),
+            routing_history: VecDeque::with_capacity(100),
             max_history: 100,
         }
     }
@@ -106,9 +108,9 @@ impl ThalamicRouter {
 
         // Record history
         if self.routing_history.len() >= self.max_history {
-            self.routing_history.remove(0);
+            self.routing_history.pop_front();
         }
-        self.routing_history.push(depth);
+        self.routing_history.push_back(depth);
 
         depth
     }
@@ -216,9 +218,9 @@ impl ThalamicRouter {
 
         // Record history
         if self.routing_history.len() >= self.max_history {
-            self.routing_history.remove(0);
+            self.routing_history.pop_front();
         }
-        self.routing_history.push(depth);
+        self.routing_history.push_back(depth);
 
         depth
     }
@@ -325,10 +327,10 @@ impl CouplingQuality {
 #[derive(Debug, Clone)]
 pub struct ActiveInferenceBridge {
     /// Recent confidence values (phase signal)
-    confidence_history: Vec<f64>,
+    confidence_history: VecDeque<f64>,
 
     /// Recent outcomes (amplitude signal)
-    outcome_history: Vec<f64>,
+    outcome_history: VecDeque<f64>,
 
     /// Window size for coupling computation
     window_size: usize,
@@ -350,8 +352,8 @@ impl ActiveInferenceBridge {
     /// Create with default configuration
     pub fn with_defaults() -> Self {
         Self {
-            confidence_history: Vec::with_capacity(100),
-            outcome_history: Vec::with_capacity(100),
+            confidence_history: VecDeque::with_capacity(100),
+            outcome_history: VecDeque::with_capacity(100),
             window_size: 100,
             min_data_points: 10,
             total_observations: 0,
@@ -367,16 +369,16 @@ impl ActiveInferenceBridge {
 
         // Track confidence
         if self.confidence_history.len() >= self.window_size {
-            self.confidence_history.remove(0);
+            self.confidence_history.pop_front();
         }
-        self.confidence_history.push(confidence);
+        self.confidence_history.push_back(confidence);
 
         // Track outcome
         let outcome = if success { 1.0 } else { 0.0 };
         if self.outcome_history.len() >= self.window_size {
-            self.outcome_history.remove(0);
+            self.outcome_history.pop_front();
         }
-        self.outcome_history.push(outcome);
+        self.outcome_history.push_back(outcome);
     }
 
     /// Compute the Modulation Index (simplified PAC)

@@ -697,7 +697,7 @@ impl ReplSession {
                 .map(|t| t.consciousness.in_flow)
                 .unwrap_or(false)
         {
-            self.stats.flow_periods += 1;
+            self.stats.flow_periods = self.stats.flow_periods.saturating_add(1);
         }
         self.stats.total_flow_time_secs = snapshot.total_flow_time_secs;
 
