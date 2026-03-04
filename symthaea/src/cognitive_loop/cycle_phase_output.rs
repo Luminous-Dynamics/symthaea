@@ -416,6 +416,7 @@ impl CognitiveLoopService {
         {
             if let Some(ref mut physics) = self.physics_integration {
                 let pt = physics.telemetry();
+                let pareto = pt.pareto_context.as_ref();
                 metadata.physics_bridge = Some(super::PhysicsBridgeTelemetry {
                     catalog_size: pt.catalog_size,
                     results_returned: pt.results_returned,
@@ -423,6 +424,11 @@ impl CognitiveLoopService {
                     top_score: pt.top_score,
                     query_count: pt.query_count,
                     queried_this_cycle: pt.queried_this_cycle,
+                    effective_interval: pt.effective_interval,
+                    effective_blend_weight: pt.effective_blend_weight,
+                    top_domain: pt.top_domain,
+                    pareto_frontier_size: pareto.map(|p| p.frontier_size),
+                    pareto_best_analogy: pareto.map(|p| p.best_analogy_score),
                 });
             }
         }
@@ -440,6 +446,11 @@ impl CognitiveLoopService {
                 training_triggered: tel.training_triggered,
                 scene_recognition_similarity: tel.scene_recognition_similarity,
                 cross_manifold_prediction_error: perception.cross_manifold_prediction_error,
+                encode_time_us: tel.encode_time_us,
+                evolve_time_us: tel.evolve_time_us,
+                vision_mean_surprise: perception.vision_mean_surprise,
+                vision_horizon_errors: perception.vision_horizon_errors.clone(),
+                scene_recognized: perception.scene_recognized,
             });
         }
 
@@ -462,6 +473,9 @@ impl CognitiveLoopService {
                             effective_max_concurrent: fov.effective_max_concurrent(),
                             recognition_count: perception.foveation_recognition_count,
                             top_recognition_confidence: perception.foveation_top_confidence,
+                            hv_binding_applied: perception.foveation_recognition_count > 0,
+                            dynamics_coupling_triggered: perception.foveation_recognition_count >= 2
+                                && perception.foveation_top_confidence > 0.6,
                         });
                 }
             }

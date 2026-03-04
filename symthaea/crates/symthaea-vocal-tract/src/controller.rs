@@ -232,6 +232,8 @@ pub struct VocalTractController {
     /// Cached cognitive channels from the pipeline (updated at 10Hz, used at 200Hz).
     /// Index 7 = consciousness_level, used for bandwidth modulation.
     cached_cognitive_channels: Option<[f32; 12]>,
+    /// Emphasis factor from FEP agent (1.0 = neutral, >1 = more assertive).
+    emphasis_factor: f32,
 }
 
 impl VocalTractController {
@@ -308,6 +310,7 @@ impl VocalTractController {
             smoothing_alpha: config.smoothing_alpha,
             max_formant_delta: config.max_formant_delta,
             cached_cognitive_channels: None,
+            emphasis_factor: 1.0,
         }
     }
 
@@ -403,6 +406,15 @@ impl VocalTractController {
             frame.b1 *= bandwidth_scale;
             frame.b2 *= bandwidth_scale;
             frame.b3 *= bandwidth_scale;
+        }
+
+        // FEP emphasis modulation: higher emphasis → more energy, tighter bandwidths
+        if (self.emphasis_factor - 1.0).abs() > 1e-4 {
+            frame.energy = (frame.energy * self.emphasis_factor).clamp(0.0, 1.0);
+            let bw_scale = 1.0 / self.emphasis_factor.sqrt();
+            frame.b1 *= bw_scale;
+            frame.b2 *= bw_scale;
+            frame.b3 *= bw_scale;
         }
 
         frame
@@ -632,6 +644,19 @@ impl VocalTractController {
     /// Get configuration.
     pub fn config(&self) -> &VocalTractConfig {
         &self.config
+    }
+
+    /// Set emphasis factor (FEP-driven articulation assertiveness).
+    ///
+    /// - `factor > 1.0`: more assertive (higher energy, tighter bandwidths)
+    /// - `factor < 1.0`: less assertive (lower energy, wider bandwidths)
+    pub fn set_emphasis(&mut self, factor: f32) {
+        self.emphasis_factor = factor.clamp(0.5, 2.0);
+    }
+
+    /// Get current emphasis factor.
+    pub fn emphasis_factor(&self) -> f32 {
+        self.emphasis_factor
     }
 
     /// Forward pass with prosody head: evolve network then apply learned prosody corrections.

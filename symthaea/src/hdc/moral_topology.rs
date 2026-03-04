@@ -66,6 +66,12 @@ impl Default for MoralTopologyConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MoralAnomalyConfig {
     /// Moral drift threshold for drift_alert flag (default: 0.25).
+    ///
+    /// Measured as L2 distance between mean harmony coordinates of the first
+    /// and second halves of the last 20 trajectory points. Harmony coordinates
+    /// are normalized 7D projections from HarmonyBasis (softmax outputs, so
+    /// each axis ∈ [0,1] and sum ≈ 1.0). Typical drift values range 0.0–0.5;
+    /// values above 0.3 indicate significant moral trajectory change.
     pub drift_alert_threshold: f64,
     /// Sigma multiplier for free energy spike detection (default: 2.0).
     pub fe_sigma_multiplier: f64,
@@ -87,7 +93,7 @@ pub struct MoralAnomalyConfig {
     pub cadence_drift_high: f64,
     /// Drift threshold for moderate cadence (default: 0.1).
     pub cadence_drift_moderate: f64,
-    /// Enable adaptive self-tuning of drift and FE thresholds (default: false).
+    /// Enable adaptive self-tuning of drift and FE thresholds (default: true).
     ///
     /// When enabled, the system learns from its own trajectory history:
     /// - `drift_alert_threshold` adapts to `ema_drift + adaptive_sigma_factor * σ(drift)`
@@ -97,12 +103,41 @@ pub struct MoralAnomalyConfig {
     /// tightens sensitivity in stable ones.
     pub adaptive_enabled: bool,
     /// EMA smoothing factor for adaptive threshold learning (default: 0.02).
-    /// Lower = slower adaptation, more stable thresholds.
+    /// Valid range: (0.0, 1.0). Lower = slower adaptation, more stable thresholds.
+    /// Values near 0.0 (e.g. 0.001) make thresholds nearly static; values near
+    /// 1.0 (e.g. 0.99) track recent observations aggressively.
     pub adaptive_alpha: f64,
     /// Sigma factor for adaptive drift threshold: `μ + factor * σ` (default: 2.0).
     pub adaptive_sigma_factor: f64,
     /// Minimum warmup evaluations before adaptive thresholds activate (default: 20).
     pub adaptive_warmup: usize,
+
+    // ── Anomaly response magnitudes ──────────────────────────────────────
+    // Applied multiplicatively in cycle_strategy.rs when multiple anomalies
+    // trigger simultaneously (e.g. inversion + drift → lr *= 1.3 * 0.85 = 1.105).
+
+    /// Learning rate scale for value inversion response (default: 1.3).
+    ///
+    /// Applied via `lr *= 1.0 + (response_lr_inversion - 1.0) * anomaly_score`.
+    /// Values > 1.0 accelerate learning to adapt to moral reorientation.
+    pub response_lr_inversion: f64,
+    /// Exploration urge delta for free energy spike response (default: 0.15).
+    ///
+    /// Applied via `exploration_urge += response_exploration_fe * anomaly_score`
+    /// (additive delta to exploration budget). Positive values boost exploration
+    /// when FE spikes; negative values suppress it (unusual but valid for
+    /// conservative systems that should retrench under moral surprise).
+    pub response_exploration_fe: f64,
+    /// Confidence delta for fragmentation increase response (default: -0.1).
+    ///
+    /// Applied via `prediction_confidence += response_confidence_frag * anomaly_score`
+    /// (additive; negative = reduce confidence during moral fragmentation).
+    pub response_confidence_frag: f64,
+    /// Learning rate scale for drift alert response (default: 0.85).
+    ///
+    /// Applied via `lr *= 1.0 + (response_lr_drift - 1.0) * anomaly_score`.
+    /// Values < 1.0 dampen learning to stabilize drifting moral topology.
+    pub response_lr_drift: f64,
 }
 
 impl Default for MoralAnomalyConfig {
@@ -119,11 +154,88 @@ impl Default for MoralAnomalyConfig {
             cadence_slow: 120,
             cadence_drift_high: 0.3,
             cadence_drift_moderate: 0.1,
-            adaptive_enabled: false,
+            adaptive_enabled: true,
             adaptive_alpha: 0.02,
             adaptive_sigma_factor: 2.0,
             adaptive_warmup: 20,
+            response_lr_inversion: 1.3,
+            response_exploration_fe: 0.15,
+            response_confidence_frag: -0.1,
+            response_lr_drift: 0.85,
         }
+    }
+}
+
+impl MoralAnomalyConfig {
+    /// Validate anomaly configuration parameters.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.drift_alert_threshold <= 0.0 || !self.drift_alert_threshold.is_finite() {
+            return Err(format!(
+                "MoralAnomalyConfig: drift_alert_threshold must be positive and finite, got {}",
+                self.drift_alert_threshold
+            ));
+        }
+        if self.fe_sigma_multiplier <= 0.0 || !self.fe_sigma_multiplier.is_finite() {
+            return Err(format!(
+                "MoralAnomalyConfig: fe_sigma_multiplier must be positive and finite, got {}",
+                self.fe_sigma_multiplier
+            ));
+        }
+        // Weights must be non-negative (zero = disabled)
+        for (name, val) in [
+            ("weight_value_inversion", self.weight_value_inversion),
+            ("weight_fe_spike", self.weight_fe_spike),
+            ("weight_fragmentation", self.weight_fragmentation),
+            ("weight_drift", self.weight_drift),
+        ] {
+            if val < 0.0 || !val.is_finite() {
+                return Err(format!(
+                    "MoralAnomalyConfig: {name} must be >= 0.0 and finite, got {val}"
+                ));
+            }
+        }
+        // Cadence values must be positive (0 would fire topology every cycle)
+        if self.cadence_fast == 0 || self.cadence_moderate == 0 || self.cadence_slow == 0 {
+            return Err(format!(
+                "MoralAnomalyConfig: cadence values must be > 0, got fast={}, moderate={}, slow={}",
+                self.cadence_fast, self.cadence_moderate, self.cadence_slow
+            ));
+        }
+        // Cadence ordering: fast < moderate < slow
+        if self.cadence_fast >= self.cadence_moderate || self.cadence_moderate >= self.cadence_slow {
+            return Err(format!(
+                "MoralAnomalyConfig: cadence_fast ({}) < cadence_moderate ({}) < cadence_slow ({}) required",
+                self.cadence_fast, self.cadence_moderate, self.cadence_slow
+            ));
+        }
+        // Adaptive parameters (only validated when adaptive is enabled)
+        if self.adaptive_enabled {
+            if self.adaptive_alpha <= 0.0 || self.adaptive_alpha >= 1.0 || !self.adaptive_alpha.is_finite() {
+                return Err(format!(
+                    "MoralAnomalyConfig: adaptive_alpha must be in (0.0, 1.0), got {}",
+                    self.adaptive_alpha
+                ));
+            }
+            if self.adaptive_warmup == 0 {
+                return Err(
+                    "MoralAnomalyConfig: adaptive_warmup must be > 0 when adaptive_enabled".into()
+                );
+            }
+        }
+        // Response magnitudes must be finite
+        for (name, val) in [
+            ("response_lr_inversion", self.response_lr_inversion),
+            ("response_exploration_fe", self.response_exploration_fe),
+            ("response_confidence_frag", self.response_confidence_frag),
+            ("response_lr_drift", self.response_lr_drift),
+        ] {
+            if !val.is_finite() {
+                return Err(format!(
+                    "MoralAnomalyConfig: {name} must be finite, got {val}"
+                ));
+            }
+        }
+        Ok(())
     }
 }
 
@@ -174,6 +286,10 @@ impl AdaptiveAnomalyState {
         free_energy: f64,
         config: &MoralAnomalyConfig,
     ) -> bool {
+        // Guard: non-finite inputs would corrupt EMA state permanently
+        let drift = if drift.is_finite() { drift } else { 0.0 };
+        let free_energy = if free_energy.is_finite() { free_energy } else { 0.0 };
+
         let alpha = config.adaptive_alpha;
         self.observations += 1;
 
@@ -195,9 +311,11 @@ impl AdaptiveAnomalyState {
         // Compute adaptive drift threshold: mean + sigma_factor * std_dev
         let drift_std = self.drift_var_ema.sqrt();
         let adaptive_drift = self.drift_ema + config.adaptive_sigma_factor * drift_std;
-        // Clamp: never below 0.05 (always catch extreme drift),
-        // never above 0.8 (never become completely insensitive)
-        self.effective_drift_threshold = adaptive_drift.clamp(0.05, 0.8);
+        // Clamp: never below 50% of the user's configured baseline (prevents
+        // adaptive loosening from silencing detection entirely), and never
+        // above 0.8 (never become completely insensitive).
+        let floor = (config.drift_alert_threshold * 0.5).max(0.05);
+        self.effective_drift_threshold = adaptive_drift.clamp(floor, 0.8);
 
         // Compute adaptive FE sigma: scale based on observed FE variance.
         // If FE variance is naturally high, use a higher multiplier (less sensitive).
@@ -305,6 +423,13 @@ pub struct MoralTopology {
     anomaly_config: MoralAnomalyConfig,
     window: VecDeque<ContinuousHV>,
     basis: Arc<HarmonyBasis>,
+    /// Summary from the PREVIOUS `analyze()` call (for anomaly detection comparisons).
+    ///
+    /// Without this, `detect_anomalies()` compares `current_summary` against
+    /// `last_summary`, which `analyze()` already overwrote to the same value —
+    /// making `value_inversion` and `fragmentation_increase` always false.
+    prev_summary: MoralTopologySummary,
+    /// Summary from the LATEST `analyze()` call.
     last_summary: MoralTopologySummary,
     /// EMA of harmony coordinates (running prior for moral free energy).
     harmony_prior: [f64; 7],
@@ -371,6 +496,7 @@ impl MoralTopology {
             anomaly_config: MoralAnomalyConfig::default(),
             window: VecDeque::new(),
             basis,
+            prev_summary: MoralTopologySummary::default(),
             last_summary: MoralTopologySummary::default(),
             harmony_prior: [0.0; 7],
             prior_count: 0,
@@ -394,6 +520,7 @@ impl MoralTopology {
             anomaly_config,
             window: VecDeque::new(),
             basis,
+            prev_summary: MoralTopologySummary::default(),
             last_summary: MoralTopologySummary::default(),
             harmony_prior: [0.0; 7],
             prior_count: 0,
@@ -445,6 +572,14 @@ impl MoralTopology {
     /// Access the last computed summary.
     pub fn last_summary(&self) -> &MoralTopologySummary {
         &self.last_summary
+    }
+
+    /// Access the previous topology summary (from the analyze() call before last).
+    /// Used internally by detect_anomalies() via self.prev_summary field; this
+    /// public accessor exists for test inspection and debugging.
+    #[allow(dead_code)]
+    pub fn prev_summary(&self) -> &MoralTopologySummary {
+        &self.prev_summary
     }
 
     /// Access the shared harmony basis.
@@ -508,7 +643,9 @@ impl MoralTopology {
     /// Thresholds and weights are drawn from `self.anomaly_config`.
     /// When `adaptive_enabled`, thresholds are dynamically tuned from experience.
     pub fn detect_anomalies(&mut self, current_summary: &MoralTopologySummary) -> MoralAnomalyReport {
-        let prev = &self.last_summary;
+        // Compare against the PREVIOUS analyze() result, not last_summary
+        // (which analyze() already overwrote to match current_summary).
+        let prev = &self.prev_summary;
         let ac = &self.anomaly_config;
 
         // Resolve effective thresholds: adaptive or static
@@ -521,13 +658,20 @@ impl MoralTopology {
             (ac.drift_alert_threshold, ac.fe_sigma_multiplier)
         };
 
-        // Value inversion: dominant harmony axis changed
-        let value_inversion =
-            prev.scenario_count > 0 && current_summary.dominant_harmony != prev.dominant_harmony;
+        // Value inversion: dominant harmony axis changed.
+        // Require >= 4 scenarios so the PGA dominant axis is statistically meaningful.
+        let value_inversion = prev.scenario_count >= 4
+            && current_summary.dominant_harmony != prev.dominant_harmony;
 
-        // Free energy spike: > fe_sigma × σ from rolling mean
+        // Free energy spike: > fe_sigma × σ from rolling mean.
+        // Guard against NaN/infinity in moral_free_energy.
         let fe_spike = {
             let points: Vec<_> = self.trajectory.iter().collect();
+            let fe_current = if current_summary.moral_free_energy.is_finite() {
+                current_summary.moral_free_energy
+            } else {
+                0.0 // treat NaN/infinity as prior (no spike)
+            };
             if points.len() >= 4 {
                 let mean_fe =
                     points.iter().map(|p| p.free_energy).sum::<f64>() / points.len() as f64;
@@ -537,15 +681,16 @@ impl MoralTopology {
                     .sum::<f64>()
                     / points.len() as f64;
                 let sigma = var.sqrt().max(1e-9);
-                (current_summary.moral_free_energy - mean_fe).abs() > fe_sigma * sigma
+                (fe_current - mean_fe).abs() > fe_sigma * sigma
             } else {
                 false
             }
         };
 
-        // Fragmentation: β₀ increased (more disconnected components)
+        // Fragmentation: β₀ increased (more disconnected components).
+        // Require >= 4 scenarios so β₀ reflects actual topology, not noise.
         let fragmentation_increase =
-            prev.scenario_count > 0 && current_summary.beta_0 > prev.beta_0;
+            prev.scenario_count >= 4 && current_summary.beta_0 > prev.beta_0;
 
         // Drift alert
         let drift = self.moral_drift(20);
@@ -606,7 +751,10 @@ impl MoralTopology {
                 scenario_count: 0,
                 moral_free_energy: MoralFreeEnergy::default(),
             };
-            self.last_summary = MoralTopologySummary::from(&assessment);
+            self.prev_summary = std::mem::replace(
+                &mut self.last_summary,
+                MoralTopologySummary::from(&assessment),
+            );
             return assessment;
         }
 
@@ -734,7 +882,10 @@ impl MoralTopology {
             scenario_count: n,
             moral_free_energy,
         };
-        self.last_summary = MoralTopologySummary::from(&assessment);
+        self.prev_summary = std::mem::replace(
+            &mut self.last_summary,
+            MoralTopologySummary::from(&assessment),
+        );
         self.last_persistent_features = assessment.persistent_features.clone();
         assessment
     }
@@ -1498,18 +1649,21 @@ mod tests {
         let encoder = TextHdcEncoder::new(TEST_DIM, 3);
         let mut topo = MoralTopology::new(test_config());
 
-        // Build trajectory and establish a baseline via analyze()
+        // Two analyze() calls so prev_summary has scenario_count >= 4 (warmup guard).
         for _ in 0..10 {
             topo.add_scenario(encoder.encode("caring for the sick and elderly"));
         }
-        let first = topo.analyze();
-        let first_dominant = MoralTopologySummary::from(&first).dominant_harmony;
+        topo.analyze(); // prev = default, last = first
 
-        // Now last_summary holds the first assessment.
-        // Construct a "new" summary with a different dominant harmony —
-        // simulates what would happen if the topology shifted.
+        for _ in 0..10 {
+            topo.add_scenario(encoder.encode("caring for the sick and elderly"));
+        }
+        let second = topo.analyze(); // prev = first (sc>=4), last = second
+        let dominant = MoralTopologySummary::from(&second).dominant_harmony;
+
+        // Construct a "new" summary with a different dominant harmony.
         let mut shifted_summary = topo.last_summary().clone();
-        shifted_summary.dominant_harmony = (first_dominant + 1) % 7;
+        shifted_summary.dominant_harmony = (dominant + 1) % 7;
 
         let report = topo.detect_anomalies(&shifted_summary);
         assert!(
@@ -1626,7 +1780,13 @@ mod tests {
         for i in 0..10 {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 1000 + i));
         }
-        topo.analyze();
+        topo.analyze(); // prev = default, last = first
+
+        // Second analyze() so prev_summary has scenario_count >= 4 (warmup guard).
+        for i in 10..20 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 1000 + i));
+        }
+        topo.analyze(); // prev = first (sc>=4), last = second
 
         let mut inversion = topo.last_summary().clone();
         // Trigger value inversion but not drift
@@ -1654,9 +1814,9 @@ mod tests {
     }
 
     #[test]
-    fn adaptive_config_defaults_disabled() {
+    fn adaptive_config_defaults_enabled() {
         let config = MoralAnomalyConfig::default();
-        assert!(!config.adaptive_enabled);
+        assert!(config.adaptive_enabled);
         assert!((config.adaptive_alpha - 0.02).abs() < f64::EPSILON);
         assert!((config.adaptive_sigma_factor - 2.0).abs() < f64::EPSILON);
         assert_eq!(config.adaptive_warmup, 20);
@@ -1858,5 +2018,227 @@ mod tests {
         // Directly verify the guard expression used in analyze()
         let guarded = 1.0 / (0_usize.max(1) as f64);
         assert_eq!(guarded, 1.0, "beta_0=0 should be guarded to produce 1.0, not infinity");
+    }
+
+    // ── Config validation tests ──────────────────────────────────────────
+
+    #[test]
+    fn anomaly_config_default_validates() {
+        assert!(MoralAnomalyConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn anomaly_config_zero_drift_threshold_rejected() {
+        let mut c = MoralAnomalyConfig::default();
+        c.drift_alert_threshold = 0.0;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn anomaly_config_bad_cadence_ordering_rejected() {
+        let mut c = MoralAnomalyConfig::default();
+        c.cadence_fast = 100;
+        c.cadence_moderate = 50; // fast >= moderate → invalid
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn anomaly_config_nan_response_rejected() {
+        let mut c = MoralAnomalyConfig::default();
+        c.response_lr_drift = f64::NAN;
+        assert!(c.validate().is_err());
+    }
+
+    #[test]
+    fn response_magnitude_defaults() {
+        let c = MoralAnomalyConfig::default();
+        assert!((c.response_lr_inversion - 1.3).abs() < f64::EPSILON);
+        assert!((c.response_exploration_fe - 0.15).abs() < f64::EPSILON);
+        assert!((c.response_confidence_frag - (-0.1)).abs() < f64::EPSILON);
+        assert!((c.response_lr_drift - 0.85).abs() < f64::EPSILON);
+    }
+
+    // ── Extreme input stability test ─────────────────────────────────────
+
+    #[test]
+    fn detect_anomalies_stable_with_nan_free_energy() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 4000 + i));
+        }
+        topo.analyze();
+
+        // Feed summary with NaN free energy — should not panic, should not fire FE spike
+        let mut bad_summary = topo.last_summary().clone();
+        bad_summary.moral_free_energy = f64::NAN;
+        let report = topo.detect_anomalies(&bad_summary);
+        assert!(report.anomaly_score.is_finite(), "anomaly_score must be finite even with NaN input");
+        // NaN is treated as 0.0 (no spike), so free_energy_spike should be false
+        assert!(!report.free_energy_spike, "NaN free energy should not trigger spike");
+    }
+
+    #[test]
+    fn detect_anomalies_stable_with_infinity_free_energy() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 5000 + i));
+        }
+        topo.analyze();
+
+        let mut bad_summary = topo.last_summary().clone();
+        bad_summary.moral_free_energy = f64::INFINITY;
+        let report = topo.detect_anomalies(&bad_summary);
+        assert!(report.anomaly_score.is_finite(), "anomaly_score must be finite even with infinity input");
+    }
+
+    // ── Prev_summary ordering test ───────────────────────────────────────
+
+    #[test]
+    fn prev_summary_tracks_previous_analysis() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 6000 + i));
+        }
+        topo.analyze();
+        let first_sc = topo.last_summary().scenario_count;
+
+        for i in 10..20 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 6000 + i));
+        }
+        topo.analyze();
+
+        // prev_summary should be the first analysis (not default)
+        assert_eq!(
+            topo.prev_summary().scenario_count, first_sc,
+            "prev_summary should hold the first analysis result"
+        );
+    }
+
+    // ── Edge-case tests ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_adaptive_extreme_alpha_near_zero() {
+        // Very low alpha → thresholds barely move from initial values
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: true,
+            adaptive_alpha: 0.001,
+            adaptive_warmup: 3,
+            ..Default::default()
+        };
+        let mut state = AdaptiveAnomalyState::default();
+        for _ in 0..50 {
+            state.observe(0.5, 10.0, &config); // feed high drift/FE
+        }
+        // With alpha=0.001, EMA moves extremely slowly; effective threshold
+        // should still be near initial bounds (clamped to [0.05, 0.8]).
+        assert!(
+            state.effective_drift_threshold >= 0.05,
+            "drift threshold must respect lower clamp"
+        );
+        assert!(
+            state.effective_drift_threshold <= 0.8,
+            "drift threshold must respect upper clamp"
+        );
+    }
+
+    #[test]
+    fn test_adaptive_extreme_alpha_near_one() {
+        // Very high alpha → thresholds track recent observations aggressively
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: true,
+            adaptive_alpha: 0.99,
+            adaptive_warmup: 2,
+            ..Default::default()
+        };
+        let mut state = AdaptiveAnomalyState::default();
+        // Feed low drift first
+        for _ in 0..5 {
+            state.observe(0.01, 0.1, &config);
+        }
+        let low_threshold = state.effective_drift_threshold;
+        // Now spike to high drift
+        for _ in 0..5 {
+            state.observe(0.6, 50.0, &config);
+        }
+        let high_threshold = state.effective_drift_threshold;
+        // With alpha=0.99, threshold should jump quickly to track the spike
+        assert!(
+            high_threshold > low_threshold,
+            "High-alpha adaptive threshold should track drift spike: low={low_threshold:.3}, high={high_threshold:.3}"
+        );
+    }
+
+    #[test]
+    fn test_all_zero_weights_produce_zero_score() {
+        // All weights = 0 → anomaly_score = 0 even when all flags are true
+        let config = MoralAnomalyConfig {
+            weight_value_inversion: 0.0,
+            weight_fe_spike: 0.0,
+            weight_fragmentation: 0.0,
+            weight_drift: 0.0,
+            drift_alert_threshold: 0.001, // very sensitive, drift_alert will fire
+            fe_sigma_multiplier: 0.01,    // very sensitive, FE spike will fire
+            ..Default::default()
+        };
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            Arc::new(HarmonyBasis::new(TEST_DIM)),
+            config,
+        );
+        // First analysis: establish prev_summary
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9000 + i));
+        }
+        topo.analyze();
+        // Second analysis with different scenarios to trigger flags
+        for i in 10..25 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9100 + i));
+        }
+        topo.analyze();
+        let summary = topo.last_summary().clone();
+        let report = topo.detect_anomalies(&summary);
+        assert_eq!(
+            report.anomaly_score, 0.0,
+            "All-zero weights should produce anomaly_score=0.0, got {}",
+            report.anomaly_score
+        );
+    }
+
+    #[test]
+    fn test_adaptive_observe_nan_fe_doesnt_corrupt() {
+        // NaN free energy should not corrupt adaptive state
+        let config = MoralAnomalyConfig {
+            adaptive_enabled: true,
+            adaptive_alpha: 0.1,
+            adaptive_warmup: 3,
+            ..Default::default()
+        };
+        let mut state = AdaptiveAnomalyState::default();
+        // Establish normal state
+        for _ in 0..10 {
+            state.observe(0.1, 1.0, &config);
+        }
+        let pre_drift = state.effective_drift_threshold;
+        let pre_fe = state.effective_fe_sigma;
+        // Feed NaN FE
+        state.observe(0.1, f64::NAN, &config);
+        // Thresholds should still be finite (NaN propagation contained or
+        // at minimum the clamp bounds keep values sane)
+        assert!(
+            state.effective_drift_threshold.is_finite(),
+            "drift threshold must remain finite after NaN FE observation"
+        );
+        assert!(
+            state.effective_fe_sigma.is_finite() || state.effective_fe_sigma == pre_fe,
+            "FE sigma should remain finite or unchanged after NaN FE, got {}",
+            state.effective_fe_sigma
+        );
+        // Drift threshold should not change significantly from NaN FE
+        // (only FE-related EMAs are affected by NaN FE input)
+        let drift_delta = (state.effective_drift_threshold - pre_drift).abs();
+        assert!(
+            drift_delta < 0.05,
+            "drift threshold should barely change from NaN FE: delta={drift_delta:.4}"
+        );
     }
 }

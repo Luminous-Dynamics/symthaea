@@ -17,6 +17,9 @@ pub(super) struct TrainingSample {
     pub learning_rate: f32,
     pub method: TrainingMethod,
     pub avg_loss: f32,
+    /// Importance weight (default 1.0). Vision surprise boosts importance.
+    /// Basis: Niv et al. (2009) — prediction error modulates learning rate.
+    pub importance: f32,
 }
 
 /// Handle held by `CognitiveLoopService` to communicate with the background
@@ -41,25 +44,27 @@ impl AsyncTrainerHandle {
             .spawn(move || {
                 let mut steps_since_publish: u32 = 0;
                 while let Ok(sample) = sample_rx.recv() {
+                    // Apply vision-surprise importance weighting to learning rate
+                    let lr = sample.learning_rate * sample.importance;
                     let result = match sample.method {
                         TrainingMethod::Spsa => network.train_step_spsa(
                             &sample.input,
                             &sample.target,
                             sample.dt,
-                            sample.learning_rate,
+                            lr,
                         ),
                         TrainingMethod::Bptt => network.train_step_bptt(
                             &[sample.input],
                             &[sample.target],
                             &[sample.dt],
-                            sample.learning_rate,
+                            lr,
                         ),
                         TrainingMethod::BpttWithSpsaFallback => {
                             let bptt = network.train_step_bptt(
                                 &[sample.input.clone()],
                                 &[sample.target.clone()],
                                 &[sample.dt],
-                                sample.learning_rate,
+                                lr,
                             );
                             match bptt {
                                 Ok(loss)
@@ -73,7 +78,7 @@ impl AsyncTrainerHandle {
                                     &sample.input,
                                     &sample.target,
                                     sample.dt,
-                                    sample.learning_rate,
+                                    lr,
                                 ),
                             }
                         }

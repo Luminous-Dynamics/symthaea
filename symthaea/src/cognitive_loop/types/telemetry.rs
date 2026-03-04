@@ -823,6 +823,16 @@ pub struct VisionManifoldTelemetry {
     pub scene_recognition_similarity: f32,
     /// Cross-manifold prediction error (vision→cognitive, 0.0 if predictor disabled).
     pub cross_manifold_prediction_error: f32,
+    /// Time spent encoding the frame into HDC (microseconds).
+    pub encode_time_us: u64,
+    /// Time spent evolving the CfC manifold state (microseconds).
+    pub evolve_time_us: u64,
+    /// Mean surprise across the visual field (Friston free energy).
+    pub vision_mean_surprise: f32,
+    /// Multi-timescale horizon prediction errors [short, mid, long].
+    pub vision_horizon_errors: Vec<f32>,
+    /// Whether a scene was recognized this cycle (Conway episodic encoding).
+    pub scene_recognized: bool,
 }
 
 /// Foveation bridge telemetry snapshot for CycleMetadata.
@@ -850,6 +860,10 @@ pub struct FoveationBridgeTelemetry {
     pub recognition_count: usize,
     /// Highest recognition confidence this cycle (0.0 if none).
     pub top_recognition_confidence: f32,
+    /// Whether HV binding was applied (foveation results blended into cognitive HV).
+    pub hv_binding_applied: bool,
+    /// Whether dynamics coupling was triggered (exploration/confidence/LR modulation).
+    pub dynamics_coupling_triggered: bool,
 }
 
 /// Physics bridge telemetry snapshot for CycleMetadata.
@@ -867,6 +881,18 @@ pub struct PhysicsBridgeTelemetry {
     pub query_count: u64,
     /// Whether a query was performed this cycle.
     pub queried_this_cycle: bool,
+    /// Effective query interval after substrate tau modulation.
+    pub effective_interval: usize,
+    /// Effective blend weight after substrate tau + scale pressure modulation.
+    pub effective_blend_weight: f32,
+    /// Top domain from last query results (e.g. "Thermodynamics").
+    pub top_domain: String,
+    /// Pareto frontier context, if injected by GuidedDesignExplorer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pareto_frontier_size: Option<usize>,
+    /// Best analogy score from Pareto frontier (0.0–1.0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pareto_best_analogy: Option<f32>,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

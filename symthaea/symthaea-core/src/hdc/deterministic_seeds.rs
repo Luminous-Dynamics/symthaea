@@ -213,6 +213,18 @@ impl NixPrimeConcept {
         self.prime() + 1_000_000_000
     }
 
+    /// All variants in discriminant order, enabling safe index → variant conversion.
+    const ALL: [NixPrimeConcept; 40] = [
+        Self::Install, Self::Search, Self::Remove, Self::Update, Self::Build,
+        Self::Switch, Self::Rollback, Self::Query, Self::Enable, Self::Disable,
+        Self::Package, Self::Service, Self::Option, Self::Flake, Self::Generation,
+        Self::Profile, Self::Module, Self::Overlay, Self::Configuration, Self::Derivation,
+        Self::System, Self::User, Self::Global, Self::Local, Self::Temporary,
+        Self::Permanent, Self::Dry, Self::Force, Self::Verbose, Self::Quiet,
+        Self::Nixpkgs, Self::Flakes, Self::Channel, Self::Git, Self::Path,
+        Self::Store, Self::Cache, Self::Binary, Self::Source, Self::Remote,
+    ];
+
     /// Get all concepts from a Gödel number (product of primes).
     pub fn factor(godel: u64) -> Vec<NixPrimeConcept> {
         let mut result = Vec::new();
@@ -222,8 +234,7 @@ impl NixPrimeConcept {
             let prime = PRIMES[i];
             while remaining.is_multiple_of(prime) {
                 remaining /= prime;
-                // Safe because we only iterate over valid indices
-                result.push(unsafe { std::mem::transmute::<u8, NixPrimeConcept>(i as u8) });
+                result.push(Self::ALL[i]);
             }
             if remaining == 1 {
                 break;

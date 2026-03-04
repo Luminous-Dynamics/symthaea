@@ -1228,6 +1228,69 @@ impl FormantVocoder {
         audio
     }
 
+    /// Synthesize audio for a single formant frame with voice quality modulation (streaming mode).
+    ///
+    /// Like `synthesize_frame` but applies `VoiceQuality` overrides: bandwidth scaling,
+    /// spectral tilt, shimmer scaling, and optional Rd override.
+    pub fn synthesize_frame_with_quality(
+        &mut self,
+        frame: &FormantFrame,
+        quality: &VoiceQuality,
+        samples_per_frame: usize,
+    ) -> Vec<f32> {
+        // Apply bandwidth scaling
+        let mut scaled = *frame;
+        scaled.b1 *= quality.bandwidth_scale;
+        scaled.b2 *= quality.bandwidth_scale;
+        scaled.b3 *= quality.bandwidth_scale;
+        self.update_resonators(&scaled);
+
+        let tilt = quality.spectral_tilt.unwrap_or(self.config.spectral_tilt);
+        let shimmer_scale = self.config.shimmer * quality.shimmer_scale;
+        let mut audio = Vec::with_capacity(samples_per_frame);
+
+        for j in 0..samples_per_frame {
+            let progress = j as f32 / samples_per_frame.max(1) as f32;
+
+            // Source excitation with optional Rd override
+            let raw_source = if let Some(rd) = quality.rd {
+                self.generate_source_with_rd(frame, progress, rd)
+            } else {
+                self.generate_source(frame, progress)
+            };
+
+            // Spectral tilt with quality override
+            let source = raw_source * (1.0 - tilt) + self.tilt_state * tilt;
+            self.tilt_state = source;
+
+            // Formant filtering + nasal
+            let filtered = self.apply_filters(
+                source,
+                frame.source_type,
+                frame.f0,
+                frame.nasal_zero_freq,
+                frame.nasal_zero_bw,
+            );
+
+            // Lip radiation
+            let radiated = filtered - self.radiation_prev;
+            self.radiation_prev = filtered;
+
+            // Shimmer-scaled energy (OU shimmer deviation scaled by quality)
+            let dt = 1.0 / self.config.sample_rate as f32;
+            let shimmer_ou = self.ou_shimmer.tick(dt);
+            let deviation = shimmer_ou - 1.0;
+            let scale = shimmer_scale / self.config.shimmer.max(0.001);
+            let shimmer_factor = (1.0 + deviation * scale).clamp(0.5, 1.5);
+
+            let output = radiated * frame.energy * shimmer_factor * self.config.volume;
+            let smoothed = self.lowpass.process(output);
+            audio.push(soft_clip(smoothed));
+        }
+
+        audio
+    }
+
     /// Get sample rate
     pub fn sample_rate(&self) -> u32 {
         self.config.sample_rate

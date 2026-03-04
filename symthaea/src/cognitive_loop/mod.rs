@@ -83,7 +83,7 @@ pub mod config;
 pub use config::*;
 
 pub mod drives;
-pub use drives::*;
+pub(crate) use drives::*;
 
 pub mod routing;
 pub use routing::*;

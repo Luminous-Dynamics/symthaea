@@ -37,7 +37,7 @@
 
 use crate::hdc::BinaryHV;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 /// Content that can enter global workspace
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -188,9 +188,11 @@ pub struct WorkspaceAssessment {
     pub explanation: String,
 }
 
+/// Broadcast handler callback type
+pub type GWBroadcastHandler = Box<dyn Fn(&[BinaryHV]) + Send + Sync>;
+
 /// Global Workspace
 /// Implements Baars' Global Workspace Theory with competitive dynamics
-#[derive(Debug)]
 pub struct GlobalWorkspace {
     /// Configuration
     config: WorkspaceConfig,
@@ -209,6 +211,23 @@ pub struct GlobalWorkspace {
 
     /// Registered recipient modules
     recipients: Vec<String>,
+
+    /// Registered broadcast handlers (module_name → callback)
+    handlers: HashMap<String, GWBroadcastHandler>,
+}
+
+impl std::fmt::Debug for GlobalWorkspace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GlobalWorkspace")
+            .field("config", &self.config)
+            .field("workspace", &self.workspace)
+            .field("competitors", &self.competitors)
+            .field("broadcasts", &self.broadcasts)
+            .field("timestep", &self.timestep)
+            .field("recipients", &self.recipients)
+            .field("handlers", &self.handlers.keys().collect::<Vec<_>>())
+            .finish()
+    }
 }
 
 impl GlobalWorkspace {
@@ -227,7 +246,14 @@ impl GlobalWorkspace {
                 "language".to_string(),
                 "action".to_string(),
             ],
+            handlers: HashMap::new(),
         }
+    }
+
+    /// Register a broadcast handler for a module.
+    /// The handler fires whenever the workspace broadcasts content.
+    pub fn register_handler(&mut self, module: &str, handler: GWBroadcastHandler) {
+        self.handlers.insert(module.to_string(), handler);
     }
 
     /// Submit content for workspace entry (competition)
@@ -257,6 +283,15 @@ impl GlobalWorkspace {
         } else {
             Vec::new()
         };
+
+        // 4b. Dispatch registered handlers on broadcasts
+        if !broadcasts.is_empty() {
+            for broadcast in &broadcasts {
+                for handler in self.handlers.values() {
+                    handler(&broadcast.content);
+                }
+            }
+        }
 
         // 5. Compute metrics
         let capacity = self.compute_capacity_metrics();

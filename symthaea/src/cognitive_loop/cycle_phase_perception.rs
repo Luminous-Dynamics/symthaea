@@ -65,11 +65,216 @@ impl CognitiveLoopService {
         let strategy_result = self.run_strategy_selection(moral_concern_detected);
         let selected_strategy = strategy_result.selected_strategy;
         let agency_strategy_override = strategy_result.agency_strategy_override;
+        let social_strategy_bias = strategy_result.social_strategy_bias;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASES 1–1.2: Encoding + Preprocessing (extracted to cycle_strategy.rs)
         // ═══════════════════════════════════════════════════════════════════════
-        let encoding = self.run_encoding_and_preprocessing(input, module_timings);
+        #[allow(unused_mut)]
+        let mut encoding = self.run_encoding_and_preprocessing(input, module_timings);
+
+        // ACh-modulated scene memory thresholds
+        #[cfg(feature = "vision-manifold")]
+        if let Some(ref mut bridge) = self.vision_bridge {
+            let ach = self.neuromod.bath.acetylcholine.effective();
+            let ach_factor = ach.max(0.5);
+            let base_coh = self.config.scene_memory_coherence_threshold;
+            let base_err = self.config.scene_memory_error_threshold;
+            let base_damp = self.config.scene_memory_dampen_factor;
+            bridge.manifold_mut().set_scene_store_thresholds(
+                (base_coh / ach_factor).clamp(0.3, 0.95),
+                (base_err * ach_factor.min(2.0)).clamp(0.01, 0.5),
+            );
+            bridge
+                .manifold_mut()
+                .set_scene_dampen_factor((base_damp * ach_factor.min(2.0)).clamp(0.1, 0.9));
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 1.3: Vision Manifold (frame → attention-boosted HDC encoding)
+        // ═══════════════════════════════════════════════════════════════════════
+        #[cfg(feature = "vision-manifold")]
+        let (visual_hv, vision_telemetry) = if let Some(ref mut bridge) = self.vision_bridge {
+            let frame = self.vision_frame_buffer.take().unwrap_or_else(|| {
+                vec![
+                    128u8;
+                    (self.config.vision_frame_width * self.config.vision_frame_height) as usize
+                ]
+            });
+            let w = self.config.vision_frame_width;
+            let h = self.config.vision_frame_height;
+            let dt = self.config.cfc_config.delta_t;
+            let (hv, tel) = bridge.process_frame_with_telemetry(
+                &frame, w, h, 1, dt,
+            );
+            (Some(hv), Some(tel))
+        } else {
+            (None, None)
+        };
+
+        // Cross-manifold predictor: predict cognitive state from vision state
+        #[cfg(feature = "vision-manifold")]
+        let cross_manifold_prediction_error =
+            if let Some(ref mut pred) = self.cross_manifold_predictor {
+                if let Some(ref vis_hv) = visual_hv {
+                    let vis_chv = symthaea_core::hdc::ContinuousHV::from_slice(vis_hv.as_slice());
+                    let _predicted = pred.predict_cognitive(&vis_chv);
+                    pred.prediction_error()
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+
+        // ── Vision mean surprise + horizon errors + scene recognition ──
+        #[cfg(feature = "vision-manifold")]
+        let vision_mean_surprise = self
+            .vision_bridge
+            .as_ref()
+            .map(|b| b.manifold().surprise_map().mean_surprise())
+            .unwrap_or(0.0);
+
+        #[cfg(feature = "vision-manifold")]
+        let vision_horizon_errors = self
+            .vision_bridge
+            .as_ref()
+            .map(|b| b.manifold().evaluate_horizons().errors)
+            .unwrap_or_default();
+
+        #[cfg(feature = "vision-manifold")]
+        let scene_recognized = vision_telemetry
+            .as_ref()
+            .map(|t| t.scene_recognition_similarity > 0.0)
+            .unwrap_or(false);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 1.4: Foveation Dispatch (dorsal surprise → ventral recognition)
+        // ═══════════════════════════════════════════════════════════════════════
+        #[cfg(feature = "foveation")]
+        let fov_results: Vec<symthaea_foveation::FoveationResult> = {
+            let mut collected = Vec::new();
+            if let Some(ref fov_mutex) = self.foveation_manager {
+                if let Ok(mut fov) = fov_mutex.lock() {
+                    // Neuromod modulation: NE → surprise threshold, DA → concurrent capacity
+                    let ne = self.neuromod.bath.noradrenaline.effective();
+                    let da = self.neuromod.bath.dopamine.effective();
+                    fov.modulate(ne, da);
+
+                    // Feed current frame to foveation
+                    if let Some(ref bridge) = self.vision_bridge {
+                        let w = self.config.vision_frame_width;
+                        let h = self.config.vision_frame_height;
+                        let frame_count = bridge.frame_count();
+                        let fb = symthaea_foveation::FrameBuffer {
+                            pixels: vec![128u8; (w * h) as usize],
+                            width: w,
+                            height: h,
+                            channels: 1,
+                            frame_id: frame_count,
+                            timestamp_us: frame_count * 20_000, // ~50fps
+                        };
+                        fov.on_frame(fb);
+
+                        // Feed salient patches with real motion vectors from manifold
+                        let regions = bridge.salient_regions();
+                        let motion = bridge.manifold().motion_vectors();
+                        let grid_cols = bridge.manifold().surprise_map().grid().cols;
+                        let patches: Vec<_> = regions
+                            .iter()
+                            .map(|r| {
+                                let mv_idx = r.grid_row * grid_cols + r.grid_col;
+                                let vel = motion.get(mv_idx).copied().unwrap_or([0.0, 0.0]);
+                                (r.grid_row, r.grid_col, r.surprise, vel)
+                            })
+                            .collect();
+                        fov.on_saliency(&patches);
+                    }
+
+                    // Tick and drain
+                    let now_us = self.start_time.elapsed().as_micros() as u64;
+                    fov.tick(now_us);
+                    collected = fov.drain_results();
+                    for result in &collected {
+                        tracing::debug!(
+                            target: "cognitive_loop::foveation",
+                            grid = ?(result.grid_row, result.grid_col),
+                            confidence = result.confidence,
+                            "Foveation recognition"
+                        );
+                    }
+                }
+            }
+            collected
+        };
+
+        // ── GWT injection: feed foveation results into Global Workspace ──
+        #[cfg(feature = "foveation")]
+        if let Some(ref mut gwt) = self.gwt {
+            for result in &fov_results {
+                let binary_hv = result.semantic_hv.to_binary(0.0);
+                let activation = result.confidence as f64;
+                let module = match &result.content {
+                    symthaea_foveation::RecognizedContent::Text(_) => "foveation_ocr",
+                    symthaea_foveation::RecognizedContent::Object { .. } => "foveation_embed",
+                    symthaea_foveation::RecognizedContent::Caption(_) => "foveation_caption",
+                    symthaea_foveation::RecognizedContent::Unknown => "foveation_unknown",
+                };
+                gwt.submit_strategy(
+                    "foveation_recognition",
+                    activation,
+                    vec![binary_hv],
+                    vec![module.to_string()],
+                );
+            }
+        }
+
+        // ── Surprise dampening: reduce surprise at recognized locations ──
+        #[cfg(feature = "foveation")]
+        if let Some(ref mut bridge) = self.vision_bridge {
+            for result in &fov_results {
+                if result.confidence > 0.7 {
+                    // Predict current position using velocity + processing latency
+                    let dt_frames = result.processing_time_us as f32 / 20_000.0; // ~50fps
+                    let pred_row = (result.grid_row as f32 + result.velocity[1] * dt_frames)
+                        .round()
+                        .max(0.0) as usize;
+                    let pred_col = (result.grid_col as f32 + result.velocity[0] * dt_frames)
+                        .round()
+                        .max(0.0) as usize;
+                    bridge.manifold_mut().surprise_map_mut().dampen(
+                        pred_row,
+                        pred_col,
+                        0.5, // halve surprise at this location
+                    );
+                }
+            }
+        }
+
+        // ── Multimodal HV binding: foveation → cognitive state ──
+        // Treisman (1980): feature integration theory — visual features bind into
+        // unified percept alongside linguistic encoding.
+        #[cfg(feature = "foveation")]
+        if !fov_results.is_empty() {
+            use super::thresholds::FOVEATION_HV_BINDING_WEIGHT;
+            let main_hv = &encoding.encoding_result.hdv;
+            let mut hvs: Vec<&symthaea_core::hdc::ContinuousHV> = vec![main_hv];
+            let mut weights: Vec<f32> = vec![1.0];
+            for result in &fov_results {
+                hvs.push(&result.semantic_hv);
+                weights.push(result.confidence * FOVEATION_HV_BINDING_WEIGHT);
+            }
+            encoding.encoding_result.hdv =
+                symthaea_core::hdc::ContinuousHV::weighted_bundle(&hvs, &weights);
+        }
+
+        #[cfg(feature = "foveation")]
+        let foveation_recognition_count = fov_results.len();
+        #[cfg(feature = "foveation")]
+        let foveation_top_confidence = fov_results
+            .iter()
+            .map(|r| r.confidence)
+            .fold(0.0f32, f32::max);
 
         // Stash negation polarity for metadata
         let negation_detected = input_negation_polarity;
@@ -105,6 +310,7 @@ impl CognitiveLoopService {
             moral_judgment,
             selected_strategy,
             agency_strategy_override,
+            social_strategy_bias,
             soul_alignment: encoding.soul_alignment,
             negation_detected,
             surprise_triggered: encoding.surprise_triggered,
@@ -116,6 +322,20 @@ impl CognitiveLoopService {
             prediction_error: encoding.prediction_error,
             effective_threshold: encoding.effective_threshold,
             memo_threshold: encoding.memo_threshold,
+            #[cfg(feature = "vision-manifold")]
+            vision_telemetry,
+            #[cfg(feature = "foveation")]
+            foveation_recognition_count,
+            #[cfg(feature = "foveation")]
+            foveation_top_confidence,
+            #[cfg(feature = "vision-manifold")]
+            cross_manifold_prediction_error,
+            #[cfg(feature = "vision-manifold")]
+            vision_mean_surprise,
+            #[cfg(feature = "vision-manifold")]
+            vision_horizon_errors,
+            #[cfg(feature = "vision-manifold")]
+            scene_recognized,
         })
     }
 }

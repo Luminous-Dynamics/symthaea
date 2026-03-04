@@ -561,6 +561,117 @@ pub const REWARD_POSITIVE_THRESHOLD: f32 = 0.5;
 pub const REWARD_NEGATIVE_THRESHOLD: f32 = -0.2;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// FOVEATION → DYNAMICS COUPLING (vision-manifold feature)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Foveation recognition count threshold for "familiar scene" dampening.
+/// Basis: Corbetta & Shulman (2002) — recognized objects reduce attentional vigilance.
+#[cfg(feature = "vision-manifold")]
+pub const FOVEATION_FAMILIAR_RECOGNITION_COUNT: usize = 2;
+
+/// Foveation confidence threshold for high-confidence dampening.
+/// Basis: Bar (2003) — confident recognition facilitates predictive processing.
+#[cfg(feature = "vision-manifold")]
+pub const FOVEATION_HIGH_CONFIDENCE_THRESHOLD: f32 = 0.6;
+
+/// Exploration dampening when scene is familiar (multiplicative).
+#[cfg(feature = "vision-manifold")]
+pub const FOVEATION_FAMILIAR_EXPLORATION_DAMPEN: f32 = 0.9;
+
+/// Confidence boost for high-confidence foveation (multiplicative).
+#[cfg(feature = "vision-manifold")]
+pub const FOVEATION_CONFIDENCE_BOOST: f32 = 1.03;
+
+/// LR boost when novel objects detected (low confidence, many recognitions).
+#[cfg(feature = "vision-manifold")]
+pub const FOVEATION_NOVEL_LR_BOOST: f32 = 1.05;
+
+/// Maximum weight a single foveation result contributes to multimodal HV binding.
+/// Basis: Treisman (1980) — feature integration theory; visual binding is secondary to attentional binding.
+#[cfg(feature = "vision-manifold")]
+pub const FOVEATION_HV_BINDING_WEIGHT: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-MANIFOLD PREDICTION ERROR (vision-manifold feature)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cross-manifold prediction error threshold for attention reallocation.
+/// Basis: Rao & Ballard (1999) — prediction error drives top-down attention shifts.
+#[cfg(feature = "vision-manifold")]
+pub const CROSS_MANIFOLD_ERROR_THRESHOLD: f32 = 0.3;
+
+/// Exploration boost per unit of cross-manifold prediction error above threshold.
+#[cfg(feature = "vision-manifold")]
+pub const CROSS_MANIFOLD_EXPLORATION_SCALE: f32 = 0.15;
+
+/// Confidence dampening when vision doesn't match cognition.
+#[cfg(feature = "vision-manifold")]
+pub const CROSS_MANIFOLD_CONFIDENCE_DAMPEN: f32 = 0.97;
+
+/// LR boost when cross-manifold error is high (need to update world model).
+#[cfg(feature = "vision-manifold")]
+pub const CROSS_MANIFOLD_LR_BOOST: f32 = 1.03;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VISION SURPRISE → EXPLORATION (vision-manifold feature)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Vision mean surprise threshold for exploration boost.
+/// Basis: Friston (2010) — free energy (surprise) is the fundamental drive for exploration.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_SURPRISE_EXPLORATION_THRESHOLD: f32 = 0.25;
+
+/// Scale factor for vision surprise → exploration boost.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_SURPRISE_EXPLORATION_SCALE: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VISION TEMPORAL HORIZONS → FEP (vision-manifold feature)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Short-horizon (33ms) visual prediction error threshold for FEP surprise boost.
+/// Basis: Adams et al. (2013) — precision-weighted prediction errors at multiple timescales.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_SHORT_HORIZON_ERROR_THRESHOLD: f32 = 0.3;
+
+/// Long-horizon (500ms+) visual prediction error threshold for confidence dampening.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_LONG_HORIZON_CONFIDENCE_THRESHOLD: f32 = 0.5;
+
+/// FEP exploration boost from short-horizon visual surprise.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_HORIZON_EXPLORATION_SCALE: f32 = 0.15;
+
+/// Confidence dampening from long-horizon visual uncertainty.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_HORIZON_CONFIDENCE_DAMPEN: f32 = 0.97;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SCENE RECOGNITION → DREAM (vision-manifold feature)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Dream recording salience boost when a visual scene is recognized.
+/// Basis: Conway (2005) — self-relevant and context-rich memories encode preferentially.
+#[cfg(feature = "vision-manifold")]
+pub const SCENE_RECOGNITION_DREAM_BOOST: f32 = 1.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VISION → TRAINING IMPORTANCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Base importance weight for training samples.
+pub const TRAINING_BASE_IMPORTANCE: f32 = 1.0;
+
+/// Vision cross-manifold error scale for training importance.
+/// Basis: Niv et al. (2009) — prediction error modulates learning rate.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_TRAINING_IMPORTANCE_SCALE: f32 = 0.5;
+
+/// Maximum training importance weight.
+#[cfg(feature = "vision-manifold")]
+pub const TRAINING_MAX_IMPORTANCE: f32 = 2.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // VALIDATION
 // ═══════════════════════════════════════════════════════════════════════════════
 

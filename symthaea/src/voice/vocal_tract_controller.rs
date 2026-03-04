@@ -91,3 +91,46 @@ pub fn refine_controller_ls(
         .collect();
     controller.refine_output_projection_ls(genesis, &targets, blend);
 }
+
+/// Train the controller on consonant-vowel and vowel-consonant transitions.
+///
+/// Generates CV (consonant→vowel) and VC (vowel→consonant) transition pairs
+/// from 6 consonants (P, T, K, S, M, N) and 3 cardinal vowels (AH, IY, UW),
+/// producing 36 training pairs. Call this AFTER `train_controller_on_phoneme_db`
+/// to improve coarticulation smoothness at syllable boundaries.
+pub fn train_controller_cv_vc_transitions(
+    controller: &mut VocalTractController,
+    genesis: &GenesisSeed,
+    db: &FormantDatabase,
+    epochs: usize,
+) -> f32 {
+    let consonants = ["P", "T", "K", "S", "M", "N"];
+    let vowels = ["AH", "IY", "UW"];
+
+    // Build CV and VC transition pairs
+    let mut pairs = Vec::new();
+    for &c in &consonants {
+        for &v in &vowels {
+            // CV transition (consonant → vowel)
+            if let (Some(ct), Some(vt)) = (db.lookup(c), db.lookup(v)) {
+                pairs.push((c, ct, v, vt));
+            }
+            // VC transition (vowel → consonant)
+            if let (Some(vt), Some(ct)) = (db.lookup(v), db.lookup(c)) {
+                pairs.push((v, vt, c, ct));
+            }
+        }
+    }
+
+    let pair_refs: Vec<(
+        &str,
+        &super::formant_targets::FormantTarget,
+        &str,
+        &super::formant_targets::FormantTarget,
+    )> = pairs
+        .iter()
+        .map(|(f, ft, t, tt)| (*f, *ft, *t, *tt))
+        .collect();
+
+    controller.train_on_transitions(genesis, &pair_refs, epochs)
+}

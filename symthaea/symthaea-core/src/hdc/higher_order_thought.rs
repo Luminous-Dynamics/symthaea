@@ -36,7 +36,7 @@
 // meta-representational hierarchy, misrepresentation detection, and
 // integration with Global Workspace Theory.
 
-use crate::hdc::{BinaryHV, HDC_DIMENSION};
+use crate::hdc::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -250,6 +250,22 @@ impl HigherOrderThoughtSystem {
     /// Add first-order state (unconscious perception/thought)
     pub fn perceive(&mut self, content: Vec<BinaryHV>, source: String) {
         let state = MentalState::first_order(content, source);
+        self.first_order.push(state);
+    }
+
+    /// Add first-order state with explicit confidence level.
+    ///
+    /// Unlike `perceive()` which defaults to confidence 1.0, this method
+    /// allows setting an arbitrary confidence. States with confidence below
+    /// `hot_threshold` will NOT receive automatic HOTs.
+    pub fn perceive_with_confidence(
+        &mut self,
+        content: Vec<BinaryHV>,
+        source: String,
+        confidence: f64,
+    ) {
+        let mut state = MentalState::first_order(content, source);
+        state.confidence = confidence;
         self.first_order.push(state);
     }
 
@@ -633,6 +649,36 @@ mod tests {
 
         // Should detect misrepresentation
         assert!(hot.is_misrepresented());
+    }
+
+    #[test]
+    fn test_perceive_with_confidence() {
+        let mut system = HigherOrderThoughtSystem::new(HOTConfig {
+            auto_generate_hots: true,
+            hot_threshold: 0.5,
+            ..Default::default()
+        });
+
+        // Low confidence: should NOT get a HOT
+        system.perceive_with_confidence(
+            vec![BinaryHV::ones(); 10],
+            "dim_stimulus".to_string(),
+            0.3,
+        );
+        // High confidence: SHOULD get a HOT
+        system.perceive_with_confidence(
+            vec![BinaryHV::random(42); 10],
+            "bright_stimulus".to_string(),
+            0.7,
+        );
+
+        let assessment = system.process();
+        // Only the high-confidence state should become conscious
+        assert_eq!(
+            assessment.second_order_count, 1,
+            "Only high-confidence state should get HOT: got {}",
+            assessment.second_order_count
+        );
     }
 
     #[test]

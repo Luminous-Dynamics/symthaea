@@ -83,15 +83,10 @@ pub(crate) struct EthicsEngineOutput {
     pub lr_factor: f32,
 
     // ── Stage 4: Moral Topology ────────────────────────────────────────
-    /// Compact topology summary (default when analysis not run this cycle).
-    #[allow(dead_code)]
-    // Constructed by engine; read via ethics_engine.moral_topology() accessor
-    pub topology_summary: MoralTopologySummary,
     /// Microseconds spent on topology analysis (0 when not run).
     pub topology_us: u64,
     /// Whether topology analysis was freshly computed this cycle.
-    #[allow(dead_code)]
-    // Constructed by engine; read via ethics_engine.moral_topology() accessor
+    /// Used by cycle_strategy.rs to gate anomaly response (prevents N× over-correction).
     pub topology_fresh: bool,
 
     // ── Stage 4b: Anomaly report ───────────────────────────────────────
@@ -190,6 +185,8 @@ struct EthicsEngineCache {
     last_topology_cycle: u64,
     /// Cached anomaly report from last evaluation.
     last_anomaly_report: MoralAnomalyReport,
+    /// Whether the last evaluate() freshly computed topology (vs cached).
+    last_topology_fresh: bool,
 }
 
 impl Default for EthicsEngineCache {
@@ -206,6 +203,7 @@ impl Default for EthicsEngineCache {
             topology_cadence: 97,
             last_topology_cycle: 0,
             last_anomaly_report: MoralAnomalyReport::default(),
+            last_topology_fresh: false,
         }
     }
 }
@@ -507,7 +505,7 @@ impl EthicsEngine {
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
         let cycles_since = input.cycle.saturating_sub(self.cache.last_topology_cycle);
-        let (topology_summary, topology_fresh) =
+        let (latest_summary, topology_fresh) =
             if cycles_since >= self.cache.topology_cadence && self.moral_topology.len() >= 3 {
                 let assessment = self.moral_topology.analyze();
 
@@ -540,8 +538,9 @@ impl EthicsEngine {
         let topology_us = t.elapsed().as_micros() as u64;
 
         // Compute anomaly report against latest topology summary
-        let anomaly_report = self.moral_topology.detect_anomalies(&topology_summary);
+        let anomaly_report = self.moral_topology.detect_anomalies(&latest_summary);
         self.cache.last_anomaly_report = anomaly_report.clone();
+        self.cache.last_topology_fresh = topology_fresh;
 
         let total_us = total_start.elapsed().as_micros() as u64;
 
@@ -568,7 +567,6 @@ impl EthicsEngine {
             anomaly_report,
             harmony_coordinates,
             moral_free_energy,
-            topology_summary,
             topology_us,
             topology_fresh,
             moral_us,
@@ -708,6 +706,11 @@ impl EthicsEngine {
     /// Cached anomaly report from the last `evaluate()` call.
     pub fn last_anomaly_report(&self) -> &MoralAnomalyReport {
         &self.cache.last_anomaly_report
+    }
+
+    /// Whether the last `evaluate()` freshly computed topology (vs returning cached).
+    pub fn last_topology_fresh(&self) -> bool {
+        self.cache.last_topology_fresh
     }
 
     /// Bidirectional feedback: exploration outcome modulates FE→exploration gain.

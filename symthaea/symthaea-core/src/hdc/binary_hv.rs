@@ -584,18 +584,15 @@ impl BinaryHV {
         }
 
         let shift = shift % Self::DIM;
-        let mut result = [0u8; 2048];
 
-        // Convert to u64 words for efficient rotation
-        // We have 2048 bytes = 256 u64 words
-        // SAFETY: `self.0` is `[u8; 2048]` which has the same size and compatible
-        // alignment as `[u64; 256]` (2048 bytes). The pointer is valid for reads
-        // over the entire array. `u64` has no invalid bit patterns.
-        let words: &[u64; 256] = unsafe { &*(self.0.as_ptr() as *const [u64; 256]) };
-        // SAFETY: `result` is `[u8; 2048]`, same layout guarantees as above.
-        // The mutable reference is exclusive since `result` is a local variable.
-        let result_words: &mut [u64; 256] =
-            unsafe { &mut *(result.as_mut_ptr() as *mut [u64; 256]) };
+        // Convert bytes to u64 words for efficient rotation (2048 bytes = 256 u64 words)
+        let mut words = [0u64; 256];
+        for (i, chunk) in self.0.chunks_exact(8).enumerate() {
+            words[i] = u64::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3],
+                                           chunk[4], chunk[5], chunk[6], chunk[7]]);
+        }
+
+        let mut result_words = [0u64; 256];
 
         // Calculate word and bit offsets
         let word_shift = shift / 64; // How many words to move
@@ -621,6 +618,13 @@ impl BinaryHV {
                 result_words[new_pos] =
                     (words[i] << bit_shift) | (words[prev_word_idx] >> inv_shift);
             }
+        }
+
+        // Convert u64 words back to bytes
+        let mut result = [0u8; 2048];
+        for (i, word) in result_words.iter().enumerate() {
+            let bytes = word.to_ne_bytes();
+            result[i * 8..i * 8 + 8].copy_from_slice(&bytes);
         }
 
         Self(result)

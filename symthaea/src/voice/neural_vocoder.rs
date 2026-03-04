@@ -144,21 +144,28 @@ impl NeuralVocoderChannel {
                 let builder = if _use_gpu {
                     info!("Attempting GPU acceleration for BigVGAN...");
                     // Try CUDA first, then CoreML, fall back to CPU
-                    builder
-                        .with_execution_providers([
-                            ort::execution_providers::CUDAExecutionProvider::default().build(),
-                            #[cfg(target_os = "macos")]
-                            ort::execution_providers::CoreMLExecutionProvider::default().build(),
-                        ])
-                        .unwrap_or_else(|e| {
+                    match builder.with_execution_providers([
+                        ort::execution_providers::CUDAExecutionProvider::default().build(),
+                        #[cfg(target_os = "macos")]
+                        ort::execution_providers::CoreMLExecutionProvider::default().build(),
+                    ]) {
+                        Ok(b) => b,
+                        Err(e) => {
                             warn!("GPU EP registration failed ({}), using CPU", e);
-                            ort::session::Session::builder().expect("session builder")
-                        })
+                            match ort::session::Session::builder() {
+                                Ok(b) => b,
+                                Err(e2) => {
+                                    warn!("Fallback session builder failed: {}. Thread exiting.", e2);
+                                    return;
+                                }
+                            }
+                        }
+                    }
                 } else {
                     builder
                 };
 
-                let session = match builder.with_model_from_file(&model_path) {
+                let mut session = match builder.commit_from_file(&model_path) {
                     Ok(session) => session,
                     Err(e) => {
                         warn!(
@@ -172,7 +179,7 @@ impl NeuralVocoderChannel {
                 info!("BigVGAN neural vocoder ready");
 
                 while let Ok(req) = request_rx.recv() {
-                    let audio = run_bigvgan_inference(&session, &req.mel_frames, n_mels);
+                    let audio = run_bigvgan_inference(&mut session, &req.mel_frames, n_mels);
                     let mut audio = audio.unwrap_or_default();
 
                     // Trim overlap context from output audio (improvement #6)
@@ -254,7 +261,7 @@ impl NeuralVocoderChannel {
 /// Output tensor shape: `[1, 1, n_samples]`
 #[cfg(feature = "neural-vocoder")]
 fn run_bigvgan_inference(
-    session: &ort::session::Session,
+    session: &mut ort::session::Session,
     mel_frames: &[Vec<f32>],
     n_mels: usize,
 ) -> Option<Vec<f32>> {
@@ -291,10 +298,10 @@ fn run_bigvgan_inference(
         }
     };
 
-    // Extract audio from first output tensor — ort 2.0 returns (shape, data) tuple
+    // Extract audio from first output tensor
     if let Ok((_shape, audio_data)) = outputs[0].try_extract_tensor::<f32>() {
         if !audio_data.is_empty() {
-            return Some(audio_data);
+            return Some(audio_data.to_vec());
         }
     }
 

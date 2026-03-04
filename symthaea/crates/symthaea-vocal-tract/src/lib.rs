@@ -41,12 +41,13 @@ pub mod types;
 pub use controller::{
     ProsodyCorrection, ProsodyHead, SpeakerProfile, VocalTractConfig, VocalTractController,
 };
-pub use encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
-pub use fep::{VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation};
+pub use encoder::{VocalTractHdcEncoder, VoiceCognitiveState, VoiceCognitiveStateDerivatives};
+pub use fep::{
+    FepTelemetry, VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation,
+};
 pub use metrics::{compute_hnr, compute_spectral_tilt, PerceptualMetrics, VocalTractMetrics};
 pub use pipeline::{
-    manner_energy_voicing, predict_duration, syllabify, Intonation, PitchAccent, ProsodyContext,
-    Syllable, VocalTractPipeline,
+    predict_duration, Intonation, PitchAccent, ProsodyContext, VocalTractPipeline,
 };
 pub use types::{FormantFrame, FormantTarget};
 

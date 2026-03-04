@@ -15,6 +15,8 @@ input sequences through the full cognitive pipeline.
 
 use proptest::prelude::*;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
+#[cfg(feature = "physics-bridge")]
+use symthaea::cognitive_loop::ParetoContext;
 
 /// Strategy for generating valid input strings (non-empty ASCII for reproducibility)
 fn input_strategy() -> impl Strategy<Value = String> {
@@ -126,6 +128,108 @@ proptest! {
                 "Too many evictions at cycle {i}: {}", result.metadata.memory.codebook_evictions);
             prop_assert!(result.metadata.memory.resonator_promotions <= 3,
                 "Too many promotions at cycle {i}: {}", result.metadata.memory.resonator_promotions);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Physics Bridge Property Tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[cfg(feature = "physics-bridge")]
+mod physics_bridge_props {
+    use super::*;
+
+    /// Helper: create a service with physics bridge enabled at aggressive settings
+    fn physics_service(interval: usize, blend: f32) -> CognitiveLoopService {
+        CognitiveLoopService::new(CognitiveLoopConfig {
+            enable_primitive_consciousness: true,
+            learning_threshold: 0.0,
+            async_training: false,
+            enable_physics_bridge: true,
+            physics_bridge_query_interval: interval,
+            physics_bridge_blend_weight: blend,
+            ..Default::default()
+        })
+        .unwrap()
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(5))]
+
+        /// Physics bridge telemetry fields are always finite for any input
+        #[test]
+        fn prop_physics_telemetry_finite(inputs in input_sequence(10, 30)) {
+            let mut service = physics_service(3, 0.2);
+            for (i, input) in inputs.iter().enumerate() {
+                let result = service.cycle(input);
+                if let Some(ref pb) = result.metadata.physics_bridge {
+                    prop_assert!(pb.top_score.is_finite(),
+                        "physics top_score NaN/Inf at cycle {i}");
+                    prop_assert!(pb.effective_blend_weight.is_finite(),
+                        "physics effective_blend_weight NaN/Inf at cycle {i}");
+                    prop_assert!(pb.effective_blend_weight >= 0.0 && pb.effective_blend_weight <= 1.0,
+                        "physics effective_blend_weight out of [0,1] at cycle {i}: {}",
+                        pb.effective_blend_weight);
+                    prop_assert!(pb.effective_interval >= 1,
+                        "physics effective_interval < 1 at cycle {i}: {}",
+                        pb.effective_interval);
+                    if let Some(score) = pb.pareto_best_analogy {
+                        prop_assert!(score.is_finite(),
+                            "pareto_best_analogy NaN/Inf at cycle {i}");
+                    }
+                }
+            }
+        }
+
+        /// Physics bridge never causes prediction_error to go NaN/Inf
+        #[test]
+        fn prop_physics_blend_preserves_finiteness(
+            inputs in input_sequence(15, 40),
+            blend in 0.0f32..1.0f32,
+        ) {
+            let interval = 1; // query every cycle for max stress
+            let mut service = physics_service(interval, blend);
+            for (i, input) in inputs.iter().enumerate() {
+                let result = service.cycle(input);
+                prop_assert!(result.prediction_error.is_finite(),
+                    "prediction_error NaN/Inf with blend={blend} at cycle {i}");
+                prop_assert!(result.prediction_error >= 0.0 && result.prediction_error <= 1.0,
+                    "prediction_error out of [0,1] with blend={blend} at cycle {i}: {}",
+                    result.prediction_error);
+            }
+        }
+
+        /// Pareto context injection never panics, always drains correctly
+        #[test]
+        fn prop_pareto_context_inject_drain(
+            frontier_size in 0usize..100,
+            score in 0.0f32..1.0f32,
+        ) {
+            let mut service = physics_service(5, 0.1);
+            // Run a few cycles to warm up
+            for _ in 0..3 {
+                service.cycle("warmup");
+            }
+            // Inject Pareto context
+            service.set_physics_pareto_context(ParetoContext {
+                frontier_size,
+                power_range: (1.0, 50.0),
+                dominant_domain: "Thermodynamics".into(),
+                best_analogy_score: score,
+            });
+            // Next cycle should drain it
+            let result = service.cycle("after pareto inject");
+            if let Some(ref pb) = result.metadata.physics_bridge {
+                if let Some(fs) = pb.pareto_frontier_size {
+                    prop_assert_eq!(fs, frontier_size,
+                        "Pareto frontier size mismatch");
+                }
+                if let Some(ba) = pb.pareto_best_analogy {
+                    prop_assert!((ba - score).abs() < 1e-6,
+                        "Pareto best_analogy mismatch: expected {score}, got {ba}");
+                }
+            }
         }
     }
 }

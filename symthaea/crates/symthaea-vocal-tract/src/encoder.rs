@@ -120,6 +120,20 @@ impl VoiceCognitiveState {
     }
 }
 
+/// Per-second rate of change of key cognitive voice state channels.
+///
+/// Used by the extended voice quality profile to detect rapid emotional shifts
+/// and modulate vocal quality accordingly (e.g., rising arousal → voice strain).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct VoiceCognitiveStateDerivatives {
+    /// Rate of change of emotional arousal (per second).
+    pub delta_arousal: f32,
+    /// Rate of change of emotional valence (per second).
+    pub delta_valence: f32,
+    /// Rate of change of consciousness level (per second).
+    pub delta_consciousness: f32,
+}
+
 /// HDC encoder for cognitive voice state.
 ///
 /// Encodes a 12D `VoiceCognitiveState` into a full 16,384D `ContinuousHV` via:

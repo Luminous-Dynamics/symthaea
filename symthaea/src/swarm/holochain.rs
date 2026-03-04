@@ -766,6 +766,18 @@ impl HolochainCortex {
         self.connected = false;
         tracing::info!("HolochainCortex shutdown");
     }
+
+    /// Find cached agents that declare a given capability, sorted by reputation (desc).
+    pub fn find_by_capability(&self, capability: &str) -> Vec<AgentPubKey> {
+        let mut results: Vec<_> = self
+            .agent_cache
+            .iter()
+            .filter(|(_, info)| info.capabilities.iter().any(|c| c == capability))
+            .map(|(key, info)| (key.clone(), info.reputation_score))
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.into_iter().map(|(key, _)| key).collect()
+    }
 }
 
 impl Default for HolochainCortex {

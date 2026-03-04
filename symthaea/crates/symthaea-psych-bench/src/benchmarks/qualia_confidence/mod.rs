@@ -32,12 +32,18 @@
 //! - **UnconsciousPriming** — Sub/supra-threshold dissociation. Sub-threshold primes
 //!   influence processing without GWT ignition; conscious primes produce stronger effects.
 //!   (Dehaene et al. 2006; Marcel 1983)
+//!
+//! - **MetacognitiveIgnition** — Does HOT's consciousness classification spontaneously
+//!   predict GWT ignition despite no direct access to workspace dynamics? Tests
+//!   architectural metacognitive alignment under competition pressure.
+//!   (Rosenthal 2005; Dehaene & Naccache 2001; Lau & Rosenthal 2011)
 
 pub mod composite;
 pub mod helpers;
 
 pub mod gwt_asphyxiation;
 pub mod bistable_perception;
+pub mod metacognitive_ignition;
 pub mod perturbational_complexity;
 pub mod phase_transition;
 pub mod somatic_interference;
@@ -46,6 +52,7 @@ pub mod unconscious_priming;
 pub use composite::QualiaConfidenceScore;
 pub use gwt_asphyxiation::GwtAsphyxiationBenchmark;
 pub use bistable_perception::BistablePerceptionBenchmark;
+pub use metacognitive_ignition::MetacognitiveIgnitionBenchmark;
 pub use perturbational_complexity::PerturbationalComplexityBenchmark;
 pub use phase_transition::PhaseTransitionBenchmark;
 pub use somatic_interference::SomaticInterferenceBenchmark;

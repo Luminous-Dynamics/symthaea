@@ -458,6 +458,21 @@ pub struct CognitiveLoopConfig {
     #[cfg(feature = "physics-bridge")]
     pub physics_bridge_blend_weight: f32,
 
+    // ── Per-Region Substrate Types (Phase 4 Foundation) ────────────────
+    /// Per-region substrate mapping: allows different cortical regions to run
+    /// on different physical substrates. When `None`, all regions use the
+    /// global `substrate_type`. When set, effective feasibility is computed
+    /// as a weighted average of per-region scores with cross-substrate
+    /// communication penalty.
+    /// Science: Phase 4 of Substrate Roadmap — heterogeneous substrate modeling.
+    #[serde(default)]
+    pub per_region_substrates: Option<
+        std::collections::HashMap<
+            symthaea_core::hdc::substrate_independence::CorticalRegion,
+            SubstrateType,
+        >,
+    >,
+
     // ── Energy Budget ─────────────────────────────────────────────────
     /// Enable substrate energy budget tracking.
     /// When true, the substrate manager tracks cumulative energy expenditure
@@ -568,6 +583,7 @@ impl Default for CognitiveLoopConfig {
             enable_substrate_speed_modulation: false,
             substrate_type: SubstrateType::SiliconDigital,
             substrate_composition: None,
+            per_region_substrates: None,
             #[cfg(feature = "physics-bridge")]
             enable_physics_bridge: false,
             #[cfg(feature = "physics-bridge")]

@@ -255,6 +255,8 @@ jobs:
           - ssm_language
           # Mamba SSM fusion
           - liquid-mamba
+          # Physics bridge (HDC semantic search for physics analogies)
+          - physics-bridge
     defaults:
       run:
         working-directory: symthaea
@@ -308,7 +310,7 @@ jobs:
             ${{ runner.os }}-cargo-subcrates-
       - name: Test sub-crates (fast path)
         run: |
-          for crate in symthaea-causal-reasoning symthaea-cell-foundry symthaea-consciousness-equation symthaea-consciousness-resonance symthaea-consciousness-topology symthaea-dream symthaea-ectogenesis symthaea-embeddings symthaea-enactive symthaea-exploration symthaea-fabrication-kernel symthaea-factor-graph symthaea-fep symthaea-field-dynamics symthaea-flight symthaea-genomics symthaea-hal symthaea-hodge symthaea-humanoid symthaea-materials symthaea-memory symthaea-narrative-self symthaea-neuromodulators symthaea-nuclear-forensics symthaea-nurture symthaea-observability symthaea-perception symthaea-phi-search symthaea-physics symthaea-population symthaea-psych-bench symthaea-sensorimotor symthaea-sentinel symthaea-seven-harmonies symthaea-ssm symthaea-stt symthaea-support symthaea-types symthaea-vehicle symthaea-vision-manifold symthaea-vocal-tract symthaea-wisdom symthaea-zkproof; do
+          for crate in symthaea-causal-reasoning symthaea-cell-foundry symthaea-consciousness-equation symthaea-consciousness-resonance symthaea-consciousness-topology symthaea-dream symthaea-ectogenesis symthaea-embeddings symthaea-enactive symthaea-exploration symthaea-fabrication-kernel symthaea-factor-graph symthaea-fep symthaea-field-dynamics symthaea-flight symthaea-genomics symthaea-hal symthaea-hodge symthaea-humanoid symthaea-materials symthaea-memory symthaea-narrative-self symthaea-neuromodulators symthaea-nuclear-forensics symthaea-nurture symthaea-observability symthaea-perception symthaea-phi-search symthaea-physics symthaea-physics-bridge symthaea-population symthaea-psych-bench symthaea-sensorimotor symthaea-sentinel symthaea-seven-harmonies symthaea-ssm symthaea-stt symthaea-support symthaea-types symthaea-vehicle symthaea-vision-manifold symthaea-vocal-tract symthaea-wisdom symthaea-zkproof; do
             echo "::group::$crate"
             cargo clippy -p $crate --lib -- -D warnings
             cargo test -p $crate --lib
@@ -409,3 +411,4 @@ jobs:
           cargo check --example vocal_tract_demo --features vocal-tract
           cargo check --example vocal_tract_benchmark --features vocal-tract
           cargo check --example conscious_reasoning_demo --features reasoning_engine
+          cargo check --example guided_design_sweep --features physics-bridge

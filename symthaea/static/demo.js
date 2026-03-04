@@ -457,7 +457,9 @@ function connect() {
         setFlag('flagReasoning', data.reasoning_confidence > 0);
         setFlag('flagInversion', data.moral_value_inversion);
         setFlag('flagFESpike', data.moral_free_energy_spike);
-        setFlag('flagDrift', (data.moral_drift || 0) > 0.25);
+        setFlag('flagDrift', data.moral_drift_alert);
+        setFlag('flagFragmentation', data.moral_fragmentation_increase);
+        setFlag('flagResponseActive', data.moral_anomaly_response_applied);
 
         // Flash anomaly badges
         const flashFlag = (id, active) => {
@@ -471,6 +473,8 @@ function connect() {
         };
         flashFlag('flagInversion', data.moral_value_inversion);
         flashFlag('flagFESpike', data.moral_free_energy_spike);
+        flashFlag('flagFragmentation', data.moral_fragmentation_increase);
+        flashFlag('flagResponseActive', data.moral_anomaly_response_applied);
 
         // Topology info
         const harmonyNames = data.harmony_labels || HARMONY_LABELS;
