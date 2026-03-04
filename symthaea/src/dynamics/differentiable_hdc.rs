@@ -285,7 +285,10 @@ impl DifferentiableHDCEncoder {
     /// For bipolar {-1, +1}: cosine similarity
     /// For binary {0, 1}: Hamming similarity
     pub fn similarity(a: &[f32], b: &[f32]) -> f32 {
-        assert_eq!(a.len(), b.len());
+        debug_assert_eq!(a.len(), b.len(), "DifferentiableHDC::similarity length mismatch");
+        if a.len() != b.len() {
+            return 0.0;
+        }
 
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();

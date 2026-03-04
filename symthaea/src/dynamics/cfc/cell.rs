@@ -47,16 +47,18 @@ pub struct CfCCell {
 impl CfCCell {
     /// Create a new CfC cell
     ///
-    /// # Panics
-    /// Panics if `config.tau_range.0` is less than `MIN_TAU` (1e-6).
-    pub fn new(config: CfCConfig) -> Self {
-        // Validate tau range to prevent NaN in exp(-dt/tau) calculations
-        assert!(
-            config.tau_range.0 >= MIN_TAU,
-            "tau_min must be >= {} to prevent numerical instability, got {}",
-            MIN_TAU,
-            config.tau_range.0
-        );
+    /// Clamps `config.tau_range.0` to at least `MIN_TAU` (1e-6) to prevent
+    /// NaN in exp(-dt/tau) calculations.
+    pub fn new(mut config: CfCConfig) -> Self {
+        // Clamp tau range to prevent NaN in exp(-dt/tau) calculations
+        if config.tau_range.0 < MIN_TAU {
+            tracing::warn!(
+                tau_min = config.tau_range.0,
+                min_tau = MIN_TAU,
+                "tau_min below MIN_TAU, clamping"
+            );
+            config.tau_range.0 = MIN_TAU;
+        }
 
         // When backbone is used, w_in takes backbone output (backbone_dim)
         // Otherwise, w_in takes raw input (input_dim)
@@ -138,15 +140,17 @@ impl CfCCell {
     /// Uses `genesis.domain(label)` to derive a SHAKE-256 RNG stream so that
     /// identical seeds and labels always produce identical weights.
     ///
-    /// # Panics
-    /// Panics if `config.tau_range.0` is less than `MIN_TAU` (1e-6).
-    pub fn from_genesis(config: CfCConfig, genesis: &GenesisSeed, label: &str) -> Self {
-        assert!(
-            config.tau_range.0 >= MIN_TAU,
-            "tau_min must be >= {} to prevent numerical instability, got {}",
-            MIN_TAU,
-            config.tau_range.0
-        );
+    /// Clamps `config.tau_range.0` to at least `MIN_TAU` (1e-6) to prevent
+    /// NaN in exp(-dt/tau) calculations.
+    pub fn from_genesis(mut config: CfCConfig, genesis: &GenesisSeed, label: &str) -> Self {
+        if config.tau_range.0 < MIN_TAU {
+            tracing::warn!(
+                tau_min = config.tau_range.0,
+                min_tau = MIN_TAU,
+                "tau_min below MIN_TAU, clamping"
+            );
+            config.tau_range.0 = MIN_TAU;
+        }
 
         let mut rng = genesis.domain(label);
 

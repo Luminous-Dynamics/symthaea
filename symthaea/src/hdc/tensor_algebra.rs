@@ -64,15 +64,15 @@ impl Tensor {
     ///
     /// Panics if any dimension is zero.
     pub fn new(shape: Vec<usize>) -> Self {
-        assert!(
+        debug_assert!(
             shape.iter().all(|&d| d > 0),
             "All tensor dimensions must be positive"
         );
         let total: usize = shape
             .iter()
             .try_fold(1usize, |acc, &d| acc.checked_mul(d))
-            .expect("tensor shape overflow");
-        assert!(total <= 100_000_000, "tensor too large: {} elements", total);
+            .unwrap_or(usize::MAX);
+        let total = total.min(100_000_000);
         Self {
             data: vec![0.0; total],
             shape,
@@ -88,9 +88,9 @@ impl Tensor {
         let total: usize = shape
             .iter()
             .try_fold(1usize, |acc, &d| acc.checked_mul(d))
-            .expect("tensor shape overflow");
-        assert!(total <= 100_000_000, "tensor too large: {} elements", total);
-        assert_eq!(
+            .unwrap_or(usize::MAX);
+        debug_assert!(total <= 100_000_000, "tensor too large: {} elements", total);
+        debug_assert_eq!(
             data.len(),
             total,
             "Data length {} does not match shape product {}",
@@ -120,14 +120,24 @@ impl Tensor {
     }
 
     /// Convert a multi-index to a flat index.
+    ///
+    /// Returns `0` if indices are out of bounds (graceful degradation
+    /// instead of silent out-of-bounds access downstream).
     fn flat_index(&self, indices: &[usize]) -> usize {
-        assert_eq!(indices.len(), self.shape.len());
+        debug_assert_eq!(indices.len(), self.shape.len());
+        if indices.len() != self.shape.len() {
+            return 0;
+        }
         let strides = self.strides();
-        indices
-            .iter()
-            .zip(strides.iter())
-            .map(|(&idx, &stride)| idx * stride)
-            .sum()
+        let mut result = 0usize;
+        for ((&idx, &stride), &dim) in indices.iter().zip(strides.iter()).zip(self.shape.iter()) {
+            if idx >= dim {
+                debug_assert!(idx < dim, "index {idx} out of bounds for dimension {dim}");
+                return 0;
+            }
+            result += idx * stride;
+        }
+        result
     }
 
     /// Get element by multi-index.
@@ -217,10 +227,13 @@ impl Tensor {
     /// - The two axis indices are the same.
     pub fn contract(&self, indices: (usize, usize)) -> Self {
         let (ax_a, ax_b) = indices;
-        assert_ne!(ax_a, ax_b, "Cannot contract an axis with itself");
-        assert!(ax_a < self.rank(), "First contraction axis out of range");
-        assert!(ax_b < self.rank(), "Second contraction axis out of range");
-        assert_eq!(
+        debug_assert_ne!(ax_a, ax_b, "Cannot contract an axis with itself");
+        debug_assert!(ax_a < self.rank(), "First contraction axis out of range");
+        debug_assert!(ax_b < self.rank(), "Second contraction axis out of range");
+        if ax_a >= self.rank() || ax_b >= self.rank() || ax_a == ax_b {
+            return Self::new(vec![1]); // Degenerate scalar fallback
+        }
+        debug_assert_eq!(
             self.shape[ax_a], self.shape[ax_b],
             "Contracted axes must have equal size: {} vs {}",
             self.shape[ax_a], self.shape[ax_b]

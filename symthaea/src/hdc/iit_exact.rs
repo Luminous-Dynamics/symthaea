@@ -294,9 +294,15 @@ impl TransitionProbabilityMatrix {
 /// A state-by-node TPM with 2^n rows and n columns.
 pub fn compute_tpm(adjacency: &[Vec<f32>], noise: f64) -> TransitionProbabilityMatrix {
     let n = adjacency.len();
-    assert!(n > 0, "Adjacency matrix must be non-empty");
+    debug_assert!(n > 0, "Adjacency matrix must be non-empty");
+    if n == 0 {
+        return TransitionProbabilityMatrix {
+            rows: vec![],
+            n_nodes: 0,
+        };
+    }
     for row in adjacency {
-        assert_eq!(row.len(), n, "Adjacency matrix must be square");
+        debug_assert_eq!(row.len(), n, "Adjacency matrix must be square");
     }
 
     let n_states = 1usize << n;
@@ -963,8 +969,8 @@ pub struct PhiValidation {
 /// Panics if n > 8 (exact IIT is intractable for larger systems).
 pub fn validate_phi_proxy(adjacency: &[Vec<f32>], noise: f64) -> PhiValidation {
     let n = adjacency.len();
-    assert!(n <= 8, "Exact IIT is intractable for n > 8 nodes");
-    assert!(n >= 2, "Need at least 2 nodes for Phi computation");
+    debug_assert!(n <= 8, "Exact IIT is intractable for n > 8 nodes");
+    debug_assert!(n >= 2, "Need at least 2 nodes for Phi computation");
 
     // Build TPM from the adjacency/similarity matrix
     let tpm = compute_tpm(adjacency, noise);

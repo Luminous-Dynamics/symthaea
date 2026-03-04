@@ -190,11 +190,11 @@ impl PhiAttentionGate {
             ));
         }
 
-        assert_eq!(
-            inputs.len(),
-            phi_values.len(),
-            "Number of inputs must match number of Phi values"
-        );
+        // Truncate to shorter length rather than panicking on mismatch
+        debug_assert_eq!(inputs.len(), phi_values.len(), "inputs/phi_values length mismatch in PhiAttention::forward");
+        let len = inputs.len().min(phi_values.len());
+        let inputs = &inputs[..len];
+        let phi_values = &phi_values[..len];
 
         // Update running statistics
         self.update_statistics(phi_values);

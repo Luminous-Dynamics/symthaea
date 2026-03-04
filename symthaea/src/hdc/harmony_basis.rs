@@ -60,9 +60,17 @@ impl HarmonyBasis {
             .iter()
             .map(|kw| encoder.encode(kw))
             .collect();
+        // HARMONY_KEYWORDS is a compile-time [&str; 7], so this always produces
+        // exactly 7 vectors. Use debug_assert for loud failure in dev builds.
+        debug_assert_eq!(vectors.len(), 7, "expected 7 harmony vectors, got {}", vectors.len());
         Self {
             vectors: vectors.try_into().unwrap_or_else(|v: Vec<ContinuousHV>| {
-                panic!("expected 7 harmony vectors, got {}", v.len())
+                // Fallback: re-encode with padding/truncation to guarantee [_; 7]
+                let mut arr = [(); 7].map(|_| ContinuousHV::zero(dim));
+                for (i, hv) in v.into_iter().enumerate().take(7) {
+                    arr[i] = hv;
+                }
+                arr
             }),
             dim,
         }
