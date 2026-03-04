@@ -156,6 +156,8 @@ pub(crate) mod substrate_manager;
 
 #[cfg(feature = "physics-bridge")]
 pub(crate) mod physics_integration;
+#[cfg(feature = "physics-bridge")]
+pub use physics_integration::ParetoContext;
 
 pub mod calibration;
 

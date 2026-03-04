@@ -6769,3 +6769,106 @@ fn test_reconfigure_substrate_clears_composition() {
         "Pure bio confidence should ≈ 0.95, got {bio_conf:.4}"
     );
 }
+
+// ── Physics Bridge Integration Tests ─────────────────────────────────
+
+/// Test that physics bridge populates telemetry when enabled.
+/// Runs 20 cycles with interval=5, verifies catalog_size, query_count, and top_match.
+#[cfg(feature = "physics-bridge")]
+#[test]
+fn test_physics_bridge_in_cognitive_loop() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_physics_bridge = true;
+    config.physics_bridge_query_interval = 5;
+    config.physics_bridge_blend_weight = 0.2;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    let mut found_physics_telemetry = false;
+    let mut found_query = false;
+    for i in 0..20 {
+        let result = service.cycle(&format!("physics cycle {i}"));
+        if let Some(ref pb) = result.metadata.physics_bridge {
+            found_physics_telemetry = true;
+            // The catalog should have the 27 built-in physics entries
+            assert!(
+                pb.catalog_size >= 27,
+                "catalog_size should be >= 27, got {}",
+                pb.catalog_size
+            );
+            if pb.queried_this_cycle {
+                found_query = true;
+                assert!(
+                    !pb.top_match.is_empty(),
+                    "top_match should be non-empty on query cycles"
+                );
+                assert!(
+                    pb.top_score > 0.0,
+                    "top_score should be > 0.0 on query cycles"
+                );
+            }
+        }
+    }
+    assert!(
+        found_physics_telemetry,
+        "Should have physics_bridge telemetry in at least one cycle"
+    );
+    assert!(
+        found_query,
+        "Should have queried at least once in 20 cycles with interval=5"
+    );
+}
+
+/// Test that physics bridge telemetry is None when disabled.
+#[cfg(feature = "physics-bridge")]
+#[test]
+fn test_physics_bridge_disabled_produces_none() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_physics_bridge = false;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    for _ in 0..5 {
+        let result = service.cycle("should have no physics");
+        assert!(
+            result.metadata.physics_bridge.is_none(),
+            "physics_bridge telemetry should be None when bridge is disabled"
+        );
+    }
+}
+
+/// Test that physics bridge blend actually modifies CfC output.
+/// Compares two services (with/without bridge, same input, interval=1, blend=0.5)
+/// and verifies their outputs diverge.
+#[cfg(feature = "physics-bridge")]
+#[test]
+fn test_physics_bridge_blend_modifies_output() {
+    // Service WITH physics bridge
+    let mut config_on = CognitiveLoopConfig::default();
+    config_on.enable_physics_bridge = true;
+    config_on.physics_bridge_query_interval = 1; // query every cycle
+    config_on.physics_bridge_blend_weight = 0.5; // strong blend
+    config_on.genesis_phrase = Some("physics_blend_test".into());
+    let mut service_on = CognitiveLoopService::new(config_on).unwrap();
+
+    // Service WITHOUT physics bridge (same genesis phrase)
+    let mut config_off = CognitiveLoopConfig::default();
+    config_off.enable_physics_bridge = false;
+    config_off.genesis_phrase = Some("physics_blend_test".into());
+    let mut service_off = CognitiveLoopService::new(config_off).unwrap();
+
+    // Run identical inputs
+    let input = "tokamak plasma confinement at high beta";
+    let mut diverged = false;
+    for _ in 0..10 {
+        let r_on = service_on.cycle(input);
+        let r_off = service_off.cycle(input);
+        // Compare prediction errors — physics blend changes CfC input → different predictions
+        if (r_on.prediction_error - r_off.prediction_error).abs() > 1e-6 {
+            diverged = true;
+            break;
+        }
+    }
+    assert!(
+        diverged,
+        "Services with/without physics bridge should produce different prediction errors"
+    );
+}
