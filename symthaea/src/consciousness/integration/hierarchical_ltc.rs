@@ -558,6 +558,9 @@ impl HierarchicalLTC {
 
     /// Inject input distributed across all circuits
     pub fn inject_distributed(&mut self, input: &[f32]) {
+        if self.circuits.is_empty() {
+            return;
+        }
         let chunk_size = input.len() / self.circuits.len();
         for (i, circuit) in self.circuits.iter_mut().enumerate() {
             let start = i * chunk_size;

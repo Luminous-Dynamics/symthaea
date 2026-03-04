@@ -185,7 +185,7 @@ impl BatchProcessor {
                 loop {
                     // Get next file
                     let work = {
-                        let mut queue = work_queue.lock().unwrap();
+                        let mut queue = work_queue.lock().unwrap_or_else(|e| e.into_inner());
                         queue.pop()
                     };
 
@@ -209,7 +209,7 @@ impl BatchProcessor {
 
                     // Store result
                     {
-                        let mut results = results.lock().unwrap();
+                        let mut results = results.lock().unwrap_or_else(|e| e.into_inner());
                         results.push(result);
                     }
 
@@ -225,7 +225,7 @@ impl BatchProcessor {
                     // Check if we should stop on error
                     if !continue_on_error {
                         // Check last result
-                        let results = results.lock().unwrap();
+                        let results = results.lock().unwrap_or_else(|e| e.into_inner());
                         if let Some(last) = results.last() {
                             if last.status.is_err() {
                                 break;
@@ -246,7 +246,7 @@ impl BatchProcessor {
         // Collect results
         let results = Arc::try_unwrap(results)
             .map(|mutex| mutex.into_inner().unwrap())
-            .unwrap_or_else(|arc| arc.lock().unwrap().clone());
+            .unwrap_or_else(|arc| arc.lock().unwrap_or_else(|e| e.into_inner()).clone());
 
         // Compute stats
         let mut stats = BatchStats {
@@ -414,7 +414,7 @@ impl BatchTrainer {
 
                 loop {
                     let work = {
-                        let mut queue = work_queue.lock().unwrap();
+                        let mut queue = work_queue.lock().unwrap_or_else(|e| e.into_inner());
                         queue.pop()
                     };
 
@@ -434,7 +434,7 @@ impl BatchTrainer {
 
                     // Update stats
                     {
-                        let mut s = stats.lock().unwrap();
+                        let mut s = stats.lock().unwrap_or_else(|e| e.into_inner());
                         s.files_processed += 1;
                         match result {
                             Ok(duration) => {
@@ -464,14 +464,14 @@ impl BatchTrainer {
         }
 
         // Finalize stats
-        let mut final_stats = stats.lock().unwrap().clone();
+        let mut final_stats = stats.lock().unwrap_or_else(|e| e.into_inner()).clone();
         final_stats.total_time_sec = start_time.elapsed().as_secs_f32();
         if final_stats.total_time_sec > 0.0 {
             final_stats.realtime_factor = final_stats.total_audio_sec / final_stats.total_time_sec;
         }
 
         // Finalize prototypes
-        let accumulators = self.accumulators.lock().unwrap();
+        let accumulators = self.accumulators.lock().unwrap_or_else(|e| e.into_inner());
         let mut prototypes = TrainedPrototypes::new(self.bootstrap_config.clone());
 
         for (phoneme, acc) in accumulators.iter() {
@@ -546,7 +546,7 @@ impl BatchTrainer {
             // Use MIDDLE frame as representative (most stable part of phoneme)
             let mid = (start + end) / 2;
             if mid < hvs.len() {
-                let mut acc = accumulators.lock().unwrap();
+                let mut acc = accumulators.lock().unwrap_or_else(|e| e.into_inner());
                 acc.entry(label.clone())
                     .or_insert_with(PhonemeAccumulator::new)
                     .add(&hvs[mid]);
@@ -617,7 +617,7 @@ impl BatchTrainer {
 
                 loop {
                     let work = {
-                        let mut queue = work_queue.lock().unwrap();
+                        let mut queue = work_queue.lock().unwrap_or_else(|e| e.into_inner());
                         queue.pop()
                     };
 
@@ -637,7 +637,7 @@ impl BatchTrainer {
 
                     // Update stats
                     {
-                        let mut s = stats.lock().unwrap();
+                        let mut s = stats.lock().unwrap_or_else(|e| e.into_inner());
                         s.files_processed += 1;
                         match result {
                             Ok(duration) => {
@@ -667,7 +667,7 @@ impl BatchTrainer {
         }
 
         // Finalize stats
-        let mut final_stats = stats.lock().unwrap().clone();
+        let mut final_stats = stats.lock().unwrap_or_else(|e| e.into_inner()).clone();
         final_stats.total_time_sec = start_time.elapsed().as_secs_f32();
         if final_stats.total_time_sec > 0.0 {
             final_stats.realtime_factor = final_stats.total_audio_sec / final_stats.total_time_sec;
@@ -676,7 +676,7 @@ impl BatchTrainer {
         // Extract the adaptive set
         let adaptive_set = Arc::try_unwrap(adaptive_set)
             .map(|mutex| mutex.into_inner().unwrap())
-            .unwrap_or_else(|arc| arc.lock().unwrap().clone());
+            .unwrap_or_else(|arc| arc.lock().unwrap_or_else(|e| e.into_inner()).clone());
 
         let adaptive_stats = adaptive_set.stats();
 
@@ -754,7 +754,7 @@ impl BatchTrainer {
 
             // Train on individual frames (not bundled) to match inference behavior
             // Each frame within the phoneme occurrence contributes to the prototype
-            let mut set = adaptive_set.lock().unwrap();
+            let mut set = adaptive_set.lock().unwrap_or_else(|e| e.into_inner());
             for frame_idx in *start..*end {
                 if frame_idx < hvs.len() {
                     set.train(label, &hvs[frame_idx]);
@@ -859,7 +859,7 @@ impl BatchDiscovery {
 
                 loop {
                     let work = {
-                        let mut queue = work_queue.lock().unwrap();
+                        let mut queue = work_queue.lock().unwrap_or_else(|e| e.into_inner());
                         queue.pop()
                     };
 
@@ -873,7 +873,7 @@ impl BatchDiscovery {
 
                     // Update stats
                     {
-                        let mut s = stats.lock().unwrap();
+                        let mut s = stats.lock().unwrap_or_else(|e| e.into_inner());
                         s.files_processed += 1;
                         match result {
                             Ok(duration) => {
@@ -903,9 +903,9 @@ impl BatchDiscovery {
         }
 
         // Finalize
-        let result = pipeline.lock().unwrap().finalize();
+        let result = pipeline.lock().unwrap_or_else(|e| e.into_inner()).finalize();
 
-        let mut final_stats = stats.lock().unwrap().clone();
+        let mut final_stats = stats.lock().unwrap_or_else(|e| e.into_inner()).clone();
         final_stats.total_time_sec = start_time.elapsed().as_secs_f32();
         if final_stats.total_time_sec > 0.0 {
             final_stats.realtime_factor = final_stats.total_audio_sec / final_stats.total_time_sec;
@@ -934,7 +934,7 @@ impl BatchDiscovery {
 
         // Feed to pipeline
         {
-            let mut pipe = pipeline.lock().unwrap();
+            let mut pipe = pipeline.lock().unwrap_or_else(|e| e.into_inner());
             pipe.process(&hvs, &saliences, &timestamps);
         }
 

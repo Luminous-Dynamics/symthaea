@@ -1214,16 +1214,17 @@ impl SleepSentinel {
         let occipital_norm = (occipital / 100.0).clamp(-1.0, 1.0);
 
         // Step frontal LTC
+        let n = self.config.local_neurons;
         let (frontal_out, _) = self
             .frontal_ltc
             .forward(&[frontal_norm])
-            .expect("Frontal forward failed");
+            .unwrap_or_else(|_| (vec![0.0; n], vec![]));
 
         // Step occipital LTC
         let (occipital_out, _) = self
             .occipital_ltc
             .forward(&[occipital_norm])
-            .expect("Occipital forward failed");
+            .unwrap_or_else(|_| (vec![0.0; n], vec![]));
 
         // Combine states for integrator
         let mut combined = Vec::with_capacity(self.config.local_neurons * 2);
@@ -1242,7 +1243,7 @@ impl SleepSentinel {
         let (integrator_out, _) = self
             .integrator_ltc
             .forward(&combined)
-            .expect("Integrator forward failed");
+            .unwrap_or_else(|_| (vec![0.0; n * 2], vec![]));
 
         // Record history
         self.frontal_history.push_back(frontal_out);

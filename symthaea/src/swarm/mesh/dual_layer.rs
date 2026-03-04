@@ -426,17 +426,17 @@ impl LoopbackTransport {
 
     /// Get all data that was sent through this transport.
     pub fn sent_data(&self) -> Vec<Vec<u8>> {
-        self.sent.lock().unwrap().clone()
+        self.sent.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// Number of send operations.
     pub fn send_count(&self) -> usize {
-        self.sent.lock().unwrap().len()
+        self.sent.lock().unwrap_or_else(|e| e.into_inner()).len()
     }
 
     /// Clear the send buffer.
     pub fn clear(&self) {
-        self.sent.lock().unwrap().clear();
+        self.sent.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
     /// Reassemble LoRa fragments from the send buffer into a WisdomPacket.
@@ -444,7 +444,7 @@ impl LoopbackTransport {
     /// Handles both compressed (via `DualLayerMesh::send`) and raw
     /// (via `WisdomPacket::fragment`) fragment streams.
     pub fn reassemble_wisdom(&self) -> Option<WisdomPacket> {
-        let sent = self.sent.lock().unwrap();
+        let sent = self.sent.lock().unwrap_or_else(|e| e.into_inner());
         if sent.is_empty() {
             return None;
         }
@@ -475,7 +475,7 @@ impl LoopbackTransport {
 
 impl MeshTransport for LoopbackTransport {
     fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
-        self.sent.lock().unwrap().push(data.to_vec());
+        self.sent.lock().unwrap_or_else(|e| e.into_inner()).push(data.to_vec());
         Ok(())
     }
 
@@ -543,12 +543,12 @@ impl BiLoopbackTransport {
 
 impl MeshTransport for BiLoopbackTransport {
     fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
-        self.tx_buf.lock().unwrap().push_back(data.to_vec());
+        self.tx_buf.lock().unwrap_or_else(|e| e.into_inner()).push_back(data.to_vec());
         Ok(())
     }
 
     fn recv_raw(&self, buf: &mut [u8]) -> Result<usize, MeshError> {
-        match self.rx_buf.lock().unwrap().pop_front() {
+        match self.rx_buf.lock().unwrap_or_else(|e| e.into_inner()).pop_front() {
             Some(data) => {
                 let len = data.len().min(buf.len());
                 buf[..len].copy_from_slice(&data[..len]);
