@@ -200,7 +200,7 @@ impl RepairPlanner {
 
         let mut merged = vec![gaps[0]];
         for &(start, end) in &gaps[1..] {
-            let last = merged.last_mut().unwrap();
+            let last = merged.last_mut().expect("merged initialized with gaps[0]");
             if start <= last.1 {
                 last.1 = last.1.max(end);
             } else {

@@ -132,7 +132,7 @@ impl ErrorCorrector {
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                .unwrap();
+                .expect("base_scores is non-empty (4 bases)");
 
             let base = match best_idx {
                 0 => Base::A,

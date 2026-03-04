@@ -776,9 +776,9 @@ impl HdcSsmProjection {
 
         // === Backprop through deep inner bottleneck (if enabled) ===
         let delta_fwd_act = if self.deep {
-            let inner_pre = inner_fwd_pre_act.as_ref().unwrap();
-            let inner_act = inner_fwd_act.as_ref().unwrap();
-            let expanded_pre = expanded_fwd_pre_act.as_ref().unwrap();
+            let inner_pre = inner_fwd_pre_act.as_ref().expect("deep mode guarantees Some intermediates");
+            let inner_act = inner_fwd_act.as_ref().expect("deep mode guarantees Some intermediates");
+            let expanded_pre = expanded_fwd_pre_act.as_ref().expect("deep mode guarantees Some intermediates");
 
             // delta_pre_deep flows into activation(expanded) + RESIDUAL_ALPHA * hidden_fwd_pre_deep
             // d/d(expanded) = delta_pre_deep * act'(expanded)

@@ -220,7 +220,7 @@ impl HdcAssembler {
                 .iter()
                 .enumerate()
                 .max_by_key(|(_, &c)| c)
-                .unwrap();
+                .expect("base_counts is non-empty (4 bases)");
 
             let base = match best_idx {
                 0 => Base::A,

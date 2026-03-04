@@ -228,12 +228,11 @@ impl PhysicsSearchEngine {
             .catalog
             .entries()
             .iter()
-            .filter(|e| e.equation.tensor.is_some())
-            .map(|entry| {
-                let tensor = entry.equation.tensor.as_ref().unwrap();
+            .filter_map(|entry| {
+                let tensor = entry.equation.tensor.as_ref()?;
                 let entry_hv = tensor_encoder.encode(tensor);
                 let score = query_hv.similarity(&entry_hv);
-                SearchResult {
+                Some(SearchResult {
                     name: entry.equation.name.clone(),
                     domain: entry.equation.domain,
                     score,
@@ -243,7 +242,7 @@ impl PhysicsSearchEngine {
                         dimensional: 0.0,
                         full: 0.0,
                     },
-                }
+                })
             })
             .collect();
         results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
