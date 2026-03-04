@@ -565,9 +565,10 @@ impl EpisodicMemory {
 
         if self.config.psi_weighted_sampling {
             // Phi-weighted sampling using softmax probabilities
+            let temp = self.config.sampling_temperature.max(1e-10);
             let scores: Vec<f64> = all_episodes
                 .iter()
-                .map(|pe| pe.score / self.config.sampling_temperature)
+                .map(|pe| pe.score / temp)
                 .collect();
 
             // Compute softmax
@@ -657,7 +658,7 @@ impl EpisodicMemory {
         let scores: Vec<f64> = all_episodes
             .iter()
             .map(|pe| {
-                let base = pe.score / self.config.sampling_temperature;
+                let base = pe.score / self.config.sampling_temperature.max(1e-10);
                 let similarity_bonus = pe
                     .episode
                     .bath_state_at_encoding

@@ -171,7 +171,7 @@ impl TemporalCoherenceMetrics {
         let bin_width = (max_tau - min_tau) / num_bins as f32;
 
         for &t in tau.iter() {
-            let bin_idx = ((t - min_tau) / bin_width) as usize;
+            let bin_idx = ((t - min_tau) / bin_width).clamp(0.0, num_bins as f32 - 1.0) as usize;
             let bin_idx = bin_idx.min(num_bins - 1);
             bins[bin_idx] += 1;
         }

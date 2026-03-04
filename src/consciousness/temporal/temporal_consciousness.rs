@@ -353,9 +353,12 @@ impl ConsciousnessContinuity {
         // Compute continuity score
         self.compute_continuity_score();
 
-        // Keep only recent discontinuities
+        // Keep only recent discontinuities (time-based + hard cap)
         let cutoff = Instant::now() - std::time::Duration::from_secs(60);
         self.discontinuities.retain(|d| d.timestamp > cutoff);
+        if self.discontinuities.len() > 1000 {
+            self.discontinuities.drain(..self.discontinuities.len() - 1000);
+        }
     }
 
     fn compute_continuity_score(&mut self) {
@@ -650,8 +653,17 @@ impl TemporalBindingAnalysis {
         }
     }
 
-    /// Add a temporal binding
+    /// Add a temporal binding (capped at 256 to prevent unbounded growth).
     pub fn add_binding(&mut self, a: &str, b: &str, relation: AllenRelation, strength: f64) {
+        if self.bindings.len() >= 256 {
+            // Evict weakest binding
+            if let Some(min_idx) = self.bindings.iter().enumerate()
+                .min_by(|(_, a), (_, b)| a.strength.partial_cmp(&b.strength).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i)
+            {
+                self.bindings.swap_remove(min_idx);
+            }
+        }
         self.bindings.push(TemporalBinding {
             component_a: a.to_string(),
             component_b: b.to_string(),

@@ -409,7 +409,7 @@ impl CausalByzantineDefense {
                 ((thresholds.name_min - features.name_length) as f64 / thresholds.name_min as f64)
                     * 100.0
             } else {
-                ((features.name_length - 100) as f64 / 100.0) * 100.0
+                (features.name_length.saturating_sub(100) as f64 / 100.0) * 100.0
             };
 
             factors.push(CausalFactor {
@@ -436,7 +436,7 @@ impl CausalByzantineDefense {
                     / thresholds.definition_min as f64)
                     * 100.0
             } else {
-                ((features.definition_length - 1000) as f64 / 1000.0) * 100.0
+                (features.definition_length.saturating_sub(1000) as f64 / 1000.0) * 100.0
             };
 
             factors.push(CausalFactor {

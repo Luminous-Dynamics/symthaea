@@ -261,7 +261,7 @@ pub struct FormantToMelConverter {
 impl FormantToMelConverter {
     /// Create a new converter with the given configuration.
     pub fn new(config: FormantToMelConfig) -> Self {
-        let samples_per_frame = (config.sample_rate / config.motor_frame_rate) as usize;
+        let samples_per_frame = (config.sample_rate / config.motor_frame_rate.max(1)) as usize;
 
         // Build mel filterbank
         let mel_filters = Self::create_mel_filterbank(&config);

@@ -233,7 +233,7 @@ impl TrajectoryFeatures {
         let bin_width = (max_val - min_val) / num_bins as f32;
 
         for &val in history {
-            let bin_idx = ((val - min_val) / bin_width) as usize;
+            let bin_idx = ((val - min_val) / bin_width).clamp(0.0, num_bins as f32 - 1.0) as usize;
             let bin_idx = bin_idx.min(num_bins - 1);
             bins[bin_idx] += 1;
         }
