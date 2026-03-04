@@ -90,7 +90,7 @@ impl FetalMonitor {
         }
         let start = self.history.len().saturating_sub(window);
         let first = &self.history[start];
-        let last = self.history.last().unwrap();
+        let Some(last) = self.history.last() else { return 0.0 };
         let weeks_elapsed = last.week.0 as f64 - first.week.0 as f64;
         if weeks_elapsed < 0.5 {
             return 0.0;

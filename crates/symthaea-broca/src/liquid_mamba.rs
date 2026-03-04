@@ -1143,7 +1143,7 @@ impl LiquidMambaGenerator {
             //
             // When Mamba output is meaningful (PE < 0.5), we boost the gradient
             // magnitude proportional to output quality.
-            let tp = self.temporal_proj.as_mut().unwrap();
+            let tp = self.temporal_proj.as_mut().expect("temporal_proj is Some when config.temporal_projection is true");
             if self.config.temporal_directional_loss {
                 tp.compute_directional_gradients(&thought_hv, None);
             } else {
