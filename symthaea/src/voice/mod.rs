@@ -97,7 +97,10 @@ pub use articulatory_synthesizer::{
 };
 pub use formant_targets::{FormantDatabase, FormantTarget};
 pub use phoneme_hdc::{AcousticParams, Manner, PhonemeHdcCodec, PhonemeSpec, PitchContour, Place};
-pub use vocoder::{cognitive_state_to_voice_quality, FormantVocoder, VocoderConfig, VoiceQuality};
+pub use vocoder::{
+    cognitive_state_to_voice_quality, cognitive_state_to_voice_quality_extended, FormantVocoder,
+    VocoderConfig, VoiceQuality,
+};
 
 // Re-export cognitive bridge types
 pub use cognitive_bridge::{
@@ -609,7 +612,7 @@ fn resample_audio(samples: &[f32], rate: f32) -> Vec<f32> {
     if samples.is_empty() || rate <= 0.0 {
         return samples.to_vec();
     }
-    let out_len = (samples.len() as f32 / rate).max(0.0) as usize;
+    let out_len = (samples.len() as f32 / rate).clamp(0.0, samples.len() as f32 * 4.0) as usize;
     let mut output = Vec::with_capacity(out_len);
     for i in 0..out_len {
         let src_pos = i as f32 * rate;

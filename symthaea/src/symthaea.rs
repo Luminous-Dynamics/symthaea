@@ -2043,7 +2043,7 @@ impl Symthaea {
         let steps_to_emergence = if consciousness >= 0.7 {
             0
         } else {
-            ((0.7 - consciousness) / 0.01) as usize
+            ((0.7 - consciousness) / 0.01).clamp(0.0, 1000.0) as usize
         };
 
         // ====================================================================
