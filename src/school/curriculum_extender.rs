@@ -810,14 +810,13 @@ fn unique_id(base: &str, used: &mut HashSet<String>) -> String {
     if used.insert(candidate.clone()) {
         return candidate;
     }
-    let mut idx = 2;
-    loop {
+    for idx in 2..10_000 {
         let next = format!("{}-{}", candidate, idx);
         if used.insert(next.clone()) {
             return next;
         }
-        idx += 1;
     }
+    format!("{}-fallback", candidate)
 }
 
 fn is_kebab_case(value: &str) -> bool {

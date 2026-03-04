@@ -364,7 +364,7 @@ async fn handle_client(
             // Send queued responses
             Some(response) = response_rx.recv() => {
                 let data = rmp_serde::to_vec(&response)?;
-                let len = (data.len() as u32).to_le_bytes();
+                let len = (data.len().min(u32::MAX as usize) as u32).to_le_bytes();
                 writer.write_all(&len).await?;
                 writer.write_all(&data).await?;
                 writer.flush().await?;
@@ -380,7 +380,7 @@ async fn handle_client(
                                     "Protocol version mismatch (client {version}, server {IPC_PROTOCOL_VERSION})"
                                 ));
                                 let data = rmp_serde::to_vec(&response)?;
-                                let len = (data.len() as u32).to_le_bytes();
+                                let len = (data.len().min(u32::MAX as usize) as u32).to_le_bytes();
                                 writer.write_all(&len).await?;
                                 writer.write_all(&data).await?;
                                 writer.flush().await?;
@@ -389,7 +389,7 @@ async fn handle_client(
                             negotiated_version = Some(version);
                             let response = IpcResponse::HelloAck { server_version: IPC_PROTOCOL_VERSION };
                             let data = rmp_serde::to_vec(&response)?;
-                            let len = (data.len() as u32).to_le_bytes();
+                            let len = (data.len().min(u32::MAX as usize) as u32).to_le_bytes();
                             writer.write_all(&len).await?;
                             writer.write_all(&data).await?;
                             writer.flush().await?;
@@ -399,7 +399,7 @@ async fn handle_client(
                         if negotiated_version.is_none() {
                             let response = IpcResponse::Error("Protocol version not negotiated".to_string());
                             let data = rmp_serde::to_vec(&response)?;
-                            let len = (data.len() as u32).to_le_bytes();
+                            let len = (data.len().min(u32::MAX as usize) as u32).to_le_bytes();
                             writer.write_all(&len).await?;
                             writer.write_all(&data).await?;
                             writer.flush().await?;
@@ -415,7 +415,7 @@ async fn handle_client(
 
                         // Send response
                         let data = rmp_serde::to_vec(&response)?;
-                        let len = (data.len() as u32).to_le_bytes();
+                        let len = (data.len().min(u32::MAX as usize) as u32).to_le_bytes();
                         writer.write_all(&len).await?;
                         writer.write_all(&data).await?;
                         writer.flush().await?;
@@ -778,7 +778,7 @@ mod tests {
         };
         let request = IpcRequest::Ping;
         let data = rmp_serde::to_vec(&request).unwrap();
-        let len = (data.len() as u32).to_le_bytes();
+        let len = (data.len().min(u32::MAX as usize) as u32).to_le_bytes();
 
         if let Err(err) = client.write_all(&len).await {
             if err.kind() == std::io::ErrorKind::PermissionDenied {

@@ -164,6 +164,74 @@ pub fn cognitive_state_to_voice_quality(
     }
 }
 
+/// Extended voice quality mapping with derivative-based modulation.
+///
+/// Builds on `cognitive_state_to_voice_quality` but adds temporal dynamics:
+/// - Rising arousal → voice strain (increased jitter)
+/// - Rapid valence shift → breathiness instability (spectral tilt flutter)
+/// - Dropping consciousness → voice uncertainty (increased shimmer)
+/// - Suppressed emotion (high |valence| × low arousal) → tighter BW, more jitter
+/// - Animated speech (high |valence| × high arousal) → tighter BW (confident)
+/// - High articulation quality → narrower bandwidths (confidence)
+/// - High rate stability → reduced jitter (steadier voice)
+pub fn cognitive_state_to_voice_quality_extended(
+    state: &symthaea_vocal_tract::encoder::VoiceCognitiveState,
+    derivs: &symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives,
+) -> VoiceQuality {
+    // Base profile from static state
+    let mut vq = cognitive_state_to_voice_quality(
+        state.emotional_valence,
+        state.emotional_arousal,
+        state.consciousness_level,
+    );
+
+    // Derivative modulations
+    // Rising arousal → voice strain (more jitter)
+    if derivs.delta_arousal > 0.0 {
+        vq.jitter_scale += derivs.delta_arousal * 0.3;
+    }
+
+    // Rapid valence shift → breathiness instability
+    let valence_instability = derivs.delta_valence.abs() * 0.1;
+    if let Some(ref mut tilt) = vq.spectral_tilt {
+        *tilt = (*tilt + valence_instability).clamp(0.0, 0.7);
+    }
+
+    // Dropping consciousness → voice uncertainty (more shimmer)
+    if derivs.delta_consciousness < 0.0 {
+        vq.shimmer_scale += derivs.delta_consciousness.abs() * 0.4;
+    }
+
+    // Conflict detection: suppressed emotion (high |valence| × low arousal)
+    let valence_magnitude = state.emotional_valence.abs();
+    let suppression = valence_magnitude * (1.0 - state.emotional_arousal);
+    if suppression > 0.5 {
+        let intensity = (suppression - 0.5) * 2.0; // 0..1
+        vq.bandwidth_scale *= 1.0 - intensity * 0.15; // tighter BW
+        vq.jitter_scale += intensity * 0.2; // voice strain from suppression
+    }
+
+    // Animation: confident, articulate speech (high |valence| × high arousal)
+    let animation = valence_magnitude * state.emotional_arousal;
+    if animation > 0.5 {
+        let intensity = (animation - 0.5) * 2.0;
+        vq.bandwidth_scale *= 1.0 - intensity * 0.1; // tighter, more focused
+    }
+
+    // Articulation quality → bandwidth confidence
+    vq.bandwidth_scale *= 1.1 - state.articulation_quality * 0.2; // 0.9–1.1
+
+    // Rate stability → jitter dampening
+    vq.jitter_scale *= 1.2 - state.rate_stability * 0.4; // 0.8–1.2
+
+    // Clamp all outputs to safe ranges
+    vq.jitter_scale = vq.jitter_scale.clamp(0.1, 3.0);
+    vq.shimmer_scale = vq.shimmer_scale.clamp(0.1, 3.0);
+    vq.bandwidth_scale = vq.bandwidth_scale.clamp(0.5, 2.0);
+
+    vq
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // BIQUAD RESONATOR FILTER
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -760,7 +828,10 @@ impl FormantVocoder {
 
         self.reset();
 
-        let total_duration = frames.last().unwrap().time - frames.first().unwrap().time;
+        let total_duration = match (frames.first(), frames.last()) {
+            (Some(first), Some(last)) => last.time - first.time,
+            _ => return Vec::new(),
+        };
         let frame_duration = if frames.len() > 1 {
             total_duration / (frames.len() - 1) as f32
         } else {
@@ -2125,6 +2196,100 @@ mod tests {
         assert!(
             samples.iter().all(|s| s.is_finite()),
             "All samples should be finite"
+        );
+    }
+
+    #[test]
+    fn test_arousal_strain_increases_jitter() {
+        let state = symthaea_vocal_tract::encoder::VoiceCognitiveState {
+            emotional_arousal: 0.5,
+            ..Default::default()
+        };
+        let zero_derivs = symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives::default();
+        let rising_derivs = symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives {
+            delta_arousal: 2.0,
+            ..Default::default()
+        };
+
+        let vq_base = cognitive_state_to_voice_quality_extended(&state, &zero_derivs);
+        let vq_rising = cognitive_state_to_voice_quality_extended(&state, &rising_derivs);
+
+        assert!(
+            vq_rising.jitter_scale > vq_base.jitter_scale,
+            "Rising arousal should increase jitter: base={}, rising={}",
+            vq_base.jitter_scale,
+            vq_rising.jitter_scale
+        );
+    }
+
+    #[test]
+    fn test_consciousness_drop_increases_shimmer() {
+        let state = symthaea_vocal_tract::encoder::VoiceCognitiveState {
+            consciousness_level: 0.5,
+            ..Default::default()
+        };
+        let zero_derivs = symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives::default();
+        let dropping_derivs = symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives {
+            delta_consciousness: -2.0,
+            ..Default::default()
+        };
+
+        let vq_base = cognitive_state_to_voice_quality_extended(&state, &zero_derivs);
+        let vq_dropping = cognitive_state_to_voice_quality_extended(&state, &dropping_derivs);
+
+        assert!(
+            vq_dropping.shimmer_scale > vq_base.shimmer_scale,
+            "Dropping consciousness should increase shimmer: base={}, dropping={}",
+            vq_base.shimmer_scale,
+            vq_dropping.shimmer_scale
+        );
+    }
+
+    #[test]
+    fn test_conflict_detection_suppressed_emotion() {
+        let zero_derivs = symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives::default();
+
+        // Suppressed: high |valence| but low arousal
+        let suppressed = symthaea_vocal_tract::encoder::VoiceCognitiveState {
+            emotional_valence: 0.9,
+            emotional_arousal: 0.1,
+            ..Default::default()
+        };
+        // Neutral
+        let neutral = symthaea_vocal_tract::encoder::VoiceCognitiveState::default();
+
+        let vq_suppressed = cognitive_state_to_voice_quality_extended(&suppressed, &zero_derivs);
+        let vq_neutral = cognitive_state_to_voice_quality_extended(&neutral, &zero_derivs);
+
+        // Suppression should affect bandwidth and/or jitter
+        assert!(
+            vq_suppressed.bandwidth_scale != vq_neutral.bandwidth_scale
+                || vq_suppressed.jitter_scale != vq_neutral.jitter_scale,
+            "Suppressed emotion should produce distinct profile"
+        );
+    }
+
+    #[test]
+    fn test_rate_stability_dampens_jitter() {
+        let zero_derivs = symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives::default();
+
+        let stable = symthaea_vocal_tract::encoder::VoiceCognitiveState {
+            rate_stability: 0.9,
+            ..Default::default()
+        };
+        let unstable = symthaea_vocal_tract::encoder::VoiceCognitiveState {
+            rate_stability: 0.1,
+            ..Default::default()
+        };
+
+        let vq_stable = cognitive_state_to_voice_quality_extended(&stable, &zero_derivs);
+        let vq_unstable = cognitive_state_to_voice_quality_extended(&unstable, &zero_derivs);
+
+        assert!(
+            vq_stable.jitter_scale < vq_unstable.jitter_scale,
+            "High rate stability should reduce jitter: stable={}, unstable={}",
+            vq_stable.jitter_scale,
+            vq_unstable.jitter_scale
         );
     }
 }
