@@ -212,6 +212,38 @@ impl CognitiveLoopService {
         self.substrate_manager.scale_pressure
     }
 
+    /// Get whether consciousness is still viable under energy constraints.
+    pub fn substrate_consciousness_viable(&self) -> bool {
+        self.substrate_manager.consciousness_viable
+    }
+
+    /// Get total energy spent so far (joules).
+    pub fn substrate_total_energy_spent(&self) -> f64 {
+        self.substrate_manager.total_energy_spent
+    }
+
+    /// Get energy spent per cycle (joules).
+    pub fn substrate_energy_per_cycle(&self) -> f64 {
+        self.substrate_manager.energy_per_cycle
+    }
+
+    /// Get energy throughput multiplier (ratio of bio energy to substrate energy).
+    pub fn substrate_energy_throughput_multiplier(&self) -> f32 {
+        self.substrate_manager.energy_throughput_multiplier
+    }
+
+    /// Inject Pareto context from a GuidedDesignExplorer into the physics bridge.
+    /// The context is drained into telemetry on the next cycle.
+    #[cfg(feature = "physics-bridge")]
+    pub fn set_physics_pareto_context(
+        &mut self,
+        ctx: super::super::physics_integration::ParetoContext,
+    ) {
+        if let Some(ref mut physics) = self.physics_integration {
+            physics.set_pareto_context(ctx);
+        }
+    }
+
     /// Inject a raw frame buffer for the next vision manifold cycle.
     /// The frame is consumed during the next `cycle()` call.
     #[cfg(feature = "vision-manifold")]

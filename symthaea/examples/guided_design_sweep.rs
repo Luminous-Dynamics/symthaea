@@ -176,4 +176,49 @@ fn main() {
     } else {
         println!("No feasible power found for D-D reaction.");
     }
+
+    // ── Pareto Context Injection Demo ──
+    println!("\n═══════════════════════════════════════════════════════════");
+    println!("  Pareto Context → Cognitive Loop");
+    println!("═══════════════════════════════════════════════════════════\n");
+
+    // Build Pareto context from explorer results
+    let pareto_result = explorer.guided_pareto(FusionReaction::DD, (1.0, 50.0), 20);
+    let pareto_ctx = symthaea::cognitive_loop::ParetoContext {
+        frontier_size: pareto_result.frontier.frontier.len(),
+        power_range: (1.0, 50.0),
+        dominant_domain: pareto_result
+            .frontier_analogies
+            .first()
+            .map(|a| a.equation_name.clone())
+            .unwrap_or_default(),
+        best_analogy_score: pareto_result
+            .frontier_analogies
+            .first()
+            .map(|a| a.similarity)
+            .unwrap_or(0.0),
+    };
+    println!(
+        "Pareto frontier: {} points, best analogy: {} ({:.1}%)",
+        pareto_ctx.frontier_size,
+        pareto_ctx.dominant_domain,
+        pareto_ctx.best_analogy_score * 100.0,
+    );
+
+    // Inject into cognitive loop (if you have one)
+    let mut config = symthaea::cognitive_loop::CognitiveLoopConfig::default();
+    config.enable_physics_bridge = true;
+    config.physics_bridge_query_interval = 5;
+    let mut service = symthaea::cognitive_loop::CognitiveLoopService::new(config).unwrap();
+
+    service.set_physics_pareto_context(pareto_ctx);
+
+    let result = service.cycle("fusion reactor design optimization");
+    if let Some(ref pb) = result.metadata.physics_bridge {
+        println!(
+            "Physics bridge: catalog={}, queried={}, top_match={}",
+            pb.catalog_size, pb.queried_this_cycle, pb.top_match,
+        );
+    }
+    println!("\nDone.");
 }
