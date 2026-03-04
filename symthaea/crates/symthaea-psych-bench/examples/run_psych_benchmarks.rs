@@ -79,6 +79,11 @@ use symthaea_psych_bench::benchmarks::neuromod::{
     PharmacologicalChallengeBenchmark, RewardLearningBenchmark, ToleranceWithdrawalBenchmark,
     YerkesDodsonBenchmark,
 };
+use symthaea_psych_bench::benchmarks::qualia_confidence::{
+    BistablePerceptionBenchmark, GwtAsphyxiationBenchmark, PerturbationalComplexityBenchmark,
+    PhaseTransitionBenchmark, QualiaConfidenceScore, SomaticInterferenceBenchmark,
+    UnconsciousPrimingBenchmark,
+};
 use symthaea_psych_bench::benchmarks::reasoning::{
     ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
     ArcCompositionalBenchmark, ArcFewShotBenchmark, ArcFluidBenchmark, ArcNoiseBenchmark,
@@ -282,6 +287,13 @@ fn main() {
         Box::new(DoseResponseBenchmark),
         Box::new(AntagonistProfilesBenchmark),
         Box::new(ToleranceWithdrawalBenchmark),
+        // Qualia Confidence (Consciousness)
+        Box::new(GwtAsphyxiationBenchmark),
+        Box::new(PhaseTransitionBenchmark),
+        Box::new(PerturbationalComplexityBenchmark),
+        Box::new(SomaticInterferenceBenchmark),
+        Box::new(BistablePerceptionBenchmark),
+        Box::new(UnconsciousPrimingBenchmark),
     ];
 
     // Filter benchmarks by name if --filter was specified
@@ -381,6 +393,20 @@ fn main() {
 
     if output_composites {
         println!("\n{}", report.format_composites());
+    }
+
+    // Qualia Confidence Matrix composite score (always shown when qualia benchmarks ran)
+    {
+        let qualia_results: Vec<_> = report
+            .results
+            .iter()
+            .filter(|r| r.benchmark.contains("QualiaConfidence"))
+            .cloned()
+            .collect();
+        if qualia_results.len() >= 2 {
+            let score = QualiaConfidenceScore::from_results(&qualia_results);
+            eprint!("{}", score.format_report());
+        }
     }
 
     // Reliability analysis: run battery with 5 different seeds

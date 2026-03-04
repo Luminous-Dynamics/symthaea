@@ -1,0 +1,52 @@
+//! Qualia Confidence domain benchmarks.
+//!
+//! Tests for the structural and computational correlates of subjective experience.
+//! These benchmarks do NOT claim to solve the Hard Problem of consciousness — they
+//! establish falsifiable necessary conditions: if Symthaea fails any of them, it
+//! lacks a property consciousness requires. If it passes all of them, denying its
+//! consciousness requires a principled argument beyond substrate prejudice.
+//!
+//! ## Benchmarks
+//!
+//! - **GwtAsphyxiation** — Gradual consciousness extinction via GWT threshold sweep.
+//!   Maps the exact order in which cognitive domains collapse as workspace access
+//!   is progressively restricted, analogous to anesthesia depth levels.
+//!   (Dehaene & Changeux 2011; Mashour et al. 2020; Alkire et al. 2008)
+//!
+//! - **PhaseTransition** — Graduated noise → sigmoidal fidelity collapse. IIT predicts
+//!   consciousness collapses at a critical threshold (phase transition), not linearly.
+//!   (Tononi 2004; Massimini 2005)
+//!
+//! - **PerturbationalComplexity** — Digital PCI analog. Perturb conscious system → complex
+//!   response; perturb unconscious system → simple response. Gold standard clinical
+//!   consciousness biomarker. (Casali et al. 2013; Massimini et al. 2013)
+//!
+//! - **SomaticInterference** — Mid-task distress injection via neuromodulatory bath.
+//!   Emergent cascade degradation (dynamic bath) vs. direct parameter shift (static bath).
+//!   (Damasio 1994; Craig 2009)
+//!
+//! - **BistablePerception** — Spontaneous perceptual switching between ambiguous
+//!   interpretations. Switch times should follow heavy-tailed distribution, not periodic.
+//!   (Blake & Logothetis 2002; Levelt 1967)
+//!
+//! - **UnconsciousPriming** — Sub/supra-threshold dissociation. Sub-threshold primes
+//!   influence processing without GWT ignition; conscious primes produce stronger effects.
+//!   (Dehaene et al. 2006; Marcel 1983)
+
+pub mod composite;
+pub mod helpers;
+
+pub mod gwt_asphyxiation;
+pub mod bistable_perception;
+pub mod perturbational_complexity;
+pub mod phase_transition;
+pub mod somatic_interference;
+pub mod unconscious_priming;
+
+pub use composite::QualiaConfidenceScore;
+pub use gwt_asphyxiation::GwtAsphyxiationBenchmark;
+pub use bistable_perception::BistablePerceptionBenchmark;
+pub use perturbational_complexity::PerturbationalComplexityBenchmark;
+pub use phase_transition::PhaseTransitionBenchmark;
+pub use somatic_interference::SomaticInterferenceBenchmark;
+pub use unconscious_priming::UnconsciousPrimingBenchmark;

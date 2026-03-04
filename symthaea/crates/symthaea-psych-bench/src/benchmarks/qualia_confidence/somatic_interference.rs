@@ -190,11 +190,13 @@ fn classify_trial(
         };
 
         // Baseline perceptual noise: always present, models normal psychophysical
-        // variability. Keeps baseline accuracy < 100% for realism.
-        // Amplitude 0.015 produces ~90-96% baseline accuracy at PERCEPTUAL_SENSITIVITY=0.20.
+        // variability. At PERCEPTUAL_SENSITIVITY=0.20, the effective margin
+        // between correct and runner-up is ~0.055. Amplitude must exceed half
+        // that margin (0.0275) to produce any flips. At 0.04 (~73% of margin),
+        // occasional flips give realistic baseline accuracy of ~85-95%.
         let baseline_noise = jitter_from_seed(
             trial_seed.wrapping_add(i as u64 * 31 + 1111),
-            0.015,
+            0.04,
         );
 
         let final_sim = adjusted + ne_noise + ht_noise + ach_noise + baseline_noise;
