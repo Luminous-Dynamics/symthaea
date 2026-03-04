@@ -39,6 +39,7 @@ pub(super) struct PerceptionPhaseResult {
     pub(super) moral_judgment: MoralJudgmentSummary,
     pub(super) selected_strategy: ResponseStrategy,
     pub(super) agency_strategy_override: bool,
+    pub(super) social_strategy_bias: bool,
     pub(super) soul_alignment: f32,
     pub(super) negation_detected: f32,
     pub(super) surprise_triggered: bool,
@@ -50,6 +51,27 @@ pub(super) struct PerceptionPhaseResult {
     pub(super) prediction_error: f32,
     pub(super) effective_threshold: f32,
     pub(super) memo_threshold: f32,
+    /// Vision manifold telemetry snapshot for this cycle (None when vision disabled).
+    #[cfg(feature = "vision-manifold")]
+    pub(super) vision_telemetry: Option<symthaea_vision_manifold::VisionTelemetry>,
+    /// Foveation recognition count this cycle.
+    #[cfg(feature = "foveation")]
+    pub(super) foveation_recognition_count: usize,
+    /// Top foveation recognition confidence this cycle.
+    #[cfg(feature = "foveation")]
+    pub(super) foveation_top_confidence: f32,
+    /// Cross-manifold prediction error (vision→cognitive).
+    #[cfg(feature = "vision-manifold")]
+    pub(super) cross_manifold_prediction_error: f32,
+    /// Mean surprise across all vision patches this cycle.
+    #[cfg(feature = "vision-manifold")]
+    pub(super) vision_mean_surprise: f32,
+    /// Per-horizon visual prediction errors (short→long timescale).
+    #[cfg(feature = "vision-manifold")]
+    pub(super) vision_horizon_errors: Vec<f32>,
+    /// Whether a scene was recognized this cycle (for dream salience boost).
+    #[cfg(feature = "vision-manifold")]
+    pub(super) scene_recognized: bool,
 }
 
 /// Result of the dynamics phase (Phases A–12).
@@ -267,6 +289,7 @@ pub(super) struct FeedbackPhaseResult {
     pub(super) consciousness_weight_variance: f64,
     // ── Weight convergence ──
     pub(super) convergence_state: String,
+    pub(super) social_learning_rate_factor: f32,
 }
 
 impl CognitiveLoopService {
@@ -289,6 +312,7 @@ impl CognitiveLoopService {
     pub fn cycle(&mut self, input: &str) -> CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
+        self.substrate_manager.tick_energy(&self.config);
         let mut module_timings = super::ModuleTimings::default();
 
         // ═══════════════════════════════════════════════════════════════════

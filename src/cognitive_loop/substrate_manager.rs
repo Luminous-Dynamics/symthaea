@@ -41,6 +41,20 @@ pub(crate) struct SubstrateManager {
     /// Scale pressure: log10(substrate_max_scale / bio_max_scale).
     /// Telemetry-only. 0.0 when speed modulation is disabled.
     pub(crate) scale_pressure: f32,
+
+    /// Whether consciousness is still viable under energy constraints.
+    /// False when energy budget is exhausted.
+    pub(crate) consciousness_viable: bool,
+
+    /// Total energy spent so far (joules).
+    pub(crate) total_energy_spent: f64,
+
+    /// Energy spent per cycle (joules).
+    pub(crate) energy_per_cycle: f64,
+
+    /// Throughput multiplier derived from substrate energy efficiency.
+    /// Higher = more efficient substrate = more ops per joule.
+    pub(crate) energy_throughput_multiplier: f32,
 }
 
 impl SubstrateManager {
@@ -52,6 +66,16 @@ impl SubstrateManager {
             Self::requirements_for(&config.substrate_type).consciousness_feasibility()
         };
 
+        // Compute energy per cycle from substrate energy_per_op
+        let energy_per_op = config.substrate_type.energy_per_operation();
+        // Approximate: 256 neurons × 256 ops each = 65536 ops per cycle
+        let ops_per_cycle = 65_536.0;
+        let energy_per_cycle = energy_per_op * ops_per_cycle;
+
+        // Throughput multiplier: ratio of bio energy to this substrate's energy
+        let bio_energy = SubstrateType::BiologicalNeurons.energy_per_operation();
+        let energy_throughput_multiplier = (bio_energy / energy_per_op).clamp(0.1, 100.0) as f32;
+
         let mut mgr = Self {
             feasibility,
             pending_transition: None,
@@ -59,6 +83,10 @@ impl SubstrateManager {
             effective_feasibility: feasibility,
             tau_factor: 1.0,
             scale_pressure: 0.0,
+            consciousness_viable: true,
+            total_energy_spent: 0.0,
+            energy_per_cycle,
+            energy_throughput_multiplier,
         };
         mgr.recompute_effective_feasibility(config);
         mgr.recompute_substrate_dynamics(config);
@@ -177,6 +205,20 @@ impl SubstrateManager {
         self.scale_pressure = (sub_scale / bio_scale).log10() as f32;
     }
 
+    /// Track energy expenditure for this cycle.
+    /// When energy budget is enabled and exceeded, marks consciousness as non-viable.
+    pub fn tick_energy(&mut self, config: &CognitiveLoopConfig) {
+        if !config.enable_energy_budget {
+            return;
+        }
+        self.total_energy_spent += self.energy_per_cycle;
+        if let Some(budget) = config.energy_budget_joules_per_sec {
+            if self.total_energy_spent > budget {
+                self.consciousness_viable = false;
+            }
+        }
+    }
+
     /// Map a canonical SubstrateType to its pre-built SubstrateRequirements profile.
     /// Unknown/future variants fall back to silicon_digital().
     pub(crate) fn requirements_for(substrate: &SubstrateType) -> SubstrateRequirements {
@@ -218,6 +260,25 @@ impl SubstrateManager {
             SubstrateType::HybridSystem => Some("hybrid"),
             _ => None,
         }
+    }
+}
+
+// ── Delegation methods on CognitiveLoopService ──────────────────────────────
+// These forward to SubstrateManager so that constructor.rs can call
+// Self::requirements_for(...) and Self::substrate_validation_key(...).
+
+impl super::CognitiveLoopService {
+    /// Default honest confidence for substrates not in the validation framework.
+    pub(crate) const THEORETICAL_CONFIDENCE: f64 = THEORETICAL_CONFIDENCE;
+
+    /// Delegate to SubstrateManager::requirements_for.
+    pub(crate) fn requirements_for(substrate: &SubstrateType) -> SubstrateRequirements {
+        SubstrateManager::requirements_for(substrate)
+    }
+
+    /// Delegate to SubstrateManager::substrate_validation_key.
+    pub(crate) fn substrate_validation_key(substrate: &SubstrateType) -> Option<&'static str> {
+        SubstrateManager::substrate_validation_key(substrate)
     }
 }
 

@@ -30,6 +30,7 @@ members = [
     "crates/symthaea-flight",
     "crates/symthaea-humanoid",
     "crates/symthaea-physics",
+    "crates/symthaea-physics-bridge",
     "crates/symthaea-vocal-tract",
     "crates/symthaea-vehicle",
     "crates/symthaea-hal",
@@ -48,6 +49,8 @@ members = [
     "crates/symthaea-memory",
     "crates/symthaea-fabrication-kernel",
     "crates/symthaea-vision-manifold",
+    "crates/symthaea-foveation",
+    "crates/symthaea-phi-oracle",
 ]
 
 
@@ -173,6 +176,9 @@ symthaea-vocal-tract = { path = "crates/symthaea-vocal-tract", default-features 
 # Symthaea Physics - Tokamak plasma HDC encoding, C-Mod adapter, Phi-based control
 symthaea-physics = { path = "crates/symthaea-physics", optional = true }
 
+# Symthaea Physics Bridge - HDC semantic search for mathematical physics analogies
+symthaea-physics-bridge = { path = "crates/symthaea-physics-bridge", optional = true }
+
 # Symthaea Broca - SSM Language Center: CfC-HDC autoregressive thought-to-text generation
 symthaea-broca = { path = "crates/symthaea-broca", optional = true }
 
@@ -192,6 +198,8 @@ symthaea-fabrication-kernel = { path = "crates/symthaea-fabrication-kernel", opt
 # Symthaea Vision Manifold - Patch-based HDC video encoding with CfC temporal dynamics
 symthaea-vision-manifold = { path = "crates/symthaea-vision-manifold", optional = true }
 
+# Symthaea Foveation Bridge - Dorsal surprise → ventral recognition dispatch
+symthaea-foveation = { path = "crates/symthaea-foveation", optional = true }
 
 # HDC / Vector Symbolic Architectures
 # hypervector = "0.1"  # Using custom HDC implementation instead
@@ -387,6 +395,8 @@ perception = ["embeddings", "vision"]                 # Full multimodal percepti
 webcam = []                                           # Live webcam capture (gates cfg blocks in source)
 vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video encoding + CfC temporal manifold
 vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"]  # Vision manifold with real camera capture via V4L2
+foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
+foveation-perception = ["foveation", "symthaea-foveation/perception"]  # Foveation with real SigLIP/OCR/Moondream models
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]
@@ -464,6 +474,7 @@ lab-controller = ["cell-foundry"]
 materials = ["dep:symthaea-materials"]
 nuclear-forensics = ["dep:symthaea-nuclear-forensics"]
 water-prediction = ["cell-foundry"]
+physics-bridge = ["physics", "dep:symthaea-physics-bridge"]  # HDC semantic physics bridge + guided design exploration
 physics-unification = ["physics"]
 grid-scaling = ["physics"]
 fission-reactor = ["physics"]

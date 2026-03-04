@@ -372,6 +372,10 @@ pub mod infrastructure;
 // Intelligence (enabled - 0 errors)
 pub mod intelligence;
 
+// Physics Bridge: HDC semantic search for mathematical physics analogies + guided design exploration
+#[cfg(feature = "physics-bridge")]
+pub mod spark_physics_bridge;
+
 // Causal: Causal discovery integration with cognitive loop
 // Tracks (input, output) pairs and discovers causal structure for attention weighting
 pub mod causal;

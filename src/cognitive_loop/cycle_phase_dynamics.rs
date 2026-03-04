@@ -165,6 +165,49 @@ impl CognitiveLoopService {
             self.adjust_exploration("quantum_coherence", coherence_boost);
         }
 
+        // ── Foveation → dynamics coupling ────────────────────────────────
+        // Corbetta & Shulman (2002): recognized objects reduce attentional vigilance;
+        // novel objects boost learning.
+        #[cfg(feature = "foveation")]
+        {
+            use super::thresholds::{
+                FOVEATION_CONFIDENCE_BOOST, FOVEATION_FAMILIAR_EXPLORATION_DAMPEN,
+                FOVEATION_FAMILIAR_RECOGNITION_COUNT, FOVEATION_HIGH_CONFIDENCE_THRESHOLD,
+                FOVEATION_NOVEL_LR_BOOST,
+            };
+            let fov_count = perception.foveation_recognition_count;
+            let fov_conf = perception.foveation_top_confidence;
+
+            if fov_count >= FOVEATION_FAMILIAR_RECOGNITION_COUNT
+                && fov_conf > FOVEATION_HIGH_CONFIDENCE_THRESHOLD
+            {
+                // Familiar scene: dampen exploration, boost confidence
+                self.scale_exploration(
+                    "foveation_familiar",
+                    FOVEATION_FAMILIAR_EXPLORATION_DAMPEN,
+                );
+                self.scale_confidence("foveation_familiar", FOVEATION_CONFIDENCE_BOOST);
+            } else if fov_count > 0 && fov_conf < FOVEATION_HIGH_CONFIDENCE_THRESHOLD {
+                // Novel objects: boost learning rate
+                self.scale_lr("foveation_novel", FOVEATION_NOVEL_LR_BOOST);
+            }
+        }
+
+        // ── Vision surprise → exploration urgency ────────────────────────
+        // Friston (2010): free energy (surprise) is the fundamental drive for active inference.
+        #[cfg(feature = "vision-manifold")]
+        {
+            use super::thresholds::{
+                VISION_SURPRISE_EXPLORATION_SCALE, VISION_SURPRISE_EXPLORATION_THRESHOLD,
+            };
+            let mean_surp = perception.vision_mean_surprise;
+            if mean_surp > VISION_SURPRISE_EXPLORATION_THRESHOLD {
+                let boost = (mean_surp - VISION_SURPRISE_EXPLORATION_THRESHOLD)
+                    * VISION_SURPRISE_EXPLORATION_SCALE;
+                self.adjust_exploration("vision_surprise", boost);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 1a. Memory System Integration: Recall relevant episodic memories
         // ═══════════════════════════════════════════════════════════════════════
@@ -471,8 +514,24 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // 2b. Physics bridge: blend physics-informed HDC into compressed state
+        #[allow(unused_mut)]
+        let mut compressed_for_cfc = perception.compressed_state.clone();
+        #[cfg(feature = "physics-bridge")]
+        if let Some(ref mut physics) = self.physics_integration {
+            physics.query_cycle(
+                self.stats.total_cycles,
+                self.config.physics_bridge_query_interval,
+                self.config.physics_bridge_blend_weight,
+                self.substrate_manager.tau_factor,
+                self.substrate_manager.scale_pressure,
+                &perception.hv16_cached,
+                &mut compressed_for_cfc,
+            );
+        }
+
         // 3. Convert to ndarray for CfC
-        let input_array: Array1<f32> = perception.compressed_state.iter().copied().collect();
+        let input_array: Array1<f32> = compressed_for_cfc.iter().copied().collect();
 
         // 4. Step CfC forward with current input
         let resonance_tau_factor = if self.carryover.history.resonance_frequency > 0.0 {
@@ -636,6 +695,53 @@ impl CognitiveLoopService {
         let effective_lr = self.stats.adaptive_learning_rate;
         let (fep_action_idx, fep_action_probs, is_surprised, fep_pragmatic_value_raw) =
             self.step_fep_active_inference(prediction_error, coherence);
+
+        // ── Cross-manifold prediction error → attention reallocation ──
+        // Rao & Ballard (1999): large prediction errors between visual and cognitive
+        // streams indicate world-model mismatch → re-engage attention, update model.
+        #[cfg(feature = "vision-manifold")]
+        {
+            use super::thresholds::{
+                CROSS_MANIFOLD_CONFIDENCE_DAMPEN, CROSS_MANIFOLD_ERROR_THRESHOLD,
+                CROSS_MANIFOLD_EXPLORATION_SCALE, CROSS_MANIFOLD_LR_BOOST,
+            };
+            let cm_error = perception.cross_manifold_prediction_error;
+            if cm_error > CROSS_MANIFOLD_ERROR_THRESHOLD {
+                let excess = cm_error - CROSS_MANIFOLD_ERROR_THRESHOLD;
+                self.adjust_exploration(
+                    "cross_manifold_error",
+                    excess * CROSS_MANIFOLD_EXPLORATION_SCALE,
+                );
+                self.scale_confidence("cross_manifold_error", CROSS_MANIFOLD_CONFIDENCE_DAMPEN);
+                self.scale_lr("cross_manifold_error", CROSS_MANIFOLD_LR_BOOST);
+            }
+        }
+
+        // ── Vision temporal horizons → FEP modulation ────────────────────
+        // Adams et al. (2013): prediction errors at multiple timescales drive
+        // hierarchical active inference. Short-horizon errors = immediate surprise;
+        // long-horizon errors = planning uncertainty.
+        #[cfg(feature = "vision-manifold")]
+        if !perception.vision_horizon_errors.is_empty() {
+            use super::thresholds::{
+                VISION_HORIZON_CONFIDENCE_DAMPEN, VISION_HORIZON_EXPLORATION_SCALE,
+                VISION_LONG_HORIZON_CONFIDENCE_THRESHOLD, VISION_SHORT_HORIZON_ERROR_THRESHOLD,
+            };
+            // Short-term error (next frame, ~33ms) → immediate surprise
+            let short_err = perception.vision_horizon_errors[0];
+            if short_err > VISION_SHORT_HORIZON_ERROR_THRESHOLD {
+                let boost = (short_err - VISION_SHORT_HORIZON_ERROR_THRESHOLD)
+                    * VISION_HORIZON_EXPLORATION_SCALE;
+                self.adjust_exploration("vision_horizon_short", boost);
+            }
+
+            // Long-term error (500ms+, index 2) → planning uncertainty
+            if let Some(&long_err) = perception.vision_horizon_errors.get(2) {
+                if long_err > VISION_LONG_HORIZON_CONFIDENCE_THRESHOLD {
+                    self.scale_confidence("vision_horizon_long", VISION_HORIZON_CONFIDENCE_DAMPEN);
+                }
+            }
+        }
 
         // ── Track 5b: MCTS plan post-hoc evaluation ─────────────────────────
         let mcts_plan_effectiveness: f32 =

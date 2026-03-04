@@ -14094,6 +14094,7 @@ dependencies = [
  "symthaea-fep",
  "symthaea-field-dynamics",
  "symthaea-flight",
+ "symthaea-foveation",
  "symthaea-genomics",
  "symthaea-hal",
  "symthaea-hodge",
@@ -14108,6 +14109,7 @@ dependencies = [
  "symthaea-observability",
  "symthaea-phi-search",
  "symthaea-physics",
+ "symthaea-physics-bridge",
  "symthaea-population",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
@@ -14345,6 +14347,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-foveation"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-perception",
+]
+
+[[package]]
 name = "symthaea-genomics"
 version = "0.1.0"
 dependencies = [
@@ -14516,6 +14528,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-phi-oracle"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-core",
+]
+
+[[package]]
 name = "symthaea-phi-search"
 version = "0.1.0"
 dependencies = [
@@ -14536,6 +14556,16 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-fep",
+]
+
+[[package]]
+name = "symthaea-physics-bridge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "symthaea-core",
 ]
 
 [[package]]
@@ -14681,6 +14711,7 @@ name = "symthaea-vocal-tract"
 version = "0.1.0"
 dependencies = [
  "hound",
+ "rustfft",
  "serde",
  "symthaea-core",
  "symthaea-fep",

@@ -441,6 +441,61 @@ pub struct CognitiveLoopConfig {
     #[serde(default)]
     pub substrate_composition:
         Option<symthaea_core::hdc::substrate_composition::SubstrateComposition>,
+
+    // ── Physics Bridge Integration ─────────────────────────────────────
+    /// Enable physics bridge for HDC semantic physics queries during cognitive loop.
+    /// When true, creates a PhysicsIntegration that queries the physics catalog
+    /// periodically and blends physics-informed HDC vectors into CfC dynamics.
+    /// Default: false.
+    #[cfg(feature = "physics-bridge")]
+    pub enable_physics_bridge: bool,
+    /// Query interval in cycles for physics bridge (default: 10).
+    /// Lower values = more frequent physics queries but higher compute cost.
+    #[cfg(feature = "physics-bridge")]
+    pub physics_bridge_query_interval: usize,
+    /// Blend weight for physics bridge HDC vectors into CfC input (default: 0.1).
+    /// Higher values = stronger physics influence on cognitive dynamics.
+    #[cfg(feature = "physics-bridge")]
+    pub physics_bridge_blend_weight: f32,
+
+    // ── Energy Budget ─────────────────────────────────────────────────
+    /// Enable substrate energy budget tracking.
+    /// When true, the substrate manager tracks cumulative energy expenditure
+    /// based on substrate energy_per_op and marks consciousness as non-viable
+    /// when budget is exceeded.
+    /// Default: false.
+    pub enable_energy_budget: bool,
+    /// Energy budget in joules per second (optional).
+    /// When set, limits cognitive throughput based on substrate energy characteristics.
+    pub energy_budget_joules_per_sec: Option<f64>,
+
+    // ── Vision Manifold Integration ─────────────────────────────────────
+    /// Enable the internal VisionBridge in the cognitive loop (default false).
+    /// When true, the cognitive loop creates a VisionBridge and processes
+    /// injected frames through the vision manifold each cycle.
+    #[cfg(feature = "vision-manifold")]
+    pub enable_vision_manifold: bool,
+    /// Vision frame width (default 64). Only used when enable_vision_manifold is true.
+    #[cfg(feature = "vision-manifold")]
+    pub vision_frame_width: u32,
+    /// Vision frame height (default 64). Only used when enable_vision_manifold is true.
+    #[cfg(feature = "vision-manifold")]
+    pub vision_frame_height: u32,
+    /// Enable vision predictive coding hierarchy (default false).
+    #[cfg(feature = "vision-manifold")]
+    pub enable_vision_predictive_hierarchy: bool,
+    /// Scene memory coherence threshold (default 0.7).
+    #[cfg(feature = "vision-manifold")]
+    pub scene_memory_coherence_threshold: f32,
+    /// Scene memory error threshold (default 0.1).
+    #[cfg(feature = "vision-manifold")]
+    pub scene_memory_error_threshold: f32,
+    /// Scene memory dampening factor (default 0.5).
+    #[cfg(feature = "vision-manifold")]
+    pub scene_memory_dampen_factor: f32,
+    /// Enable cross-manifold predictor (vision→cognitive Hebbian mapping, default false).
+    #[cfg(feature = "vision-manifold")]
+    pub enable_cross_manifold_predictor: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -513,6 +568,30 @@ impl Default for CognitiveLoopConfig {
             enable_substrate_speed_modulation: false,
             substrate_type: SubstrateType::SiliconDigital,
             substrate_composition: None,
+            #[cfg(feature = "physics-bridge")]
+            enable_physics_bridge: false,
+            #[cfg(feature = "physics-bridge")]
+            physics_bridge_query_interval: 10,
+            #[cfg(feature = "physics-bridge")]
+            physics_bridge_blend_weight: 0.1,
+            enable_energy_budget: false,
+            energy_budget_joules_per_sec: None,
+            #[cfg(feature = "vision-manifold")]
+            enable_vision_manifold: false,
+            #[cfg(feature = "vision-manifold")]
+            vision_frame_width: 64,
+            #[cfg(feature = "vision-manifold")]
+            vision_frame_height: 64,
+            #[cfg(feature = "vision-manifold")]
+            enable_vision_predictive_hierarchy: false,
+            #[cfg(feature = "vision-manifold")]
+            scene_memory_coherence_threshold: 0.7,
+            #[cfg(feature = "vision-manifold")]
+            scene_memory_error_threshold: 0.1,
+            #[cfg(feature = "vision-manifold")]
+            scene_memory_dampen_factor: 0.5,
+            #[cfg(feature = "vision-manifold")]
+            enable_cross_manifold_predictor: false,
         }
     }
 }
@@ -874,6 +953,10 @@ impl CognitiveLoopConfig {
         if self.attestation_buffer_capacity == 0 {
             return Err("CognitiveLoopConfig: attestation_buffer_capacity must be > 0".into());
         }
+        // Validate moral anomaly config
+        self.moral_anomaly_config
+            .validate()
+            .map_err(|e| format!("CognitiveLoopConfig: {e}"))?;
         Ok(())
     }
 }

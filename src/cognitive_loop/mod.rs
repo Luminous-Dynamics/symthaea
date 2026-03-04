@@ -152,6 +152,10 @@ pub(crate) mod self_model_tier;
 pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
+pub(crate) mod substrate_manager;
+
+#[cfg(feature = "physics-bridge")]
+pub(crate) mod physics_integration;
 
 pub mod calibration;
 
@@ -245,6 +249,20 @@ impl Default for SocialState {
             external_reward: 0.0,
             social_trust: 0.5,
             social_cooperation_rate: 0.0,
+        }
+    }
+}
+
+/// Wrapper around social coherence state, used by cycle phases that
+/// reference `self.social_coherence.social.*`.
+pub(crate) struct SocialCoherenceState {
+    pub social: SocialState,
+}
+
+impl Default for SocialCoherenceState {
+    fn default() -> Self {
+        Self {
+            social: SocialState::default(),
         }
     }
 }
@@ -502,6 +520,11 @@ pub struct CognitiveLoopService {
     /// When enabled, submits encodings to workspace for conscious broadcast.
     gwt: Option<UnifiedGlobalWorkspace>,
 
+    /// GWT handler flag: memory consolidation requested via broadcast.
+    gwt_memory_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// GWT handler counter: perception broadcast events consumed.
+    gwt_perception_count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+
     /// Consciousness monitoring tier: resonance, quantum, temporal, embodied,
     /// thermodynamics, phenomenal binding, hierarchical free energy.
     consciousness_monitors: consciousness_monitor_tier::ConsciousnessMonitorTier,
@@ -597,6 +620,10 @@ pub struct CognitiveLoopService {
     /// Social and external signal state (relational psi, reward, trust, cooperation).
     pub(crate) social: SocialState,
 
+    /// Social coherence wrapper — used by cycle phases that reference
+    /// `self.social_coherence.social.*` for relational psi access.
+    pub(crate) social_coherence: SocialCoherenceState,
+
     /// Phi-Dyad calculator for relational consciousness.
     /// Computes Φ_dyad from recent AI + input HVs each cycle.
     phi_dyad: Option<PhiDyadCalculator>,
@@ -624,6 +651,23 @@ pub struct CognitiveLoopService {
     /// 5-HT, DA, adenosine based on attachment dynamics each cycle.
     #[cfg(feature = "nurture")]
     pub(crate) nurture_attachment: Option<nurture_bridge::NurtureAttachmentBridge>,
+
+    /// Vision bridge: frame → attention-boosted HDC encoding.
+    #[cfg(feature = "vision-manifold")]
+    pub(super) vision_bridge: Option<symthaea_vision_manifold::VisionBridge>,
+    /// Latest frame buffer for vision processing (injected externally or from mock).
+    #[cfg(feature = "vision-manifold")]
+    pub(super) vision_frame_buffer: Option<Vec<u8>>,
+
+    /// Cross-manifold predictor: vision→cognitive Hebbian mapping.
+    #[cfg(feature = "vision-manifold")]
+    pub(super) cross_manifold_predictor: Option<symthaea_vision_manifold::CrossManifoldPredictor>,
+
+    /// Foveation bridge: dorsal surprise → ventral recognition dispatch.
+    /// When enabled, receives salient patches from vision manifold and dispatches
+    /// background ventral recognition, feeding results into GWT.
+    #[cfg(feature = "foveation")]
+    pub(super) foveation_manager: Option<std::sync::Mutex<symthaea_foveation::FoveationManager>>,
 
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.
@@ -722,6 +766,15 @@ pub struct CognitiveLoopService {
     /// into a single `measure()` call per cycle with co-prime interval scheduling.
     /// Runs **alongside** existing inline code (additive wiring — old code not removed yet).
     consciousness_engine: consciousness_engine::ConsciousnessEngine,
+
+    /// Substrate independence manager: consolidates feasibility, validation overlay,
+    /// speed/scale modulation, and telemetry into a single cohesive struct.
+    pub(super) substrate_manager: substrate_manager::SubstrateManager,
+
+    /// Physics bridge integration: HDC semantic search for physics analogies.
+    /// When enabled, blends physics-informed HDC vectors into CfC dynamics each cycle.
+    #[cfg(feature = "physics-bridge")]
+    physics_integration: Option<physics_integration::PhysicsIntegration>,
 
     /// Pre-computed substrate feasibility [0,1] from config.substrate_type.
     /// Scales Equation V2 consciousness to reflect substrate limitations.
