@@ -141,7 +141,7 @@ impl SelfAssessmentMonitor {
         self.allostatic_load_ema =
             self.allostatic_load_ema * (1.0 - ALPHA) + input.allostatic_load as f64 * ALPHA;
 
-        self.observations_since_calibration += 1;
+        self.observations_since_calibration = self.observations_since_calibration.saturating_add(1);
 
         if self.cooldown > 0 {
             self.cooldown -= 1;

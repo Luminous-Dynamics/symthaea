@@ -140,7 +140,7 @@ impl CognitiveSubsystem for DriveManager {
         // ── 2. Boredom dynamics ───────────────────────────────────────────
         // Sustained low prediction error → boredom → exploration urge
         if pe < Self::LOW_ERROR_THRESHOLD {
-            self.low_error_streak += 1;
+            self.low_error_streak = self.low_error_streak.saturating_add(1);
             if self.low_error_streak > Self::BOREDOM_ONSET_CYCLES {
                 // Boredom ramps up linearly, capped
                 self.boredom = (self.boredom + 0.03).min(Self::MAX_BOREDOM);
@@ -164,7 +164,7 @@ impl CognitiveSubsystem for DriveManager {
             && snapshot.arousal < 0.8;
 
         if meets_flow {
-            self.flow_streak += 1;
+            self.flow_streak = self.flow_streak.saturating_add(1);
             if self.flow_streak >= Self::FLOW_ONSET_CYCLES {
                 self.in_flow = true;
                 self.flow_intensity = (self.flow_intensity + Self::FLOW_RAMP).min(1.0);

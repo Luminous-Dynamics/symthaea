@@ -4,6 +4,8 @@
 //! `decay_rate` (default 0.95) each `tick()`. This produces
 //! a measurable recency bias matching human working memory.
 
+use std::collections::VecDeque;
+
 use symthaea_core::hdc::ContinuousHV;
 
 /// Default activation decay rate per tick.
@@ -41,9 +43,9 @@ impl Default for WmConfig {
 /// or `activations()` to incorporate recency into retrieval.
 #[derive(Debug)]
 pub struct WorkingMemory {
-    items: Vec<ContinuousHV>,
-    arrival_ticks: Vec<u64>,
-    activations: Vec<f32>,
+    items: VecDeque<ContinuousHV>,
+    arrival_ticks: VecDeque<u64>,
+    activations: VecDeque<f32>,
     tick: u64,
     config: WmConfig,
     evicted: Vec<(ContinuousHV, u64)>,
@@ -53,9 +55,9 @@ impl WorkingMemory {
     /// Create a new working memory.
     pub fn new(config: WmConfig) -> Self {
         Self {
-            items: Vec::new(),
-            arrival_ticks: Vec::new(),
-            activations: Vec::new(),
+            items: VecDeque::new(),
+            arrival_ticks: VecDeque::new(),
+            activations: VecDeque::new(),
             tick: 0,
             config,
             evicted: Vec::new(),
@@ -65,15 +67,16 @@ impl WorkingMemory {
     /// Add an item to working memory, evicting the oldest if at capacity.
     pub fn perceive(&mut self, hv: ContinuousHV) {
         while self.items.len() >= self.config.capacity {
-            let evicted_hv = self.items.remove(0);
-            let arrival = self.arrival_ticks.remove(0);
-            self.activations.remove(0);
-            let steps_survived = self.tick.saturating_sub(arrival);
-            self.evicted.push((evicted_hv, steps_survived));
+            if let Some(evicted_hv) = self.items.pop_front() {
+                let arrival = self.arrival_ticks.pop_front().unwrap_or(0);
+                self.activations.pop_front();
+                let steps_survived = self.tick.saturating_sub(arrival);
+                self.evicted.push((evicted_hv, steps_survived));
+            }
         }
-        self.items.push(hv);
-        self.arrival_ticks.push(self.tick);
-        self.activations.push(1.0);
+        self.items.push_back(hv);
+        self.arrival_ticks.push_back(self.tick);
+        self.activations.push_back(1.0);
     }
 
     /// Advance one tick: decay all activations.
@@ -86,12 +89,12 @@ impl WorkingMemory {
     }
 
     /// Get current working memory contents.
-    pub fn contents(&self) -> &[ContinuousHV] {
+    pub fn contents(&self) -> &VecDeque<ContinuousHV> {
         &self.items
     }
 
     /// Get activation levels for each item (parallel to `contents()`).
-    pub fn activations(&self) -> &[f32] {
+    pub fn activations(&self) -> &VecDeque<f32> {
         &self.activations
     }
 

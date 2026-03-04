@@ -225,6 +225,16 @@ impl CognitiveLoopService {
             ""
         };
 
+        // ── Foveation neuromodulation ────────────────────────────────────
+        // NE → surprise threshold (attention aperture), DA → compute budget.
+        // Science: Corbetta & Shulman (2002) — NE modulates attentional scope.
+        #[cfg(feature = "foveation")]
+        if let Some(ref mut fov) = self.foveation_manager {
+            let ne = self.neuromod.bath.noradrenaline.effective();
+            let da = self.neuromod.bath.dopamine.effective();
+            fov.modulate(ne, da);
+        }
+
         // ── Attachment-driven neuromodulation ──────────────────────────────
         // Science: Bowlby (1969) — caregiver proximity modulates HPA axis
         // and oxytocinergic circuits, shaping arousal regulation lifelong.

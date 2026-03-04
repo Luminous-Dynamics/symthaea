@@ -64,31 +64,36 @@ impl CognitiveLoopService {
             if matches!(urgency, super::super::CycleUrgency::Cruise)
                 || urgency.should_run(self.stats.total_cycles, 10, 20, 5)
             {
-                if let Ok(result) = dream.dream() {
-                    dream_insights = result.insights;
-                    dream_phi_improvement = result.best_phi_improvement;
+                match dream.dream() {
+                    Ok(result) => {
+                        dream_insights = result.insights;
+                        dream_phi_improvement = result.best_phi_improvement;
 
-                    if result.insights > 0 {
-                        tracing::debug!(
-                            insights = result.insights,
-                            phi_improvement = result.best_phi_improvement,
-                            simulations = result.simulations_run,
-                            cycle = self.stats.total_cycles,
-                            "Dream replay generated insights"
-                        );
-
-                        // Dream→Narrative coupling: dream insights feed narrative self-model.
-                        // Science: Revonsuo (2000) — dreaming enhances threat simulation
-                        // and narrative integration of novel experiences.
-                        if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
-                            narrative.process_experience(
-                                hv16_cached,
-                                &format!("dream_insight_{}", result.insights),
-                                true, // counterfactual-validated
-                                unified_psi,
-                                result.best_phi_improvement as f64,
+                        if result.insights > 0 {
+                            tracing::debug!(
+                                insights = result.insights,
+                                phi_improvement = result.best_phi_improvement,
+                                simulations = result.simulations_run,
+                                cycle = self.stats.total_cycles,
+                                "Dream replay generated insights"
                             );
+
+                            // Dream→Narrative coupling: dream insights feed narrative self-model.
+                            // Science: Revonsuo (2000) — dreaming enhances threat simulation
+                            // and narrative integration of novel experiences.
+                            if let Some(ref mut narrative) = self.self_model_tier.narrative_self {
+                                narrative.process_experience(
+                                    hv16_cached,
+                                    &format!("dream_insight_{}", result.insights),
+                                    true, // counterfactual-validated
+                                    unified_psi,
+                                    result.best_phi_improvement as f64,
+                                );
+                            }
                         }
+                    }
+                    Err(e) => {
+                        tracing::debug!(error = %e, cycle = self.stats.total_cycles, "Dream replay failed");
                     }
                 }
             }

@@ -97,7 +97,7 @@ fn get_standard_primitives() -> Vec<Primitive> {
 }
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 /// State representation for RL
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,7 +219,7 @@ pub struct QLearningAgent {
     q_table: HashMap<(u64, u64), f64>,
 
     /// Experience replay buffer
-    replay_buffer: Vec<Experience>,
+    replay_buffer: VecDeque<Experience>,
 
     /// Learning rate
     alpha: f64,
@@ -238,6 +238,9 @@ pub struct QLearningAgent {
 
     /// Maximum replay buffer size
     max_buffer_size: usize,
+
+    /// Maximum Q-table entries (prevents unbounded growth)
+    max_q_table_size: usize,
 }
 
 impl QLearningAgent {
@@ -245,13 +248,14 @@ impl QLearningAgent {
     pub fn new(alpha: f64, gamma: f64, epsilon: f64) -> Self {
         Self {
             q_table: HashMap::new(),
-            replay_buffer: Vec::new(),
+            replay_buffer: VecDeque::new(),
             alpha,
             gamma,
             epsilon,
             epsilon_decay: 0.995,
             epsilon_min: 0.01,
             max_buffer_size: 10000,
+            max_q_table_size: 50_000,
         }
     }
 
@@ -263,6 +267,22 @@ impl QLearningAgent {
     /// Set Q-value for state-action pair
     fn set_q(&mut self, state_hash: u64, action_hash: u64, value: f64) {
         self.q_table.insert((state_hash, action_hash), value);
+
+        // Evict lowest-value entries when exceeding capacity
+        if self.q_table.len() > self.max_q_table_size {
+            let evict_key = self
+                .q_table
+                .iter()
+                .min_by(|(_, a), (_, b)| {
+                    a.abs()
+                        .partial_cmp(&b.abs())
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .map(|(k, _)| *k);
+            if let Some(key) = evict_key {
+                self.q_table.remove(&key);
+            }
+        }
     }
 
     /// Select action using epsilon-greedy policy
@@ -303,11 +323,11 @@ impl QLearningAgent {
 
     /// Add experience to replay buffer
     pub fn add_experience(&mut self, experience: Experience) {
-        self.replay_buffer.push(experience);
+        self.replay_buffer.push_back(experience);
 
         // Keep buffer size bounded
         if self.replay_buffer.len() > self.max_buffer_size {
-            self.replay_buffer.remove(0);
+            self.replay_buffer.pop_front();
         }
     }
 
@@ -323,6 +343,7 @@ impl QLearningAgent {
         let mut rng = rand::thread_rng();
         let batch: Vec<_> = self
             .replay_buffer
+            .make_contiguous()
             .choose_multiple(&mut rng, batch_size)
             .cloned()
             .collect();
