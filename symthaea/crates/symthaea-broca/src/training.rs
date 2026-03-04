@@ -405,7 +405,7 @@ pub fn train_with_adam(
                         target_id as usize,
                         lr,
                         config.grad_clip,
-                        adam_state.as_mut().unwrap(),
+                        adam_state.as_mut().expect("invariant: adam_state is Some when config.use_adam"),
                     )
                 } else {
                     apply_weight_tied_gradient(

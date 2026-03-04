@@ -219,7 +219,13 @@ impl FederatedCoordinator {
         let address = node.address.clone();
 
         // Register with backend for routing (node_id → address mapping)
-        let _ = self.backend.register_node(&node).await;
+        if let Err(e) = self.backend.register_node(&node).await {
+            tracing::warn!(
+                node_id = hex::encode(&node_id[..8]),
+                error = %e,
+                "Backend node registration failed — peer may lack routing entry"
+            );
+        }
 
         self.peers.write().insert(node_id, node);
 

@@ -148,7 +148,7 @@ fn forward_and_pool<B: burn::prelude::Backend>(
     };
 
     let data = pooled.into_data();
-    let mut embedding: Vec<f32> = data.to_vec().unwrap();
+    let mut embedding: Vec<f32> = data.to_vec().map_err(|e| anyhow::anyhow!("tensor to_vec failed: {e}"))?;
     embedding.truncate(out_dim);
 
     if normalize {
@@ -367,7 +367,7 @@ fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
 
     // Convert [B, D] tensor to Vec<Vec<f32>>
     let data = pooled.into_data();
-    let flat: Vec<f32> = data.to_vec().unwrap();
+    let flat: Vec<f32> = data.to_vec().map_err(|e| anyhow::anyhow!("tensor to_vec failed: {e}"))?;
     let results: Vec<Vec<f32>> = flat
         .chunks(out_dim)
         .map(|chunk| chunk.to_vec())

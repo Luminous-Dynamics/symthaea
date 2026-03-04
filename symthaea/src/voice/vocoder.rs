@@ -688,7 +688,8 @@ impl FormantVocoder {
             0.1
         };
 
-        let samples_per_frame = (frame_duration * self.config.sample_rate as f32) as usize;
+        let samples_per_frame =
+            (frame_duration.clamp(0.0, 1.0) * self.config.sample_rate as f32) as usize;
         let total_samples = samples_per_frame * frames.len();
 
         let mut audio = Vec::with_capacity(total_samples);
@@ -765,7 +766,8 @@ impl FormantVocoder {
         } else {
             0.1
         };
-        let samples_per_frame = (frame_duration * self.config.sample_rate as f32) as usize;
+        let samples_per_frame =
+            (frame_duration.clamp(0.0, 1.0) * self.config.sample_rate as f32) as usize;
         let default_quality = VoiceQuality::default();
 
         let mut audio = Vec::with_capacity(samples_per_frame * frames.len());

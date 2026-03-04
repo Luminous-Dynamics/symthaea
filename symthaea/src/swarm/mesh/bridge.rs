@@ -25,7 +25,7 @@ use tokio::sync::mpsc;
 /// The Mind writes to this via the handle; the bridge actor reads it
 /// when constructing / updating DualLayerMesh and MeshReceiver.
 #[cfg(feature = "mesh-encryption")]
-type SharedEncryptionKey = Arc<std::sync::Mutex<Option<[u8; 32]>>>;
+type SharedEncryptionKey = Arc<parking_lot::Mutex<Option<[u8; 32]>>>;
 
 /// Shared encryption epoch (random byte, set once).
 #[cfg(feature = "mesh-encryption")]
@@ -157,7 +157,7 @@ impl MeshBridgeHandle {
     /// Pass `None` to disable encryption.
     #[cfg(feature = "mesh-encryption")]
     pub fn set_encryption_key(&self, key: Option<[u8; 32]>) {
-        *self.shared_key.lock().unwrap() = key;
+        *self.shared_key.lock() = key;
         self.shared_generation.fetch_add(1, Ordering::Release);
     }
 
@@ -231,7 +231,7 @@ impl MeshBridgeActor {
         // Only overwrite if shared state has a key — preserve builder-set keys otherwise.
         #[cfg(feature = "mesh-encryption")]
         {
-            let key = *self.shared_key.lock().unwrap();
+            let key = *self.shared_key.lock();
             if key.is_some() {
                 mesh.set_encryption_key(key);
                 receiver.set_encryption_key(key);
@@ -284,7 +284,7 @@ impl MeshBridgeActor {
                     {
                         let current_gen = self.shared_generation.load(Ordering::Acquire);
                         if current_gen != last_generation {
-                            let current_key = *self.shared_key.lock().unwrap();
+                            let current_key = *self.shared_key.lock();
                             let epoch = self.shared_epoch.load(Ordering::Relaxed);
                             mesh.set_encryption_key(current_key);
                             receiver.set_encryption_key(current_key);
