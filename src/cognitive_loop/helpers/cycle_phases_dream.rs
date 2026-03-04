@@ -53,6 +53,15 @@ impl CognitiveLoopService {
                 .unwrap_or(1.0);
             let phi_weighted_surprise =
                 prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience;
+            // Scene recognition boost: recognized visual contexts encode preferentially.
+            // Conway (2005) — self-relevant and context-rich memories encode preferentially.
+            #[cfg(feature = "vision-manifold")]
+            let phi_weighted_surprise = if state.scene_recognized {
+                phi_weighted_surprise
+                    * super::super::thresholds::SCENE_RECOGNITION_DREAM_BOOST
+            } else {
+                phi_weighted_surprise
+            };
             dream.record(
                 &dream_state,
                 dream_action,

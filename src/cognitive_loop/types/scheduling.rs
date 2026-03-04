@@ -114,5 +114,8 @@ pub(crate) struct CycleState<'a> {
     pub urgency: CycleUrgency,
     pub attention_budget_exceeded: bool,
     pub predictive_budget_gated: bool,
+    /// Whether a visual scene was recognized this cycle (for dream salience boost).
+    #[cfg(feature = "vision-manifold")]
+    pub scene_recognized: bool,
 }
 

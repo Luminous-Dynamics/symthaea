@@ -160,6 +160,15 @@ const INDICATORS: &[IndicatorDef] = &[
         prediction_threshold: 0.01,
         weight: 1.0,
     },
+    IndicatorDef {
+        name: "Metacognitive Tracking",
+        benchmark_contains: "MetacognitiveIgnition",
+        metric_key: "spontaneous_tracking_score",
+        // Already in [0, 1]
+        normalize: |score| clamp01(score),
+        prediction_threshold: 0.50,
+        weight: 1.0,
+    },
 ];
 
 impl QualiaConfidenceScore {
@@ -318,6 +327,7 @@ mod tests {
             super::super::SomaticInterferenceBenchmark.run(&config),
             super::super::BistablePerceptionBenchmark.run(&config),
             super::super::UnconsciousPrimingBenchmark.run(&config),
+            super::super::MetacognitiveIgnitionBenchmark.run(&config),
         ]
     }
 
@@ -335,7 +345,7 @@ mod tests {
             "Composite should be in [0, 1]: {}",
             score.composite
         );
-        assert_eq!(score.indicators.len(), 6);
+        assert_eq!(score.indicators.len(), 7);
     }
 
     #[test]

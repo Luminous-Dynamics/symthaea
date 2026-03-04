@@ -80,9 +80,9 @@ use symthaea_psych_bench::benchmarks::neuromod::{
     YerkesDodsonBenchmark,
 };
 use symthaea_psych_bench::benchmarks::qualia_confidence::{
-    BistablePerceptionBenchmark, GwtAsphyxiationBenchmark, PerturbationalComplexityBenchmark,
-    PhaseTransitionBenchmark, QualiaConfidenceScore, SomaticInterferenceBenchmark,
-    UnconsciousPrimingBenchmark,
+    BistablePerceptionBenchmark, GwtAsphyxiationBenchmark, MetacognitiveIgnitionBenchmark,
+    PerturbationalComplexityBenchmark, PhaseTransitionBenchmark, QualiaConfidenceScore,
+    SomaticInterferenceBenchmark, UnconsciousPrimingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::reasoning::{
     ArcAbductiveBenchmark, ArcAlgebraBenchmark, ArcAnalogyBenchmark, ArcChainBenchmark,
@@ -294,6 +294,7 @@ fn main() {
         Box::new(SomaticInterferenceBenchmark),
         Box::new(BistablePerceptionBenchmark),
         Box::new(UnconsciousPrimingBenchmark),
+        Box::new(MetacognitiveIgnitionBenchmark),
     ];
 
     // Filter benchmarks by name if --filter was specified

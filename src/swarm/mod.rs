@@ -64,6 +64,7 @@
 //! let peer_state = channel.recv_tensor().await?;
 //! ```
 
+mod capability_card;
 mod checkpoint;
 mod config;
 mod error;
@@ -124,6 +125,13 @@ pub use federated_network::{
     FederatedMessage, FederatedNetworkConfig, FederatedNode, LocalChannelBackend, NetworkBackend,
     NetworkError, NetworkResult, NodeAddress, TcpBackend,
 };
+
+// Capability Card - BLAKE3-hashed self-description for peer discovery
+pub use capability_card::{CapabilityCard, CardStats};
+mod reputation_bridge;
+pub use reputation_bridge::{ReputationBridge, VouchDecision};
+mod topological_handshake;
+pub use topological_handshake::{evaluate_compatibility, HandshakeConfig};
 
 // Federated Learning Checkpointing - fault-tolerant distributed training
 pub use checkpoint::{

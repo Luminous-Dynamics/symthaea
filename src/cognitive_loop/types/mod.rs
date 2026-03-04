@@ -19,6 +19,37 @@ pub(crate) use carryover::{ConsciousnessCache, CycleCarryover, QualityMetrics};
 pub(crate) use carryover::{LearningState, UrgencyState};
 pub(crate) use scheduling::CycleState;
 
+// ── Substrate Telemetry ─────────────────────────────────────────────────────
+
+/// Substrate telemetry snapshot returned by `SubstrateManager::telemetry()`.
+///
+/// Groups all substrate-related fields into a single struct for assignment
+/// to `CycleMetadata.substrate` via `metadata.substrate = self.substrate_manager.telemetry()`.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct SubstrateTelemetry {
+    /// Effective substrate feasibility [0,1] used in consciousness equation.
+    /// Legacy field — identical to `substrate_effective_feasibility`.
+    pub substrate_feasibility: f64,
+    /// Describes a substrate transition that occurred during this cycle (if any).
+    pub substrate_transition: Option<String>,
+    /// Raw substrate feasibility before validation overlay (0.0-1.0).
+    pub substrate_feasibility_raw: f64,
+    /// Honest evidence confidence for current substrate (0.0-0.95).
+    pub substrate_honest_confidence: f64,
+    /// Effective feasibility after validation overlay blending (0.0-1.0).
+    pub substrate_effective_feasibility: f64,
+    /// CfC tau factor from substrate speed modulation [0.5, 2.0].
+    #[serde(default = "default_one_f32_substrate")]
+    pub substrate_tau_factor: f32,
+    /// Scale pressure: log10(substrate_max_scale / bio_max_scale).
+    #[serde(default)]
+    pub substrate_scale_pressure: f32,
+}
+
+fn default_one_f32_substrate() -> f32 {
+    1.0
+}
+
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;

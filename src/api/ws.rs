@@ -166,6 +166,15 @@ pub struct DemoCycleData {
     /// True when free energy exceeds 2σ of rolling mean.
     #[serde(default)]
     pub moral_free_energy_spike: bool,
+    /// True when moral drift exceeds configured threshold.
+    #[serde(default)]
+    pub moral_drift_alert: bool,
+    /// True when β₀ increased since last topology evaluation.
+    #[serde(default)]
+    pub moral_fragmentation_increase: bool,
+    /// True when anomaly response modulations were applied this cycle.
+    #[serde(default)]
+    pub moral_anomaly_response_applied: bool,
 
     // ── Vision Manifold Telemetry ──
     /// Whether the vision manifold is active this cycle.

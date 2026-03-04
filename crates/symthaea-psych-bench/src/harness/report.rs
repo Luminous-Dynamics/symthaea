@@ -1379,6 +1379,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("LiveLoopAblation") => "live_da_knockout_gradient_drop_pct",
         b if b.contains("BehavioralKnockout") => "da_ko_lr_d",
         b if b.contains("ConsciousnessPharmacology") => "psychedelic_proxy_peak",
+        b if b.contains("MetacognitiveIgnition") => "spontaneous_tracking_score",
         _ => "overall_accuracy",
     }
 }

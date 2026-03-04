@@ -313,24 +313,14 @@ fn parse_npy<R: Read>(reader: &mut R) -> Result<(Vec<usize>, Vec<f32>)> {
         .checked_mul(4)
         .ok_or_else(|| anyhow::anyhow!("Byte count overflow for {} elements", n_elements))?;
 
-    // Read data (float32 little-endian)
-    let mut data = vec![0.0f32; n_elements];
+    // Read data (float32 little-endian) — read raw bytes then convert safely
+    let mut raw_bytes = vec![0u8; byte_count];
+    reader.read_exact(&mut raw_bytes)?;
 
-    // SAFETY: `data` is a valid `Vec<f32>` of length `n_elements`, and `byte_count`
-    // equals `n_elements * 4` (checked above). `f32` has no padding bytes and is
-    // layout-compatible with `[u8; 4]`, so reinterpreting the backing allocation as
-    // `&mut [u8]` of length `byte_count` is sound. The pointer is properly aligned
-    // (Vec guarantees alignment) and the lifetime is bounded by `data`.
-    debug_assert_eq!(byte_count, n_elements * std::mem::size_of::<f32>());
-    let data_bytes =
-        unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, byte_count) };
-    reader.read_exact(data_bytes)?;
-
-    // Convert from little-endian if needed (no-op on little-endian systems)
-    #[cfg(target_endian = "big")]
-    for val in &mut data {
-        *val = f32::from_le_bytes(val.to_ne_bytes());
-    }
+    let data: Vec<f32> = raw_bytes
+        .chunks_exact(4)
+        .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+        .collect();
 
     Ok((shape, data))
 }

@@ -59,6 +59,12 @@ pub struct StreamingVocalTract {
     pub vocoder: super::vocoder::FormantVocoder,
     /// Audio samples per motor frame (sample_rate / frame_rate).
     samples_per_frame: usize,
+    /// Previous cognitive state for derivative computation.
+    prev_cognitive_state: Option<super::vocal_tract_encoder::VoiceCognitiveState>,
+    /// Elapsed time since last cognitive state update (seconds).
+    last_tick_time: f32,
+    /// Last computed cognitive state derivatives.
+    last_derivs: symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives,
 
     // ── Neural vocoder fields (feature-gated) ───────────────────────
     /// Background neural vocoder channel (None = DSP-only mode).
@@ -127,6 +133,9 @@ impl StreamingVocalTract {
             pipeline,
             vocoder: super::vocoder::FormantVocoder::with_config(vocoder_config),
             samples_per_frame: (sample_rate / frame_rate) as usize,
+            prev_cognitive_state: None,
+            last_tick_time: 0.0,
+            last_derivs: symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives::default(),
             #[cfg(feature = "neural-vocoder")]
             neural_channel: None,
             #[cfg(feature = "neural-vocoder")]
@@ -212,6 +221,32 @@ impl StreamingVocalTract {
     /// Returns a chunk of audio samples (length = sample_rate / frame_rate).
     /// When neural vocoder is active, formant frames are converted to mel and
     /// submitted for ONNX inference; DSP gap-fills until neural audio is ready.
+    /// Compute cognitive state derivatives from previous state.
+    fn compute_derivatives(
+        &self,
+        current: &super::vocal_tract_encoder::VoiceCognitiveState,
+        dt: f32,
+    ) -> symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives {
+        if let Some(ref prev) = self.prev_cognitive_state {
+            let inv_dt = if dt > 1e-6 { 1.0 / dt } else { 0.0 };
+            symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives {
+                delta_arousal: (current.emotional_arousal - prev.emotional_arousal) * inv_dt,
+                delta_valence: (current.emotional_valence - prev.emotional_valence) * inv_dt,
+                delta_consciousness: (current.consciousness_level - prev.consciousness_level)
+                    * inv_dt,
+            }
+        } else {
+            symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives::default()
+        }
+    }
+
+    /// Get the current cognitive state derivatives (if available).
+    pub fn last_derivatives(
+        &self,
+    ) -> symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives {
+        self.last_derivs
+    }
+
     pub fn tick(
         &mut self,
         cognitive_state: &super::vocal_tract_encoder::VoiceCognitiveState,
@@ -219,6 +254,13 @@ impl StreamingVocalTract {
         dt: f32,
         phoneme: Option<&str>,
     ) -> Vec<f32> {
+        // Track derivatives for extended voice quality
+        self.last_tick_time += dt;
+        let derivs = self.compute_derivatives(cognitive_state, self.last_tick_time);
+        self.last_derivs = derivs;
+        self.prev_cognitive_state = Some(*cognitive_state);
+        self.last_tick_time = 0.0;
+
         let frame = self
             .pipeline
             .tick_phoneme(cognitive_state, metrics, dt, phoneme);
@@ -228,8 +270,13 @@ impl StreamingVocalTract {
             return self.tick_neural(&frame, cognitive_state);
         }
 
+        // Apply derivative-based voice quality modulation
+        let quality = super::vocoder::cognitive_state_to_voice_quality_extended(
+            cognitive_state,
+            &derivs,
+        );
         self.vocoder
-            .synthesize_frame(&frame, self.samples_per_frame)
+            .synthesize_frame_with_quality(&frame, &quality, self.samples_per_frame)
     }
 
     /// Run one motor frame with prosody and produce audio samples.
@@ -420,6 +467,9 @@ impl StreamingVocalTract {
     pub fn reset(&mut self) {
         self.pipeline.reset();
         self.vocoder.reset();
+        self.prev_cognitive_state = None;
+        self.last_tick_time = 0.0;
+        self.last_derivs = symthaea_vocal_tract::encoder::VoiceCognitiveStateDerivatives::default();
         #[cfg(feature = "neural-vocoder")]
         {
             if let Some(ref mut converter) = self.mel_converter {
@@ -573,5 +623,314 @@ mod tests {
             rms > 1e-6,
             "Streaming output should have non-trivial content: rms={rms}"
         );
+    }
+
+    /// Emphasis factor modulates energy up and bandwidths down.
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_emphasis_factor_modulates_controller() {
+        use symthaea_core::genesis::GenesisSeed;
+        use symthaea_vocal_tract::encoder::VoiceCognitiveState;
+
+        let genesis = GenesisSeed::from_phrase("test-emphasis");
+        let mut pipeline_base = VocalTractPipeline::new(&genesis);
+        let mut pipeline_emph = VocalTractPipeline::new(&genesis);
+        populate_manner_map(&mut pipeline_base);
+        populate_manner_map(&mut pipeline_emph);
+
+        // Set emphasis on one pipeline
+        pipeline_emph.controller.set_emphasis(1.5);
+
+        let state = VoiceCognitiveState {
+            emotional_arousal: 0.5,
+            consciousness_level: 0.5,
+            ..Default::default()
+        };
+
+        // Warm up both pipelines identically
+        for _ in 0..20 {
+            pipeline_base.tick_phoneme(&state, None, 0.005, Some("AH"));
+            pipeline_emph.tick_phoneme(&state, None, 0.005, Some("AH"));
+        }
+
+        let frame_base = pipeline_base.tick_phoneme(&state, None, 0.005, Some("AH"));
+        let frame_emph = pipeline_emph.tick_phoneme(&state, None, 0.005, Some("AH"));
+
+        // Emphasis 1.5 should increase energy
+        assert!(
+            frame_emph.energy >= frame_base.energy,
+            "Emphasis should increase energy: base={}, emph={}",
+            frame_base.energy,
+            frame_emph.energy
+        );
+
+        // Emphasis 1.5 should narrow bandwidths (divide by sqrt(1.5))
+        assert!(
+            frame_emph.b1 <= frame_base.b1,
+            "Emphasis should narrow B1: base={}, emph={}",
+            frame_base.b1,
+            frame_emph.b1
+        );
+    }
+
+    /// Unvoiced phonemes (P, T, K, S) should get voicing = 0.0.
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_voicing_override_unvoiced_phonemes() {
+        use symthaea_core::genesis::GenesisSeed;
+        use symthaea_vocal_tract::encoder::VoiceCognitiveState;
+
+        let genesis = GenesisSeed::from_phrase("test-voicing");
+        let mut pipeline = VocalTractPipeline::new(&genesis);
+        populate_manner_map(&mut pipeline);
+
+        let state = VoiceCognitiveState {
+            emotional_arousal: 0.5,
+            consciousness_level: 0.5,
+            ..Default::default()
+        };
+
+        // Warm up
+        for _ in 0..10 {
+            pipeline.tick_phoneme(&state, None, 0.005, Some("AH"));
+        }
+
+        // Voiced phoneme should have voicing > 0
+        let voiced_frame = pipeline.tick_phoneme(&state, None, 0.005, Some("AH"));
+        assert!(
+            voiced_frame.voicing > 0.0,
+            "Voiced phoneme AH should have voicing > 0: {}",
+            voiced_frame.voicing
+        );
+
+        // Unvoiced phonemes should have voicing = 0
+        for phoneme in &["P", "T", "K", "S"] {
+            let frame = pipeline.tick_phoneme(&state, None, 0.005, Some(phoneme));
+            assert!(
+                frame.voicing < f32::EPSILON,
+                "Unvoiced phoneme {} should have voicing ≈ 0: {}",
+                phoneme,
+                frame.voicing
+            );
+        }
+    }
+
+    /// Derivatives are computed and stored when cognitive state changes between ticks.
+    #[cfg(feature = "vocal-tract")]
+    #[test]
+    fn test_derivatives_wired_in_streaming() {
+        use symthaea_core::genesis::GenesisSeed;
+        use symthaea_vocal_tract::encoder::VoiceCognitiveState;
+
+        let genesis = GenesisSeed::from_phrase("test-derivs");
+        let mut streaming = StreamingVocalTract::new(&genesis, 24000, 200);
+
+        let state1 = VoiceCognitiveState {
+            emotional_arousal: 0.3,
+            emotional_valence: 0.0,
+            consciousness_level: 0.8,
+            ..Default::default()
+        };
+        let state2 = VoiceCognitiveState {
+            emotional_arousal: 0.9,
+            emotional_valence: -0.5,
+            consciousness_level: 0.4,
+            ..Default::default()
+        };
+
+        // First tick: no previous state, so derivatives should be zero
+        streaming.tick(&state1, None, 0.005, Some("AH"));
+        let derivs1 = streaming.last_derivatives();
+        assert!(
+            derivs1.delta_arousal.abs() < f32::EPSILON,
+            "First tick derivs should be zero"
+        );
+
+        // Second tick with different state: should have non-zero derivatives
+        streaming.tick(&state2, None, 0.005, Some("AH"));
+        let derivs2 = streaming.last_derivatives();
+        assert!(
+            derivs2.delta_arousal > 0.0,
+            "Rising arousal should give positive delta: {}",
+            derivs2.delta_arousal
+        );
+        assert!(
+            derivs2.delta_consciousness < 0.0,
+            "Dropping consciousness should give negative delta: {}",
+            derivs2.delta_consciousness
+        );
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STRESS TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[cfg(test)]
+#[cfg(feature = "vocal-tract")]
+mod stress_tests {
+    use super::*;
+    use symthaea_core::genesis::GenesisSeed;
+
+    /// 1000 frames × 120 samples = 120K samples. No NaN/Inf, no clicks, no long underruns.
+    #[test]
+    fn test_sustained_streaming_1000_frames() {
+        let genesis = GenesisSeed::from_phrase("stress-sustained");
+        let mut streaming = StreamingVocalTract::new(&genesis, 24000, 200);
+        let state = super::super::vocal_tract_encoder::VoiceCognitiveState::default();
+
+        let mut all_samples = Vec::with_capacity(120_000);
+        for _ in 0..1000 {
+            let chunk = streaming.tick(&state, None, 0.005, Some("AH"));
+            all_samples.extend_from_slice(&chunk);
+        }
+
+        assert_eq!(all_samples.len(), 120_000);
+        assert!(
+            all_samples.iter().all(|s| s.is_finite()),
+            "All 120K samples must be finite"
+        );
+
+        // No clicks: max delta < 1.5 (relaxed for 1000 frames — DSP vocoder
+        // can produce slightly larger deltas at rare glottal pulse transitions)
+        let max_delta: f32 = all_samples
+            .windows(2)
+            .map(|w| (w[1] - w[0]).abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            max_delta < 1.5,
+            "Click detected: max delta = {max_delta:.3}"
+        );
+
+        // No long underruns: max consecutive zeros < 240 (1ms at 24kHz)
+        let mut consecutive_zeros = 0usize;
+        let mut max_zeros = 0usize;
+        for &s in &all_samples {
+            if s.abs() < 1e-10 {
+                consecutive_zeros += 1;
+                max_zeros = max_zeros.max(consecutive_zeros);
+            } else {
+                consecutive_zeros = 0;
+            }
+        }
+        assert!(
+            max_zeros < 240,
+            "Long underrun: {max_zeros} consecutive zeros"
+        );
+    }
+
+    /// Switch phonemes every 5 frames across 10 phonemes. All finite, bounded.
+    #[test]
+    fn test_burst_phoneme_switching() {
+        let genesis = GenesisSeed::from_phrase("stress-burst");
+        let mut streaming = StreamingVocalTract::new(&genesis, 24000, 200);
+        let state = super::super::vocal_tract_encoder::VoiceCognitiveState {
+            emotional_arousal: 0.6,
+            ..Default::default()
+        };
+
+        let phonemes = ["AH", "IY", "UW", "EH", "AA", "P", "T", "S", "M", "N"];
+        let mut all_samples = Vec::with_capacity(60_000);
+
+        for cycle in 0..500 {
+            let ph = phonemes[cycle / 5 % phonemes.len()];
+            let chunk = streaming.tick(&state, None, 0.005, Some(ph));
+            all_samples.extend_from_slice(&chunk);
+        }
+
+        assert!(
+            all_samples.iter().all(|s| s.is_finite()),
+            "All samples must be finite under burst switching"
+        );
+        let max_abs: f32 = all_samples
+            .iter()
+            .map(|s| s.abs())
+            .fold(0.0f32, f32::max);
+        assert!(
+            max_abs < 2.0,
+            "Max abs too high under burst switching: {max_abs:.3}"
+        );
+    }
+
+    /// 3 extreme cognitive states × 100 frames each. All finite.
+    #[test]
+    fn test_extreme_cognitive_states() {
+        let genesis = GenesisSeed::from_phrase("stress-extreme");
+        let mut streaming = StreamingVocalTract::new(&genesis, 24000, 200);
+
+        let extremes = [
+            // All minimum
+            super::super::vocal_tract_encoder::VoiceCognitiveState {
+                prediction_error: 0.0,
+                emotional_valence: -1.0,
+                emotional_arousal: 0.0,
+                unified_quality: 0.0,
+                epistemic_confidence: 0.0,
+                coherence_velocity: -1.0,
+                cross_agreement: 0.0,
+                consciousness_level: 0.0,
+                articulation_quality: 0.0,
+                rate_stability: 0.0,
+                integrated_phi: 0.0,
+                expected_free_energy: 0.0,
+            },
+            // All maximum
+            super::super::vocal_tract_encoder::VoiceCognitiveState {
+                prediction_error: 2.0,
+                emotional_valence: 1.0,
+                emotional_arousal: 1.0,
+                unified_quality: 1.0,
+                epistemic_confidence: 1.0,
+                coherence_velocity: 1.0,
+                cross_agreement: 1.0,
+                consciousness_level: 1.0,
+                articulation_quality: 1.0,
+                rate_stability: 1.0,
+                integrated_phi: 2.0,
+                expected_free_energy: 5.0,
+            },
+            // High expected free energy (uncertainty)
+            super::super::vocal_tract_encoder::VoiceCognitiveState {
+                expected_free_energy: 5.0,
+                emotional_arousal: 0.9,
+                consciousness_level: 0.1,
+                ..Default::default()
+            },
+        ];
+
+        for (idx, state) in extremes.iter().enumerate() {
+            for frame in 0..100 {
+                let chunk = streaming.tick(state, None, 0.005, Some("AH"));
+                assert!(
+                    chunk.iter().all(|s| s.is_finite()),
+                    "NaN/Inf at extreme state {idx}, frame {frame}"
+                );
+            }
+        }
+    }
+
+    /// 500 frames with consistently bad FEP metrics. Should not diverge.
+    #[test]
+    fn test_fep_feedback_stress() {
+        let genesis = GenesisSeed::from_phrase("stress-fep");
+        let mut streaming = StreamingVocalTract::new(&genesis, 24000, 200);
+        let state = super::super::vocal_tract_encoder::VoiceCognitiveState::default();
+
+        let bad_metrics = VocalTractObservation {
+            articulation_score: 0.1,
+            formant_accuracy: 0.1,
+            pitch_stability: 0.1,
+            coarticulation_smoothness: 0.1,
+            duration_accuracy: 0.1,
+            energy_consistency: 0.1,
+        };
+
+        for frame in 0..500 {
+            let chunk = streaming.tick(&state, Some(&bad_metrics), 0.005, Some("AH"));
+            assert!(
+                chunk.iter().all(|s| s.is_finite()),
+                "NaN/Inf under bad FEP metrics at frame {frame}"
+            );
+        }
     }
 }

@@ -29,7 +29,11 @@ pub struct DemoRunner {
 impl DemoRunner {
     /// Create a new demo runner with default configuration.
     pub fn new() -> anyhow::Result<Self> {
-        let config = CognitiveLoopConfig::default();
+        let mut config = CognitiveLoopConfig::default();
+        #[cfg(feature = "vision-manifold")]
+        {
+            config.enable_vision_manifold = true;
+        }
         let service = CognitiveLoopService::new(config)?;
 
         Ok(Self {
@@ -76,25 +80,18 @@ impl DemoRunner {
     pub fn run_cycle(&mut self) -> DemoCycleData {
         self.cycle_count += 1;
 
-        // Optionally run vision manifold and feed through cognitive loop
+        // Inject camera frame into cognitive loop's internal VisionBridge.
+        // The frame is processed during cycle() through the perception phase.
         #[cfg(feature = "vision-manifold")]
-        let vision_tel = if self.vision_enabled {
+        if self.vision_enabled {
             if let Some(ref mut cam) = self.vision {
-                if let Ok(tel) = cam.tick() {
-                    // Feed the vision state into the cognitive loop's fast path
-                    let state = cam.manifold().state().clone();
-                    let _ = self.service.cycle_with_hv(&state);
-                    let horizons = cam.manifold().evaluate_horizons();
-                    Some((tel, horizons))
-                } else {
-                    None
-                }
-            } else {
-                None
+                let _ = cam.tick(); // advance mock camera for frame sequencing
             }
-        } else {
-            None
-        };
+            let w = self.service.config().vision_frame_width;
+            let h = self.service.config().vision_frame_height;
+            let mock_frame = vec![128u8; (w * h) as usize];
+            self.service.inject_vision_frame(mock_frame);
+        }
 
         let result = self.service.cycle(&self.current_input);
         let m = &result.metadata;
@@ -215,6 +212,9 @@ impl DemoRunner {
             moral_anomaly_score: m.ethics.moral_anomaly_score,
             moral_value_inversion: m.ethics.moral_value_inversion,
             moral_free_energy_spike: m.ethics.moral_free_energy_spike,
+            moral_drift_alert: m.ethics.moral_drift_alert,
+            moral_fragmentation_increase: m.ethics.moral_fragmentation_increase,
+            moral_anomaly_response_applied: m.ethics.moral_anomaly_response_applied,
             // Vision manifold telemetry (defaults, overwritten below if active)
             vision_active: false,
             vision_prediction_error: 0.0,
@@ -239,19 +239,24 @@ impl DemoRunner {
             substrate_feasibility: m.substrate_feasibility,
         };
 
-        // Populate vision telemetry if active
+        // Populate vision telemetry from CycleMetadata (internal VisionBridge path)
         #[cfg(feature = "vision-manifold")]
-        if let Some((ref tel, ref horizons)) = vision_tel {
-            data.vision_active = true;
-            data.vision_prediction_error = tel.prediction_error;
-            data.vision_coherence = tel.manifold_coherence;
-            data.vision_attention_entropy = tel.attention_entropy;
-            data.vision_salient_patches = tel.num_salient_patches;
-            data.vision_frame_sequence = tel.frame_sequence;
-            data.vision_horizon_errors = horizons.errors.clone();
-            data.vision_encode_us = tel.encode_time_us;
-            data.vision_evolve_us = tel.evolve_time_us;
-            data.vision_training_triggered = tel.training_triggered;
+        if let Some(ref vt) = m.vision {
+            data.vision_active = vt.vision_active;
+            data.vision_prediction_error = vt.prediction_error;
+            data.vision_coherence = vt.manifold_coherence;
+            data.vision_attention_entropy = vt.attention_entropy;
+            data.vision_salient_patches = vt.num_salient_patches;
+            data.vision_frame_sequence = vt.frame_sequence;
+            data.vision_training_triggered = vt.training_triggered;
+            data.vision_encode_us = vt.encode_time_us;
+            data.vision_evolve_us = vt.evolve_time_us;
+        }
+        #[cfg(feature = "vision-manifold")]
+        if self.vision_enabled {
+            if let Some(horizons) = self.service.vision_evaluate_horizons() {
+                data.vision_horizon_errors = horizons.errors;
+            }
         }
 
         // Redact sensitive vector fields if requested (Item 3: telemetry protection).
@@ -273,7 +278,12 @@ impl DemoRunner {
 
     /// Reset the service to initial state.
     pub fn reset(&mut self) {
-        if let Ok(service) = CognitiveLoopService::new(CognitiveLoopConfig::default()) {
+        let mut config = CognitiveLoopConfig::default();
+        #[cfg(feature = "vision-manifold")]
+        {
+            config.enable_vision_manifold = true;
+        }
+        if let Ok(service) = CognitiveLoopService::new(config) {
             self.service = service;
             self.cycle_count = 0;
             self.current_input = "consciousness emerges from integrated information".to_string();

@@ -90,6 +90,61 @@ pub enum SubstrateType {
     ExoticSubstrate,
 }
 
+// ============================================================================
+// Cortical Regions (matching Actor Brain 12-region architecture)
+// ============================================================================
+
+/// Cortical regions corresponding to the 12-region Actor Brain architecture.
+///
+/// Used for per-region substrate assignment in hybrid substrate configurations
+/// (Phase 4 of the Substrate Roadmap). Each region can potentially run on a
+/// different physical substrate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CorticalRegion {
+    /// Prefrontal cortex: meta-cognition, planning, HOT
+    Prefrontal,
+    /// Motor cortex: action selection, motor planning
+    Motor,
+    /// Somatosensory cortex: touch, proprioception
+    Sensory,
+    /// Visual cortex: vision processing, feature binding
+    Visual,
+    /// Auditory cortex: sound processing, speech perception
+    Auditory,
+    /// Language areas: Broca's + Wernicke's, syntax/semantics
+    Language,
+    /// Hippocampus + medial temporal: episodic memory, consolidation
+    Memory,
+    /// Amygdala + limbic: emotion, valence, arousal
+    Emotional,
+    /// TPJ + mPFC: theory of mind, social cognition
+    Social,
+    /// Default mode network: imagination, creativity, mind-wandering
+    Creative,
+    /// Dorsolateral PFC + ACC: executive control, conflict monitoring
+    Executive,
+    /// Thalamus + claustrum: cross-modal integration, binding
+    Integration,
+}
+
+impl CorticalRegion {
+    /// All 12 cortical regions.
+    pub const ALL: [CorticalRegion; 12] = [
+        CorticalRegion::Prefrontal,
+        CorticalRegion::Motor,
+        CorticalRegion::Sensory,
+        CorticalRegion::Visual,
+        CorticalRegion::Auditory,
+        CorticalRegion::Language,
+        CorticalRegion::Memory,
+        CorticalRegion::Emotional,
+        CorticalRegion::Social,
+        CorticalRegion::Creative,
+        CorticalRegion::Executive,
+        CorticalRegion::Integration,
+    ];
+}
+
 impl SubstrateType {
     /// Map aliases to canonical variants used internally.
     pub fn canonical(&self) -> Self {

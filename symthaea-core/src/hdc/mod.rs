@@ -298,6 +298,7 @@ pub mod grid_encoder;
 
 // Global Workspace Theory (conscious access, competition, broadcasting)
 pub mod global_workspace; // GWT implementation with competitive dynamics
+pub mod higher_order_thought; // Higher-Order Thought (HOT) theory — meta-representational consciousness
 
 // Consciousness topology and Φ measurement modules
 pub mod binary_hv;

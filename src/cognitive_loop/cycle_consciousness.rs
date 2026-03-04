@@ -1082,6 +1082,8 @@ mod tests {
             urgency: CycleUrgency::Normal,
             attention_budget_exceeded: false,
             predictive_budget_gated: false,
+            #[cfg(feature = "vision-manifold")]
+            scene_recognized: false,
         }
     }
 

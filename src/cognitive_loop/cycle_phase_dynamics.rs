@@ -30,8 +30,11 @@ use super::thresholds::{
     THALAMIC_DEEP_BUDGET_SCALE, THALAMIC_DEEP_LR_FACTOR, THALAMIC_DEEP_SALIENCE,
     THALAMIC_REFLEX_BUDGET_SCALE, THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE,
     WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE,
+    TRAINING_BASE_IMPORTANCE,
     WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
+#[cfg(feature = "vision-manifold")]
+use super::thresholds::{TRAINING_MAX_IMPORTANCE, VISION_TRAINING_IMPORTANCE_SCALE};
 use super::training::TrainingSample;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, TrainingMethod,
@@ -664,6 +667,25 @@ impl CognitiveLoopService {
         let (pattern, pattern_confidence) = self.temporal_signature_encoder.classify_state();
         let coherence = self.coherence_bridge.smoothed_coherence();
         self.carryover.history.cached_coherence = Some(coherence);
+
+        // Voice feedback heartbeat: synthesize metrics from cognitive state
+        // to keep the voice→cognition loop alive (Liberman & Mattingly 1985)
+        let voice_heartbeat = crate::voice::VoiceOutputMetrics {
+            articulation_score: coherence.clamp(0.0, 1.0),
+            formant_accuracy: (1.0 - prediction_error).clamp(0.0, 1.0),
+            speech_rate: 4.0 * self.adaptive_behavior.speech_rate_multiplier,
+            pitch_stability: pattern_confidence,
+            coarticulation_smoothness: coherence.clamp(0.0, 1.0) * 0.8,
+            listener_prediction: if prediction_error < self.config.learning_threshold {
+                0.8
+            } else {
+                0.3
+            },
+            duration_accuracy: 0.7,
+            energy_consistency: 0.8,
+        };
+        self.voice_feedback_bridge.update(voice_heartbeat);
+
         let voice_confidence = self.voice_feedback_bridge.summary().voice_confidence;
         self.adaptive_behavior = AdaptiveBehavior::from_consciousness_state(
             pattern,
@@ -1281,6 +1303,15 @@ impl CognitiveLoopService {
                 (train_input, train_target, effective_lr * 0.1)
             };
 
+            // Compute vision-surprise importance weight for training
+            #[cfg(feature = "vision-manifold")]
+            let importance = (TRAINING_BASE_IMPORTANCE
+                + perception.cross_manifold_prediction_error
+                    * VISION_TRAINING_IMPORTANCE_SCALE)
+                .min(TRAINING_MAX_IMPORTANCE);
+            #[cfg(not(feature = "vision-manifold"))]
+            let importance = TRAINING_BASE_IMPORTANCE;
+
             if let Some(ref trainer) = self.async_trainer {
                 trainer.send(TrainingSample {
                     input: train_input,
@@ -1289,6 +1320,7 @@ impl CognitiveLoopService {
                     learning_rate: lr,
                     method: self.config.training_method,
                     avg_loss: self.stats.avg_training_loss,
+                    importance,
                 });
                 (true, None)
             } else {

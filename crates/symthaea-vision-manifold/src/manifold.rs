@@ -60,6 +60,16 @@ pub struct VisionManifold {
     predictive: Option<PredictiveCodingHierarchy>,
     /// When true, skip training and contrastive refinement.
     learning_frozen: bool,
+    /// Optional episodic scene memory for recognition and surprise dampening.
+    scene_memory: Option<SceneMemory>,
+    /// Last scene recognition match (if any).
+    last_scene_match: Option<SceneMatch>,
+    /// Minimum coherence required to store a scene landmark (default 0.7).
+    scene_store_coherence_threshold: f32,
+    /// Maximum prediction error allowed to store a scene landmark (default 0.1).
+    scene_store_error_threshold: f32,
+    /// Dampening factor for recognized scenes: higher = stronger suppression (default 0.5).
+    scene_dampen_factor: f32,
 }
 
 impl VisionManifold {
@@ -108,6 +118,11 @@ impl VisionManifold {
             error_ema: 0.0,
             predictive,
             learning_frozen: false,
+            scene_memory: None, // Enabled externally via enable_scene_memory()
+            last_scene_match: None,
+            scene_store_coherence_threshold: 0.7,
+            scene_store_error_threshold: 0.1,
+            scene_dampen_factor: 0.5,
         }
     }
 
@@ -191,6 +206,11 @@ impl VisionManifold {
             output_hv_norm: 0.0,
             attention_boost_applied: 0.0,
             cross_scale_prediction_error,
+            scene_recognized: self.last_scene_match.is_some(),
+            scene_recognition_similarity: self
+                .last_scene_match
+                .as_ref()
+                .map_or(0.0, |m| m.similarity),
         };
 
         self.telemetry.clone()
@@ -253,6 +273,32 @@ impl VisionManifold {
         self.last_frame_hv = Some(frame_hv.clone());
         self.last_patch_hvs = patch_hvs.to_vec();
         self.frame_count += 1;
+
+        // Scene memory: recognize and optionally store the current scene
+        self.last_scene_match = None;
+        if let Some(ref mut memory) = self.scene_memory {
+            self.last_scene_match = memory.recognize(&self.state, self.frame_count);
+
+            // Dampen surprise for recognized scenes
+            if let Some(ref scene_match) = self.last_scene_match {
+                let factor =
+                    1.0 - scene_match.similarity.clamp(0.0, 1.0) * self.scene_dampen_factor;
+                let rows = self.surprise.grid().rows;
+                let cols = self.surprise.grid().cols;
+                for row in 0..rows {
+                    for col in 0..cols {
+                        self.surprise.dampen(row, col, factor);
+                    }
+                }
+            }
+
+            // Store current state as landmark when coherence is high and error is low
+            if self.coherence > self.scene_store_coherence_threshold
+                && self.prediction_error < self.scene_store_error_threshold
+            {
+                memory.remember(&self.state, self.frame_count);
+            }
+        }
 
         // Store training telemetry
         self.telemetry.training_triggered = training_triggered;
@@ -342,6 +388,11 @@ impl VisionManifold {
         &self.surprise
     }
 
+    /// Mutable access to the spatial surprise map (for top-down priming).
+    pub fn surprise_map_mut(&mut self) -> &mut SurpriseMap {
+        &mut self.surprise
+    }
+
     /// Last telemetry snapshot.
     pub fn telemetry(&self) -> &VisionTelemetry {
         &self.telemetry
@@ -417,6 +468,27 @@ impl VisionManifold {
     /// Whether learning is currently frozen.
     pub fn is_learning_frozen(&self) -> bool {
         self.learning_frozen
+    }
+
+    /// Last scene recognition match (if any).
+    pub fn last_scene_match(&self) -> Option<&SceneMatch> {
+        self.last_scene_match.as_ref()
+    }
+
+    /// Set the coherence and error thresholds for scene memory storage.
+    pub fn set_scene_store_thresholds(&mut self, coherence: f32, error: f32) {
+        self.scene_store_coherence_threshold = coherence;
+        self.scene_store_error_threshold = error;
+    }
+
+    /// Set the dampening factor for recognized scenes.
+    pub fn set_scene_dampen_factor(&mut self, factor: f32) {
+        self.scene_dampen_factor = factor.clamp(0.0, 1.0);
+    }
+
+    /// Enable scene memory with given capacity.
+    pub fn enable_scene_memory(&mut self, capacity: usize) {
+        self.scene_memory = Some(SceneMemory::new(capacity));
     }
 
     /// Access the underlying config.
@@ -639,6 +711,10 @@ impl VisionManifold {
         if let Some(ref mut predictive) = self.predictive {
             predictive.reset();
         }
+        if let Some(ref mut memory) = self.scene_memory {
+            memory.clear();
+        }
+        self.last_scene_match = None;
     }
 }
 
@@ -2125,6 +2201,40 @@ mod tests {
             late_mean <= 1.0,
             "Cross-scale prediction error should be bounded: {late_mean}"
         );
+    }
+
+    // === Configurable Scene Memory Thresholds ===
+
+    #[test]
+    fn test_configurable_scene_thresholds() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 32, 32);
+        m.enable_scene_memory(10);
+
+        m.set_scene_store_thresholds(0.5, 0.2);
+        m.set_scene_dampen_factor(0.8);
+
+        let frame: Vec<u8> = (0..32 * 32).map(|i| (i % 256) as u8).collect();
+        for _ in 0..10 {
+            m.observe_frame(&frame, 32, 32, 1, 0.033);
+        }
+        assert!(m.telemetry().prediction_error.is_finite());
+    }
+
+    #[test]
+    fn test_low_coherence_threshold_stores_more() {
+        let cfg = VisionConfig::default();
+        let mut m = VisionManifold::new(cfg, 32, 32);
+        m.enable_scene_memory(100);
+
+        // Very permissive thresholds
+        m.set_scene_store_thresholds(0.01, 10.0);
+
+        let frame: Vec<u8> = (0..32 * 32).map(|i| (i % 256) as u8).collect();
+        for _ in 0..30 {
+            m.observe_frame(&frame, 32, 32, 1, 0.033);
+        }
+        assert!(m.telemetry().manifold_coherence.is_finite());
     }
 
     // === Config Validation ===

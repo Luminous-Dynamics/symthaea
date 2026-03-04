@@ -22,6 +22,7 @@ use super::{CognitiveLoopService, ModuleTimings, ResponseStrategy};
 pub(crate) struct StrategySelectionResult {
     pub(crate) selected_strategy: ResponseStrategy,
     pub(crate) agency_strategy_override: bool,
+    pub(crate) social_strategy_bias: bool,
 }
 
 /// Result from the encoding and preprocessing phase (Phases 1–1.2).
@@ -99,6 +100,39 @@ impl CognitiveLoopService {
             }
         };
 
+        // ── Social trust → strategy modulation (Decety & Chaminade 2003) ──
+        // Proportional: trust deviation from neutral (0.5) scales bias strength
+        let trust_deviation = self.social.social_trust - 0.5; // [-0.5, 0.5]
+        let social_strategy_bias = if trust_deviation > 0.1
+            && self.social.social_cooperation_rate > 0.3
+        {
+            // High trust: strength scales [0, 1] over deviation [0.1, 0.5]
+            let strength = ((trust_deviation - 0.1) * 2.5).min(1.0);
+            if strength > 0.5 && selected_strategy == ResponseStrategy::Concise {
+                selected_strategy = ResponseStrategy::Supportive;
+                true
+            } else if strength > 0.3 {
+                self.adjust_exploration("social_trust_high", strength * 0.05);
+                false
+            } else {
+                false
+            }
+        } else if trust_deviation < -0.1 {
+            // Low trust: caution scales [0, 1] over deviation [-0.5, -0.1]
+            let caution = ((-trust_deviation - 0.1) * 2.5).min(1.0);
+            if caution > 0.5 && selected_strategy == ResponseStrategy::Exploratory {
+                selected_strategy = ResponseStrategy::Detailed;
+                true
+            } else if caution > 0.3 {
+                self.adjust_exploration("social_trust_low", -caution * 0.05);
+                false
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
         self.apply_strategy_modulation(selected_strategy);
 
         // ── Phase 21: Embodied agency → strategy modulation ──────────────
@@ -121,6 +155,7 @@ impl CognitiveLoopService {
         StrategySelectionResult {
             selected_strategy,
             agency_strategy_override,
+            social_strategy_bias,
         }
     }
 
@@ -280,20 +315,39 @@ impl CognitiveLoopService {
         if ethics_output.lr_factor != 1.0 {
             self.scale_lr("ethics_engine", ethics_output.lr_factor);
         }
-        // Anomaly response: corrective feedback when moral anomalies detected (opt-in)
-        if self.config.enable_moral_anomaly_response {
+        // Anomaly response: corrective feedback when moral anomalies detected (opt-in).
+        // Gate on topology_fresh to prevent N× over-correction from stale anomaly flags
+        // between topology analyses (cadence can be 30–120 cycles).
+        //
+        // Formulas (all severity-weighted by composite anomaly_score ∈ [0,1]):
+        //   value_inversion  → lr *= 1 + (response_lr_inversion - 1) * severity
+        //   free_energy_spike → exploration += response_exploration_fe * severity
+        //   fragmentation    → confidence  += response_confidence_frag * severity
+        //   drift_alert      → lr *= 1 + (response_lr_drift - 1) * severity
+        //
+        // When multiple anomalies trigger simultaneously, LR scales stack
+        // multiplicatively (e.g. inversion + drift → lr *= 1.09 * 0.96 = 1.047
+        // at defaults with severity=0.3). This runs after the ethics engine's
+        // own LR/confidence adjustments (lines 295-299), so both are in effect.
+        if self.config.enable_moral_anomaly_response && ethics_output.topology_fresh {
             let report = &ethics_output.anomaly_report;
+            let severity = report.anomaly_score as f32;
+            let ac = &self.config.moral_anomaly_config;
+            let lr_inv = ac.response_lr_inversion as f32;
+            let expl_fe = ac.response_exploration_fe as f32;
+            let conf_frag = ac.response_confidence_frag as f32;
+            let lr_drift = ac.response_lr_drift as f32;
             if report.value_inversion {
-                self.scale_lr("moral_anomaly_inversion", 1.2);
+                self.scale_lr("moral_anomaly_inversion", 1.0 + (lr_inv - 1.0) * severity);
             }
             if report.free_energy_spike {
-                self.adjust_exploration("moral_anomaly_fe", -0.1);
+                self.adjust_exploration("moral_anomaly_fe", expl_fe * severity);
             }
             if report.fragmentation_increase {
-                self.adjust_confidence("moral_anomaly_frag", 0.05);
+                self.adjust_confidence("moral_anomaly_frag", conf_frag * severity);
             }
             if report.drift_alert {
-                self.scale_lr("moral_anomaly_drift", 0.8);
+                self.scale_lr("moral_anomaly_drift", 1.0 + (lr_drift - 1.0) * severity);
             }
         }
         self.carryover.quality.last_value_score = ethics_output.value_score;

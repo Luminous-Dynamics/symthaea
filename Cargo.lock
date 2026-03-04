@@ -14354,6 +14354,7 @@ dependencies = [
  "serde_json",
  "symthaea-core",
  "symthaea-perception",
+ "tracing",
 ]
 
 [[package]]

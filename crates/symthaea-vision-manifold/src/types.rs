@@ -299,6 +299,12 @@ pub struct VisionTelemetry {
     pub attention_boost_applied: f32,
     /// Cross-scale prediction error from the predictive coding hierarchy (if enabled).
     pub cross_scale_prediction_error: f32,
+    /// Whether the current scene was recognized from scene memory.
+    #[serde(default)]
+    pub scene_recognized: bool,
+    /// Cosine similarity of the scene recognition match (0.0 if no match).
+    #[serde(default)]
+    pub scene_recognition_similarity: f32,
 }
 
 /// Per-patch spatial attention/surprise map.

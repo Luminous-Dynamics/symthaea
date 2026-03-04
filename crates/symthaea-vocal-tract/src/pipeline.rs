@@ -9,7 +9,7 @@
 
 use crate::controller::{SpeakerProfile, VocalTractConfig, VocalTractController};
 use crate::encoder::{VocalTractHdcEncoder, VoiceCognitiveState};
-use crate::fep::{VocalTractFepAgent, VocalTractObservation};
+use crate::fep::{VocalTractFepAgent, VocalTractFepResult, VocalTractObservation};
 use crate::types::{FormantFrame, SourceType};
 use symthaea_core::genesis::{GenesisCovenant, GenesisSeed};
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
@@ -364,6 +364,10 @@ pub struct VocalTractPipeline {
     coarticulation_frames: usize,
     /// Phoneme name → manner of articulation (for setting source_type on output frames).
     phoneme_manner_map: std::collections::HashMap<String, SourceType>,
+    /// Phoneme name → voicing (true = voiced, false = unvoiced).
+    phoneme_voicing_map: std::collections::HashMap<String, bool>,
+    /// Last FEP result (for telemetry / inspection).
+    last_fep_result: Option<VocalTractFepResult>,
 }
 
 impl VocalTractPipeline {
@@ -385,6 +389,8 @@ impl VocalTractPipeline {
             coarticulation_counter: 0,
             coarticulation_frames: 16, // 80ms at 200Hz
             phoneme_manner_map: std::collections::HashMap::new(),
+            phoneme_voicing_map: std::collections::HashMap::new(),
+            last_fep_result: None,
         }
     }
 
@@ -406,6 +412,8 @@ impl VocalTractPipeline {
             coarticulation_counter: 0,
             coarticulation_frames: 16,
             phoneme_manner_map: std::collections::HashMap::new(),
+            phoneme_voicing_map: std::collections::HashMap::new(),
+            last_fep_result: None,
         }
     }
 
@@ -442,6 +450,8 @@ impl VocalTractPipeline {
             coarticulation_counter: 0,
             coarticulation_frames: 16,
             phoneme_manner_map: std::collections::HashMap::new(),
+            phoneme_voicing_map: std::collections::HashMap::new(),
+            last_fep_result: None,
         }
     }
 
@@ -457,6 +467,22 @@ impl VocalTractPipeline {
     /// Register a single phoneme's manner of articulation.
     pub fn register_phoneme_manner(&mut self, phoneme: &str, manner: SourceType) {
         self.phoneme_manner_map.insert(phoneme.to_string(), manner);
+    }
+
+    /// Set the phoneme voicing map for manner-aware voicing overrides.
+    pub fn set_voicing_map(&mut self, map: std::collections::HashMap<String, bool>) {
+        self.phoneme_voicing_map = map;
+    }
+
+    /// Register a single phoneme's voicing.
+    pub fn register_phoneme_voicing(&mut self, phoneme: &str, is_voiced: bool) {
+        self.phoneme_voicing_map
+            .insert(phoneme.to_string(), is_voiced);
+    }
+
+    /// Get the last FEP result (for telemetry / inspection).
+    pub fn last_fep_result(&self) -> Option<&VocalTractFepResult> {
+        self.last_fep_result.as_ref()
     }
 
     /// Get or create a cached phoneme identity HV.
@@ -517,6 +543,8 @@ impl VocalTractPipeline {
                 let current_lr = self.controller.learning_rate();
                 self.controller
                     .set_learning_rate(current_lr * fep_result.learning_rate_factor);
+                self.controller.set_emphasis(fep_result.emphasis_factor);
+                self.last_fep_result = Some(fep_result);
             }
         }
 
@@ -602,10 +630,15 @@ impl VocalTractPipeline {
         frame.time = self.cumulative_time;
         self.cumulative_time += dt;
 
-        // Set source_type from phoneme manner map (vocoder uses this for excitation)
+        // Set source_type and voicing from phoneme maps
         if let Some(ph) = phoneme {
             if let Some(&manner) = self.phoneme_manner_map.get(ph) {
                 frame.source_type = manner;
+            }
+            if let Some(&is_voiced) = self.phoneme_voicing_map.get(ph) {
+                if !is_voiced {
+                    frame.voicing = 0.0;
+                }
             }
         }
 
@@ -658,6 +691,8 @@ impl VocalTractPipeline {
                 let current_lr = self.controller.learning_rate();
                 self.controller
                     .set_learning_rate(current_lr * fep_result.learning_rate_factor);
+                self.controller.set_emphasis(fep_result.emphasis_factor);
+                self.last_fep_result = Some(fep_result);
             }
         }
 
@@ -753,10 +788,15 @@ impl VocalTractPipeline {
         frame.time = self.cumulative_time;
         self.cumulative_time += dt;
 
-        // Set source_type from phoneme manner map
+        // Set source_type and voicing from phoneme maps
         if let Some(ph) = phoneme {
             if let Some(&manner) = self.phoneme_manner_map.get(ph) {
                 frame.source_type = manner;
+            }
+            if let Some(&is_voiced) = self.phoneme_voicing_map.get(ph) {
+                if !is_voiced {
+                    frame.voicing = 0.0;
+                }
             }
         }
 

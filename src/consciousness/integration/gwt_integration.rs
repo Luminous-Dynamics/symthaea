@@ -43,6 +43,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
+/// Handler callback for GWT broadcast events.
+pub type BroadcastHandler = Box<dyn Fn(&[BinaryHV]) + Send + Sync>;
+
 /// Unified GWT processor integrating #23 and #69
 pub struct UnifiedGlobalWorkspace {
     /// The HDC-based workspace (#23)
@@ -59,6 +62,9 @@ pub struct UnifiedGlobalWorkspace {
 
     /// Statistics
     stats: UnifiedGWTStats,
+
+    /// Registered broadcast handlers (module_name → callback)
+    handlers: HashMap<String, BroadcastHandler>,
 
     // ═══════════════════════════════════════════════════════════════════
     // REVOLUTIONARY STATE - Advanced Consciousness Dynamics
@@ -276,9 +282,18 @@ impl UnifiedGlobalWorkspace {
             metacognitive_assessments: Vec::new(),
             workspace_stability: 1.0,
             phi_estimates: HashMap::new(),
+            handlers: HashMap::new(),
             #[cfg(feature = "observability_module")]
             observer: None,
         }
+    }
+
+    /// Register a broadcast handler for a named module.
+    ///
+    /// The handler fires whenever the workspace broadcasts content
+    /// tagged with the given module name.
+    pub fn register_handler(&mut self, module: &str, handler: BroadcastHandler) {
+        self.handlers.insert(module.to_string(), handler);
     }
 
     /// Create new unified workspace with observer
@@ -298,6 +313,7 @@ impl UnifiedGlobalWorkspace {
             metacognitive_assessments: Vec::new(),
             workspace_stability: 1.0,
             phi_estimates: HashMap::new(),
+            handlers: HashMap::new(),
             observer,
         }
     }
@@ -601,6 +617,13 @@ impl UnifiedGlobalWorkspace {
                     broadcast.strength,
                     broadcast.recipients.join(",")
                 ));
+            }
+
+            // Dispatch registered handlers on every broadcast
+            for broadcast in &assessment.broadcasts {
+                for handler in self.handlers.values() {
+                    handler(&broadcast.content);
+                }
             }
         }
 

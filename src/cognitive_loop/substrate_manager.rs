@@ -4,7 +4,11 @@
 //! into a single cohesive manager. Handles feasibility computation,
 //! validation overlays, speed/scale modulation, and runtime reconfiguration.
 
-use symthaea_core::hdc::substrate_independence::{SubstrateRequirements, SubstrateType};
+use std::collections::HashMap;
+
+use symthaea_core::hdc::substrate_independence::{
+    CorticalRegion, SubstrateRequirements, SubstrateType,
+};
 
 use super::config::CognitiveLoopConfig;
 
@@ -55,6 +59,12 @@ pub(crate) struct SubstrateManager {
     /// Throughput multiplier derived from substrate energy efficiency.
     /// Higher = more efficient substrate = more ops per joule.
     pub(crate) energy_throughput_multiplier: f32,
+
+    /// Per-region substrate types (None = use global substrate for all).
+    per_region_substrates: Option<HashMap<CorticalRegion, SubstrateType>>,
+
+    /// Per-region feasibility scores.
+    per_region_feasibility: HashMap<CorticalRegion, f32>,
 }
 
 impl SubstrateManager {
@@ -87,9 +97,12 @@ impl SubstrateManager {
             total_energy_spent: 0.0,
             energy_per_cycle,
             energy_throughput_multiplier,
+            per_region_substrates: config.per_region_substrates.clone(),
+            per_region_feasibility: HashMap::new(),
         };
         mgr.recompute_effective_feasibility(config);
         mgr.recompute_substrate_dynamics(config);
+        mgr.recompute_per_region_feasibility(config);
         mgr
     }
 
@@ -219,6 +232,76 @@ impl SubstrateManager {
         }
     }
 
+    // ── Per-region substrate methods ──────────────────────────────────────
+
+    /// Get the feasibility score for a specific cortical region.
+    /// Returns the global effective feasibility when per-region is not configured.
+    #[allow(dead_code)] // Phase 4: per-region substrate modeling
+    pub fn region_feasibility(&self, region: CorticalRegion) -> f32 {
+        self.per_region_feasibility
+            .get(&region)
+            .copied()
+            .unwrap_or(self.effective_feasibility as f32)
+    }
+
+    /// Reconfigure a single region's substrate at runtime.
+    #[allow(dead_code)] // Phase 4: per-region substrate modeling
+    pub fn reconfigure_region(&mut self, region: CorticalRegion, substrate: SubstrateType) {
+        let map = self.per_region_substrates.get_or_insert_with(HashMap::new);
+        map.insert(region, substrate.canonical());
+        let feas =
+            Self::requirements_for(&substrate.canonical()).consciousness_feasibility() as f32;
+        self.per_region_feasibility.insert(region, feas);
+        // Recompute aggregate effective feasibility from per-region scores
+        self.recompute_aggregate_from_regions();
+    }
+
+    /// Recompute per-region feasibility scores from current substrate assignments.
+    fn recompute_per_region_feasibility(&mut self, config: &CognitiveLoopConfig) {
+        self.per_region_feasibility.clear();
+        if let Some(ref map) = self.per_region_substrates {
+            for (&region, substrate) in map {
+                let feas = Self::requirements_for(&substrate.canonical())
+                    .consciousness_feasibility() as f32;
+                self.per_region_feasibility.insert(region, feas);
+            }
+            self.recompute_aggregate_from_regions();
+        }
+        // If no per-region map, per_region_feasibility stays empty and
+        // region_feasibility() falls back to global effective_feasibility.
+        let _ = config; // used for future validation overlay per-region
+    }
+
+    /// Recompute aggregate effective feasibility from per-region scores.
+    ///
+    /// Effective = weighted average (equal weights) of per-region feasibilities,
+    /// with a cross-substrate communication penalty (0.95× per distinct substrate pair).
+    fn recompute_aggregate_from_regions(&mut self) {
+        if self.per_region_feasibility.is_empty() {
+            return;
+        }
+        // Equal-weight average
+        let sum: f32 = self.per_region_feasibility.values().sum();
+        let count = self.per_region_feasibility.len() as f32;
+        let avg = sum / count;
+
+        // Cross-substrate communication penalty: count distinct substrate types
+        let distinct_substrates: std::collections::HashSet<_> = self
+            .per_region_substrates
+            .as_ref()
+            .map(|m| m.values().map(|s| std::mem::discriminant(s)).collect())
+            .unwrap_or_default();
+        let num_pairs = if distinct_substrates.len() > 1 {
+            distinct_substrates.len() - 1
+        } else {
+            0
+        };
+        // 0.95× penalty per distinct substrate pair
+        let penalty = 0.95_f32.powi(num_pairs as i32);
+
+        self.effective_feasibility = (avg * penalty) as f64;
+    }
+
     /// Map a canonical SubstrateType to its pre-built SubstrateRequirements profile.
     /// Unknown/future variants fall back to silicon_digital().
     pub(crate) fn requirements_for(substrate: &SubstrateType) -> SubstrateRequirements {
@@ -267,6 +350,7 @@ impl SubstrateManager {
 // These forward to SubstrateManager so that constructor.rs can call
 // Self::requirements_for(...) and Self::substrate_validation_key(...).
 
+#[allow(dead_code)] // Delegation kept for backward compatibility
 impl super::CognitiveLoopService {
     /// Default honest confidence for substrates not in the validation framework.
     pub(crate) const THEORETICAL_CONFIDENCE: f64 = THEORETICAL_CONFIDENCE;
