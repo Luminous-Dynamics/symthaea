@@ -90,7 +90,7 @@ impl SimpleRng {
     ///
     /// Returns a sample from N(0, 1). Uses two uniforms to produce one normal.
     pub fn next_normal(&mut self) -> f64 {
-        loop {
+        for _ in 0..100 {
             let u1 = self.next_f64();
             let u2 = self.next_f64();
             // Guard against log(0)
@@ -100,6 +100,7 @@ impl SimpleRng {
                 return r * theta.cos();
             }
         }
+        0.0 // Fallback: RNG produced 100 consecutive near-zero values
     }
 }
 

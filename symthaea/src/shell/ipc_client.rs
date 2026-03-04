@@ -879,7 +879,7 @@ impl ShellIpcClient {
             let writer = self.writer.as_mut().context("Not connected to service")?;
 
             let data = rmp_serde::to_vec(&request)?;
-            let len = (data.len() as u32).to_le_bytes();
+            let len = (data.len().min(u32::MAX as usize) as u32).to_le_bytes();
 
             writer
                 .write_all(&len)

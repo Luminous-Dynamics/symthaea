@@ -532,7 +532,10 @@ impl StreamingInference {
                 last_output = Some(network.forward(input, *dt));
             }
 
-            last_output.expect("inputs was non-empty")
+            match last_output {
+                Some(out) => out,
+                None => return, // inputs was empty (should not reach here)
+            }
         };
 
         let now = Instant::now();
