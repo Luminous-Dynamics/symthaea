@@ -50,6 +50,8 @@ impl CognitiveLoopService {
             urgency: perception.urgency,
             attention_budget_exceeded: dynamics.attention_budget_exceeded,
             predictive_budget_gated: dynamics.predictive_budget_gated,
+            #[cfg(feature = "vision-manifold")]
+            scene_recognized: perception.scene_recognized,
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -239,6 +241,12 @@ impl CognitiveLoopService {
             } else {
                 0.0
             };
+
+        // ── Social trust → learning rate modulation (Decety & Chaminade 2003) ──
+        let social_learning_rate_factor = 0.8 + 0.4 * self.social.social_trust; // [0.8, 1.2]
+        if (social_learning_rate_factor - 1.0).abs() > 0.01 {
+            self.scale_lr("social_trust", social_learning_rate_factor);
+        }
 
         // ── Phase 20: Causal relations density → urgency gating ──────────────
         let causal_urgency_gated = causal_relations_count > 10
@@ -536,7 +544,7 @@ impl CognitiveLoopService {
                 attractor_detected: self.neuromod.phase_tracker.detect_attractor().is_some(),
                 sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
                 gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
-                substrate_feasibility: self.substrate_effective_feasibility,
+                substrate_feasibility: self.substrate_manager.effective_feasibility,
                 // Moral topology → consciousness coupling
                 moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
                 moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
@@ -921,6 +929,7 @@ impl CognitiveLoopService {
             consciousness_weight_variance,
             // Weight convergence
             convergence_state,
+            social_learning_rate_factor,
         }
     }
 }

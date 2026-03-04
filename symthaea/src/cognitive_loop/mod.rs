@@ -776,32 +776,6 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "physics-bridge")]
     physics_integration: Option<physics_integration::PhysicsIntegration>,
 
-    /// Pre-computed substrate feasibility [0,1] from config.substrate_type.
-    /// Scales Equation V2 consciousness to reflect substrate limitations.
-    substrate_feasibility: f64,
-
-    /// Pending substrate transition description for telemetry.
-    /// Populated by `reconfigure_substrate()`/`reconfigure_composition()`,
-    /// drained into `CycleMetadata.substrate_transition` once per cycle.
-    pending_substrate_transition: Option<String>,
-
-    /// Honest evidence confidence for the current substrate (0.0–0.95).
-    /// From SubstrateValidationFramework: biological=0.95, silicon=0.10, etc.
-    substrate_honest_confidence: f64,
-
-    /// Effective feasibility after validation overlay blending.
-    /// When overlay disabled: equals substrate_feasibility.
-    /// When enabled: substrate_feasibility × (floor + (1 − floor) × honest_confidence).
-    substrate_effective_feasibility: f64,
-
-    /// CfC tau factor from substrate speed modulation [0.5, 2.0].
-    /// 1.0 when speed modulation is disabled.
-    substrate_tau_factor: f32,
-
-    /// Scale pressure: log10(substrate_max_scale / bio_max_scale).
-    /// Telemetry-only. 0.0 when speed modulation is disabled.
-    substrate_scale_pressure: f32,
-
     /// Cycle at which consciousness weights first converged (0 = not yet).
     convergence_cycle: usize,
 
