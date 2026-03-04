@@ -111,13 +111,15 @@ impl WorkingMemory {
         // Evict lowest-activation if over capacity
         if self.items.len() > self.capacity {
             // Find index of minimum activation
-            let min_idx = self
+            let Some(min_idx) = self
                 .items
                 .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.activation.total_cmp(&b.activation))
                 .map(|(i, _)| i)
-                .unwrap();
+            else {
+                return;
+            };
             let evicted = self.items.remove(min_idx);
             self.last_evicted = Some(evicted);
         }

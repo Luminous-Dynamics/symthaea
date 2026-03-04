@@ -161,7 +161,7 @@ impl TelemetryAccumulator {
             let mut sorted: Vec<f64> = self.tick_history.iter().copied().collect();
             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let len = sorted.len();
-            let p50 = sorted[(len as f64 * 0.50) as usize];
+            let p50 = sorted[((len as f64 * 0.50) as usize).min(len - 1)];
             let p95 = sorted[((len as f64 * 0.95) as usize).min(len - 1)];
             let p99 = sorted[((len as f64 * 0.99) as usize).min(len - 1)];
             let mean = sorted.iter().sum::<f64>() / len as f64;

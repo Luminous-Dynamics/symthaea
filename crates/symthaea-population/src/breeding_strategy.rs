@@ -167,8 +167,8 @@ pub fn select_pairs_hdc_distance(
             used_males.insert(*m);
 
             // Compute HLA complementarity from genome HVs
-            let f_ind = population.individuals.iter().find(|i| i.id == *f).unwrap();
-            let m_ind = population.individuals.iter().find(|i| i.id == *m).unwrap();
+            let Some(f_ind) = population.individuals.iter().find(|i| i.id == *f) else { continue };
+            let Some(m_ind) = population.individuals.iter().find(|i| i.id == *m) else { continue };
             let hla = crate::hdc_genetics::hla_complementarity(
                 &f_ind.genome_hv,
                 &m_ind.genome_hv,

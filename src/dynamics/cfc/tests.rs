@@ -208,29 +208,34 @@ fn test_cfc_reset_clears_state() {
 // =====================================================================
 
 #[test]
-#[should_panic(expected = "tau_min must be >= ")]
-fn test_cfc_rejects_zero_tau() {
+fn test_cfc_clamps_zero_tau() {
     let cell_config = CfCConfig {
         input_dim: 4,
         hidden_dim: 8,
-        tau_range: (0.0, 1.0), // Zero tau_min should panic
+        tau_range: (0.0, 1.0), // Zero tau_min gets clamped to MIN_TAU
         use_backbone: false,
         ..Default::default()
     };
-    let _ = CfCCell::new(cell_config);
+    let cell = CfCCell::new(cell_config);
+    // Verify tau values are clamped above MIN_TAU
+    for &t in cell.tau.iter() {
+        assert!(t >= 1e-6, "tau should be >= MIN_TAU after clamp: {t}");
+    }
 }
 
 #[test]
-#[should_panic(expected = "tau_min must be >= ")]
-fn test_cfc_rejects_very_small_tau() {
+fn test_cfc_clamps_very_small_tau() {
     let cell_config = CfCConfig {
         input_dim: 4,
         hidden_dim: 8,
-        tau_range: (1e-8, 1.0), // Below MIN_TAU should panic
+        tau_range: (1e-8, 1.0), // Below MIN_TAU gets clamped
         use_backbone: false,
         ..Default::default()
     };
-    let _ = CfCCell::new(cell_config);
+    let cell = CfCCell::new(cell_config);
+    for &t in cell.tau.iter() {
+        assert!(t >= 1e-6, "tau should be >= MIN_TAU after clamp: {t}");
+    }
 }
 
 #[test]
