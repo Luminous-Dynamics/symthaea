@@ -34,7 +34,10 @@ use super::thresholds::{
     WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
-use super::thresholds::{TRAINING_MAX_IMPORTANCE, VISION_TRAINING_IMPORTANCE_SCALE};
+use super::thresholds::{
+    TRAINING_MAX_IMPORTANCE, VISION_SURPRISE_TRAINING_IMPORTANCE_SCALE,
+    VISION_TRAINING_IMPORTANCE_SCALE,
+};
 use super::training::TrainingSample;
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, TrainingMethod,
@@ -1311,7 +1314,9 @@ impl CognitiveLoopService {
             #[cfg(feature = "vision-manifold")]
             let importance = (TRAINING_BASE_IMPORTANCE
                 + perception.cross_manifold_prediction_error
-                    * VISION_TRAINING_IMPORTANCE_SCALE)
+                    * VISION_TRAINING_IMPORTANCE_SCALE
+                + perception.vision_mean_surprise
+                    * VISION_SURPRISE_TRAINING_IMPORTANCE_SCALE)
                 .min(TRAINING_MAX_IMPORTANCE);
             #[cfg(not(feature = "vision-manifold"))]
             let importance = TRAINING_BASE_IMPORTANCE;

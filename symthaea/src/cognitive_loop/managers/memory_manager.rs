@@ -64,6 +64,12 @@ impl MemoryManager {
     /// Basis: Born & Wilhelm (2012) — sleep-dependent memory consolidation.
     const MAX_CONSOLIDATION_INTERVAL: u32 = 100;
 
+    /// Current consolidation pressure [0.0, 1.0].
+    /// High values indicate memory systems are overloaded and need dreaming/consolidation.
+    pub fn consolidation_pressure(&self) -> f32 {
+        self.consolidation_pressure
+    }
+
     fn mean_retrieval_quality(&self) -> f32 {
         if self.retrieval_count == 0 {
             return 0.5;
