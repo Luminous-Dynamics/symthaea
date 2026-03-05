@@ -320,6 +320,11 @@ impl SubstrateManager {
 
     /// Build a `SubstrateTelemetry` snapshot and drain the pending transition.
     pub fn telemetry(&mut self) -> super::types::SubstrateTelemetry {
+        let per_region = self
+            .per_region_feasibility
+            .iter()
+            .map(|(region, &feas)| (format!("{:?}", region), feas))
+            .collect();
         super::types::SubstrateTelemetry {
             substrate_feasibility: self.effective_feasibility,
             substrate_transition: self.pending_transition.take(),
@@ -328,6 +333,7 @@ impl SubstrateManager {
             substrate_effective_feasibility: self.effective_feasibility,
             substrate_tau_factor: self.tau_factor,
             substrate_scale_pressure: self.scale_pressure,
+            per_region_feasibility: per_region,
         }
     }
 

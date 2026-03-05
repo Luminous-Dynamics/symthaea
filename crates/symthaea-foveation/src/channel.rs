@@ -43,7 +43,7 @@ impl FoveationChannel {
         std::thread::Builder::new()
             .name("symthaea-foveation".into())
             .spawn(move || {
-                let pipeline = VentralPipeline::new(routing);
+                let mut pipeline = VentralPipeline::new(routing);
 
                 while let Ok(channel_req) = request_rx.recv() {
                     let result = pipeline.process(&channel_req.request);

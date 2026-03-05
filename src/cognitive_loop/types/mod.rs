@@ -44,6 +44,9 @@ pub struct SubstrateTelemetry {
     /// Scale pressure: log10(substrate_max_scale / bio_max_scale).
     #[serde(default)]
     pub substrate_scale_pressure: f32,
+    /// Per-region feasibility breakdown (empty when per-region not configured).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub per_region_feasibility: Vec<(String, f32)>,
 }
 
 fn default_one_f32_substrate() -> f32 {

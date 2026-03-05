@@ -782,4 +782,97 @@ mod tests {
             "handler should not fire for non-matching recipient"
         );
     }
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        /// Strategy: generate a list of recipient names for the workspace
+        fn recipient_names() -> impl Strategy<Value = Vec<String>> {
+            prop::collection::vec(
+                prop::sample::select(vec![
+                    "perception", "memory", "planning", "language", "action",
+                    "custom_a", "custom_b", "custom_c",
+                ]),
+                1..=5,
+            )
+            .prop_map(|v| v.into_iter().map(|s| s.to_string()).collect())
+        }
+
+        /// Strategy: generate a list of handler keys to register
+        fn handler_keys() -> impl Strategy<Value = Vec<String>> {
+            prop::collection::vec(
+                prop::sample::select(vec![
+                    "perception", "memory", "planning", "language", "action",
+                    "custom_a", "custom_b", "custom_c", "unrelated",
+                ]),
+                0..=4,
+            )
+            .prop_map(|v| v.into_iter().map(|s| s.to_string()).collect())
+        }
+
+        proptest! {
+            #[test]
+            fn filtered_dispatch_only_fires_matching_handlers(
+                recipients in recipient_names(),
+                handlers in handler_keys(),
+            ) {
+                // Deduplicate handler keys (HashMap.insert overwrites duplicates)
+                let mut seen = std::collections::HashSet::new();
+                let unique_handlers: Vec<String> = handlers
+                    .into_iter()
+                    .filter(|k| seen.insert(k.clone()))
+                    .collect();
+
+                let counters: Vec<(String, Arc<AtomicUsize>)> = unique_handlers
+                    .iter()
+                    .map(|k| (k.clone(), Arc::new(AtomicUsize::new(0))))
+                    .collect();
+
+                let mut ws = GlobalWorkspace::new(WorkspaceConfig {
+                    enable_broadcasting: true,
+                    entry_threshold: 0.3,
+                    ..Default::default()
+                });
+
+                // Override recipients
+                ws.recipients = recipients.clone();
+
+                // Register handlers
+                for (key, counter) in &counters {
+                    let c = counter.clone();
+                    ws.register_handler(key, Box::new(move |_| {
+                        c.fetch_add(1, Ordering::Relaxed);
+                    }));
+                }
+
+                // Submit high-activation content to trigger broadcast
+                let content = WorkspaceContent::new(
+                    vec![BinaryHV::random(42); 3],
+                    0.9,
+                    "source".to_string(),
+                );
+                ws.submit(content);
+                let assessment = ws.process();
+                let num_broadcasts = assessment.broadcasts.len();
+
+                // Verify: each handler fires exactly once per broadcast IF its key
+                // is in the recipients list, and zero times otherwise.
+                for (key, counter) in &counters {
+                    let count = counter.load(Ordering::Relaxed);
+                    let expected_per_broadcast = if recipients.contains(key) { 1 } else { 0 };
+                    // Key may appear multiple times in recipients → fires multiple times
+                    let recipient_occurrences = recipients.iter().filter(|r| *r == key).count();
+                    let expected = recipient_occurrences * num_broadcasts;
+                    prop_assert_eq!(
+                        count, expected,
+                        "handler '{}': expected {} fires (recipients={:?}, broadcasts={}), got {}",
+                        key, expected, recipients, num_broadcasts, count
+                    );
+                }
+            }
+        }
+    }
 }

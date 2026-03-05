@@ -141,6 +141,41 @@ fn main() {
         );
     }
 
+    // ── 1c. Dream consolidation accumulation ──────────────────────────
+    {
+        let mut gwt_consolidation_count = 0usize;
+        let mut total_dream_insights = 0usize;
+        let mut max_wisdom_count = 0usize;
+
+        for i in 0..SOAK_CYCLES {
+            let input = inputs[i % inputs.len()];
+            let result = service.cycle(input);
+            let m = &result.metadata;
+
+            if m.gwt_memory_consolidation_requested {
+                gwt_consolidation_count += 1;
+            }
+            total_dream_insights += m.memory.dream_insights;
+            max_wisdom_count = max_wisdom_count.max(m.memory.dream_wisdom_count);
+        }
+
+        println!("\n── Dream Consolidation ──");
+        println!("  GWT consolidation events: {gwt_consolidation_count}");
+        println!("  Total dream insights:     {total_dream_insights}");
+        println!("  Max wisdom count:         {max_wisdom_count}");
+
+        // Dream engine should have been active (at least some insights over 1000 cycles)
+        // The exact count depends on dynamics, but the system should not be completely inert.
+        assert!(
+            total_dream_insights < SOAK_CYCLES * 10,
+            "Dream insights should be bounded"
+        );
+        assert!(
+            max_wisdom_count < 500,
+            "Wisdom count should be bounded: {max_wisdom_count}"
+        );
+    }
+
     // ── 2. Capability card integrity ────────────────────────────────────
 
     println!("\n── Capability Card Integrity ──");

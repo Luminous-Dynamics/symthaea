@@ -667,6 +667,12 @@ pub const TRAINING_BASE_IMPORTANCE: f32 = 1.0;
 #[cfg(feature = "vision-manifold")]
 pub const VISION_TRAINING_IMPORTANCE_SCALE: f32 = 0.5;
 
+/// Vision mean-surprise scale for training importance.
+/// Complementary to cross-manifold error (0.5): surprise is a rawer signal.
+/// Basis: Pearce & Hall (1980) — stimulus surprise increases associability.
+#[cfg(feature = "vision-manifold")]
+pub const VISION_SURPRISE_TRAINING_IMPORTANCE_SCALE: f32 = 0.3;
+
 /// Maximum training importance weight.
 #[cfg(feature = "vision-manifold")]
 pub const TRAINING_MAX_IMPORTANCE: f32 = 2.0;

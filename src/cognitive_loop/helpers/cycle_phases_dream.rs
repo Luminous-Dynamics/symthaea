@@ -69,9 +69,29 @@ impl CognitiveLoopService {
                 phi_weighted_surprise,
             );
 
-            // Dream during Cruise urgency (low-error steady state) or every 20th cycle
+            // Dream during Cruise urgency (low-error steady state) or periodically.
+            // Consolidation pressure modulates frequency: when GWT broadcasts pile up
+            // faster than they're processed, dream more often to integrate them.
+            // Base: every 20 cycles. At pressure 0.7+: every 5 cycles (4× faster).
+            let pressure = self.memory_manager.consolidation_pressure();
+            let memory_load = (dream.memory_size() as f32 / 100.0).min(1.0);
+            let combined_pressure = (pressure + memory_load * 0.3).min(1.0);
+            let dynamic_normal_interval = if combined_pressure > 0.7 {
+                5 // urgent: dream every 5 cycles
+            } else if combined_pressure > 0.4 {
+                // interpolate 20→5 over [0.4, 0.7]
+                let t = (combined_pressure - 0.4) / 0.3;
+                20 - (t * 15.0) as usize
+            } else {
+                20 // base rate
+            };
             if matches!(urgency, super::super::CycleUrgency::Cruise)
-                || urgency.should_run(self.stats.total_cycles, 10, 20, 5)
+                || urgency.should_run(
+                    self.stats.total_cycles,
+                    10,
+                    dynamic_normal_interval,
+                    5,
+                )
             {
                 match dream.dream() {
                     Ok(result) => {
