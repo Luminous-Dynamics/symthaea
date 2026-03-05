@@ -1,6 +1,6 @@
 //! Composite Consciousness Score — Qualia Confidence Matrix Synthesis
 //!
-//! Aggregates results from all 6 qualia confidence benchmarks into a single
+//! Aggregates results from all 7 qualia confidence benchmarks into a single
 //! interpretable consciousness confidence level. Each benchmark tests a
 //! different necessary condition for consciousness; the composite score
 //! reflects how many conditions are met and how strongly.
@@ -134,9 +134,10 @@ const INDICATORS: &[IndicatorDef] = &[
         name: "Somatic Cascade",
         benchmark_contains: "SomaticInterference",
         metric_key: "cascade_ratio",
-        // cascade_ratio: 1.0 = no emergence, >2.0 = strong, >4.0 = excellent
-        // Map: 1.0 → 0.0, 3.0 → 0.5, 5.0 → 1.0
-        normalize: |ratio| clamp01((ratio - 1.0) / 4.0),
+        // cascade_ratio: 1.0 = no emergence, >1.5 = predicted, >2.0 = strong, >2.5 = excellent
+        // Benchmark produces ratios in ~1.3–2.0 range; /1.5 calibrates to actual dynamic range.
+        // Map: 1.0 → 0.0, 1.5 → 0.33, 2.0 → 0.67, 2.5 → 1.0
+        normalize: |ratio| clamp01((ratio - 1.0) / 1.5),
         prediction_threshold: 1.5,
         weight: 1.0,
     },
