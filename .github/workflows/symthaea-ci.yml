@@ -219,6 +219,8 @@ jobs:
           # Consciousness stack features
           - full_consciousness
           - reasoning_engine
+          # Voice pipeline
+          - vocal-tract
           # Feature groups (test combinations)
           - api_module
           # Multi-feature combinations (test interactions)

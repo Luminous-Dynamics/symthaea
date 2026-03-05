@@ -319,6 +319,18 @@ impl<A: DreamableAction> DreamEngine<A> {
         }
     }
 
+    /// Record a GWT-triggered consolidation event (Dehaene & Changeux 2011).
+    ///
+    /// When the global workspace broadcasts, the current cognitive state should
+    /// be consolidated as a high-salience memory. This bypasses the normal
+    /// surprise threshold to ensure broadcast-worthy content is always recorded.
+    pub fn record_consolidation_event(&mut self, state: &[f32], action: A, prediction_error: f32) {
+        // Use prediction_error boosted above threshold so it always records.
+        // The state doubles as outcome (self-referential snapshot).
+        let boosted_surprise = prediction_error.max(self.config.surprise_threshold + 0.01);
+        self.record(state, action, state, boosted_surprise);
+    }
+
     /// Run a dream cycle (Counterfactual Simulation)
     ///
     /// Processes stored events and generates counterfactual scenarios

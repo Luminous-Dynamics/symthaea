@@ -619,10 +619,12 @@ impl UnifiedGlobalWorkspace {
                 ));
             }
 
-            // Dispatch registered handlers on every broadcast
+            // Dispatch registered handlers to matching broadcast recipients
             for broadcast in &assessment.broadcasts {
-                for handler in self.handlers.values() {
-                    handler(&broadcast.content);
+                for recipient in &broadcast.recipients {
+                    if let Some(handler) = self.handlers.get(recipient) {
+                        handler(&broadcast.content);
+                    }
                 }
             }
         }

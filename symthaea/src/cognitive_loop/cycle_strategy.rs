@@ -509,4 +509,38 @@ mod tests {
         let result = svc.run_strategy_selection(true);
         assert_eq!(result.selected_strategy, ResponseStrategy::Supportive);
     }
+
+    #[test]
+    fn test_social_high_trust_switches_concise_to_supportive() {
+        let mut svc = make_service();
+        // trust=0.85 → deviation=0.35, strength=(0.35-0.1)*2.5=0.625 > 0.5
+        svc.social.social_trust = 0.85;
+        svc.social.social_cooperation_rate = 0.5;
+        // Force CLL to pick Concise
+        svc.closed_learning_loop.force_strategy(ResponseStrategy::Concise);
+        let result = svc.run_strategy_selection(false);
+        assert_eq!(result.selected_strategy, ResponseStrategy::Supportive);
+        assert!(result.social_strategy_bias);
+    }
+
+    #[test]
+    fn test_social_low_trust_switches_exploratory_to_detailed() {
+        let mut svc = make_service();
+        // trust=0.1 → deviation=-0.4, caution=(0.4-0.1)*2.5=0.75 > 0.5
+        svc.social.social_trust = 0.1;
+        // Force CLL to pick Exploratory
+        svc.closed_learning_loop.force_strategy(ResponseStrategy::Exploratory);
+        let result = svc.run_strategy_selection(false);
+        assert_eq!(result.selected_strategy, ResponseStrategy::Detailed);
+        assert!(result.social_strategy_bias);
+    }
+
+    #[test]
+    fn test_social_neutral_trust_no_bias() {
+        let mut svc = make_service();
+        // trust=0.5 → deviation=0.0, within dead zone (|deviation| < 0.1)
+        svc.social.social_trust = 0.5;
+        let result = svc.run_strategy_selection(false);
+        assert!(!result.social_strategy_bias);
+    }
 }
