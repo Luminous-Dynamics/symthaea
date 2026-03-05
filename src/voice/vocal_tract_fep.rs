@@ -288,6 +288,13 @@ impl StreamingVocalTract {
         phoneme: Option<&str>,
         prosody: &ProsodyContext,
     ) -> Vec<f32> {
+        // Track derivatives for voice quality modulation
+        self.last_tick_time += dt;
+        let derivs = self.compute_derivatives(cognitive_state, self.last_tick_time);
+        self.last_derivs = derivs;
+        self.prev_cognitive_state = Some(*cognitive_state);
+        self.last_tick_time = 0.0;
+
         let frame = self
             .pipeline
             .tick_with_prosody(cognitive_state, metrics, dt, phoneme, prosody);
@@ -297,8 +304,12 @@ impl StreamingVocalTract {
             return self.tick_neural(&frame, cognitive_state);
         }
 
+        let quality = super::vocoder::cognitive_state_to_voice_quality_extended(
+            cognitive_state,
+            &derivs,
+        );
         self.vocoder
-            .synthesize_frame(&frame, self.samples_per_frame)
+            .synthesize_frame_with_quality(&frame, &quality, self.samples_per_frame)
     }
 
     /// Neural vocoder tick: mel conversion → buffer → submit → collect → crossfade/gap-fill.
@@ -317,6 +328,12 @@ impl StreamingVocalTract {
         cognitive_state: &super::vocal_tract_encoder::VoiceCognitiveState,
     ) -> Vec<f32> {
         use symthaea_vocal_tract::formant_to_mel::MelVoiceQuality;
+
+        // Compute voice quality for DSP fallback/blend paths
+        let dsp_quality = super::vocoder::cognitive_state_to_voice_quality_extended(
+            cognitive_state,
+            &self.last_derivs,
+        );
 
         // 1. Convert cognitive state to voice quality for breathiness modulation
         let vq = MelVoiceQuality {
@@ -384,7 +401,7 @@ impl StreamingVocalTract {
 
             // Apply crossfade from DSP→neural if we're in the transition window
             if self.crossfade_remaining > 0 {
-                let dsp_samples = self.vocoder.synthesize_frame(frame, self.samples_per_frame);
+                let dsp_samples = self.vocoder.synthesize_frame_with_quality(frame, &dsp_quality, self.samples_per_frame);
                 let mut blended = Vec::with_capacity(self.samples_per_frame);
 
                 for (&neural, &dsp) in neural_samples.iter().zip(dsp_samples.iter()) {
@@ -400,7 +417,7 @@ impl StreamingVocalTract {
                 blended
             } else if neural_preference < 0.95 {
                 // Continuous consciousness-modulated blend
-                let dsp_samples = self.vocoder.synthesize_frame(frame, self.samples_per_frame);
+                let dsp_samples = self.vocoder.synthesize_frame_with_quality(frame, &dsp_quality, self.samples_per_frame);
                 neural_samples
                     .iter()
                     .zip(dsp_samples.iter())
@@ -410,9 +427,9 @@ impl StreamingVocalTract {
                 neural_samples
             }
         } else {
-            // DSP gap-fill
+            // DSP gap-fill with voice quality modulation
             self.vocoder
-                .synthesize_frame(frame, self.samples_per_frame)
+                .synthesize_frame_with_quality(frame, &dsp_quality, self.samples_per_frame)
         }
     }
 
