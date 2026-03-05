@@ -107,6 +107,10 @@ pub struct VocalTractFepAgent {
     tick_count: u64,
     /// Last action taken (for learn_from_outcome closure).
     last_action: Option<usize>,
+    /// Cached modulation factors from the last tick (for telemetry).
+    last_tau: f32,
+    last_lr: f32,
+    last_emphasis: f32,
 }
 
 impl VocalTractFepAgent {
@@ -134,6 +138,9 @@ impl VocalTractFepAgent {
             agent: ActiveInferenceAgent::new(config),
             tick_count: 0,
             last_action: None,
+            last_tau: 1.0,
+            last_lr: 1.0,
+            last_emphasis: 1.0,
         }
     }
 
@@ -179,6 +186,11 @@ impl VocalTractFepAgent {
             VocalAction::ShiftEmphasis => (1.0, 1.0, 1.3),
             VocalAction::ExplorationBurst => (0.9, 1.2, 1.1),
         };
+
+        // Cache for telemetry
+        self.last_tau = tau_factor;
+        self.last_lr = lr_factor;
+        self.last_emphasis = emphasis_factor;
 
         VocalTractFepResult {
             tau_factor,
@@ -228,6 +240,9 @@ impl VocalTractFepAgent {
         self.agent.reset();
         self.tick_count = 0;
         self.last_action = None;
+        self.last_tau = 1.0;
+        self.last_lr = 1.0;
+        self.last_emphasis = 1.0;
     }
 
     /// Access the underlying agent stats (for testing/inspection).
@@ -243,9 +258,9 @@ impl VocalTractFepAgent {
         FepTelemetry {
             free_energy: fe.map(|f| f.total).unwrap_or(0.0),
             prediction_error: fe.map(|f| f.prediction_error).unwrap_or(0.0),
-            tau_factor: 1.0,
-            lr_factor: 1.0,
-            emphasis_factor: 1.0,
+            tau_factor: self.last_tau,
+            lr_factor: self.last_lr,
+            emphasis_factor: self.last_emphasis,
             action: self
                 .last_action
                 .map(VocalAction::from_index)
