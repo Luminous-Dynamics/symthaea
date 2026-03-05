@@ -391,6 +391,27 @@ impl CognitiveLoopService {
             .gwt_perception_count
             .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
 
+        // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
+        // When global workspace broadcasts, record current state for episodic
+        // replay so broadcast-worthy content is preferentially consolidated.
+        if metadata.gwt_memory_consolidation_requested {
+            if let Some(ref mut dream) = self.dream_engine {
+                let action: Vec<f32> = perception
+                    .encoding_result
+                    .hdv
+                    .values
+                    .iter()
+                    .take(32)
+                    .copied()
+                    .collect();
+                dream.record_consolidation_event(
+                    &perception.compressed_state,
+                    action,
+                    perception.prediction_error,
+                );
+            }
+        }
+
         // ── Voice telemetry ──
         {
             let voice_summary = self.voice_feedback_bridge.summary();

@@ -669,7 +669,11 @@ impl CognitiveLoopService {
         self.carryover.history.cached_coherence = Some(coherence);
 
         // Voice feedback heartbeat: synthesize metrics from cognitive state
-        // to keep the voice→cognition loop alive (Liberman & Mattingly 1985)
+        // to keep the voice→cognition loop alive (Liberman & Mattingly 1985).
+        // NOTE: This is a synthetic proxy — real voice output metrics will replace
+        // these when the vocal tract pipeline is wired into the cycle (Phase 28+).
+        // Until then, this provides a non-trivial self-referential signal that
+        // keeps AdaptiveBehavior.confidence responsive to cognitive coherence.
         let voice_heartbeat = crate::voice::VoiceOutputMetrics {
             articulation_score: coherence.clamp(0.0, 1.0),
             formant_accuracy: (1.0 - prediction_error).clamp(0.0, 1.0),

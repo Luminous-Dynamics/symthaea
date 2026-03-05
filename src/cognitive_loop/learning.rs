@@ -261,6 +261,16 @@ impl ClosedLearningLoop {
     pub fn reset(&mut self) {
         *self = Self::default();
     }
+
+    /// Force the CLL to deterministically select a specific strategy by
+    /// setting its Q-value to 1.0 and all others to 0.0 with no exploration.
+    #[cfg(test)]
+    pub(crate) fn force_strategy(&mut self, strategy: ResponseStrategy) {
+        let idx = self.strategy_index(strategy);
+        self.q_values = [0.0; 5];
+        self.q_values[idx] = 1.0;
+        self.exploration_rate = 0.0;
+    }
 }
 
 #[cfg(test)]

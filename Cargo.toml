@@ -1124,6 +1124,13 @@ name = "precognition_demo"
 [[example]]
 name = "autonomous_forge_demo"
 
+# Soak tests (long-running validation)
+[[example]]
+name = "soak_discovery_pipeline"
+
+[[example]]
+name = "soak_moral_anomaly"
+
 # Benchmarks
 # Quick suite for CI (~5 min)
 # Standard suite (~30 min)

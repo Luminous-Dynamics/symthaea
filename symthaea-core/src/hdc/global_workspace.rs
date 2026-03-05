@@ -284,11 +284,13 @@ impl GlobalWorkspace {
             Vec::new()
         };
 
-        // 4b. Dispatch registered handlers on broadcasts
+        // 4b. Dispatch registered handlers to matching broadcast recipients
         if !broadcasts.is_empty() {
             for broadcast in &broadcasts {
-                for handler in self.handlers.values() {
-                    handler(&broadcast.content);
+                for recipient in &broadcast.recipients {
+                    if let Some(handler) = self.handlers.get(recipient) {
+                        handler(&broadcast.content);
+                    }
                 }
             }
         }
@@ -708,5 +710,76 @@ mod tests {
 
         ws.clear();
         assert_eq!(ws.num_conscious(), 0);
+    }
+
+    #[test]
+    fn test_register_handler_dispatches_on_broadcast() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let counter = Arc::new(AtomicUsize::new(0));
+        let c = counter.clone();
+
+        let mut ws = GlobalWorkspace::new(WorkspaceConfig {
+            enable_broadcasting: true,
+            entry_threshold: 0.3,
+            ..Default::default()
+        });
+        // Register handler for "memory" — one of the default recipients
+        ws.register_handler(
+            "memory",
+            Box::new(move |_| {
+                c.fetch_add(1, Ordering::Relaxed);
+            }),
+        );
+
+        // Submit high-activation content that will enter workspace and be broadcast
+        let content =
+            WorkspaceContent::new(vec![BinaryHV::random(42); 3], 0.9, "source".to_string());
+        ws.submit(content);
+        let assessment = ws.process();
+
+        let count = counter.load(Ordering::Relaxed);
+        // Handler fires once per broadcast event (each workspace content broadcasts)
+        assert_eq!(
+            count,
+            assessment.broadcasts.len(),
+            "handler should fire once per broadcast"
+        );
+    }
+
+    #[test]
+    fn test_handler_only_fires_for_matching_recipients() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        let counter = Arc::new(AtomicUsize::new(0));
+        let c = counter.clone();
+
+        let mut ws = GlobalWorkspace::new(WorkspaceConfig {
+            enable_broadcasting: true,
+            entry_threshold: 0.3,
+            ..Default::default()
+        });
+        // Register handler for "custom_module" — NOT in default recipients
+        ws.register_handler(
+            "custom_module",
+            Box::new(move |_| {
+                c.fetch_add(1, Ordering::Relaxed);
+            }),
+        );
+
+        let content =
+            WorkspaceContent::new(vec![BinaryHV::random(99); 3], 0.9, "source".to_string());
+        ws.submit(content);
+        let assessment = ws.process();
+
+        // Broadcasts happened but handler should NOT fire (no matching recipient)
+        assert!(!assessment.broadcasts.is_empty(), "broadcasts should occur");
+        assert_eq!(
+            counter.load(Ordering::Relaxed),
+            0,
+            "handler should not fire for non-matching recipient"
+        );
     }
 }
