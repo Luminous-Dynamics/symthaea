@@ -297,6 +297,35 @@ impl CommonsZome {
         Self::SupportDiagnostics,
         Self::Space,
     ];
+
+    /// Resolve a commons zome name string to the correct sub-cluster hApp role.
+    ///
+    /// Returns `"commons_land"` for physical infrastructure zomes (property,
+    /// housing, water, food) and `"commons_care"` for social/care zomes
+    /// (care, mutualaid, transport, support, space).
+    ///
+    /// Returns `None` if the zome name is not a recognized commons zome.
+    /// Also handles the `commons_bridge` zome which exists in both sub-clusters.
+    pub fn resolve_role(zome_name: &str) -> Option<&'static str> {
+        // Try to match against known zome names
+        if let Some(zome) = Self::from_str(zome_name) {
+            if zome.is_land() {
+                Some("commons_land")
+            } else {
+                Some("commons_care")
+            }
+        } else if zome_name == "commons_bridge" {
+            // Bridge exists in both; default to land (caller can override)
+            Some("commons_land")
+        } else {
+            None
+        }
+    }
+
+    /// Parse a zome name string into a CommonsZome variant.
+    pub fn from_str(s: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|z| z.as_str() == s)
+    }
 }
 
 // ============================================================================

@@ -284,7 +284,7 @@ async fn test_bridge_health_check() {
         .await;
 
     assert!(health.healthy);
-    assert_eq!(health.domains.len(), 7);
+    assert_eq!(health.domains.len(), 9);
     assert!(health.domains.contains(&"property".to_string()));
     assert!(health.domains.contains(&"housing".to_string()));
     assert!(health.domains.contains(&"care".to_string()));
@@ -292,6 +292,8 @@ async fn test_bridge_health_check() {
     assert!(health.domains.contains(&"water".to_string()));
     assert!(health.domains.contains(&"food".to_string()));
     assert!(health.domains.contains(&"transport".to_string()));
+    assert!(health.domains.contains(&"support".to_string()));
+    assert!(health.domains.contains(&"space".to_string()));
 }
 
 // ============================================================================

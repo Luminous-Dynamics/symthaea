@@ -1,6 +1,9 @@
 # Mycelix Ecosystem - Task Runner
 # Run `just` to see all available commands
 
+# Auto-detect LIBCLANG_PATH for bindgen (sweettest builds need this outside nix develop)
+export LIBCLANG_PATH := env("LIBCLANG_PATH", "/nix/store/xibf2ayyaljj1r7wgjf4n7n4vg5z8n2v-clang-21.1.8-lib/lib")
+
 # Default: show help
 default:
     @just --list --unsorted
@@ -1142,6 +1145,9 @@ test-sweettest-bridge:
 
 test-sweettest-privacy:
     cd tests/sweettest && cargo test --release privacy -- --ignored --nocapture
+
+test-sweettest-personal:
+    cd tests/sweettest && cargo test --release --test personal_workflow -- --ignored --test-threads=1
 
 test-sweettest-commons:
     cd ../mycelix-commons && cargo test --release --test sweettest_integration -- --ignored --nocapture

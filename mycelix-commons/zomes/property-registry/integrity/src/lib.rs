@@ -261,8 +261,8 @@ fn validate_create_property(
     if property.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Property ID cannot be empty".into()));
     }
-    if property.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Property ID must be 64 characters or fewer".into()));
+    if property.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Property ID must be 256 characters or fewer".into()));
     }
     if property.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Property title cannot be empty".into()));
@@ -379,8 +379,8 @@ fn validate_update_property(
     _action: Update,
     property: Property,
 ) -> ExternResult<ValidateCallbackResult> {
-    if property.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Property ID must be 64 characters or fewer".into()));
+    if property.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Property ID must be 256 characters or fewer".into()));
     }
     if property.title.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid("Property title must be 256 characters or fewer".into()));
@@ -448,14 +448,14 @@ fn validate_create_title_deed(
     if deed.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Deed ID cannot be empty".into()));
     }
-    if deed.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Deed ID must be 64 characters or fewer".into()));
+    if deed.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Deed ID must be 256 characters or fewer".into()));
     }
     if deed.property_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Deed property_id cannot be empty".into()));
     }
-    if deed.property_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Deed property_id must be 64 characters or fewer".into()));
+    if deed.property_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Deed property_id must be 256 characters or fewer".into()));
     }
     if !deed.owner_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
@@ -464,8 +464,8 @@ fn validate_create_title_deed(
         return Ok(ValidateCallbackResult::Invalid("Owner DID must be 256 characters or fewer".into()));
     }
     if let Some(ref prev) = deed.previous_deed_id {
-        if prev.len() > 64 {
-            return Ok(ValidateCallbackResult::Invalid("Previous deed ID must be 64 characters or fewer".into()));
+        if prev.len() > 256 {
+            return Ok(ValidateCallbackResult::Invalid("Previous deed ID must be 256 characters or fewer".into()));
         }
     }
     if deed.encumbrances.len() > 50 {
@@ -1123,7 +1123,7 @@ mod tests {
     #[test]
     fn property_id_too_long_rejected() {
         let mut p = make_property();
-        p.id = "x".repeat(65);
+        p.id = "x".repeat(257);
         let result = validate_create_property(fake_entry_creation_action(), p);
         assert!(is_invalid(&result));
     }
@@ -1543,7 +1543,7 @@ mod tests {
     #[test]
     fn deed_id_too_long_rejected() {
         let mut deed = make_title_deed();
-        deed.id = "x".repeat(65);
+        deed.id = "x".repeat(257);
         let result = validate_create_title_deed(fake_entry_creation_action(), deed);
         assert!(is_invalid(&result));
     }
@@ -1567,7 +1567,7 @@ mod tests {
     #[test]
     fn deed_property_id_too_long_rejected() {
         let mut deed = make_title_deed();
-        deed.property_id = "x".repeat(65);
+        deed.property_id = "x".repeat(257);
         let result = validate_create_title_deed(fake_entry_creation_action(), deed);
         assert!(is_invalid(&result));
     }
@@ -1599,7 +1599,7 @@ mod tests {
     #[test]
     fn deed_previous_deed_id_too_long_rejected() {
         let mut deed = make_title_deed();
-        deed.previous_deed_id = Some("x".repeat(65));
+        deed.previous_deed_id = Some("x".repeat(257));
         let result = validate_create_title_deed(fake_entry_creation_action(), deed);
         assert!(is_invalid(&result));
     }

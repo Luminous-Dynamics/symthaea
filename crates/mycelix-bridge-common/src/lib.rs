@@ -261,6 +261,30 @@ pub fn dispatch_call_cross_cluster(
     }
 }
 
+/// Cross-cluster dispatch to commons with automatic sub-cluster role resolution.
+///
+/// Instead of using a fixed `"commons"` role, this resolves the target zome
+/// to either `"commons_land"` or `"commons_care"` based on which sub-cluster
+/// DNA contains that zome.
+///
+/// This is needed because the commons cluster is split into two DNA roles
+/// in the unified hApp to fit under Holochain's 16MB DNA limit.
+pub fn dispatch_call_cross_cluster_commons(
+    input: &CrossClusterDispatchInput,
+    allowed_zomes: &[&str],
+) -> ExternResult<DispatchResult> {
+    // Resolve which sub-cluster this zome belongs to
+    let role = CommonsZome::resolve_role(&input.zome).unwrap_or("commons_land");
+
+    let routed_input = CrossClusterDispatchInput {
+        role: role.to_string(),
+        zome: input.zome.clone(),
+        fn_name: input.fn_name.clone(),
+        payload: input.payload.clone(),
+    };
+    dispatch_call_cross_cluster(&routed_input, allowed_zomes)
+}
+
 // ============================================================================
 // Rate limiting constants
 // ============================================================================

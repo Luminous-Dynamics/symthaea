@@ -231,7 +231,7 @@ pub async fn setup_test_agents(
     for _ in 0..n {
         let mut conductor = SweetConductor::from_standard_config().await;
         let app = conductor
-            .setup_app(app_name, &[dna.clone()])
+            .setup_app(app_name, [&dna])
             .await
             .unwrap();
 
@@ -277,7 +277,7 @@ pub async fn setup_test_agents_from_happ(
     let role_dnas = DnaPaths::unified_happ_dnas();
 
     // Load all available DNAs
-    let mut loaded: Vec<(String, SweetDnaFile)> = Vec::new();
+    let mut loaded: Vec<(String, DnaFile)> = Vec::new();
     for (role_name, dna_path) in &role_dnas {
         if !dna_path.exists() {
             eprintln!(
@@ -302,8 +302,7 @@ pub async fn setup_test_agents_from_happ(
         "No DNAs could be loaded for unified hApp. Build at least one DNA first."
     );
 
-    let dna_files: Vec<SweetDnaFile> = loaded.iter().map(|(_, dna)| dna.clone()).collect();
-    let role_names: Vec<String> = loaded.iter().map(|(name, _)| name.clone()).collect();
+    let role_names: Vec<String> = loaded.iter().map(|(name, _)| name.to_string()).collect();
 
     let mut agents = Vec::with_capacity(n);
 
@@ -311,7 +310,7 @@ pub async fn setup_test_agents_from_happ(
         let mut conductor = SweetConductor::from_standard_config().await;
         let app_name = format!("mycelix-unified-{}", i);
         let app = conductor
-            .setup_app(&app_name, &dna_files)
+            .setup_app(&app_name, &loaded)
             .await
             .unwrap_or_else(|e| panic!("Failed to setup unified hApp: {:?}", e));
 

@@ -20,7 +20,8 @@
 
 set -euo pipefail
 
-CONDUCTOR_DIR="${CONDUCTOR_DIR:-/tmp/mycelix-conductor}"
+SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CONDUCTOR_DIR="${CONDUCTOR_DIR:-$SCRIPT_DIR/.conductor}"
 ADMIN_PORT="${ADMIN_PORT:-4444}"
 APP_PORT="${APP_PORT:-4445}"
 PASSPHRASE="${PASSPHRASE:-test-passphrase}"
@@ -64,8 +65,8 @@ stop_conductor() {
         rm -f "$PIDS_FILE"
     fi
     # Clean up any orphans
-    pkill -f "lair-keystore.*mycelix-conductor" 2>/dev/null || true
-    pkill -f "holochain.*mycelix-conductor" 2>/dev/null || true
+    pkill -f "lair-keystore.*${CONDUCTOR_DIR}" 2>/dev/null || true
+    pkill -f "holochain.*${CONDUCTOR_DIR}" 2>/dev/null || true
 }
 
 status_conductor() {
