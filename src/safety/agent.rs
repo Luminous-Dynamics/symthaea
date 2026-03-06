@@ -112,8 +112,10 @@ impl Default for SafetyAgentConfig {
 pub struct SafetyAssessment {
     /// Cycle number from the snapshot.
     pub cycle: usize,
-    /// Computed safety level.
+    /// Computed safety level (may include trend escalation).
     pub level: SafetyLevel,
+    /// Safety level from metrics alone (before trend escalation).
+    pub raw_level: SafetyLevel,
     /// Consciousness level at time of assessment.
     pub consciousness_level: f32,
     /// Prediction error at time of assessment.
@@ -203,12 +205,18 @@ impl SafetyAgent {
             level = escalate(level);
         }
 
-        // Trend detection: sustained degradation escalates
+        // Capture raw level (metrics-only, before trend escalation)
+        let raw_level = level;
+
+        // Trend detection: sustained degradation escalates.
+        // Uses raw_level (metrics-only, before trend escalation) to prevent
+        // self-reinforcing Yellow lock-in where trend-escalated assessments
+        // perpetually pollute the window.
         if self.history.len() >= self.config.escalation_window {
             let window_start = self.history.len() - self.config.escalation_window;
             let recent_degraded = self.history[window_start..]
                 .iter()
-                .all(|a| a.level >= SafetyLevel::Yellow);
+                .all(|a| a.raw_level >= SafetyLevel::Yellow);
             if recent_degraded && level == SafetyLevel::Green {
                 reasons.push(format!(
                     "sustained degradation over {} cycles",
@@ -228,6 +236,7 @@ impl SafetyAgent {
             prediction_error: metrics.prediction_error,
             temporal_coherence: metrics.temporal_coherence,
             level,
+            raw_level,
             reasons,
         };
 

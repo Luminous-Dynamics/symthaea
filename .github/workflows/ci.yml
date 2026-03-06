@@ -18,6 +18,18 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  governance:
+    name: Governance Check (Class A/B Changes)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for safety-critical changes
+        run: bash symthaea/scripts/check-class-a-changes.sh --ci
+
   fmt:
     name: Format Check
     runs-on: ubuntu-latest
@@ -242,6 +254,7 @@ jobs:
           - "all_benchmarks"
           - "genesis-missions"
           - "genesis"
+          - "wasm-sandbox"
     steps:
       - uses: actions/checkout@v4
 
@@ -379,6 +392,7 @@ jobs:
           - "web_research_module,reasoning_engine"
           - "nix-mind,reasoning_engine"
           - "vision-manifold-camera,full_perception"
+          - "wasm-sandbox,reasoning_engine"
     steps:
       - uses: actions/checkout@v4
 
