@@ -629,7 +629,7 @@ pub fn check_housing_capacity_for_sheltering(input: CheckHousingCapacityInput) -
     let response = call(
         CallTargetCell::OtherRole(COMMONS_ROLE.into()),
         ZomeName::from("housing_units"),
-        FunctionName::from("get_all_units"),
+        FunctionName::from("get_available_units"),
         None,
         (),
     );
