@@ -153,6 +153,10 @@ pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
 pub(crate) mod substrate_manager;
+pub(crate) mod fep_module;
+
+#[cfg(feature = "ssm_language")]
+pub(crate) mod broca_bridge;
 
 #[cfg(feature = "physics-bridge")]
 pub(crate) mod physics_integration;
@@ -182,7 +186,7 @@ use crate::consciousness::cross_modal_binding::CrossModalBinder;
 use crate::consciousness::dream::DreamEngine;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::enactive_cognition::EnactiveCognition;
-use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
+// ActiveInferenceAgent, EnhancedFEPBridge moved to fep_module.rs
 use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
 use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
@@ -197,7 +201,7 @@ use crate::consciousness::stability_regime::StabilityRegimeProcessor;
 use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::dynamics::cfc_coherence::CfCCoherenceBridge;
 use crate::dynamics::temporal_signatures::TemporalSignatureEncoder;
-use crate::exploration::SurpriseExplorationBridge;
+// SurpriseExplorationBridge moved to fep_module.rs
 // MoralAlgebra + MoralParser now solely owned by EthicsEngine
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
 use crate::memory::memory_coordinator::MemoryCoordinator;
@@ -242,6 +246,14 @@ pub(crate) struct SocialState {
     pub social_trust: f32,
     /// Social cooperation rate injected by Mind module's SocialCoherence (0.0–1.0).
     pub social_cooperation_rate: f32,
+    /// Rolling accuracy of social predictions (0.0–1.0).
+    /// Updated when predictions are validated against outcomes.
+    /// Derived from SocialCoherenceStats::successful_predictions / total_predictions.
+    pub social_prediction_accuracy: f32,
+    /// Number of active mental models being tracked by SocialCoherence.
+    pub social_models_count: usize,
+    /// Mean trust across all tracked relationships (from SocialCoherenceStats).
+    pub social_mean_trust: f32,
 }
 
 impl Default for SocialState {
@@ -251,22 +263,18 @@ impl Default for SocialState {
             external_reward: 0.0,
             social_trust: 0.5,
             social_cooperation_rate: 0.0,
+            social_prediction_accuracy: 0.5,
+            social_models_count: 0,
+            social_mean_trust: 0.5,
         }
     }
 }
 
 /// Wrapper around social coherence state, used by cycle phases that
 /// reference `self.social_coherence.social.*`.
+#[derive(Default)]
 pub(crate) struct SocialCoherenceState {
     pub social: SocialState,
-}
-
-impl Default for SocialCoherenceState {
-    fn default() -> Self {
-        Self {
-            social: SocialState::default(),
-        }
-    }
 }
 
 // ── Primary service struct ──────────────────────────────────────────────────
@@ -363,35 +371,8 @@ pub struct CognitiveLoopService {
     /// Determines how deep the cognitive processing should go
     cognitive_depth: CognitiveDepth,
 
-    /// Active Inference Bridge for precision-weighted prediction
-    /// Connects MAGI Loop calibration to control signals via PAC tracking
-    active_inference_bridge: ActiveInferenceBridge,
-
-    /// Closed Learning Loop for strategy-based behavioral adaptation
-    /// Implements the paradigm: Learning -> Behavioral Change
-    closed_learning_loop: ClosedLearningLoop,
-
-    /// Episodic Memory Bridge for memory encoding and recall during cycles
-    episodic_memory: EpisodicMemoryBridge,
-
-    /// Goal System Bridge for goal-directed attention modulation
-    goal_system: GoalSystemBridge,
-
-    /// World Model Bridge for hierarchical grounded prediction
-    world_model: WorldModelBridge,
-
-    /// FEP Active Inference Agent for full perception-action loop
-    fep_agent: ActiveInferenceAgent,
-
-    /// Enhanced FEP Bridge with motor system integration
-    /// Provides learning signals and motor command outputs
-    enhanced_fep_bridge: EnhancedFEPBridge,
-
-    /// Current learning signal from FEP (for downstream systems)
-    fep_learning_signal: f32,
-
-    /// FEP-driven learning rate boost (applied during CfC training step)
-    fep_lr_boost: f64,
+    /// Consolidated FEP / Active Inference subsystem (10 fields -> 1).
+    fep: fep_module::FepModule,
 
     /// Decoupled feedback state: attributed proposals for prediction_confidence
     /// and fep_lr_boost (Phase 2.2 Great Refactor).
@@ -505,10 +486,7 @@ pub struct CognitiveLoopService {
     /// Previous cycle's primitive consciousness state for prediction error computation
     prev_primitive_state: Option<PrimitiveConsciousnessState>,
 
-    /// Surprise-driven exploration bridge for FEP-based exploration.
-    /// Tracks prediction errors and triggers exploration when surprise
-    /// exceeds an adaptive threshold. Modulates curiosity drive.
-    surprise_bridge: Option<SurpriseExplorationBridge>,
+    // NOTE: surprise_bridge moved into fep_module::FepModule
 
     /// Prefrontal cortex for executive control and working memory.
     /// When enabled, maintains a working memory of recent inputs and
@@ -670,6 +648,12 @@ pub struct CognitiveLoopService {
     /// background ventral recognition, feeding results into GWT.
     #[cfg(feature = "foveation")]
     pub(super) foveation_manager: Option<std::sync::Mutex<symthaea_foveation::FoveationManager>>,
+
+    /// Broca SSM language center: consciousness-gated thought-to-text.
+    /// When enabled via `ssm_language` feature + `enable_broca_language` config,
+    /// generates text from HDC-encoded thoughts with epistemic/emotional gating.
+    #[cfg(feature = "ssm_language")]
+    pub(crate) broca_manager: Option<broca_bridge::BrocaManager>,
 
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.

@@ -65,7 +65,7 @@ impl CognitiveLoopService {
 
         /// Current FEP learning signal (0.0-1.0).
         /// Used by the facade to modulate L-SSM distillation intensity.
-        pub fn fep_learning_signal(&self) -> f32 { self.fep_learning_signal }
+        pub fn fep_learning_signal(&self) -> f32 { self.fep.learning_signal }
 
         // ═══════════════════════════════════════════════════════════════════
         // PSI ATTESTATION
@@ -123,7 +123,7 @@ impl CognitiveLoopService {
 
         let card_stats = crate::swarm::CardStats {
             generated_at,
-            substrate_feasibility: self.substrate_manager.effective_feasibility as f64,
+            substrate_feasibility: self.substrate_manager.effective_feasibility,
             cycle_hz: self.stats.cycles_per_second,
             phi: self.stats.unified_psi as f64,
             features: Vec::new(), // populated by caller who knows feature flags

@@ -126,7 +126,7 @@ mod tests {
     #[test]
     fn set_social_signals_clamps_trust() {
         let mut s = make_service();
-        s.set_social_signals(5.0, 0.5);
+        s.set_social_signals(5.0, 0.5, 0.5, 0, 0.5);
         assert!(s.social.social_trust <= 1.0);
         assert!(s.social.social_trust >= 0.0);
     }
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn set_social_signals_clamps_cooperation() {
         let mut s = make_service();
-        s.set_social_signals(0.5, -3.0);
+        s.set_social_signals(0.5, -3.0, 0.5, 0, 0.5);
         assert!(s.social.social_cooperation_rate >= 0.0);
         assert!(s.social.social_cooperation_rate <= 1.0);
     }
@@ -142,9 +142,12 @@ mod tests {
     #[test]
     fn set_social_signals_preserves_in_range() {
         let mut s = make_service();
-        s.set_social_signals(0.8, 0.3);
+        s.set_social_signals(0.8, 0.3, 0.7, 5, 0.6);
         assert!((s.social.social_trust - 0.8).abs() < f32::EPSILON);
         assert!((s.social.social_cooperation_rate - 0.3).abs() < f32::EPSILON);
+        assert!((s.social.social_prediction_accuracy - 0.7).abs() < f32::EPSILON);
+        assert_eq!(s.social.social_models_count, 5);
+        assert!((s.social.social_mean_trust - 0.6).abs() < f32::EPSILON);
     }
 
     // ── Relational Psi ────────────────────────────────────────────────

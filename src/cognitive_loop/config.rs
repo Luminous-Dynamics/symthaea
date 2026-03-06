@@ -458,6 +458,14 @@ pub struct CognitiveLoopConfig {
     #[cfg(feature = "physics-bridge")]
     pub physics_bridge_blend_weight: f32,
 
+    // ── Broca SSM Language Center ──────────────────────────────────────
+    /// Enable Broca SSM language generation in the cognitive loop.
+    /// When true and `ssm_language` feature is enabled, generates text
+    /// from HDC-encoded thoughts with consciousness-gated quality control.
+    /// Default: false.
+    #[cfg(feature = "ssm_language")]
+    pub enable_broca_language: bool,
+
     // ── Per-Region Substrate Types (Phase 4 Foundation) ────────────────
     /// Per-region substrate mapping: allows different cortical regions to run
     /// on different physical substrates. When `None`, all regions use the
@@ -590,6 +598,8 @@ impl Default for CognitiveLoopConfig {
             physics_bridge_query_interval: 10,
             #[cfg(feature = "physics-bridge")]
             physics_bridge_blend_weight: 0.1,
+            #[cfg(feature = "ssm_language")]
+            enable_broca_language: false,
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
             #[cfg(feature = "vision-manifold")]
@@ -703,6 +713,10 @@ impl ConsciousnessProfile {
         #[cfg(feature = "nurture")]
         {
             config.enable_nurture_attachment = false;
+        }
+        #[cfg(feature = "ssm_language")]
+        {
+            config.enable_broca_language = false;
         }
 
         match self {

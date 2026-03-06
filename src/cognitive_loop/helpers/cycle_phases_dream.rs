@@ -173,7 +173,7 @@ impl CognitiveLoopService {
         // FEEDBACK: Current-cycle dream insights boost learning signal
         // (reinforces pathways that produced the insight)
         if dream_phi_improvement > 0.05 {
-            self.fep_learning_signal *= 1.0 + (dream_phi_improvement * 0.2).min(0.15);
+            self.fep.learning_signal *= 1.0 + (dream_phi_improvement * 0.2).min(0.15);
         }
 
         // Dream feedback bridge: adjust prediction confidence based on accumulated

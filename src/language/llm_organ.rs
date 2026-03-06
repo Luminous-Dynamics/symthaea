@@ -834,20 +834,32 @@ impl LLMOrgan {
 
         // ── Text Prompt Path (standard LLMs) ────────────────────────────────
         let prompt = self.build_translation_prompt(thought, mood_temperature);
+        let is_code_task = thought.code_context.is_some();
 
-        // Affective mapping
-        let gen_temp = (mood_temperature * 0.5).clamp(0.1, 1.2);
-        let max_len = if mood_temperature > 1.3 {
-            128 // Sharp/Concise when exhausted
+        // Use code-specific system prompt and parameters for code tasks
+        let (query_type, system_prompt, gen_temp, max_len) = if is_code_task {
+            (
+                QueryType::Code,
+                super::consciousness_prompts::CODE_GENERATION_SYSTEM_PROMPT.to_string(),
+                0.2_f32,   // Low temperature for deterministic code
+                2048_usize, // Code needs more tokens
+            )
         } else {
-            512 // Expansive when rested
+            let temp = (mood_temperature * 0.5).clamp(0.1, 1.2);
+            let len = if mood_temperature > 1.3 { 128 } else { 512 };
+            (
+                QueryType::Translation,
+                TRANSLATION_SYSTEM_PROMPT.to_string(),
+                temp,
+                len,
+            )
         };
 
         let query = LLMQuery {
-            query_type: QueryType::Translation,
+            query_type,
             content: prompt,
             context: Vec::new(),
-            system_prompt: Some(TRANSLATION_SYSTEM_PROMPT.to_string()),
+            system_prompt: Some(system_prompt),
             params: Some(LLMQueryParams {
                 temperature: Some(gen_temp),
                 max_length: Some(max_len),

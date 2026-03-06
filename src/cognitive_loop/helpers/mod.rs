@@ -620,7 +620,7 @@ impl CognitiveLoopService {
         self.stats.thalamic_deep_rate = deep_rate;
 
         // Active Inference Bridge statistics
-        let ai_stats = self.active_inference_bridge.statistics();
+        let ai_stats = self.fep.active_inference_bridge.statistics();
         self.stats.active_inference_modulation_index =
             ai_stats.modulation_index.map(|mi| mi as f32).unwrap_or(0.0);
         self.stats.active_inference_coupling_quality = format!("{:?}", ai_stats.coupling_quality);
@@ -630,24 +630,24 @@ impl CognitiveLoopService {
             .unwrap_or(0.5);
 
         // Enhanced FEP Bridge statistics
-        self.stats.fep_learning_signal = self.fep_learning_signal;
+        self.stats.fep_learning_signal = self.fep.learning_signal;
         // attention_shift is updated during cycle processing
         // fep_action_outcome_coupling is updated during cycle processing by enhanced FEP bridge
 
         // Closed Learning Loop statistics
-        self.stats.current_strategy = format!("{:?}", self.closed_learning_loop.current_strategy);
-        self.stats.best_strategy = format!("{:?}", self.closed_learning_loop.best_strategy());
-        self.stats.average_reward = self.closed_learning_loop.average_reward();
-        self.stats.exploration_rate = self.closed_learning_loop.exploration_rate();
-        self.stats.learning_loop_interactions = self.closed_learning_loop.total_interactions();
+        self.stats.current_strategy = format!("{:?}", self.fep.closed_learning_loop.current_strategy);
+        self.stats.best_strategy = format!("{:?}", self.fep.closed_learning_loop.best_strategy());
+        self.stats.average_reward = self.fep.closed_learning_loop.average_reward();
+        self.stats.exploration_rate = self.fep.closed_learning_loop.exploration_rate();
+        self.stats.learning_loop_interactions = self.fep.closed_learning_loop.total_interactions();
 
         // Memory system statistics
-        let (short_term, long_term) = self.episodic_memory.memory_count();
+        let (short_term, long_term) = self.fep.episodic_memory.memory_count();
         self.stats.memory_short_term_count = short_term;
         self.stats.memory_long_term_count = long_term;
-        self.stats.memory_total_encoded = self.episodic_memory.stats.total_encoded;
-        self.stats.world_model_avg_error = self.world_model.avg_error;
-        self.stats.active_goals_count = self.goal_system.active_goals().len();
+        self.stats.memory_total_encoded = self.fep.episodic_memory.stats.total_encoded;
+        self.stats.world_model_avg_error = self.fep.world_model.avg_error;
+        self.stats.active_goals_count = self.fep.goal_system.active_goals().len();
     }
 
     pub(super) fn update_loss_stats(&mut self, loss: f32) {
@@ -713,7 +713,7 @@ impl CognitiveLoopService {
         self.emotion_contagion.reset();
         self.curiosity_drive.reset();
         self.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
-        self.fep_agent = ActiveInferenceAgent::new(self.fep_agent.config.clone());
+        self.fep.agent = ActiveInferenceAgent::new(self.fep.agent.config.clone());
         self.coherence_tracker.reset();
         self.social = super::SocialState::default();
         self.social_coherence = super::SocialCoherenceState::default();

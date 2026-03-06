@@ -15,19 +15,19 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get memory counts (short_term, long_term)
-        pub fn memory_counts(&self) -> (usize, usize) { self.episodic_memory.memory_count() }
+        pub fn memory_counts(&self) -> (usize, usize) { self.fep.episodic_memory.memory_count() }
 
         /// Get active goals
-        pub fn active_goals(&self) -> Vec<&CognitiveGoal> { self.goal_system.active_goals() }
+        pub fn active_goals(&self) -> Vec<&CognitiveGoal> { self.fep.goal_system.active_goals() }
 
         /// Get the world model bridge reference
-        pub fn world_model(&self) -> &WorldModelBridge { &self.world_model }
+        pub fn world_model(&self) -> &WorldModelBridge { &self.fep.world_model }
 
         /// Get abstract level state from world model
-        pub fn world_model_abstract_state(&self) -> &[f32] { self.world_model.abstract_state() }
+        pub fn world_model_abstract_state(&self) -> &[f32] { self.fep.world_model.abstract_state() }
 
         /// Get world model prediction errors at each level
-        pub fn world_model_level_errors(&self) -> &[f32] { self.world_model.level_errors() }
+        pub fn world_model_level_errors(&self) -> &[f32] { self.fep.world_model.level_errors() }
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -123,12 +123,12 @@ impl CognitiveLoopService {
 
     /// Recall memories similar to input
     pub fn recall_memories(&mut self, query: &[f32], top_k: usize) -> Vec<(EpisodicMemory, f32)> {
-        self.episodic_memory.recall(query, top_k, 0.2)
+        self.fep.episodic_memory.recall(query, top_k, 0.2)
     }
 
     /// Add a goal to the system
     pub fn add_goal(&mut self, id: &str, description: &str, priority: f32) {
-        self.goal_system
+        self.fep.goal_system
             .add_goal(CognitiveGoal::new(id, description, priority));
     }
 }

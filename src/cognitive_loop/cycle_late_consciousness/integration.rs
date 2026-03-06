@@ -74,13 +74,19 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // CROSS-MODAL BINDING: Bind HDC encodings across modalities
         // Runs every cycle (lightweight: 2 HV ops + similarity)
+        // Substrate-gated: skip when substrate is degraded
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (cross_modal_binding_strength, cross_modal_psi) = self.update_cross_modal_binding(
-            &ctx.hv16_cached,
-            late.affective_valence,
-            late.predictive_free_energy,
-        );
+        let (cross_modal_binding_strength, cross_modal_psi) =
+            if self.substrate_manager.should_degrade_consciousness() {
+                (0.0, 0.0)
+            } else {
+                self.update_cross_modal_binding(
+                    &ctx.hv16_cached,
+                    late.affective_valence,
+                    late.predictive_free_energy,
+                )
+            };
 
         module_timings.cross_modal_binding = _t.elapsed().as_micros() as u64;
 
@@ -591,11 +597,11 @@ impl CognitiveLoopService {
             // high consciousness → prioritize memory encoding.
             if level > 0.5 {
                 // Trigger demand-driven consolidation at high consciousness
-                self.episodic_memory.consolidate_recent();
+                self.fep.episodic_memory.consolidate_recent();
             }
             // Scale learning signal by consciousness quality (gradual, not on/off)
             // This complements the binary consciousness_awake gate with continuous modulation
-            self.fep_learning_signal *= (0.5_f32 + level as f32 * 0.5_f32).clamp(0.5_f32, 1.0_f32);
+            self.fep.learning_signal *= (0.5_f32 + level as f32 * 0.5_f32).clamp(0.5_f32, 1.0_f32);
 
             level
         } else {
@@ -603,6 +609,14 @@ impl CognitiveLoopService {
             self.carryover.learning.mce_lr_boost *= crate::cognitive_loop::thresholds::MCE_BOOST_DECAY;
             0.0
         };
+
+        // Social cognition modulation: accurate ToM predictions boost consciousness.
+        // Science: Frith & Frith (2006) — social cognition recruits higher-order
+        // mentalizing networks that correlate with conscious processing capacity.
+        // Scale: 0.95 at accuracy=0.0, 1.05 at accuracy=1.0 (mild +/-5% modulation).
+        let social_accuracy = self.social.social_prediction_accuracy;
+        let social_mod = 0.95 + 0.1 * social_accuracy as f64;
+        let consciousness_level = (consciousness_level * social_mod).clamp(0.0, 1.0);
 
         // Store resonance frequency and quantum coherence for next cycle's feedback
         self.carryover.history.resonance_frequency = resonance_frequency;

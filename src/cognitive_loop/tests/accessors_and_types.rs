@@ -184,8 +184,8 @@ fn test_provide_reward_no_panic() {
 fn test_set_social_signals_no_panic() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Out-of-range values should be clamped silently.
-    service.set_social_signals(5.0, -3.0);
-    service.set_social_signals(0.5, 0.5);
+    service.set_social_signals(5.0, -3.0, 1.5, 0, -0.5);
+    service.set_social_signals(0.5, 0.5, 0.5, 3, 0.5);
 }
 
 #[test]

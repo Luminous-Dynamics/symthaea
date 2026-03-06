@@ -74,7 +74,7 @@ impl CognitiveLoopService {
 
         self.feedback_state.snapshot_cycle_start(
             self.prediction_confidence,
-            self.fep_lr_boost,
+            self.fep.lr_boost,
             self.curiosity_drive.exploration_urge,
             self.carryover.learning.adaptive_threshold_scale,
         );
@@ -161,10 +161,9 @@ impl CognitiveLoopService {
             // ── Wake→Sleep transition: optional calibration battery spawn ──
             // Spawn calibration battery subprocess at sleep onset so results
             // are ready by the next sleep→wake transition.
-            if !self.neuromod.was_sleeping && is_sleep_now {
-                if self.neuromod.pending_calibration.is_none() {
-                    self.spawn_calibration_battery(self.stats.total_cycles as u64);
-                }
+            if !self.neuromod.was_sleeping && is_sleep_now
+                && self.neuromod.pending_calibration.is_none() {
+                self.spawn_calibration_battery(self.stats.total_cycles as u64);
             }
 
             self.neuromod.was_sleeping = is_sleep_now;

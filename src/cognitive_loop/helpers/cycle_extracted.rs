@@ -157,7 +157,7 @@ impl CognitiveLoopService {
         (self
             .curiosity_drive
             .effective_learning_rate(semantic_modulated_lr)
-            * self.fep_lr_boost as f32
+            * self.fep.lr_boost as f32
             * (1.0 + self.carryover.learning.mce_lr_boost)
             * subsystem_lr)
             .clamp(0.0, 0.01)
@@ -276,7 +276,7 @@ impl CognitiveLoopService {
         compressed_state: &[f32],
     ) -> f32 {
         let hdv_sample: Vec<f32> = compressed_state[..64.min(compressed_state.len())].to_vec();
-        let recalled_memories = self.episodic_memory.recall(
+        let recalled_memories = self.fep.episodic_memory.recall(
             &hdv_sample,
             MEMORY_RECALL_TOP_K,
             MEMORY_RECALL_SIM_THRESHOLD,
@@ -332,7 +332,7 @@ impl CognitiveLoopService {
         let mut exploration_action = None;
 
         let mut deferred_exploration_delta: Option<f32> = None;
-        if let Some(ref mut bridge) = self.surprise_bridge {
+        if let Some(ref mut bridge) = self.fep.surprise_bridge {
             let predicted = self.last_prediction.as_deref().unwrap_or(&[]);
             let actual_len = predicted.len().max(1).min(compressed_state.len());
             let actual = &compressed_state[..actual_len];
@@ -423,7 +423,7 @@ impl CognitiveLoopService {
         // FEP free energy reduction enrichment
         // Science: Friston (2010) — free energy minimization as the objective
         // Reward FE reduction (prev > current = improving model)
-        let fep_bonus = if let Some(ref fe) = self.fep_agent.last_fe_components {
+        let fep_bonus = if let Some(ref fe) = self.fep.agent.last_fe_components {
             let current_fe = fe.total;
             let prev_fe = self.stats.last_total_fe;
             // Update cached value for next cycle
@@ -542,26 +542,26 @@ impl CognitiveLoopService {
             self.prediction_confidence,
             effective_lr as f64,
         );
-        let _perception = self.fep_agent.perceive(&fep_obs);
-        let action_result = self.fep_agent.select_action();
-        let _outcome = self.fep_agent.act(action_result.action);
+        let _perception = self.fep.agent.perceive(&fep_obs);
+        let action_result = self.fep.agent.select_action();
+        let _outcome = self.fep.agent.act(action_result.action);
 
         let fep_action_idx = action_result.action;
         let fep_action_probs = action_result.action_probabilities.clone();
 
-        let is_surprised = self.fep_agent.is_surprised();
+        let is_surprised = self.fep.agent.is_surprised();
         match action_result.action {
             0 => {
                 // Boost learning rate when free energy is high
-                if let Some(ref fe) = self.fep_agent.last_fe_components {
+                if let Some(ref fe) = self.fep.agent.last_fe_components {
                     let fe_boost = (fe.total.abs() as f32 / 2.0).clamp(0.0, 1.5);
                     self.scale_lr("fep_free_energy", 1.0 + fe_boost * 0.5);
                 }
             }
             1 => {
                 // Reset sensory precision toward 1.0 to trust new observations after shift
-                let current = self.fep_agent.precision.sensory_precision;
-                self.fep_agent.precision.sensory_precision = current * 0.7 + 1.0 * 0.3;
+                let current = self.fep.agent.precision.sensory_precision;
+                self.fep.agent.precision.sensory_precision = current * 0.7 + 1.0 * 0.3;
             }
             2 => {
                 // Boost exploration -- stronger nudge when surprised
@@ -570,7 +570,7 @@ impl CognitiveLoopService {
             }
             3 => {
                 // Tighten trust via precision
-                if let Some(ref fe) = self.fep_agent.last_fe_components {
+                if let Some(ref fe) = self.fep.agent.last_fe_components {
                     let precision_mod = (1.0 - fe.prediction_error).clamp(0.0, 1.0) as f32;
                     self.self_model_tier.self_reflection.trust_threshold =
                         (self.self_model_tier.self_reflection.trust_threshold * 0.9
@@ -817,7 +817,7 @@ impl CognitiveLoopService {
         // Surprise-gated learning rate boost
         if is_surprised {
             let surprise_boost =
-                (self.fep_agent.current_free_energy() as f32 / FEP_SURPRISE_SCALE).clamp(0.1, 0.5);
+                (self.fep.agent.current_free_energy() as f32 / FEP_SURPRISE_SCALE).clamp(0.1, 0.5);
             self.adjust_lr("fep_surprise", surprise_boost);
         } else {
             self.scale_lr("fep_decay", FEP_LR_DECAY);

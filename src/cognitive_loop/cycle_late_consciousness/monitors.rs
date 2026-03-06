@@ -92,7 +92,7 @@ impl CognitiveLoopService {
                         } else {
                             ctx.pp_phi
                         };
-                        self.episodic_memory.encode(
+                        self.fep.episodic_memory.encode(
                             &grad.id,
                             grad.embedding
                                 .values
@@ -129,7 +129,7 @@ impl CognitiveLoopService {
             // FEEDBACK: WM overload triggers emergency consolidation (Baddeley 2000)
             // Science: Working memory overflow should push items to long-term storage,
             // not just block exploration. Force episodic consolidation to free WM slots.
-            self.episodic_memory.consolidate_recent();
+            self.fep.episodic_memory.consolidate_recent();
         }
 
         // FEEDBACK: Dual-veto freeze detection and recovery (Fuchs 2008 multistability)
@@ -137,7 +137,7 @@ impl CognitiveLoopService {
         // exploration=0, learning=0. Soften both to allow partial recovery.
         if ctx.reasoning_gate_blocked && prefrontal_veto {
             self.set_exploration("dual_veto_freeze", 0.3);
-            self.set_lr("dual_veto_freeze", self.fep_lr_boost.max(1.0) as f32);
+            self.set_lr("dual_veto_freeze", self.fep.lr_boost.max(1.0) as f32);
             tracing::debug!(
                 cycle = self.stats.total_cycles,
                 "Dual-veto freeze detected: softening both gates for recovery"
@@ -209,7 +209,7 @@ impl CognitiveLoopService {
                         flow_intensity: self.flow_state.intensity,
                         in_flow: self.flow_state.in_flow,
                         curiosity_boredom: self.curiosity_drive.boredom,
-                        fep_learning_signal: self.fep_learning_signal,
+                        fep_learning_signal: self.fep.learning_signal,
                         error_trend: self.stats.error_trend,
                         cycles_per_second: self.stats.cycles_per_second,
                         target_frequency: self.config.target_frequency,
@@ -335,7 +335,7 @@ impl CognitiveLoopService {
         if narrative_self_psi > 0.7 {
             // High self-coherence → stabilize moral score (dampen fluctuations)
             // Multiply moral learning signal toward 1.0 (neutral)
-            self.fep_learning_signal *= 1.0 + (narrative_self_psi as f32 - 0.7) * 0.1;
+            self.fep.learning_signal *= 1.0 + (narrative_self_psi as f32 - 0.7) * 0.1;
         } else if narrative_self_psi > 0.0 && narrative_self_psi < 0.2 {
             // Low self-coherence → amplify moral concern sensitivity
             self.adaptive_behavior.attention_sensitivity *=

@@ -21,7 +21,16 @@ impl CognitiveLoopService {
         &mut self,
         input: &Array1<f32>,
     ) -> (Vec<f32>, Vec<Array1<f32>>) {
-        let horizons = &self.config.cfc_config.prediction_horizons;
+        // Scale prediction horizons by substrate tau_factor so faster substrates
+        // predict further ahead in wall-clock time.
+        let effective_horizons: Vec<f32> = self
+            .config
+            .cfc_config
+            .prediction_horizons
+            .iter()
+            .map(|h| h * self.substrate_manager.tau_factor)
+            .collect();
+        let horizons = &effective_horizons;
 
         if horizons.is_empty() {
             // Fallback: single-step prediction

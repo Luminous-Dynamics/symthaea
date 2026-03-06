@@ -65,7 +65,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let prior_phi = self.unification_engine.psi;
         let prior_reward = self
-            .closed_learning_loop
+            .fep.closed_learning_loop
             .last_result
             .as_ref()
             .map(|r| r.reward);
@@ -73,7 +73,7 @@ impl CognitiveLoopService {
             ResponseStrategy::Supportive
         } else {
             let base_strategy = self
-                .closed_learning_loop
+                .fep.closed_learning_loop
                 .select_strategy(prior_phi, prior_reward);
 
             if let Some(&(plan_action, plan_confidence)) = self.carryover.history.mcts_plan.as_ref()
@@ -517,7 +517,7 @@ mod tests {
         svc.social.social_trust = 0.85;
         svc.social.social_cooperation_rate = 0.5;
         // Force CLL to pick Concise
-        svc.closed_learning_loop.force_strategy(ResponseStrategy::Concise);
+        svc.fep.closed_learning_loop.force_strategy(ResponseStrategy::Concise);
         let result = svc.run_strategy_selection(false);
         assert_eq!(result.selected_strategy, ResponseStrategy::Supportive);
         assert!(result.social_strategy_bias);
@@ -529,7 +529,7 @@ mod tests {
         // trust=0.1 → deviation=-0.4, caution=(0.4-0.1)*2.5=0.75 > 0.5
         svc.social.social_trust = 0.1;
         // Force CLL to pick Exploratory
-        svc.closed_learning_loop.force_strategy(ResponseStrategy::Exploratory);
+        svc.fep.closed_learning_loop.force_strategy(ResponseStrategy::Exploratory);
         let result = svc.run_strategy_selection(false);
         assert_eq!(result.selected_strategy, ResponseStrategy::Detailed);
         assert!(result.social_strategy_bias);

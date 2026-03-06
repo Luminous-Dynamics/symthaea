@@ -287,7 +287,7 @@ impl HigherOrderThoughtSystem {
         hot.timestamp = self.timestep;
 
         // Target is now conscious (has HOT about it)
-        let hot_idx = match hot.order {
+        match hot.order {
             RepresentationOrder::SecondOrder => {
                 let idx = self.second_order.len();
                 self.second_order.push(hot);
@@ -299,9 +299,7 @@ impl HigherOrderThoughtSystem {
                 Some(idx)
             }
             _ => None,
-        };
-
-        hot_idx
+        }
     }
 
     /// Process HOT dynamics (automatic HOT generation)
@@ -449,7 +447,7 @@ impl HigherOrderThoughtSystem {
         }
 
         // State counts
-        if self.second_order.len() > 0 {
+        if !self.second_order.is_empty() {
             parts.push(format!("{} conscious thoughts", self.second_order.len()));
         }
 

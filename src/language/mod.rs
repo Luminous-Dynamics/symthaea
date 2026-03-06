@@ -42,6 +42,8 @@ pub mod ssm_backend;
 #[cfg(feature = "code_generation")]
 pub mod code_domain_plugin;
 #[cfg(feature = "code_generation")]
+pub mod code_executor;
+#[cfg(feature = "code_generation")]
 pub mod code_generator;
 #[cfg(feature = "code_generation")]
 pub mod code_intent;
