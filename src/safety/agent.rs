@@ -140,6 +140,8 @@ pub struct SafetyAgent {
     config: SafetyAgentConfig,
     history: Vec<SafetyAssessment>,
     max_history: usize,
+    /// Append-only log of human overrides (EU AI Act Article 14).
+    override_log: Vec<SafetyOverrideEntry>,
 }
 
 impl SafetyAgent {
@@ -152,6 +154,7 @@ impl SafetyAgent {
             config,
             history: Vec::new(),
             max_history: 1000,
+            override_log: Vec::new(),
         }
     }
 
@@ -270,6 +273,58 @@ impl SafetyAgent {
     pub fn config(&self) -> &SafetyAgentConfig {
         &self.config
     }
+
+    /// Record a human override of the current safety level.
+    ///
+    /// Per EU AI Act Article 14, human oversight must be logged.
+    /// Returns the override entry for confirmation.
+    pub fn record_override(
+        &mut self,
+        operator: &str,
+        reason: &str,
+        new_level: SafetyLevel,
+    ) -> SafetyOverrideEntry {
+        let original_level = self.current_level();
+        let entry = SafetyOverrideEntry {
+            timestamp_nanos: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos() as u64)
+                .unwrap_or(0),
+            cycle: self.history.last().map(|a| a.cycle).unwrap_or(0),
+            operator: operator.to_string(),
+            reason: reason.to_string(),
+            original_level,
+            override_level: new_level,
+        };
+        self.override_log.push(entry.clone());
+        entry
+    }
+
+    /// All recorded human overrides (append-only audit trail).
+    pub fn override_log(&self) -> &[SafetyOverrideEntry] {
+        &self.override_log
+    }
+}
+
+/// A record of a human operator overriding the safety level.
+///
+/// Required by EU AI Act Article 14 (Human Oversight) and
+/// ISO 42001 A.6.2.6 (AI System Incident Management).
+/// This log is append-only to maintain audit trail integrity.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SafetyOverrideEntry {
+    /// Unix timestamp in nanoseconds.
+    pub timestamp_nanos: u64,
+    /// Cycle number at time of override.
+    pub cycle: usize,
+    /// Identifier of the human operator who authorized the override.
+    pub operator: String,
+    /// Justification for the override.
+    pub reason: String,
+    /// Safety level before override.
+    pub original_level: SafetyLevel,
+    /// Safety level set by the operator.
+    pub override_level: SafetyLevel,
 }
 
 impl Default for SafetyAgent {
@@ -727,5 +782,63 @@ mod tests {
         };
         let agent = SafetyAgent::with_config(config);
         assert_eq!(agent.config().consciousness_yellow, 0.9);
+    }
+
+    // ── Human oversight (EU AI Act Article 14) ──────────────────────────
+
+    #[test]
+    fn test_override_log_initially_empty() {
+        let agent = SafetyAgent::new();
+        assert!(agent.override_log().is_empty());
+    }
+
+    #[test]
+    fn test_record_override_appends() {
+        let mut agent = SafetyAgent::new();
+        agent.assess(metrics(0.1, 0.1, 0.7)); // Red
+
+        let entry = agent.record_override(
+            "operator-1",
+            "False positive — sensor miscalibration",
+            SafetyLevel::Green,
+        );
+
+        assert_eq!(entry.original_level, SafetyLevel::Red);
+        assert_eq!(entry.override_level, SafetyLevel::Green);
+        assert_eq!(entry.operator, "operator-1");
+        assert_eq!(agent.override_log().len(), 1);
+    }
+
+    #[test]
+    fn test_override_log_append_only() {
+        let mut agent = SafetyAgent::new();
+        agent.record_override("op-a", "test1", SafetyLevel::Yellow);
+        agent.record_override("op-b", "test2", SafetyLevel::Orange);
+        agent.record_override("op-c", "test3", SafetyLevel::Green);
+
+        assert_eq!(agent.override_log().len(), 3);
+        assert_eq!(agent.override_log()[0].operator, "op-a");
+        assert_eq!(agent.override_log()[1].operator, "op-b");
+        assert_eq!(agent.override_log()[2].operator, "op-c");
+    }
+
+    #[test]
+    fn test_override_preserves_timestamp() {
+        let mut agent = SafetyAgent::new();
+        let entry = agent.record_override("op", "reason", SafetyLevel::Green);
+        assert!(entry.timestamp_nanos > 0, "Should have non-zero timestamp");
+    }
+
+    #[test]
+    fn test_raw_level_captured() {
+        let mut agent = SafetyAgent::new();
+        // Fill escalation window with Yellow
+        for _ in 0..3 {
+            agent.assess(metrics(0.5, 0.1, 0.7)); // Yellow
+        }
+        // Green metrics, but trend-escalated to Yellow
+        let a = agent.assess(metrics(0.8, 0.1, 0.7));
+        assert_eq!(a.raw_level, SafetyLevel::Green, "Raw level should be Green");
+        assert_eq!(a.level, SafetyLevel::Yellow, "Final level should be trend-escalated Yellow");
     }
 }

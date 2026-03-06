@@ -916,13 +916,27 @@ impl MoralAlgebra {
             .fold(f32::NEG_INFINITY, f32::max)
     }
 
-    /// Create a "consent violation" prototype
+    /// Create a "consent violation" prototype (absent consent)
     pub fn consent_violation_prototype(&self) -> ContinuousHV {
         // Consent violation = action affecting patient without consent
+        // Structure matches encode_consent_action: action ⊗ patient ⊗ consent
         let action = self.encode_action("affect");
+        let patient = self.encode_patient("someone");
         let consent = self.encode_consent(ConsentState::Absent);
 
-        action.bind(&consent)
+        action.bind(&patient).bind(&consent)
+    }
+
+    /// Create a "denied consent violation" prototype (explicit refusal)
+    ///
+    /// Distinct from `consent_violation_prototype` which covers absent consent.
+    /// Denied consent is a stronger violation — the patient explicitly refused.
+    pub fn denied_consent_violation_prototype(&self) -> ContinuousHV {
+        let action = self.encode_action("affect");
+        let patient = self.encode_patient("someone");
+        let consent = self.encode_consent(ConsentState::Denied);
+
+        action.bind(&patient).bind(&consent)
     }
 
     /// Create a "proportional justice" prototype
@@ -947,8 +961,8 @@ impl MoralAlgebra {
     // Moral Judgment
     // ========================================================================
 
-    /// Judge if an action is morally good/bad based on similarity to prototypes
-    /// Uses multi-prototype matching for better accuracy
+    /// Judge if an action is morally good/bad based on similarity to prototypes.
+    /// Uses multi-prototype matching for better accuracy.
     pub fn judge_action(&self, action_hv: &ContinuousHV) -> MoralJudgment {
         // Use multi-prototype matching for better coverage
         let good_protos = self.good_action_prototypes();
@@ -956,7 +970,10 @@ impl MoralAlgebra {
 
         let good_sim = self.max_similarity_to_prototypes(action_hv, &good_protos);
         let bad_sim = self.max_similarity_to_prototypes(action_hv, &bad_protos);
-        let consent_viol_sim = action_hv.similarity(&self.consent_violation_prototype());
+        // Check both absent and denied consent prototypes
+        let absent_sim = action_hv.similarity(&self.consent_violation_prototype());
+        let denied_sim = action_hv.similarity(&self.denied_consent_violation_prototype());
+        let consent_viol_sim = absent_sim.max(denied_sim);
 
         MoralJudgment {
             good_similarity: good_sim,
@@ -966,6 +983,49 @@ impl MoralAlgebra {
                 MoralVerdict::Good
             } else if consent_viol_sim > 0.3 {
                 MoralVerdict::ConsentViolation
+            } else if bad_sim > good_sim {
+                MoralVerdict::Bad
+            } else {
+                MoralVerdict::Neutral
+            },
+        }
+    }
+
+    /// Judge a consent-sensitive action with explicit consent state.
+    ///
+    /// Unlike `judge_action` which tries to infer consent violations from HV
+    /// similarity (unreliable across different action/patient strings due to HDC
+    /// orthogonality), this method uses the known `ConsentState` directly.
+    ///
+    /// This closes risk R-2.3 (Consent Violation False Negatives) from the
+    /// AI Risk Register.
+    pub fn judge_consent_action(
+        &self,
+        action_hv: &ContinuousHV,
+        consent: ConsentState,
+    ) -> MoralJudgment {
+        let good_protos = self.good_action_prototypes();
+        let bad_protos = self.bad_action_prototypes();
+
+        let good_sim = self.max_similarity_to_prototypes(action_hv, &good_protos);
+        let bad_sim = self.max_similarity_to_prototypes(action_hv, &bad_protos);
+
+        // Direct consent state check — no HDC inference needed
+        let consent_viol_sim = match consent {
+            ConsentState::Denied => 1.0,  // Explicit denial is always a violation
+            ConsentState::Absent => 0.8,  // Missing consent is a strong violation signal
+            ConsentState::Implied => 0.1, // Implied consent is weak but not a violation
+            ConsentState::Given => 0.0,   // Explicit consent = no violation
+        };
+
+        MoralJudgment {
+            good_similarity: good_sim,
+            bad_similarity: bad_sim,
+            consent_violation_similarity: consent_viol_sim,
+            verdict: if consent_viol_sim > 0.3 {
+                MoralVerdict::ConsentViolation
+            } else if good_sim > bad_sim {
+                MoralVerdict::Good
             } else if bad_sim > good_sim {
                 MoralVerdict::Bad
             } else {

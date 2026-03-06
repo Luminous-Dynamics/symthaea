@@ -47,7 +47,10 @@ pub mod water_bridge;
 pub use gateway::{SafetyCheck, SafetyDecision, SafetyGateway};
 
 #[cfg(feature = "safety-agents")]
-pub use agent::{SafetyAgent, SafetyAgentConfig, SafetyAssessment, SafetyLevel, SafetyMetrics};
+pub use agent::{
+    SafetyAgent, SafetyAgentConfig, SafetyAssessment, SafetyLevel, SafetyMetrics,
+    SafetyOverrideEntry,
+};
 #[cfg(feature = "safety-agents")]
 pub use audit::SafetyAuditReport;
 #[cfg(feature = "safety-agents")]
