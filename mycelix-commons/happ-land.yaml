@@ -1,0 +1,23 @@
+---
+# Mycelix Commons-Land hApp Bundle
+# Physical infrastructure: property + housing + water + food + bridge
+# Part of the commons sub-cluster split (land + care)
+
+manifest_version: "0"
+name: mycelix-commons-land
+description: |
+  Physical infrastructure commons for the Mycelix ecosystem.
+  Property registry, housing cooperatives, water stewardship,
+  and food systems. Cross-cluster calls to commons-care via OtherRole.
+
+roles:
+  - name: commons_land
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_commons_land.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

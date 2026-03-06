@@ -1318,3 +1318,28 @@ deploy-status:
 # Restart a specific production service (e.g., just deploy-restart conductor)
 deploy-restart service:
     cd deploy && docker compose -f docker-compose.prod.yml restart {{service}}
+
+# ============================================================
+# LOCAL CONDUCTOR (works without nix develop)
+# ============================================================
+
+# Start a local Holochain conductor (auto-detects binaries from nix store)
+conductor-start:
+    @./scripts/start-conductor.sh start
+
+# Stop the local conductor
+conductor-stop:
+    @./scripts/start-conductor.sh stop
+
+# Check conductor status
+conductor-status:
+    @./scripts/start-conductor.sh status
+
+# Install a hApp on the running conductor
+conductor-install app_id happ_path:
+    @echo "test-passphrase" | env PATH="/nix/store/iiccjs34fkg4ak9g8lh6wfag2s60i88a-lair-keystore-0.6.3/bin:$PATH" hc sandbox --piped call --running 4444 install-app --app-id {{app_id}} {{happ_path}}
+    @echo "test-passphrase" | env PATH="/nix/store/iiccjs34fkg4ak9g8lh6wfag2s60i88a-lair-keystore-0.6.3/bin:$PATH" hc sandbox --piped call --running 4444 enable-app {{app_id}}
+
+# List apps on the running conductor
+conductor-list-apps:
+    @echo "test-passphrase" | env PATH="/nix/store/iiccjs34fkg4ak9g8lh6wfag2s60i88a-lair-keystore-0.6.3/bin:$PATH" hc sandbox --piped call --running 4444 list-apps

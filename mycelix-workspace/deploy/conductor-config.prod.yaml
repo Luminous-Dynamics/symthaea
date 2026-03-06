@@ -1,5 +1,5 @@
 # Mycelix Production Conductor Configuration
-# Holochain 0.6.0
+# Holochain 0.6.x
 #
 # Key differences from development config:
 #   - Uses lair_server keystore (not in-proc or test keystore)
@@ -10,19 +10,10 @@
 # Reference: https://developer.holochain.org/references/conductor-config/
 ---
 
-# Cryptographic service URIs — not used in standard deployments.
-# Set these only if running external signing/encryption services.
-signing_service_uri: ~
-encryption_service_uri: ~
-decryption_service_uri: ~
-
-# DPKI (Distributed Public Key Infrastructure) — disabled for now.
-# Enable when Holochain's DPKI service is production-ready.
-dpki: ~
-
 # Lair keystore configuration.
-# In Docker, lair runs in-process and reads its passphrase from LAIR_PASSPHRASE env var.
+# In Docker, lair runs as a separate process and reads its passphrase from LAIR_PASSPHRASE env var.
 # The socket file lives in the persistent volume so keys survive container restarts.
+# IMPORTANT: The lair binary version must match the one used during `lair-keystore init`.
 keystore:
   type: lair_server
   connection_url: "unix:///data/holochain/lair/socket"
@@ -36,35 +27,22 @@ admin_interfaces:
       port: 4444
       allowed_origins: "*"
 
-# App WebSocket interface — client-facing, used by Observatory and SDK clients.
-# This is the port that nginx proxies WSS traffic to.
-app_interfaces:
-  - driver:
-      type: websocket
-      port: 8888
-      allowed_origins: "*"
-
 # Network configuration — how this conductor discovers and communicates with peers.
+# Updated for Holochain 0.6.x format (bootstrap_url/signal_url/relay_url replace
+# the old bootstrap_service/transport_pool format).
 network:
-  # Bootstrap server: initial peer discovery.
-  # Use holo.host for public networks, or run your own for private deployments.
-  bootstrap_service: https://bootstrap.holo.host
-
-  # Transport: WebRTC for NAT traversal.
-  # The signal server facilitates WebRTC handshakes between peers.
-  transport_pool:
-    - type: webrtc
-      signal_url: wss://signal.holo.host
-
-  # Tuning parameters for production — defaults are reasonable for most deployments.
-  # Uncomment and adjust if you need faster gossip or lower bandwidth.
-  # tuning_params:
-  #   gossip_loop_iteration_delay_ms: 500
-  #   gossip_peer_on_success_next_gossip_delay_ms: 500
-  #   gossip_peer_on_error_next_gossip_delay_ms: 5000
-  #   gossip_local_sync_delay_ms: 1000
-  #   gossip_redundancy_target: 3
+  bootstrap_url: https://bootstrap.holo.host
+  signal_url: wss://signal.holo.host
+  relay_url: wss://signal.holo.host
+  target_arc_factor: 1
+  advanced:
+    tx5Transport:
+      signalAllowPlainText: false
 
 # Persistent storage for all Holochain databases (source chain, DHT, cache).
 # This MUST be on a Docker volume for data to survive container restarts.
 data_root_path: /data/holochain/databases
+
+# Database sync strategy.
+# "Resilient" flushes more often (safer, slightly slower).
+db_sync_strategy: Resilient

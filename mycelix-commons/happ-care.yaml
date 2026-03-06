@@ -1,0 +1,23 @@
+---
+# Mycelix Commons-Care hApp Bundle
+# Social/care infrastructure: care + mutualaid + transport + support + space + bridge
+# Part of the commons sub-cluster split (land + care)
+
+manifest_version: "0"
+name: mycelix-commons-care
+description: |
+  Social care commons for the Mycelix ecosystem.
+  Timebanking, mutual aid, transport sharing, support tickets,
+  and community spaces. Cross-cluster calls to commons-land via OtherRole.
+
+roles:
+  - name: commons_care
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_commons_care.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
