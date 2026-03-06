@@ -788,4 +788,117 @@ mod tests {
             mgr.scale_pressure
         );
     }
+
+    // ── Phase 3: Energy, Viability, Recovery ────────────────────────────
+
+    #[test]
+    fn test_energy_per_cycle_positive_for_all_substrates() {
+        for sub in &[
+            SubstrateType::BiologicalNeurons,
+            SubstrateType::SiliconDigital,
+            SubstrateType::QuantumComputer,
+            SubstrateType::PhotonicProcessor,
+            SubstrateType::NeuromorphicChip,
+            SubstrateType::BiochemicalComputer,
+            SubstrateType::HybridSystem,
+            SubstrateType::ExoticSubstrate,
+        ] {
+            let mut cfg = default_config();
+            cfg.substrate_type = *sub;
+            let mgr = SubstrateManager::new(&cfg);
+            assert!(
+                mgr.energy_per_cycle > 0.0 && mgr.energy_per_cycle.is_finite(),
+                "{sub:?} energy_per_cycle={:.2e}",
+                mgr.energy_per_cycle
+            );
+        }
+    }
+
+    #[test]
+    fn test_energy_accumulates_with_tick_energy() {
+        let mut cfg = default_config();
+        cfg.enable_energy_budget = true;
+        cfg.energy_budget_joules_per_sec = Some(1e10); // large budget so viability stays true
+        let mut mgr = SubstrateManager::new(&cfg);
+        assert!((mgr.total_energy_spent - 0.0).abs() < f64::EPSILON);
+        for _ in 0..10 {
+            mgr.tick_energy(&cfg);
+        }
+        assert!(
+            mgr.total_energy_spent > 0.0,
+            "10 ticks should accumulate energy"
+        );
+        assert!(mgr.consciousness_viable, "large budget → still viable");
+    }
+
+    #[test]
+    fn test_tick_energy_noop_without_budget() {
+        let cfg = default_config(); // enable_energy_budget = false
+        let mut mgr = SubstrateManager::new(&cfg);
+        mgr.tick_energy(&cfg);
+        assert!(
+            (mgr.total_energy_spent - 0.0).abs() < f64::EPSILON,
+            "tick_energy should be a no-op when budget disabled"
+        );
+    }
+
+    #[test]
+    fn test_budget_exhaustion_kills_viability() {
+        let mut cfg = default_config();
+        cfg.enable_energy_budget = true;
+        // Set budget to exactly 1 cycle's worth of energy
+        let mgr_ref = SubstrateManager::new(&cfg);
+        cfg.energy_budget_joules_per_sec = Some(mgr_ref.energy_per_cycle * 0.5);
+        let mut mgr = SubstrateManager::new(&cfg);
+        assert!(mgr.consciousness_viable);
+        // One tick should exceed the budget
+        mgr.tick_energy(&cfg);
+        assert!(
+            !mgr.consciousness_viable,
+            "Exceeding energy budget should kill viability"
+        );
+    }
+
+    #[test]
+    fn test_consciousness_viable_biological() {
+        let mut cfg = default_config();
+        cfg.substrate_type = SubstrateType::BiologicalNeurons;
+        cfg.enable_validation_overlay = true;
+        let mgr = SubstrateManager::new(&cfg);
+        assert!(mgr.consciousness_viable);
+    }
+
+    #[test]
+    fn test_throughput_multiplier_varies_by_substrate() {
+        let cfg_silicon = default_config(); // SiliconDigital
+        let mgr_silicon = SubstrateManager::new(&cfg_silicon);
+
+        let mut cfg_bio = default_config();
+        cfg_bio.substrate_type = SubstrateType::BiologicalNeurons;
+        let mgr_bio = SubstrateManager::new(&cfg_bio);
+
+        // Bio/bio ratio = 1.0, silicon should differ (lower energy → higher multiplier)
+        assert!(
+            (mgr_bio.energy_throughput_multiplier - 1.0).abs() < 0.01,
+            "Bio reference should have multiplier ≈ 1.0, got {:.4}",
+            mgr_bio.energy_throughput_multiplier
+        );
+        assert!(
+            mgr_silicon.energy_throughput_multiplier != mgr_bio.energy_throughput_multiplier,
+            "Different substrates should have different throughput multipliers"
+        );
+    }
+
+    #[test]
+    fn test_per_region_feasibility_fallback() {
+        let cfg = default_config(); // no per-region config
+        let mgr = SubstrateManager::new(&cfg);
+        // With no per-region substrates, should fall back to global effective_feasibility
+        let region_f = mgr.region_feasibility(CorticalRegion::Prefrontal);
+        assert!(
+            (region_f - mgr.effective_feasibility as f32).abs() < f32::EPSILON,
+            "Without per-region config, should fall back to global: region={region_f:.4}, global={:.4}",
+            mgr.effective_feasibility
+        );
+    }
 }
