@@ -135,6 +135,15 @@ pub struct PipelineResult {
     pub execution: Option<ExecutionOutcome>,
     /// Empathic response - how Symthaea resonates with user
     pub empathic_response: EmpathicResponseInfo,
+    /// NixOS knowledge base answer (from curated articles, if nix-mind active)
+    #[cfg(feature = "nix-mind")]
+    pub nix_knowledge_answer: Option<String>,
+    /// NixOS Ollama LLM fallback answer (if knowledge base had no match)
+    #[cfg(feature = "nix-mind")]
+    pub nix_ollama_answer: Option<String>,
+    /// NixOS action plan rationale (from active inference, if available)
+    #[cfg(feature = "nix-mind")]
+    pub nix_action_rationale: Option<String>,
     /// Processing time in milliseconds
     pub processing_time_ms: u64,
 }
@@ -358,8 +367,12 @@ impl ConsciousPipeline {
         // =========================================================
         // Step 1.25: OPTIONAL NixOS Deep Cognition (active inference, causal reasoning)
         // =========================================================
+        // When the nix-mind hook is active, its causal graph and world model
+        // can detect side-effect risks that the primary HDC+LTC layer misses.
+        // If nix cognition is surprised or predicts danger, downgrade the
+        // execution strategy to be more cautious.
         #[cfg(feature = "nix-mind")]
-        let _nix_deep_result = {
+        let nix_deep_result: Option<symthaea_nix::plugin::pipeline_integration::NixPipelineResult> =
             if nix_understanding.confidence >= 0.3 {
                 if let Some(ref mut hook) = self.nix_hook {
                     let confidence = nix_understanding.confidence as f64;
@@ -369,6 +382,38 @@ impl ConsciousPipeline {
                 }
             } else {
                 None
+            };
+
+        #[cfg(feature = "nix-mind")]
+        let execution_strategy = {
+            if let Some(ref result) = nix_deep_result {
+                // Downgrade strategy if nix cognition detects risk:
+                // 1. Surprised by recent state changes (causal model violated)
+                // 2. Nix quadrant blocks execution (Curious/Confused)
+                // 3. Phi gating denied the action
+                let nix_caution = result.is_surprised
+                    || !result.quadrant.allows_execution()
+                    || !result.phi_allowed;
+
+                if nix_caution {
+                    match &execution_strategy {
+                        ExecutionStrategy::Confident { .. } => ExecutionStrategy::Curious {
+                            explore_first: true,
+                            targeted_questions: vec![],
+                            share_reasoning: true,
+                        },
+                        ExecutionStrategy::Autopilot { .. } => ExecutionStrategy::Curious {
+                            explore_first: true,
+                            targeted_questions: vec![],
+                            share_reasoning: true,
+                        },
+                        other => other.clone(),
+                    }
+                } else {
+                    execution_strategy
+                }
+            } else {
+                execution_strategy
             }
         };
 
@@ -544,6 +589,19 @@ impl ConsciousPipeline {
             action_allowed,
             execution,
             empathic_response: empathic_response_info,
+            #[cfg(feature = "nix-mind")]
+            nix_knowledge_answer: nix_deep_result
+                .as_ref()
+                .and_then(|r| r.knowledge_answer.clone()),
+            #[cfg(feature = "nix-mind")]
+            nix_ollama_answer: nix_deep_result
+                .as_ref()
+                .and_then(|r| r.ollama_answer.clone()),
+            #[cfg(feature = "nix-mind")]
+            nix_action_rationale: nix_deep_result
+                .as_ref()
+                .and_then(|r| r.plan.actions.first())
+                .map(|a| a.rationale.clone()),
             processing_time_ms,
         })
     }
@@ -1030,6 +1088,169 @@ mod tests {
             ConsciousnessStateLevel::default(),
             ConsciousnessStateLevel::Dormant
         );
+    }
+
+    /// Mock NixPipelineHook for testing strategy downgrade behavior.
+    #[cfg(feature = "nix-mind")]
+    struct MockNixHook {
+        surprised: bool,
+        phi_allowed: bool,
+        quadrant: symthaea_nix::plugin::pipeline_integration::NixConsciousnessQuadrant,
+        process_called: std::sync::atomic::AtomicBool,
+        post_execute_called: std::sync::atomic::AtomicBool,
+        feedback_called: std::sync::atomic::AtomicBool,
+    }
+
+    #[cfg(feature = "nix-mind")]
+    impl MockNixHook {
+        fn confident() -> Self {
+            use std::sync::atomic::AtomicBool;
+            Self {
+                surprised: false,
+                phi_allowed: true,
+                quadrant: symthaea_nix::plugin::pipeline_integration::NixConsciousnessQuadrant::Confident,
+                process_called: AtomicBool::new(false),
+                post_execute_called: AtomicBool::new(false),
+                feedback_called: AtomicBool::new(false),
+            }
+        }
+
+        fn cautious() -> Self {
+            use std::sync::atomic::AtomicBool;
+            Self {
+                surprised: true,
+                phi_allowed: false,
+                quadrant: symthaea_nix::plugin::pipeline_integration::NixConsciousnessQuadrant::Curious,
+                process_called: AtomicBool::new(false),
+                post_execute_called: AtomicBool::new(false),
+                feedback_called: AtomicBool::new(false),
+            }
+        }
+
+        fn make_result(&self) -> symthaea_nix::plugin::pipeline_integration::NixPipelineResult {
+            use symthaea_nix::mind::{ActionPlan, InferredGoal};
+            use symthaea_nix::plugin::pipeline_integration::{NixPipelineResult, NixPipelineStage};
+            use symthaea_core::hdc::ContinuousHV;
+
+            NixPipelineResult {
+                plan: ActionPlan {
+                    actions: vec![],
+                    current_free_energy: 0.5,
+                    goal: InferredGoal {
+                        goal_state: ContinuousHV::zero(128),
+                        confidence: 0.8,
+                        description: "test goal".into(),
+                        needs_clarification: false,
+                    },
+                    needs_clarification: false,
+                },
+                quadrant: self.quadrant,
+                free_energy: 0.5,
+                hierarchy_errors: [0.1; 4],
+                is_surprised: self.surprised,
+                completed_stage: NixPipelineStage::Learn,
+                command: None,
+                safety_level: symthaea_nix::action::SafetyLevel::ReadOnly,
+                phi_allowed: self.phi_allowed,
+                active_memory: vec![],
+                knowledge_answer: None,
+                ollama_answer: None,
+            }
+        }
+    }
+
+    #[cfg(feature = "nix-mind")]
+    impl symthaea_nix::plugin::pipeline_integration::NixPipelineHook for MockNixHook {
+        fn pre_process(&self) -> f64 {
+            0.6
+        }
+
+        fn process_nix_input(
+            &mut self,
+            _input: &str,
+            _phi: f64,
+            _confidence: f64,
+        ) -> symthaea_nix::plugin::pipeline_integration::NixPipelineResult {
+            self.process_called.store(true, std::sync::atomic::Ordering::Relaxed);
+            self.make_result()
+        }
+
+        fn post_execute(&mut self, _action: &str, _success: bool, _output: &str) {
+            self.post_execute_called.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+
+        fn feedback(&mut self, _was_positive: bool) {
+            self.feedback_called.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    #[cfg(feature = "nix-mind")]
+    #[test]
+    fn test_nix_hook_confident_preserves_strategy() {
+        let hook = MockNixHook::confident();
+        assert!(hook.quadrant.allows_execution());
+        assert!(!hook.surprised);
+        assert!(hook.phi_allowed);
+    }
+
+    #[cfg(feature = "nix-mind")]
+    #[test]
+    fn test_nix_hook_surprise_downgrades_strategy() {
+        let hook = MockNixHook::cautious();
+        assert!(hook.surprised);
+        assert!(!hook.phi_allowed);
+
+        let original = ExecutionStrategy::Confident {
+            execute_immediately: true,
+            validate_after: true,
+            explain_reasoning: true,
+        };
+
+        let nix_caution = hook.surprised
+            || !hook.quadrant.allows_execution()
+            || !hook.phi_allowed;
+
+        let downgraded = if nix_caution {
+            match &original {
+                ExecutionStrategy::Confident { .. } | ExecutionStrategy::Autopilot { .. } => {
+                    ExecutionStrategy::Curious {
+                        explore_first: true,
+                        targeted_questions: vec![],
+                        share_reasoning: true,
+                    }
+                }
+                other => other.clone(),
+            }
+        } else {
+            original
+        };
+
+        assert!(matches!(downgraded, ExecutionStrategy::Curious { explore_first: true, .. }));
+    }
+
+    #[cfg(feature = "nix-mind")]
+    #[test]
+    fn test_nix_hook_feedback_forwarding() {
+        let mut hook = MockNixHook::confident();
+        assert!(!hook.feedback_called.load(std::sync::atomic::Ordering::Relaxed));
+
+        symthaea_nix::plugin::pipeline_integration::NixPipelineHook::feedback(&mut hook, true);
+        assert!(hook.feedback_called.load(std::sync::atomic::Ordering::Relaxed));
+    }
+
+    #[cfg(feature = "nix-mind")]
+    #[test]
+    fn test_nix_hook_post_execute_called() {
+        let mut hook = MockNixHook::confident();
+        assert!(!hook.post_execute_called.load(std::sync::atomic::Ordering::Relaxed));
+
+        symthaea_nix::plugin::pipeline_integration::NixPipelineHook::post_execute(
+            &mut hook,
+            "nixos-rebuild switch",
+            true,
+            "activation successful",
+        );
+        assert!(hook.post_execute_called.load(std::sync::atomic::Ordering::Relaxed));
     }
 
     #[test]

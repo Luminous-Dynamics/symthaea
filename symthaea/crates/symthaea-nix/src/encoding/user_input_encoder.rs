@@ -119,6 +119,21 @@ impl<'a> UserInputEncoder<'a> {
         None
     }
 
+    /// Resolve package aliases in entity tokens.
+    ///
+    /// Maps natural language names like "vscode" → "nixpkgs.vscode",
+    /// "chrome" → "nixpkgs.google-chrome", etc. using the 600+ alias table.
+    fn resolve_aliases<'t>(&self, tokens: &[&'t str]) -> Vec<String> {
+        tokens
+            .iter()
+            .map(|&t| {
+                super::package_aliases::resolve_alias(t)
+                    .map(|nix_name| nix_name.to_string())
+                    .unwrap_or_else(|| t.to_string())
+            })
+            .collect()
+    }
+
     /// Extract and encode entity tokens (non-stopwords, non-verbs).
     fn encode_entities(&mut self, tokens: &[&str]) -> ContinuousHV {
         let stopwords = [
@@ -145,9 +160,12 @@ impl<'a> UserInputEncoder<'a> {
             return ContinuousHV::zero(self.codebook.dim());
         }
 
+        // Resolve package aliases (e.g. "vscode" → "nixpkgs.vscode")
+        let resolved = self.resolve_aliases(&entities);
+
         // Encode entities with package/service role binding
         let pkg_role = self.codebook.package_role.clone();
-        let encoded: Vec<ContinuousHV> = entities
+        let encoded: Vec<ContinuousHV> = resolved
             .iter()
             .map(|entity| {
                 let basis = self.codebook.get_or_create(entity).clone();
@@ -292,5 +310,48 @@ mod tests {
             enc.encode_input("")
         };
         assert!(hv.norm() < 1e-6, "Empty input should produce zero vector");
+    }
+
+    #[test]
+    fn test_alias_resolution_improves_similarity() {
+        // "install vscode" should produce the same entity encoding as
+        // "install code" since both resolve to the same nix package via aliases.
+        let mut cb = NixCodebook::new();
+
+        let vscode = {
+            let mut enc = UserInputEncoder::new(&mut cb);
+            enc.encode_input("install vscode")
+        };
+        let code = {
+            let mut enc = UserInputEncoder::new(&mut cb);
+            enc.encode_input("install code")
+        };
+        let unrelated = {
+            let mut enc = UserInputEncoder::new(&mut cb);
+            enc.encode_input("install htop")
+        };
+
+        // Both "vscode" and "code" should resolve to the same nix package,
+        // making them more similar than an unrelated package
+        let sim_alias = vscode.similarity(&code);
+        let sim_unrelated = vscode.similarity(&unrelated);
+
+        assert!(
+            sim_alias > sim_unrelated,
+            "Aliased packages ({:.3}) should be more similar than unrelated ({:.3})",
+            sim_alias,
+            sim_unrelated,
+        );
+    }
+
+    #[test]
+    fn test_resolve_aliases() {
+        let mut cb = NixCodebook::new();
+        let enc = UserInputEncoder::new(&mut cb);
+
+        let resolved = enc.resolve_aliases(&["firefox", "vscode", "unknown_pkg"]);
+        // "unknown_pkg" should pass through unchanged
+        assert_eq!(resolved[2], "unknown_pkg");
+        assert_eq!(resolved.len(), 3);
     }
 }

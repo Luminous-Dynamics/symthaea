@@ -9,6 +9,7 @@ pub mod codebook;
 pub mod config_encoder;
 pub mod flake_graph_encoder;
 pub mod option_encoder;
+pub mod package_aliases;
 pub mod package_encoder;
 pub mod semantic_search;
 pub mod system_state_encoder;

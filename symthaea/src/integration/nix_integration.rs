@@ -470,12 +470,44 @@ mod tests {
         });
     }
 
-    // NOTE: test_end_to_end_pipeline_with_nix_hook was removed because it called
-    // ConsciousPipeline::with_nix_hook(), accessed PipelineResult::nix_enrichment,
-    // and called pipeline.consolidation_counter() -- none of which were ever
-    // implemented on ConsciousPipeline. This was an aspirational test. When the
-    // NixOS hook integration is added to ConsciousPipeline, a proper end-to-end
-    // test should be written.
+    #[test]
+    fn test_e2e_process_with_knowledge_base() {
+        // Exercise the full cognition chain: input → HDC → active inference → knowledge lookup
+        let hippo = Arc::new(Mutex::new(HippocampusActor::new(1000)));
+        let bridge = Arc::new(NixHippocampusBridge::new(hippo));
+        let processor = NixPipelineProcessor::new().with_skip_observe(true);
+        let mut hook = NixPipelineHookImpl::new(processor, bridge);
+
+        // Process a query that the knowledge base should be able to answer
+        let result = hook.process_nix_input("nix store gc", 0.7, 0.8);
+        assert!(result.phi_allowed);
+        assert!(result.quadrant.allows_execution());
+        // The plan should have at least one action
+        assert!(
+            !result.plan.actions.is_empty() || result.plan.needs_clarification,
+            "Should produce actions or ask for clarification"
+        );
+    }
+
+    #[test]
+    fn test_e2e_post_execute_causal_learning() {
+        // Verify the full causal learning chain: execute → learn → hippocampus
+        let hippo = Arc::new(Mutex::new(HippocampusActor::new(1000)));
+        let bridge = Arc::new(NixHippocampusBridge::new(hippo));
+        let processor = NixPipelineProcessor::new().with_skip_observe(true);
+        let mut hook = NixPipelineHookImpl::new(processor, bridge);
+
+        // Process input first to set up state
+        let _result = hook.process_nix_input("install firefox", 0.6, 0.7);
+
+        // Record execution outcome — should trigger causal learning + hippocampus store
+        hook.post_execute("nix-env -iA firefox", true, "installed firefox-120.0");
+
+        // Causal graph should now have learned from this interaction
+        assert!(hook.causal_graph().edge_count() > 0);
+        // World model should have been updated
+        assert!(hook.world_model().observation_count() > 0);
+    }
 
     #[test]
     fn test_consolidation_triggers() {

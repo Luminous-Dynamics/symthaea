@@ -92,6 +92,10 @@ pub struct NixPipelineResult {
     pub phi_allowed: bool,
     /// Working memory items active during this decision.
     pub active_memory: Vec<(String, f64)>,
+    /// Knowledge base answer (if a matching article was found).
+    pub knowledge_answer: Option<String>,
+    /// LLM fallback answer from Ollama (if knowledge base had no match).
+    pub ollama_answer: Option<String>,
 }
 
 /// Consciousness quadrant for NixOS decision-making.
@@ -170,16 +174,24 @@ pub struct NixPipelineProcessor {
     codebook: NixCodebook,
     phi_threshold: f64,
     skip_observe: bool,
+    /// Knowledge base for answering NixOS questions from curated articles.
+    knowledge_base: Option<crate::support::knowledge::KnowledgeBase>,
+    /// Ollama bridge for LLM fallback when HDC + knowledge base can't answer.
+    ollama_bridge: Option<crate::mind::OllamaBridge>,
 }
 
 impl NixPipelineProcessor {
     /// Create a new standalone processor.
     pub fn new() -> Self {
+        let mut codebook = NixCodebook::new();
+        let knowledge_base = Some(crate::support::knowledge::KnowledgeBase::new(&mut codebook));
         Self {
             engine: NixActiveInference::new(),
-            codebook: NixCodebook::new(),
+            codebook,
             phi_threshold: 0.3,
             skip_observe: false,
+            knowledge_base,
+            ollama_bridge: None,
         }
     }
 
@@ -192,6 +204,24 @@ impl NixPipelineProcessor {
     /// Skip live system observation (useful for testing or offline use).
     pub fn with_skip_observe(mut self, skip: bool) -> Self {
         self.skip_observe = skip;
+        self
+    }
+
+    /// Enable Ollama LLM fallback for queries the knowledge base can't answer.
+    pub fn with_ollama(mut self) -> Self {
+        self.ollama_bridge = Some(crate::mind::OllamaBridge::default());
+        self
+    }
+
+    /// Enable Ollama with custom configuration.
+    pub fn with_ollama_config(mut self, config: crate::mind::OllamaBridgeConfig) -> Self {
+        self.ollama_bridge = Some(crate::mind::OllamaBridge::new(config));
+        self
+    }
+
+    /// Disable the knowledge base (for testing).
+    pub fn without_knowledge_base(mut self) -> Self {
+        self.knowledge_base = None;
         self
     }
 
@@ -251,6 +281,36 @@ impl NixPipelineProcessor {
             .map(|item| (item.label.clone(), item.activation))
             .collect();
 
+        // Stage 6: Knowledge base lookup — search curated articles for an answer
+        // Encode the query first, then search — avoids simultaneous borrows.
+        let knowledge_answer = if plan.needs_clarification || plan.actions.is_empty() {
+            let query_hv =
+                crate::support::knowledge::KnowledgeBase::encode_text(&mut self.codebook, input);
+            self.knowledge_base
+                .as_ref()
+                .and_then(|kb| {
+                    let matches = kb.search_by_hv(&query_hv, 1);
+                    matches
+                        .first()
+                        .filter(|m| m.similarity > 0.3)
+                        .map(|m| m.article.solution.to_string())
+                })
+        } else {
+            None
+        };
+
+        // Stage 7: Ollama LLM fallback — only if knowledge base had no answer
+        let ollama_answer = if knowledge_answer.is_none()
+            && (plan.needs_clarification || plan.actions.is_empty())
+        {
+            self.ollama_bridge
+                .as_mut()
+                .and_then(|bridge| bridge.query_nixos(input, None))
+                .map(|resp| resp.text)
+        } else {
+            None
+        };
+
         NixPipelineResult {
             plan,
             quadrant,
@@ -266,6 +326,8 @@ impl NixPipelineProcessor {
             safety_level,
             phi_allowed,
             active_memory,
+            knowledge_answer,
+            ollama_answer,
         }
     }
 

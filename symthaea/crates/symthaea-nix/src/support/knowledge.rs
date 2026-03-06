@@ -255,7 +255,7 @@ impl KnowledgeBase {
         self.dynamic_articles.len()
     }
 
-    fn search_by_hv(&self, query_hv: &ContinuousHV, k: usize) -> Vec<KnowledgeMatch<'_>> {
+    pub fn search_by_hv(&self, query_hv: &ContinuousHV, k: usize) -> Vec<KnowledgeMatch<'_>> {
         let mut scored: Vec<KnowledgeMatch<'_>> = self
             .articles
             .iter()
@@ -341,7 +341,7 @@ impl KnowledgeBase {
     }
 
     /// Encode a free-text string by bundling word-level basis vectors.
-    fn encode_text(codebook: &mut NixCodebook, text: &str) -> ContinuousHV {
+    pub fn encode_text(codebook: &mut NixCodebook, text: &str) -> ContinuousHV {
         let words: Vec<ContinuousHV> = text
             .split_whitespace()
             .map(|w| {
