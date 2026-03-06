@@ -125,7 +125,6 @@ jobs:
         run: npm install
 
       - name: Type check
-        continue-on-error: true  # LUCID frontend in active development; type errors need client rebuild
         run: npm run check
 
       - name: Build
@@ -419,7 +418,6 @@ jobs:
       - name: Run TypeScript unit tests
         run: npm test
         working-directory: mycelix-workspace/sdk-ts
-        continue-on-error: true
 
   # ============================================================================
   # Integration Tests (with Holochain conductor)
@@ -949,19 +947,16 @@ jobs:
         run: |
           cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
         working-directory: mycelix-commons
-        continue-on-error: true
 
       - name: Run consciousness gating sweettests (Civic)
         run: |
           cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
         working-directory: mycelix-civic
-        continue-on-error: true
 
       - name: Run consciousness gating sweettests (Hearth)
         run: |
           cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
         working-directory: mycelix-hearth
-        continue-on-error: true
 
   # ============================================================================
   # Governance Zome Tests
@@ -1143,6 +1138,113 @@ jobs:
         run: cargo hack check --feature-powerset --depth 2 -p mycelix-fl-proofs
 
   # ============================================================================
+  # Unified hApp Bundle Build
+  # ============================================================================
+  unified-happ:
+    name: Unified hApp Bundle
+    runs-on: ubuntu-latest
+    needs: [happ-check]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Holochain cache
+        run: |
+          nix-env -iA cachix -f https://cachix.org/api/v1/install
+          cachix use holochain-ci
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-unified-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build all cluster WASM
+        run: |
+          for cluster in mycelix-personal mycelix-identity mycelix-hearth mycelix-commons mycelix-civic mycelix-attribution mycelix-governance; do
+            if [ -d "$cluster" ] && [ -f "$cluster/Cargo.toml" ]; then
+              echo "Building $cluster..."
+              cd "$cluster" && cargo build --release --target wasm32-unknown-unknown && cd ..
+            else
+              echo "::warning::$cluster not found — skipping"
+            fi
+          done
+
+      - name: Pack DNAs
+        run: |
+          if ! command -v hc &> /dev/null; then
+            echo "Installing hc CLI..."
+            cargo install hc --version 0.4.0 || { echo "::error::Failed to install hc"; exit 1; }
+          fi
+
+          PACK_ERRORS=0
+          for cluster_dir in mycelix-personal mycelix-identity mycelix-hearth mycelix-commons mycelix-civic mycelix-attribution mycelix-governance; do
+            if [ -d "$cluster_dir" ]; then
+              find "$cluster_dir" -name "dna.yaml" -not -path "*/target/*" | while read dna_yaml; do
+                dna_dir=$(dirname "$dna_yaml")
+                echo "Packing DNA: $dna_yaml"
+                hc dna pack "$dna_dir" || { echo "::warning::Failed to pack $dna_yaml"; PACK_ERRORS=$((PACK_ERRORS + 1)); }
+              done
+            fi
+          done
+
+          if [ "$PACK_ERRORS" -gt 0 ]; then
+            echo "::warning::$PACK_ERRORS DNA pack failures"
+          fi
+
+      - name: Pack unified hApp bundle
+        run: |
+          cd mycelix-workspace/happs
+          echo "Packing unified hApp bundle..."
+          hc app pack . -o mycelix-unified.happ || {
+            echo "::error::Failed to pack unified hApp bundle"
+            echo "Checking DNA file availability..."
+            for dna_path in \
+              personal/dna/mycelix_personal.dna \
+              identity/dna/mycelix_identity_dna.dna \
+              hearth/dna/mycelix_hearth.dna \
+              commons/dna/mycelix_commons_land.dna \
+              commons/dna/mycelix_commons_care.dna \
+              civic/dna/mycelix_civic.dna \
+              attribution/dna/mycelix_attribution_dna.dna; do
+              if [ -f "$dna_path" ]; then
+                echo "  ✅ $dna_path ($(du -h "$dna_path" | cut -f1))"
+              else
+                echo "  ❌ $dna_path MISSING"
+              fi
+            done
+            exit 1
+          }
+          echo "✅ Unified hApp bundle: $(du -h mycelix-unified.happ | cut -f1)"
+
+      - name: Upload unified hApp artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mycelix-unified-happ
+          path: mycelix-workspace/happs/mycelix-unified.happ
+          retention-days: 7
+
+  # ============================================================================
   # CI Pass Check (ensures all required jobs succeed)
   # ============================================================================
   ci-pass:
@@ -1164,12 +1266,13 @@ jobs:
       - crypto-libs
       - personal-tests
       - fl-feature-matrix
+      - unified-happ
 
     steps:
       - name: Check all jobs passed
         uses: re-actors/alls-green@release/v1
         with:
-          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest, sweettest-consciousness, fl-feature-matrix
+          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest, sweettest-consciousness, fl-feature-matrix, unified-happ
           jobs: ${{ toJSON(needs) }}
 
       - name: Summary

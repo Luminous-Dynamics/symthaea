@@ -430,4 +430,128 @@ mod tests {
             assert_eq!(ut, back);
         }
     }
+
+    #[test]
+    fn test_usage_scale_roundtrip() {
+        let scales = vec![
+            UsageScale::Small,
+            UsageScale::Medium,
+            UsageScale::Large,
+            UsageScale::Enterprise,
+        ];
+        for s in scales {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: UsageScale = serde_json::from_str(&json).unwrap();
+            assert_eq!(s, back);
+        }
+    }
+
+    #[test]
+    fn test_max_proof_size_constant() {
+        assert_eq!(UsageAttestation::MAX_PROOF_SIZE, 500_000);
+    }
+
+    // ── Receipt edge cases ──────────────────────────────────────────
+
+    #[test]
+    fn test_receipt_none_context_valid() {
+        let mut r = valid_receipt();
+        r.context = None;
+        let result = validate_create_usage_receipt(test_action(), r).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_receipt_none_organization_valid() {
+        let mut r = valid_receipt();
+        r.organization = None;
+        r.scale = None;
+        r.version_range = None;
+        let result = validate_create_usage_receipt(test_action(), r).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // ── Attestation edge cases ──────────────────────────────────────
+
+    #[test]
+    fn test_attestation_empty_dependency_id_rejected() {
+        let mut a = valid_attestation();
+        a.dependency_id = String::new();
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_attestation_invalid_user_did_rejected() {
+        let mut a = valid_attestation();
+        a.user_did = "not-a-did".into();
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_attestation_empty_id_rejected() {
+        let mut a = valid_attestation();
+        a.id = String::new();
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_attestation_valid_verifier_fields() {
+        let mut a = valid_attestation();
+        a.verifier_pubkey = Some(vec![0u8; 32]);
+        a.verifier_signature = Some(vec![0u8; 64]);
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_attestation_with_expiry_valid() {
+        let mut a = valid_attestation();
+        a.expires_at = Some(Timestamp::now());
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    // ── UsageReceipt serde ──────────────────────────────────────────
+
+    #[test]
+    fn test_usage_receipt_serde_roundtrip() {
+        let r = valid_receipt();
+        let json = serde_json::to_string(&r).unwrap();
+        let back: UsageReceipt = serde_json::from_str(&json).unwrap();
+        assert_eq!(r.id, back.id);
+        assert_eq!(r.dependency_id, back.dependency_id);
+        assert_eq!(r.usage_type, back.usage_type);
+    }
+
+    #[test]
+    fn test_usage_attestation_serde_roundtrip() {
+        let a = valid_attestation();
+        let json = serde_json::to_string(&a).unwrap();
+        let back: UsageAttestation = serde_json::from_str(&json).unwrap();
+        assert_eq!(a.id, back.id);
+        assert_eq!(a.dependency_id, back.dependency_id);
+        assert_eq!(a.witness_commitment, back.witness_commitment);
+        assert_eq!(a.verified, back.verified);
+    }
+
+    #[test]
+    fn test_anchor_serde_roundtrip() {
+        let anchor = Anchor("test".into());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(anchor, back);
+    }
+
+    // ── Proof size exactly 1 byte (minimum) ─────────────────────────
+
+    #[test]
+    fn test_proof_minimum_1_byte_valid() {
+        let mut a = valid_attestation();
+        a.proof_bytes = vec![0x01];
+        let result = validate_create_usage_attestation(test_action(), a).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
 }

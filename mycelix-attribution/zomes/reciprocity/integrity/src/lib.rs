@@ -399,4 +399,163 @@ mod tests {
             assert_eq!(c, back);
         }
     }
+
+    // ── Update validation tests ─────────────────────────────────────
+
+    fn test_update_action() -> Update {
+        Update {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: Timestamp::now(),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_action_address: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex::from(0),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_valid_update_pledge() {
+        let result = validate_update_pledge(
+            test_update_action(),
+            valid_pledge(),
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_empty_id_rejected() {
+        let mut p = valid_pledge();
+        p.id = String::new();
+        let result = validate_update_pledge(
+            test_update_action(),
+            p,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_update_invalid_did_rejected() {
+        let mut p = valid_pledge();
+        p.contributor_did = "bad".into();
+        let result = validate_update_pledge(
+            test_update_action(),
+            p,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_update_negative_amount_rejected() {
+        let mut p = valid_pledge();
+        p.amount = Some(-1.0);
+        let result = validate_update_pledge(
+            test_update_action(),
+            p,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_update_financial_without_currency_rejected() {
+        let mut p = valid_pledge();
+        p.pledge_type = PledgeType::Financial;
+        p.currency = None;
+        let result = validate_update_pledge(
+            test_update_action(),
+            p,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_update_description_too_long_rejected() {
+        let mut p = valid_pledge();
+        p.description = "x".repeat(1001);
+        let result = validate_update_pledge(
+            test_update_action(),
+            p,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Additional edge cases ───────────────────────────────────────
+
+    #[test]
+    fn test_none_amount_valid() {
+        let mut p = valid_pledge();
+        p.amount = None;
+        p.pledge_type = PledgeType::DeveloperTime;
+        p.currency = None;
+        let result = validate_create_pledge(test_action(), p).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_pledge_serde_roundtrip() {
+        let p = valid_pledge();
+        let json = serde_json::to_string(&p).unwrap();
+        let back: ReciprocityPledge = serde_json::from_str(&json).unwrap();
+        assert_eq!(p.id, back.id);
+        assert_eq!(p.dependency_id, back.dependency_id);
+        assert_eq!(p.pledge_type, back.pledge_type);
+        assert_eq!(p.amount, back.amount);
+        assert_eq!(p.currency, back.currency);
+        assert_eq!(p.acknowledged, back.acknowledged);
+    }
+
+    #[test]
+    fn test_anchor_serde_roundtrip() {
+        let anchor = Anchor("all_pledges".into());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(anchor, back);
+    }
+
+    #[test]
+    fn test_description_exactly_1000_valid() {
+        let mut p = valid_pledge();
+        p.description = "x".repeat(1000);
+        let result = validate_create_pledge(test_action(), p).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_all_pledge_types_valid_without_currency() {
+        // Non-financial types should all be valid without currency
+        let non_financial = vec![
+            PledgeType::Compute,
+            PledgeType::Bandwidth,
+            PledgeType::DeveloperTime,
+            PledgeType::QA,
+            PledgeType::Documentation,
+            PledgeType::Other,
+        ];
+        for pt in non_financial {
+            let mut p = valid_pledge();
+            p.pledge_type = pt.clone();
+            p.currency = None;
+            p.amount = None;
+            let result = validate_create_pledge(test_action(), p).unwrap();
+            assert_eq!(result, ValidateCallbackResult::Valid, "failed for {:?}", pt);
+        }
+    }
 }

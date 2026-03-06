@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { initializeStores, ecosystemStatus, byzantineAlerts, isLiveMode } from '$lib/stores';
+  import { initializeStores, ecosystemStatus, byzantineAlerts, isLiveMode, conductorStatus } from '$lib/stores';
 
   // Derived stats from stores
   $: stats = {
@@ -60,10 +60,12 @@
           <h1 class="text-xl font-bold">Mycelix Observatory</h1>
         </div>
         <div class="flex items-center gap-4">
-          {#if $isLiveMode}
-            <span class="text-green-400">● Live Mode</span>
+          {#if $conductorStatus === 'connected'}
+            <span class="text-green-400">● Live</span>
+          {:else if $conductorStatus === 'connecting'}
+            <span class="text-yellow-400 animate-pulse">● Connecting</span>
           {:else}
-            <span class="text-yellow-400">● Demo Mode</span>
+            <span class="text-yellow-400">● Demo</span>
           {/if}
           <span class="text-gray-400">v0.1.0</span>
         </div>

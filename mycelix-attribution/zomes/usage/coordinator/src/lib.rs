@@ -713,3 +713,317 @@ pub fn bulk_record_usage(receipts: Vec<UsageReceipt>) -> ExternResult<BulkUsageR
 
     Ok(BulkUsageResult { recorded, records })
 }
+
+/// Pure computation of has_more flag (testable without HDK).
+fn compute_has_more(offset: u64, limit: u64, total: u64) -> bool {
+    offset + limit < total
+}
+
+/// Pure validation of pagination limit (testable without HDK).
+fn validate_page_limit(limit: u64) -> Result<(), String> {
+    if limit > MAX_PAGE_SIZE {
+        Err(format!(
+            "Pagination limit {} exceeds maximum {}",
+            limit, MAX_PAGE_SIZE
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Pure validation of verifier pubkey length.
+fn validate_verifier_pubkey_len(len: usize) -> Result<(), String> {
+    if len != 32 {
+        Err(format!(
+            "Invalid verifier pubkey: expected 32 bytes, got {}",
+            len
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Pure validation of verifier signature length.
+fn validate_verifier_signature_len(len: usize) -> Result<(), String> {
+    if len != 64 {
+        Err(format!(
+            "Invalid verifier signature: expected 64 bytes, got {}",
+            len
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Pure computation of renewal depth from attestation ID.
+fn compute_renewal_depth(id: &str) -> u32 {
+    id.matches("-renewed").count() as u32
+}
+
+/// Check whether renewal depth exceeds the limit.
+fn exceeds_renewal_depth(id: &str) -> bool {
+    compute_renewal_depth(id) >= MAX_RENEWAL_DEPTH
+}
+
+// ── Unit Tests ───────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Constants ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_max_page_size_is_1000() {
+        assert_eq!(MAX_PAGE_SIZE, 1000);
+    }
+
+    #[test]
+    fn test_rate_limit_window_is_60_seconds() {
+        assert_eq!(RATE_LIMIT_WINDOW_SECS, 60);
+    }
+
+    #[test]
+    fn test_max_renewal_depth_is_5() {
+        assert_eq!(MAX_RENEWAL_DEPTH, 5);
+    }
+
+    // ── Pagination validation ───────────────────────────────────────
+
+    #[test]
+    fn test_validate_page_limit_within_max() {
+        assert!(validate_page_limit(500).is_ok());
+    }
+
+    #[test]
+    fn test_validate_page_limit_at_max() {
+        assert!(validate_page_limit(MAX_PAGE_SIZE).is_ok());
+    }
+
+    #[test]
+    fn test_validate_page_limit_exceeds_max() {
+        let err = validate_page_limit(MAX_PAGE_SIZE + 1).unwrap_err();
+        assert!(err.contains("exceeds maximum"), "error: {}", err);
+    }
+
+    #[test]
+    fn test_validate_page_limit_zero() {
+        assert!(validate_page_limit(0).is_ok());
+    }
+
+    // ── has_more computation ────────────────────────────────────────
+
+    #[test]
+    fn test_has_more_true_when_remaining() {
+        assert!(compute_has_more(0, 10, 20));
+    }
+
+    #[test]
+    fn test_has_more_false_at_exact_end() {
+        assert!(!compute_has_more(10, 10, 20));
+    }
+
+    #[test]
+    fn test_has_more_false_past_end() {
+        assert!(!compute_has_more(15, 10, 20));
+    }
+
+    #[test]
+    fn test_has_more_false_empty() {
+        assert!(!compute_has_more(0, 10, 0));
+    }
+
+    // ── Verifier field validation ───────────────────────────────────
+
+    #[test]
+    fn test_verifier_pubkey_valid_32_bytes() {
+        assert!(validate_verifier_pubkey_len(32).is_ok());
+    }
+
+    #[test]
+    fn test_verifier_pubkey_wrong_size() {
+        assert!(validate_verifier_pubkey_len(31).is_err());
+        assert!(validate_verifier_pubkey_len(33).is_err());
+        assert!(validate_verifier_pubkey_len(0).is_err());
+    }
+
+    #[test]
+    fn test_verifier_signature_valid_64_bytes() {
+        assert!(validate_verifier_signature_len(64).is_ok());
+    }
+
+    #[test]
+    fn test_verifier_signature_wrong_size() {
+        assert!(validate_verifier_signature_len(63).is_err());
+        assert!(validate_verifier_signature_len(65).is_err());
+        assert!(validate_verifier_signature_len(0).is_err());
+    }
+
+    // ── Renewal depth ───────────────────────────────────────────────
+
+    #[test]
+    fn test_renewal_depth_zero() {
+        assert_eq!(compute_renewal_depth("attest-001"), 0);
+    }
+
+    #[test]
+    fn test_renewal_depth_one() {
+        assert_eq!(compute_renewal_depth("attest-001-renewed"), 1);
+    }
+
+    #[test]
+    fn test_renewal_depth_multiple() {
+        assert_eq!(
+            compute_renewal_depth("attest-001-renewed-renewed-renewed"),
+            3
+        );
+    }
+
+    #[test]
+    fn test_renewal_depth_at_limit() {
+        let id = "attest-001-renewed-renewed-renewed-renewed-renewed";
+        assert_eq!(compute_renewal_depth(id), 5);
+        assert!(exceeds_renewal_depth(id));
+    }
+
+    #[test]
+    fn test_renewal_depth_below_limit() {
+        let id = "attest-001-renewed-renewed-renewed-renewed";
+        assert_eq!(compute_renewal_depth(id), 4);
+        assert!(!exceeds_renewal_depth(id));
+    }
+
+    #[test]
+    fn test_renewal_depth_suffix_match() {
+        // "-renewed" as substring match — "attest-renewedfoo" still contains "-renewed"
+        assert_eq!(compute_renewal_depth("attest-renewedfoo"), 1);
+        // Clean suffix
+        assert_eq!(compute_renewal_depth("attest-renewed"), 1);
+        // No match at all
+        assert_eq!(compute_renewal_depth("attest-renew"), 0);
+    }
+
+    // ── Top dependency sorting ──────────────────────────────────────
+
+    #[test]
+    fn test_top_dependency_sort_descending() {
+        let mut deps = vec![
+            TopDependency {
+                dependency_id: "a".into(),
+                usage_count: 10,
+            },
+            TopDependency {
+                dependency_id: "b".into(),
+                usage_count: 50,
+            },
+            TopDependency {
+                dependency_id: "c".into(),
+                usage_count: 30,
+            },
+        ];
+        deps.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
+        assert_eq!(deps[0].dependency_id, "b");
+        assert_eq!(deps[1].dependency_id, "c");
+        assert_eq!(deps[2].dependency_id, "a");
+    }
+
+    #[test]
+    fn test_top_dependency_truncate() {
+        let mut deps: Vec<TopDependency> = (0..20)
+            .map(|i| TopDependency {
+                dependency_id: format!("dep-{}", i),
+                usage_count: i,
+            })
+            .collect();
+        deps.sort_by(|a, b| b.usage_count.cmp(&a.usage_count));
+        let limit = 5u64.min(MAX_PAGE_SIZE);
+        deps.truncate(limit as usize);
+        assert_eq!(deps.len(), 5);
+        assert_eq!(deps[0].usage_count, 19);
+    }
+
+    // ── Serde roundtrip tests ───────────────────────────────────────
+
+    #[test]
+    fn test_pagination_input_serde_roundtrip() {
+        let input = PaginationInput {
+            offset: 42,
+            limit: 100,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: PaginationInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.offset, 42);
+        assert_eq!(back.limit, 100);
+    }
+
+    #[test]
+    fn test_top_dependency_serde_roundtrip() {
+        let td = TopDependency {
+            dependency_id: "crate:serde".into(),
+            usage_count: 1234,
+        };
+        let json = serde_json::to_string(&td).unwrap();
+        let back: TopDependency = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.dependency_id, "crate:serde");
+        assert_eq!(back.usage_count, 1234);
+    }
+
+    #[test]
+    fn test_bulk_usage_result_serde_roundtrip() {
+        let result = BulkUsageResult {
+            recorded: 5,
+            records: vec![],
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: BulkUsageResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.recorded, 5);
+        assert!(back.records.is_empty());
+    }
+
+    #[test]
+    fn test_usage_signal_serde_roundtrip() {
+        let signals = vec![
+            UsageSignal::UsageRecorded {
+                dependency_id: "dep1".into(),
+                user_did: "did:mycelix:user1".into(),
+            },
+            UsageSignal::AttestationSubmitted {
+                dependency_id: "dep1".into(),
+                user_did: "did:mycelix:user1".into(),
+            },
+            UsageSignal::AttestationVerified {
+                attestation_id: "att1".into(),
+                dependency_id: "dep1".into(),
+            },
+            UsageSignal::AttestationRevoked {
+                attestation_id: "att1".into(),
+                dependency_id: "dep1".into(),
+            },
+            UsageSignal::AttestationRenewed {
+                attestation_id: "att1".into(),
+                dependency_id: "dep1".into(),
+            },
+        ];
+        for sig in signals {
+            let json = serde_json::to_string(&sig).unwrap();
+            let back: UsageSignal = serde_json::from_str(&json).unwrap();
+            let json2 = serde_json::to_string(&back).unwrap();
+            assert_eq!(json, json2);
+        }
+    }
+
+    #[test]
+    fn test_paginated_usage_input_serde_roundtrip() {
+        let input = PaginatedUsageInput {
+            id: "crate:serde".into(),
+            pagination: PaginationInput {
+                offset: 0,
+                limit: 50,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: PaginatedUsageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.id, "crate:serde");
+        assert_eq!(back.pagination.limit, 50);
+    }
+}

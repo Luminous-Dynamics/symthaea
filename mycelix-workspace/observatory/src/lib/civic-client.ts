@@ -704,15 +704,16 @@ export async function loadLiveDashboardData(agentId: string): Promise<DashboardD
 }
 
 /**
- * Check if civic client can connect to conductor
+ * Check if civic client can connect to conductor.
+ * Returns true only when a live conductor connection is available.
  */
 export async function checkCivicConnection(): Promise<boolean> {
   if (!browser) return false;
-
   if (isConnected()) return true;
 
   try {
-    return await connectToConductor();
+    const ok = await connectToConductor();
+    return ok;
   } catch {
     return false;
   }

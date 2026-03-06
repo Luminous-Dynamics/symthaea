@@ -339,4 +339,150 @@ mod tests {
         let result = validate_create_dependency(test_action(), dep).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
+
+    #[test]
+    fn test_boundary_name_length_128() {
+        let mut dep = valid_dep();
+        dep.name = "x".repeat(128);
+        let result = validate_create_dependency(test_action(), dep).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_boundary_description_500() {
+        let mut dep = valid_dep();
+        dep.description = "x".repeat(500);
+        let result = validate_create_dependency(test_action(), dep).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_http_repo_url_valid() {
+        let mut dep = valid_dep();
+        dep.repository_url = Some("http://example.com/repo".into());
+        let result = validate_create_dependency(test_action(), dep).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_ssh_repo_url_rejected() {
+        let mut dep = valid_dep();
+        dep.repository_url = Some("git@github.com:user/repo.git".into());
+        let result = validate_create_dependency(test_action(), dep).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Update validation tests ─────────────────────────────────────
+
+    fn test_update_action() -> Update {
+        Update {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: Timestamp::now(),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_action_address: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex::from(0),
+                0.into(),
+                EntryVisibility::Public,
+            )),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_valid_update_dependency() {
+        let result = validate_update_dependency(
+            test_update_action(),
+            valid_dep(),
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_update_empty_id_rejected() {
+        let mut dep = valid_dep();
+        dep.id = String::new();
+        let result = validate_update_dependency(
+            test_update_action(),
+            dep,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_update_invalid_did_rejected() {
+        let mut dep = valid_dep();
+        dep.maintainer_did = "not-a-did".into();
+        let result = validate_update_dependency(
+            test_update_action(),
+            dep,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_update_invalid_repo_url_rejected() {
+        let mut dep = valid_dep();
+        dep.repository_url = Some("ftp://bad.url".into());
+        let result = validate_update_dependency(
+            test_update_action(),
+            dep,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_update_description_too_long_rejected() {
+        let mut dep = valid_dep();
+        dep.description = "x".repeat(501);
+        let result = validate_update_dependency(
+            test_update_action(),
+            dep,
+            ActionHash::from_raw_36(vec![0u8; 36]),
+        )
+        .unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── DependencyIdentity serde ────────────────────────────────────
+
+    #[test]
+    fn test_dependency_identity_serde_roundtrip() {
+        let dep = valid_dep();
+        let json = serde_json::to_string(&dep).unwrap();
+        let back: DependencyIdentity = serde_json::from_str(&json).unwrap();
+        assert_eq!(dep.id, back.id);
+        assert_eq!(dep.name, back.name);
+        assert_eq!(dep.ecosystem, back.ecosystem);
+        assert_eq!(dep.maintainer_did, back.maintainer_did);
+        assert_eq!(dep.verified, back.verified);
+    }
+
+    #[test]
+    fn test_anchor_serde_roundtrip() {
+        let anchor = Anchor("test_anchor".into());
+        let json = serde_json::to_string(&anchor).unwrap();
+        let back: Anchor = serde_json::from_str(&json).unwrap();
+        assert_eq!(anchor, back);
+    }
+
+    #[test]
+    fn test_ecosystem_display_python_and_other() {
+        assert_eq!(
+            DependencyEcosystem::PythonPackage.to_string(),
+            "python_package"
+        );
+        assert_eq!(DependencyEcosystem::Other.to_string(), "other");
+    }
 }

@@ -4,6 +4,8 @@
  * Wraps callZome from $lib/conductor with mock fallback for demo mode.
  */
 
+import { isConnected, callZome } from './conductor';
+
 // ── Types ──────────────────────────────────────────────────────────
 
 export interface AttributionStats {
@@ -90,8 +92,12 @@ const MOCK_ECOSYSTEMS: EcosystemStat[] = [
 let isLive = false;
 
 async function tryCallZome<T>(zome: string, fn_name: string, payload: unknown): Promise<T | null> {
+  // Skip the attempt entirely when we know the conductor is down
+  if (!isConnected()) {
+    isLive = false;
+    return null;
+  }
   try {
-    const { callZome } = await import('./conductor');
     const result = await callZome<T>({
       role_name: 'attribution',
       zome_name: zome,

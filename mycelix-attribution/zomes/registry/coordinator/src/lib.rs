@@ -372,6 +372,11 @@ pub fn get_all_dependencies_paginated(
     })
 }
 
+/// Pure computation of has_more flag (testable without HDK).
+fn compute_has_more(offset: u64, limit: u64, total: u64) -> bool {
+    offset + limit < total
+}
+
 // ── Ecosystem Statistics ────────────────────────────────────────────
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -415,4 +420,184 @@ pub fn get_ecosystem_statistics(_: ()) -> ExternResult<EcosystemStatistics> {
         ecosystems,
         verified_count: verified,
     })
+}
+
+// ── Unit Tests ───────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Pagination validation ───────────────────────────────────────
+
+    #[test]
+    fn test_validate_pagination_within_limit() {
+        let input = PaginationInput {
+            offset: 0,
+            limit: 100,
+        };
+        assert!(validate_pagination(&input).is_ok());
+    }
+
+    #[test]
+    fn test_validate_pagination_at_max() {
+        let input = PaginationInput {
+            offset: 0,
+            limit: MAX_PAGE_SIZE,
+        };
+        assert!(validate_pagination(&input).is_ok());
+    }
+
+    #[test]
+    fn test_validate_pagination_exceeds_max() {
+        let input = PaginationInput {
+            offset: 0,
+            limit: MAX_PAGE_SIZE + 1,
+        };
+        let err = validate_pagination(&input).unwrap_err();
+        let msg = format!("{:?}", err);
+        assert!(msg.contains("exceeds maximum"), "error: {}", msg);
+    }
+
+    #[test]
+    fn test_validate_pagination_zero_limit() {
+        let input = PaginationInput {
+            offset: 0,
+            limit: 0,
+        };
+        assert!(validate_pagination(&input).is_ok());
+    }
+
+    #[test]
+    fn test_validate_pagination_large_offset_ok() {
+        let input = PaginationInput {
+            offset: 999_999,
+            limit: 50,
+        };
+        assert!(validate_pagination(&input).is_ok());
+    }
+
+    #[test]
+    fn test_max_page_size_is_1000() {
+        assert_eq!(MAX_PAGE_SIZE, 1000);
+    }
+
+    // ── has_more computation ────────────────────────────────────────
+
+    #[test]
+    fn test_has_more_true_when_remaining() {
+        assert!(compute_has_more(0, 10, 20));
+    }
+
+    #[test]
+    fn test_has_more_false_at_exact_end() {
+        assert!(!compute_has_more(10, 10, 20));
+    }
+
+    #[test]
+    fn test_has_more_false_past_end() {
+        assert!(!compute_has_more(15, 10, 20));
+    }
+
+    #[test]
+    fn test_has_more_false_empty_total() {
+        assert!(!compute_has_more(0, 10, 0));
+    }
+
+    #[test]
+    fn test_has_more_single_item_first_page() {
+        assert!(!compute_has_more(0, 10, 1));
+    }
+
+    #[test]
+    fn test_has_more_boundary_one_remaining() {
+        // offset=0, limit=9, total=10 → 0+9 < 10 → true
+        assert!(compute_has_more(0, 9, 10));
+    }
+
+    // ── Serde roundtrip tests ───────────────────────────────────────
+
+    #[test]
+    fn test_pagination_input_serde_roundtrip() {
+        let input = PaginationInput {
+            offset: 42,
+            limit: 100,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: PaginationInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.offset, 42);
+        assert_eq!(back.limit, 100);
+    }
+
+    #[test]
+    fn test_ecosystem_stat_serde_roundtrip() {
+        let stat = EcosystemStat {
+            ecosystem: "rust_crate".into(),
+            count: 42,
+        };
+        let json = serde_json::to_string(&stat).unwrap();
+        let back: EcosystemStat = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.ecosystem, "rust_crate");
+        assert_eq!(back.count, 42);
+    }
+
+    #[test]
+    fn test_ecosystem_statistics_serde_roundtrip() {
+        let stats = EcosystemStatistics {
+            total_dependencies: 100,
+            ecosystems: vec![
+                EcosystemStat {
+                    ecosystem: "rust_crate".into(),
+                    count: 60,
+                },
+                EcosystemStat {
+                    ecosystem: "npm_package".into(),
+                    count: 40,
+                },
+            ],
+            verified_count: 25,
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        let back: EcosystemStatistics = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.total_dependencies, 100);
+        assert_eq!(back.ecosystems.len(), 2);
+        assert_eq!(back.verified_count, 25);
+    }
+
+    #[test]
+    fn test_bulk_register_result_serde_roundtrip() {
+        let result = BulkRegisterResult {
+            registered: vec![],
+            skipped: vec!["crate:foo".into(), "crate:bar".into()],
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: BulkRegisterResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.skipped.len(), 2);
+        assert_eq!(back.skipped[0], "crate:foo");
+    }
+
+    // ── Signal variant serde ────────────────────────────────────────
+
+    #[test]
+    fn test_registry_signal_serde_roundtrip() {
+        let signals = vec![
+            RegistrySignal::DependencyRegistered {
+                dependency_id: "dep1".into(),
+                name: "serde".into(),
+                ecosystem: "rust_crate".into(),
+            },
+            RegistrySignal::DependencyUpdated {
+                dependency_id: "dep1".into(),
+            },
+            RegistrySignal::DependencyVerified {
+                dependency_id: "dep1".into(),
+            },
+        ];
+        for sig in signals {
+            let json = serde_json::to_string(&sig).unwrap();
+            let back: RegistrySignal = serde_json::from_str(&json).unwrap();
+            let json2 = serde_json::to_string(&back).unwrap();
+            assert_eq!(json, json2);
+        }
+    }
 }
