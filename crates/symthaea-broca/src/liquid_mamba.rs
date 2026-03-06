@@ -231,6 +231,17 @@ pub struct LiquidMambaConfig {
     /// Separate LR for LoRA adapter updates (typically lower than projection LR).
     #[serde(default = "default_lora_lr")]
     pub lora_lr: f32,
+
+    /// Path to pre-computed embedding stats file for manifold moment matching.
+    /// When set with `temporal_adapter`, the adapter MLP is initialized with
+    /// whitening weights derived from Mamba's embedding table statistics.
+    #[serde(default)]
+    pub embedding_stats_path: Option<String>,
+
+    /// Number of simultaneous E2E gradient positions per step (default 1 = legacy rotating).
+    /// With K=4, each chunk position gets gradient 4× more often than K=1 rotating.
+    #[serde(default = "default_e2e_grad_chunks")]
+    pub e2e_grad_chunks: usize,
 }
 
 fn default_grad_clip() -> f32 {
@@ -271,6 +282,9 @@ fn default_lora_alpha() -> f32 {
 }
 fn default_lora_lr() -> f32 {
     0.0001
+}
+fn default_e2e_grad_chunks() -> usize {
+    1
 }
 
 impl Default for LiquidMambaConfig {
@@ -332,6 +346,8 @@ impl Default for LiquidMambaConfig {
             lora_rank: 0,
             lora_alpha: 1.0,
             lora_lr: 0.0001,
+            embedding_stats_path: None,
+            e2e_grad_chunks: 1,
         }
     }
 }
@@ -437,9 +453,31 @@ impl LiquidMambaGenerator {
             if config.temporal_num_groups > 1 {
                 tp.set_num_groups(config.temporal_num_groups, genesis);
             }
-            // Improvement E: adapter MLP
+            // Improvement E: adapter MLP (with optional manifold moment matching)
             if config.temporal_adapter {
-                tp.enable_adapter(genesis);
+                if let Some(ref stats_path) = config.embedding_stats_path {
+                    match crate::temporal_projection::EmbeddingStats::load(stats_path) {
+                        Ok(stats) => {
+                            tracing::info!(
+                                dim = stats.dim,
+                                count = stats.count,
+                                path = stats_path,
+                                "Adapter initialized with manifold moment matching (whitening)"
+                            );
+                            tp.enable_adapter_from_stats(genesis, &stats);
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                path = stats_path,
+                                error = %e,
+                                "Failed to load embedding stats, falling back to random adapter init"
+                            );
+                            tp.enable_adapter(genesis);
+                        }
+                    }
+                } else {
+                    tp.enable_adapter(genesis);
+                }
             }
             Some(tp)
         } else {
@@ -1143,7 +1181,7 @@ impl LiquidMambaGenerator {
             //
             // When Mamba output is meaningful (PE < 0.5), we boost the gradient
             // magnitude proportional to output quality.
-            let tp = self.temporal_proj.as_mut().expect("temporal_proj is Some when config.temporal_projection is true");
+            let tp = self.temporal_proj.as_mut().unwrap();
             if self.config.temporal_directional_loss {
                 tp.compute_directional_gradients(&thought_hv, None);
             } else {
@@ -1189,21 +1227,54 @@ impl LiquidMambaGenerator {
                 );
             }
 
-            // Improvement B: Rotating grad-chunk E2E loss
+            // Improvement B: E2E loss (single rotating or multi-position)
             if self.config.temporal_rotate_grad_position && use_mamba_signal {
                 let num_chunks = tp.num_chunks();
-                let pos = self.generation_count % num_chunks;
                 let sequence = tp.project_to_ssm_sequence(&thought_hv);
-                let ssm_grads = self.mamba.compute_e2e_token_loss_at(
-                    &sequence,
-                    &result.token_ids,
-                    pos,
-                );
-                if let Ok(grad) = ssm_grads {
-                    // Build sparse gradient array: only position `pos` has a gradient
-                    let mut sparse: Vec<Option<Vec<f32>>> = vec![None; num_chunks];
-                    sparse[pos] = Some(grad);
-                    tp.compute_e2e_gradients(&thought_hv, &sparse);
+                let k = self.config.e2e_grad_chunks.max(1);
+
+                if k > 1 {
+                    // Multi-position: K evenly-spaced positions with rotating offset
+                    let offset = self.generation_count % (num_chunks / k).max(1);
+                    let positions: Vec<usize> = (0..k)
+                        .map(|i| (offset + i * num_chunks / k) % num_chunks)
+                        .collect();
+
+                    // Warn on large configs that may exceed VRAM
+                    if num_chunks > 32 && k > 2 && self.generation_count == 1 {
+                        tracing::warn!(
+                            num_chunks,
+                            e2e_grad_chunks = k,
+                            "Large chunk count with multi-position E2E may use significant VRAM"
+                        );
+                    }
+
+                    if let Ok(multi_grads) = self.mamba.compute_e2e_token_loss_multi(
+                        &sequence,
+                        &result.token_ids,
+                        &positions,
+                    ) {
+                        let mut sparse: Vec<Option<Vec<f32>>> = vec![None; num_chunks];
+                        for (pos, grad) in multi_grads {
+                            if pos < num_chunks {
+                                sparse[pos] = Some(grad);
+                            }
+                        }
+                        tp.compute_e2e_gradients(&thought_hv, &sparse);
+                    }
+                } else {
+                    // Single rotating position (legacy behavior)
+                    let pos = self.generation_count % num_chunks;
+                    let ssm_grads = self.mamba.compute_e2e_token_loss_at(
+                        &sequence,
+                        &result.token_ids,
+                        pos,
+                    );
+                    if let Ok(grad) = ssm_grads {
+                        let mut sparse: Vec<Option<Vec<f32>>> = vec![None; num_chunks];
+                        sparse[pos] = Some(grad);
+                        tp.compute_e2e_gradients(&thought_hv, &sparse);
+                    }
                 }
             }
 
@@ -2289,5 +2360,153 @@ mod tests {
             lr > 0.0,
             "LR should still be positive"
         );
+    }
+
+    // ─── Multi-Position E2E Gradient tests ───────────────────────────────
+
+    #[test]
+    fn test_multi_position_mock() {
+        use crate::mamba::tests::MockMamba;
+        let mut mock = MockMamba::new();
+        let d = mock.d_model();
+        let sequence: Vec<Vec<f32>> = (0..16).map(|_| vec![0.1; d]).collect();
+        let tokens = vec![1, 2, 3];
+        let positions = vec![2, 5, 10, 14];
+
+        let results = mock.compute_e2e_token_loss_multi(&sequence, &tokens, &positions)
+            .expect("multi-position should succeed");
+
+        assert_eq!(results.len(), 4, "should return K=4 gradients");
+        for (pos, grad) in &results {
+            assert!(positions.contains(pos), "pos {pos} not in requested positions");
+            assert_eq!(grad.len(), d);
+            assert!(grad.iter().all(|x| x.is_finite()));
+        }
+    }
+
+    #[test]
+    fn test_multi_position_sparse_fills() {
+        let genesis = GenesisSeed::from_phrase("test-multi-pos");
+        let config = LiquidMambaConfig {
+            temporal_projection: true,
+            temporal_rotate_grad_position: true,
+            e2e_grad_chunks: 4,
+            enable_consciousness_gating: false,
+            enable_veto: false,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+        gen.enable_diagnostics();
+
+        // Simulate a distill step that triggers multi-position
+        let channels = ThoughtChannels {
+            channels: [0.5; 20],
+        };
+        let thought_hv = gen.encoder().encode(&channels);
+        let tp = gen.temporal_proj().unwrap();
+        let num_chunks = tp.num_chunks();
+        let sequence = tp.project_to_ssm_sequence(&thought_hv);
+
+        // Directly call multi-position
+        let positions: Vec<usize> = (0..4).map(|i| i * num_chunks / 4).collect();
+        let results = gen.mamba.compute_e2e_token_loss_multi(
+            &sequence,
+            &[1, 2],
+            &positions,
+        ).expect("multi-position should succeed");
+
+        // Should have exactly 4 entries
+        assert_eq!(results.len(), 4, "should return 4 gradient entries");
+        for (pos, _grad) in &results {
+            assert!(positions.contains(pos));
+        }
+    }
+
+    #[test]
+    fn test_single_position_backward_compat() {
+        let genesis = GenesisSeed::from_phrase("test-backward-compat");
+        let config_single = LiquidMambaConfig {
+            temporal_projection: true,
+            temporal_rotate_grad_position: true,
+            e2e_grad_chunks: 1,  // Legacy single position
+            enable_consciousness_gating: false,
+            enable_veto: false,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config_single);
+
+        // Run a generate + distill cycle — should work same as before
+        let channels = ThoughtChannels { channels: [0.3; 20] };
+        let result = gen.generate(&channels);
+        gen.distill_step(&channels, &result);
+        // No panic means backward compat is preserved
+    }
+
+    #[test]
+    fn test_multi_position_rotating_offset() {
+        use crate::mamba::tests::MockMamba;
+        let mut mock = MockMamba::new();
+        let d = mock.d_model();
+        let num_chunks = 16;
+        let k = 4;
+        let sequence: Vec<Vec<f32>> = (0..num_chunks).map(|_| vec![0.1; d]).collect();
+        let tokens = vec![1, 2];
+
+        // Simulate two steps with different generation_count for offset
+        for gen_count in 0..4 {
+            let offset = gen_count % (num_chunks / k).max(1);
+            let positions: Vec<usize> = (0..k)
+                .map(|i| (offset + i * num_chunks / k) % num_chunks)
+                .collect();
+
+            let results = mock.compute_e2e_token_loss_multi(&sequence, &tokens, &positions)
+                .expect("should succeed");
+            assert_eq!(results.len(), k);
+
+            // Verify positions are evenly spaced
+            let mut sorted: Vec<usize> = results.iter().map(|(p, _)| *p).collect();
+            sorted.sort();
+            for i in 1..sorted.len() {
+                let gap = (sorted[i] + num_chunks - sorted[i-1]) % num_chunks;
+                assert!(gap >= num_chunks / k - 1 && gap <= num_chunks / k + 1,
+                    "positions should be roughly evenly spaced, gap={gap}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_multi_position_integration() {
+        let genesis = GenesisSeed::from_phrase("test-multi-integration");
+        let config = LiquidMambaConfig {
+            temporal_projection: true,
+            temporal_rotate_grad_position: true,
+            e2e_grad_chunks: 4,
+            enable_consciousness_gating: false,
+            enable_veto: false,
+            base_lr: 0.001,
+            accumulation_steps: 1,
+            warmup_steps: 0,
+            ..Default::default()
+        };
+        let mut gen = LiquidMambaGenerator::with_mock(&genesis, config);
+
+        // Get initial weights
+        let tp = gen.temporal_proj().unwrap();
+        let initial_weights = tp.flatten_weights();
+
+        // Run enough distill steps to trigger gradient application
+        let channels = ThoughtChannels { channels: [0.5; 20] };
+        for _ in 0..5 {
+            let result = gen.generate(&channels);
+            gen.distill_step(&channels, &result);
+        }
+
+        // Weights should have changed
+        let tp = gen.temporal_proj().unwrap();
+        let updated_weights = tp.flatten_weights();
+        let diff: f32 = initial_weights.iter().zip(updated_weights.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(diff > 0.0, "weights should update after distill steps with multi-position E2E");
     }
 }

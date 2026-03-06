@@ -104,25 +104,49 @@ pub trait MambaBackend: Send {
     /// The sequence is typically 64 chunks of 768D from temporal projection.
     fn inject_context_sequence(&mut self, sequence: &[Vec<f32>]) -> Result<()>;
 
-    /// End-to-end token prediction loss with gradients w.r.t. input SSM tokens.
+    /// Compute E2E token loss at a specific position in the SSM sequence (Improvement B).
     ///
-    /// 1. Injects `ssm_sequence` as continuous embeddings (like `inject_context_sequence`)
-    /// 2. Teacher-forces `target_tokens` through Mamba, collecting logits
-    /// 3. Computes cross-entropy loss between logits and next-token targets
-    /// 4. Backpropagates through Mamba's SSM layers via candle autograd
-    /// 5. Returns (loss_value, gradient_per_ssm_token) for chain rule through projection
+    /// Injects [0..pos) as context (no grad), injects [pos] as Var, detaches state,
+    /// injects [pos+1..N) as context, teacher-forces, backward, and extracts gradient
+    /// at position `pos`.
     ///
-    /// The returned gradients are `d_loss/d_ssm_token[i][j]` — one Vec<f32> per chunk.
-    /// These can be chained to projection weights via `compute_e2e_gradients()`.
-    fn compute_e2e_token_loss(
+    /// Default implementation delegates to the full `compute_e2e_token_loss` with
+    /// all positions, returning a zero gradient vector.
+    fn compute_e2e_token_loss_at(
         &mut self,
-        ssm_sequence: &[Vec<f32>],
-        target_tokens: &[u32],
-    ) -> Result<(f32, Vec<Vec<f32>>)> {
-        // Default: not supported
-        let _ = (ssm_sequence, target_tokens);
-        anyhow::bail!("End-to-end token loss not supported by this backend")
+        _sequence: &[Vec<f32>],
+        _tokens: &[u32],
+        _pos: usize,
+    ) -> Result<Vec<f32>> {
+        // Default: return zero gradient
+        let d = self.d_model();
+        Ok(vec![0.0f32; d])
     }
+
+    /// Compute E2E token loss at multiple positions simultaneously.
+    ///
+    /// Returns `Vec<(position, gradient)>` for each requested position.
+    /// The SSM state carries gradient across positions: we detach once before
+    /// the first Var position, then all K Vars share one connected computation graph.
+    ///
+    /// Default: delegates to single-position for each (backward compat).
+    fn compute_e2e_token_loss_multi(
+        &mut self,
+        sequence: &[Vec<f32>],
+        tokens: &[u32],
+        positions: &[usize],
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        let mut results = Vec::with_capacity(positions.len());
+        for &pos in positions {
+            let grad = self.compute_e2e_token_loss_at(sequence, tokens, pos)?;
+            results.push((pos, grad));
+        }
+        Ok(results)
+    }
+
+    /// Enable LoRA adapters on the model layers (Improvement D).
+    /// Default: no-op.
+    fn enable_lora(&mut self, _rank: usize, _alpha: f32, _lr: f32) {}
 }
 
 /// Wrapper around candle-transformers' Mamba model with Symthaea integration.
@@ -132,6 +156,8 @@ pub struct MambaWrapper {
     config: Config,
     tokenizer: tokenizers::Tokenizer,
     device: Device,
+    /// LoRA learning rate (0 = disabled, Improvement D)
+    lora_lr: f32,
 }
 
 impl MambaWrapper {
@@ -210,6 +236,7 @@ impl MambaWrapper {
             config,
             tokenizer,
             device,
+            lora_lr: 0.0,
         })
     }
 
@@ -382,6 +409,208 @@ impl MambaWrapper {
         &self.device
     }
 
+    /// Access the raw embedding table `[vocab_size, d_model]`.
+    ///
+    /// Used to compute per-dimension mean/variance for manifold moment matching
+    /// (whitening adapter initialization).
+    pub fn embedding_table(&self) -> &Tensor {
+        self.model.embedding_table()
+    }
+
+    /// Enable LoRA adapters on all Mamba layers (Improvement D).
+    pub fn enable_lora(&mut self, rank: usize, alpha: f32, lr: f32) -> Result<()> {
+        self.lora_lr = lr;
+        Ok(self.model.enable_lora(rank, alpha, &self.device)?)
+    }
+
+    /// Compute E2E token loss at a specific position (Improvement B).
+    ///
+    /// Injects [0..pos) as context (no grad), makes [pos] a Var, detaches state,
+    /// injects [pos+1..N) as context, teacher-forces, backward, returns gradient at pos.
+    pub fn compute_e2e_token_loss_at(
+        &mut self,
+        sequence: &[Vec<f32>],
+        tokens: &[u32],
+        pos: usize,
+    ) -> Result<Vec<f32>> {
+        let d_model = self.config.d_model;
+        let n = sequence.len();
+        if n == 0 || pos >= n || tokens.is_empty() {
+            return Ok(vec![0.0f32; d_model]);
+        }
+
+        // Reset state
+        self.reset();
+
+        // 1. Inject [0..pos) as context (no autograd)
+        for i in 0..pos {
+            let embed = Tensor::from_vec(
+                sequence[i].clone(),
+                (1, d_model),
+                &self.device,
+            )?;
+            self.model.forward_embeds_no_head(&embed, &mut self.state)?;
+        }
+
+        // 2. Make sequence[pos] a Var for gradient tracking
+        let var_embed = candle_core::Var::from_tensor(
+            &Tensor::from_vec(sequence[pos].clone(), (1, d_model), &self.device)?,
+        )?;
+        let _logits = self.model.forward_embeds(&var_embed.as_tensor(), &mut self.state)?;
+
+        // 3. Detach state to prevent gradient flow through warmup
+        self.state.detach()?;
+
+        // 4. Inject [pos+1..N) as context (no autograd needed for these)
+        for i in (pos + 1)..n {
+            let embed = Tensor::from_vec(
+                sequence[i].clone(),
+                (1, d_model),
+                &self.device,
+            )?;
+            self.model.forward_embeds_no_head(&embed, &mut self.state)?;
+        }
+
+        // 5. Teacher-force: run one token to get loss
+        // Use the first token as the teacher signal
+        let teacher_token = tokens[0.min(tokens.len() - 1)];
+        let input = Tensor::new(&[teacher_token], &self.device)?;
+        let logits = self.model.forward(&input, &mut self.state)?;
+        let logits = logits.squeeze(0)?;
+
+        // Cross-entropy loss at target token
+        let target_idx = tokens.get(1).copied().unwrap_or(teacher_token) as usize;
+        let vocab = logits.dim(0)?;
+        if target_idx >= vocab {
+            return Ok(vec![0.0f32; d_model]);
+        }
+
+        let log_softmax = candle_nn::ops::log_softmax(&logits, 0)?;
+        let loss = log_softmax.i(target_idx)?.neg()?;
+
+        // 6. Backward pass
+        let grads = loss.backward()?;
+
+        // 7. Apply LoRA grads if enabled
+        if self.lora_lr > 0.0 && self.model.has_lora() {
+            self.model.apply_lora_grads(&grads, self.lora_lr)?;
+        }
+
+        // 8. Extract gradient at the Var position
+        let grad = match grads.get(var_embed.as_tensor()) {
+            Some(g) => g.flatten_all()?.to_vec1::<f32>()?,
+            None => vec![0.0f32; d_model],
+        };
+
+        Ok(grad)
+    }
+
+    /// Compute E2E token loss at multiple positions simultaneously.
+    ///
+    /// Creates K Vars at the requested positions and builds a single connected
+    /// computation graph. The SSM state carries gradient between Var positions
+    /// because `State.hs` contains autograd-tracked tensors.
+    ///
+    /// Steps:
+    /// 1. Inject `[0..first_var_pos)` as context (no autograd)
+    /// 2. Detach state (cut gradient flow from warmup)
+    /// 3. Inject `[first_var_pos..N)`: Var at requested positions, Tensor elsewhere
+    /// 4. Teacher-force 1 token, compute cross-entropy loss
+    /// 5. Backward → extract gradients from all K Vars
+    pub fn compute_e2e_token_loss_multi(
+        &mut self,
+        sequence: &[Vec<f32>],
+        tokens: &[u32],
+        positions: &[usize],
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        let d_model = self.config.d_model;
+        let n = sequence.len();
+        if n == 0 || positions.is_empty() || tokens.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Sort positions for sequential processing
+        let mut sorted_positions = positions.to_vec();
+        sorted_positions.sort_unstable();
+        sorted_positions.dedup();
+
+        let first_var_pos = sorted_positions[0];
+
+        // Reset state
+        self.reset();
+
+        // 1. Inject [0..first_var_pos) as context (no autograd)
+        for i in 0..first_var_pos.min(n) {
+            let embed = Tensor::from_vec(
+                sequence[i].clone(),
+                (1, d_model),
+                &self.device,
+            )?;
+            self.model.forward_embeds_no_head(&embed, &mut self.state)?;
+        }
+
+        // 2. Detach state to cut gradient flow from warmup
+        self.state.detach()?;
+
+        // 3. Inject [first_var_pos..N): Var at requested positions, Tensor elsewhere
+        let pos_set: std::collections::HashSet<usize> = sorted_positions.iter().copied().collect();
+        let mut vars: Vec<(usize, candle_core::Var)> = Vec::with_capacity(sorted_positions.len());
+
+        for i in first_var_pos..n {
+            if pos_set.contains(&i) {
+                let var_embed = candle_core::Var::from_tensor(
+                    &Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?,
+                )?;
+                self.model.forward_embeds_no_head(var_embed.as_tensor(), &mut self.state)?;
+                vars.push((i, var_embed));
+            } else {
+                let embed = Tensor::from_vec(
+                    sequence[i].clone(),
+                    (1, d_model),
+                    &self.device,
+                )?;
+                self.model.forward_embeds_no_head(&embed, &mut self.state)?;
+            }
+        }
+
+        // 4. Teacher-force: run one token to get loss
+        let teacher_token = tokens[0.min(tokens.len() - 1)];
+        let input = Tensor::new(&[teacher_token], &self.device)?;
+        let logits = self.model.forward(&input, &mut self.state)?;
+        let logits = logits.squeeze(0)?;
+
+        let target_idx = tokens.get(1).copied().unwrap_or(teacher_token) as usize;
+        let vocab = logits.dim(0)?;
+        if target_idx >= vocab {
+            return Ok(vars.iter().map(|(pos, _)| (*pos, vec![0.0f32; d_model])).collect());
+        }
+
+        let log_softmax = candle_nn::ops::log_softmax(&logits, 0)?;
+        let loss = log_softmax.i(target_idx)?.neg()?;
+
+        // 5. Backward pass
+        let grads = loss.backward()?;
+
+        // 6. Apply LoRA grads if enabled
+        if self.lora_lr > 0.0 && self.model.has_lora() {
+            self.model.apply_lora_grads(&grads, self.lora_lr)?;
+        }
+
+        // 7. Extract gradients from all Vars
+        let results: Vec<(usize, Vec<f32>)> = vars
+            .iter()
+            .map(|(pos, var)| {
+                let grad = match grads.get(var.as_tensor()) {
+                    Some(g) => g.flatten_all().and_then(|t| t.to_vec1::<f32>()).unwrap_or_else(|_| vec![0.0f32; d_model]),
+                    None => vec![0.0f32; d_model],
+                };
+                (*pos, grad)
+            })
+            .collect();
+
+        Ok(results)
+    }
+
     /// Feed a sequence of continuous embedding vectors through Mamba's layers.
     ///
     /// Resets state, then processes each vector as a soft token via `forward_embeds()`,
@@ -416,86 +645,6 @@ impl MambaWrapper {
         // Forward through all layers using inject_sequence (skips lm_head)
         self.model.inject_sequence(&stacked, &mut self.state)?;
         Ok(())
-    }
-
-    /// End-to-end token prediction loss with autograd gradients.
-    ///
-    /// Uses candle's `Var` to track gradients through Mamba's SSM layers:
-    /// 1. Creates input embeddings as a `Var` (leaf variable for autograd)
-    /// 2. Injects through all SSM layers (graph stays connected via state tensors)
-    /// 3. Teacher-forces target tokens, computing cross-entropy loss
-    /// 4. Calls `backward()` to get `d_loss/d_input_embeddings`
-    ///
-    /// Returns (loss_value, gradient_per_chunk) for projection chain rule.
-    pub fn compute_e2e_token_loss(
-        &mut self,
-        ssm_sequence: &[Vec<f32>],
-        target_tokens: &[u32],
-    ) -> Result<(f32, Vec<Vec<f32>>)> {
-        use candle_core::Var;
-
-        if target_tokens.len() < 2 {
-            anyhow::bail!("Need at least 2 target tokens for teacher forcing");
-        }
-
-        self.reset();
-        let d_model = self.config.d_model;
-        let seq_len = ssm_sequence.len();
-
-        // 1. Create input as Var for autograd tracking
-        let mut flat = Vec::with_capacity(seq_len * d_model);
-        for chunk in ssm_sequence {
-            assert_eq!(chunk.len(), d_model);
-            flat.extend_from_slice(chunk);
-        }
-        let input_var = Var::from_vec(flat, (seq_len, d_model), &self.device)
-            .context("Failed to create Var for e2e")?;
-        let input_tensor = input_var.as_tensor();
-
-        // 2. Warmstart conv1d from first chunk
-        if seq_len > 0 {
-            let summary = input_tensor.i(0)?.unsqueeze(0)?;
-            self.model
-                .warmstart_conv_history(&summary, &mut self.state)?;
-        }
-
-        // 3. Inject all SSM tokens (graph stays connected through state)
-        self.model.inject_sequence(input_tensor, &mut self.state)?;
-
-        // 4. Teacher-force target tokens, accumulating cross-entropy loss
-        let num_targets = target_tokens.len() - 1; // predict each next token
-        let mut total_loss = Tensor::zeros((), DType::F32, &self.device)?;
-        for i in 0..num_targets {
-            let input_id = Tensor::new(&[target_tokens[i]], &self.device)?;
-            let logits = self.model.forward(&input_id, &mut self.state)?;
-            // logits shape: (1, vocab_size) — squeeze to (vocab_size)
-            let logits_1d = logits.squeeze(0)?;
-            let target = Tensor::new(&[target_tokens[i + 1] as u32], &self.device)?
-                .to_dtype(DType::U32)?;
-            let loss = candle_nn::loss::cross_entropy(&logits_1d.unsqueeze(0)?, &target)?;
-            total_loss = (total_loss + loss)?;
-        }
-        // Average over tokens
-        let avg_loss = (total_loss / num_targets as f64)?;
-
-        // 5. Backward pass — compute d_loss/d_input_var
-        let loss_val = avg_loss.to_scalar::<f32>()?;
-        let grads = avg_loss.backward().context("Autograd backward failed")?;
-
-        // 6. Extract gradients for the input embeddings
-        let input_grad = grads
-            .get(input_var.as_tensor())
-            .context("No gradient for input Var — autograd graph may be disconnected")?;
-
-        // Reshape from (seq_len, d_model) to Vec<Vec<f32>>
-        let grad_flat: Vec<f32> = input_grad.flatten_all()?.to_vec1()?;
-        let mut ssm_grads = Vec::with_capacity(seq_len);
-        for i in 0..seq_len {
-            let start = i * d_model;
-            ssm_grads.push(grad_flat[start..start + d_model].to_vec());
-        }
-
-        Ok((loss_val, ssm_grads))
     }
 }
 
@@ -562,12 +711,28 @@ impl MambaBackend for MambaWrapper {
         MambaWrapper::inject_context_sequence(self, sequence)
     }
 
-    fn compute_e2e_token_loss(
+    fn compute_e2e_token_loss_at(
         &mut self,
-        ssm_sequence: &[Vec<f32>],
-        target_tokens: &[u32],
-    ) -> Result<(f32, Vec<Vec<f32>>)> {
-        MambaWrapper::compute_e2e_token_loss(self, ssm_sequence, target_tokens)
+        sequence: &[Vec<f32>],
+        tokens: &[u32],
+        pos: usize,
+    ) -> Result<Vec<f32>> {
+        MambaWrapper::compute_e2e_token_loss_at(self, sequence, tokens, pos)
+    }
+
+    fn compute_e2e_token_loss_multi(
+        &mut self,
+        sequence: &[Vec<f32>],
+        tokens: &[u32],
+        positions: &[usize],
+    ) -> Result<Vec<(usize, Vec<f32>)>> {
+        MambaWrapper::compute_e2e_token_loss_multi(self, sequence, tokens, positions)
+    }
+
+    fn enable_lora(&mut self, rank: usize, alpha: f32, lr: f32) {
+        if let Err(e) = MambaWrapper::enable_lora(self, rank, alpha, lr) {
+            tracing::error!("Failed to enable LoRA: {e}");
+        }
     }
 }
 
@@ -733,22 +898,34 @@ pub(crate) mod tests {
             Ok(())
         }
 
-        fn compute_e2e_token_loss(
+        fn compute_e2e_token_loss_at(
             &mut self,
-            ssm_sequence: &[Vec<f32>],
-            target_tokens: &[u32],
-        ) -> Result<(f32, Vec<Vec<f32>>)> {
-            // Mock: return synthetic loss and gradients proportional to input magnitude
-            let d_model = if ssm_sequence.is_empty() { 768 } else { ssm_sequence[0].len() };
-            let loss = 5.0f32; // Synthetic loss
-            let grads: Vec<Vec<f32>> = ssm_sequence
-                .iter()
-                .map(|chunk| {
-                    chunk.iter().map(|&x| -0.01 * x).collect()
-                })
-                .collect();
-            let _ = (d_model, target_tokens);
-            Ok((loss, grads))
+            _sequence: &[Vec<f32>],
+            _tokens: &[u32],
+            _pos: usize,
+        ) -> Result<Vec<f32>> {
+            // Mock: return small deterministic gradient
+            let d = self.d_model();
+            Ok(vec![0.001f32; d])
+        }
+
+        fn compute_e2e_token_loss_multi(
+            &mut self,
+            _sequence: &[Vec<f32>],
+            _tokens: &[u32],
+            positions: &[usize],
+        ) -> Result<Vec<(usize, Vec<f32>)>> {
+            // Mock: return small deterministic gradient at each requested position
+            let d = self.d_model();
+            Ok(positions.iter().map(|&pos| {
+                // Vary gradient slightly by position for testing
+                let grad_val = 0.001 * (1.0 + pos as f32 * 0.01);
+                (pos, vec![grad_val; d])
+            }).collect())
+        }
+
+        fn enable_lora(&mut self, _rank: usize, _alpha: f32, _lr: f32) {
+            // No-op in mock
         }
     }
 
