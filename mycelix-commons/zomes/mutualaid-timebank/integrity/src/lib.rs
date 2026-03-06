@@ -100,9 +100,9 @@ fn validate_service_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackR
     }
 
     // ID length limit
-    if offer.id.len() > 64 {
+    if offer.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Service offer ID exceeds 64 character limit".to_string(),
+            "Service offer ID exceeds 256 character limit".to_string(),
         ));
     }
 
@@ -186,9 +186,9 @@ fn validate_service_request(request: ServiceRequest) -> ExternResult<ValidateCal
     }
 
     // ID length limit
-    if request.id.len() > 64 {
+    if request.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Service request ID exceeds 64 character limit".to_string(),
+            "Service request ID exceeds 256 character limit".to_string(),
         ));
     }
 
@@ -254,9 +254,9 @@ fn validate_time_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallba
     }
 
     // ID length limit
-    if exchange.id.len() > 64 {
+    if exchange.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Time exchange ID exceeds 64 character limit".to_string(),
+            "Time exchange ID exceeds 256 character limit".to_string(),
         ));
     }
 
@@ -2125,7 +2125,7 @@ mod tests {
     #[test]
     fn test_validate_offer_id_too_long() {
         let mut o = valid_offer();
-        o.id = "a".repeat(65);
+        o.id = "a".repeat(257);
         assert!(is_invalid(&validate_service_offer(o)));
     }
 
@@ -2187,7 +2187,7 @@ mod tests {
     #[test]
     fn test_validate_request_id_too_long() {
         let mut r = valid_request();
-        r.id = "a".repeat(65);
+        r.id = "a".repeat(257);
         assert!(is_invalid(&validate_service_request(r)));
     }
 
@@ -2226,7 +2226,7 @@ mod tests {
     #[test]
     fn test_validate_exchange_id_too_long() {
         let mut e = valid_exchange();
-        e.id = "a".repeat(65);
+        e.id = "a".repeat(257);
         assert!(is_invalid(&validate_time_exchange(e)));
     }
 

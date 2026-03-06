@@ -490,9 +490,9 @@ fn validate_create_bylaw(_action: Create, bylaw: ByLaw) -> ExternResult<Validate
             "ByLaw ID cannot be empty".into(),
         ));
     }
-    if bylaw.id.len() > 64 {
+    if bylaw.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "ByLaw ID must be 64 characters or fewer".into(),
+            "ByLaw ID must be 256 characters or fewer".into(),
         ));
     }
     if bylaw.title.trim().is_empty() {
@@ -529,9 +529,9 @@ fn validate_update_bylaw(bylaw: ByLaw) -> ExternResult<ValidateCallbackResult> {
             "ByLaw ID cannot be empty".into(),
         ));
     }
-    if bylaw.id.len() > 64 {
+    if bylaw.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "ByLaw ID must be 64 characters or fewer".into(),
+            "ByLaw ID must be 256 characters or fewer".into(),
         ));
     }
     if bylaw.title.len() > 512 {
@@ -1880,10 +1880,10 @@ mod tests {
     #[test]
     fn create_bylaw_id_too_long() {
         let mut b = valid_bylaw();
-        b.id = "x".repeat(65);
+        b.id = "x".repeat(257);
         assert_invalid(
             validate_create_bylaw(fake_create(), b),
-            "ByLaw ID must be 64 characters or fewer",
+            "ByLaw ID must be 256 characters or fewer",
         );
     }
 
@@ -2064,8 +2064,8 @@ mod tests {
     #[test]
     fn update_bylaw_id_too_long() {
         let mut b = valid_bylaw();
-        b.id = "x".repeat(65);
-        assert_invalid(validate_update_bylaw(b), "ByLaw ID must be 64 characters or fewer");
+        b.id = "x".repeat(257);
+        assert_invalid(validate_update_bylaw(b), "ByLaw ID must be 256 characters or fewer");
     }
 
     #[test]

@@ -203,9 +203,9 @@ fn validate_create_building(
             "Building ID cannot be empty".into(),
         ));
     }
-    if building.id.len() > 64 {
+    if building.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Building ID must be at most 64 characters".into(),
+            "Building ID must be at most 256 characters".into(),
         ));
     }
     if building.name.trim().is_empty() {
@@ -593,12 +593,12 @@ mod tests {
     #[test]
     fn test_building_id_over_max_length() {
         let mut building = valid_building();
-        building.id = "a".repeat(65);
+        building.id = "a".repeat(257);
         let result = validate_create_building(mock_create_action(), building);
         assert!(result.is_ok());
         match result.unwrap() {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Building ID must be at most 64 characters");
+                assert_eq!(msg, "Building ID must be at most 256 characters");
             }
             _ => panic!("Expected Invalid result"),
         }

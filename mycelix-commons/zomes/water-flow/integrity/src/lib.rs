@@ -391,9 +391,9 @@ fn validate_create_water_source(
             "Water source ID cannot be empty".into(),
         ));
     }
-    if source.id.len() > 64 {
+    if source.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Water source ID must be 64 characters or fewer".into(),
+            "Water source ID must be 256 characters or fewer".into(),
         ));
     }
     if source.name.trim().is_empty() {
@@ -1367,12 +1367,12 @@ mod tests {
     #[test]
     fn water_source_id_over_limit_rejected() {
         let mut src = make_water_source();
-        src.id = "A".repeat(65);
+        src.id = "A".repeat(257);
         let result = validate_create_water_source(fake_create(), src);
         assert!(is_invalid(&result));
         assert_eq!(
             invalid_msg(&result),
-            "Water source ID must be 64 characters or fewer"
+            "Water source ID must be 256 characters or fewer"
         );
     }
 

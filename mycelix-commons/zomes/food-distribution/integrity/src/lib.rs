@@ -179,8 +179,8 @@ fn validate_market(m: Market) -> ExternResult<ValidateCallbackResult> {
     if m.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Market ID cannot be empty".into()));
     }
-    if m.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Market ID must be 64 characters or fewer".into()));
+    if m.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Market ID must be 256 characters or fewer".into()));
     }
     if m.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Market name cannot be empty".into()));
@@ -1003,8 +1003,8 @@ mod tests {
     #[test]
     fn market_id_over_limit_rejected() {
         let mut m = valid_market();
-        m.id = "A".repeat(65);
-        assert_invalid(validate_market(m), "Market ID must be 64 characters or fewer");
+        m.id = "A".repeat(257);
+        assert_invalid(validate_market(m), "Market ID must be 256 characters or fewer");
     }
 
     #[test]

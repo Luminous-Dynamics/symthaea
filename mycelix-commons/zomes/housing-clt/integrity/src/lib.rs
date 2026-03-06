@@ -236,9 +236,9 @@ fn validate_create_trust(
             "Trust ID cannot be empty".into(),
         ));
     }
-    if trust.id.len() > 64 {
+    if trust.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Trust ID must be at most 64 characters".into(),
+            "Trust ID must be at most 256 characters".into(),
         ));
     }
     if trust.name.trim().is_empty() {
@@ -638,10 +638,10 @@ mod tests {
     #[test]
     fn create_trust_id_over_max_length() {
         let mut t = valid_land_trust();
-        t.id = "a".repeat(65);
+        t.id = "a".repeat(257);
         assert_invalid(
             validate_create_trust(fake_create(), t),
-            "Trust ID must be at most 64 characters",
+            "Trust ID must be at most 256 characters",
         );
     }
 

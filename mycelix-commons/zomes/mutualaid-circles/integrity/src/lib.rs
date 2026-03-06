@@ -93,9 +93,9 @@ fn validate_credit_circle(circle: CreditCircle) -> ExternResult<ValidateCallback
     }
 
     // ID length limit
-    if circle.id.len() > 64 {
+    if circle.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Circle ID exceeds 64 character limit".to_string(),
+            "Circle ID exceeds 256 character limit".to_string(),
         ));
     }
 
@@ -238,9 +238,9 @@ fn validate_credit_transaction(tx: CreditTransaction) -> ExternResult<ValidateCa
     }
 
     // ID length limit
-    if tx.id.len() > 64 {
+    if tx.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Transaction ID exceeds 64 character limit".to_string(),
+            "Transaction ID exceeds 256 character limit".to_string(),
         ));
     }
 
@@ -1131,7 +1131,7 @@ mod tests {
     #[test]
     fn test_validate_circle_id_too_long() {
         let mut circle = valid_credit_circle();
-        circle.id = "x".repeat(65);
+        circle.id = "x".repeat(257);
         let result = validate_credit_circle(circle).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
@@ -1257,7 +1257,7 @@ mod tests {
     #[test]
     fn test_validate_transaction_id_too_long() {
         let mut tx = valid_credit_transaction();
-        tx.id = "t".repeat(65);
+        tx.id = "t".repeat(257);
         let result = validate_credit_transaction(tx).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }

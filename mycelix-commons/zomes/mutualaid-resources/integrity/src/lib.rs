@@ -95,9 +95,9 @@ fn validate_shared_resource(resource: SharedResource) -> ExternResult<ValidateCa
     }
 
     // ID length limit
-    if resource.id.len() > 64 {
+    if resource.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Resource ID must be 64 characters or fewer".to_string(),
+            "Resource ID must be 256 characters or fewer".to_string(),
         ));
     }
 
@@ -204,9 +204,9 @@ fn validate_booking(booking: Booking) -> ExternResult<ValidateCallbackResult> {
     }
 
     // ID length limit
-    if booking.id.len() > 64 {
+    if booking.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Booking ID must be 64 characters or fewer".to_string(),
+            "Booking ID must be 256 characters or fewer".to_string(),
         ));
     }
 
@@ -1161,7 +1161,7 @@ mod tests {
     #[test]
     fn test_shared_resource_id_65_rejected() {
         let mut resource = valid_shared_resource();
-        resource.id = "x".repeat(65);
+        resource.id = "x".repeat(257);
         let result = validate_shared_resource(resource);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -1237,7 +1237,7 @@ mod tests {
     #[test]
     fn test_booking_id_65_rejected() {
         let mut booking = valid_booking();
-        booking.id = "x".repeat(65);
+        booking.id = "x".repeat(257);
         let result = validate_booking(booking);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }

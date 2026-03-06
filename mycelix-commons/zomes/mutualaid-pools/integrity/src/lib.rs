@@ -280,9 +280,9 @@ fn validate_mutual_aid_pool(pool: &MutualAidPool) -> ExternResult<ValidateCallba
     // Validate ID
     validate_id(&pool.id, "Pool ID")?;
 
-    if pool.id.len() > 64 {
+    if pool.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool ID must be 64 characters or fewer".into()
+            "Pool ID must be 256 characters or fewer".into()
         ));
     }
 
@@ -373,14 +373,14 @@ fn validate_contribution(contribution: &Contribution) -> ExternResult<ValidateCa
     validate_id(&contribution.id, "Contribution ID")?;
     validate_id(&contribution.pool_id, "Pool ID")?;
 
-    if contribution.id.len() > 64 {
+    if contribution.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Contribution ID must be 64 characters or fewer".into()
+            "Contribution ID must be 256 characters or fewer".into()
         ));
     }
-    if contribution.pool_id.len() > 64 {
+    if contribution.pool_id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool ID must be 64 characters or fewer".into()
+            "Pool ID must be 256 characters or fewer".into()
         ));
     }
     if contribution.member_did.len() > 256 {
@@ -416,14 +416,14 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
     validate_id(&disbursement.id, "Disbursement ID")?;
     validate_id(&disbursement.pool_id, "Pool ID")?;
 
-    if disbursement.id.len() > 64 {
+    if disbursement.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Disbursement ID must be 64 characters or fewer".into()
+            "Disbursement ID must be 256 characters or fewer".into()
         ));
     }
-    if disbursement.pool_id.len() > 64 {
+    if disbursement.pool_id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool ID must be 64 characters or fewer".into()
+            "Pool ID must be 256 characters or fewer".into()
         ));
     }
     if disbursement.recipient_did.len() > 256 {
@@ -520,9 +520,9 @@ fn validate_pool_membership(membership: &PoolMembership) -> ExternResult<Validat
     // Validate IDs
     validate_id(&membership.pool_id, "Pool ID")?;
 
-    if membership.pool_id.len() > 64 {
+    if membership.pool_id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool ID must be 64 characters or fewer".into()
+            "Pool ID must be 256 characters or fewer".into()
         ));
     }
     if membership.member_did.len() > 256 {
@@ -1510,10 +1510,10 @@ mod tests {
     #[test]
     fn validate_pool_id_65_rejected() {
         let mut pool = valid_pool();
-        pool.id = "x".repeat(65);
+        pool.id = "x".repeat(257);
         assert_invalid(
             validate_mutual_aid_pool(&pool),
-            "Pool ID must be 64 characters or fewer",
+            "Pool ID must be 256 characters or fewer",
         );
     }
 
@@ -1586,10 +1586,10 @@ mod tests {
     #[test]
     fn validate_contribution_id_65_rejected() {
         let mut contrib = valid_contribution();
-        contrib.id = "x".repeat(65);
+        contrib.id = "x".repeat(257);
         assert_invalid(
             validate_contribution(&contrib),
-            "Contribution ID must be 64 characters or fewer",
+            "Contribution ID must be 256 characters or fewer",
         );
     }
 
@@ -1604,10 +1604,10 @@ mod tests {
     #[test]
     fn validate_contribution_pool_id_65_rejected() {
         let mut contrib = valid_contribution();
-        contrib.pool_id = "x".repeat(65);
+        contrib.pool_id = "x".repeat(257);
         assert_invalid(
             validate_contribution(&contrib),
-            "Pool ID must be 64 characters or fewer",
+            "Pool ID must be 256 characters or fewer",
         );
     }
 
@@ -1640,10 +1640,10 @@ mod tests {
     #[test]
     fn validate_disbursement_id_65_rejected() {
         let mut disb = valid_disbursement();
-        disb.id = "x".repeat(65);
+        disb.id = "x".repeat(257);
         assert_invalid(
             validate_disbursement(&disb),
-            "Disbursement ID must be 64 characters or fewer",
+            "Disbursement ID must be 256 characters or fewer",
         );
     }
 
@@ -1720,10 +1720,10 @@ mod tests {
     #[test]
     fn validate_membership_pool_id_65_rejected() {
         let mut mem = valid_membership();
-        mem.pool_id = "x".repeat(65);
+        mem.pool_id = "x".repeat(257);
         assert_invalid(
             validate_pool_membership(&mem),
-            "Pool ID must be 64 characters or fewer",
+            "Pool ID must be 256 characters or fewer",
         );
     }
 

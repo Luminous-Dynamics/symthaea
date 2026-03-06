@@ -273,8 +273,8 @@ fn validate_plot(plot: Plot) -> ExternResult<ValidateCallbackResult> {
     if plot.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Plot ID cannot be empty".into()));
     }
-    if plot.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Plot ID must be 64 characters or fewer".into()));
+    if plot.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Plot ID must be 256 characters or fewer".into()));
     }
     if plot.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Plot name cannot be empty".into()));
@@ -962,8 +962,8 @@ mod tests {
     #[test]
     fn plot_id_too_long_rejected() {
         let mut p = valid_plot();
-        p.id = "x".repeat(65);
-        assert_invalid(validate_plot(p), "Plot ID must be 64 characters or fewer");
+        p.id = "x".repeat(257);
+        assert_invalid(validate_plot(p), "Plot ID must be 256 characters or fewer");
     }
 
     #[test]

@@ -99,9 +99,9 @@ fn validate_need(need: Need) -> ExternResult<ValidateCallbackResult> {
     }
 
     // ID length limit
-    if need.id.len() > 64 {
+    if need.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Need ID exceeds 64 character limit".to_string(),
+            "Need ID exceeds 256 character limit".to_string(),
         ));
     }
 
@@ -155,9 +155,9 @@ fn validate_offer(offer: Offer) -> ExternResult<ValidateCallbackResult> {
     }
 
     // ID length limit
-    if offer.id.len() > 64 {
+    if offer.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Offer ID exceeds 64 character limit".to_string(),
+            "Offer ID exceeds 256 character limit".to_string(),
         ));
     }
 
@@ -211,9 +211,9 @@ fn validate_match(m: Match) -> ExternResult<ValidateCallbackResult> {
     }
 
     // ID length limit
-    if m.id.len() > 64 {
+    if m.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Match ID exceeds 64 character limit".to_string(),
+            "Match ID exceeds 256 character limit".to_string(),
         ));
     }
 
@@ -1473,7 +1473,7 @@ mod tests {
     #[test]
     fn test_validate_need_id_too_long() {
         let mut need = valid_need();
-        need.id = "x".repeat(65);
+        need.id = "x".repeat(257);
         let result = validate_need(need);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -1499,7 +1499,7 @@ mod tests {
     #[test]
     fn test_validate_offer_id_too_long() {
         let mut offer = valid_offer();
-        offer.id = "x".repeat(65);
+        offer.id = "x".repeat(257);
         let result = validate_offer(offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
@@ -1525,7 +1525,7 @@ mod tests {
     #[test]
     fn test_validate_match_id_too_long() {
         let mut m = valid_match();
-        m.id = "x".repeat(65);
+        m.id = "x".repeat(257);
         let result = validate_match(m);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }

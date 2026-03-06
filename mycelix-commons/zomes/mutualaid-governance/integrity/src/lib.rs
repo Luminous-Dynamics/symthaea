@@ -88,8 +88,8 @@ fn validate_proposal(proposal: Proposal) -> ExternResult<ValidateCallbackResult>
     if proposal.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Proposal ID cannot be empty".into()));
     }
-    if proposal.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Proposal ID must be 64 characters or fewer".into()));
+    if proposal.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Proposal ID must be 256 characters or fewer".into()));
     }
     if proposal.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Proposal title cannot be empty".into()));
@@ -122,8 +122,8 @@ fn validate_rule(rule: Rule) -> ExternResult<ValidateCallbackResult> {
     if rule.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Rule ID cannot be empty".into()));
     }
-    if rule.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Rule ID must be 64 characters or fewer".into()));
+    if rule.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Rule ID must be 256 characters or fewer".into()));
     }
     if rule.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Rule title cannot be empty".into()));
@@ -1195,7 +1195,7 @@ mod tests {
     #[test]
     fn proposal_id_over_max_length_rejected() {
         let mut p = make_valid_proposal();
-        p.id = "x".repeat(65);
+        p.id = "x".repeat(257);
         assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Invalid(_))));
     }
 
@@ -1243,7 +1243,7 @@ mod tests {
     #[test]
     fn rule_id_over_max_length_rejected() {
         let mut r = make_valid_rule();
-        r.id = "r".repeat(65);
+        r.id = "r".repeat(257);
         assert!(matches!(validate_rule(r), Ok(ValidateCallbackResult::Invalid(_))));
     }
 

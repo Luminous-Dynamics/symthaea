@@ -353,9 +353,9 @@ fn validate_create_watershed(
             "Watershed ID cannot be empty".into(),
         ));
     }
-    if ws.id.len() > 64 {
+    if ws.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Watershed ID must be 64 characters or fewer".into(),
+            "Watershed ID must be 256 characters or fewer".into(),
         ));
     }
     if ws.name.trim().is_empty() {
@@ -1620,12 +1620,12 @@ mod tests {
     #[test]
     fn watershed_id_over_limit_rejected() {
         let mut ws = make_watershed();
-        ws.id = "A".repeat(65);
+        ws.id = "A".repeat(257);
         let result = validate_create_watershed(fake_create(), ws);
         assert!(is_invalid(&result));
         assert_eq!(
             invalid_msg(&result),
-            "Watershed ID must be 64 characters or fewer"
+            "Watershed ID must be 256 characters or fewer"
         );
     }
 

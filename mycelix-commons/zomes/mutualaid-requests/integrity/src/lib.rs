@@ -207,9 +207,9 @@ fn validate_aid_request(request: &AidRequest) -> ExternResult<ValidateCallbackRe
     validate_id(&request.id, "Request ID")?;
 
     // ID length limit
-    if request.id.len() > 64 {
+    if request.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Request ID exceeds 64 character limit".into()
+            "Request ID exceeds 256 character limit".into()
         ));
     }
 
@@ -279,14 +279,14 @@ fn validate_aid_offer(offer: &AidOffer) -> ExternResult<ValidateCallbackResult> 
     validate_id(&offer.request_id, "Request ID")?;
 
     // ID length limits
-    if offer.id.len() > 64 {
+    if offer.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Offer ID exceeds 64 character limit".into()
+            "Offer ID exceeds 256 character limit".into()
         ));
     }
-    if offer.request_id.len() > 64 {
+    if offer.request_id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Request ID exceeds 64 character limit".into()
+            "Request ID exceeds 256 character limit".into()
         ));
     }
 
@@ -1350,7 +1350,7 @@ mod tests {
     #[test]
     fn test_validate_request_id_too_long() {
         let mut request = valid_aid_request();
-        request.id = "a".repeat(65);
+        request.id = "a".repeat(257);
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
@@ -1466,7 +1466,7 @@ mod tests {
     #[test]
     fn test_validate_offer_id_too_long() {
         let mut offer = valid_aid_offer();
-        offer.id = "a".repeat(65);
+        offer.id = "a".repeat(257);
         let result = validate_aid_offer(&offer);
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
@@ -1486,7 +1486,7 @@ mod tests {
     #[test]
     fn test_validate_offer_request_id_too_long() {
         let mut offer = valid_aid_offer();
-        offer.request_id = "r".repeat(65);
+        offer.request_id = "r".repeat(257);
         let result = validate_aid_offer(&offer);
         assert!(result.is_ok());
         assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));

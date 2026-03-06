@@ -247,8 +247,8 @@ fn validate_storage(s: StorageUnit) -> ExternResult<ValidateCallbackResult> {
     if s.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Storage ID cannot be empty".into()));
     }
-    if s.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Storage ID too long (max 64 chars)".into()));
+    if s.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Storage ID too long (max 256 chars)".into()));
     }
     if s.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Storage name cannot be empty".into()));
@@ -663,8 +663,8 @@ mod tests {
     #[test]
     fn storage_id_too_long_rejected() {
         let mut s = valid_storage();
-        s.id = "x".repeat(65);
-        assert_invalid(validate_storage(s), "Storage ID too long (max 64 chars)");
+        s.id = "x".repeat(257);
+        assert_invalid(validate_storage(s), "Storage ID too long (max 256 chars)");
     }
 
     #[test]

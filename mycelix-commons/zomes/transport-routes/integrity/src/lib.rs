@@ -276,8 +276,8 @@ fn validate_vehicle(v: Vehicle) -> ExternResult<ValidateCallbackResult> {
     if v.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Vehicle ID cannot be empty".into()));
     }
-    if v.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Vehicle ID too long (max 64 chars)".into()));
+    if v.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Vehicle ID too long (max 256 chars)".into()));
     }
     if !v.capacity_kg.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("capacity_kg must be a finite number".into()));
@@ -292,8 +292,8 @@ fn validate_route(r: Route) -> ExternResult<ValidateCallbackResult> {
     if r.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Route ID cannot be empty".into()));
     }
-    if r.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Route ID too long (max 64 chars)".into()));
+    if r.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Route ID too long (max 256 chars)".into()));
     }
     if r.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Route name cannot be empty".into()));
@@ -353,8 +353,8 @@ fn validate_maintenance(m: MaintenanceRecord) -> ExternResult<ValidateCallbackRe
     if m.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Maintenance ID cannot be empty".into()));
     }
-    if m.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Maintenance ID too long (max 64 chars)".into()));
+    if m.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Maintenance ID too long (max 256 chars)".into()));
     }
     if m.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
@@ -582,8 +582,8 @@ mod tests {
     #[test]
     fn vehicle_id_too_long_rejected() {
         let mut v = valid_vehicle();
-        v.id = "x".repeat(65);
-        assert_invalid(validate_vehicle(v), "Vehicle ID too long (max 64 chars)");
+        v.id = "x".repeat(257);
+        assert_invalid(validate_vehicle(v), "Vehicle ID too long (max 256 chars)");
     }
 
     #[test]
@@ -697,8 +697,8 @@ mod tests {
     #[test]
     fn route_id_too_long_rejected() {
         let mut r = valid_route();
-        r.id = "x".repeat(65);
-        assert_invalid(validate_route(r), "Route ID too long (max 64 chars)");
+        r.id = "x".repeat(257);
+        assert_invalid(validate_route(r), "Route ID too long (max 256 chars)");
     }
 
     #[test]
@@ -1204,8 +1204,8 @@ mod tests {
     #[test]
     fn maintenance_id_too_long_rejected() {
         let mut m = valid_maintenance();
-        m.id = "x".repeat(65);
-        assert_invalid(validate_maintenance(m), "Maintenance ID too long (max 64 chars)");
+        m.id = "x".repeat(257);
+        assert_invalid(validate_maintenance(m), "Maintenance ID too long (max 256 chars)");
     }
 
     #[test]

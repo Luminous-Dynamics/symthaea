@@ -209,8 +209,8 @@ fn validate_create_common_resource(
         return Ok(ValidateCallbackResult::Invalid("Resource description cannot be empty".into()));
     }
     // --- String length limits ---
-    if resource.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Resource id too long (max 64 chars)".into()));
+    if resource.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Resource id too long (max 256 chars)".into()));
     }
     if resource.name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid("Resource name too long (max 256 chars)".into()));
@@ -255,11 +255,11 @@ fn validate_create_usage_right(
         return Ok(ValidateCallbackResult::Invalid("UsageRight resource_id cannot be empty".into()));
     }
     // --- String length limits ---
-    if right.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("UsageRight id too long (max 64 chars)".into()));
+    if right.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("UsageRight id too long (max 256 chars)".into()));
     }
-    if right.resource_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("UsageRight resource_id too long (max 64 chars)".into()));
+    if right.resource_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("UsageRight resource_id too long (max 256 chars)".into()));
     }
     // --- Existing validation ---
     if !right.holder_did.starts_with("did:") {
@@ -294,11 +294,11 @@ fn validate_create_usage_log(
         return Ok(ValidateCallbackResult::Invalid("UsageLog unit cannot be empty".into()));
     }
     // --- String length limits ---
-    if log.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog id too long (max 64 chars)".into()));
+    if log.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog id too long (max 256 chars)".into()));
     }
-    if log.resource_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog resource_id too long (max 64 chars)".into()));
+    if log.resource_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("UsageLog resource_id too long (max 256 chars)".into()));
     }
     if log.usage_type.len() > 128 {
         return Ok(ValidateCallbackResult::Invalid("UsageLog usage_type too long (max 128 chars)".into()));
@@ -1015,7 +1015,7 @@ mod tests {
     #[test]
     fn test_common_resource_id_too_long() {
         let mut resource = create_common_resource();
-        resource.id = "x".repeat(65);
+        resource.id = "x".repeat(257);
         let action = create_entry_creation_action();
         let result = validate_create_common_resource(action, resource).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
@@ -1107,7 +1107,7 @@ mod tests {
     #[test]
     fn test_usage_right_id_too_long() {
         let mut right = create_usage_right();
-        right.id = "x".repeat(65);
+        right.id = "x".repeat(257);
         let action = create_entry_creation_action();
         let result = validate_create_usage_right(action, right).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
@@ -1125,7 +1125,7 @@ mod tests {
     #[test]
     fn test_usage_right_resource_id_too_long() {
         let mut right = create_usage_right();
-        right.resource_id = "x".repeat(65);
+        right.resource_id = "x".repeat(257);
         let action = create_entry_creation_action();
         let result = validate_create_usage_right(action, right).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
@@ -1154,7 +1154,7 @@ mod tests {
     #[test]
     fn test_usage_log_id_too_long() {
         let mut log = create_usage_log();
-        log.id = "x".repeat(65);
+        log.id = "x".repeat(257);
         let action = create_entry_creation_action();
         let result = validate_create_usage_log(action, log).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
@@ -1172,7 +1172,7 @@ mod tests {
     #[test]
     fn test_usage_log_resource_id_too_long() {
         let mut log = create_usage_log();
-        log.resource_id = "x".repeat(65);
+        log.resource_id = "x".repeat(257);
         let action = create_entry_creation_action();
         let result = validate_create_usage_log(action, log).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));

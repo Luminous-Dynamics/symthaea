@@ -329,9 +329,9 @@ fn validate_create_conservation_method(
             "Conservation method ID cannot be empty".into(),
         ));
     }
-    if method.id.len() > 64 {
+    if method.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Conservation method ID must be 64 characters or fewer".into(),
+            "Conservation method ID must be 256 characters or fewer".into(),
         ));
     }
     if method.title.trim().is_empty() {
@@ -1553,12 +1553,12 @@ mod tests {
     #[test]
     fn conservation_method_id_over_limit_rejected() {
         let mut m = make_conservation_method();
-        m.id = "A".repeat(65);
+        m.id = "A".repeat(257);
         let result = validate_create_conservation_method(fake_create(), m);
         assert!(is_invalid(&result));
         assert_eq!(
             invalid_msg(&result),
-            "Conservation method ID must be 64 characters or fewer"
+            "Conservation method ID must be 256 characters or fewer"
         );
     }
 

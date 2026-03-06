@@ -183,11 +183,11 @@ fn validate_create_transfer(
         return Ok(ValidateCallbackResult::Invalid("Transfer property_id cannot be empty".into()));
     }
     // --- String length limits ---
-    if transfer.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Transfer id too long (max 64 chars)".into()));
+    if transfer.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Transfer id too long (max 256 chars)".into()));
     }
-    if transfer.property_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Transfer property_id too long (max 64 chars)".into()));
+    if transfer.property_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Transfer property_id too long (max 256 chars)".into()));
     }
     if let Some(ref currency) = transfer.currency {
         if currency.len() > 16 {
@@ -227,11 +227,11 @@ fn validate_create_escrow(
         return Ok(ValidateCallbackResult::Invalid("Escrow transfer_id cannot be empty".into()));
     }
     // --- String length limits ---
-    if escrow.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Escrow id too long (max 64 chars)".into()));
+    if escrow.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Escrow id too long (max 256 chars)".into()));
     }
-    if escrow.transfer_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Escrow transfer_id too long (max 64 chars)".into()));
+    if escrow.transfer_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Escrow transfer_id too long (max 256 chars)".into()));
     }
     if escrow.currency.len() > 16 {
         return Ok(ValidateCallbackResult::Invalid("Escrow currency too long (max 16 chars)".into()));
@@ -1073,7 +1073,7 @@ mod tests {
     #[test]
     fn test_transfer_id_too_long() {
         let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
-        transfer.id = "x".repeat(65);
+        transfer.id = "x".repeat(257);
         let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
         assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
     }
@@ -1097,7 +1097,7 @@ mod tests {
     #[test]
     fn test_transfer_property_id_too_long() {
         let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
-        transfer.property_id = "x".repeat(65);
+        transfer.property_id = "x".repeat(257);
         let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
         assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
     }
@@ -1139,7 +1139,7 @@ mod tests {
     #[test]
     fn test_escrow_id_too_long() {
         let mut escrow = create_test_escrow(1000.0);
-        escrow.id = "x".repeat(65);
+        escrow.id = "x".repeat(257);
         let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
         assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
     }
@@ -1155,7 +1155,7 @@ mod tests {
     #[test]
     fn test_escrow_transfer_id_too_long() {
         let mut escrow = create_test_escrow(1000.0);
-        escrow.transfer_id = "x".repeat(65);
+        escrow.transfer_id = "x".repeat(257);
         let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
         assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
     }
