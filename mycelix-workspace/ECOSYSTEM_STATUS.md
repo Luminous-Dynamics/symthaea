@@ -156,39 +156,60 @@ These domains are fully implemented as zomes within the Commons or Civic cluster
 ### SDK Rust Modules
 agentic, bridge, credentials, crypto, dkg, economics, epistemic, error, fl, hyperfeel, identity, intentions, matl, pagination, pog, storage, temporal, wasm, zkproof
 
-### SDK TypeScript Integration Modules (34 — audited 2026-03-06)
+### SDK TypeScript Integration Modules (37 — re-audited 2026-03-06)
 
-**Full (19 modules, 53%)** — 5+ exported functions with business logic:
+All 37 integration modules have real implementations (types + classes + methods). None are stubs.
 
-| Module | Functions | Types | LOC |
-|--------|-----------|-------|-----|
-| health-fhir | 11 | 20 | 1,443 |
-| health-food | 11 | 11 | 965 |
-| health-marketplace | 10 | 13 | 1,187 |
-| health-governance | 9 | 10 | 831 |
-| identity | 9 | 24 | 749 |
-| epistemic-markets | 8 | 31 | 1,120 |
-| genetics | 8 | 16 | 637 |
-| health-energy | 8 | 9 | 631 |
-| commons | 7 | 21 | 567 |
-| finance | 6 | 20 | 583 |
-| governance | 6 | 22 | 751 |
-| justice | 6 | 25 | 803 |
-| knowledge | 6 | 20 | 684 |
-| media | 6 | 21 | 810 |
-| property | 6 | 22 | 619 |
-| water-energy | 6 | 29 | 918 |
-| food-shelter | 5 | 21 | 837 |
-| hearth | 5 | 22 | 576 |
-| personal | 5 | 15 | 530 |
+**Zome-connected (22 modules, 59%)** — call `callZome` to interact with Holochain conductors:
 
-**Types (5 modules, 12%)** — primarily type/interface definitions:
-fabrication (56 types, 1,269 LOC), food (37 types), health (58 types), support (34 types), transport (33 types)
+| Module | Methods | Types | LOC | Files |
+|--------|---------|-------|-----|-------|
+| energy | 11 | 16 | 4,488 | 10 |
+| governance | 6 | 22 | 4,142 | 9 |
+| finance | 6 | 20 | 3,596 | 9 |
+| property | 6 | 22 | 3,057 | 8 |
+| knowledge | 6 | 20 | 2,978 | 7 |
+| identity | 9 | 24 | 2,457 | 7 |
+| health | 85 | 58 | 1,912 | 2 |
+| health-fhir | 11 | 20 | 1,443 | 1 |
+| health-marketplace | 10 | 13 | 1,187 | 1 |
+| health-food | 11 | 11 | 965 | 1 |
+| health-governance | 9 | 10 | 831 | 1 |
+| media | 6 | 21 | 810 | 1 |
+| justice | 6 | 25 | 803 | 1 |
+| food | 37 | 37 | 803 | 1 |
+| genetics | 8 | 16 | 637 | 1 |
+| health-energy | 8 | 9 | 631 | 1 |
+| hearth | 5 | 22 | 576 | 1 |
+| commons | 7 | 21 | 567 | 1 |
+| attribution | 34 | 25 | 552 | 1 |
+| personal | 5 | 15 | 530 | 1 |
+| civic | 18 | 23 | 494 | 1 |
+| support | 50 | 34 | 756 | 1 |
+| transport | 37 | 33 | 640 | 1 |
 
-**Stub (12 modules, 35%)** — minimal re-exports (<3 functions):
-academic, attribution, civic, climate, consensus, desci, edunet, energy, mail, marketplace, music, mutualaid, supplychain
+**Local-only (15 modules, 41%)** — in-memory Map storage with LocalBridge (functional but not yet wired to Holochain):
 
-**Total**: 23,926 LOC across 34 integration modules. Bridge module adds 835 LOC (10 functions + LocalBridge + BridgeRouter classes).
+| Module | Methods | Types | LOC |
+|--------|---------|-------|-----|
+| fabrication | 100 | 56 | 1,269 |
+| epistemic-markets | 109 | 31 | 1,120 |
+| water-energy | 88 | 29 | 918 |
+| food-shelter | 69 | 21 | 837 |
+| consensus | 13 | 7 | 677 |
+| academic | 15 | 20 | 640 |
+| supplychain | 7 | 6 | 623 |
+| desci | 14 | 7 | 605 |
+| music | 11 | 7 | 545 |
+| edunet | 8 | 6 | 471 |
+| marketplace | 9 | 5 | 435 |
+| mail | 6 | 4 | 368 |
+| mutualaid | 11 | 6 | 367 |
+| climate | 12 | 8 | 337 |
+
+**Note**: The previous audit (2026-03-06 initial) incorrectly classified 12 local-only modules as "Stub". All have real business logic, type definitions, and 6-109 methods. They use `LocalBridge` + in-memory `Map` storage rather than `callZome`, which is a valid local-first pattern. They will be wired to Holochain conductors when their corresponding hApps reach beta.
+
+**Total**: ~37,500 LOC across 37 integration modules + bridge-routing.ts (254 LOC).
 
 ---
 
@@ -213,7 +234,7 @@ academic, attribution, civic, climate, consensus, desci, edunet, energy, mail, m
 4. ~~**Observatory mock-only**~~: Live conductor connection fully implemented, awaiting conductor.
 5. ~~**hApp scaffolding incomplete**~~: Fixed 2026-02-08. All 10 ready-to-build hApps have v0 manifest format.
 6. **Scope sprawl**: 24 hApps total, 12 with bundles, 10 scaffolded (ready to build), 2 REST APIs.
-7. ~~**SDK-TS bundle size**~~: Audited 2026-03-06. 34 integration modules: 19 Full (53%, 5+ exported functions), 5 Types (12%, primarily type definitions), 12 Stub (35%, minimal re-exports). Total 23,926 LOC. See SDK-TS Audit section below.
+7. ~~**SDK-TS bundle size**~~: Re-audited 2026-03-06. All 37 integration modules have real implementations (0 stubs). 22 are zome-connected (callZome), 15 are local-only (in-memory Map + LocalBridge). Total ~37,500 LOC.
 8. **Cross-hApp bridges**: Claimed in architecture docs, not tested in integration.
 9. **WASM builds pending**: 6 hApps (climate, mutualaid, consensus, music, food, transport) need `nix develop` + WASM compilation.
 10. ~~**FL consciousness integration**~~: `ConsciousnessAwareByzantinePlugin` added 2026-02-15. Uses Phi scores for weight adjustment (boost/dampen/veto). 110 tests pass.
@@ -229,7 +250,7 @@ academic, attribution, civic, climate, consensus, desci, edunet, energy, mail, m
 3. ~~Implement Core REST API (3 endpoints minimum)~~: 4 endpoints implemented
 4. ~~Connect Observatory to real conductor (or clearly label demo mode)~~: 3-tier fallback system
 5. ~~Promote Identity + Governance from scaffold to beta~~: Corrected 2026-03-06. Both are fully implemented (Identity: 9 zomes/36.8K LOC, Governance: 7 zomes/28.4K LOC). Moved to Core Four.
-6. ~~Audit SDK-TS integration modules for empty exports~~: Done 2026-03-06. 19 Full / 5 Types / 12 Stub
+6. ~~Audit SDK-TS integration modules for empty exports~~: Re-audited 2026-03-06. All 37 modules have real implementations. 0 stubs found.
 
 ---
 
