@@ -35,12 +35,13 @@ pub use normative::{
     NeuromodCalibration, ReceptorSubtype, SharedCalibrationProfile, TransmitterCalibration,
 };
 pub use monitor::{SelfAssessmentInput, SelfAssessmentMonitor};
-pub use history::{CalibrationHistory, CalibrationSnapshot};
+pub use history::{CalibrationHistory, CalibrationSnapshot, CalibrationValidator};
 
 // Re-export test-only helpers for the tests submodule
 #[cfg(test)]
 pub(crate) use normative::{is_lower_better_metric, z_to_sensitivity_factor};
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 #[path = "tests.rs"]
 mod tests;

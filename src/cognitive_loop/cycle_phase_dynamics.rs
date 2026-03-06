@@ -12,7 +12,7 @@ use rayon::join as rayon_join;
 use std::borrow::Cow;
 use std::time::Instant;
 
-use super::cycle::{
+use super::phase_results::{
     DynCore, DynFep, DynReasoning, DynAttention, DynResonator, DynHomeostasis, DynGuidance, DynNeuromod,
     DynamicsPhaseResult, PerceptionPhaseResult,
 };
@@ -579,11 +579,23 @@ impl CognitiveLoopService {
             arousal_recovery_active = false;
         }
 
+        // FEP surprise → CfC time constant modulation.
+        // Friston (2010): high surprise (free energy) accelerates inference dynamics;
+        // low surprise allows consolidation via slower dynamics.
+        // Factor: [0.8, 1.2] — moderate modulation to prevent instability.
+        let fep_tau_factor = if let Some(ref fe) = self.fep.agent.last_fe_components {
+            let surprise_norm = (fe.surprise as f32).clamp(0.0, 2.0) / 2.0; // [0, 1]
+            1.0 - surprise_norm * 0.2 // high surprise → 0.8 (faster), low → 1.0
+        } else {
+            1.0
+        };
+
         let delta_t = self.config.cfc_config.delta_t
             * resonance_tau_factor
             * arousal_tau_factor
             * codebook_tau_factor
             * arousal_recovery_tau_factor
+            * fep_tau_factor
             * self
                 .somatic_bridge
                 .to_interoceptive_signals()
@@ -617,6 +629,36 @@ impl CognitiveLoopService {
             self.stats.avg_prediction_coherence
         };
 
+        // 5b. Epistemic vs aleatoric uncertainty decomposition.
+        // Epistemic (model uncertainty): prediction disagreement across horizons — reducible
+        // by exploration. Aleatoric (data noise): mean per-horizon prediction variance — not
+        // reducible. Only epistemic uncertainty should drive exploration.
+        // Depeweg et al. (2018): decomposing uncertainty for active learning.
+        let (epistemic_uncertainty, aleatoric_uncertainty) = if raw_predictions.len() >= 2 {
+            // Epistemic ≈ 1 - cross-horizon coherence (disagreement = model uncertainty)
+            let epistemic = (1.0 - prediction_coherence).clamp(0.0, 1.0);
+
+            // Aleatoric ≈ mean within-dimension variance across predictions
+            let dim = raw_predictions[0].len().max(1);
+            let n = raw_predictions.len() as f32;
+            let mut mean_var = 0.0f32;
+            for d in 0..dim {
+                let mean: f32 = raw_predictions.iter().map(|p| p[d]).sum::<f32>() / n;
+                let var: f32 = raw_predictions.iter().map(|p| (p[d] - mean).powi(2)).sum::<f32>() / n;
+                mean_var += var;
+            }
+            let aleatoric = (mean_var / dim as f32).sqrt().clamp(0.0, 1.0);
+            (epistemic, aleatoric)
+        } else {
+            (0.5, 0.1) // defaults when insufficient data
+        };
+
+        // Only epistemic uncertainty drives exploration (aleatoric is irreducible noise).
+        if epistemic_uncertainty > 0.4 && self.stats.total_cycles % 7 == 0 {
+            let epistemic_explore = (epistemic_uncertainty - 0.4) * 0.1;
+            self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
+        }
+
         // 6. Get current CfC state as output
         let output = self
             .temporal_network
@@ -631,6 +673,22 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         self.fep.world_model
             .update_sensory(&perception.encoding.compressed_state);
+
+        // Incorporate causal structure into world model (every 41 cycles, co-prime).
+        // Pearl (2009): causal knowledge provides structural priors beyond correlation.
+        if self.stats.total_cycles % 41 == 0 {
+            if let Some(ref enhancer) = self.causal_enhancer {
+                let graph = enhancer.current_graph();
+                if !graph.is_empty() {
+                    let edges: Vec<(usize, usize, f32)> = graph
+                        .edges
+                        .iter()
+                        .map(|e| (e.from, e.to, e.strength as f32))
+                        .collect();
+                    self.fep.world_model.incorporate_causal_structure(&edges);
+                }
+            }
+        }
 
         let wm_stiffness = self.fep.world_model.avg_error.clamp(0.0, 1.0);
         if self.stats.total_cycles > 20 {
@@ -996,24 +1054,43 @@ impl CognitiveLoopService {
                     }
                 }
                 MotorCommandType::ExplorationTrigger => {
+                    let intensity = enhanced_result.motor_command.intensity as f32;
                     if enhanced_result.fep_result.epistemic_value > 0.5 {
-                        self.adjust_exploration("motor_exploration_trigger", 0.1);
+                        // Scale exploration boost by epistemic value
+                        let boost = (intensity * 0.15).min(0.2);
+                        self.adjust_exploration("motor_exploration_trigger", boost);
+                    }
+                    // High-intensity exploration → boost learning to absorb novelty
+                    if intensity > 0.8 {
+                        self.scale_lr("motor_explore_intense", 1.1);
                     }
                 }
                 MotorCommandType::ReflectionInitiate => {
-                    if enhanced_result.motor_command.intensity > 0.7 {
+                    let intensity = enhanced_result.motor_command.intensity as f32;
+                    if intensity > 0.5 {
                         self.self_model_tier.self_reflection.force_reflection();
+                        // Boost meta-awareness proportional to intensity
+                        self.adjust_confidence(
+                            "motor_reflection",
+                            (intensity - 0.5) * 0.05,
+                        );
                     }
                 }
                 MotorCommandType::MemoryConsolidate => {
                     if enhanced_result.motor_command.intensity > 0.5 {
                         self.fep.episodic_memory.consolidate_recent();
+                        // Also increase world model plasticity to lock in patterns
+                        self.fep.world_model.increase_plasticity(
+                            enhanced_result.motor_command.intensity as f32,
+                        );
                     }
                 }
                 MotorCommandType::ExpectationReset => {
                     if enhanced_result.action_outcome_coupling < 0.3 {
                         self.last_prediction = None;
                         self.set_confidence("inference_mode_init", 0.5);
+                        // Reset world model levels to accept new patterns
+                        self.fep.world_model.reset();
                     }
                 }
                 MotorCommandType::MotorOutput | MotorCommandType::NoOp => {}
@@ -1058,9 +1135,20 @@ impl CognitiveLoopService {
             super::CognitiveDepth::Cortical => 1.0,
             super::CognitiveDepth::Reflex => THALAMIC_REFLEX_BUDGET_SCALE,
         };
+        // Epistemic uncertainty → attention budget expansion.
+        // Science: Gottlieb et al. (2013) — uncertain environments demand more attentional resources.
+        // High epistemic (>0.4) scales budget up to 1.3×; low (<0.2) contracts to 0.9×.
+        let epistemic_budget_scale = if epistemic_uncertainty > 0.4 {
+            1.0 + (epistemic_uncertainty - 0.4).min(0.3)
+        } else if epistemic_uncertainty < 0.2 {
+            0.9 + epistemic_uncertainty * 0.5 // 0.9 at 0.0, 1.0 at 0.2
+        } else {
+            1.0
+        };
         let attention_budget_us = (ATTENTION_BUDGET_US as f64
             * neuromod_attention_alloc as f64
-            * depth_budget_scale) as u64;
+            * depth_budget_scale
+            * epistemic_budget_scale as f64) as u64;
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
@@ -1496,6 +1584,68 @@ impl CognitiveLoopService {
             self.adjust_confidence("causal_attention", causal_attention_boost * 0.05);
         }
 
+        // ── Broca SSM language generation + feedback ─────────────────────────
+        // Demand-driven: generate only when consciousness is sufficient AND there's
+        // novel content worth articulating. Minimum cadence 7 to prevent spam.
+        // Biologically: Broca's area activates for speech production when there's
+        // something meaningful to express (Hickok & Poeppel 2007).
+        #[cfg(feature = "ssm_language")]
+        {
+            let broca_psi = self.unification_engine.psi as f32;
+            let broca_novelty = prediction_error > self.config.learning_threshold
+                || surprise_triggered;
+            let broca_should_generate = broca_psi > 0.4
+                && broca_novelty
+                && self.stats.total_cycles % 7 != 0; // min spacing
+            if broca_should_generate {
+                if let Some(ref mut broca) = self.broca_manager {
+                    let signals = super::broca_bridge::BrocaConsciousnessSignals {
+                        epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
+                        emotional_valence: self.emotion_contagion.prosody_valence(),
+                        emotional_arousal: self.emotion_contagion.prosody_arousal(),
+                        emotional_warmth: 0.5,
+                        consciousness_level: broca_psi,
+                        meta_awareness: self.carryover.learning.self_model_accuracy as f32,
+                        coherence,
+                    };
+                    if let Some(result) = broca.generate(signals) {
+                        // Surface the generated text for consumers
+                        if !result.text.is_empty() {
+                            self.last_broca_text = Some(result.text.clone());
+                        }
+                        // Coherence feedback: high Broca coherence → confidence boost
+                        if result.final_coherence > 0.7 {
+                            self.adjust_confidence(
+                                "broca_coherent",
+                                (result.final_coherence - 0.7) * 0.03,
+                            );
+                        } else if result.final_coherence < 0.3 {
+                            self.scale_confidence(
+                                "broca_incoherent",
+                                1.0 - (0.3 - result.final_coherence) * 0.05,
+                            );
+                        }
+                        // Veto feedback: triggered veto → dampen exploration
+                        if result.veto_triggered {
+                            self.scale_exploration("broca_veto", 0.95);
+                        }
+                        // Semantic PE → FEP: language reconstruction error as
+                        // additional surprise signal (closes language-perception loop).
+                        #[cfg(feature = "liquid-mamba")]
+                        if result.semantic_pe > 0.1 {
+                            let sem_obs = Observation::from_consciousness_state(
+                                result.semantic_pe as f64,
+                                0.1,
+                                coherence as f64,
+                                effective_lr as f64,
+                            );
+                            self.fep.agent.perceive(&sem_obs);
+                        }
+                    }
+                }
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // PARALLEL POST-PROCESSING
         // ═══════════════════════════════════════════════════════════════════════
@@ -1672,11 +1822,20 @@ impl CognitiveLoopService {
             binding_confidence_mod,
             epistemic_semantic_lr_mod,
             pfe_surprise_mod,
+            epistemic_uncertainty,
+            aleatoric_uncertainty,
+            fep_tau_factor,
+            causal_world_model_edges: if self.causal_enhancer.as_ref().map_or(false, |e| e.has_causal_structure()) {
+                self.causal_enhancer.as_ref().map_or(0, |e| e.current_graph().edges.len())
+            } else {
+                0
+            },
         }
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use crate::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 

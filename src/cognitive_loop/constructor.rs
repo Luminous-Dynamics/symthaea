@@ -453,6 +453,13 @@ impl CognitiveLoopService {
         #[cfg(feature = "vision-manifold")]
         let vision_manifold_enabled = config.enable_vision_manifold;
 
+        #[cfg(feature = "ssm_language")]
+        let broca_checkpoint_path = config.broca_checkpoint_path.clone();
+        #[cfg(feature = "ssm_language")]
+        let broca_enabled = config.enable_broca_language;
+        #[cfg(feature = "ssm_language")]
+        let broca_genesis_phrase = config.genesis_phrase.clone();
+
         Ok(Self {
             config,
             encoder,
@@ -746,9 +753,8 @@ impl CognitiveLoopService {
                 ))
             },
             #[cfg(feature = "ssm_language")]
-            broca_manager: if config.enable_broca_language {
-                let genesis = config
-                    .genesis_phrase
+            broca_manager: if broca_enabled {
+                let genesis = broca_genesis_phrase
                     .as_deref()
                     .map(symthaea_core::genesis::GenesisSeed::from_phrase)
                     .unwrap_or_else(|| {
@@ -757,10 +763,13 @@ impl CognitiveLoopService {
                 Some(super::broca_bridge::BrocaManager::new(
                     &genesis,
                     symthaea_broca::BrocaConfig::default(),
+                    broca_checkpoint_path.as_deref(),
                 ))
             } else {
                 None
             },
+            #[cfg(feature = "ssm_language")]
+            last_broca_text: None,
             psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),
             master_equation: MasterConsciousnessEquation::default(),
@@ -872,6 +881,7 @@ impl CognitiveLoopService {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 

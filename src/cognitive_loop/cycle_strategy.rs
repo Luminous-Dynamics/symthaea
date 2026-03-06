@@ -43,6 +43,7 @@ pub(crate) struct EncodingPhaseResult {
     pub(crate) predicted_urgency: &'static str,
     pub(crate) prediction_coherence_urgency_bias: f32,
     pub(crate) prediction_error: f32,
+    pub(crate) temporal_binding_strength: f32,
 }
 
 impl CognitiveLoopService {
@@ -184,7 +185,56 @@ impl CognitiveLoopService {
 
         // Pre-compute BinaryHV once for all subsystems that need it.
         let _t_core = Instant::now();
-        let hv16_cached = real_hv_to_hv16(&encoding_result.hdv);
+        let mut hv16_cached = real_hv_to_hv16(&encoding_result.hdv);
+
+        // Temporal context binding with theta-oscillation gating.
+        // Plate (2003): permutation + binding encodes sequence order in HDC.
+        // Fries (2005): attention-weighted binding strengthens salient items.
+        // Buzsáki (2002): theta oscillations (4-8Hz) gate memory access —
+        //   binding is stronger at theta peaks, weaker at troughs.
+        // Items with high PE at encoding time carry more novel information.
+        let mut temporal_binding_strength = 0.0f32;
+        {
+            let recent = &self.carryover.history.recent_hvs;
+            if !recent.is_empty() {
+                // Theta oscillation: simulate 6Hz rhythm at 50Hz loop rate.
+                // Phase advances ~0.75 rad/cycle (6Hz × 2π / 50Hz ≈ 0.754 rad).
+                let theta_phase = (self.stats.total_cycles as f64 * 0.754)
+                    % (2.0 * std::f64::consts::PI);
+                // Theta weight: [0, 1] — peaks = strong binding, troughs = weak
+                let theta_weight = ((theta_phase.sin() + 1.0) / 2.0) as f32;
+
+                // Compute per-HV salience weights from recent prediction errors.
+                let error_hist = &self.carryover.history.error_history;
+                let n_recent = recent.len();
+                let salience_weights: Vec<f32> = (0..n_recent)
+                    .map(|i| {
+                        let eh_idx = error_hist.len().saturating_sub(n_recent - i);
+                        error_hist.get(eh_idx).copied().unwrap_or(0.1).clamp(0.05, 1.0)
+                    })
+                    .collect();
+
+                let mut temporal_context = hv16_cached;
+                for (i, past_hv) in recent.iter().rev().enumerate() {
+                    let shifted = past_hv.permute(i + 1);
+                    temporal_context.bind_inplace(&shifted);
+                }
+
+                // Combine salience + theta into binding strength.
+                // Theta gates access; salience weights the contribution.
+                let mean_salience = salience_weights.iter().sum::<f32>()
+                    / salience_weights.len().max(1) as f32;
+                let binding_strength = (mean_salience * theta_weight).clamp(0.1, 0.9);
+                temporal_binding_strength = binding_strength;
+
+                // Bundle when binding strength exceeds threshold.
+                // At theta troughs (weight~0), binding is suppressed → encoding stays clean.
+                // At theta peaks + high salience → strong temporal integration.
+                if binding_strength > 0.25 {
+                    hv16_cached = crate::hdc::BinaryHV::bundle(&[hv16_cached, temporal_context]);
+                }
+            }
+        }
         module_timings.core_compress = _t_core.elapsed().as_micros() as u64;
 
         // ── Semantic Encoder: collect previous cycle's result, submit current ───
@@ -252,12 +302,41 @@ impl CognitiveLoopService {
         // 1.1 Surprise-Driven Exploration
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let compressed_state: Vec<f32> = self
-            .encoder
-            .compress_for_ltc(&encoding_result.hdv, self.config.cfc_config.input_dim)
-            .iter()
-            .map(|v| v * phi_attention_weight)
-            .collect();
+        let compressed_state: Vec<f32> = {
+            let raw: Vec<f32> = self
+                .encoder
+                .compress_for_ltc(&encoding_result.hdv, self.config.cfc_config.input_dim)
+                .iter()
+                .map(|v| v * phi_attention_weight)
+                .collect();
+
+            // Prediction-error-weighted dimension salience: when PE is high,
+            // amplify dimensions that differ most from last prediction.
+            // Feldman & Friston (2010): precision-weighted prediction errors
+            // gate information flow at the dimension level.
+            if prediction_error > 0.2 {
+                if let Some(ref last_pred) = self.last_prediction {
+                    if last_pred.len() == raw.len() {
+                        let pred_slice = last_pred.as_slice();
+                        let pe_scale = 1.0 + (prediction_error - 0.2).min(0.5) * 0.3;
+                        raw.iter()
+                            .zip(pred_slice.iter())
+                            .map(|(&r, &p)| {
+                                let dim_pe = (r - p).abs();
+                                // Salient dimensions (high local PE) get boosted
+                                r * (1.0 + dim_pe * (pe_scale - 1.0))
+                            })
+                            .collect()
+                    } else {
+                        raw
+                    }
+                } else {
+                    raw
+                }
+            } else {
+                raw
+            }
+        };
         let (surprise_triggered, exploration_action) =
             self.run_surprise_exploration(&compressed_state);
         module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
@@ -393,6 +472,7 @@ impl CognitiveLoopService {
             predicted_urgency,
             prediction_coherence_urgency_bias,
             prediction_error,
+            temporal_binding_strength,
         }
     }
 }
