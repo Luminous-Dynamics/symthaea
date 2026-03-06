@@ -777,6 +777,15 @@ pub struct CycleMetadata {
     /// Social learning rate factor applied this cycle (0.8–1.2).
     #[serde(default = "default_one_f32")]
     pub social_learning_rate_factor: f32,
+    /// Social prediction accuracy (ToM) — rolling mean of prediction vs outcome (0.0–1.0).
+    #[serde(default = "default_half_f32")]
+    pub social_prediction_accuracy: f32,
+    /// Number of active mental models being tracked.
+    #[serde(default)]
+    pub social_models_count: usize,
+    /// Mean trust across all tracked relationships (0.0–1.0).
+    #[serde(default = "default_half_f32")]
+    pub social_mean_trust: f32,
 
     // ── Vision Manifold Telemetry ───────────────────────────────────────
     /// Vision manifold telemetry (None when vision-manifold feature disabled or not active).
@@ -792,6 +801,11 @@ pub struct CycleMetadata {
     /// Physics bridge telemetry (None when physics-bridge feature disabled or not active).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub physics_bridge: Option<PhysicsBridgeTelemetry>,
+
+    // ── Broca SSM Language Telemetry ────────────────────────────────────
+    /// Broca SSM language generation telemetry (None when ssm_language feature disabled or not active).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub broca: Option<BrocaGenerationTelemetry>,
 }
 
 fn default_response_profile() -> String {
@@ -800,6 +814,10 @@ fn default_response_profile() -> String {
 
 fn default_one_f32() -> f32 {
     1.0
+}
+
+fn default_half_f32() -> f32 {
+    0.5
 }
 
 /// Vision manifold telemetry snapshot for CycleMetadata.
@@ -893,6 +911,23 @@ pub struct PhysicsBridgeTelemetry {
     /// Best analogy score from Pareto frontier (0.0–1.0).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pareto_best_analogy: Option<f32>,
+}
+
+/// Broca SSM language generation telemetry snapshot for CycleMetadata.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BrocaGenerationTelemetry {
+    /// Whether generation was attempted this cycle.
+    pub generated: bool,
+    /// Number of tokens produced.
+    pub token_count: usize,
+    /// Final short-window coherence score from the generator.
+    pub final_coherence: f32,
+    /// Whether a semantic veto was triggered during generation.
+    pub veto_triggered: bool,
+    /// Generation wall-clock time in microseconds.
+    pub generation_time_us: u64,
+    /// Whether generation was skipped due to low consciousness.
+    pub consciousness_gated: bool,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

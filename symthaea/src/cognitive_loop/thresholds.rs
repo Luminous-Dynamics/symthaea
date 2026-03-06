@@ -870,6 +870,97 @@ pub fn validate() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SUBSYSTEM FEEDBACK CLAMPING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum subsystem LR factor (shared across all subsystem feedback loops).
+/// Basis: prevents any single loop from completely suppressing learning.
+pub const SUBSYSTEM_LR_FACTOR_MIN: f32 = 0.7;
+
+/// Maximum subsystem LR factor (shared across all subsystem feedback loops).
+/// Basis: bounds amplification to prevent runaway learning.
+pub const SUBSYSTEM_LR_FACTOR_MAX: f32 = 1.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-MODULE QUALITY METRICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Cross-module agreement above this signals high convergence → confidence boost.
+#[allow(dead_code)]
+pub const CROSS_MODULE_AGREEMENT_HIGH: f32 = 0.8;
+
+/// Cross-module agreement below this signals divergence → exploration boost.
+#[allow(dead_code)]
+pub const CROSS_MODULE_AGREEMENT_LOW: f32 = 0.3;
+
+/// Unified quality score composition: prediction accuracy weight.
+#[allow(dead_code)]
+pub const UNIFIED_QUALITY_PREDICTION_WEIGHT: f32 = 0.5;
+
+/// Unified quality score composition: cross-module agreement weight.
+#[allow(dead_code)]
+pub const UNIFIED_QUALITY_AGREEMENT_WEIGHT: f32 = 0.3;
+
+/// Unified quality score composition: anomaly (inverse) weight.
+#[allow(dead_code)]
+pub const UNIFIED_QUALITY_ANOMALY_WEIGHT: f32 = 0.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FEP / ACTIVE INFERENCE DYNAMICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// FEP accuracy above this triggers confidence boost.
+/// Basis: Friston (2010) — accurate prediction reduces free energy.
+#[allow(dead_code)]
+pub const FEP_ACCURACY_CONFIDENCE_THRESHOLD: f64 = 0.5;
+
+/// FEP complexity above this dampens learning rate.
+/// Basis: Bayesian model complexity penalty (BIC/MDL principle).
+#[allow(dead_code)]
+pub const FEP_COMPLEXITY_THRESHOLD: f64 = 1.0;
+
+/// FEP pragmatic value above this triggers exploitation strategy.
+/// Basis: Friston et al. (2015) — expected free energy pragmatic term.
+#[allow(dead_code)]
+pub const FEP_PRAGMATIC_EXPLOIT_THRESHOLD: f64 = 0.7;
+
+/// FEP pragmatic value below this triggers exploration.
+#[allow(dead_code)]
+pub const FEP_PRAGMATIC_EXPLORE_THRESHOLD: f64 = 0.3;
+
+/// FEP temporal difference error above this triggers causal discovery.
+#[allow(dead_code)]
+pub const FEP_TD_ERROR_DISCOVERY_THRESHOLD: f64 = 0.5;
+
+/// FEP learning signal above this enables world model plasticity increase.
+#[allow(dead_code)]
+pub const FEP_LEARNING_PLASTICITY_THRESHOLD: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMOTIONAL HOMEOSTASIS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Homeostasis pull multiplier during Cruise urgency (relaxed → stronger pull).
+/// Basis: Russell (2003) — circumplex model neutral return.
+pub const HOMEOSTASIS_PULL_CRUISE: f32 = 1.5;
+
+/// Homeostasis pull multiplier during Normal urgency.
+pub const HOMEOSTASIS_PULL_NORMAL: f32 = 1.0;
+
+/// Homeostasis pull multiplier during Critical urgency (weaker → allow reactive emotion).
+pub const HOMEOSTASIS_PULL_CRITICAL: f32 = 0.6;
+
+/// Arousal target for homeostasis (slightly above neutral).
+pub const HOMEOSTASIS_AROUSAL_TARGET: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREDICTIVE BUDGET GATING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Fraction of attention budget at which predictive gating activates (80%).
+pub const PREDICTIVE_BUDGET_GATING_RATIO: f64 = 0.8;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 

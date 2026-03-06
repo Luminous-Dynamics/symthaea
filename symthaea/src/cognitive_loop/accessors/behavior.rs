@@ -139,29 +139,29 @@ impl CognitiveLoopService {
         pub(crate) fn coherence_tracker(&self) -> &ConversationCoherenceTracker { &self.coherence_tracker }
 
         /// Get the coupling quality assessment
-        pub fn coupling_quality(&self) -> CouplingQuality { self.active_inference_bridge.coupling_quality() }
+        pub fn coupling_quality(&self) -> CouplingQuality { self.fep.active_inference_bridge.coupling_quality() }
 
         // ═══════════════════════════════════════════════════════════════════
         // CLOSED LEARNING LOOP
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get the current response strategy
-        pub fn current_strategy(&self) -> ResponseStrategy { self.closed_learning_loop.current_strategy }
+        pub fn current_strategy(&self) -> ResponseStrategy { self.fep.closed_learning_loop.current_strategy }
 
         /// Get the best strategy according to Q-learning
-        pub fn best_strategy(&self) -> ResponseStrategy { self.closed_learning_loop.best_strategy() }
+        pub fn best_strategy(&self) -> ResponseStrategy { self.fep.closed_learning_loop.best_strategy() }
 
         /// Get average reward from the learning loop
-        pub fn average_reward(&self) -> f32 { self.closed_learning_loop.average_reward() }
+        pub fn average_reward(&self) -> f32 { self.fep.closed_learning_loop.average_reward() }
 
         /// Get Q-values for all strategies
-        pub fn strategy_q_values(&self) -> &[f32; 5] { self.closed_learning_loop.q_values() }
+        pub fn strategy_q_values(&self) -> &[f32; 5] { self.fep.closed_learning_loop.q_values() }
 
         /// Get strategy usage counts
-        pub fn strategy_usage_counts(&self) -> &[u64; 5] { self.closed_learning_loop.strategy_counts() }
+        pub fn strategy_usage_counts(&self) -> &[u64; 5] { self.fep.closed_learning_loop.strategy_counts() }
 
         /// Get the last learning result
-        pub fn last_learning_result(&self) -> Option<&CycleLearningResult> { self.closed_learning_loop.last_result.as_ref() }
+        pub fn last_learning_result(&self) -> Option<&CycleLearningResult> { self.fep.closed_learning_loop.last_result.as_ref() }
 
         // ═══════════════════════════════════════════════════════════════════
         // ADAPTIVE BEHAVIOR
@@ -274,7 +274,7 @@ impl CognitiveLoopService {
                 .last_spectral_mip_phi
                 .unwrap_or(0.5) as f32,
             expected_free_energy: self
-                .fep_agent
+                .fep.agent
                 .last_fe_components
                 .as_ref()
                 .map(|fe| fe.total as f32)
@@ -290,7 +290,7 @@ impl CognitiveLoopService {
 
     /// Get the prediction-outcome coupling Modulation Index
     pub fn modulation_index(&self) -> Option<f64> {
-        self.active_inference_bridge.modulation_index()
+        self.fep.active_inference_bridge.modulation_index()
     }
 
     /// Process input through the unified dialogue pipeline
@@ -303,7 +303,7 @@ impl CognitiveLoopService {
 
     /// Get the current FEP free energy (if available)
     pub fn fep_free_energy(&self) -> Option<f64> {
-        self.fep_agent
+        self.fep.agent
             .last_fe_components
             .as_ref()
             .map(|fe| fe.total)
@@ -325,9 +325,23 @@ impl CognitiveLoopService {
 
     /// Inject social signals from Mind module's SocialCoherence.
     /// Called by the Symthaea facade after Mind.tick() computes social stats.
-    pub fn set_social_signals(&mut self, trust: f32, cooperation_rate: f32) {
+    ///
+    /// `prediction_accuracy`: rolling ToM prediction accuracy (0.0–1.0).
+    /// `models_count`: number of active mental models being tracked.
+    /// `mean_trust`: mean trust across all tracked relationships.
+    pub fn set_social_signals(
+        &mut self,
+        trust: f32,
+        cooperation_rate: f32,
+        prediction_accuracy: f32,
+        models_count: usize,
+        mean_trust: f32,
+    ) {
         self.social.social_trust = trust.clamp(0.0, 1.0);
         self.social.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
+        self.social.social_prediction_accuracy = prediction_accuracy.clamp(0.0, 1.0);
+        self.social.social_models_count = models_count;
+        self.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
     }
 
     /// Set the relational Psi from an external dyad computation.

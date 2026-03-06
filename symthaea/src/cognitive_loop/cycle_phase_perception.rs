@@ -9,7 +9,7 @@
 
 use std::time::Instant;
 
-use super::cycle::PerceptionPhaseResult;
+use super::cycle::{PercEncoding, PercMoral, PercStrategy, PercExploration, PercUrgency, PerceptionPhaseResult};
 use super::{CognitiveLoopService, CycleResult, ModuleTimings};
 
 impl CognitiveLoopService {
@@ -296,46 +296,42 @@ impl CognitiveLoopService {
         }
 
         Ok(PerceptionPhaseResult {
-            encoding_result: encoding.encoding_result,
-            hv16_cached: encoding.hv16_cached,
-            compressed_state: encoding.compressed_state,
-            phi_attention_weight: encoding.phi_attention_weight,
-            exploration_urge_start,
+            encoding: PercEncoding {
+                encoding_result: encoding.encoding_result,
+                hv16_cached: encoding.hv16_cached,
+                compressed_state: encoding.compressed_state,
+                phi_attention_weight: encoding.phi_attention_weight,
+                input_memoized: encoding.input_memoized,
+                input_similarity: encoding.input_similarity,
+                memo_threshold: encoding.memo_threshold,
+                effective_threshold: encoding.effective_threshold,
+            },
+            moral: PercMoral {
+                moral_concern_detected,
+                moral_score,
+                moral_judgment,
+                soul_alignment: encoding.soul_alignment,
+            },
+            strategy: PercStrategy {
+                selected_strategy,
+                agency_strategy_override,
+                social_strategy_bias,
+            },
+            exploration: PercExploration {
+                exploration_urge_start,
+                surprise_triggered: encoding.surprise_triggered,
+                exploration_action: encoding.exploration_action,
+            },
+            urgency: PercUrgency {
+                urgency: encoding.urgency,
+                error_pattern: encoding.error_pattern,
+                predicted_urgency: encoding.predicted_urgency,
+                prediction_coherence_urgency_bias: encoding.prediction_coherence_urgency_bias,
+                prediction_error: encoding.prediction_error,
+            },
             startup_suppressed,
             startup_warmup_progress,
-            input_memoized: encoding.input_memoized,
-            input_similarity: encoding.input_similarity,
-            moral_concern_detected,
-            moral_score,
-            moral_judgment,
-            selected_strategy,
-            agency_strategy_override,
-            social_strategy_bias,
-            soul_alignment: encoding.soul_alignment,
             negation_detected,
-            surprise_triggered: encoding.surprise_triggered,
-            exploration_action: encoding.exploration_action,
-            urgency: encoding.urgency,
-            error_pattern: encoding.error_pattern,
-            predicted_urgency: encoding.predicted_urgency,
-            prediction_coherence_urgency_bias: encoding.prediction_coherence_urgency_bias,
-            prediction_error: encoding.prediction_error,
-            effective_threshold: encoding.effective_threshold,
-            memo_threshold: encoding.memo_threshold,
-            #[cfg(feature = "vision-manifold")]
-            vision_telemetry,
-            #[cfg(feature = "foveation")]
-            foveation_recognition_count,
-            #[cfg(feature = "foveation")]
-            foveation_top_confidence,
-            #[cfg(feature = "vision-manifold")]
-            cross_manifold_prediction_error,
-            #[cfg(feature = "vision-manifold")]
-            vision_mean_surprise,
-            #[cfg(feature = "vision-manifold")]
-            vision_horizon_errors,
-            #[cfg(feature = "vision-manifold")]
-            scene_recognized,
         })
     }
 }
@@ -364,13 +360,13 @@ mod tests {
         let result = svc
             .phase_perception("test input", Instant::now(), &mut timings)
             .unwrap();
-        assert!(result.moral_score.is_finite());
-        assert!(result.phi_attention_weight.is_finite());
-        assert!(result.prediction_error.is_finite());
-        assert!(result.soul_alignment.is_finite());
+        assert!(result.moral.moral_score.is_finite());
+        assert!(result.encoding.phi_attention_weight.is_finite());
+        assert!(result.urgency.prediction_error.is_finite());
+        assert!(result.moral.soul_alignment.is_finite());
         assert!(result.negation_detected.is_finite());
-        assert!(result.exploration_urge_start.is_finite());
-        assert!(result.effective_threshold.is_finite());
+        assert!(result.exploration.exploration_urge_start.is_finite());
+        assert!(result.encoding.effective_threshold.is_finite());
     }
 
     #[test]
@@ -380,8 +376,8 @@ mod tests {
         let result = svc
             .phase_perception("encoding check", Instant::now(), &mut timings)
             .unwrap();
-        assert!(!result.encoding_result.hdv.values.is_empty());
-        assert!(result.encoding_result.peak_attention.is_finite());
+        assert!(!result.encoding.encoding_result.hdv.values.is_empty());
+        assert!(result.encoding.encoding_result.peak_attention.is_finite());
     }
 
     #[test]

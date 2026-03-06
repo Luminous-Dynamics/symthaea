@@ -91,12 +91,12 @@ impl CognitiveLoopService {
             flow_periods: self.flow_state.flow_periods,
             avg_flow_duration_secs: self.flow_state.avg_flow_duration_secs,
             fep_free_energy: self
-                .fep_agent
+                .fep.agent
                 .last_fe_components
                 .as_ref()
                 .map(|fe| fe.total)
                 .unwrap_or(0.0),
-            fep_precision: self.fep_agent.precision.perceptual_precision(),
+            fep_precision: self.fep.agent.precision.perceptual_precision(),
             spectral_mip_phi: self.carryover.consciousness.last_spectral_mip_phi,
             harmonies_alignment: self
                 .ethics_engine

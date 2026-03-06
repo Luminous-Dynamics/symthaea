@@ -597,7 +597,7 @@ fn test_social_signals_modulate_affect() {
     .unwrap();
 
     // Inject high social trust
-    service.set_social_signals(0.9, 0.8);
+    service.set_social_signals(0.9, 0.8, 0.75, 3, 0.85);
 
     // Run several cycles and capture result
     let mut result = service.cycle("social modulation test");
@@ -1376,14 +1376,14 @@ fn helper_confidence_clamps_to_bounds() {
 #[test]
 fn helper_adjust_lr_applies_delta_and_records_proposal() {
     let mut svc = make_helper_service();
-    let before = svc.fep_lr_boost;
+    let before = svc.fep.lr_boost;
     svc.feedback_state.begin_cycle();
     let delta: f32 = 0.5;
     svc.adjust_lr("test_source", delta);
     assert!(
-        (svc.fep_lr_boost - (before + delta as f64)).abs() < 1e-10,
+        (svc.fep.lr_boost - (before + delta as f64)).abs() < 1e-10,
         "adjust_lr should add delta: {} vs expected {}",
-        svc.fep_lr_boost,
+        svc.fep.lr_boost,
         before + delta as f64
     );
     assert_eq!(svc.feedback_state.learning_rate.len(), 1);
@@ -1392,14 +1392,14 @@ fn helper_adjust_lr_applies_delta_and_records_proposal() {
 #[test]
 fn helper_scale_lr_applies_factor() {
     let mut svc = make_helper_service();
-    let before = svc.fep_lr_boost;
+    let before = svc.fep.lr_boost;
     svc.feedback_state.begin_cycle();
     let factor: f32 = 1.5;
     svc.scale_lr("test_source", factor);
     assert!(
-        (svc.fep_lr_boost - (before * factor as f64)).abs() < 1e-10,
+        (svc.fep.lr_boost - (before * factor as f64)).abs() < 1e-10,
         "scale_lr should multiply: {} vs expected {}",
-        svc.fep_lr_boost,
+        svc.fep.lr_boost,
         before * factor as f64
     );
 }
@@ -1410,15 +1410,15 @@ fn helper_lr_clamps_to_bounds() {
     svc.feedback_state.begin_cycle();
     svc.set_lr("test", 10.0);
     assert!(
-        (svc.fep_lr_boost - 3.0).abs() < 1e-7,
+        (svc.fep.lr_boost - 3.0).abs() < 1e-7,
         "lr should clamp to 3.0: got {}",
-        svc.fep_lr_boost
+        svc.fep.lr_boost
     );
     svc.set_lr("test", 0.0);
     assert!(
-        (svc.fep_lr_boost - 1.0).abs() < 1e-7,
+        (svc.fep.lr_boost - 1.0).abs() < 1e-7,
         "lr should clamp to 1.0: got {}",
-        svc.fep_lr_boost
+        svc.fep.lr_boost
     );
 }
 

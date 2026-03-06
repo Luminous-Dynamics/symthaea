@@ -12,7 +12,10 @@ use rayon::join as rayon_join;
 use std::borrow::Cow;
 use std::time::Instant;
 
-use super::cycle::{DynamicsPhaseResult, PerceptionPhaseResult};
+use super::cycle::{
+    DynCore, DynFep, DynReasoning, DynAttention, DynResonator, DynHomeostasis, DynGuidance, DynNeuromod,
+    DynamicsPhaseResult, PerceptionPhaseResult,
+};
 use super::helpers;
 use super::thresholds::{
     ATTENTION_BUDGET_US, BINDING_CONFIDENCE_THRESHOLD, BINDING_LOW_THRESHOLD,
@@ -30,8 +33,11 @@ use super::thresholds::{
     THALAMIC_DEEP_BUDGET_SCALE, THALAMIC_DEEP_LR_FACTOR, THALAMIC_DEEP_SALIENCE,
     THALAMIC_REFLEX_BUDGET_SCALE, THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE,
     WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE,
-    TRAINING_BASE_IMPORTANCE,
-    WORLD_MODEL_STIFFNESS_THRESHOLD,
+    TRAINING_BASE_IMPORTANCE, HOMEOSTASIS_PULL_CRUISE, HOMEOSTASIS_PULL_NORMAL,
+    HOMEOSTASIS_PULL_CRITICAL, HOMEOSTASIS_AROUSAL_TARGET, PREDICTIVE_BUDGET_GATING_RATIO,
+    WORLD_MODEL_STIFFNESS_THRESHOLD, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
+    FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_THRESHOLD,
+    FEP_TD_ERROR_DISCOVERY_THRESHOLD, FEP_LEARNING_PLASTICITY_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -55,16 +61,16 @@ impl CognitiveLoopService {
         cycle_start: Instant,
         module_timings: &mut super::ModuleTimings,
     ) -> DynamicsPhaseResult {
-        let prediction_error = perception.prediction_error;
-        let urgency = perception.urgency;
-        let phi_attention_weight = perception.phi_attention_weight;
-        let surprise_triggered = perception.surprise_triggered;
-        let moral_concern_detected = perception.moral_concern_detected;
-        let _input_memoized = perception.input_memoized;
-        let selected_strategy = perception.selected_strategy;
+        let prediction_error = perception.urgency.prediction_error;
+        let urgency = perception.urgency.urgency;
+        let phi_attention_weight = perception.encoding.phi_attention_weight;
+        let surprise_triggered = perception.exploration.surprise_triggered;
+        let moral_concern_detected = perception.moral.moral_concern_detected;
+        let _input_memoized = perception.encoding.input_memoized;
+        let selected_strategy = perception.strategy.selected_strategy;
 
         // Cache moral_score for neuromod feedback (consumed in helpers/cycle_phases.rs)
-        self.carryover.quality.last_moral_score = perception.moral_score;
+        self.carryover.quality.last_moral_score = perception.moral.moral_score;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE A: OBSERVE — Build immutable CycleSnapshot (Phase 2.3)
@@ -72,7 +78,7 @@ impl CognitiveLoopService {
         let cycle_snapshot = super::subsystem_trait::CycleSnapshot::build(
             self.stats.total_cycles as u64,
             self.prediction_confidence,
-            self.fep_lr_boost,
+            self.fep.lr_boost,
             prediction_error,
             self.coherence_bridge.smoothed_coherence(),
             self.stats.unified_psi as f64,
@@ -84,8 +90,8 @@ impl CognitiveLoopService {
             self.somatic_bridge.systemic_stress(),
             urgency,
             false, // attention_budget_exceeded not yet known at this point
-            &perception.compressed_state,
-            &perception.hv16_cached,
+            &perception.encoding.compressed_state,
+            &perception.encoding.hv16_cached,
             &self.carryover.consciousness,
             &self.carryover.quality,
         );
@@ -217,7 +223,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 1a. Memory System Integration: Recall relevant episodic memories
         // ═══════════════════════════════════════════════════════════════════════
-        let memory_context_boost = self.recall_episodic_context(&perception.compressed_state);
+        let memory_context_boost = self.recall_episodic_context(&perception.encoding.compressed_state);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1a.1 Resonator-enhanced recall: factorize bundled memories
@@ -228,7 +234,7 @@ impl CognitiveLoopService {
 
         let resonator_prediction_error: f32 =
             if let Some(ref prev_pred) = self.stats.last_resonator_prediction {
-                let sim = helpers::cosine_f32(prev_pred, &perception.compressed_state);
+                let sim = helpers::cosine_f32(prev_pred, &perception.encoding.compressed_state);
                 (1.0 - sim).clamp(0.0, 1.0)
             } else {
                 0.0
@@ -305,10 +311,10 @@ impl CognitiveLoopService {
             if let Some(ref mut res_mem) = self.resonator_memory {
                 let res_start = Instant::now();
 
-                let res_dim_ok = perception.compressed_state.len() == res_mem.resonator.config.dim;
+                let res_dim_ok = perception.encoding.compressed_state.len() == res_mem.resonator.config.dim;
                 if res_dim_ok && !res_mem.is_empty() {
                     if let Ok(matches) =
-                        res_mem.retrieve(&[("content", &perception.compressed_state)])
+                        res_mem.retrieve(&[("content", &perception.encoding.compressed_state)])
                     {
                         // Thalamic depth → recall depth gating
                         // Science: Cowan (2001) — WM capacity scales with attentional focus
@@ -321,7 +327,7 @@ impl CognitiveLoopService {
 
                         let best_match_sim = top_matches
                             .iter()
-                            .map(|m| helpers::cosine_f32(&perception.compressed_state, &m.hv))
+                            .map(|m| helpers::cosine_f32(&perception.encoding.compressed_state, &m.hv))
                             .fold(0.0f32, f32::max);
                         let match_timestamps: Vec<u64> =
                             top_matches.iter().map(|m| m.timestamp).collect();
@@ -330,13 +336,13 @@ impl CognitiveLoopService {
                         if best_match_sim > 0.3 {
                             let best_ep = top_matches.iter().max_by(|a, b| {
                                 let sa: f32 = perception
-                                    .compressed_state
+                                    .encoding.compressed_state
                                     .iter()
                                     .zip(a.hv.iter())
                                     .map(|(x, y)| x * y)
                                     .sum();
                                 let sb: f32 = perception
-                                    .compressed_state
+                                    .encoding.compressed_state
                                     .iter()
                                     .zip(b.hv.iter())
                                     .map(|(x, y)| x * y)
@@ -349,7 +355,7 @@ impl CognitiveLoopService {
                         }
 
                         let bundled = if top_matches.len() >= 2 {
-                            let dim = perception.compressed_state.len();
+                            let dim = perception.encoding.compressed_state.len();
                             let mut b = vec![0.0f32; dim];
                             let n = top_matches.len() as f32;
                             for ep in &top_matches {
@@ -370,7 +376,7 @@ impl CognitiveLoopService {
                         if let Some(bundled) = bundled {
                             if let Ok(factors) = res_mem.query_factorize(
                                 &bundled,
-                                &[("content", &perception.compressed_state)],
+                                &[("content", &perception.encoding.compressed_state)],
                             ) {
                                 for (label, _hv) in &factors {
                                     match label.as_str() {
@@ -412,7 +418,7 @@ impl CognitiveLoopService {
         }
 
         if resonator_best_sim > 0.5 {
-            self.fep_agent.precision.prior_precision = (self.fep_agent.precision.prior_precision
+            self.fep.agent.precision.prior_precision = (self.fep.agent.precision.prior_precision
                 + (resonator_best_sim - 0.5) as f64 * 0.1)
                 .min(2.0);
         }
@@ -420,9 +426,9 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 1a.2. Goal System: Apply attention bias from active goals
         // ═══════════════════════════════════════════════════════════════════════
-        let goal_attention_bias = self.goal_system.attention_bias();
+        let goal_attention_bias = self.fep.goal_system.attention_bias();
 
-        if let Some(top) = self.goal_system.top_goal() {
+        if let Some(top) = self.fep.goal_system.top_goal() {
             let goal_priority = top.priority;
             if goal_priority > 0.5 {
                 let goal_lr_boost = (goal_priority - 0.5) * 0.1;
@@ -447,14 +453,14 @@ impl CognitiveLoopService {
             let curr_a = self.emotion_contagion.prosody_arousal();
 
             let pull_mult = match self.carryover.urgency.urgency {
-                super::CycleUrgency::Cruise => 1.5f32,
-                super::CycleUrgency::Normal => 1.0,
-                super::CycleUrgency::Critical => 0.6,
+                super::CycleUrgency::Cruise => HOMEOSTASIS_PULL_CRUISE,
+                super::CycleUrgency::Normal => HOMEOSTASIS_PULL_NORMAL,
+                super::CycleUrgency::Critical => HOMEOSTASIS_PULL_CRITICAL,
             };
             homeostasis_pull_strength = pull_mult;
 
             let v_pull = -curr_v * 0.05 * pull_mult;
-            let a_pull = (0.3 - curr_a) * 0.05 * pull_mult;
+            let a_pull = (HOMEOSTASIS_AROUSAL_TARGET - curr_a) * 0.05 * pull_mult;
             self.emotion_contagion.valence = (curr_v + v_pull).clamp(-1.0, 1.0);
 
             valence_homeostasis_pull = v_pull;
@@ -492,9 +498,9 @@ impl CognitiveLoopService {
         let _t_core = Instant::now();
         let semantic_hdc: Cow<'_, [f32]> = self
             .temporal_network
-            .project_to_hdc_vec(&perception.compressed_state)
+            .project_to_hdc_vec(&perception.encoding.compressed_state)
             .map(Cow::Owned)
-            .unwrap_or(Cow::Borrowed(&perception.compressed_state));
+            .unwrap_or(Cow::Borrowed(&perception.encoding.compressed_state));
         let current_phi_for_lr = pre_update_coherence as f64;
         let mut semantic_lr_factor = self.semantic_memory.compute_lr_factor_phi_weighted(
             &semantic_hdc,
@@ -522,7 +528,7 @@ impl CognitiveLoopService {
 
         // 2b. Physics bridge: blend physics-informed HDC into compressed state
         #[allow(unused_mut)]
-        let mut compressed_for_cfc = perception.compressed_state.clone();
+        let mut compressed_for_cfc = perception.encoding.compressed_state.clone();
         #[cfg(feature = "physics-bridge")]
         if let Some(ref mut physics) = self.physics_integration {
             physics.query_cycle(
@@ -531,7 +537,7 @@ impl CognitiveLoopService {
                 self.config.physics_bridge_blend_weight,
                 self.substrate_manager.tau_factor,
                 self.substrate_manager.scale_pressure,
-                &perception.hv16_cached,
+                &perception.encoding.hv16_cached,
                 &mut compressed_for_cfc,
             );
         }
@@ -623,10 +629,10 @@ impl CognitiveLoopService {
         // 6b. World Model
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        self.world_model
-            .update_sensory(&perception.compressed_state);
+        self.fep.world_model
+            .update_sensory(&perception.encoding.compressed_state);
 
-        let wm_stiffness = self.world_model.avg_error.clamp(0.0, 1.0);
+        let wm_stiffness = self.fep.world_model.avg_error.clamp(0.0, 1.0);
         if self.stats.total_cycles > 20 {
             if wm_stiffness > WORLD_MODEL_STIFFNESS_THRESHOLD {
                 let stiffness_nudge = (wm_stiffness - WORLD_MODEL_STIFFNESS_THRESHOLD)
@@ -639,7 +645,7 @@ impl CognitiveLoopService {
             }
         }
 
-        let level_errors = self.world_model.level_errors();
+        let level_errors = self.fep.world_model.level_errors();
         let mut wm_sensory_mismatch = false;
         if level_errors.len() >= 2 && self.stats.total_cycles > 10 {
             let sensory_error = level_errors[0];
@@ -655,7 +661,7 @@ impl CognitiveLoopService {
         let previous_state = self.last_state.clone();
 
         // 9. Create experience
-        self.create_experience(&perception.compressed_state, &prediction, prediction_error);
+        self.create_experience(&perception.encoding.compressed_state, &prediction, prediction_error);
 
         // 10. Update coherence bridge
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
@@ -715,7 +721,7 @@ impl CognitiveLoopService {
         // 10d.5 Active Inference Bridge
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_success = prediction_error < self.config.learning_threshold;
-        self.active_inference_bridge
+        self.fep.active_inference_bridge
             .observe_resolution(self.prediction_confidence, prediction_success);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -819,17 +825,17 @@ impl CognitiveLoopService {
 
         // ── FEP Free Energy Decomposition ──────────────
         let fep_vals = self
-            .fep_agent
+            .fep.agent
             .last_fe_components
             .as_ref()
             .map(|fe| (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error));
         let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) =
             if let Some((acc, comp, surp, pe)) = fep_vals {
-                if acc > 0.5 {
+                if acc > FEP_ACCURACY_CONFIDENCE_THRESHOLD {
                     self.adjust_confidence("fep_accuracy_high", 0.01);
                 }
-                if comp > 1.0 {
-                    self.scale_lr("fep_complexity", 1.0 - ((comp - 1.0).min(0.5) * 0.1) as f32);
+                if comp > FEP_COMPLEXITY_THRESHOLD {
+                    self.scale_lr("fep_complexity", 1.0 - ((comp - FEP_COMPLEXITY_THRESHOLD).min(0.5) * 0.1) as f32);
                 }
                 if surp > reflection_thresholds.surprise as f64 {
                     let s_explore =
@@ -842,17 +848,17 @@ impl CognitiveLoopService {
             };
 
         let fep_pragmatic_value = fep_pragmatic_value_raw;
-        if fep_pragmatic_value > 0.7 {
+        if fep_pragmatic_value > FEP_PRAGMATIC_EXPLOIT_THRESHOLD {
             self.scale_exploration(
                 "fep_pragmatic_exploit",
-                (1.0 - (fep_pragmatic_value - 0.7) * 0.3) as f32,
+                (1.0 - (fep_pragmatic_value - FEP_PRAGMATIC_EXPLOIT_THRESHOLD) * 0.3) as f32,
             );
-        } else if fep_pragmatic_value < 0.3 && fep_pragmatic_value > 0.0 {
-            let p_explore = ((0.3 - fep_pragmatic_value) * 0.15).min(0.05) as f32;
+        } else if fep_pragmatic_value < FEP_PRAGMATIC_EXPLORE_THRESHOLD && fep_pragmatic_value > 0.0 {
+            let p_explore = ((FEP_PRAGMATIC_EXPLORE_THRESHOLD - fep_pragmatic_value) * 0.15).min(0.05) as f32;
             self.adjust_exploration("fep_pragmatic_low", p_explore);
         }
 
-        if fep_td_error.abs() > 0.5 {
+        if fep_td_error.abs() > FEP_TD_ERROR_DISCOVERY_THRESHOLD {
             if let Some(ref mut enhancer) = self.causal_enhancer {
                 if enhancer.should_discover() {
                     let _ = enhancer.run_discovery();
@@ -920,7 +926,7 @@ impl CognitiveLoopService {
                 self.prediction_confidence,
                 effective_lr as f64,
             );
-            self.fep_agent
+            self.fep.agent
                 .learn_from_outcome(fep_action_idx, &outcome_obs);
         }
 
@@ -929,8 +935,8 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let (moral_steering_category, pfe_surprise_mod) = self.apply_moral_modulation(
             moral_concern_detected,
-            &perception.moral_judgment,
-            perception.moral_score,
+            &perception.moral.moral_judgment,
+            perception.moral.moral_score,
             is_surprised,
         );
 
@@ -956,13 +962,13 @@ impl CognitiveLoopService {
             || prediction_error > self.config.learning_threshold
             || urgency.should_run(self.stats.total_cycles, 1, 4, 8);
         let enhanced_result = if run_enhanced {
-            let r = self.enhanced_fep_bridge.cycle(
+            let r = self.fep.enhanced_bridge.cycle(
                 prediction_error as f64,
                 coherence as f64,
                 self.prediction_confidence,
                 effective_lr as f64,
             );
-            self.fep_learning_signal = r.learning_signal as f32;
+            self.fep.learning_signal = r.learning_signal as f32;
             Some(r)
         } else {
             None
@@ -1001,7 +1007,7 @@ impl CognitiveLoopService {
                 }
                 MotorCommandType::MemoryConsolidate => {
                     if enhanced_result.motor_command.intensity > 0.5 {
-                        self.episodic_memory.consolidate_recent();
+                        self.fep.episodic_memory.consolidate_recent();
                     }
                 }
                 MotorCommandType::ExpectationReset => {
@@ -1013,9 +1019,9 @@ impl CognitiveLoopService {
                 MotorCommandType::MotorOutput | MotorCommandType::NoOp => {}
             }
 
-            if self.fep_learning_signal > 0.5 && enhanced_result.should_learn {
-                self.world_model
-                    .increase_plasticity(self.fep_learning_signal);
+            if self.fep.learning_signal > FEP_LEARNING_PLASTICITY_THRESHOLD && enhanced_result.should_learn {
+                self.fep.world_model
+                    .increase_plasticity(self.fep.learning_signal);
             }
         }
 
@@ -1032,8 +1038,8 @@ impl CognitiveLoopService {
                 0.1,
                 effective_lr as f64,
             );
-            self.fep_agent.perceive(&urgent_obs);
-            self.enhanced_fep_bridge
+            self.fep.agent.perceive(&urgent_obs);
+            self.fep.enhanced_bridge
                 .cycle(coh_urgency as f64, 0.1, 0.1, effective_lr as f64);
         }
 
@@ -1071,7 +1077,8 @@ impl CognitiveLoopService {
             self.stats.attention_budget_exceeded_count = 0;
         }
 
-        let predictive_budget_gated = attention_budget_elapsed_us > (ATTENTION_BUDGET_US * 4 / 5)
+        let predictive_budget_gated = attention_budget_elapsed_us
+            > (attention_budget_us as f64 * PREDICTIVE_BUDGET_GATING_RATIO) as u64
             && !attention_budget_exceeded;
         if predictive_budget_gated {
             self.stats.predictive_budget_gated_count += 1;
@@ -1115,7 +1122,11 @@ impl CognitiveLoopService {
         let mut reasoning_plan_confidence: f32 = 0.0;
         #[allow(unused_mut)]
         let mut reasoning_narrative: Option<String> = None;
+        // Used by reasoning_engine gate below; suppress warning when feature is off.
+        #[allow(unused_variables)]
+        let substrate_degraded = self.substrate_manager.should_degrade_consciousness();
         #[cfg(feature = "reasoning_engine")]
+        if !substrate_degraded {
         if let Some(ref mut reasoning_engine) = self.reasoning_engine {
             use crate::consciousness::epistemic_conflict::MultiTheoryMetrics as ECMetrics;
             use crate::consciousness::reasoning_engine::ReasoningContext;
@@ -1126,7 +1137,7 @@ impl CognitiveLoopService {
                 ast: self.prediction_confidence,
                 pp: (1.0 - prediction_error as f64).clamp(0.0, 1.0),
                 rpt: pattern_confidence as f64,
-                embodiment: self.fep_learning_signal as f64,
+                embodiment: self.fep.learning_signal as f64,
                 unified: unified_psi,
             };
 
@@ -1183,6 +1194,7 @@ impl CognitiveLoopService {
                 "Reasoning engine cycle"
             );
         }
+        } // if !substrate_degraded (reasoning_engine)
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.2 KL-divergence policy gate + adaptive temperature
@@ -1201,7 +1213,7 @@ impl CognitiveLoopService {
                     (reasoning_plan_confidence * (1.0 + fep_prob_for_mcts as f32 * 0.3)).min(1.0);
             } else {
                 let dampen = (0.3 + fep_prob_for_mcts * 0.7) as f32;
-                self.fep_learning_signal *= dampen;
+                self.fep.learning_signal *= dampen;
                 reasoning_plan_confidence *= dampen;
             }
 
@@ -1213,7 +1225,7 @@ impl CognitiveLoopService {
                 let agree_rate = self.policy_agreement_window.iter().filter(|&&a| a).count() as f64
                     / self.policy_agreement_window.len() as f64;
                 let adaptive_temp = POLICY_TEMP_BASE + (1.0 - agree_rate) * POLICY_TEMP_RANGE;
-                self.fep_agent.config.action_temperature = adaptive_temp;
+                self.fep.agent.config.action_temperature = adaptive_temp;
             }
         }
 
@@ -1283,7 +1295,7 @@ impl CognitiveLoopService {
             };
 
         let neuromod_threshold =
-            perception.effective_threshold * self.neuromod.bath.threshold_gate();
+            perception.encoding.effective_threshold * self.neuromod.bath.threshold_gate();
 
         // 11. Learn if error is significant
         let _t_core = Instant::now();
@@ -1299,14 +1311,14 @@ impl CognitiveLoopService {
             let (train_input, train_target, lr) = if let Some(prev) = previous_state {
                 (
                     Array1::from_vec(prev),
-                    perception.compressed_state.iter().copied().collect(),
+                    perception.encoding.compressed_state.iter().copied().collect(),
                     effective_lr,
                 )
             } else {
                 let train_input: Array1<f32> =
-                    perception.compressed_state.iter().copied().collect();
+                    perception.encoding.compressed_state.iter().copied().collect();
                 let train_target: Array1<f32> =
-                    perception.compressed_state.iter().copied().collect();
+                    perception.encoding.compressed_state.iter().copied().collect();
                 (train_input, train_target, effective_lr * 0.1)
             };
 
@@ -1408,10 +1420,10 @@ impl CognitiveLoopService {
 
         // Goal←Cognition feedback
         if !learning_occurred && self.carryover.urgency.consecutive_low_error > 5 {
-            if let Some(top) = self.goal_system.top_goal() {
+            if let Some(top) = self.fep.goal_system.top_goal() {
                 let top_id = top.id.clone();
                 let delta = (0.01 * (1.0 + self.prediction_confidence * 0.5)) as f32;
-                self.goal_system.update_progress(&top_id, delta);
+                self.fep.goal_system.update_progress(&top_id, delta);
             }
         }
 
@@ -1450,9 +1462,9 @@ impl CognitiveLoopService {
         let causal_attention_boost = if self.stats.total_cycles % 41 == 0 {
             if let Some(ref mut cc) = self.causal_consciousness {
                 let vars: Vec<Vec<f64>> = perception
-                    .compressed_state
+                    .encoding.compressed_state
                     .chunks(8)
-                    .map(|chunk| chunk.iter().map(|&v| v as f64).collect())
+                    .map(|chunk: &[f32]| chunk.iter().map(|&v| v as f64).collect())
                     .collect();
                 if vars.len() >= 2 {
                     let attention = cc.attention.compute_attention(&vars);
@@ -1494,7 +1506,7 @@ impl CognitiveLoopService {
         let pp_emotional_valence = self.emotion_contagion.prosody_valence();
         let pp_phi = self.unification_engine.psi as f32;
         let pp_smoothed_coh = coherence as f64;
-        let pp_wm_importance_boost = self.world_model.avg_error.clamp(0.0, 1.0) * 0.3;
+        let pp_wm_importance_boost = self.fep.world_model.avg_error.clamp(0.0, 1.0) * 0.3;
         let pp_thalamic_salience = match self.cognitive_depth {
             super::CognitiveDepth::DeepThought => THALAMIC_DEEP_SALIENCE,
             super::CognitiveDepth::Cortical => 0.0,
@@ -1517,17 +1529,17 @@ impl CognitiveLoopService {
             let discovery_service = &mut self.discovery_service;
             let semantic_memory = &mut self.semantic_memory;
             let causal_enhancer = &mut self.causal_enhancer;
-            let episodic_memory = &mut self.episodic_memory;
+            let episodic_memory = &mut self.fep.episodic_memory;
             let primitive_belief_bridge = &mut self.primitive_belief_bridge;
-            let closed_learning_loop = &mut self.closed_learning_loop;
-            let fep_learning_signal = &mut self.fep_learning_signal;
+            let closed_learning_loop = &mut self.fep.closed_learning_loop;
+            let fep_learning_signal = &mut self.fep.learning_signal;
             let prev_primitive_state = &mut self.prev_primitive_state;
             let resonator_memory = &mut self.resonator_memory;
 
             module_timings.stability_regime = helpers::run_stability_regime(
                 stability_regime,
                 discovery_service,
-                &perception.hv16_cached,
+                &perception.encoding.hv16_cached,
                 delta_t,
                 pp_total_cycles,
                 urgency,
@@ -1537,12 +1549,12 @@ impl CognitiveLoopService {
                 prediction_error,
                 in_flow: pp_in_flow,
                 input,
-                compressed_state: &perception.compressed_state,
+                compressed_state: &perception.encoding.compressed_state,
                 emotional_valence: pp_emotional_valence,
                 phi: pp_phi,
                 total_cycles: pp_total_cycles,
                 smoothed_coh: pp_smoothed_coh,
-                detected_primitives: &perception.encoding_result.detected_primitives,
+                detected_primitives: &perception.encoding.encoding_result.detected_primitives,
                 memory_context_boost,
                 wm_importance_boost: pp_wm_importance_boost + pp_thalamic_salience,
             };
@@ -1553,7 +1565,7 @@ impl CognitiveLoopService {
                         semantic_memory,
                         causal_enhancer,
                         semantic_hdc.into_owned(),
-                        &perception.compressed_state,
+                        &perception.encoding.compressed_state,
                         &output,
                         prediction_error,
                         pp_total_cycles,
@@ -1587,63 +1599,79 @@ impl CognitiveLoopService {
         self.stats.semantic_entries_stored = self.semantic_memory.stats().total_stored;
 
         DynamicsPhaseResult {
-            output,
-            prediction,
-            prediction_error,
-            coherence,
-            unified_psi,
-            learning_occurred,
-            training_loss,
-            effective_lr,
-            attention_budget_exceeded,
-            attention_budget_elapsed_us,
-            predictive_budget_gated,
-            fep_action_idx,
-            fep_pragmatic_value,
-            fep_accuracy,
-            fep_complexity,
-            fep_surprise,
-            fep_td_error,
-            cycle_reward,
-            reasoning_confidence,
-            reasoning_gate_blocked,
-            reasoning_fallback,
-            reasoning_plan_action,
-            reasoning_plan_confidence,
-            reasoning_narrative,
-            metacognitive_anomaly,
-            anomaly_recovery_progress,
-            anomaly_recovering,
-            prediction_coherence,
-            self_model_accuracy,
-            resonator_wm_primed,
-            resonator_reconsolidated,
-            resonator_best_sim,
-            resonator_prediction_error,
-            resonator_error_exploration_mod,
+            core: DynCore {
+                output,
+                prediction,
+                prediction_error,
+                coherence,
+                unified_psi,
+                learning_occurred,
+                training_loss,
+                effective_lr,
+                cycle_reward,
+                prediction_coherence,
+                self_model_accuracy,
+            },
+            fep: DynFep {
+                fep_action_idx,
+                fep_pragmatic_value,
+                fep_accuracy,
+                fep_complexity,
+                fep_surprise,
+                fep_td_error,
+            },
+            reasoning: DynReasoning {
+                reasoning_confidence,
+                reasoning_gate_blocked,
+                reasoning_fallback,
+                reasoning_plan_action,
+                reasoning_plan_confidence,
+                reasoning_narrative,
+                metacognitive_anomaly,
+                mcts_plan_effectiveness,
+                causal_attention_edges,
+                school_predicted_phi_gain,
+            },
+            attention: DynAttention {
+                attention_budget_exceeded,
+                attention_budget_elapsed_us,
+                predictive_budget_gated,
+            },
+            resonator: DynResonator {
+                resonator_wm_primed,
+                resonator_reconsolidated,
+                resonator_best_sim,
+                resonator_prediction_error,
+                resonator_error_exploration_mod,
+            },
+            homeostasis: DynHomeostasis {
+                anomaly_recovery_progress,
+                anomaly_recovering,
+                valence_homeostasis_pull,
+                arousal_homeostasis_pull,
+                homeostasis_pull_strength,
+                arousal_recovery_active,
+                arousal_recovery_tau_factor,
+            },
+            guidance: DynGuidance {
+                moral_steering_category: moral_steering_category.into(),
+                guiding_priority_category,
+                guiding_question,
+                dominant_harmonic,
+            },
+            neuromod: DynNeuromod {
+                neuromod_attention_alloc,
+                ne_reorienting_boost,
+                ne_arousal_feedback,
+                confidence_velocity,
+                sht_crash_dip,
+                exploration_sht_drain,
+                phasic_da_replay_boost: 0, // set during feedback phase
+            },
             binding_threshold_mod,
             binding_confidence_mod,
             epistemic_semantic_lr_mod,
             pfe_surprise_mod,
-            mcts_plan_effectiveness,
-            causal_attention_edges,
-            moral_steering_category: moral_steering_category.into(),
-            valence_homeostasis_pull,
-            arousal_homeostasis_pull,
-            homeostasis_pull_strength,
-            arousal_recovery_active,
-            arousal_recovery_tau_factor,
-            guiding_priority_category,
-            guiding_question,
-            dominant_harmonic,
-            school_predicted_phi_gain,
-            neuromod_attention_alloc,
-            ne_reorienting_boost,
-            ne_arousal_feedback,
-            confidence_velocity,
-            sht_crash_dip,
-            exploration_sht_drain,
-            phasic_da_replay_boost: 0, // set during feedback phase
         }
     }
 }

@@ -220,16 +220,27 @@ impl SubstrateManager {
 
     /// Track energy expenditure for this cycle.
     /// When energy budget is enabled and exceeded, marks consciousness as non-viable.
+    ///
+    /// Faster substrates (tau_factor > 1.0) complete more cycles per wall-clock
+    /// second, so energy per wall-clock tick scales with tau_factor.
     pub fn tick_energy(&mut self, config: &CognitiveLoopConfig) {
         if !config.enable_energy_budget {
             return;
         }
-        self.total_energy_spent += self.energy_per_cycle;
+        let speed_adjusted_energy = self.energy_per_cycle * self.tau_factor as f64;
+        self.total_energy_spent += speed_adjusted_energy;
         if let Some(budget) = config.energy_budget_joules_per_sec {
             if self.total_energy_spent > budget {
                 self.consciousness_viable = false;
             }
         }
+    }
+
+    /// Returns true when substrate feasibility is too low for full consciousness.
+    /// Below threshold, expensive modules (reasoning, dream, cross-modal) should
+    /// be skipped to focus resources on core perception-prediction.
+    pub fn should_degrade_consciousness(&self) -> bool {
+        self.effective_feasibility < 0.3 || !self.consciousness_viable
     }
 
     // ── Per-region substrate methods ──────────────────────────────────────
@@ -289,7 +300,7 @@ impl SubstrateManager {
         let distinct_substrates: std::collections::HashSet<_> = self
             .per_region_substrates
             .as_ref()
-            .map(|m| m.values().map(|s| std::mem::discriminant(s)).collect())
+            .map(|m| m.values().map(std::mem::discriminant).collect())
             .unwrap_or_default();
         let num_pairs = if distinct_substrates.len() > 1 {
             distinct_substrates.len() - 1
@@ -886,6 +897,70 @@ mod tests {
         assert!(
             mgr_silicon.energy_throughput_multiplier != mgr_bio.energy_throughput_multiplier,
             "Different substrates should have different throughput multipliers"
+        );
+    }
+
+    #[test]
+    fn test_energy_scales_with_tau() {
+        // Photonic (fast, tau > 1.0) should burn more energy per tick
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.enable_substrate_speed_modulation = true;
+        config.substrate_type = SubstrateType::PhotonicProcessor;
+        config.energy_budget_joules_per_sec = Some(1e-6);
+        let mut mgr = SubstrateManager::new(&config);
+        let initial_energy = mgr.energy_per_cycle;
+        mgr.tick_energy(&config);
+        // With tau > 1.0, energy spent should exceed base energy_per_cycle
+        assert!(
+            mgr.total_energy_spent > initial_energy,
+            "Photonic substrate should burn more energy: {} vs {}",
+            mgr.total_energy_spent,
+            initial_energy
+        );
+    }
+
+    #[test]
+    fn test_consciousness_collapse_gating() {
+        let mut config = default_config();
+        config.enable_validation_overlay = true;
+        config.validation_skepticism_floor = 0.0; // maximally skeptical
+        config.substrate_type = SubstrateType::ExoticSubstrate;
+        let mgr = SubstrateManager::new(&config);
+        // Exotic substrate with max skepticism should degrade
+        assert!(
+            mgr.should_degrade_consciousness() || mgr.effective_feasibility < 0.3,
+            "Exotic substrate with zero floor should degrade: eff={:.4}, viable={}",
+            mgr.effective_feasibility,
+            mgr.consciousness_viable
+        );
+    }
+
+    #[test]
+    fn test_should_degrade_when_energy_exhausted() {
+        let mut config = default_config();
+        config.enable_energy_budget = true;
+        config.energy_budget_joules_per_sec = Some(1e-20); // impossibly small budget
+        let mut mgr = SubstrateManager::new(&config);
+        assert!(!mgr.should_degrade_consciousness());
+        mgr.tick_energy(&config);
+        assert!(
+            mgr.should_degrade_consciousness(),
+            "Should degrade after energy exhaustion"
+        );
+    }
+
+    #[test]
+    fn test_should_not_degrade_biological() {
+        let mut config = default_config();
+        config.substrate_type = SubstrateType::BiologicalNeurons;
+        config.enable_validation_overlay = true;
+        config.validation_skepticism_floor = 0.5;
+        let mgr = SubstrateManager::new(&config);
+        assert!(
+            !mgr.should_degrade_consciousness(),
+            "Biological substrate should never degrade: eff={:.4}",
+            mgr.effective_feasibility
         );
     }
 

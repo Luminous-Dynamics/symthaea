@@ -401,6 +401,11 @@ pub struct Symthaea {
     #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
     last_autoresearch_topic: Option<String>,
 
+    // ── Code Generation ────────────────────────────────────────────────
+    /// Code generator: CfC-planned code structure with HDC verification.
+    #[cfg(feature = "code_generation")]
+    code_generator: crate::language::code_generator::CodeGenerator,
+
     // ── Nociception: Pain & Infrastructure Health ──────────────────────
     /// Somatic error bridge: drains infrastructure errors → felt stress.
     somatic_bridge: SomaticErrorBridge,
@@ -719,6 +724,10 @@ impl Symthaea {
             last_autoresearch_at: None,
             #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
             last_autoresearch_topic: None,
+            #[cfg(feature = "code_generation")]
+            code_generator: crate::language::code_generator::CodeGenerator::new(
+                crate::hdc::code_encoder::CodeHDEncoder::new(hdc_dim),
+            ),
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -995,6 +1004,10 @@ impl Symthaea {
             last_autoresearch_at: None,
             #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
             last_autoresearch_topic: None,
+            #[cfg(feature = "code_generation")]
+            code_generator: crate::language::code_generator::CodeGenerator::new(
+                crate::hdc::code_encoder::CodeHDEncoder::new(hdc_dim),
+            ),
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -1511,6 +1524,96 @@ impl Symthaea {
         }
 
         // ====================================================================
+        // PHASE 3.6: CODE CONTEXT INJECTION (CfC-planned code generation)
+        // ====================================================================
+        // When the domain is "programming", run the CodeGenerator to produce
+        // CfC-planned code structure with HDC-verified intent similarity and
+        // Phi measurement, then inject into the structured thought so the LLM
+        // translation phase receives a fully-planned code context.
+        #[cfg(feature = "code_generation")]
+        if detected_domain == "programming" {
+            use crate::language::code_intent::{
+                CodeIntentCategory, CodeIntentClassifier, CodeSpec, CodeTarget,
+            };
+            use crate::language::code_parser::EntityKind;
+
+            let classifier = CodeIntentClassifier::new(self.hdc_dim);
+            let category = classifier.classify(content);
+
+            // Extract language from domain entities or default to "rust"
+            let lang = domain_entities
+                .iter()
+                .find(|e| e.entity_type == "language")
+                .map(|e| e.value.clone())
+                .unwrap_or_else(|| "rust".to_string());
+
+            // Build a CodeIntent::Create for generation tasks; for other
+            // categories, populate code_context with plan steps only.
+            let intent = match category {
+                CodeIntentCategory::Create => {
+                    let target = CodeTarget::new(
+                        content.split_whitespace().take(4).collect::<Vec<_>>().join("_"),
+                        EntityKind::Function,
+                    )
+                    .with_language(lang.clone());
+                    let spec = CodeSpec::new(&lang, "generated", content);
+                    crate::language::code_intent::CodeIntent::Create { target, spec }
+                }
+                _ => {
+                    let target = CodeTarget::new("target", EntityKind::Function)
+                        .with_language(lang.clone());
+                    let spec = CodeSpec::new(&lang, "target", content);
+                    crate::language::code_intent::CodeIntent::Create { target, spec }
+                }
+            };
+
+            let gen_ctx = crate::language::code_generator::CodeContext::default();
+            let generated = self.code_generator.generate(&intent, &gen_ctx);
+
+            // Extract spec fields for the structured thought
+            let (spec_purpose, spec_signature, spec_constraints, spec_examples) =
+                if let crate::language::code_intent::CodeIntent::Create { ref spec, .. } = intent {
+                    (
+                        Some(spec.purpose.clone()),
+                        spec.signature.clone(),
+                        spec.constraints.clone(),
+                        spec.examples.clone(),
+                    )
+                } else {
+                    (None, None, Vec::new(), Vec::new())
+                };
+
+            thought.code_context = Some(crate::mind::structured_thought::CodeContext {
+                language: lang,
+                spec_purpose,
+                spec_signature,
+                spec_constraints,
+                spec_examples,
+                plan_steps: generated
+                    .plan_steps
+                    .iter()
+                    .map(|s| format!("{:?}", s.action))
+                    .collect(),
+                generated_code: Some(generated.source.clone()),
+                phi_score: Some(generated.phi_score),
+                intent_similarity: Some(generated.intent_similarity),
+                syntactically_valid: None, // Set in Phase 5.5
+                notes: generated.notes,
+            });
+
+            thought.semantic_intent = crate::mind::SemanticIntent::Answer;
+            thought.epistemic_status = generated.epistemic_status;
+
+            tracing::debug!(
+                target: "symthaea::code",
+                phi = generated.phi_score,
+                similarity = generated.intent_similarity,
+                plan_steps = generated.plan_steps.len(),
+                "Phase 3.6: CfC code plan injected into structured thought"
+            );
+        }
+
+        // ====================================================================
         // PHASE 4: RELATIONAL ENRICHMENT (Add partnership context)
         // ====================================================================
         thought.relationship_stage = self.relational.partner.stage;
@@ -1589,6 +1692,160 @@ impl Symthaea {
             let confidence = self.mind.state.consciousness_level as f32;
             self.llm
                 .cycle_level_distill(fep_proxy, thermo_load, confidence, 1.0);
+        }
+
+        // ====================================================================
+        // PHASE 5.5: CODE VERIFICATION (Tree-sitter + HDC round-trip)
+        // ====================================================================
+        // When code was generated, verify syntax via tree-sitter and re-encode
+        // to HDC space to measure semantic fidelity. On failure, retry once
+        // with error feedback injected into the thought context.
+        #[cfg(feature = "code_generation")]
+        let mut generation = generation; // shadow as mutable for retry
+        #[cfg(feature = "code_generation")]
+        if thought.code_context.is_some() {
+            let code_block = Self::extract_code_block(&generation.text);
+            let lang = thought
+                .code_context
+                .as_ref()
+                .map(|c| c.language.clone())
+                .unwrap_or_else(|| "rust".to_string());
+
+            // Step 1: Tree-sitter syntax verification + HDC semantic round-trip
+            let mut tree_sitter_ok = false;
+            if let Some(parsed) = Self::parse_code_for_verification(&lang, &code_block) {
+                let verifier = crate::language::code_verifier::CodeVerifier::new(
+                    crate::hdc::code_encoder::CodeHDEncoder::new(self.hdc_dim),
+                );
+                let intent_hv = self.text_to_hv(
+                    thought
+                        .code_context
+                        .as_ref()
+                        .and_then(|c| c.spec_purpose.as_deref())
+                        .unwrap_or(""),
+                );
+                let result = verifier.verify_against_intent(&parsed, &intent_hv);
+
+                if let Some(ref mut ctx) = thought.code_context {
+                    ctx.syntactically_valid = Some(result.syntactically_valid);
+                    ctx.intent_similarity = Some(result.semantic_similarity);
+                }
+
+                tree_sitter_ok = result.is_acceptable();
+
+                if !tree_sitter_ok {
+                    tracing::warn!(
+                        target: "symthaea::code",
+                        valid = result.syntactically_valid,
+                        similarity = result.semantic_similarity,
+                        errors = result.syntax_errors.len(),
+                        "Phase 5.5: Tree-sitter verification failed, retrying"
+                    );
+
+                    let error_notes: Vec<String> = result
+                        .syntax_errors
+                        .iter()
+                        .take(3)
+                        .map(|e| {
+                            let line = e.span.as_ref().map_or(0, |s| s.start_line);
+                            format!("Line {}: {}", line, e.message)
+                        })
+                        .collect();
+                    if let Some(ref mut ctx) = thought.code_context {
+                        ctx.notes.extend(error_notes);
+                        ctx.notes
+                            .push("RETRY: Fix the syntax errors above.".to_string());
+                    }
+
+                    let retry = self.llm.translate_thought(&thought, mood_temp).await;
+                    generation = retry;
+                } else {
+                    tracing::debug!(
+                        target: "symthaea::code",
+                        similarity = result.semantic_similarity,
+                        entities = result.entity_count,
+                        "Phase 5.5: Tree-sitter verification passed"
+                    );
+                }
+            }
+
+            // Step 2: Compilation verification via CodeExecutor (sandbox)
+            // Only runs after tree-sitter passes to avoid wasting compile time
+            if tree_sitter_ok {
+                let final_code = Self::extract_code_block(&generation.text);
+                let mut executor = crate::language::code_executor::CodeExecutor::new();
+                let exec_result = match lang.as_str() {
+                    "rust" => executor.execute_rust(&final_code, None),
+                    "python" => executor.execute_python(&final_code),
+                    "nix" => executor.evaluate_nix(&final_code),
+                    _ => executor.execute_rust(&final_code, None),
+                };
+
+                let surprise = exec_result.to_surprise();
+                if surprise > 0.0 {
+                    tracing::info!(
+                        target: "symthaea::code",
+                        compiled = exec_result.compiled,
+                        errors = exec_result.compile_errors.len(),
+                        surprise = surprise,
+                        simulated = exec_result.simulated,
+                        "Phase 5.5: Compilation verification result"
+                    );
+                }
+
+                // Feed compilation errors back for a second retry
+                if !exec_result.compiled && !exec_result.simulated {
+                    if let Some(ref mut ctx) = thought.code_context {
+                        ctx.syntactically_valid = Some(false);
+                        ctx.notes.push("COMPILATION FAILED:".to_string());
+                        for err in exec_result.compile_errors.iter().take(5) {
+                            ctx.notes.push(format!("  {err}"));
+                        }
+                        ctx.notes.push("RETRY: Fix the compilation errors.".to_string());
+                    }
+
+                    let retry = self.llm.translate_thought(&thought, mood_temp).await;
+                    generation = retry;
+
+                    tracing::debug!(
+                        target: "symthaea::code",
+                        "Phase 5.5: Post-compilation retry complete"
+                    );
+                }
+
+                // Store successful code generation in episodic memory
+                if exec_result.is_success() && !exec_result.simulated {
+                    let intent_hv = self.text_to_hv(
+                        thought
+                            .code_context
+                            .as_ref()
+                            .and_then(|c| c.spec_purpose.as_deref())
+                            .unwrap_or(""),
+                    );
+                    let code_hv = self.text_to_hv(&final_code);
+                    let phi = thought
+                        .code_context
+                        .as_ref()
+                        .and_then(|c| c.phi_score)
+                        .unwrap_or(0.0);
+                    let timestamp = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    let episode = crate::memory::Episode::new(
+                        intent_hv,
+                        code_hv,
+                        phi as f64,
+                        timestamp,
+                    );
+                    self.episodic_memory.store_if_significant(episode);
+                    tracing::info!(
+                        target: "symthaea::code",
+                        phi = phi,
+                        "Phase 5.5: Successful code stored in episodic memory"
+                    );
+                }
+            }
         }
 
         // ====================================================================
@@ -2135,6 +2392,45 @@ impl Symthaea {
     /// - Uncertain epistemic status → translation should contain hedging
     /// - MustInclude constraints → translation should contain required content
     /// - MustExclude constraints → translation should not contain forbidden content
+    /// Extract a fenced code block from LLM output.
+    ///
+    /// Returns the content between the first ``` and the closing ```,
+    /// stripping the optional language tag. Falls back to the full text
+    /// if no fenced block is found.
+    #[cfg(feature = "code_generation")]
+    fn extract_code_block(text: &str) -> String {
+        if let Some(start) = text.find("```") {
+            let after_fence = &text[start + 3..];
+            // Skip the language tag (first line after ```)
+            let code_start = after_fence.find('\n').map(|i| i + 1).unwrap_or(0);
+            let code_region = &after_fence[code_start..];
+            if let Some(end) = code_region.find("```") {
+                return code_region[..end].trim().to_string();
+            }
+        }
+        text.to_string()
+    }
+
+    /// Parse code using the appropriate tree-sitter parser for verification.
+    #[cfg(feature = "code_generation")]
+    fn parse_code_for_verification(
+        lang: &str,
+        source: &str,
+    ) -> Option<crate::language::code_parser::ParsedCode> {
+        use crate::language::code_parser::CodeParser;
+        match lang {
+            "rust" => {
+                let mut parser = crate::language::rust_parser::RustParser::new();
+                parser.parse(source).ok()
+            }
+            "python" => {
+                let mut parser = crate::language::python_parser::PythonParser::new();
+                parser.parse(source).ok()
+            }
+            _ => None,
+        }
+    }
+
     fn verify_translation_fidelity(&self, thought: &StructuredThought, text: &str) -> bool {
         let text_lower = text.to_lowercase();
         let mut verified = true;
@@ -2371,22 +2667,34 @@ impl Symthaea {
         self.mind.set_cached_moral_topology(summary);
     }
 
-    /// Extract current social signals (trust, cooperation_rate) from Mind's SocialCoherence.
-    /// Returns (0.5, 0.0) if social coherence is disabled.
+    /// Extract current social signals from Mind's SocialCoherence.
+    /// Returns (trust, cooperation_rate, prediction_accuracy, models_count, mean_trust).
+    /// Returns safe defaults if social coherence is disabled.
     ///
     /// Consumers should call this after `process()` and inject into the cognitive loop:
     /// ```ignore
-    /// let (trust, coop) = symthaea.social_signals();
-    /// loop_service.set_social_signals(trust, coop);
+    /// let (trust, coop, pred_acc, models, mean_t) = symthaea.social_signals();
+    /// loop_service.set_social_signals(trust, coop, pred_acc, models, mean_t);
     /// ```
-    pub fn social_signals(&self) -> (f32, f32) {
+    pub fn social_signals(&self) -> (f32, f32, f32, usize, f32) {
         self.mind
             .social_coherence()
             .map(|sc| {
                 let stats = sc.stats();
-                (stats.avg_trust, stats.cooperation_rate)
+                let prediction_accuracy = if stats.total_predictions > 0 {
+                    stats.successful_predictions as f32 / stats.total_predictions as f32
+                } else {
+                    0.5 // prior: no data → neutral
+                };
+                (
+                    stats.avg_trust,
+                    stats.cooperation_rate,
+                    prediction_accuracy,
+                    stats.agents_modeled as usize,
+                    stats.avg_trust,
+                )
             })
-            .unwrap_or((0.5, 0.0))
+            .unwrap_or((0.5, 0.0, 0.5, 0, 0.5))
     }
 
     // ========================================================================
@@ -3206,7 +3514,7 @@ mod tests {
     #[tokio::test]
     async fn test_social_signals_default() {
         let s = Symthaea::new(1024, 64).await.unwrap();
-        let (trust, cooperation) = s.social_signals();
+        let (trust, cooperation, pred_acc, models, mean_trust) = s.social_signals();
         // Without social coherence enabled, should return safe defaults
         assert!(
             (trust - 0.5).abs() < f32::EPSILON,
@@ -3215,6 +3523,15 @@ mod tests {
         assert!(
             cooperation.abs() < f32::EPSILON,
             "Default cooperation should be 0.0, got {cooperation}"
+        );
+        assert!(
+            (pred_acc - 0.5).abs() < f32::EPSILON,
+            "Default prediction accuracy should be 0.5, got {pred_acc}"
+        );
+        assert_eq!(models, 0, "Default models count should be 0");
+        assert!(
+            (mean_trust - 0.5).abs() < f32::EPSILON,
+            "Default mean trust should be 0.5, got {mean_trust}"
         );
     }
 

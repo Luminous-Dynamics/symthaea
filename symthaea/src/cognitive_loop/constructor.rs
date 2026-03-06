@@ -477,33 +477,33 @@ impl CognitiveLoopService {
             thalamic_router: ThalamicRouter::default(),
             unification_engine: ConsciousnessUnificationEngine::new(),
             cognitive_depth: CognitiveDepth::default(),
-            active_inference_bridge: ActiveInferenceBridge::with_defaults(),
-            closed_learning_loop,
-            // Memory system bridges
-            episodic_memory: EpisodicMemoryBridge::default(),
-            goal_system: GoalSystemBridge::new(),
-            world_model: WorldModelBridge::default(),
-            // FEP Active Inference Agent
-            fep_agent: ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
-                state_dim: 8,
-                obs_dim: 4,
-                num_actions: 4,
-                enable_td_learning: true,
-                ..Default::default()
-            }),
-            // Enhanced FEP Bridge with motor system (8 motor command types, 4D proprioceptive state)
-            enhanced_fep_bridge: EnhancedFEPBridge::new(
-                ActiveInferenceAgentConfig {
+            fep: super::fep_module::FepModule {
+                active_inference_bridge: ActiveInferenceBridge::with_defaults(),
+                closed_learning_loop,
+                episodic_memory: EpisodicMemoryBridge::default(),
+                goal_system: GoalSystemBridge::new(),
+                world_model: WorldModelBridge::default(),
+                agent: ActiveInferenceAgent::new(ActiveInferenceAgentConfig {
                     state_dim: 8,
                     obs_dim: 4,
-                    num_actions: 8, // Matches MotorCommandType variants
+                    num_actions: 4,
                     enable_td_learning: true,
                     ..Default::default()
-                },
-                4, // Motor state dimension
-            ),
-            fep_learning_signal: 0.0,
-            fep_lr_boost: 1.0,
+                }),
+                enhanced_bridge: EnhancedFEPBridge::new(
+                    ActiveInferenceAgentConfig {
+                        state_dim: 8,
+                        obs_dim: 4,
+                        num_actions: 8,
+                        enable_td_learning: true,
+                        ..Default::default()
+                    },
+                    4,
+                ),
+                learning_signal: 0.0,
+                lr_boost: 1.0,
+                surprise_bridge,
+            },
             feedback_state: super::feedback_state::FeedbackState::new(),
             coherence_tracker: ConversationCoherenceTracker::new(0.3),
             stability_regime: StabilityRegimeProcessor::new(),
@@ -677,7 +677,6 @@ impl CognitiveLoopService {
             #[cfg(feature = "support")]
             support_cycle_counter: 0,
             carryover: CycleCarryover::default(),
-            surprise_bridge,
             prefrontal,
             self_model_tier,
             gwt,
@@ -745,6 +744,22 @@ impl CognitiveLoopService {
                 Some(std::sync::Mutex::new(
                     symthaea_foveation::FoveationManager::new(fov_config, 8),
                 ))
+            },
+            #[cfg(feature = "ssm_language")]
+            broca_manager: if config.enable_broca_language {
+                let genesis = config
+                    .genesis_phrase
+                    .as_deref()
+                    .map(symthaea_core::genesis::GenesisSeed::from_phrase)
+                    .unwrap_or_else(|| {
+                        symthaea_core::genesis::GenesisSeed::from_phrase("symthaea-broca-default")
+                    });
+                Some(super::broca_bridge::BrocaManager::new(
+                    &genesis,
+                    symthaea_broca::BrocaConfig::default(),
+                ))
+            } else {
+                None
             },
             psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),

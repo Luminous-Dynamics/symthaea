@@ -16,7 +16,7 @@ impl MetricsProvider for CognitiveLoopService {
             coherence,
             is_conscious: phi > 0.3,
             cognitive_depth: format!("{:?}", self.cognitive_depth),
-            strategy: format!("{:?}", self.closed_learning_loop.current_strategy),
+            strategy: format!("{:?}", self.fep.closed_learning_loop.current_strategy),
             in_flow: self.flow_state.in_flow,
             prediction_error: self.stats.avg_prediction_error,
             emotional_valence: self.emotion_contagion.prosody_valence(),
@@ -49,7 +49,7 @@ impl MetricsProvider for CognitiveLoopService {
     }
 
     fn current_strategy(&self) -> String {
-        format!("{:?}", self.closed_learning_loop.current_strategy)
+        format!("{:?}", self.fep.closed_learning_loop.current_strategy)
     }
 
     fn in_flow(&self) -> bool {

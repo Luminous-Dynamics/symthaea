@@ -27,72 +27,72 @@ impl CognitiveLoopService {
 
         let value_trend = self.primitive_tier.value_feedback.recent_trend(50);
         let circadian_phase_str = self.biorhythm.phase.as_str();
-        let selected_strategy_str = perception.selected_strategy.as_str();
+        let selected_strategy_str = perception.strategy.selected_strategy.as_str();
 
         let _t = Instant::now();
         let moral_anomaly_report = self.ethics_engine.last_anomaly_report().clone();
         let mut metadata = super::CycleMetadata {
-            surprise_triggered: perception.surprise_triggered,
-            prefrontal_veto: feedback.prefrontal_veto,
-            reasoning_confidence: dynamics.reasoning_confidence,
-            exploration_action: perception.exploration_action.clone(),
-            reasoning_gate_blocked: dynamics.reasoning_gate_blocked,
-            reasoning_fallback: dynamics.reasoning_fallback.clone(),
-            reasoning_plan_action: dynamics.reasoning_plan_action,
-            reasoning_plan_confidence: dynamics.reasoning_plan_confidence,
-            reasoning_narrative: dynamics.reasoning_narrative.clone(),
+            surprise_triggered: perception.exploration.surprise_triggered,
+            prefrontal_veto: feedback.self_model.prefrontal_veto,
+            reasoning_confidence: dynamics.reasoning.reasoning_confidence,
+            exploration_action: perception.exploration.exploration_action.clone(),
+            reasoning_gate_blocked: dynamics.reasoning.reasoning_gate_blocked,
+            reasoning_fallback: dynamics.reasoning.reasoning_fallback.clone(),
+            reasoning_plan_action: dynamics.reasoning.reasoning_plan_action,
+            reasoning_plan_confidence: dynamics.reasoning.reasoning_plan_confidence,
+            reasoning_narrative: dynamics.reasoning.reasoning_narrative.clone(),
             quality: super::QualityDiagnostics {
-                meta_cognitive_accuracy: feedback.meta_cognitive_accuracy,
-                meta_cognitive_depth: feedback.meta_cognitive_depth,
-                dissipative_health: feedback.dissipative_health,
-                dissipative_regime: feedback.dissipative_regime.clone(),
-                dissipative_entropy_rate: feedback.dissipative_entropy_rate,
-                epistemic_phi_eff: feedback.epistemic_phi_eff,
-                equation_v2_consciousness: feedback.equation_v2_consciousness,
-                hierarchical_ltc_phi: feedback.hierarchical_ltc_phi,
-                unified_quality_score: feedback.unified_quality_score,
-                dissipative_health_gated: feedback.dissipative_health_gated,
-                dissipative_lr_factor: feedback.dissipative_lr_factor,
-                coherence_velocity: feedback.coherence_velocity,
-                coherence_velocity_gated: feedback.coherence_velocity_gated,
-                anomaly_recovery_progress: dynamics.anomaly_recovery_progress,
-                anomaly_recovering: dynamics.anomaly_recovering,
+                meta_cognitive_accuracy: feedback.self_model.meta_cognitive_accuracy,
+                meta_cognitive_depth: feedback.self_model.meta_cognitive_depth,
+                dissipative_health: feedback.quality.dissipative_health,
+                dissipative_regime: feedback.quality.dissipative_regime.clone(),
+                dissipative_entropy_rate: feedback.quality.dissipative_entropy_rate,
+                epistemic_phi_eff: feedback.reasoning.epistemic_phi_eff,
+                equation_v2_consciousness: feedback.consciousness.equation_v2_consciousness,
+                hierarchical_ltc_phi: feedback.evolution.hierarchical_ltc_phi,
+                unified_quality_score: feedback.quality.unified_quality_score,
+                dissipative_health_gated: feedback.quality.dissipative_health_gated,
+                dissipative_lr_factor: feedback.quality.dissipative_lr_factor,
+                coherence_velocity: feedback.quality.coherence_velocity,
+                coherence_velocity_gated: feedback.quality.coherence_velocity_gated,
+                anomaly_recovery_progress: dynamics.homeostasis.anomaly_recovery_progress,
+                anomaly_recovering: dynamics.homeostasis.anomaly_recovering,
             },
-            narrative_self_psi: feedback.narrative_self_psi,
-            body_phi_modulation: feedback.body_psi_modulation,
-            body_valence: feedback.body_valence,
-            body_arousal: feedback.body_arousal,
-            consciousness_level: feedback.consciousness_level,
-            predictive_self_safety: feedback.predictive_self_safety,
+            narrative_self_psi: feedback.self_model.narrative_self_psi,
+            body_phi_modulation: feedback.self_model.body_psi_modulation,
+            body_valence: feedback.self_model.body_valence,
+            body_arousal: feedback.self_model.body_arousal,
+            consciousness_level: feedback.consciousness.consciousness_level,
+            predictive_self_safety: feedback.self_model.predictive_self_safety,
             attention: super::AttentionMetrics {
-                attention_schema_focus: feedback.attention_schema_focus,
-                gwt_broadcast: feedback.gwt_broadcast,
-                gwt_coalition_size: feedback.gwt_coalition_size,
-                psi_attention_avg: feedback.psi_attention_avg,
-                phi_attention_weight: perception.phi_attention_weight,
-                attention_budget_exceeded: dynamics.attention_budget_exceeded,
-                attention_budget_elapsed_us: dynamics.attention_budget_elapsed_us,
-                input_similarity: perception.input_similarity,
-                input_memoized: perception.input_memoized,
-                attention_budget_gated: feedback.attention_budget_gated,
+                attention_schema_focus: feedback.self_model.attention_schema_focus,
+                gwt_broadcast: feedback.self_model.gwt_broadcast,
+                gwt_coalition_size: feedback.self_model.gwt_coalition_size,
+                psi_attention_avg: feedback.self_model.psi_attention_avg,
+                phi_attention_weight: perception.encoding.phi_attention_weight,
+                attention_budget_exceeded: dynamics.attention.attention_budget_exceeded,
+                attention_budget_elapsed_us: dynamics.attention.attention_budget_elapsed_us,
+                input_similarity: perception.encoding.input_similarity,
+                input_memoized: perception.encoding.input_memoized,
+                attention_budget_gated: feedback.loops.attention_budget_gated,
                 attention_shift_applied: self.stats.attention_shift,
             },
-            resonance_frequency: feedback.resonance_frequency,
-            quantum_coherence_level: feedback.quantum_coherence_level,
-            temporal_coherence_score: feedback.temporal_coherence_score,
-            temporal_discontinuity: feedback.temporal_discontinuity,
-            embodied_phi_modulation: feedback.embodied_psi_modulation,
-            embodied_agency: feedback.embodied_agency,
-            narrative_gwt_veto: feedback.narrative_gwt_veto,
-            narrative_gwt_self_psi: feedback.narrative_gwt_self_psi,
-            living_mind_vitality: feedback.living_mind_vitality,
-            living_mind_coherence: feedback.living_mind_coherence,
-            urgency: perception.urgency,
+            resonance_frequency: feedback.self_model.resonance_frequency,
+            quantum_coherence_level: feedback.self_model.quantum_coherence_level,
+            temporal_coherence_score: feedback.self_model.temporal_coherence_score,
+            temporal_discontinuity: feedback.self_model.temporal_discontinuity,
+            embodied_phi_modulation: feedback.self_model.embodied_psi_modulation,
+            embodied_agency: feedback.self_model.embodied_agency,
+            narrative_gwt_veto: feedback.self_model.narrative_gwt_veto,
+            narrative_gwt_self_psi: feedback.self_model.narrative_gwt_self_psi,
+            living_mind_vitality: feedback.self_model.living_mind_vitality,
+            living_mind_coherence: feedback.self_model.living_mind_coherence,
+            urgency: perception.urgency.urgency,
             memory: super::MemoryResonatorMetrics {
-                dream_insights: feedback.dream_insights,
-                dream_phi_improvement: feedback.dream_phi_improvement,
-                dream_wisdom_count: feedback.dream_wisdom_count,
-                continuity_replay_triggered: feedback.continuity_replay_needed,
+                dream_insights: feedback.memory.dream_insights,
+                dream_phi_improvement: feedback.memory.dream_phi_improvement,
+                dream_wisdom_count: feedback.memory.dream_wisdom_count,
+                continuity_replay_triggered: feedback.consciousness.continuity_replay_needed,
                 resonator_codebook_size: self
                     .resonator_memory
                     .as_ref()
@@ -105,51 +105,51 @@ impl CognitiveLoopService {
                     .as_ref()
                     .map(|m| m.resonator.iterations())
                     .unwrap_or(0),
-                resonator_wm_primed: dynamics.resonator_wm_primed,
-                resonator_reconsolidated: dynamics.resonator_reconsolidated,
-                resonator_promotions: feedback.resonator_promotions,
-                resonator_best_sim: dynamics.resonator_best_sim,
-                codebook_evictions: feedback.codebook_evictions,
-                codebook_diversity: feedback.codebook_diversity,
-                resonator_prediction_error: dynamics.resonator_prediction_error,
-                codebook_utilization_rate: feedback.codebook_utilization_rate,
-                surprise_replay_batch_size: feedback.surprise_replay_batch_size,
+                resonator_wm_primed: dynamics.resonator.resonator_wm_primed,
+                resonator_reconsolidated: dynamics.resonator.resonator_reconsolidated,
+                resonator_promotions: feedback.memory.resonator_promotions,
+                resonator_best_sim: dynamics.resonator.resonator_best_sim,
+                codebook_evictions: feedback.memory.codebook_evictions,
+                codebook_diversity: feedback.memory.codebook_diversity,
+                resonator_prediction_error: dynamics.resonator.resonator_prediction_error,
+                codebook_utilization_rate: feedback.memory.codebook_utilization_rate,
+                surprise_replay_batch_size: feedback.memory.surprise_replay_batch_size,
             },
             fep: super::FepTelemetry {
-                fep_action: dynamics.fep_action_idx,
-                fep_pragmatic_value: dynamics.fep_pragmatic_value,
-                fep_accuracy: dynamics.fep_accuracy,
-                fep_complexity: dynamics.fep_complexity,
-                fep_surprise: dynamics.fep_surprise,
-                fep_td_error: dynamics.fep_td_error,
-                predictive_free_energy: feedback.predictive_free_energy,
-                predictive_phi_modulation: feedback.predictive_psi_modulation,
+                fep_action: dynamics.fep.fep_action_idx,
+                fep_pragmatic_value: dynamics.fep.fep_pragmatic_value,
+                fep_accuracy: dynamics.fep.fep_accuracy,
+                fep_complexity: dynamics.fep.fep_complexity,
+                fep_surprise: dynamics.fep.fep_surprise,
+                fep_td_error: dynamics.fep.fep_td_error,
+                predictive_free_energy: feedback.self_model.predictive_free_energy,
+                predictive_phi_modulation: feedback.self_model.predictive_psi_modulation,
             },
-            cross_modal_binding_strength: feedback.cross_modal_binding_strength,
-            cross_modal_psi: feedback.cross_modal_psi,
-            affective_valence: feedback.affective_valence,
-            affective_arousal: feedback.affective_arousal,
-            thermodynamic_entropy: feedback.thermodynamic_entropy,
-            thermodynamic_free_energy: feedback.thermodynamic_free_energy,
-            phenomenal_binding_strength: feedback.phenomenal_binding_strength,
-            phenomenal_fragmented: feedback.phenomenal_fragmented,
-            hierarchical_total_free_energy: feedback.hierarchical_total_free_energy,
-            primitive_psi: feedback.primitive_psi,
-            temporal_causal_chains: feedback.temporal_causal_chains,
-            temporal_continuity: feedback.temporal_continuity,
-            temporal_max_chain_length: feedback.temporal_max_chain_length,
-            lattice_height: feedback.lattice_height,
-            lattice_width: feedback.lattice_width,
-            lattice_join_concept: feedback.lattice_join_concept.clone().unwrap_or_default(),
-            causal_codebook_entries: feedback.causal_codebook_entries_len,
-            compositionality_total: feedback.compositionality_total,
-            composition_rule_applied: feedback.composition_rule_applied.clone(),
+            cross_modal_binding_strength: feedback.self_model.cross_modal_binding_strength,
+            cross_modal_psi: feedback.self_model.cross_modal_psi,
+            affective_valence: feedback.self_model.affective_valence,
+            affective_arousal: feedback.self_model.affective_arousal,
+            thermodynamic_entropy: feedback.self_model.thermodynamic_entropy,
+            thermodynamic_free_energy: feedback.self_model.thermodynamic_free_energy,
+            phenomenal_binding_strength: feedback.self_model.phenomenal_binding_strength,
+            phenomenal_fragmented: feedback.self_model.phenomenal_fragmented,
+            hierarchical_total_free_energy: feedback.self_model.hierarchical_total_free_energy,
+            primitive_psi: feedback.consciousness.primitive_psi,
+            temporal_causal_chains: feedback.consciousness.temporal_causal_chains,
+            temporal_continuity: feedback.consciousness.temporal_continuity,
+            temporal_max_chain_length: feedback.consciousness.temporal_max_chain_length,
+            lattice_height: feedback.consciousness.lattice_height,
+            lattice_width: feedback.consciousness.lattice_width,
+            lattice_join_concept: feedback.consciousness.lattice_join_concept.clone().unwrap_or_default(),
+            causal_codebook_entries: feedback.consciousness.causal_codebook_entries_len,
+            compositionality_total: feedback.consciousness.compositionality_total,
+            composition_rule_applied: feedback.ethics.composition_rule_applied.clone(),
             harmonics: super::HarmonicMetrics {
-                harmonies_alignment: feedback.harmonies_alignment,
-                harmonies_approved: feedback.harmonies_approved,
-                harmonic_field_coherence: feedback.harmonic_field_coherence,
-                harmonic_love_resonance: feedback.harmonic_love_resonance,
-                harmonic_interferences: feedback.harmonic_interferences,
+                harmonies_alignment: feedback.ethics.harmonies_alignment,
+                harmonies_approved: feedback.ethics.harmonies_approved,
+                harmonic_field_coherence: feedback.ethics.harmonic_field_coherence,
+                harmonic_love_resonance: feedback.ethics.harmonic_love_resonance,
+                harmonic_interferences: feedback.ethics.harmonic_interferences,
                 harmony_coordinates: *self.ethics_engine.last_harmony_coordinates(),
                 moral_scenario_distribution: self
                     .ethics_engine
@@ -162,21 +162,21 @@ impl CognitiveLoopService {
                 moral_kl_divergence: self.ethics_engine.last_moral_free_energy().kl_divergence,
                 moral_entropy: self.ethics_engine.last_moral_free_energy().entropy,
                 moral_surprise: self.ethics_engine.last_moral_free_energy().surprise,
-                dominant_harmonic: dynamics.dominant_harmonic.clone(),
-                guiding_question: dynamics.guiding_question.clone(),
-                guiding_priority_category: dynamics.guiding_priority_category.clone(),
+                dominant_harmonic: dynamics.guidance.dominant_harmonic.clone(),
+                guiding_question: dynamics.guidance.guiding_question.clone(),
+                guiding_priority_category: dynamics.guidance.guiding_priority_category.clone(),
             },
             ethics: super::EthicalTelemetry {
-                moral_score: perception.moral_score,
-                moral_steering_category: dynamics.moral_steering_category.clone(),
-                value_evaluator_score: feedback.value_evaluator_score,
-                value_evaluator_decision: feedback.value_evaluator_decision.clone(),
+                moral_score: perception.moral.moral_score,
+                moral_steering_category: dynamics.guidance.moral_steering_category.clone(),
+                value_evaluator_score: feedback.ethics.value_evaluator_score,
+                value_evaluator_decision: feedback.ethics.value_evaluator_decision.clone(),
                 value_feedback_trend: value_trend,
-                value_gate_factor: feedback.value_gate_factor,
-                soul_alignment: perception.soul_alignment,
-                empathic_compassion: feedback.empathic_compassion,
-                empathic_tone_adj: feedback.empathic_tone_adj,
-                empathic_speech_rate_mod: feedback.empathic_speech_rate_mod,
+                value_gate_factor: feedback.ethics.value_gate_factor,
+                soul_alignment: perception.moral.soul_alignment,
+                empathic_compassion: feedback.ethics.empathic_compassion,
+                empathic_tone_adj: feedback.ethics.empathic_tone_adj,
+                empathic_speech_rate_mod: feedback.ethics.empathic_speech_rate_mod,
                 moral_topo_beta_0: self.ethics_engine.moral_topology().last_summary().beta_0,
                 moral_topo_beta_1: self.ethics_engine.moral_topology().last_summary().beta_1,
                 moral_topo_beta_2: self.ethics_engine.moral_topology().last_summary().beta_2,
@@ -227,58 +227,58 @@ impl CognitiveLoopService {
                     && moral_anomaly_report.anomaly_score > 0.0,
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
-            consciousness_profile_composite: feedback.consciousness_profile_composite,
-            synergy_enhanced_composite: feedback.synergy_enhanced_composite,
-            emergent_properties_count: feedback.emergent_properties_count,
-            reasoning_context: feedback.reasoning_context.clone(),
-            context_phi_weight: feedback.context_phi_weight,
-            reasoning_chain_confidence: feedback.reasoning_chain_confidence,
-            reasoning_chain_depth: feedback.reasoning_chain_depth,
-            causal_relations_count: feedback.causal_relations_count,
-            causal_avg_confidence: feedback.causal_avg_confidence,
-            evolution_generation: feedback.evolution_generation,
-            evolution_phi_delta: feedback.evolution_phi_delta,
-            value_embeddings_created: feedback.value_embeddings_created,
-            value_cache_hit_rate: feedback.value_cache_hit_rate,
-            adaptive_reasoning_phi: feedback.adaptive_reasoning_phi,
-            epistemic_quality: feedback.epistemic_quality,
-            phi_validation_correlation: feedback.phi_validation_correlation,
-            epistemic_conflict_count: feedback.epistemic_conflict_count,
-            holographic_unity: feedback.holographic_unity,
-            holographic_binding: feedback.holographic_binding,
-            consciousness_gradient_magnitude: feedback.consciousness_gradient_magnitude,
-            consciousness_limiting_component: feedback.consciousness_limiting_component.clone(),
-            eq_v2_limiting_component: feedback.eq_v2_limiting_component.clone(),
-            affect_consciousness_valence: feedback.affect_cons_valence,
-            affect_consciousness_arousal: feedback.affect_cons_arousal,
-            pipeline_consciousness: feedback.pipeline_consciousness,
-            multimodal_integrated_phi: feedback.multimodal_integrated_phi,
-            consciousness_state_label: feedback.consciousness_state_label.clone(),
-            consciousness_state_level: feedback.consciousness_state_level,
-            epistemic_gate_confidence: feedback.epistemic_gate_confidence,
-            epistemic_gate_approved: feedback.epistemic_gate_approved,
-            primitive_validation_phi_gain: feedback.primitive_validation_phi_gain,
-            primitive_validation_p_value: feedback.primitive_validation_p_value,
-            meta_reasoning_confidence: feedback.meta_reasoning_confidence,
-            meta_reasoning_insights: feedback.meta_reasoning_insights,
-            code_primitives_selected: feedback.code_primitives_selected.clone(),
-            metacognitive_anomaly: dynamics.metacognitive_anomaly,
+            consciousness_profile_composite: feedback.consciousness.consciousness_profile_composite,
+            synergy_enhanced_composite: feedback.consciousness.synergy_enhanced_composite,
+            emergent_properties_count: feedback.consciousness.emergent_properties_count,
+            reasoning_context: feedback.reasoning.reasoning_context.clone(),
+            context_phi_weight: feedback.reasoning.context_phi_weight,
+            reasoning_chain_confidence: feedback.reasoning.reasoning_chain_confidence,
+            reasoning_chain_depth: feedback.reasoning.reasoning_chain_depth,
+            causal_relations_count: feedback.reasoning.causal_relations_count,
+            causal_avg_confidence: feedback.reasoning.causal_avg_confidence,
+            evolution_generation: feedback.evolution.evolution_generation,
+            evolution_phi_delta: feedback.evolution.evolution_phi_delta,
+            value_embeddings_created: feedback.ethics.value_embeddings_created,
+            value_cache_hit_rate: feedback.ethics.value_cache_hit_rate,
+            adaptive_reasoning_phi: feedback.reasoning.adaptive_reasoning_phi,
+            epistemic_quality: feedback.reasoning.epistemic_quality,
+            phi_validation_correlation: feedback.reasoning.phi_validation_correlation,
+            epistemic_conflict_count: feedback.reasoning.epistemic_conflict_count,
+            holographic_unity: feedback.consciousness.holographic_unity,
+            holographic_binding: feedback.consciousness.holographic_binding,
+            consciousness_gradient_magnitude: feedback.consciousness.consciousness_gradient_magnitude,
+            consciousness_limiting_component: feedback.consciousness.consciousness_limiting_component.clone(),
+            eq_v2_limiting_component: feedback.consciousness.eq_v2_limiting_component.clone(),
+            affect_consciousness_valence: feedback.consciousness.affect_cons_valence,
+            affect_consciousness_arousal: feedback.consciousness.affect_cons_arousal,
+            pipeline_consciousness: feedback.consciousness.pipeline_consciousness,
+            multimodal_integrated_phi: feedback.consciousness.multimodal_integrated_phi,
+            consciousness_state_label: feedback.consciousness.consciousness_state_label.clone(),
+            consciousness_state_level: feedback.consciousness.consciousness_state_level,
+            epistemic_gate_confidence: feedback.reasoning.epistemic_gate_confidence,
+            epistemic_gate_approved: feedback.reasoning.epistemic_gate_approved,
+            primitive_validation_phi_gain: feedback.evolution.primitive_validation_phi_gain,
+            primitive_validation_p_value: feedback.evolution.primitive_validation_p_value,
+            meta_reasoning_confidence: feedback.reasoning.meta_reasoning_confidence,
+            meta_reasoning_insights: feedback.reasoning.meta_reasoning_insights,
+            code_primitives_selected: feedback.reasoning.code_primitives_selected,
+            metacognitive_anomaly: dynamics.reasoning.metacognitive_anomaly,
             safety_blocked: false,
             safety_category: None,
             negation_polarity: perception.negation_detected,
             selected_strategy: selected_strategy_str.into(),
-            actual_effective_lr: if dynamics.learning_occurred {
-                dynamics.effective_lr
+            actual_effective_lr: if dynamics.core.learning_occurred {
+                dynamics.core.effective_lr
             } else {
                 0.0
             },
-            cycle_reward: dynamics.cycle_reward,
-            support_triage_count: feedback.support_triage_count,
-            support_alert_fired: feedback.support_alert_fired,
-            support_federation_graduated: feedback.support_federation_graduated,
-            support_efe: feedback.support_efe,
-            sigma: feedback.sigma,
-            spectral_mip_phi: feedback.spectral_mip_phi,
+            cycle_reward: dynamics.core.cycle_reward,
+            support_triage_count: feedback.support.support_triage_count,
+            support_alert_fired: feedback.support.support_alert_fired,
+            support_federation_graduated: feedback.support.support_federation_graduated,
+            support_efe: feedback.support.support_efe,
+            sigma: feedback.consciousness.sigma,
+            spectral_mip_phi: feedback.consciousness.spectral_mip_phi,
             hierarchical_mip_phi: self.carryover.consciousness.last_hierarchical_mip_phi,
             hierarchical_mip_scales: self
                 .carryover
@@ -287,63 +287,63 @@ impl CognitiveLoopService {
                 .map(|_| 3usize)
                 .unwrap_or(0),
             // Structural Phi decomposition
-            structural_micro_phi: feedback.structural_micro_phi,
-            structural_meso_phi: feedback.structural_meso_phi,
-            structural_macro_phi: feedback.structural_macro_phi,
-            structural_bottleneck: feedback.structural_bottleneck,
-            structural_emergence_ratio: feedback.structural_emergence_ratio,
-            structural_num_clusters: feedback.structural_num_clusters,
+            structural_micro_phi: feedback.consciousness.structural_micro_phi,
+            structural_meso_phi: feedback.consciousness.structural_meso_phi,
+            structural_macro_phi: feedback.consciousness.structural_macro_phi,
+            structural_bottleneck: feedback.consciousness.structural_bottleneck,
+            structural_emergence_ratio: feedback.consciousness.structural_emergence_ratio,
+            structural_num_clusters: feedback.consciousness.structural_num_clusters,
             // Dynamic consciousness weights
-            consciousness_weights: feedback.consciousness_weights,
-            consciousness_weight_variance: feedback.consciousness_weight_variance,
+            consciousness_weights: feedback.consciousness.consciousness_weights,
+            consciousness_weight_variance: feedback.consciousness.consciousness_weight_variance,
             module_timings_us: {
                 module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
                 module_timings.clone()
             },
             circadian_phase: circadian_phase_str.into(),
             circadian_plasticity: self.biorhythm.plasticity_mod as f32,
-            cross_module_agreement: feedback.cross_module_agreement,
+            cross_module_agreement: feedback.quality.cross_module_agreement,
             thalamic_depth_score,
-            epistemic_gate_gated: !feedback.epistemic_gate_approved,
-            causal_attention_edges: dynamics.causal_attention_edges,
-            mcts_plan_effectiveness: dynamics.mcts_plan_effectiveness,
-            prediction_coherence: dynamics.prediction_coherence,
-            valence_homeostasis_pull: dynamics.valence_homeostasis_pull,
-            arousal_homeostasis_pull: dynamics.arousal_homeostasis_pull,
-            arousal_recovery_active: dynamics.arousal_recovery_active,
-            arousal_recovery_tau_factor: dynamics.arousal_recovery_tau_factor,
+            epistemic_gate_gated: !feedback.reasoning.epistemic_gate_approved,
+            causal_attention_edges: dynamics.reasoning.causal_attention_edges,
+            mcts_plan_effectiveness: dynamics.reasoning.mcts_plan_effectiveness,
+            prediction_coherence: dynamics.core.prediction_coherence,
+            valence_homeostasis_pull: dynamics.homeostasis.valence_homeostasis_pull,
+            arousal_homeostasis_pull: dynamics.homeostasis.arousal_homeostasis_pull,
+            arousal_recovery_active: dynamics.homeostasis.arousal_recovery_active,
+            arousal_recovery_tau_factor: dynamics.homeostasis.arousal_recovery_tau_factor,
             cycle_duration_us: cycle_start.elapsed().as_micros() as u64,
-            school_predicted_phi_gain: dynamics.school_predicted_phi_gain,
-            epistemic_coherence_gated: feedback.epistemic_coherence_gated,
+            school_predicted_phi_gain: dynamics.reasoning.school_predicted_phi_gain,
+            epistemic_coherence_gated: feedback.loops.epistemic_coherence_gated,
             phi_validation_cached: self.carryover.quality.phi_validation_correlation,
-            phi_spectral_weight: feedback.phi_spectral_weight,
-            error_pattern: perception.error_pattern.into(),
+            phi_spectral_weight: feedback.consciousness.phi_spectral_weight,
+            error_pattern: perception.urgency.error_pattern.into(),
             startup_suppressed: perception.startup_suppressed,
             startup_warmup_progress: perception.startup_warmup_progress,
-            self_model_accuracy: dynamics.self_model_accuracy,
+            self_model_accuracy: dynamics.core.self_model_accuracy,
             mode_confidence: self.carryover.urgency.mode_confidence,
             mode_stability_counter: self.carryover.urgency.mode_stability_counter,
-            predicted_urgency: perception.predicted_urgency.into(),
-            context_phi_applied: feedback.context_phi_applied,
-            evolution_confidence_delta: feedback.evolution_confidence_delta,
-            homeostasis_pull_strength: dynamics.homeostasis_pull_strength,
-            prediction_coherence_urgency_bias: perception.prediction_coherence_urgency_bias,
-            limiting_component_boosted: feedback.limiting_component_boosted.clone(),
-            love_resonance_boost: feedback.love_resonance_boost,
-            reasoning_chain_boosted: feedback.reasoning_chain_boosted,
-            harmonic_interference_lr_mod: feedback.harmonic_interference_lr_mod,
-            resonator_error_exploration_mod: dynamics.resonator_error_exploration_mod,
+            predicted_urgency: perception.urgency.predicted_urgency.into(),
+            context_phi_applied: feedback.reasoning.context_phi_applied,
+            evolution_confidence_delta: feedback.evolution.evolution_confidence_delta,
+            homeostasis_pull_strength: dynamics.homeostasis.homeostasis_pull_strength,
+            prediction_coherence_urgency_bias: perception.urgency.prediction_coherence_urgency_bias,
+            limiting_component_boosted: feedback.loops.limiting_component_boosted.clone(),
+            love_resonance_boost: feedback.loops.love_resonance_boost,
+            reasoning_chain_boosted: feedback.loops.reasoning_chain_boosted,
+            harmonic_interference_lr_mod: feedback.loops.harmonic_interference_lr_mod,
+            resonator_error_exploration_mod: dynamics.resonator.resonator_error_exploration_mod,
             binding_threshold_mod: dynamics.binding_threshold_mod,
-            causal_urgency_gated: feedback.causal_urgency_gated,
+            causal_urgency_gated: feedback.loops.causal_urgency_gated,
             epistemic_semantic_lr_mod: dynamics.epistemic_semantic_lr_mod,
-            predictive_budget_gated: dynamics.predictive_budget_gated,
+            predictive_budget_gated: dynamics.attention.predictive_budget_gated,
             binding_confidence_mod: dynamics.binding_confidence_mod,
             discontinuity_streak: self.carryover.urgency.discontinuity_streak,
             epistemic_reasoning_accelerated: self.carryover.quality.last_epistemic_conflict_count
                 > 5,
-            agency_strategy_override: perception.agency_strategy_override,
+            agency_strategy_override: perception.strategy.agency_strategy_override,
             pfe_surprise_mod: dynamics.pfe_surprise_mod,
-            adaptive_memo_threshold: perception.memo_threshold,
+            adaptive_memo_threshold: perception.encoding.memo_threshold,
             grid_encoding_norm: feedback.grid_encoding_norm,
             grid_spatial_complexity: feedback.grid_spatial_complexity,
             mood_temperature: 1.0,
@@ -361,7 +361,7 @@ impl CognitiveLoopService {
             response_profile: {
                 let user_state = crate::resonant_speech::UserState::from_neuromod(
                     self.neuromod.bath.allostatic_load,
-                    feedback.consciousness_level,
+                    feedback.consciousness.consciousness_level,
                     self.emotion_contagion.arousal,
                     self.neuromod.bath.oxytocin.effective(),
                 );
@@ -380,8 +380,11 @@ impl CognitiveLoopService {
         // ── Social coherence telemetry ──
         metadata.social_trust_current = self.social.social_trust;
         metadata.social_cooperation_current = self.social.social_cooperation_rate;
-        metadata.social_strategy_bias_applied = perception.social_strategy_bias;
+        metadata.social_strategy_bias_applied = perception.strategy.social_strategy_bias;
         metadata.social_learning_rate_factor = feedback.social_learning_rate_factor;
+        metadata.social_prediction_accuracy = self.social.social_prediction_accuracy;
+        metadata.social_models_count = self.social.social_models_count;
+        metadata.social_mean_trust = self.social.social_mean_trust;
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
@@ -397,7 +400,7 @@ impl CognitiveLoopService {
         if metadata.gwt_memory_consolidation_requested {
             if let Some(ref mut dream) = self.dream_engine {
                 let action: Vec<f32> = perception
-                    .encoding_result
+                    .encoding.encoding_result
                     .hdv
                     .values
                     .iter()
@@ -405,9 +408,9 @@ impl CognitiveLoopService {
                     .copied()
                     .collect();
                 dream.record_consolidation_event(
-                    &perception.compressed_state,
+                    &perception.encoding.compressed_state,
                     action,
-                    perception.prediction_error,
+                    perception.urgency.prediction_error,
                 );
             }
         }
@@ -502,9 +505,18 @@ impl CognitiveLoopService {
             }
         }
 
-        metadata.weight_convergence_state = feedback.convergence_state.clone();
-        if feedback.convergence_state == "Converged" && self.convergence_cycle == 0 {
-            self.convergence_cycle = self.stats.total_cycles as usize;
+        // Broca SSM language generation telemetry
+        #[cfg(feature = "ssm_language")]
+        {
+            metadata.broca = self
+                .broca_manager
+                .as_ref()
+                .map(|m| m.last_telemetry().clone());
+        }
+
+        metadata.weight_convergence_state = feedback.consciousness.convergence_state.clone();
+        if feedback.consciousness.convergence_state == "Converged" && self.convergence_cycle == 0 {
+            self.convergence_cycle = self.stats.total_cycles;
         }
         metadata.convergence_cycle = self.convergence_cycle;
 
@@ -536,44 +548,44 @@ impl CognitiveLoopService {
         // ── End-of-cycle stats ──
         self.run_end_of_cycle_stats(
             &mut metadata,
-            dynamics.resonator_wm_primed,
-            feedback.resonator_promotions,
-            feedback.codebook_evictions,
-            feedback.codebook_diversity,
-            dynamics.fep_surprise,
+            dynamics.resonator.resonator_wm_primed,
+            feedback.memory.resonator_promotions,
+            feedback.memory.codebook_evictions,
+            feedback.memory.codebook_diversity,
+            dynamics.fep.fep_surprise,
             self.self_model_tier
                 .self_reflection
                 .get_thresholds()
                 .surprise as f64,
-            dynamics.neuromod_attention_alloc,
-            dynamics.phasic_da_replay_boost,
-            dynamics.ne_reorienting_boost,
-            dynamics.ne_arousal_feedback,
-            dynamics.confidence_velocity,
-            dynamics.sht_crash_dip,
-            dynamics.exploration_sht_drain,
+            dynamics.neuromod.neuromod_attention_alloc,
+            dynamics.neuromod.phasic_da_replay_boost,
+            dynamics.neuromod.ne_reorienting_boost,
+            dynamics.neuromod.ne_arousal_feedback,
+            dynamics.neuromod.confidence_velocity,
+            dynamics.neuromod.sht_crash_dip,
+            dynamics.neuromod.exploration_sht_drain,
         );
 
         // Cross-manifold predictor: observe actual cognitive state for Hebbian learning
         #[cfg(feature = "vision-manifold")]
         if let Some(ref mut pred) = self.cross_manifold_predictor {
-            pred.observe_cognitive(&perception.encoding_result.hdv);
+            pred.observe_cognitive(&perception.encoding.encoding_result.hdv);
         }
 
         // Project 16,384D HDC to 32D for visualization
         let thought_vector = {
             debug_assert!(
-                !perception.encoding_result.hdv.values.is_empty(),
+                !perception.encoding.encoding_result.hdv.values.is_empty(),
                 "HDV must not be empty for thought_vector projection"
             );
-            let chunk_size = (perception.encoding_result.hdv.values.len() / 32).max(1);
+            let chunk_size = (perception.encoding.encoding_result.hdv.values.len() / 32).max(1);
             perception
-                .encoding_result
+                .encoding.encoding_result
                 .hdv
                 .values
                 .chunks(chunk_size)
                 .take(32)
-                .map(|chunk| chunk.iter().sum::<f32>() / chunk.len() as f32)
+                .map(|chunk: &[f32]| chunk.iter().sum::<f32>() / chunk.len() as f32)
                 .collect()
         };
 
@@ -589,8 +601,8 @@ impl CognitiveLoopService {
         // METRICS COLLECTION
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref metrics) = self.metrics_collector {
-            metrics.set_phi(dynamics.unified_psi);
-            metrics.set_coherence(dynamics.coherence as f64);
+            metrics.set_phi(dynamics.core.unified_psi);
+            metrics.set_coherence(dynamics.core.coherence as f64);
             metrics.set_consciousness_level(metadata.consciousness_level);
             metrics.track_execution(metadata.safety_blocked, false);
 
@@ -604,14 +616,14 @@ impl CognitiveLoopService {
         }
 
         #[cfg(feature = "identity")]
-        let signed_output = self.mfdi_bridge.sign_output(&dynamics.output).ok();
+        let signed_output = self.mfdi_bridge.sign_output(&dynamics.core.output).ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 
         // ── Phase 2.2: End feedback proposal collection ──────────────────
         let feedback_consensus = self.feedback_state.end_cycle(
             self.prediction_confidence,
-            self.fep_lr_boost,
+            self.fep.lr_boost,
             self.curiosity_drive.exploration_urge,
             self.carryover.learning.adaptive_threshold_scale,
         );
@@ -648,16 +660,16 @@ impl CognitiveLoopService {
         }
 
         CycleResult {
-            output: dynamics.output.clone(),
-            prediction_error: dynamics.prediction_error,
-            peak_attention: perception.encoding_result.peak_attention,
-            detected_primitives: perception.encoding_result.detected_primitives.clone(),
-            learning_occurred: dynamics.learning_occurred,
-            training_loss: dynamics.training_loss,
+            output: dynamics.core.output.clone(),
+            prediction_error: dynamics.core.prediction_error,
+            peak_attention: perception.encoding.encoding_result.peak_attention,
+            detected_primitives: perception.encoding.encoding_result.detected_primitives.clone(),
+            learning_occurred: dynamics.core.learning_occurred,
+            training_loss: dynamics.core.training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             metadata,
             thought_vector,
-            wisdom_hv: perception.hv16_cached.clone(),
+            wisdom_hv: perception.encoding.hv16_cached,
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]

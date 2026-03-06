@@ -68,7 +68,7 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .learning_rate
             .propose(source, FeedbackProposal::Add(delta64));
-        self.fep_lr_boost = (self.fep_lr_boost + delta64).clamp(1.0, 3.0);
+        self.fep.lr_boost = (self.fep.lr_boost + delta64).clamp(1.0, 3.0);
     }
 
     /// Record and apply a multiplicative scale factor to fep_lr_boost.
@@ -80,7 +80,7 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .learning_rate
             .propose(source, FeedbackProposal::Scale(factor64));
-        self.fep_lr_boost = (self.fep_lr_boost * factor64).clamp(1.0, 3.0);
+        self.fep.lr_boost = (self.fep.lr_boost * factor64).clamp(1.0, 3.0);
     }
 
     /// Record and apply a hard set of fep_lr_boost.
@@ -92,7 +92,7 @@ impl super::super::CognitiveLoopService {
         self.feedback_state
             .learning_rate
             .propose(source, FeedbackProposal::Set(value64));
-        self.fep_lr_boost = value64.clamp(1.0, 3.0);
+        self.fep.lr_boost = value64.clamp(1.0, 3.0);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

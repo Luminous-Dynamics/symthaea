@@ -476,6 +476,16 @@ pub struct StructuredThought {
 pub struct CodeContext {
     /// Programming language (e.g., "rust", "python", "nix")
     pub language: String,
+    /// Purpose description from the CodeSpec (what the code should do)
+    pub spec_purpose: Option<String>,
+    /// Expected signature from the CodeSpec (function/struct signature)
+    pub spec_signature: Option<String>,
+    /// Constraints from the CodeSpec that the code must satisfy
+    pub spec_constraints: Vec<String>,
+    /// Input/output examples from the CodeSpec
+    pub spec_examples: Vec<(String, String)>,
+    /// CfC-sequenced plan steps (e.g., "DefineFunction", "AddField")
+    pub plan_steps: Vec<String>,
     /// Generated source code (if applicable)
     pub generated_code: Option<String>,
     /// Phi-based integration/quality score of the code
@@ -601,6 +611,30 @@ impl StructuredThought {
         // Code context (from code understanding/generation pipeline)
         if let Some(ref ctx) = self.code_context {
             prompt.push_str(&format!("CODE_LANGUAGE: {}\n", ctx.language));
+            if let Some(ref purpose) = ctx.spec_purpose {
+                prompt.push_str(&format!("SPEC_PURPOSE: {purpose}\n"));
+            }
+            if let Some(ref sig) = ctx.spec_signature {
+                prompt.push_str(&format!("SPEC_SIGNATURE: {sig}\n"));
+            }
+            if !ctx.spec_constraints.is_empty() {
+                prompt.push_str("CONSTRAINTS:\n");
+                for c in &ctx.spec_constraints {
+                    prompt.push_str(&format!("  - {c}\n"));
+                }
+            }
+            if !ctx.spec_examples.is_empty() {
+                prompt.push_str("EXAMPLES:\n");
+                for (input, output) in &ctx.spec_examples {
+                    prompt.push_str(&format!("  {input} -> {output}\n"));
+                }
+            }
+            if !ctx.plan_steps.is_empty() {
+                prompt.push_str("PLAN_STEPS:\n");
+                for step in &ctx.plan_steps {
+                    prompt.push_str(&format!("  {step}\n"));
+                }
+            }
             if let Some(ref code) = ctx.generated_code {
                 prompt.push_str(&format!(
                     "GENERATED_CODE:\n```{}\n{}\n```\n",

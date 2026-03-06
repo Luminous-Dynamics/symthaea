@@ -411,7 +411,7 @@ impl NeuromodCalibration {
                 let factor = z_to_sensitivity_factor(weighted_z, true);
                 let source_names: Vec<String> = {
                     let mut names = Vec::new();
-                    if ecb_z_sources.len() >= 1 { names.push("composite".to_string()); }
+                    if !ecb_z_sources.is_empty() { names.push("composite".to_string()); }
                     names
                 };
                 adjustments.push(TransmitterCalibration {

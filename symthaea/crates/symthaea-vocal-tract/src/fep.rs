@@ -41,11 +41,12 @@ pub struct VocalTractObservation {
 }
 
 /// Actions the FEP agent can take to modulate the vocal tract.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum VocalAction {
     /// Decrease tau -> faster formant transitions (high surprise).
     DropTau = 0,
     /// Increase tau -> smoother sustained vowels (low surprise).
+    #[default]
     RaiseTau = 1,
     /// Increase learning rate -> faster adaptation.
     BoostLR = 2,
@@ -280,12 +281,6 @@ pub struct FepTelemetry {
     pub emphasis_factor: f32,
     pub action: VocalAction,
     pub tick_count: u64,
-}
-
-impl Default for VocalAction {
-    fn default() -> Self {
-        VocalAction::RaiseTau
-    }
 }
 
 impl Default for VocalTractFepAgent {

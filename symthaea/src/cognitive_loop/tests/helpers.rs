@@ -330,14 +330,14 @@ fn test_step_fep_active_inference_returns_valid_action() {
 #[test]
 fn test_step_fep_active_inference_high_error_response() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let initial_lr_boost = service.fep_lr_boost;
+    let initial_lr_boost = service.fep.lr_boost;
     // Run with very high prediction error
     let (_idx, _probs, _surprised, _prag) = service.step_fep_active_inference(0.9, 0.2);
     // The FEP system should have responded in some way
     // (exact behavior depends on action selection, but state should have changed)
-    let state_changed = service.fep_lr_boost != initial_lr_boost
+    let state_changed = service.fep.lr_boost != initial_lr_boost
         || service.curiosity_drive.exploration_urge > 0.0
-        || service.fep_agent.precision.sensory_precision != 1.0;
+        || service.fep.agent.precision.sensory_precision != 1.0;
     // This is a soft assertion — FEP action is stochastic
     let _ = state_changed; // Just verify no panic
 }

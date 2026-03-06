@@ -512,9 +512,11 @@ impl MoralTopology {
         basis: Arc<HarmonyBasis>,
         anomaly_config: MoralAnomalyConfig,
     ) -> Self {
-        let mut adaptive_state = AdaptiveAnomalyState::default();
-        adaptive_state.effective_drift_threshold = anomaly_config.drift_alert_threshold;
-        adaptive_state.effective_fe_sigma = anomaly_config.fe_sigma_multiplier;
+        let adaptive_state = AdaptiveAnomalyState {
+            effective_drift_threshold: anomaly_config.drift_alert_threshold,
+            effective_fe_sigma: anomaly_config.fe_sigma_multiplier,
+            ..Default::default()
+        };
         Self {
             config,
             anomaly_config,

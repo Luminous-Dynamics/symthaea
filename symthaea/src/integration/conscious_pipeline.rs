@@ -235,6 +235,9 @@ pub struct ConsciousPipeline {
     stats: PipelineStats,
     /// Empathic unification engine - true empathy for users
     empathy: EmpathicUnification,
+    /// OPTIONAL: NixOS deep cognition hook (active inference, causal learning, episodic memory)
+    #[cfg(feature = "nix-mind")]
+    nix_hook: Option<Box<dyn symthaea_nix::plugin::pipeline_integration::NixPipelineHook>>,
 }
 
 /// Pipeline statistics
@@ -288,6 +291,8 @@ impl ConsciousPipeline {
             session_id: None,
             stats: PipelineStats::default(),
             empathy,
+            #[cfg(feature = "nix-mind")]
+            nix_hook: None,
         })
     }
 
@@ -295,6 +300,16 @@ impl ConsciousPipeline {
     pub async fn with_llm(mut config: PipelineConfig, llm_config: LlmConfig) -> Result<Self> {
         config.llm = Some(llm_config);
         Self::new(config).await
+    }
+
+    /// Attach a NixOS deep cognition hook for active inference, causal learning, episodic memory.
+    #[cfg(feature = "nix-mind")]
+    pub fn with_nix_hook(
+        mut self,
+        hook: Box<dyn symthaea_nix::plugin::pipeline_integration::NixPipelineHook>,
+    ) -> Self {
+        self.nix_hook = Some(hook);
+        self
     }
 
     /// Start a new conversation session
@@ -339,6 +354,23 @@ impl ConsciousPipeline {
 
         // Update current Φ from HDC+LTC processing
         self.current_phi = phi;
+
+        // =========================================================
+        // Step 1.25: OPTIONAL NixOS Deep Cognition (active inference, causal reasoning)
+        // =========================================================
+        #[cfg(feature = "nix-mind")]
+        let _nix_deep_result = {
+            if nix_understanding.confidence >= 0.3 {
+                if let Some(ref mut hook) = self.nix_hook {
+                    let confidence = nix_understanding.confidence as f64;
+                    Some(hook.process_nix_input(input, phi, confidence))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
 
         // =========================================================
         // Step 1.5: EMPATHIC PROCESSING - Sense user's emotional state
@@ -436,6 +468,21 @@ impl ConsciousPipeline {
             }
             None
         };
+
+        // =========================================================
+        // Step 6.5: NixOS post-execute causal learning
+        // =========================================================
+        #[cfg(feature = "nix-mind")]
+        if let Some(ref mut hook) = self.nix_hook {
+            if let Some(ref exec) = execution {
+                let action_desc = intent
+                    .as_ref()
+                    .and_then(|i| i.command.as_ref())
+                    .map(|c| format!("{:?}", c))
+                    .unwrap_or_default();
+                hook.post_execute(&action_desc, exec.success, &exec.output);
+            }
+        }
 
         // =========================================================
         // Step 7: Record to memory
@@ -860,6 +907,12 @@ impl ConsciousPipeline {
         ) {
             feedback.user_feedback = Some(was_positive);
             self.core.receive_action_outcome(feedback);
+        }
+
+        // Forward feedback to NixOS deep cognition hook for adaptive threshold learning
+        #[cfg(feature = "nix-mind")]
+        if let Some(ref mut hook) = self.nix_hook {
+            hook.feedback(was_positive);
         }
     }
 
