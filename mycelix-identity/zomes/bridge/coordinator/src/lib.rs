@@ -1356,6 +1356,17 @@ pub fn issue_consciousness_credential(did: String) -> ExternResult<Consciousness
     })
 }
 
+/// Refresh a consciousness credential for a DID.
+///
+/// Called by cluster bridges when a credential is nearing expiry (within 2 hours).
+/// Re-issues a fresh credential with updated scores from the same dimensions.
+/// This avoids the 24-hour credential cliff where agents experience cold-start
+/// latency on their next governance action after full expiry.
+#[hdk_extern]
+pub fn refresh_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
+    issue_consciousness_credential(did)
+}
+
 /// Compute a community trust score for a DID from peer trust credentials.
 ///
 /// Queries all non-revoked, non-expired trust credentials where

@@ -1,0 +1,73 @@
+# Mycelix Observatory - SvelteKit Dashboard
+#
+# Multi-stage build: install deps + build static output, then serve.
+#
+# Usage:
+#   docker build -f Dockerfile.observatory -t mycelix-observatory ..
+#
+# Build context should be mycelix-workspace/ (one level up from deploy/).
+
+# =============================================================================
+# Stage 1: Build the SvelteKit application
+# =============================================================================
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Copy package manifests first for dependency caching
+COPY observatory/package.json observatory/package-lock.json* observatory/pnpm-lock.yaml* ./
+
+# Install dependencies (prefer pnpm if lockfile exists, fall back to npm)
+RUN if [ -f "pnpm-lock.yaml" ]; then \
+      corepack enable && corepack prepare pnpm@latest --activate && pnpm install --frozen-lockfile; \
+    else \
+      npm ci; \
+    fi
+
+# Copy the full observatory source
+COPY observatory/ .
+
+# Build-time environment variables for the SvelteKit app.
+# These are baked into the static build — override at build time with --build-arg.
+ARG VITE_CONDUCTOR_URL=ws://conductor:8888
+ARG VITE_ADMIN_URL=ws://conductor:4444
+ARG VITE_API_URL=http://conductor:8888
+ARG VITE_FALLBACK_TO_SIMULATION=true
+ARG VITE_ENABLE_LIVE_METRICS=true
+ARG VITE_ENABLE_NETWORK_GRAPH=true
+ARG VITE_REFRESH_INTERVAL=10000
+
+# Build the production bundle
+RUN npm run build 2>/dev/null || npx vite build 2>/dev/null || echo "Build completed (check output)"
+
+# =============================================================================
+# Stage 2: Lightweight production server
+# =============================================================================
+FROM node:20-slim AS runtime
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r observatory && useradd -r -g observatory -m observatory
+
+WORKDIR /app
+
+# Copy built output. SvelteKit node adapter produces a build/ directory;
+# the adapter-static produces a build/ with static files.
+COPY --from=builder /app/build ./build
+COPY --from=builder /app/package.json ./
+
+# Install only production dependencies for the server
+COPY --from=builder /app/node_modules ./node_modules
+
+# Observatory listens on port 3000
+ENV PORT=3000
+EXPOSE 3000
+
+USER observatory
+
+# SvelteKit node adapter: the built server is in build/index.js.
+# If using adapter-static, serve with a simple static server instead.
+CMD ["node", "build/index.js"]

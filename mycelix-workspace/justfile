@@ -1166,3 +1166,64 @@ test-clusters: test-commons-unit test-civic-unit
     @echo "🧪 Running SDK cluster integration tests..."
     @cd sdk-ts && npx vitest run tests/cluster-integration.test.ts
     @echo "✅ All cluster tests passed!"
+
+# ============================================================
+# DEPLOYMENT
+# ============================================================
+
+# Build production Docker images
+deploy-build:
+    cd deploy && docker compose -f docker-compose.prod.yml build
+
+# Start production stack
+deploy-up:
+    cd deploy && docker compose -f docker-compose.prod.yml up -d
+
+# Stop production stack
+deploy-down:
+    cd deploy && docker compose -f docker-compose.prod.yml down
+
+# View production logs
+deploy-logs:
+    cd deploy && docker compose -f docker-compose.prod.yml logs -f
+
+# Production health check
+deploy-health:
+    #!/usr/bin/env bash
+    echo ""
+    echo "Mycelix Production Health Check"
+    echo "================================"
+    echo ""
+    # Check Observatory
+    if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+        echo "  [OK] Observatory (port 3000)"
+    elif curl -sf https://localhost -k > /dev/null 2>&1; then
+        echo "  [OK] Observatory (via nginx/443)"
+    else
+        echo "  [--] Observatory: DOWN"
+    fi
+    # Check Conductor app interface (WebSocket — curl won't get HTTP 200, but connection works)
+    if curl -sf --max-time 2 http://localhost:8888 > /dev/null 2>&1; then
+        echo "  [OK] Conductor app (port 8888)"
+    else
+        echo "  [..] Conductor app (port 8888): no HTTP response (WebSocket-only is normal)"
+    fi
+    # Check nginx
+    if curl -sf --max-time 2 http://localhost:80 > /dev/null 2>&1; then
+        echo "  [OK] Nginx (port 80 -> 443 redirect)"
+    else
+        echo "  [--] Nginx: DOWN or not listening on 80"
+    fi
+    # Check Docker containers
+    echo ""
+    echo "Container Status:"
+    docker compose -f deploy/docker-compose.prod.yml ps 2>/dev/null || echo "  docker compose not available or stack not running"
+    echo ""
+
+# Show production container status
+deploy-status:
+    cd deploy && docker compose -f docker-compose.prod.yml ps
+
+# Restart a specific production service (e.g., just deploy-restart conductor)
+deploy-restart service:
+    cd deploy && docker compose -f docker-compose.prod.yml restart {{service}}

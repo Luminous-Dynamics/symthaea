@@ -58,19 +58,24 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Integration status**: Core pipeline fully wired with surprise exploration, prefrontal gating, meta-cognition, reasoning engine (7-step cycle with Phi/gating/planning), moral algebra, CycleMetadata telemetry, social coherence (ToM in Mind module). ~25% of `src/` modules remain structural/disconnected (iroh P2P, some consciousness subsystems).
 - **Sub-crate pattern**: `pub use symthaea_X as module_name;` in consciousness/mod.rs for zero API changes
 
-### Mycelix Cluster Architecture
-12 domain hApps consolidated into 2 cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
+### Mycelix Fractal Architecture (7-role unified hApp)
+Fractal CivOS with 5 tiers, consolidated into cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
 
-| Cluster | Path | Domains | Zomes |
-|---------|------|---------|-------|
-| **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water, food, transport | 35 (34 domain + 1 bridge) |
-| **mycelix-civic** | `mycelix-civic/` | justice, emergency, media | 16 (15 domain + 1 bridge) |
+| Cluster | Path | Domains | Zomes | Tests |
+|---------|------|---------|-------|-------|
+| **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water, food, transport | 35 (34 domain + 1 bridge) | 5,276 |
+| **mycelix-civic** | `mycelix-civic/` | justice, emergency, media | 16 (15 domain + 1 bridge) | 2,273 |
+| **mycelix-hearth** | `mycelix-hearth/` | kinship, gratitude, care, autonomy, decisions, stories, milestones, rhythms, emergency, resources | 12 (11 domain + 1 bridge) | 1,023 |
+| **mycelix-identity** | `mycelix-identity/` | DID registry, MFA, trust credentials, verifiable credentials, recovery | 9 | 23+ unit, 100+ sweettest |
+| **mycelix-governance** | `mycelix-governance/` | proposals, voting, threshold-signing (DKG), councils, constitution, execution | 7 | 44+ unit, 130+ sweettest |
+| **mycelix-personal** | `mycelix-personal/` | identity vault, health vault, credential wallet | 4 (3 domain + 1 bridge) | 20 |
+| **mycelix-attribution** | `mycelix-attribution/` | dependency registry, usage receipts, reciprocity | 3 | 17 |
 
-- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster)
-- **Cross-cluster bridge**: Commons↔Civic via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`)
-- **SDK TS clients**: `mycelix-workspace/sdk-ts/src/integrations/{commons,civic}/` (includes cross-cluster methods)
+- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster + consciousness gating)
+- **Cross-cluster bridge**: All clusters via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`)
+- **Consciousness gating**: 4D profile (identity/reputation/community/engagement) → 5 tiers (Observer→Guardian) → progressive vote weights
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
-- **Tests**: 33 SDK TS cluster tests + 6,211 Rust unit tests (4,126 commons + 2,030 civic + 55 bridge-common)
+- **Tests**: 8,600+ Rust workspace tests across clusters + 212 bridge-common + 996 SDK Rust + 6,650+ SDK TS
 
 ---
 

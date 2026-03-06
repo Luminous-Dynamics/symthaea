@@ -125,5 +125,13 @@ name = "mutualaid_workflow"
 path = "tests/mutualaid_workflow.rs"
 
 [[test]]
+name = "cross_cluster_workflows"
+path = "tests/cross_cluster_workflows.rs"
+
+[[test]]
+name = "cross_cluster_consciousness"
+path = "tests/cross_cluster_consciousness.rs"
+
+[[test]]
 name = "food_transport_workflow"
 path = "tests/food_transport_workflow.rs"

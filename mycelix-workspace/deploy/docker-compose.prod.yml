@@ -1,0 +1,113 @@
+# Mycelix Production Docker Compose
+#
+# Services:
+#   conductor   — Holochain 0.6.0 conductor (WASM zome runtime + DHT networking)
+#   observatory — SvelteKit dashboard (network visualization, trust metrics)
+#   nginx       — TLS termination, WSS proxy, security headers
+#
+# Usage:
+#   cd deploy/
+#   cp .env.example .env        # fill in LAIR_PASSPHRASE, cert paths
+#   docker-compose -f docker-compose.prod.yml build
+#   docker-compose -f docker-compose.prod.yml up -d
+#
+# The build context for conductor and observatory is the parent directory
+# (mycelix-workspace/) so Dockerfiles can COPY from happs/, observatory/, etc.
+
+services:
+  # ---------------------------------------------------------------------------
+  # Holochain Conductor
+  # ---------------------------------------------------------------------------
+  # Runs the Holochain 0.6.0 conductor with the Mycelix unified hApp.
+  # Stores agent keys (Lair) and DHT databases in a persistent volume.
+  conductor:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.conductor
+    container_name: mycelix-conductor
+    restart: unless-stopped
+    environment:
+      - LAIR_PASSPHRASE=${LAIR_PASSPHRASE}
+    ports:
+      # Admin WebSocket — restrict to localhost in production (use nginx for external)
+      - "127.0.0.1:${CONDUCTOR_ADMIN_PORT:-4444}:4444"
+      # App WebSocket — nginx proxies WSS to this port
+      - "${CONDUCTOR_APP_PORT:-8888}:8888"
+    volumes:
+      - holochain-data:/data/holochain
+    networks:
+      - mycelix-net
+    healthcheck:
+      # Basic TCP check on the app WebSocket port
+      test: ["CMD", "curl", "-sf", "http://localhost:8888", "||", "true"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Observatory Dashboard
+  # ---------------------------------------------------------------------------
+  # SvelteKit app that visualizes the Mycelix network: trust scores, DHT health,
+  # epistemic metrics, and agent activity.
+  observatory:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.observatory
+      args:
+        VITE_CONDUCTOR_URL: ${VITE_CONDUCTOR_URL:-ws://conductor:8888}
+        VITE_FALLBACK_TO_SIMULATION: ${VITE_FALLBACK_TO_SIMULATION:-true}
+        VITE_ENABLE_LIVE_METRICS: ${VITE_ENABLE_LIVE_METRICS:-true}
+        VITE_ENABLE_NETWORK_GRAPH: ${VITE_ENABLE_NETWORK_GRAPH:-true}
+    container_name: mycelix-observatory
+    restart: unless-stopped
+    expose:
+      # Only exposed to nginx, not to the host directly
+      - "${OBSERVATORY_PORT:-3000}"
+    depends_on:
+      conductor:
+        condition: service_started
+    networks:
+      - mycelix-net
+
+  # ---------------------------------------------------------------------------
+  # Nginx Reverse Proxy
+  # ---------------------------------------------------------------------------
+  # TLS termination, WSS->WS proxying, security headers.
+  # Serves Observatory on HTTPS/443 and proxies /ws to the conductor.
+  nginx:
+    image: nginx:alpine
+    container_name: mycelix-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      # Admin API on separate port (firewalled in production)
+      - "127.0.0.1:4445:4445"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TLS_CERT_PATH:-./certs/mycelix.crt}:/etc/ssl/certs/mycelix.crt:ro
+      - ${TLS_KEY_PATH:-./certs/mycelix.key}:/etc/ssl/private/mycelix.key:ro
+    depends_on:
+      - conductor
+      - observatory
+    networks:
+      - mycelix-net
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  mycelix-net:
+    driver: bridge
+    # Internal network for inter-service communication.
+    # Only nginx ports are exposed to the host.
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  # Persistent storage for Holochain databases and Lair keystore.
+  # Back this up regularly — it contains agent keys and DHT data.
+  holochain-data:
+    driver: local

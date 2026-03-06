@@ -3,6 +3,12 @@
 **/*.rs.bk
 Cargo.lock
 
+# Cargo local cache (should never be committed)
+.cargo/registry/
+.cargo/.global-cache
+.cargo/.package-cache
+.cargo/.package-cache-mutate
+
 # Node
 node_modules/
 /dist

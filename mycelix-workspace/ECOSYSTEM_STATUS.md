@@ -85,26 +85,47 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 | **EduNet** | 10 | Restored | Restored from archive. Needs verification. |
 | **Consensus (RBBFT)** | 1 | Compiles | Native workspace hApp. Minimal. |
 
+### Core Four (fully implemented, integrated)
+
+| hApp | Zomes | Tests | Notes |
+|------|-------|-------|-------|
+| **Identity** | 9 (did_registry, trust_credential, mfa, verifiable_credential, credential_schema, education, revocation, recovery, bridge) | 23 unit + 100+ sweettests | W3C DID Core, MFA (5 factor types), ZK-based trust attestations, consciousness credential issuance. 36,820 LOC. |
+| **Governance** | 7 (proposals, voting, threshold-signing, councils, constitution, execution, bridge) | 44 unit + 130+ sweettests | 5 proposal types, Phi-weighted voting, Feldman VSS DKG (off-chain ceremony, on-chain commitments), constitutional amendments. 28,364 LOC. |
+
+### Additional Clusters
+
+| Cluster | Zomes | LOC | Tests | Notes |
+|---------|-------|-----|-------|-------|
+| **Hearth** (FAMILY tier) | 11 + bridge | 30,403 | 1,023 (workspace) | Kinship, gratitude, care, autonomy, decisions, stories, milestones, rhythms, emergency, resources. Consciousness-gated. |
+| **Personal** (Sovereign tier) | 3 + bridge | 4,447 | 20 | Identity vault, health vault, credential wallet. Lightweight scaffold. |
+| **Attribution** (OPEN tier) | 3 zomes | 6,849 | 17 | Dependency registry, usage receipts, reciprocity pledges. |
+
+### Cluster Domains (active in commons/civic clusters)
+
+These domains are fully implemented as zomes within the Commons or Civic cluster DNAs. They are NOT standalone hApps.
+
+| Domain | Cluster | Zomes | Notes |
+|--------|---------|-------|-------|
+| **Property** | Commons | 4 | Registry, transfers, disputes, commons management |
+| **Housing** | Commons | 6 | Units, membership, finances, maintenance, CLT, governance |
+| **Care** | Commons | 5 | Timebank, circles, matching, plans, credentials |
+| **Mutual Aid** | Commons | 7 | Needs, circles, governance, pools, requests, resources, timebank |
+| **Water** | Commons | 5 | Flow, purity, capture, stewardship, traditional knowledge |
+| **Food** | Commons | 4 | Production, distribution, preservation, knowledge |
+| **Transport** | Commons | 3 | Routes, sharing, carbon impact |
+| **Justice** | Civic | 5 | Cases, evidence, arbitration, restorative circles, enforcement |
+| **Emergency** | Civic | 6 | Incidents, triage, resources, coordination, shelters, comms |
+| **Media** | Civic | 4 | Publication, attribution, fact-checking, curation |
+
 ### Scaffold (compiles to WASM, core logic incomplete)
 
 | hApp | Status | Notes |
 |------|--------|-------|
-| **Identity** | Types + structure | 15 subdirectories. Foundation for other hApps but missing core zome logic. |
 | **Knowledge** | Types + structure | 23 subdirectories. Large scope. |
-| **Governance** | Types + structure | Needed for ecosystem self-management. |
-| **Justice** | Types + structure | |
-| **Finance** | Types + structure | |
-| **Property** | Types + structure | |
-| **Energy** | Types + structure | |
-| **Media** | Types + structure | 13 subdirectories. |
-| **Health** | MVP (7 zomes) | Reduced from 37 to 7 core zomes (patient, provider, records, prescriptions, consent, bridge, shared). 22 archived to `_archive-2026-02-15/`. |
+| **Finance** | Types + structure | 22,273 LOC. Needs promotion to beta. |
+| **Energy** | Types + structure | 10,118 LOC. |
+| **Health** | MVP (7 zomes) | Reduced from 37 to 7 core zomes. 22 archived to `_archive-2026-02-15/`. |
 | **Space** | Types + structure | 12 subdirectories. |
-| **Care** | New scaffold | Restored/created recently. |
-| **Emergency** | Complete (6 zomes, ~12,700 LOC) | 6 zomes in civic cluster: incidents, triage, resources, coordination, shelters, comms. Cross-domain bridges validated. 2,030 civic tests pass. |
-| **Water** | New scaffold | Restored/created recently. |
-| **Housing** | New scaffold | Restored/created recently. |
-| **Food** | New scaffold | 4 zomes (production, distribution, preservation, knowledge). Part of Commons cluster. |
-| **Transport** | New scaffold | 3 zomes (routes, sharing, impact). Part of Commons cluster. |
 
 ### Stub / Early Stage
 
@@ -135,10 +156,39 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 ### SDK Rust Modules
 agentic, bridge, credentials, crypto, dkg, economics, epistemic, error, fl, hyperfeel, identity, intentions, matl, pagination, pog, storage, temporal, wasm, zkproof
 
-### SDK TypeScript Integration Modules (29)
-academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabrication, finance, food-shelter, genetics, governance, health, health-energy, health-fhir, health-food, health-governance, health-marketplace, identity, justice, knowledge, mail, marketplace, media, music, mutualaid, property, supplychain, water-energy
+### SDK TypeScript Integration Modules (34 — audited 2026-03-06)
 
-**Warning**: Many of these 29 integration modules may point to empty or minimal implementations. Audit needed.
+**Full (19 modules, 53%)** — 5+ exported functions with business logic:
+
+| Module | Functions | Types | LOC |
+|--------|-----------|-------|-----|
+| health-fhir | 11 | 20 | 1,443 |
+| health-food | 11 | 11 | 965 |
+| health-marketplace | 10 | 13 | 1,187 |
+| health-governance | 9 | 10 | 831 |
+| identity | 9 | 24 | 749 |
+| epistemic-markets | 8 | 31 | 1,120 |
+| genetics | 8 | 16 | 637 |
+| health-energy | 8 | 9 | 631 |
+| commons | 7 | 21 | 567 |
+| finance | 6 | 20 | 583 |
+| governance | 6 | 22 | 751 |
+| justice | 6 | 25 | 803 |
+| knowledge | 6 | 20 | 684 |
+| media | 6 | 21 | 810 |
+| property | 6 | 22 | 619 |
+| water-energy | 6 | 29 | 918 |
+| food-shelter | 5 | 21 | 837 |
+| hearth | 5 | 22 | 576 |
+| personal | 5 | 15 | 530 |
+
+**Types (5 modules, 12%)** — primarily type/interface definitions:
+fabrication (56 types, 1,269 LOC), food (37 types), health (58 types), support (34 types), transport (33 types)
+
+**Stub (12 modules, 35%)** — minimal re-exports (<3 functions):
+academic, attribution, civic, climate, consensus, desci, edunet, energy, mail, marketplace, music, mutualaid, supplychain
+
+**Total**: 23,926 LOC across 34 integration modules. Bridge module adds 835 LOC (10 functions + LocalBridge + BridgeRouter classes).
 
 ---
 
@@ -163,7 +213,7 @@ academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabricat
 4. ~~**Observatory mock-only**~~: Live conductor connection fully implemented, awaiting conductor.
 5. ~~**hApp scaffolding incomplete**~~: Fixed 2026-02-08. All 10 ready-to-build hApps have v0 manifest format.
 6. **Scope sprawl**: 24 hApps total, 12 with bundles, 10 scaffolded (ready to build), 2 REST APIs.
-7. **SDK-TS bundle size**: 29 integration modules, unclear how many are functional.
+7. ~~**SDK-TS bundle size**~~: Audited 2026-03-06. 34 integration modules: 19 Full (53%, 5+ exported functions), 5 Types (12%, primarily type definitions), 12 Stub (35%, minimal re-exports). Total 23,926 LOC. See SDK-TS Audit section below.
 8. **Cross-hApp bridges**: Claimed in architecture docs, not tested in integration.
 9. **WASM builds pending**: 6 hApps (climate, mutualaid, consensus, music, food, transport) need `nix develop` + WASM compilation.
 10. ~~**FL consciousness integration**~~: `ConsciousnessAwareByzantinePlugin` added 2026-02-15. Uses Phi scores for weight adjustment (boost/dampen/veto). 110 tests pass.
@@ -178,8 +228,8 @@ academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabricat
 2. ~~Remove Python SDK references or create the package~~: SDK exists, 45 tests pass
 3. ~~Implement Core REST API (3 endpoints minimum)~~: 4 endpoints implemented
 4. ~~Connect Observatory to real conductor (or clearly label demo mode)~~: 3-tier fallback system
-5. Promote Identity + Governance from scaffold to beta
-6. Audit SDK-TS integration modules for empty exports
+5. ~~Promote Identity + Governance from scaffold to beta~~: Corrected 2026-03-06. Both are fully implemented (Identity: 9 zomes/36.8K LOC, Governance: 7 zomes/28.4K LOC). Moved to Core Four.
+6. ~~Audit SDK-TS integration modules for empty exports~~: Done 2026-03-06. 19 Full / 5 Types / 12 Stub
 
 ---
 
