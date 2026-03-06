@@ -59,8 +59,18 @@ fn main() {
         temporal_smoothness_weight: opts.smoothness_weight,
         temporal_rank_reg_weight: opts.rank_reg_weight,
         temporal_learned_attention: opts.learned_attention,
-        temporal_e2e_loss: opts.e2e_loss,
         grad_clip: opts.grad_clip,
+        temporal_chunk_dim: opts.chunk_size,
+        temporal_num_groups: opts.num_groups,
+        temporal_anticollapse_weight: opts.anticollapse,
+        temporal_anticollapse_threshold: opts.anticollapse_threshold,
+        temporal_rotate_grad_position: !opts.no_rotate_grad,
+        temporal_adapter: opts.adapter,
+        lora_rank: opts.lora_rank,
+        lora_alpha: opts.lora_alpha,
+        lora_lr: opts.lora_lr,
+        embedding_stats_path: opts.embedding_stats.clone(),
+        e2e_grad_chunks: opts.e2e_grad_chunks,
         // Disable runtime safety features during batch training:
         // - consciousness_gating: the PE > 0.8 gate in distill_step() blocks all
         //   gradient flow when projection is untrained (PE ≈ 1.0 always).
@@ -231,7 +241,13 @@ fn main() {
         temporal = opts.temporal_projection,
         learned_pos_enc = opts.learned_pos_enc,
         directional_loss = opts.directional_loss,
-        e2e_loss = opts.e2e_loss,
+        num_groups = opts.num_groups,
+        anticollapse = opts.anticollapse,
+        adapter = opts.adapter,
+        lora_rank = opts.lora_rank,
+        rotate_grad = !opts.no_rotate_grad,
+        e2e_grad_chunks = opts.e2e_grad_chunks,
+        embedding_stats = opts.embedding_stats.is_some(),
         "Starting projection training"
     );
 
@@ -272,16 +288,7 @@ fn main() {
             let result = gen.generate(&channels);
 
             // Distill step: update projection from reconstruction error
-            // When e2e loss is enabled, encode target text for Mamba's tokenizer
-            if opts.e2e_loss && !pair.target_text.is_empty() {
-                if let Ok(target_tokens) = gen.mamba().encode(&pair.target_text) {
-                    gen.distill_step_with_targets(&channels, &result, Some(&target_tokens));
-                } else {
-                    gen.distill_step(&channels, &result);
-                }
-            } else {
-                gen.distill_step(&channels, &result);
-            }
+            gen.distill_step(&channels, &result);
 
             epoch_semantic_pe += result.semantic_pe;
             epoch_coherence += result.final_coherence;
@@ -412,16 +419,33 @@ fn main() {
     let weights = gen.projection().flatten_weights();
 
     let mut checkpoint = if let Some(tp) = gen.temporal_proj() {
-        ProjectionCheckpoint::new_temporal(
-            weights,
-            tp.flatten_weights(),
-            gen.config().hdc_dim,
-            gen.config().bottleneck_dim,
-            gen.config().ssm_dim,
-            final_epoch,
-            tp.chunk_size(),
-            tp.num_chunks(),
-        )
+        let num_groups = tp.num_groups();
+        let has_adapter = tp.has_adapter();
+        if num_groups > 1 || has_adapter {
+            ProjectionCheckpoint::new_temporal_with_groups(
+                weights,
+                tp.flatten_weights(),
+                gen.config().hdc_dim,
+                gen.config().bottleneck_dim,
+                gen.config().ssm_dim,
+                final_epoch,
+                tp.chunk_size(),
+                tp.num_chunks(),
+                num_groups,
+                has_adapter,
+            )
+        } else {
+            ProjectionCheckpoint::new_temporal(
+                weights,
+                tp.flatten_weights(),
+                gen.config().hdc_dim,
+                gen.config().bottleneck_dim,
+                gen.config().ssm_dim,
+                final_epoch,
+                tp.chunk_size(),
+                tp.num_chunks(),
+            )
+        }
     } else {
         ProjectionCheckpoint::new(
             weights,
@@ -520,8 +544,19 @@ struct ProjectionTrainOpts {
     rank_reg_weight: f32,
     pos_enc_unfreeze_epoch: usize,
     learned_attention: bool,
-    e2e_loss: bool,
     max_gen_tokens: usize,
+    // ─── Improvement A-F CLI options ───
+    chunk_size: usize,
+    num_groups: usize,
+    anticollapse: f32,
+    anticollapse_threshold: f32,
+    adapter: bool,
+    no_rotate_grad: bool,
+    lora_rank: usize,
+    lora_alpha: f32,
+    lora_lr: f32,
+    embedding_stats: Option<String>,
+    e2e_grad_chunks: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
@@ -552,8 +587,18 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         rank_reg_weight: 0.0,
         pos_enc_unfreeze_epoch: 0,
         learned_attention: false,
-        e2e_loss: false,
         max_gen_tokens: 16,
+        chunk_size: 0,
+        num_groups: 1,
+        anticollapse: 0.0,
+        anticollapse_threshold: 0.9,
+        adapter: false,
+        no_rotate_grad: false,
+        lora_rank: 0,
+        lora_alpha: 1.0,
+        lora_lr: 0.0001,
+        embedding_stats: None,
+        e2e_grad_chunks: 1,
     };
 
     let mut i = 1;
@@ -690,9 +735,6 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
             "--learned-attention" => {
                 opts.learned_attention = true;
             }
-            "--e2e-loss" => {
-                opts.e2e_loss = true;
-            }
             "--pos-enc-unfreeze" => {
                 i += 1;
                 opts.pos_enc_unfreeze_epoch = args
@@ -708,6 +750,84 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                     .ok_or("--max-gen-tokens requires a number")?
                     .parse()
                     .map_err(|_| "--max-gen-tokens must be a positive integer")?;
+            }
+            "--chunk-size" => {
+                i += 1;
+                opts.chunk_size = args
+                    .get(i)
+                    .ok_or("--chunk-size requires a number")?
+                    .parse()
+                    .map_err(|_| "--chunk-size must be a positive integer")?;
+            }
+            "--num-groups" => {
+                i += 1;
+                opts.num_groups = args
+                    .get(i)
+                    .ok_or("--num-groups requires a number")?
+                    .parse()
+                    .map_err(|_| "--num-groups must be a positive integer")?;
+            }
+            "--anticollapse" => {
+                i += 1;
+                opts.anticollapse = args
+                    .get(i)
+                    .ok_or("--anticollapse requires a number")?
+                    .parse()
+                    .map_err(|_| "--anticollapse must be a float")?;
+            }
+            "--anticollapse-threshold" => {
+                i += 1;
+                opts.anticollapse_threshold = args
+                    .get(i)
+                    .ok_or("--anticollapse-threshold requires a number")?
+                    .parse()
+                    .map_err(|_| "--anticollapse-threshold must be a float")?;
+            }
+            "--adapter" => {
+                opts.adapter = true;
+            }
+            "--no-rotate-grad" => {
+                opts.no_rotate_grad = true;
+            }
+            "--lora-rank" => {
+                i += 1;
+                opts.lora_rank = args
+                    .get(i)
+                    .ok_or("--lora-rank requires a number")?
+                    .parse()
+                    .map_err(|_| "--lora-rank must be a positive integer")?;
+            }
+            "--lora-alpha" => {
+                i += 1;
+                opts.lora_alpha = args
+                    .get(i)
+                    .ok_or("--lora-alpha requires a number")?
+                    .parse()
+                    .map_err(|_| "--lora-alpha must be a float")?;
+            }
+            "--lora-lr" => {
+                i += 1;
+                opts.lora_lr = args
+                    .get(i)
+                    .ok_or("--lora-lr requires a number")?
+                    .parse()
+                    .map_err(|_| "--lora-lr must be a float")?;
+            }
+            "--embedding-stats" => {
+                i += 1;
+                opts.embedding_stats = Some(
+                    args.get(i)
+                        .cloned()
+                        .ok_or("--embedding-stats requires a path")?,
+                );
+            }
+            "--e2e-grad-chunks" => {
+                i += 1;
+                opts.e2e_grad_chunks = args
+                    .get(i)
+                    .ok_or("--e2e-grad-chunks requires a number")?
+                    .parse()
+                    .map_err(|_| "--e2e-grad-chunks must be a positive integer")?;
             }
             "--help" | "-h" => {
                 print_usage();
@@ -767,6 +887,19 @@ fn print_usage() {
     eprintln!("  --learned-attention          Enable learned chunk attention weighting (requires --temporal)");
     eprintln!("  --pos-enc-unfreeze N        Epoch to unfreeze learned pos_enc (0 = always learned, requires --learned-pos-enc)");
     eprintln!("  --max-gen-tokens N          Max tokens per generation during training (default: 16)");
+    eprintln!();
+    eprintln!("Architecture improvements (A-F):");
+    eprintln!("  --chunk-size N              Override chunk dimension for temporal projection (default: bottleneck_dim=256)");
+    eprintln!("  --num-groups N              Number of per-group up-projection matrices (default: 1 = shared)");
+    eprintln!("  --anticollapse W            Anti-collapse regularization weight (default: 0 = disabled, try 0.01-0.1)");
+    eprintln!("  --anticollapse-threshold T  Cosine similarity threshold for anti-collapse (default: 0.9)");
+    eprintln!("  --adapter                   Enable adapter MLP after temporal up-projection");
+    eprintln!("  --no-rotate-grad            Disable rotating grad-chunk position (use all chunks for E2E)");
+    eprintln!("  --lora-rank N               LoRA rank for Mamba layer adaptation (0 = disabled)");
+    eprintln!("  --lora-alpha A              LoRA alpha scaling factor (default: 1.0)");
+    eprintln!("  --lora-lr LR                LoRA learning rate (default: 0.0001)");
+    eprintln!("  --embedding-stats PATH      Pre-computed embedding stats for manifold moment matching adapter init");
+    eprintln!("  --e2e-grad-chunks K         Simultaneous E2E gradient positions per step (default: 1 = legacy rotating)");
     eprintln!();
     eprintln!("Evaluation options:");
     eprintln!("  --eval PATH            Held-out JSONL for post-training evaluation");

@@ -51,6 +51,11 @@ name = "broca-compare"
 path = "src/bin/broca_compare.rs"
 required-features = ["mamba"]
 
+[[bin]]
+name = "broca-embedding-stats"
+path = "src/bin/broca_embedding_stats.rs"
+required-features = ["mamba"]
+
 [features]
 default = ["simd"]
 mamba = ["dep:candle-core", "dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]

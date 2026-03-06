@@ -108,6 +108,82 @@ impl State {
             pos: 0,
         })
     }
+
+    /// Detach all hidden state tensors from the autograd graph.
+    ///
+    /// Used for rotating grad-chunk position (Improvement B): after warming up
+    /// state on context chunks, detach to prevent gradient flow through the warmup.
+    pub fn detach(&mut self) -> Result<()> {
+        for h in &mut self.hs {
+            *h = h.detach();
+        }
+        for xs in &mut self.prev_xs {
+            for x in xs.iter_mut() {
+                *x = x.detach();
+            }
+        }
+        Ok(())
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LORA ADAPTER (Improvement D)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Low-Rank Adaptation (LoRA) adapter for Mamba projection layers.
+///
+/// Adds a low-rank update to the frozen weight: `out += (x @ A^T) @ B^T * (alpha/rank)`.
+/// A is initialized from N(0, 1/rank) and B from zeros, so the adapter starts as zero.
+#[derive(Clone, Debug)]
+pub struct LoraAdapter {
+    /// Low-rank matrix A: [rank, in_dim]
+    pub a: candle_core::Var,
+    /// Low-rank matrix B: [out_dim, rank]
+    pub b: candle_core::Var,
+    pub rank: usize,
+    pub alpha: f32,
+}
+
+impl LoraAdapter {
+    /// Create a new LoRA adapter.
+    pub fn new(in_dim: usize, out_dim: usize, rank: usize, alpha: f32, device: &Device) -> Result<Self> {
+        // A: random init scaled by 1/sqrt(rank)
+        let a_scale = 1.0 / (rank as f64).sqrt();
+        let a_data = Tensor::randn(0.0f32, a_scale as f32, (rank, in_dim), device)?;
+        let a = candle_core::Var::from_tensor(&a_data)?;
+
+        // B: zero init (so adapter starts as identity)
+        let b_data = Tensor::zeros((out_dim, rank), DType::F32, device)?;
+        let b = candle_core::Var::from_tensor(&b_data)?;
+
+        Ok(Self { a, b, rank, alpha })
+    }
+
+    /// Forward pass: returns the LoRA delta to add to the main layer's output.
+    ///
+    /// `x` shape: [batch, in_dim]
+    /// Returns: [batch, out_dim]
+    pub fn forward(&self, x: &Tensor) -> Result<Tensor> {
+        let scale = self.alpha / self.rank as f32;
+        // x @ A^T → [batch, rank]
+        let h = x.matmul(&self.a.as_tensor().t()?)?;
+        // h @ B^T → [batch, out_dim]
+        let out = h.matmul(&self.b.as_tensor().t()?)?;
+        out * scale as f64
+    }
+
+    /// Apply gradients from the backward pass to the LoRA parameters.
+    pub fn apply_grads(&self, grads: &candle_core::backprop::GradStore, lr: f32) -> Result<()> {
+        if let Some(grad_a) = grads.get(self.a.as_tensor()) {
+            let updated = (self.a.as_tensor() - (grad_a * lr as f64)?)?;
+            self.a.set(&updated)?;
+        }
+        if let Some(grad_b) = grads.get(self.b.as_tensor()) {
+            let updated = (self.b.as_tensor() - (grad_b * lr as f64)?)?;
+            self.b.set(&updated)?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -123,6 +199,9 @@ pub struct MambaBlock {
     dt_rank: usize,
     layer_index: usize,
     d_inner: usize,
+    // LoRA adapters (Improvement D)
+    pub lora_in_proj: Option<LoraAdapter>,
+    pub lora_out_proj: Option<LoraAdapter>,
 }
 
 impl MambaBlock {
@@ -155,13 +234,20 @@ impl MambaBlock {
             dt_rank,
             layer_index,
             d_inner,
+            lora_in_proj: None,
+            lora_out_proj: None,
         })
     }
 
     pub fn forward(&self, xs: &Tensor, state: &mut State) -> Result<Tensor> {
         let (b_sz, _dim) = xs.dims2()?;
         let li = self.layer_index;
-        let mut xs = xs.apply(&self.in_proj)?.chunk(2, D::Minus1)?;
+        let mut in_proj_out = xs.apply(&self.in_proj)?;
+        // Add LoRA delta for in_proj (Improvement D)
+        if let Some(ref lora) = self.lora_in_proj {
+            in_proj_out = (in_proj_out + lora.forward(xs)?)?;
+        }
+        let mut xs = in_proj_out.chunk(2, D::Minus1)?;
         let proj_for_silu = xs.remove(1);
         state.prev_xs[li][state.pos % D_CONV] = xs.remove(0);
         let mut proj_for_conv = self.conv1d_bias.broadcast_as((b_sz, self.d_inner))?;
@@ -202,7 +288,12 @@ impl MambaBlock {
             + proj_for_conv.broadcast_mul(&d)?)?;
 
         let ys = (ss * candle_nn::ops::silu(&proj_for_silu))?;
-        ys.apply(&self.out_proj)
+        let mut out = ys.apply(&self.out_proj)?;
+        // Add LoRA delta for out_proj (Improvement D)
+        if let Some(ref lora) = self.lora_out_proj {
+            out = (out + lora.forward(&ys)?)?;
+        }
+        Ok(out)
     }
 }
 
@@ -343,7 +434,64 @@ impl Model {
         Ok(())
     }
 
+    /// Access the raw embedding table `[vocab_size, d_model]`.
+    ///
+    /// Used by manifold moment matching to compute per-dimension statistics
+    /// of Mamba's embedding space for whitening adapter initialization.
+    pub fn embedding_table(&self) -> &Tensor {
+        self.embedding.embeddings()
+    }
+
     pub fn dtype(&self) -> DType {
         self.dtype
+    }
+
+    /// Enable LoRA adapters on all MambaBlock in_proj and out_proj layers.
+    ///
+    /// `rank`: LoRA rank (typically 4-16)
+    /// `alpha`: scaling factor (typically 8.0)
+    pub fn enable_lora(&mut self, rank: usize, alpha: f32, device: &Device) -> Result<()> {
+        if rank == 0 {
+            return Ok(());
+        }
+        for layer in &mut self.layers {
+            let d_inner = layer.mixer.d_inner;
+            let d_model = d_inner / 2; // d_inner = d_model * 2
+            // in_proj: [d_model] → [d_inner * 2]
+            layer.mixer.lora_in_proj = Some(LoraAdapter::new(
+                d_model,
+                d_inner * 2,
+                rank,
+                alpha,
+                device,
+            )?);
+            // out_proj: [d_inner] → [d_model]
+            layer.mixer.lora_out_proj = Some(LoraAdapter::new(
+                d_inner,
+                d_model,
+                rank,
+                alpha,
+                device,
+            )?);
+        }
+        Ok(())
+    }
+
+    /// Apply LoRA gradients from a GradStore to all LoRA parameters.
+    pub fn apply_lora_grads(&self, grads: &candle_core::backprop::GradStore, lr: f32) -> Result<()> {
+        for layer in &self.layers {
+            if let Some(ref lora) = layer.mixer.lora_in_proj {
+                lora.apply_grads(grads, lr)?;
+            }
+            if let Some(ref lora) = layer.mixer.lora_out_proj {
+                lora.apply_grads(grads, lr)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether LoRA is enabled.
+    pub fn has_lora(&self) -> bool {
+        self.layers.first().map_or(false, |l| l.mixer.lora_in_proj.is_some())
     }
 }
