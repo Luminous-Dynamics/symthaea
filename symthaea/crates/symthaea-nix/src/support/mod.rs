@@ -9,6 +9,7 @@
 pub mod assessment;
 pub mod health_check;
 pub mod knowledge;
+pub mod poml;
 pub mod predictive;
 pub mod scrubber;
 pub mod watchdog;
@@ -22,4 +23,8 @@ pub use predictive::{
     AlertThresholds, Prediction, PredictiveMonitor, SavedPredictiveState, SystemTelemetry,
 };
 pub use scrubber::{ScrubResult, Scrubber};
+pub use poml::{
+    CacheSettings, ModelHints, PomlContext, PomlFeature, PomlMetadata, PomlProcessor, PomlResult,
+    PomlValue,
+};
 pub use watchdog::{AutonomyLevel, Watchdog, WatchdogConfig, WatchdogVerdict};
