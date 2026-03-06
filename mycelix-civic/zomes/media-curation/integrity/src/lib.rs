@@ -193,14 +193,14 @@ fn validate_create_endorsement(
     if endorsement.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Endorsement ID cannot be empty".into()));
     }
-    if endorsement.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Endorsement ID too long (max 64 chars)".into()));
+    if endorsement.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Endorsement ID too long (max 256 chars)".into()));
     }
     if endorsement.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Endorsement publication_id cannot be empty".into()));
     }
-    if endorsement.publication_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Endorsement publication_id too long (max 64 chars)".into()));
+    if endorsement.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Endorsement publication_id too long (max 256 chars)".into()));
     }
     if !endorsement.endorser_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Endorser must be a valid DID".into()));
@@ -223,8 +223,8 @@ fn validate_create_collection(
     if collection.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Collection ID cannot be empty".into()));
     }
-    if collection.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Collection ID too long (max 64 chars)".into()));
+    if collection.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Collection ID too long (max 256 chars)".into()));
     }
     if !collection.curator_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Curator must be a valid DID".into()));
@@ -310,14 +310,14 @@ fn validate_create_featured_content(
     if featured.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("FeaturedContent ID cannot be empty".into()));
     }
-    if featured.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("FeaturedContent ID too long (max 64 chars)".into()));
+    if featured.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("FeaturedContent ID too long (max 256 chars)".into()));
     }
     if featured.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("FeaturedContent publication_id cannot be empty".into()));
     }
-    if featured.publication_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("FeaturedContent publication_id too long (max 64 chars)".into()));
+    if featured.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("FeaturedContent publication_id too long (max 256 chars)".into()));
     }
     if !featured.featured_by.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Featured by must be a valid DID".into()));
@@ -944,7 +944,7 @@ mod tests {
     #[test]
     fn collection_id_at_limit_passes() {
         let mut c = make_collection();
-        c.id = "c".repeat(64);
+        c.id = "c".repeat(256);
         let result = validate_create_collection(fake_entry_creation_action(), c);
         assert!(is_valid(&result));
     }
@@ -952,10 +952,10 @@ mod tests {
     #[test]
     fn collection_id_over_limit_rejected() {
         let mut c = make_collection();
-        c.id = "c".repeat(65);
+        c.id = "c".repeat(257);
         let result = validate_create_collection(fake_entry_creation_action(), c);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Collection ID too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "Collection ID too long (max 256 chars)");
     }
 
     #[test]
@@ -1051,7 +1051,7 @@ mod tests {
     #[test]
     fn endorsement_id_at_limit_passes() {
         let mut e = make_endorsement();
-        e.id = "e".repeat(64);
+        e.id = "e".repeat(256);
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_valid(&result));
     }
@@ -1059,16 +1059,16 @@ mod tests {
     #[test]
     fn endorsement_id_over_limit_rejected() {
         let mut e = make_endorsement();
-        e.id = "e".repeat(65);
+        e.id = "e".repeat(257);
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Endorsement ID too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "Endorsement ID too long (max 256 chars)");
     }
 
     #[test]
     fn endorsement_publication_id_at_limit_passes() {
         let mut e = make_endorsement();
-        e.publication_id = "p".repeat(64);
+        e.publication_id = "p".repeat(256);
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_valid(&result));
     }
@@ -1076,10 +1076,10 @@ mod tests {
     #[test]
     fn endorsement_publication_id_over_limit_rejected() {
         let mut e = make_endorsement();
-        e.publication_id = "p".repeat(65);
+        e.publication_id = "p".repeat(257);
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Endorsement publication_id too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "Endorsement publication_id too long (max 256 chars)");
     }
 
     #[test]
@@ -1243,7 +1243,7 @@ mod tests {
     #[test]
     fn featured_content_id_at_limit_passes() {
         let mut f = make_featured_content();
-        f.id = "f".repeat(64);
+        f.id = "f".repeat(256);
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_valid(&result));
     }
@@ -1251,16 +1251,16 @@ mod tests {
     #[test]
     fn featured_content_id_over_limit_rejected() {
         let mut f = make_featured_content();
-        f.id = "f".repeat(65);
+        f.id = "f".repeat(257);
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FeaturedContent ID too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "FeaturedContent ID too long (max 256 chars)");
     }
 
     #[test]
     fn featured_content_publication_id_at_limit_passes() {
         let mut f = make_featured_content();
-        f.publication_id = "p".repeat(64);
+        f.publication_id = "p".repeat(256);
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_valid(&result));
     }
@@ -1268,10 +1268,10 @@ mod tests {
     #[test]
     fn featured_content_publication_id_over_limit_rejected() {
         let mut f = make_featured_content();
-        f.publication_id = "p".repeat(65);
+        f.publication_id = "p".repeat(257);
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FeaturedContent publication_id too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "FeaturedContent publication_id too long (max 256 chars)");
     }
 
     #[test]

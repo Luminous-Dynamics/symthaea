@@ -208,14 +208,14 @@ fn validate_create_fact_check(
     if check.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("FactCheck ID cannot be empty".into()));
     }
-    if check.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("FactCheck ID too long (max 64 chars)".into()));
+    if check.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("FactCheck ID too long (max 256 chars)".into()));
     }
     if check.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("FactCheck publication_id cannot be empty".into()));
     }
-    if check.publication_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("FactCheck publication_id too long (max 64 chars)".into()));
+    if check.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("FactCheck publication_id too long (max 256 chars)".into()));
     }
     if !check.checker_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Checker must be a valid DID".into()));
@@ -260,8 +260,8 @@ fn validate_create_source_credibility(
     if source.source_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id cannot be empty".into()));
     }
-    if source.source_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id too long (max 64 chars)".into()));
+    if source.source_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id too long (max 256 chars)".into()));
     }
     if !source.credibility_score.is_finite() {
         return Ok(ValidateCallbackResult::Invalid("credibility_score must be a finite number".into()));
@@ -292,14 +292,14 @@ fn validate_create_fact_check_dispute(
     if dispute.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Dispute ID cannot be empty".into()));
     }
-    if dispute.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Dispute ID too long (max 64 chars)".into()));
+    if dispute.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Dispute ID too long (max 256 chars)".into()));
     }
     if dispute.fact_check_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Dispute fact_check_id cannot be empty".into()));
     }
-    if dispute.fact_check_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Dispute fact_check_id too long (max 64 chars)".into()));
+    if dispute.fact_check_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Dispute fact_check_id too long (max 256 chars)".into()));
     }
     if !dispute.disputer_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Disputer must be a valid DID".into()));
@@ -990,7 +990,7 @@ mod tests {
     #[test]
     fn fact_check_id_at_limit_passes() {
         let mut fc = make_fact_check();
-        fc.id = "i".repeat(64);
+        fc.id = "i".repeat(256);
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_valid(&result));
     }
@@ -998,16 +998,16 @@ mod tests {
     #[test]
     fn fact_check_id_over_limit_rejected() {
         let mut fc = make_fact_check();
-        fc.id = "i".repeat(65);
+        fc.id = "i".repeat(257);
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FactCheck ID too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "FactCheck ID too long (max 256 chars)");
     }
 
     #[test]
     fn fact_check_publication_id_at_limit_passes() {
         let mut fc = make_fact_check();
-        fc.publication_id = "p".repeat(64);
+        fc.publication_id = "p".repeat(256);
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_valid(&result));
     }
@@ -1015,10 +1015,10 @@ mod tests {
     #[test]
     fn fact_check_publication_id_over_limit_rejected() {
         let mut fc = make_fact_check();
-        fc.publication_id = "p".repeat(65);
+        fc.publication_id = "p".repeat(257);
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FactCheck publication_id too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "FactCheck publication_id too long (max 256 chars)");
     }
 
     #[test]
@@ -1107,7 +1107,7 @@ mod tests {
     #[test]
     fn source_credibility_source_id_at_limit_passes() {
         let mut sc = make_source_credibility();
-        sc.source_id = "s".repeat(64);
+        sc.source_id = "s".repeat(256);
         let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
         assert!(is_valid(&result));
     }
@@ -1115,16 +1115,16 @@ mod tests {
     #[test]
     fn source_credibility_source_id_over_limit_rejected() {
         let mut sc = make_source_credibility();
-        sc.source_id = "s".repeat(65);
+        sc.source_id = "s".repeat(257);
         let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "SourceCredibility source_id too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "SourceCredibility source_id too long (max 256 chars)");
     }
 
     #[test]
     fn dispute_id_at_limit_passes() {
         let mut dispute = make_dispute();
-        dispute.id = "d".repeat(64);
+        dispute.id = "d".repeat(256);
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_valid(&result));
     }
@@ -1132,16 +1132,16 @@ mod tests {
     #[test]
     fn dispute_id_over_limit_rejected() {
         let mut dispute = make_dispute();
-        dispute.id = "d".repeat(65);
+        dispute.id = "d".repeat(257);
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Dispute ID too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "Dispute ID too long (max 256 chars)");
     }
 
     #[test]
     fn dispute_fact_check_id_at_limit_passes() {
         let mut dispute = make_dispute();
-        dispute.fact_check_id = "f".repeat(64);
+        dispute.fact_check_id = "f".repeat(256);
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_valid(&result));
     }
@@ -1149,10 +1149,10 @@ mod tests {
     #[test]
     fn dispute_fact_check_id_over_limit_rejected() {
         let mut dispute = make_dispute();
-        dispute.fact_check_id = "f".repeat(65);
+        dispute.fact_check_id = "f".repeat(257);
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Dispute fact_check_id too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "Dispute fact_check_id too long (max 256 chars)");
     }
 
     #[test]

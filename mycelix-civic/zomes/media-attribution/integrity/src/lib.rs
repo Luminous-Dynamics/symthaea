@@ -201,14 +201,14 @@ fn validate_create_attribution(
     if attribution.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Attribution ID cannot be empty".into()));
     }
-    if attribution.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Attribution ID too long (max 64 chars)".into()));
+    if attribution.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Attribution ID too long (max 256 chars)".into()));
     }
     if attribution.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Attribution publication_id cannot be empty".into()));
     }
-    if attribution.publication_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Attribution publication_id too long (max 64 chars)".into()));
+    if attribution.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Attribution publication_id too long (max 256 chars)".into()));
     }
     if !attribution.contributor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Contributor must be a valid DID".into()));
@@ -245,14 +245,14 @@ fn validate_create_royalty_rule(
     if rule.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("RoyaltyRule ID cannot be empty".into()));
     }
-    if rule.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule ID too long (max 64 chars)".into()));
+    if rule.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule ID too long (max 256 chars)".into()));
     }
     if rule.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("RoyaltyRule publication_id cannot be empty".into()));
     }
-    if rule.publication_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule publication_id too long (max 64 chars)".into()));
+    if rule.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule publication_id too long (max 256 chars)".into()));
     }
     if rule.currency.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Currency cannot be empty".into()));
@@ -299,14 +299,14 @@ fn validate_create_usage_record(
     if record.id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Usage record ID cannot be empty".into()));
     }
-    if record.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Usage record ID too long (max 64 chars)".into()));
+    if record.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Usage record ID too long (max 256 chars)".into()));
     }
     if record.publication_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Usage record publication_id cannot be empty".into()));
     }
-    if record.publication_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Usage record publication_id too long (max 64 chars)".into()));
+    if record.publication_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Usage record publication_id too long (max 256 chars)".into()));
     }
     if let Some(ref did) = record.user_did {
         if !did.trim().is_empty() && !did.starts_with("did:") {
@@ -1065,13 +1065,13 @@ mod tests {
         attr.id = "a".repeat(10_000);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Attribution ID too long (max 64 chars)");
+        assert_eq!(get_invalid_reason(result), "Attribution ID too long (max 256 chars)");
     }
 
     #[test]
     fn attribution_id_at_limit_passes() {
         let mut attr = valid_attribution();
-        attr.id = "a".repeat(64);
+        attr.id = "a".repeat(256);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_valid(&result));
     }
@@ -1079,10 +1079,10 @@ mod tests {
     #[test]
     fn attribution_id_over_limit_rejected() {
         let mut attr = valid_attribution();
-        attr.id = "a".repeat(65);
+        attr.id = "a".repeat(257);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Attribution ID too long (max 64 chars)");
+        assert_eq!(get_invalid_reason(result), "Attribution ID too long (max 256 chars)");
     }
 
     #[test]
@@ -1106,7 +1106,7 @@ mod tests {
     #[test]
     fn attribution_publication_id_at_limit_passes() {
         let mut attr = valid_attribution();
-        attr.publication_id = "p".repeat(64);
+        attr.publication_id = "p".repeat(256);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_valid(&result));
     }
@@ -1114,10 +1114,10 @@ mod tests {
     #[test]
     fn attribution_publication_id_over_limit_rejected() {
         let mut attr = valid_attribution();
-        attr.publication_id = "p".repeat(65);
+        attr.publication_id = "p".repeat(257);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Attribution publication_id too long (max 64 chars)");
+        assert_eq!(get_invalid_reason(result), "Attribution publication_id too long (max 256 chars)");
     }
 
     #[test]
@@ -1145,13 +1145,13 @@ mod tests {
         rule.publication_id = "x".repeat(10_000);
         let result = validate_create_royalty_rule(create_action(), rule);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "RoyaltyRule publication_id too long (max 64 chars)");
+        assert_eq!(get_invalid_reason(result), "RoyaltyRule publication_id too long (max 256 chars)");
     }
 
     #[test]
     fn royalty_rule_id_at_limit_passes() {
         let mut rule = valid_royalty_rule();
-        rule.id = "r".repeat(64);
+        rule.id = "r".repeat(256);
         let result = validate_create_royalty_rule(create_action(), rule);
         assert!(is_valid(&result));
     }
@@ -1159,10 +1159,10 @@ mod tests {
     #[test]
     fn royalty_rule_id_over_limit_rejected() {
         let mut rule = valid_royalty_rule();
-        rule.id = "r".repeat(65);
+        rule.id = "r".repeat(257);
         let result = validate_create_royalty_rule(create_action(), rule);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "RoyaltyRule ID too long (max 64 chars)");
+        assert_eq!(get_invalid_reason(result), "RoyaltyRule ID too long (max 256 chars)");
     }
 
     #[test]
@@ -1203,7 +1203,7 @@ mod tests {
     #[test]
     fn usage_record_id_at_limit_passes() {
         let mut record = valid_usage_record();
-        record.id = "u".repeat(64);
+        record.id = "u".repeat(256);
         let result = validate_create_usage_record(create_action(), record);
         assert!(is_valid(&result));
     }
@@ -1211,16 +1211,16 @@ mod tests {
     #[test]
     fn usage_record_id_over_limit_rejected() {
         let mut record = valid_usage_record();
-        record.id = "u".repeat(65);
+        record.id = "u".repeat(257);
         let result = validate_create_usage_record(create_action(), record);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Usage record ID too long (max 64 chars)");
+        assert_eq!(get_invalid_reason(result), "Usage record ID too long (max 256 chars)");
     }
 
     #[test]
     fn usage_record_publication_id_at_limit_passes() {
         let mut record = valid_usage_record();
-        record.publication_id = "p".repeat(64);
+        record.publication_id = "p".repeat(256);
         let result = validate_create_usage_record(create_action(), record);
         assert!(is_valid(&result));
     }
@@ -1228,10 +1228,10 @@ mod tests {
     #[test]
     fn usage_record_publication_id_over_limit_rejected() {
         let mut record = valid_usage_record();
-        record.publication_id = "p".repeat(65);
+        record.publication_id = "p".repeat(257);
         let result = validate_create_usage_record(create_action(), record);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Usage record publication_id too long (max 64 chars)");
+        assert_eq!(get_invalid_reason(result), "Usage record publication_id too long (max 256 chars)");
     }
 
     #[test]

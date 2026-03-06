@@ -214,9 +214,9 @@ fn validate_create_resource(
             "Resource ID cannot be empty".into(),
         ));
     }
-    if resource.id.len() > 64 {
+    if resource.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Resource ID too long (max 64)".into(),
+            "Resource ID too long (max 256)".into(),
         ));
     }
     if resource.name.trim().is_empty() {
@@ -258,9 +258,9 @@ fn validate_update_resource(resource: EmergencyResource) -> ExternResult<Validat
             "Resource ID cannot be empty".into(),
         ));
     }
-    if resource.id.len() > 64 {
+    if resource.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Resource ID too long (max 64)".into(),
+            "Resource ID too long (max 256)".into(),
         ));
     }
     if resource.name.len() > 256 {
@@ -1193,12 +1193,12 @@ mod tests {
     // STRING LENGTH LIMIT BOUNDARY TESTS
     // ========================================================================
 
-    // -- Resource ID (max 64) --
+    // -- Resource ID (max 256) --
 
     #[test]
     fn create_resource_id_at_limit_accepted() {
         let mut r = make_resource();
-        r.id = "x".repeat(64);
+        r.id = "x".repeat(256);
         let result = validate_create_resource(fake_create(), r);
         assert!(is_valid(&result));
     }
@@ -1206,10 +1206,10 @@ mod tests {
     #[test]
     fn create_resource_id_over_limit_rejected() {
         let mut r = make_resource();
-        r.id = "x".repeat(65);
+        r.id = "x".repeat(257);
         let result = validate_create_resource(fake_create(), r);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Resource ID too long (max 64)");
+        assert_eq!(invalid_msg(&result), "Resource ID too long (max 256)");
     }
 
     // -- Resource name (max 256) --
@@ -1293,10 +1293,10 @@ mod tests {
     #[test]
     fn update_resource_id_over_limit_rejected() {
         let mut r = make_resource();
-        r.id = "x".repeat(65);
+        r.id = "x".repeat(257);
         let result = validate_update_resource(r);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Resource ID too long (max 64)");
+        assert_eq!(invalid_msg(&result), "Resource ID too long (max 256)");
     }
 
     #[test]

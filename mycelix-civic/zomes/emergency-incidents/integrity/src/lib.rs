@@ -278,9 +278,9 @@ fn validate_create_disaster(
             "Disaster ID cannot be empty".into(),
         ));
     }
-    if disaster.id.len() > 64 {
+    if disaster.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Disaster ID too long (max 64)".into(),
+            "Disaster ID too long (max 256)".into(),
         ));
     }
     if disaster.title.trim().is_empty() {
@@ -355,9 +355,9 @@ fn validate_create_disaster(
     }
     // Validate nested zone fields
     for zone in &disaster.affected_area.zones {
-        if zone.id.len() > 64 {
+        if zone.id.len() > 256 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Zone ID too long (max 64)".into(),
+                "Zone ID too long (max 256)".into(),
             ));
         }
         if zone.name.len() > 128 {
@@ -380,9 +380,9 @@ fn validate_update_disaster(disaster: Disaster) -> ExternResult<ValidateCallback
             "Disaster ID cannot be empty".into(),
         ));
     }
-    if disaster.id.len() > 64 {
+    if disaster.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Disaster ID too long (max 64)".into(),
+            "Disaster ID too long (max 256)".into(),
         ));
     }
     if disaster.title.trim().is_empty() {
@@ -421,9 +421,9 @@ fn validate_update_disaster(disaster: Disaster) -> ExternResult<ValidateCallback
         ));
     }
     for zone in &disaster.affected_area.zones {
-        if zone.id.len() > 64 {
+        if zone.id.len() > 256 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Zone ID too long (max 64)".into(),
+                "Zone ID too long (max 256)".into(),
             ));
         }
         if zone.name.len() > 128 {
@@ -929,7 +929,7 @@ mod tests {
     #[test]
     fn test_disaster_id_too_long_rejected() {
         let mut disaster = valid_disaster();
-        disaster.id = "x".repeat(65);
+        disaster.id = "x".repeat(257);
         let result = validate_create_disaster(fake_create(), disaster);
         assert!(is_invalid(result));
     }
@@ -937,7 +937,7 @@ mod tests {
     #[test]
     fn test_disaster_id_at_limit_accepted() {
         let mut disaster = valid_disaster();
-        disaster.id = "x".repeat(64);
+        disaster.id = "x".repeat(256);
         let result = validate_create_disaster(fake_create(), disaster);
         assert!(is_valid(result));
     }
@@ -1030,7 +1030,7 @@ mod tests {
     fn test_disaster_zone_id_too_long_rejected() {
         let mut disaster = valid_disaster();
         disaster.affected_area.zones = vec![OperationalZone {
-            id: "x".repeat(65),
+            id: "x".repeat(257),
             name: "Zone".into(),
             boundary: vec![(35.0, -80.0)],
             priority: ZonePriority::Medium,
@@ -1044,7 +1044,7 @@ mod tests {
     fn test_disaster_zone_id_at_limit_accepted() {
         let mut disaster = valid_disaster();
         disaster.affected_area.zones = vec![OperationalZone {
-            id: "x".repeat(64),
+            id: "x".repeat(256),
             name: "Zone".into(),
             boundary: vec![(35.0, -80.0)],
             priority: ZonePriority::Medium,
@@ -1164,7 +1164,7 @@ mod tests {
     #[test]
     fn test_update_disaster_id_too_long_rejected() {
         let mut disaster = valid_disaster();
-        disaster.id = "x".repeat(65);
+        disaster.id = "x".repeat(257);
         let result = validate_update_disaster(disaster);
         assert!(is_invalid(result));
     }
@@ -1172,7 +1172,7 @@ mod tests {
     #[test]
     fn test_update_disaster_id_at_limit_accepted() {
         let mut disaster = valid_disaster();
-        disaster.id = "x".repeat(64);
+        disaster.id = "x".repeat(256);
         let result = validate_update_disaster(disaster);
         assert!(is_valid(result));
     }
@@ -1263,7 +1263,7 @@ mod tests {
     fn test_update_disaster_zone_id_too_long_rejected() {
         let mut disaster = valid_disaster();
         disaster.affected_area.zones = vec![OperationalZone {
-            id: "x".repeat(65),
+            id: "x".repeat(257),
             name: "Zone".into(),
             boundary: vec![(35.0, -80.0)],
             priority: ZonePriority::Medium,
@@ -1277,7 +1277,7 @@ mod tests {
     fn test_update_disaster_zone_id_at_limit_accepted() {
         let mut disaster = valid_disaster();
         disaster.affected_area.zones = vec![OperationalZone {
-            id: "x".repeat(64),
+            id: "x".repeat(256),
             name: "Zone".into(),
             boundary: vec![(35.0, -80.0)],
             priority: ZonePriority::Medium,

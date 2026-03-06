@@ -86,11 +86,11 @@ fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult
     if evidence.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
     }
-    if evidence.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 64 chars)".into()));
+    if evidence.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 256 chars)".into()));
     }
-    if evidence.complaint_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Complaint ID too long (max 64 chars)".into()));
+    if evidence.complaint_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Complaint ID too long (max 256 chars)".into()));
     }
     if evidence.title.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid("Title too long (max 256 chars)".into()));
@@ -108,11 +108,11 @@ fn validate_evidence_verification(v: &EvidenceVerification) -> ExternResult<Vali
     if v.evidence_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Evidence ID required".into()));
     }
-    if v.evidence_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 64 chars)".into()));
+    if v.evidence_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 256 chars)".into()));
     }
-    if v.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Verification ID too long (max 64 chars)".into()));
+    if v.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Verification ID too long (max 256 chars)".into()));
     }
     if let Some(ref notes) = v.notes {
         if notes.len() > 8192 {
@@ -132,8 +132,8 @@ fn validate_evidence_dispute(d: &EvidenceDispute) -> ExternResult<ValidateCallba
     if d.evidence_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Evidence ID required".into()));
     }
-    if d.evidence_id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 64 chars)".into()));
+    if d.evidence_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 256 chars)".into()));
     }
     if d.reason.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Dispute reason required".into()));
@@ -141,8 +141,8 @@ fn validate_evidence_dispute(d: &EvidenceDispute) -> ExternResult<ValidateCallba
     if d.reason.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid("Dispute reason too long (max 4096 chars)".into()));
     }
-    if d.id.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Dispute ID too long (max 64 chars)".into()));
+    if d.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Dispute ID too long (max 256 chars)".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -746,7 +746,7 @@ mod tests {
     #[test]
     fn dispute_evidence_id_at_limit_passes() {
         let mut d = make_dispute();
-        d.evidence_id = "e".repeat(64);
+        d.evidence_id = "e".repeat(256);
         let result = validate_evidence_dispute(&d);
         assert!(is_valid(&result));
     }
@@ -754,10 +754,10 @@ mod tests {
     #[test]
     fn dispute_evidence_id_over_limit_rejected() {
         let mut d = make_dispute();
-        d.evidence_id = "e".repeat(65);
+        d.evidence_id = "e".repeat(257);
         let result = validate_evidence_dispute(&d);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Evidence ID too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "Evidence ID too long (max 256 chars)");
     }
 
     #[test]
@@ -766,13 +766,13 @@ mod tests {
         v.evidence_id = "ev-".to_string() + &"9".repeat(10_000);
         let result = validate_evidence_verification(&v);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Evidence ID too long (max 64 chars)");
+        assert_eq!(invalid_msg(&result), "Evidence ID too long (max 256 chars)");
     }
 
     #[test]
     fn verification_evidence_id_at_limit_passes() {
         let mut v = make_verification();
-        v.evidence_id = "e".repeat(64);
+        v.evidence_id = "e".repeat(256);
         let result = validate_evidence_verification(&v);
         assert!(is_valid(&result));
     }
