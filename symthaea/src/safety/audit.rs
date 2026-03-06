@@ -171,6 +171,7 @@ mod tests {
             SafetyAssessment {
                 cycle: 0,
                 level: SafetyLevel::Green,
+                raw_level: SafetyLevel::Green,
                 consciousness_level: 0.8,
                 prediction_error: 0.1,
                 temporal_coherence: 0.7,
@@ -179,6 +180,7 @@ mod tests {
             SafetyAssessment {
                 cycle: 1,
                 level: SafetyLevel::Yellow,
+                raw_level: SafetyLevel::Yellow,
                 consciousness_level: 0.5,
                 prediction_error: 0.3,
                 temporal_coherence: 0.6,
@@ -187,6 +189,7 @@ mod tests {
             SafetyAssessment {
                 cycle: 2,
                 level: SafetyLevel::Red,
+                raw_level: SafetyLevel::Red,
                 consciousness_level: 0.1,
                 prediction_error: 0.9,
                 temporal_coherence: 0.2,
