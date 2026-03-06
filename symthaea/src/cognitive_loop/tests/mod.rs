@@ -16,4 +16,5 @@ mod helpers;
 mod integration;
 #[allow(clippy::field_reassign_with_default)]
 mod phase_coverage;
+mod phase_results;
 mod subsystems;
