@@ -312,10 +312,10 @@ fn trace_feedback_populates_details() {
     // confidence and LR trace vectors.
     let any_conf_trace = results
         .iter()
-        .any(|r| !r.metadata.feedback_trace_confidence.is_empty());
+        .any(|r| !r.metadata.feedback.feedback_trace_confidence.is_empty());
     let any_lr_trace = results
         .iter()
-        .any(|r| !r.metadata.feedback_trace_lr.is_empty());
+        .any(|r| !r.metadata.feedback.feedback_trace_lr.is_empty());
 
     assert!(
         any_conf_trace,
@@ -425,11 +425,11 @@ fn exploration_threshold_proposals_counted() {
 
     let total_exploration: u32 = results
         .iter()
-        .map(|r| r.metadata.feedback_exploration_proposals)
+        .map(|r| r.metadata.feedback.feedback_exploration_proposals)
         .sum();
     let total_threshold: u32 = results
         .iter()
-        .map(|r| r.metadata.feedback_threshold_proposals)
+        .map(|r| r.metadata.feedback.feedback_threshold_proposals)
         .sum();
 
     assert!(

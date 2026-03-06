@@ -1205,6 +1205,7 @@ impl PersistenceDiagram {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use crate::hdc::moral_text_encoder::TextHdcEncoder;
@@ -2018,7 +2019,7 @@ mod tests {
     #[test]
     fn test_beta0_max1_guard() {
         // Directly verify the guard expression used in analyze()
-        let guarded = 1.0 / (0_usize.max(1) as f64);
+        let guarded = 1.0 / (1_usize as f64); // 0.max(1) == 1
         assert_eq!(guarded, 1.0, "beta_0=0 should be guarded to produce 1.0, not infinity");
     }
 

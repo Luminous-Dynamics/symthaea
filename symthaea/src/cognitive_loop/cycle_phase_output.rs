@@ -5,7 +5,7 @@
 
 use std::time::Instant;
 
-use super::cycle::{DynamicsPhaseResult, FeedbackPhaseResult, PerceptionPhaseResult};
+use super::phase_results::{DynamicsPhaseResult, FeedbackPhaseResult, PerceptionPhaseResult};
 use super::{CognitiveLoopService, CycleResult};
 
 impl CognitiveLoopService {
@@ -374,6 +374,25 @@ impl CognitiveLoopService {
                 .to_string()
             },
             is_consolidating: self.is_consolidating,
+            // Adaptive dynamics telemetry
+            epistemic_uncertainty: dynamics.epistemic_uncertainty,
+            aleatoric_uncertainty: dynamics.aleatoric_uncertainty,
+            theta_phase: ((self.stats.total_cycles as f64 * 0.754)
+                % (2.0 * std::f64::consts::PI)) as f32,
+            temporal_binding_strength: perception.encoding.temporal_binding_strength,
+            prediction_horizon_scale: {
+                let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
+                if pe > 0.3 { 1.0 - (pe - 0.3) * 0.6 }
+                else if pe < 0.05 { 1.0 + (0.05 - pe) * 6.0 }
+                else { 1.0 }
+            },
+            fep_tau_factor: dynamics.fep_tau_factor,
+            causal_world_model_edges: dynamics.causal_world_model_edges,
+            calibration_validations_total: self.neuromod.calibration_validator.total_validations(),
+            calibration_improvements: self.neuromod.calibration_validator.improvements,
+            calibration_regressions: self.neuromod.calibration_validator.regressions,
+            calibration_adjustment_multiplier: self.neuromod.calibration_validator.adjustment_multiplier(),
+            calibration_cooldown_duration: self.neuromod.self_assessment.cooldown_duration(),
             ..Default::default()
         };
 
@@ -670,6 +689,8 @@ impl CognitiveLoopService {
             metadata,
             thought_vector,
             wisdom_hv: perception.encoding.hv16_cached,
+            #[cfg(feature = "ssm_language")]
+            language_output: self.last_broca_text.take(),
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]

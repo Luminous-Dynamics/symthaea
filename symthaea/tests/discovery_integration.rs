@@ -298,7 +298,7 @@ fn test_voice_telemetry_populated() {
 fn test_social_trust_influences_telemetry() {
     let mut service = make_service();
     // Set high social trust
-    service.set_social_signals(0.9, 0.8);
+    service.set_social_signals(0.9, 0.8, 0.5, 1, 0.5);
     let result = service.cycle("social trust test");
     let meta = &result.metadata;
     assert!(
@@ -326,7 +326,7 @@ fn test_social_learning_rate_modulation() {
     let mut service = make_service();
 
     // Low trust → LR factor near 0.8
-    service.set_social_signals(0.0, 0.0);
+    service.set_social_signals(0.0, 0.0, 0.5, 0, 0.0);
     let result = service.cycle("low trust");
     let factor = result.metadata.social_learning_rate_factor;
     assert!(
@@ -335,7 +335,7 @@ fn test_social_learning_rate_modulation() {
     );
 
     // High trust → LR factor near 1.2
-    service.set_social_signals(1.0, 1.0);
+    service.set_social_signals(1.0, 1.0, 0.9, 5, 1.0);
     let result = service.cycle("high trust");
     let factor = result.metadata.social_learning_rate_factor;
     assert!(

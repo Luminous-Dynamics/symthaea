@@ -158,12 +158,28 @@ impl CognitiveLoopService {
                 }
             }
 
-            // ── Wake→Sleep transition: optional calibration battery spawn ──
-            // Spawn calibration battery subprocess at sleep onset so results
-            // are ready by the next sleep→wake transition.
-            if !self.neuromod.was_sleeping && is_sleep_now
-                && self.neuromod.pending_calibration.is_none() {
-                self.spawn_calibration_battery(self.stats.total_cycles as u64);
+            // ── Wake→Sleep transition: consolidation replay + calibration battery ──
+            if !self.neuromod.was_sleeping && is_sleep_now {
+                // Hippocampal replay: replay important experiences through CfC during sleep.
+                // Wilson & McNaughton (1994): hippocampal replay strengthens memories offline.
+                // Tononi & Cirelli (2006): sleep-dependent synaptic homeostasis.
+                if self.config.enable_consolidation {
+                    match self.consolidate() {
+                        Ok(loss) if loss > 0.0 => {
+                            tracing::info!(loss, "Sleep-onset consolidation replay completed");
+                        }
+                        Err(e) => {
+                            tracing::debug!(error = %e, "Sleep consolidation replay failed");
+                        }
+                        _ => {}
+                    }
+                }
+
+                // Spawn calibration battery subprocess at sleep onset so results
+                // are ready by the next sleep→wake transition.
+                if self.neuromod.pending_calibration.is_none() {
+                    self.spawn_calibration_battery(self.stats.total_cycles as u64);
+                }
             }
 
             self.neuromod.was_sleeping = is_sleep_now;
@@ -291,6 +307,34 @@ impl CognitiveLoopService {
                 allostatic_load: self.neuromod.bath.allostatic_load,
             };
             self.neuromod.self_assessment.update(&sa_input);
+
+            // Closed-loop calibration validation: check if previous calibration improved metrics.
+            // Powers & Cisek (2021): outcome monitoring for closed-loop neuromodulation.
+            if let Some(improved) = self.neuromod.calibration_validator.check_validation(
+                self.stats.avg_prediction_error as f64,
+                self.coherence_bridge.smoothed_coherence().into(),
+                self.neuromod.self_assessment.confidence_error_ema(),
+                self.stats.total_cycles as u64,
+            ) {
+                let v = &self.neuromod.calibration_validator;
+                tracing::info!(
+                    improved,
+                    total = v.total_validations(),
+                    improvements = v.improvements,
+                    regressions = v.regressions,
+                    damping = v.regression_damping,
+                    "Calibration validation completed"
+                );
+
+                // Item #3: Adaptive calibration cadence — feed validation outcomes
+                // back to self-assessment trigger sensitivity.
+                // Rescorla-Wagner (1972): learning rate adapts to prediction accuracy.
+                let total = v.total_validations();
+                if total >= 3 {
+                    let improvement_ratio = v.improvements as f32 / total as f32;
+                    self.neuromod.self_assessment.adapt_sensitivity(improvement_ratio);
+                }
+            }
 
             // Poll async calibration battery (non-blocking).
             self.poll_calibration_battery();

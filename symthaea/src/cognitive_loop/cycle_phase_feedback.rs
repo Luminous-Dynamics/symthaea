@@ -7,7 +7,7 @@
 
 use std::time::Instant;
 
-use super::cycle::{
+use super::phase_results::{
     DynamicsPhaseResult, FbConsciousness, FbEthics, FbEvolution, FbLoops, FbMemory, FbQuality,
     FbReasoning, FbSelfModel, FbSupport, FeedbackPhaseResult, PerceptionPhaseResult,
 };
@@ -591,7 +591,16 @@ impl CognitiveLoopService {
                 replay.boost_recent_consolidation(consolidation_boost);
             }
         }
-        let spectral_mip_phi = consciousness_output.spectral_mip_phi;
+        // Theta phase → Phi modulation (Buzsáki 2006).
+        // 6Hz theta oscillation at 50Hz loop rate (phase advance 0.754 rad/cycle).
+        // Theta peaks (sin > 0) enhance integration; troughs suppress.
+        // Modulation range: ±10% of spectral Phi.
+        let theta_phase = (self.stats.total_cycles as f64 * 0.754)
+            % (2.0 * std::f64::consts::PI);
+        let theta_phi_mod = theta_phase.sin() * 0.1; // ±10%
+        let spectral_mip_phi = consciousness_output
+            .spectral_mip_phi
+            .map(|phi| (phi * (1.0 + theta_phi_mod)).max(0.0));
         let sigma = consciousness_output.sigma;
         let eq_v2_limiting_component = consciousness_output
             .limiting_component

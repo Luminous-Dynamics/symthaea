@@ -2,6 +2,7 @@
 //!
 //! Tests the full widget↔Nix bidirectional pipeline: binding registration,
 //! change handling, Nix sync, semantic search, and constraint validation.
+#![cfg(feature = "gui")]
 
 use symthaea::gui_bridge::widget_mapper::WidgetValueType;
 use symthaea::gui_bridge::*;

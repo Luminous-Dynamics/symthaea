@@ -148,6 +148,29 @@ impl SelfAssessmentMonitor {
         }
     }
 
+    /// Adjust trigger sensitivity based on calibration effectiveness.
+    ///
+    /// Called externally with the CalibrationValidator's improvement ratio.
+    /// If calibrations consistently help, lower thresholds (calibrate more often);
+    /// if regressions dominate, raise thresholds (calibrate less often).
+    ///
+    /// Science: Rescorla-Wagner (1972) — learning rate adapts to prediction accuracy.
+    pub fn adapt_sensitivity(&mut self, improvement_ratio: f32) {
+        // improvement_ratio: improvements / total, range [0, 1]
+        // > 0.5 → calibrations are helping → lower cooldown
+        // < 0.3 → calibrations are hurting → increase cooldown
+        if improvement_ratio > 0.5 {
+            // Effective calibrations → reduce cooldown (calibrate more often)
+            self.cooldown_duration = (self.cooldown_duration as f32 * 0.9) as u32;
+            self.cooldown_duration = self.cooldown_duration.max(200); // floor: 200 cycles
+        } else if improvement_ratio < 0.3 {
+            // Regressions dominate → increase cooldown (calibrate less often)
+            self.cooldown_duration = (self.cooldown_duration as f32 * 1.15) as u32;
+            self.cooldown_duration = self.cooldown_duration.min(2000); // cap: 2000 cycles
+        }
+        // 0.3..0.5 → neutral, no change
+    }
+
     /// Check if calibration should be triggered.
     ///
     /// Returns `Some(calibration)` when performance drift exceeds thresholds
@@ -306,6 +329,11 @@ impl SelfAssessmentMonitor {
     /// Current inhibition error EMA (proxy for NE).
     pub fn inhibition_error_ema(&self) -> f64 {
         self.inhibition_error_ema
+    }
+
+    /// Current adaptive cooldown duration (cycles between calibrations).
+    pub fn cooldown_duration(&self) -> u32 {
+        self.cooldown_duration
     }
 
     /// Current social coherence EMA (proxy for Oxytocin).

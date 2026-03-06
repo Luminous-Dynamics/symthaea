@@ -129,6 +129,7 @@ pub(crate) mod consciousness_engine;
 pub(crate) mod consciousness_monitor_tier;
 mod constructor;
 mod cycle;
+mod phase_results;
 mod cycle_consciousness;
 mod cycle_late_consciousness;
 mod cycle_neuromod_phase;
@@ -654,6 +655,11 @@ pub struct CognitiveLoopService {
     /// generates text from HDC-encoded thoughts with epistemic/emotional gating.
     #[cfg(feature = "ssm_language")]
     pub(crate) broca_manager: Option<broca_bridge::BrocaManager>,
+
+    /// Most recent Broca-generated text, drained into `CycleResult.language_output`
+    /// each cycle. `None` when Broca is disabled or gated by low consciousness.
+    #[cfg(feature = "ssm_language")]
+    pub(crate) last_broca_text: Option<String>,
 
     /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
     /// Populated when `config.enable_psi_attestation` is true.

@@ -641,9 +641,9 @@
         engine.update_weights_from_emergence(structural.emergence_ratio);
 
         let unified = engine.compute_unified(Some(100.0), 1.0, 1.0, 1.0);
-        assert!(unified >= 0.0 && unified <= 1.0);
+        assert!((0.0..=1.0).contains(&unified));
         let unified2 = engine.compute_unified(Some(0.0), 0.0, 0.0, 0.0);
-        assert!(unified2 >= 0.0 && unified2 <= 1.0);
+        assert!((0.0..=1.0).contains(&unified2));
     }
 
     // ═══════════════════════════════════════════════════════════════════

@@ -9,7 +9,7 @@
 
 use std::time::Instant;
 
-use super::cycle::{PercEncoding, PercMoral, PercStrategy, PercExploration, PercUrgency, PerceptionPhaseResult};
+use super::phase_results::{PercEncoding, PercMoral, PercStrategy, PercExploration, PercUrgency, PerceptionPhaseResult};
 use super::{CognitiveLoopService, CycleResult, ModuleTimings};
 
 impl CognitiveLoopService {
@@ -305,6 +305,7 @@ impl CognitiveLoopService {
                 input_similarity: encoding.input_similarity,
                 memo_threshold: encoding.memo_threshold,
                 effective_threshold: encoding.effective_threshold,
+                temporal_binding_strength: encoding.temporal_binding_strength,
             },
             moral: PercMoral {
                 moral_concern_detected,
@@ -337,6 +338,7 @@ impl CognitiveLoopService {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
     use crate::cognitive_loop::CognitiveLoopConfig;

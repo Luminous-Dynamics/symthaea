@@ -1527,7 +1527,7 @@ mod tests {
         let level = mind.state.consciousness_level;
 
         // With psi=0, boost factor is 1.0 (no change)
-        assert!(level >= 0.0 && level <= 1.0);
+        assert!((0.0..=1.0).contains(&level));
     }
 
     // ====================================================================
@@ -1677,7 +1677,7 @@ mod tests {
         // The dream thought is stochastic, so we just verify no panic
         let _output = mind.process_dream();
         assert!(
-            mind.working_memory.len() >= 1,
+            !mind.working_memory.is_empty(),
             "dissimilar memories should be preserved"
         );
     }
