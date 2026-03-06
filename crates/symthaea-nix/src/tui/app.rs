@@ -14,7 +14,7 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -22,11 +22,49 @@ use ratatui::{
 };
 
 use super::widgets::{
-    CausalExplorer, CausalLink, ConsciousnessGauge, ConsciousnessState, GenerationTimeline,
-    HealthSnapshot, SystemHealth, TimelineEntry, WorldModelSnapshot, WorldModelView,
+    AlertsPanel, AlertsSnapshot, CausalExplorer, CausalLink, ConsciousnessGauge,
+    ConsciousnessState, GenerationTimeline, HealthSnapshot, SystemHealth, TimelineEntry,
+    WorldModelSnapshot, WorldModelView,
 };
 use crate::ipc::{self, DaemonSnapshot};
 use crate::mind::active_inference::NixActiveInference;
+
+/// Adaptive complexity level — controls how much detail the TUI shows.
+///
+/// Ported from the Python TUI's `AdaptiveInterface` / `ComplexityLevel`.
+/// The TUI auto-adjusts based on user interaction success rate, or the
+/// user can cycle manually with `Ctrl-L`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComplexityLevel {
+    /// Minimal: consciousness gauge + input only (zen mode).
+    Zen,
+    /// Beginner: gauge + health + input/output.
+    Beginner,
+    /// Standard: all panels visible.
+    Standard,
+    /// Expert: all panels + alerts + debug info.
+    Expert,
+}
+
+impl ComplexityLevel {
+    fn next(self) -> Self {
+        match self {
+            Self::Zen => Self::Beginner,
+            Self::Beginner => Self::Standard,
+            Self::Standard => Self::Expert,
+            Self::Expert => Self::Zen,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Zen => "Zen",
+            Self::Beginner => "Beginner",
+            Self::Standard => "Standard",
+            Self::Expert => "Expert",
+        }
+    }
+}
 
 /// Which panel is focused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,6 +74,7 @@ pub enum FocusPanel {
     Generations,
     WorldModel,
     CausalGraph,
+    Alerts,
     Input,
 }
 
@@ -59,6 +98,8 @@ pub struct App {
     output: Vec<String>,
     /// Focused panel.
     focus: FocusPanel,
+    /// Alerts snapshot.
+    alerts: AlertsSnapshot,
     /// Scroll offset for causal explorer.
     causal_scroll: usize,
     /// Whether the app should quit.
@@ -67,6 +108,12 @@ pub struct App {
     tick: u64,
     /// Dry-run mode.
     _dry_run: bool,
+    /// Adaptive complexity level.
+    complexity: ComplexityLevel,
+    /// Successful interaction count (for auto-complexity).
+    success_count: u32,
+    /// Total interaction count (for auto-complexity).
+    total_count: u32,
     /// Path to daemon IPC snapshot.
     daemon_snapshot_path: std::path::PathBuf,
     /// Last daemon snapshot (if available).
@@ -86,10 +133,14 @@ impl App {
             input: String::new(),
             output: vec!["Welcome to nix-mind TUI. Type a command or press 'q' to quit.".into()],
             focus: FocusPanel::Input,
+            alerts: AlertsSnapshot::default(),
             causal_scroll: 0,
             should_quit: false,
             tick: 0,
             _dry_run: dry_run,
+            complexity: ComplexityLevel::Standard,
+            success_count: 0,
+            total_count: 0,
             daemon_snapshot_path: ipc::default_snapshot_path(),
             daemon_snapshot: None,
         }
@@ -155,8 +206,28 @@ impl App {
                     FocusPanel::Health => FocusPanel::Generations,
                     FocusPanel::Generations => FocusPanel::WorldModel,
                     FocusPanel::WorldModel => FocusPanel::CausalGraph,
-                    FocusPanel::CausalGraph => FocusPanel::Input,
+                    FocusPanel::CausalGraph => FocusPanel::Alerts,
+                    FocusPanel::Alerts => FocusPanel::Input,
                 };
+            }
+            // Ctrl-L: cycle complexity level
+            KeyCode::Char('l') if self.focus != FocusPanel::Input => {
+                self.complexity = self.complexity.next();
+                self.output.push(format!(
+                    "Complexity: {} (Ctrl-L to cycle)",
+                    self.complexity.name()
+                ));
+            }
+            // Ctrl-Z: toggle zen mode
+            KeyCode::Char('z') if self.focus != FocusPanel::Input => {
+                if self.complexity == ComplexityLevel::Zen {
+                    self.complexity = ComplexityLevel::Standard;
+                    self.output.push("Exited zen mode.".into());
+                } else {
+                    self.complexity = ComplexityLevel::Zen;
+                    self.output
+                        .push("Zen mode: minimal interface. Press 'z' to exit.".into());
+                }
             }
             KeyCode::Char(c) if self.focus == FocusPanel::Input => {
                 self.input.push(c);
@@ -173,6 +244,25 @@ impl App {
             KeyCode::Down if self.focus == FocusPanel::CausalGraph => {
                 if self.causal_scroll + 1 < self.causal_links.len() {
                     self.causal_scroll += 1;
+                }
+            }
+            KeyCode::Up if self.focus == FocusPanel::Alerts => {
+                self.alerts.selected_index = self.alerts.selected_index.saturating_sub(1);
+            }
+            KeyCode::Down if self.focus == FocusPanel::Alerts => {
+                let max = self.alerts.active_alerts.len().saturating_sub(1);
+                if self.alerts.selected_index < max {
+                    self.alerts.selected_index += 1;
+                }
+            }
+            // Acknowledge alert
+            KeyCode::Char('a') if self.focus == FocusPanel::Alerts => {
+                if let Some(alert) = self
+                    .alerts
+                    .active_alerts
+                    .get(self.alerts.selected_index)
+                {
+                    self.alerts.acknowledged.insert(alert.metric.clone());
                 }
             }
             _ => {}
@@ -229,6 +319,30 @@ impl App {
                 "Best: {:?} (EFE={:.3}, pragmatic={:.2}, epistemic={:.2})",
                 best.action, best.expected_free_energy, best.pragmatic_value, best.epistemic_value,
             ));
+            self.success_count += 1;
+        }
+        self.total_count += 1;
+
+        // Auto-adjust complexity based on success rate
+        self.auto_adjust_complexity();
+    }
+
+    /// Adjust complexity level based on interaction success rate.
+    fn auto_adjust_complexity(&mut self) {
+        if self.total_count < 5 {
+            return; // Wait for enough data
+        }
+        let rate = self.success_count as f64 / self.total_count as f64;
+        let new = if rate > 0.8 {
+            ComplexityLevel::Expert
+        } else if rate > 0.5 {
+            ComplexityLevel::Standard
+        } else {
+            ComplexityLevel::Beginner
+        };
+        // Only auto-adjust if user hasn't set Zen manually
+        if self.complexity != ComplexityLevel::Zen {
+            self.complexity = new;
         }
     }
 
@@ -284,6 +398,34 @@ impl App {
 
         // Health: merge daemon stats with direct service queries
         self.health.services_failed = snap.anomaly_count as usize;
+
+        // Alerts from daemon snapshot
+        self.alerts.active_alerts = snap
+            .recent_anomalies
+            .iter()
+            .map(|a| crate::ipc::AlertEntry {
+                metric: a.unit.clone(),
+                current_value: a.score * 100.0,
+                predicted_value: a.score * 120.0,
+                hours_ahead: 6.0,
+                threshold: 80.0,
+                confidence: a.score,
+                recommended_action: Some(format!("Investigate {}", a.unit)),
+                severity: if a.score > 0.8 {
+                    crate::ipc::AlertSeverity::Critical
+                } else if a.score > 0.5 {
+                    crate::ipc::AlertSeverity::Warning
+                } else {
+                    crate::ipc::AlertSeverity::Info
+                },
+                first_seen: snap.timestamp,
+                last_seen: snap.timestamp,
+                consecutive_cycles: 1,
+                prev_predicted_value: None,
+                journal_context: vec![a.reason.clone()],
+            })
+            .collect();
+
         self.refresh_generations();
     }
 
@@ -315,17 +457,71 @@ impl App {
         }
     }
 
-    /// Draw the UI.
+    /// Draw the UI, adapting layout to the current complexity level.
     fn draw(&self, frame: &mut ratatui::Frame) {
         let size = frame.area();
 
-        // Main layout: top (panels) + bottom (input/output)
+        match self.complexity {
+            ComplexityLevel::Zen => self.draw_zen(frame, size),
+            ComplexityLevel::Beginner => self.draw_beginner(frame, size),
+            ComplexityLevel::Standard => self.draw_standard(frame, size),
+            ComplexityLevel::Expert => self.draw_expert(frame, size),
+        }
+    }
+
+    /// Zen mode: consciousness gauge + input only.
+    fn draw_zen(&self, frame: &mut ratatui::Frame, size: Rect) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(8), Constraint::Length(3), Constraint::Min(1)])
+            .split(size);
+
+        let cons_block = Block::default()
+            .title(" Consciousness [Zen] ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::Consciousness));
+        let gauge = ConsciousnessGauge::new(self.consciousness).block(cons_block);
+        frame.render_widget(gauge, chunks[0]);
+
+        self.draw_input(frame, chunks[1]);
+        self.draw_output(frame, chunks[2]);
+    }
+
+    /// Beginner: gauge + health + input/output.
+    fn draw_beginner(&self, frame: &mut ratatui::Frame, size: Rect) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(8),
+                Constraint::Length(5),
+                Constraint::Length(3),
+                Constraint::Min(1),
+            ])
+            .split(size);
+
+        let cons_block = Block::default()
+            .title(" Consciousness [Beginner] ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::Consciousness));
+        frame.render_widget(ConsciousnessGauge::new(self.consciousness).block(cons_block), chunks[0]);
+
+        let health_block = Block::default()
+            .title(" System Health ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::Health));
+        frame.render_widget(SystemHealth::new(self.health.clone()).block(health_block), chunks[1]);
+
+        self.draw_input(frame, chunks[2]);
+        self.draw_output(frame, chunks[3]);
+    }
+
+    /// Standard: all panels visible (original layout).
+    fn draw_standard(&self, frame: &mut ratatui::Frame, size: Rect) {
         let main_chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(10), Constraint::Length(6)])
             .split(size);
 
-        // Top: left column (consciousness + health) + right column (world model + causal)
         let top_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
@@ -341,29 +537,23 @@ impl App {
             ])
             .split(top_chunks[0]);
 
-        // Consciousness gauge
         let cons_block = Block::default()
             .title(" Consciousness ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        let gauge = ConsciousnessGauge::new(self.consciousness).block(cons_block);
-        frame.render_widget(gauge, left_chunks[0]);
+        frame.render_widget(ConsciousnessGauge::new(self.consciousness).block(cons_block), left_chunks[0]);
 
-        // System health
         let health_block = Block::default()
             .title(" System Health ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Health));
-        let health = SystemHealth::new(self.health.clone()).block(health_block);
-        frame.render_widget(health, left_chunks[1]);
+        frame.render_widget(SystemHealth::new(self.health.clone()).block(health_block), left_chunks[1]);
 
-        // Generations
         let gen_block = Block::default()
             .title(" Generations ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Generations));
-        let timeline = GenerationTimeline::new(self.generations.clone()).block(gen_block);
-        frame.render_widget(timeline, left_chunks[2]);
+        frame.render_widget(GenerationTimeline::new(self.generations.clone()).block(gen_block), left_chunks[2]);
 
         // Right column
         let right_chunks = Layout::default()
@@ -371,23 +561,22 @@ impl App {
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(top_chunks[1]);
 
-        // World model
         let model_block = Block::default()
             .title(" World Model ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::WorldModel));
-        let model = WorldModelView::new(self.world_model.clone()).block(model_block);
-        frame.render_widget(model, right_chunks[0]);
+        frame.render_widget(WorldModelView::new(self.world_model.clone()).block(model_block), right_chunks[0]);
 
-        // Causal explorer
         let causal_block = Block::default()
             .title(" Causal Graph ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::CausalGraph));
-        let causal = CausalExplorer::new(self.causal_links.clone())
-            .scroll(self.causal_scroll)
-            .block(causal_block);
-        frame.render_widget(causal, right_chunks[1]);
+        frame.render_widget(
+            CausalExplorer::new(self.causal_links.clone())
+                .scroll(self.causal_scroll)
+                .block(causal_block),
+            right_chunks[1],
+        );
 
         // Bottom: input + output
         let bottom_chunks = Layout::default()
@@ -395,7 +584,98 @@ impl App {
             .constraints([Constraint::Length(3), Constraint::Min(1)])
             .split(main_chunks[1]);
 
-        // Input — show daemon connection status
+        self.draw_input(frame, bottom_chunks[0]);
+        self.draw_output(frame, bottom_chunks[1]);
+    }
+
+    /// Expert: all panels + alerts panel.
+    fn draw_expert(&self, frame: &mut ratatui::Frame, size: Rect) {
+        let main_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(10), Constraint::Length(8)])
+            .split(size);
+
+        let top_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(30),
+                Constraint::Percentage(35),
+                Constraint::Percentage(35),
+            ])
+            .split(main_chunks[0]);
+
+        // Left column: consciousness + health + generations
+        let left_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(40),
+                Constraint::Percentage(30),
+                Constraint::Percentage(30),
+            ])
+            .split(top_chunks[0]);
+
+        let cons_block = Block::default()
+            .title(" Consciousness [Expert] ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::Consciousness));
+        frame.render_widget(ConsciousnessGauge::new(self.consciousness).block(cons_block), left_chunks[0]);
+
+        let health_block = Block::default()
+            .title(" System Health ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::Health));
+        frame.render_widget(SystemHealth::new(self.health.clone()).block(health_block), left_chunks[1]);
+
+        let gen_block = Block::default()
+            .title(" Generations ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::Generations));
+        frame.render_widget(GenerationTimeline::new(self.generations.clone()).block(gen_block), left_chunks[2]);
+
+        // Middle column: world model + causal graph
+        let mid_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(top_chunks[1]);
+
+        let model_block = Block::default()
+            .title(" World Model ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::WorldModel));
+        frame.render_widget(WorldModelView::new(self.world_model.clone()).block(model_block), mid_chunks[0]);
+
+        let causal_block = Block::default()
+            .title(" Causal Graph ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::CausalGraph));
+        frame.render_widget(
+            CausalExplorer::new(self.causal_links.clone())
+                .scroll(self.causal_scroll)
+                .block(causal_block),
+            mid_chunks[1],
+        );
+
+        // Right column: alerts panel
+        let alerts_block = Block::default()
+            .title(" Alerts & Predictions ")
+            .borders(Borders::ALL)
+            .border_style(self.border_style(FocusPanel::Alerts));
+        let mut alerts_snap = self.alerts.clone();
+        alerts_snap.is_focused = self.focus == FocusPanel::Alerts;
+        frame.render_widget(AlertsPanel::new(alerts_snap).block(alerts_block), top_chunks[2]);
+
+        // Bottom: input + output
+        let bottom_chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(1)])
+            .split(main_chunks[1]);
+
+        self.draw_input(frame, bottom_chunks[0]);
+        self.draw_output(frame, bottom_chunks[1]);
+    }
+
+    /// Draw the input bar.
+    fn draw_input(&self, frame: &mut ratatui::Frame, area: Rect) {
         let daemon_status = match &self.daemon_snapshot {
             Some(snap) => format!(
                 " [daemon pid {} | {} obs | {} anomalies]",
@@ -403,8 +683,9 @@ impl App {
             ),
             None => " [daemon offline]".to_string(),
         };
+        let complexity_tag = format!(" [{}]", self.complexity.name());
         let input_block = Block::default()
-            .title(format!(" Input (Tab/Esc){} ", daemon_status))
+            .title(format!(" Input (Tab/Esc){}{} ", daemon_status, complexity_tag))
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Input));
         let cursor = if self.focus == FocusPanel::Input {
@@ -413,18 +694,18 @@ impl App {
             ""
         };
         let input_text = format!("{}{}", self.input, cursor);
-        let input_widget = Paragraph::new(input_text).block(input_block);
-        frame.render_widget(input_widget, bottom_chunks[0]);
+        frame.render_widget(Paragraph::new(input_text).block(input_block), area);
+    }
 
-        // Output
+    /// Draw the output panel.
+    fn draw_output(&self, frame: &mut ratatui::Frame, area: Rect) {
         let output_lines: Vec<Line> = self
             .output
             .iter()
             .map(|s| Line::from(Span::raw(s.as_str())))
             .collect();
         let output_block = Block::default().borders(Borders::ALL).title(" Output ");
-        let output_widget = Paragraph::new(output_lines).block(output_block);
-        frame.render_widget(output_widget, bottom_chunks[1]);
+        frame.render_widget(Paragraph::new(output_lines).block(output_block), area);
     }
 
     /// Get border style based on focus.
@@ -450,6 +731,7 @@ mod tests {
         assert_eq!(app.focus, FocusPanel::Input);
         assert!(app._dry_run);
         assert!(app.daemon_snapshot.is_none());
+        assert_eq!(app.complexity, ComplexityLevel::Standard);
     }
 
     #[test]
@@ -466,6 +748,8 @@ mod tests {
         assert_eq!(app.focus, FocusPanel::WorldModel);
         app.handle_key(KeyCode::Tab);
         assert_eq!(app.focus, FocusPanel::CausalGraph);
+        app.handle_key(KeyCode::Tab);
+        assert_eq!(app.focus, FocusPanel::Alerts);
         app.handle_key(KeyCode::Tab);
         assert_eq!(app.focus, FocusPanel::Input);
     }
@@ -524,6 +808,57 @@ mod tests {
     }
 
     #[test]
+    fn test_complexity_cycling() {
+        let mut app = App::new(true);
+        app.focus = FocusPanel::Health; // Not input, so 'l' triggers complexity
+        assert_eq!(app.complexity, ComplexityLevel::Standard);
+        app.handle_key(KeyCode::Char('l'));
+        assert_eq!(app.complexity, ComplexityLevel::Expert);
+        app.handle_key(KeyCode::Char('l'));
+        assert_eq!(app.complexity, ComplexityLevel::Zen);
+        app.handle_key(KeyCode::Char('l'));
+        assert_eq!(app.complexity, ComplexityLevel::Beginner);
+        app.handle_key(KeyCode::Char('l'));
+        assert_eq!(app.complexity, ComplexityLevel::Standard);
+    }
+
+    #[test]
+    fn test_zen_toggle() {
+        let mut app = App::new(true);
+        app.focus = FocusPanel::Health;
+        assert_eq!(app.complexity, ComplexityLevel::Standard);
+        app.handle_key(KeyCode::Char('z'));
+        assert_eq!(app.complexity, ComplexityLevel::Zen);
+        app.handle_key(KeyCode::Char('z'));
+        assert_eq!(app.complexity, ComplexityLevel::Standard);
+    }
+
+    #[test]
+    fn test_auto_adjust_complexity() {
+        let mut app = App::new(true);
+        // Simulate 10 successful interactions
+        for _ in 0..10 {
+            app.success_count += 1;
+            app.total_count += 1;
+        }
+        app.auto_adjust_complexity();
+        assert_eq!(app.complexity, ComplexityLevel::Expert);
+
+        // Now mostly failures
+        app.success_count = 1;
+        app.total_count = 10;
+        app.auto_adjust_complexity();
+        assert_eq!(app.complexity, ComplexityLevel::Beginner);
+
+        // Zen mode should be preserved
+        app.complexity = ComplexityLevel::Zen;
+        app.success_count = 10;
+        app.total_count = 10;
+        app.auto_adjust_complexity();
+        assert_eq!(app.complexity, ComplexityLevel::Zen);
+    }
+
+    #[test]
     fn test_apply_daemon_snapshot() {
         let mut app = App::new(true);
         let snap = DaemonSnapshot {
@@ -551,6 +886,8 @@ mod tests {
             }],
             daemon_running: true,
             daemon_pid: 1,
+            support_status: None,
+            recommendation_count: 0,
         };
 
         app.apply_daemon_snapshot(&snap);

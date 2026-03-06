@@ -3,8 +3,9 @@
 pub mod app;
 pub mod widgets;
 
-pub use app::{App, FocusPanel};
+pub use app::{App, ComplexityLevel, FocusPanel};
 pub use widgets::{
-    CausalExplorer, CausalLink, ConsciousnessGauge, ConsciousnessState, GenerationTimeline,
-    HealthSnapshot, SystemHealth, TimelineEntry, WorldModelSnapshot, WorldModelView,
+    AlertsPanel, AlertsSnapshot, CausalExplorer, CausalLink, ConsciousnessGauge,
+    ConsciousnessState, GenerationTimeline, HealthSnapshot, SystemHealth, TimelineEntry,
+    WorldModelSnapshot, WorldModelView,
 };

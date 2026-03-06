@@ -69,6 +69,46 @@ pub struct AnomalyEntry {
     pub unit: String,
 }
 
+/// Severity level for predictive alerts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AlertSeverity {
+    Critical,
+    Warning,
+    Info,
+}
+
+/// A predictive alert entry from the daemon.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AlertEntry {
+    /// Metric name (e.g., "disk_usage", "memory_usage").
+    pub metric: String,
+    /// Current observed value.
+    pub current_value: f64,
+    /// Predicted future value.
+    pub predicted_value: f64,
+    /// Hours ahead for the prediction.
+    pub hours_ahead: f64,
+    /// Threshold that triggers the alert.
+    pub threshold: f64,
+    /// Confidence in the prediction (0.0-1.0).
+    pub confidence: f64,
+    /// Recommended action to mitigate.
+    pub recommended_action: Option<String>,
+    /// Severity of the alert.
+    pub severity: AlertSeverity,
+    /// Unix timestamp when first detected.
+    pub first_seen: u64,
+    /// Unix timestamp of last update.
+    pub last_seen: u64,
+    /// Number of consecutive detection cycles.
+    pub consecutive_cycles: u32,
+    /// Previous predicted value (for trend).
+    pub prev_predicted_value: Option<f64>,
+    /// Corroborating journal context entries.
+    #[serde(default)]
+    pub journal_context: Vec<String>,
+}
+
 impl DaemonSnapshot {
     /// Write this snapshot atomically to the given path.
     ///
