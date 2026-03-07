@@ -148,6 +148,11 @@ impl ReplState {
         let cognitive_config = match temporal_backend {
             TemporalBackend::CfC => CognitiveLoopConfig::with_cfc(),
             TemporalBackend::HdcLtcUnified => CognitiveLoopConfig::with_hdc_ltc_unified(),
+            TemporalBackend::HierarchicalCfC => {
+                let mut cfg = CognitiveLoopConfig::with_cfc();
+                cfg.temporal_backend = TemporalBackend::HierarchicalCfC;
+                cfg
+            }
         };
         let cognitive = CognitiveLoopService::new(cognitive_config)?;
 

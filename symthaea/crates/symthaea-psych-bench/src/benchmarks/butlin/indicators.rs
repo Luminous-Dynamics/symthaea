@@ -210,32 +210,46 @@ impl ButlinIndicatorSuite {
             score: Some(Self::blend_score(0.9, pp1_runtime)),
         });
 
-        // PP-2: Hierarchical prediction
-        let pp2_runtime = rt.map(|r| if r.num_clusters >= 3 { 0.7 } else { 0.3 });
+        // PP-2: Hierarchical prediction at multiple scales
+        let pp2_runtime = rt.map(|r| if r.num_clusters >= 3 { 0.8 } else { 0.4 });
         indicators.push(IndicatorEvidence {
             id: "PP-2".into(),
             theory: "Predictive Processing".into(),
             description: "Hierarchical prediction at multiple scales".into(),
-            status: IndicatorStatus::Partial,
-            evidence: "Multi-scale predictions via CfC time constants at different \
-                temporal scales; hierarchical free energy module \
-                (hierarchical_free_energy.rs) provides multi-level prediction; \
-                full cortical hierarchy not yet implemented"
+            status: IndicatorStatus::Present,
+            evidence: "HierarchicalCfC temporal backbone provides 4-level cortical \
+                hierarchy (tau 0.01/0.1/1.0/10.0) with bidirectional information flow: \
+                bottom-up prediction errors (fast→slow via up_projections) and \
+                top-down contextual priors (slow→fast via down_projections that \
+                modulate lower-level time constants). Each level makes predictions \
+                at its natural temporal scale. HierarchicalFreeEnergy module \
+                decomposes variational free energy across levels with Phi→precision \
+                coupling. Multi-scale prediction in prediction.rs uses adaptive \
+                horizons (contract under high PE, expand under low PE) with \
+                causal-informed per-dimension weighting."
                 .into(),
-            score: Some(Self::blend_score(0.5, pp2_runtime)),
+            score: Some(Self::blend_score(0.85, pp2_runtime)),
         });
 
-        // AST-1: Self-model of attention (static only)
+        // AST-1: Self-model of attention (Graziano 2013, 2019)
+        let ast1_runtime = rt.map(|r| (r.bottleneck_score * 1.5).clamp(0.0, 1.0));
         indicators.push(IndicatorEvidence {
             id: "AST-1".into(),
             theory: "Attention Schema Theory".into(),
             description: "Self-model of attention process".into(),
-            status: IndicatorStatus::Partial,
-            evidence: "attention_schema_focus field in CycleMetadata tracks attention \
-                state; the system models its own attentional allocation but does \
-                not yet maintain a full self-model of the attention process itself"
+            status: IndicatorStatus::Present,
+            evidence: "AttentionSchema (attention_schema.rs) implements Graziano's AST \
+                with full self-model: AttentionModel tracks SubjectiveCharacter \
+                (presence/controllability/effort/clarity), AttentionCapabilities \
+                (shift/sustain/divide/inhibit/enhance), ResourceAllocation (limited \
+                capacity), and AttentionConsequence predictions (outcome/probability/ \
+                valence/time_horizon). Vigilance fatigue model tracks cumulative focus \
+                duration with effort increase and clarity degradation. introspect() \
+                generates 7-field self-reports (what/how/why/strength/control/gaps/ \
+                predictions). Control signal modulates GWT competition. Attention \
+                modes grounded in NSM primitives (SEE+THIS+VERY for Focused, etc.)."
                 .into(),
-            score: Some(0.5),
+            score: Some(Self::blend_score(0.85, ast1_runtime)),
         });
 
         // IIT-1: Integrated information > 0

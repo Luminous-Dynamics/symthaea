@@ -42,7 +42,6 @@ use crate::generator::GenerationResult;
 use crate::mamba::{MambaBackend, MambaWrapper};
 use crate::projection::{HdcSsmProjection, ProjectionGradientDiagnostics};
 use crate::temporal_projection::TemporalProjection;
-use crate::tokenizer::BpeTokenizer;
 
 /// Configuration for the Liquid-Mamba generator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -486,12 +485,12 @@ impl LiquidMambaGenerator {
 
         let encoder = ThoughtLanguageEncoder::new(genesis);
 
-        // Create gating modules using a minimal tokenizer for classification
-        // (the actual token logits come from Mamba's 50K vocab)
-        let tokenizer = BpeTokenizer::default_minimal();
+        // Create gating modules using Mamba's own tokenizer (GPT-2) so that
+        // token IDs match the logits produced by forward_one_token().
         let gating_config = GatingConfig::default();
-        let epistemic_gate = EpistemicGate::new(&tokenizer, &gating_config);
-        let emotional_modulator = EmotionalModulator::new(&tokenizer, &gating_config);
+        let epistemic_gate = EpistemicGate::new_from_backend(mamba.as_ref(), &gating_config);
+        let emotional_modulator =
+            EmotionalModulator::new_from_backend(mamba.as_ref(), &gating_config);
 
         let enable_ema = config.enable_ema;
         let ema_decay = config.ema_decay;
@@ -679,16 +678,14 @@ impl LiquidMambaGenerator {
                 if self.config.enable_gating {
                     let effective_epistemic =
                         (channels.epistemic_ordinal() + token_pe_boost).clamp(0.0, 4.0);
-                    let gate_len = logits.len().min(512);
                     self.epistemic_gate
-                        .apply(&mut logits[..gate_len], effective_epistemic);
+                        .apply(&mut logits, effective_epistemic);
                 }
 
                 // 7d. Emotional modulation
                 if self.config.enable_gating {
-                    let gate_len = logits.len().min(512);
                     self.emotional_modulator
-                        .apply(&mut logits[..gate_len], channels, pos);
+                        .apply(&mut logits, channels, pos);
                 }
 
                 // 7e. Top-k sampling
@@ -2508,5 +2505,44 @@ mod tests {
             .map(|(a, b)| (a - b).abs())
             .sum();
         assert!(diff > 0.0, "weights should update after distill steps with multi-position E2E");
+    }
+
+    #[test]
+    fn test_mock_gating_uses_backend_tokenizer() {
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-gating");
+        let gen = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
+        // Gate should have been constructed via new_from_backend (MockMamba)
+        assert_eq!(
+            gen.epistemic_gate.hedging_count(),
+            crate::gating::CANONICAL_HEDGING_WORDS.len(),
+            "Epistemic gate should resolve all hedging words via backend"
+        );
+        assert_eq!(
+            gen.epistemic_gate.factual_count(),
+            crate::gating::CANONICAL_FACTUAL_WORDS.len(),
+            "Epistemic gate should resolve all factual words via backend"
+        );
+    }
+
+    #[test]
+    fn test_gate_covers_full_vocab() {
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-gating");
+        let gen = LiquidMambaGenerator::with_mock(&genesis, LiquidMambaConfig::default());
+        // Verify gate applies to all logits (no 512 cap)
+        let vocab_size = 50280; // MockMamba vocab size
+        let mut logits = vec![0.0_f32; vocab_size];
+        gen.epistemic_gate.apply(&mut logits, 3.0); // Unknown
+
+        let modified: Vec<usize> = logits
+            .iter()
+            .enumerate()
+            .filter(|(_, &l)| l.abs() > 1e-6)
+            .map(|(i, _)| i)
+            .collect();
+        assert!(
+            !modified.is_empty(),
+            "Gate should modify logits at backend-resolved positions"
+        );
+        assert_eq!(logits.len(), vocab_size, "Logits should remain full-sized");
     }
 }

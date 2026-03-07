@@ -1,6 +1,7 @@
 //! Telemetry types — CycleMetadata and sub-structs.
 
 use serde::{Deserialize, Serialize};
+use symthaea_types::N_HARMONIES;
 
 use super::scheduling::CycleUrgency;
 
@@ -1079,6 +1080,12 @@ pub struct QualityDiagnostics {
 pub struct AttentionMetrics {
     /// Attention schema focus intensity (0.0 to 1.0, 0.0 when not enabled).
     pub attention_schema_focus: f32,
+    /// Vigilance fatigue level (0.0 = fresh, 1.0 = fully fatigued after ~60 cycles).
+    /// Mackworth (1948) vigilance decrement. Resets on attention shift.
+    pub attention_fatigue: f32,
+    /// Attention schema prediction accuracy (0.0 to 1.0).
+    /// Tracks how often the schema correctly predicted shift vs. maintenance.
+    pub attention_prediction_accuracy: f32,
     /// Whether a GWT broadcast occurred this cycle.
     pub gwt_broadcast: bool,
     /// GWT winning coalition size (0 if no broadcast).
@@ -1118,11 +1125,11 @@ pub struct HarmonicMetrics {
     /// Number of harmonic interference patterns detected (0 when off).
     pub harmonic_interferences: usize,
     /// 7D harmony coordinates: cosine similarity to each Harmony basis.
-    pub harmony_coordinates: [f64; 7],
+    pub harmony_coordinates: [f64; N_HARMONIES],
     /// Softmax distribution over harmonies for the current scenario.
-    pub moral_scenario_distribution: [f64; 7],
+    pub moral_scenario_distribution: [f64; N_HARMONIES],
     /// Softmax distribution over harmonies for the EMA prior.
-    pub moral_prior_distribution: [f64; 7],
+    pub moral_prior_distribution: [f64; N_HARMONIES],
     /// KL divergence from moral prior to observed.
     pub moral_kl_divergence: f64,
     /// Entropy of observed harmony distribution.

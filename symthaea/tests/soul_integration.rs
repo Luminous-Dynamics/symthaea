@@ -21,8 +21,8 @@ fn test_soul_default_has_seven_harmonies() {
     let values: Vec<_> = soul.core_values().collect();
     assert_eq!(
         values.len(),
-        7,
-        "Default soul should have 7 core values (Seven Harmonies)"
+        8,
+        "Default soul should have 8 core values (Eight Harmonies)"
     );
     assert!(
         soul.get_value("resonance").is_some(),
@@ -163,8 +163,8 @@ fn test_add_custom_value() {
     let values: Vec<_> = soul.core_values().collect();
     assert_eq!(
         values.len(),
-        8,
-        "Should now have 8 values (7 default + 1 custom)"
+        9,
+        "Should now have 9 values (8 default + 1 custom)"
     );
 }
 

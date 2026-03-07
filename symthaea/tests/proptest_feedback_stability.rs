@@ -1021,10 +1021,10 @@ proptest! {
             prop_assert!(m.theta_phase >= 0.0 && m.theta_phase <= 7.0,
                 "theta_phase out of bounds: {} at cycle {i}", m.theta_phase);
 
-            // Prediction horizon scale must be [0.5, 1.4]
+            // Prediction horizon scale must be [0.3, 2.0] (clamped by thresholds)
             assert_finite_f32(m.prediction_horizon_scale,
                 &format!("prediction_horizon_scale@cycle{i}"))?;
-            prop_assert!(m.prediction_horizon_scale >= 0.5 && m.prediction_horizon_scale <= 1.4,
+            prop_assert!(m.prediction_horizon_scale >= 0.3 && m.prediction_horizon_scale <= 2.0,
                 "prediction_horizon_scale out of bounds: {} at cycle {i}", m.prediction_horizon_scale);
 
             // FEP tau factor must be [0.7, 1.1]
@@ -1039,6 +1039,34 @@ proptest! {
                 && m.calibration_adjustment_multiplier <= 1.0,
                 "calibration_adjustment_multiplier out of bounds: {} at cycle {i}",
                 m.calibration_adjustment_multiplier);
+
+            // Error slope must be finite (can be negative or positive)
+            assert_finite_f32(m.error_slope, &format!("error_slope@cycle{i}"))?;
+            prop_assert!(m.error_slope >= -2.0 && m.error_slope <= 2.0,
+                "error_slope out of bounds: {} at cycle {i}", m.error_slope);
+
+            // Oscillation ratio must be [0.0, 1.0]
+            assert_finite_f32(m.oscillation_ratio, &format!("oscillation_ratio@cycle{i}"))?;
+            prop_assert!(m.oscillation_ratio >= 0.0 && m.oscillation_ratio <= 1.0,
+                "oscillation_ratio out of bounds: {} at cycle {i}", m.oscillation_ratio);
+
+            // Smoothed epistemic uncertainty must be [0.0, 1.0]
+            assert_finite_f32(m.smoothed_epistemic_uncertainty,
+                &format!("smoothed_epistemic@cycle{i}"))?;
+            prop_assert!(m.smoothed_epistemic_uncertainty >= 0.0
+                && m.smoothed_epistemic_uncertainty <= 1.0,
+                "smoothed_epistemic out of bounds: {} at cycle {i}",
+                m.smoothed_epistemic_uncertainty);
+
+            // Feedback signals high-water mark monotonically non-decreasing
+            prop_assert!(m.feedback_signals_high_water >= m.feedback_signals_fired
+                || i == 0,
+                "high_water {} < fired {} at cycle {i}",
+                m.feedback_signals_high_water, m.feedback_signals_fired);
+
+            // Mode transitions cumulative counter bounded
+            prop_assert!(m.mode_transitions < 10000,
+                "mode_transitions unreasonably high: {} at cycle {i}", m.mode_transitions);
         }
     }
 }

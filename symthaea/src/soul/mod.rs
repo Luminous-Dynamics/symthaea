@@ -33,7 +33,7 @@ impl Default for SoulConfig {
     fn default() -> Self {
         Self {
             dimension: 512,
-            num_core_values: 7,
+            num_core_values: 8,
             learning_enabled: true,
             stability: 0.95,
         }
@@ -175,7 +175,7 @@ impl Soul {
     pub fn new(config: SoulConfig) -> Self {
         let dim = config.dimension;
 
-        // Initialize default core values (Seven Harmonies)
+        // Initialize default core values (Eight Harmonies)
         let mut core_values = HashMap::new();
 
         let default_values = [
@@ -213,6 +213,11 @@ impl Soul {
                 "evolution",
                 "Evolutionary Progression",
                 "Wise becoming and continuous growth",
+            ),
+            (
+                "stillness",
+                "Sacred Stillness",
+                "Rest, silence, release, and generative emptiness",
             ),
         ];
 

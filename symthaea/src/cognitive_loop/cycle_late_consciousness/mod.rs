@@ -44,6 +44,8 @@ pub(super) struct LateConsciousnessResult {
     pub hierarchical_total_free_energy: f64,
     pub predictive_self_safety: f32,
     pub attention_schema_focus: f32,
+    pub attention_fatigue: f32,
+    pub attention_prediction_accuracy: f32,
     pub psi_attention_avg: f32,
 }
 
@@ -227,6 +229,8 @@ mod tests {
             hierarchical_total_free_energy: 0.0,
             predictive_self_safety: 0.5,
             attention_schema_focus: 0.4,
+            attention_fatigue: 0.0,
+            attention_prediction_accuracy: 0.0,
             psi_attention_avg: 0.3,
         };
         let mut timings = super::super::ModuleTimings::default();
@@ -257,6 +261,8 @@ mod tests {
             hierarchical_total_free_energy: 0.0,
             predictive_self_safety: 0.0,
             attention_schema_focus: 0.0,
+            attention_fatigue: 0.0,
+            attention_prediction_accuracy: 0.0,
             psi_attention_avg: 0.0,
         };
         let mut timings = super::super::ModuleTimings::default();
@@ -293,6 +299,8 @@ mod tests {
             hierarchical_total_free_energy: 0.0,
             predictive_self_safety: 0.0,
             attention_schema_focus: 0.0,
+            attention_fatigue: 0.0,
+            attention_prediction_accuracy: 0.0,
             psi_attention_avg: 0.0,
         };
         let mut timings = super::super::ModuleTimings::default();
@@ -323,6 +331,8 @@ mod tests {
             hierarchical_total_free_energy: 0.0,
             predictive_self_safety: 0.0,
             attention_schema_focus: 0.0,
+            attention_fatigue: 0.0,
+            attention_prediction_accuracy: 0.0,
             psi_attention_avg: 0.0,
         };
         let mut timings = super::super::ModuleTimings::default();

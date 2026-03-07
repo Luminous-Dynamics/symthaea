@@ -524,6 +524,7 @@ impl ReplSession {
         let temporal_backend = match config.temporal_backend.to_lowercase().as_str() {
             "cfc" => TemporalBackend::CfC,
             "hdc-ltc" | "hdcltc" | "unified" => TemporalBackend::HdcLtcUnified,
+            "hierarchical" | "hcfc" => TemporalBackend::HierarchicalCfC,
             _ => TemporalBackend::CfC,
         };
 
@@ -531,6 +532,11 @@ impl ReplSession {
         let cognitive_config = match temporal_backend {
             TemporalBackend::CfC => CognitiveLoopConfig::with_cfc(),
             TemporalBackend::HdcLtcUnified => CognitiveLoopConfig::with_hdc_ltc_unified(),
+            TemporalBackend::HierarchicalCfC => {
+                let mut cfg = CognitiveLoopConfig::with_cfc();
+                cfg.temporal_backend = TemporalBackend::HierarchicalCfC;
+                cfg
+            }
         };
         let cognitive = CognitiveLoopService::new(cognitive_config)
             .context("Failed to initialize cognitive loop")?;

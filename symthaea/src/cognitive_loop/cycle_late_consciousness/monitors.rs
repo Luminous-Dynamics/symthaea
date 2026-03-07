@@ -485,6 +485,19 @@ impl CognitiveLoopService {
             }
         }
 
+        // FEEDBACK: Vigilance fatigue drives attention shift pressure (Mackworth 1948, AST-1)
+        // Science: Sustained attention on a single target degrades performance after ~30 cycles.
+        // The schema's fatigue_level() reflects accumulated focus duration. When fatigue is
+        // high, increase exploration to encourage attention re-allocation.
+        if let Some(ref schema) = self.self_model_tier.attention_schema {
+            let fatigue = schema.fatigue_level();
+            if fatigue > 0.5 {
+                // Graduated exploration push: 0.0 at fatigue=0.5, up to 0.04 at fatigue=1.0
+                let fatigue_push = (fatigue - 0.5) * 0.08;
+                self.adjust_exploration("vigilance_fatigue", fatigue_push);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // PHI ATTENTION: Adaptive Φ-weighted attention routing
         // Observes current Phi and gates expensive actions by consciousness level.
@@ -546,6 +559,14 @@ impl CognitiveLoopService {
             hierarchical_total_free_energy,
             predictive_self_safety,
             attention_schema_focus,
+            attention_fatigue: self.self_model_tier.attention_schema
+                .as_ref()
+                .map(|s| s.fatigue_level())
+                .unwrap_or(0.0),
+            attention_prediction_accuracy: self.self_model_tier.attention_schema
+                .as_ref()
+                .map(|s| s.prediction_accuracy() as f32)
+                .unwrap_or(0.0),
             psi_attention_avg,
         }
     }

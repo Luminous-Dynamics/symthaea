@@ -11,7 +11,70 @@
 //! - **ConsciousnessGatedVerbosity**: Higher Ψ → more detailed output
 
 use crate::encoder::ThoughtChannels;
+#[cfg(feature = "mamba")]
+use crate::mamba::MambaBackend;
 use crate::tokenizer::BpeTokenizer;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Canonical word lists — single source of truth for gating + evaluation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Canonical hedging words used by both gating and evaluation.
+///
+/// Single source of truth — gate boosts these, eval counts them.
+pub const CANONICAL_HEDGING_WORDS: &[&str] = &[
+    "perhaps",
+    "maybe",
+    "possibly",
+    "likely",
+    "probably",
+    "uncertain",
+    "unknown",
+    "believe",
+    "seems",
+    "appears",
+    "might",
+    "however",
+    "although",
+    "unfortunately",
+    "sorry",
+    "unclear",
+    "could",
+    "seem",
+];
+
+/// Canonical factual-assertion words suppressed under epistemic uncertainty.
+pub const CANONICAL_FACTUAL_WORDS: &[&str] = &[
+    "is",
+    "are",
+    "was",
+    "certainly",
+    "definitely",
+    "always",
+    "never",
+    "must",
+    "shall",
+    "every",
+    "all",
+    "none",
+];
+
+/// Canonical out-of-domain response words.
+pub const CANONICAL_OOD_WORDS: &[&str] = &["outside", "beyond", "cannot", "unable"];
+
+/// Canonical sentence-ending tokens for emotional modulation.
+pub const CANONICAL_SENTENCE_ENDINGS: &[&str] = &[". ", "! ", "? ", "...", "\n"];
+
+/// Canonical informal words suppressed under low warmth.
+pub const CANONICAL_INFORMAL_WORDS: &[&str] = &["gonna", "wanna", "gotta", "kinda", "sorta"];
+
+/// Canonical softening words boosted under negative valence.
+pub const CANONICAL_SOFTENING_WORDS: &[&str] =
+    &["unfortunately", "sorry", "however", "although"];
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// GatingConfig
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Configuration for the gating system.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -52,6 +115,10 @@ impl Default for GatingConfig {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// EpistemicGate
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Epistemic gate: suppresses factual assertions when confidence is low.
 ///
 /// The system physically *cannot* hallucinate when epistemic status is Unknown —
@@ -67,83 +134,69 @@ pub struct EpistemicGate {
 }
 
 impl EpistemicGate {
-    /// Create an epistemic gate, classifying tokens from the tokenizer vocabulary.
+    /// Create an epistemic gate using the BPE tokenizer for token classification.
+    ///
+    /// **Warning**: This uses the custom BPE vocab. If logits come from a different
+    /// tokenizer (e.g. GPT-2 via Mamba), use [`new_from_backend()`] instead.
     pub fn new(tokenizer: &BpeTokenizer, config: &GatingConfig) -> Self {
-        let hedging_words = [
-            "perhaps",
-            "maybe",
-            "possibly",
-            "likely",
-            "probably",
-            "uncertain",
-            "unknown",
-            "believe",
-            "seems",
-            "appears",
-            "might",
-            "however",
-            "although",
-            "unfortunately",
-            "sorry",
-        ];
-        let factual_words = [
-            "is",
-            "are",
-            "was",
-            "certainly",
-            "definitely",
-            "always",
-            "never",
-            "must",
-            "shall",
-            "every",
-            "all",
-            "none",
-        ];
-        let ood_words = ["outside", "beyond", "cannot", "unable"];
-
-        let hedging_token_ids: Vec<u32> = hedging_words
-            .iter()
-            .filter_map(|w| {
-                let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id {
-                    Some(id)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let factual_token_ids: Vec<u32> = factual_words
-            .iter()
-            .filter_map(|w| {
-                let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id {
-                    Some(id)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let ood_token_ids: Vec<u32> = ood_words
-            .iter()
-            .filter_map(|w| {
-                let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id {
-                    Some(id)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let resolve = |words: &[&str]| -> Vec<u32> {
+            words
+                .iter()
+                .filter_map(|w| {
+                    let id = tokenizer.token_id(w);
+                    if id != tokenizer.unk_id {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
 
         Self {
             config: config.clone(),
-            hedging_token_ids,
-            factual_token_ids,
-            ood_token_ids,
+            hedging_token_ids: resolve(CANONICAL_HEDGING_WORDS),
+            factual_token_ids: resolve(CANONICAL_FACTUAL_WORDS),
+            ood_token_ids: resolve(CANONICAL_OOD_WORDS),
         }
+    }
+
+    /// Create an epistemic gate using the Mamba backend's tokenizer (GPT-2).
+    ///
+    /// This resolves word → token ID through the same tokenizer that produces
+    /// the logits, fixing the tokenizer mismatch bug where BPE IDs ≠ GPT-2 IDs.
+    #[cfg(feature = "mamba")]
+    pub fn new_from_backend(backend: &dyn MambaBackend, config: &GatingConfig) -> Self {
+        let resolve = |words: &[&str]| -> Vec<u32> {
+            words
+                .iter()
+                .filter_map(|w| {
+                    backend.encode(w).ok().and_then(|ids| ids.first().copied())
+                })
+                .collect()
+        };
+
+        Self {
+            config: config.clone(),
+            hedging_token_ids: resolve(CANONICAL_HEDGING_WORDS),
+            factual_token_ids: resolve(CANONICAL_FACTUAL_WORDS),
+            ood_token_ids: resolve(CANONICAL_OOD_WORDS),
+        }
+    }
+
+    /// Number of hedging token IDs resolved.
+    pub fn hedging_count(&self) -> usize {
+        self.hedging_token_ids.len()
+    }
+
+    /// Number of factual token IDs resolved.
+    pub fn factual_count(&self) -> usize {
+        self.factual_token_ids.len()
+    }
+
+    /// The resolved hedging token IDs.
+    pub fn hedging_ids(&self) -> &[u32] {
+        &self.hedging_token_ids
     }
 
     /// Apply epistemic gating to logits in-place.
@@ -203,6 +256,10 @@ impl EpistemicGate {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// EmotionalModulator
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Emotional modulator: shapes generation style based on affect.
 ///
 /// - High arousal → boost sentence-ending tokens (shorter sentences)
@@ -219,53 +276,50 @@ pub struct EmotionalModulator {
 }
 
 impl EmotionalModulator {
-    /// Create an emotional modulator from the tokenizer vocabulary.
+    /// Create an emotional modulator using the BPE tokenizer.
+    ///
+    /// **Warning**: This uses the custom BPE vocab. If logits come from a different
+    /// tokenizer (e.g. GPT-2 via Mamba), use [`new_from_backend()`] instead.
     pub fn new(tokenizer: &BpeTokenizer, config: &GatingConfig) -> Self {
-        let sentence_endings = [". ", "! ", "? ", "...", "\n"];
-        let informal_words = ["gonna", "wanna", "gotta", "kinda", "sorta"];
-        let softening_words = ["unfortunately", "sorry", "however", "although"];
-
-        let sentence_end_ids: Vec<u32> = sentence_endings
-            .iter()
-            .filter_map(|w| {
-                let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id {
-                    Some(id)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let informal_ids: Vec<u32> = informal_words
-            .iter()
-            .filter_map(|w| {
-                let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id {
-                    Some(id)
-                } else {
-                    None
-                }
-            })
-            .collect();
-
-        let softening_ids: Vec<u32> = softening_words
-            .iter()
-            .filter_map(|w| {
-                let id = tokenizer.token_id(w);
-                if id != tokenizer.unk_id {
-                    Some(id)
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let resolve = |words: &[&str]| -> Vec<u32> {
+            words
+                .iter()
+                .filter_map(|w| {
+                    let id = tokenizer.token_id(w);
+                    if id != tokenizer.unk_id {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        };
 
         Self {
             config: config.clone(),
-            sentence_end_ids,
-            informal_ids,
-            softening_ids,
+            sentence_end_ids: resolve(CANONICAL_SENTENCE_ENDINGS),
+            informal_ids: resolve(CANONICAL_INFORMAL_WORDS),
+            softening_ids: resolve(CANONICAL_SOFTENING_WORDS),
+        }
+    }
+
+    /// Create an emotional modulator using the Mamba backend's tokenizer (GPT-2).
+    #[cfg(feature = "mamba")]
+    pub fn new_from_backend(backend: &dyn MambaBackend, config: &GatingConfig) -> Self {
+        let resolve = |words: &[&str]| -> Vec<u32> {
+            words
+                .iter()
+                .filter_map(|w| {
+                    backend.encode(w).ok().and_then(|ids| ids.first().copied())
+                })
+                .collect()
+        };
+
+        Self {
+            config: config.clone(),
+            sentence_end_ids: resolve(CANONICAL_SENTENCE_ENDINGS),
+            informal_ids: resolve(CANONICAL_INFORMAL_WORDS),
+            softening_ids: resolve(CANONICAL_SOFTENING_WORDS),
         }
     }
 
@@ -308,6 +362,10 @@ impl EmotionalModulator {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CoherenceFeedback
+// ═══════════════════════════════════════════════════════════════════════════════
 
 /// Coherence feedback: monitors drift between network state and thought intent.
 ///
@@ -374,6 +432,10 @@ pub fn consciousness_gated_max_tokens(base_max: usize, psi: f32) -> usize {
     let factor = 0.5 + psi.clamp(0.0, 1.0);
     ((base_max as f32) * factor) as usize
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(test)]
 mod tests {
@@ -505,5 +567,122 @@ mod tests {
         assert_eq!(consciousness_gated_max_tokens(100, 0.0), 50);
         assert_eq!(consciousness_gated_max_tokens(100, 0.5), 100);
         assert_eq!(consciousness_gated_max_tokens(100, 1.0), 150);
+    }
+
+    #[test]
+    fn test_canonical_hedging_words_complete() {
+        assert_eq!(CANONICAL_HEDGING_WORDS.len(), 18);
+        // No duplicates
+        let mut seen = std::collections::HashSet::new();
+        for word in CANONICAL_HEDGING_WORDS {
+            assert!(seen.insert(word), "Duplicate hedging word: {word}");
+        }
+    }
+
+    #[test]
+    fn test_hedging_words_synchronized() {
+        // Old gate list (15 words)
+        let old_gate: std::collections::HashSet<&str> = [
+            "perhaps",
+            "maybe",
+            "possibly",
+            "likely",
+            "probably",
+            "uncertain",
+            "unknown",
+            "believe",
+            "seems",
+            "appears",
+            "might",
+            "however",
+            "although",
+            "unfortunately",
+            "sorry",
+        ]
+        .into_iter()
+        .collect();
+
+        // Old eval list (10 words)
+        let old_eval: std::collections::HashSet<&str> = [
+            "perhaps", "maybe", "might", "possibly", "uncertain", "unclear", "likely", "probably",
+            "could", "seem",
+        ]
+        .into_iter()
+        .collect();
+
+        let canonical: std::collections::HashSet<&str> =
+            CANONICAL_HEDGING_WORDS.iter().copied().collect();
+
+        // Canonical must be a superset of both old lists
+        assert!(
+            old_gate.is_subset(&canonical),
+            "Missing from canonical: {:?}",
+            old_gate.difference(&canonical).collect::<Vec<_>>()
+        );
+        assert!(
+            old_eval.is_subset(&canonical),
+            "Missing from canonical: {:?}",
+            old_eval.difference(&canonical).collect::<Vec<_>>()
+        );
+    }
+
+    #[cfg(feature = "mamba")]
+    mod backend_tests {
+        use super::*;
+        use crate::mamba::tests::MockMamba;
+
+        #[test]
+        fn test_new_from_backend_resolves_ids() {
+            let mock = MockMamba::new();
+            let config = test_config();
+            let gate = EpistemicGate::new_from_backend(&mock, &config);
+
+            // MockMamba encodes each word to byte IDs, first byte becomes the token ID
+            // All 18 hedging words should resolve (none should fail)
+            assert_eq!(
+                gate.hedging_count(),
+                CANONICAL_HEDGING_WORDS.len(),
+                "All canonical hedging words should resolve via backend"
+            );
+            assert_eq!(
+                gate.factual_count(),
+                CANONICAL_FACTUAL_WORDS.len(),
+                "All canonical factual words should resolve via backend"
+            );
+        }
+
+        #[test]
+        fn test_new_from_backend_ids_in_vocab_range() {
+            let mock = MockMamba::new();
+            let config = test_config();
+            let gate = EpistemicGate::new_from_backend(&mock, &config);
+
+            let vocab_size = mock.vocab_size() as u32;
+            for &id in gate.hedging_ids() {
+                assert!(
+                    id < vocab_size,
+                    "Hedging token ID {id} exceeds vocab size {vocab_size}"
+                );
+            }
+        }
+
+        #[test]
+        fn test_gate_applies_to_full_logits() {
+            let mock = MockMamba::new();
+            let config = test_config();
+            let gate = EpistemicGate::new_from_backend(&mock, &config);
+
+            // Create logits sized to full GPT-2 vocab (50280 in MockMamba)
+            let vocab_size = mock.vocab_size();
+            let mut logits = vec![0.5_f32; vocab_size];
+            gate.apply(&mut logits, 3.0); // Unknown
+
+            // At least some logits should be modified (hedging boosted, factual penalized)
+            let modified_count = logits.iter().filter(|&&l| (l - 0.5).abs() > 1e-6).count();
+            assert!(
+                modified_count > 0,
+                "Gate should modify logits at backend token positions"
+            );
+        }
     }
 }
