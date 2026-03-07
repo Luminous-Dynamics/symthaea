@@ -7,27 +7,25 @@
 //!
 //! | Line  | Section | Description |
 //! |-------|---------|-------------|
-//! |  ~75  | Phase A: OBSERVE | Build immutable CycleSnapshot |
-//! | ~100  | Phase B: COMPUTE | Run subsystem managers via trait |
-//! | ~133  | Self-model | Accuracy tracking (EMA) |
-//! | ~180  | Foveation | Vision-manifold coupling (cfg) |
-//! | ~223  | 1a: Memory | Episodic recall + resonator + goals |
-//! | ~270  | Binding | Phenomenal binding → threshold/confidence |
-//! | ~426  | 1b+15+18: Emotion | Contagion + homeostasis (→ `apply_emotional_homeostasis`) |
-//! | ~476  | 1c: Emotion | Unified emotional bridge (VAD) |
-//! | ~490  | 2a: Semantic | Semantic memory lookup + LR modulation |
-//! | ~677  | CfC step | Temporal network forward + prediction |
-//! | ~785  | 6b: World model | World model stiffness → LR scaling |
-//! | ~846  | MCTS | Plan evaluation + application |
-//! | ~891  | FEP decomp | Free energy → accuracy/complexity/pragmatic |
-//! | ~998  | 10d.5: AI bridge | Active inference bridge update |
-//! | ~1022 | 10d.6: FEP | Active inference step + policy |
-//! | ~1112 | 10d.7: Moral | Moral modulation of inference |
-//! | ~1136 | Attention | Budget check + substrate tau scaling |
-//! | ~1231 | Training | CfC weight update + async dispatch |
-//! | ~1391 | Parallel | rayon::join post-processing (stability, episodic) |
-//! | ~1691 | Broca | SSM language generation + feedback (cfg) |
-//! | ~1850 | Result | Assemble DynamicsPhaseResult |
+//! |  ~86  | Phase A: OBSERVE | Build immutable CycleSnapshot |
+//! | ~123  | Phase B: COMPUTE | Run subsystem managers via trait |
+//! | ~156  | Self-model | Accuracy tracking (EMA) |
+//! | ~200  | Foveation | Vision-manifold coupling (cfg) |
+//! | ~240  | 1a: Memory | Episodic recall + resonator + goals |
+//! | ~290  | Binding | Phenomenal binding → threshold/confidence |
+//! | ~468  | 1b+15+18: Emotion | Contagion + homeostasis (→ `apply_emotional_homeostasis`) |
+//! | ~479  | 1c: Emotion | Unified emotional bridge (VAD) |
+//! | ~498  | 2a: Semantic | Semantic memory lookup + LR modulation |
+//! | ~660  | CfC step | Temporal network forward + prediction |
+//! | ~780  | 6b: World model | World model stiffness → LR scaling |
+//! | ~853  | MCTS | Plan evaluation + application |
+//! | ~967  | FEP decomp | Free energy → accuracy/complexity/pragmatic |
+//! | ~1006 | 10d.7: Moral | Moral modulation of inference |
+//! | ~1030 | 10d.6b: FEP | Enhanced FEP bridge |
+//! | ~1143 | Attention | Budget check + substrate tau scaling |
+//! | ~1240 | Training | CfC weight update + async dispatch |
+//! | ~1830 | Parallel | rayon::join post-processing (stability, episodic) |
+//! | ~1869 | Result | Assemble DynamicsPhaseResult |
 
 use crate::consciousness::fep_active_inference::{MotorCommandType, Observation};
 use ndarray::Array1;
