@@ -20,6 +20,25 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     hash_entry(&anchor)
 }
 
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn initiate_transfer(input: InitiateTransferInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "initiate_transfer")?;
@@ -43,7 +62,7 @@ pub fn initiate_transfer(input: InitiateTransferInput) -> ExternResult<Record> {
     create_link(anchor_hash(&input.property_id)?, action_hash.clone(), LinkTypes::PropertyToTransfers, ())?;
     create_link(anchor_hash(&input.from_did)?, action_hash.clone(), LinkTypes::SellerToTransfers, ())?;
     create_link(anchor_hash(&input.to_did)?, action_hash.clone(), LinkTypes::BuyerToTransfers, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -78,7 +97,7 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
     // Update transfer status
     update_transfer_status(&input.transfer_id, TransferStatus::InEscrow)?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -185,7 +204,7 @@ pub fn complete_transfer(transfer_id: String) -> ExternResult<Record> {
                     bridge_input,
                 );
 
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -233,7 +252,7 @@ pub fn satisfy_condition(input: SatisfyConditionInput) -> ExternResult<Record> {
                     condition.verified_by = Some(input.verifier_did);
                 }
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(transfer))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -325,7 +344,7 @@ pub fn cancel_transfer(input: CancelTransferInput) -> ExternResult<Record> {
                     ..transfer
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(cancelled))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -364,7 +383,7 @@ pub fn accept_transfer(input: AcceptTransferInput) -> ExternResult<Record> {
                     ..transfer
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(accepted))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -393,7 +412,7 @@ pub fn fund_escrow(escrow_id: String) -> ExternResult<Record> {
 
                 let funded = Escrow { funded: true, ..escrow };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Escrow(funded))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -420,7 +439,7 @@ pub fn release_escrow(escrow_id: String) -> ExternResult<Record> {
                 let now = sys_time()?;
                 let released = Escrow { released: Some(now), ..escrow };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Escrow(released))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -462,7 +481,7 @@ pub fn dispute_transfer(input: DisputeTransferInput) -> ExternResult<Record> {
                     ..transfer
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(disputed))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -501,7 +520,7 @@ pub fn add_condition(input: AddConditionInput) -> ExternResult<Record> {
 
                 let updated = Transfer { conditions, ..transfer };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }

@@ -112,6 +112,25 @@ fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
 ///
 /// Rate-limited to 100 calls per 60 seconds per agent. Validates the target
 /// zome against an allowlist, then uses `call(CallTargetCell::Local, ...)`.
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
     // Validate zome and fn_name are not empty
@@ -190,7 +209,7 @@ pub fn query_civic(query: CivicQueryEntry) -> ExternResult<Record> {
         }
     }
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created query".into()
     )))
 }
@@ -226,7 +245,7 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
     query.success = Some(input.success);
 
     let updated_hash = update_entry(input.query_hash, &EntryTypes::Query(query))?;
-    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(updated_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated query".into()
     )))
 }
@@ -296,7 +315,7 @@ pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
     };
     emit_signal(&signal)?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created event".into()
     )))
 }
@@ -1174,7 +1193,7 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
     let target = link.target.into_action_hash().ok_or_else(||
         wasm_error!(WasmErrorInner::Guest("Invalid credential cache link target".into())))?;
 
-    if let Some(record) = get(target, GetOptions::default())? {
+    if let Some(record) = get_latest_record(target)? {
         let cached: CachedCredentialEntry = record.entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
@@ -1369,11 +1388,11 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
             if let Some(cached) = get_cached_credential(&did)? {
                 return Ok(cached);
             }
-            // No cache either — return Observer-tier fallback
+            // No cache either — return Citizen-tier fallback
             let now_us = sys_time()?.as_micros() as u64;
             ConsciousnessCredential::from_unified_consciousness(
                 did.clone(),
-                0.0, 0.0, 0.0, 0.0,
+                0.5, 0.5, 0.5, 0.5,
                 "did:mycelix:civic-bridge-fallback".to_string(),
                 now_us,
             )

@@ -22,6 +22,25 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     hash_entry(&anchor)
 }
 
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn file_dispute(input: FileDisputeInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "file_dispute")?;
@@ -43,7 +62,7 @@ pub fn file_dispute(input: FileDisputeInput) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::PropertyDispute(dispute))?;
     create_link(anchor_hash(&input.property_id)?, action_hash.clone(), LinkTypes::PropertyToDisputes, ())?;
     create_link(anchor_hash(&input.claimant_did)?, action_hash.clone(), LinkTypes::ClaimantToDisputes, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -72,7 +91,7 @@ pub fn file_ownership_claim(input: FileClaimInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::OwnershipClaim(claim))?;
     create_link(anchor_hash(&input.property_id)?, action_hash.clone(), LinkTypes::PropertyToClaims, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -97,7 +116,7 @@ pub fn escalate_to_justice(input: EscalateInput) -> ExternResult<Record> {
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PropertyDispute(updated))?;
                 create_link(action_hash.clone(), anchor_hash(&input.justice_case_id)?, LinkTypes::DisputeToJustice, ())?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -124,7 +143,7 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
                     ..dispute
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PropertyDispute(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -205,7 +224,7 @@ pub fn update_dispute_status(input: UpdateDisputeStatusInput) -> ExternResult<Re
                     ..dispute
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PropertyDispute(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -234,7 +253,7 @@ pub fn update_claim_status(input: UpdateClaimStatusInput) -> ExternResult<Record
                     ..claim
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::OwnershipClaim(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -268,7 +287,7 @@ pub fn add_dispute_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
 
                 let updated = PropertyDispute { evidence_ids, ..dispute };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PropertyDispute(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -338,7 +357,7 @@ pub fn add_claim_document(input: AddDocumentInput) -> ExternResult<Record> {
 
                 let updated = OwnershipClaim { supporting_documents: docs, ..claim };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::OwnershipClaim(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }

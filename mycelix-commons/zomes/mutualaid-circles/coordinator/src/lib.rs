@@ -68,6 +68,25 @@ pub struct ClearingInput {
 // =============================================================================
 
 /// Create a new credit circle
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_circle(input: CreateCircleInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_circle")?;
@@ -117,7 +136,7 @@ pub fn create_circle(input: CreateCircleInput) -> ExternResult<Record> {
     let all_anchor = all_circles_anchor()?;
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllCircles, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created circle".to_string()
     )))
 }
@@ -140,7 +159,7 @@ pub fn get_all_circles(_: ()) -> ExternResult<Vec<Record>> {
     let mut circles = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 circles.push(record);
             }
         }
@@ -161,7 +180,7 @@ pub fn get_my_circles(_: ()) -> ExternResult<Vec<Record>> {
     let mut circles = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 circles.push(record);
             }
         }
@@ -255,7 +274,7 @@ pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
     create_link(member.clone(), input.circle_hash.clone(), LinkTypes::MemberToCircles, ())?;
     create_link(member, line_hash.clone(), LinkTypes::MemberToCreditLines, ())?;
 
-    get(line_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(line_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created credit line".to_string()
     )))
 }
@@ -271,7 +290,7 @@ pub fn get_my_credit_line_for_circle(circle_hash: ActionHash) -> ExternResult<Op
 
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(line) = record
                     .entry()
                     .to_app_option::<CreditLine>()
@@ -387,7 +406,7 @@ pub fn transfer(input: TransferInput) -> ExternResult<Record> {
     create_link(from, tx_hash.clone(), LinkTypes::MemberToTransactions, ())?;
     create_link(input.to, tx_hash.clone(), LinkTypes::MemberToTransactions, ())?;
 
-    get(tx_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(tx_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created transaction".to_string()
     )))
 }
@@ -404,7 +423,7 @@ fn get_credit_line_for_member(
 
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(line) = record
                     .entry()
                     .to_app_option::<CreditLine>()
@@ -434,7 +453,7 @@ pub fn get_my_transactions(circle_hash: ActionHash) -> ExternResult<Vec<Record>>
     let mut transactions = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(tx) = record
                     .entry()
                     .to_app_option::<CreditTransaction>()
@@ -463,7 +482,7 @@ pub fn get_circle_transactions(circle_hash: ActionHash) -> ExternResult<Vec<Reco
     let mut transactions = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 transactions.push(record);
             }
         }
@@ -615,7 +634,7 @@ pub fn run_clearing(input: ClearingInput) -> ExternResult<Vec<Record>> {
                 (),
             )?;
 
-            if let Some(record) = get(tx_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(tx_hash)? {
                 clearing_transactions.push(record);
             }
 
@@ -704,7 +723,7 @@ pub fn adjust_credit_limit(input: AdjustCreditLimitInput) -> ExternResult<Record
     let line_hash = line_record.action_address().clone();
     let new_hash = update_entry(line_hash, EntryTypes::CreditLine(line))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated credit line".to_string()
     )))
 }

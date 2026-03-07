@@ -21,6 +21,25 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 /// Submit a new maintenance request
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn submit_request(req: MaintenanceRequest) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "submit_request")?;
@@ -51,7 +70,7 @@ pub fn submit_request(req: MaintenanceRequest) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created request".into()
     )))
 }
@@ -87,7 +106,7 @@ pub fn acknowledge_request(input: AcknowledgeRequestInput) -> ExternResult<Recor
 
     let new_hash = update_entry(input.request_hash, &EntryTypes::MaintenanceRequest(req))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated request".into()
     )))
 }
@@ -131,7 +150,7 @@ pub fn create_work_order(order: WorkOrder) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created work order".into()
     )))
 }
@@ -211,7 +230,7 @@ pub fn complete_work_order(input: CompleteWorkOrderInput) -> ExternResult<Record
         (),
     )?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated work order".into()
     )))
 }
@@ -229,7 +248,7 @@ pub fn schedule_inspection(inspection: Inspection) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created inspection".into()
     )))
 }
@@ -264,7 +283,7 @@ pub fn record_inspection(input: RecordInspectionInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.inspection_hash, &EntryTypes::Inspection(inspection))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated inspection".into()
     )))
 }
@@ -281,7 +300,7 @@ pub fn get_open_requests(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             requests.push(record);
         }
     }
@@ -320,7 +339,7 @@ pub fn get_building_maintenance_history(building_hash: ActionHash) -> ExternResu
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             requests.push(record);
         }
     }

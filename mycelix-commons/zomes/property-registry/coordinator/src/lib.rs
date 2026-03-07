@@ -21,6 +21,25 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     hash_entry(&anchor)
 }
 
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn register_property(input: RegisterPropertyInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "register_property")?;
@@ -61,7 +80,7 @@ pub fn register_property(input: RegisterPropertyInput) -> ExternResult<Record> {
     let deed_hash = create_entry(&EntryTypes::TitleDeed(deed))?;
     create_link(action_hash.clone(), deed_hash, LinkTypes::PropertyToDeeds, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -118,7 +137,7 @@ pub fn add_encumbrance(input: AddEncumbranceInput) -> ExternResult<Record> {
                 encumbrances.push(new_encumbrance);
                 let updated = TitleDeed { encumbrances, ..deed };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::TitleDeed(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -203,7 +222,7 @@ pub fn update_property_metadata(input: UpdateMetadataInput) -> ExternResult<Reco
                     ..property
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Property(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -236,7 +255,7 @@ pub fn remove_encumbrance(input: RemoveEncumbranceInput) -> ExternResult<Record>
 
                 let updated = TitleDeed { encumbrances, ..deed };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::TitleDeed(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -294,7 +313,7 @@ pub fn add_co_owner(input: AddCoOwnerInput) -> ExternResult<Record> {
 
                 let updated = Property { co_owners, ..property };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Property(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -331,7 +350,7 @@ pub fn remove_co_owner(input: RemoveCoOwnerInput) -> ExternResult<Record> {
 
                 let updated = Property { co_owners, ..property };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Property(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }

@@ -21,6 +21,25 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 /// Register a new building in the cooperative
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn register_building(building: Building) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "register_building")?;
@@ -51,7 +70,7 @@ pub fn register_building(building: Building) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created building".into()
     )))
 }
@@ -87,7 +106,7 @@ pub fn register_unit(unit: Unit) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created unit".into()
     )))
 }
@@ -147,7 +166,7 @@ pub fn update_unit_status(input: UpdateUnitStatusInput) -> ExternResult<Record> 
         )?;
     }
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated unit".into()
     )))
 }
@@ -164,7 +183,7 @@ pub fn get_building_units(building_hash: ActionHash) -> ExternResult<Vec<Record>
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             units.push(record);
         }
     }
@@ -184,7 +203,7 @@ pub fn get_available_units(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             units.push(record);
         }
     }
@@ -249,7 +268,7 @@ pub fn assign_occupant(input: AssignOccupantInput) -> ExternResult<Record> {
         }
     }
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated unit".into()
     )))
 }
@@ -258,7 +277,7 @@ pub fn assign_occupant(input: AssignOccupantInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn vacate_unit(unit_action_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "vacate_unit")?;
-    let record = get(unit_action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(unit_action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Unit not found".into())))?;
 
     let mut unit: Unit = record
@@ -306,7 +325,7 @@ pub fn vacate_unit(unit_action_hash: ActionHash) -> ExternResult<Record> {
         (),
     )?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated unit".into()
     )))
 }

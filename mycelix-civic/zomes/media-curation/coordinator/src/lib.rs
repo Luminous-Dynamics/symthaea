@@ -21,6 +21,25 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     hash_entry(&anchor)
 }
 
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn endorse(input: EndorseInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "endorse")?;
@@ -37,7 +56,7 @@ pub fn endorse(input: EndorseInput) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Endorsement(endorsement))?;
     create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToEndorsements, ())?;
     create_link(anchor_hash(&input.endorser_did)?, action_hash.clone(), LinkTypes::EndorserToEndorsements, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -70,7 +89,7 @@ pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
         create_link(action_hash.clone(), anchor_hash(&pub_id)?, LinkTypes::CollectionToPublications, ())?;
     }
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -105,7 +124,7 @@ pub fn calculate_quality_score(publication_id: String) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::QualityScore(score))?;
     create_link(anchor_hash(&publication_id)?, action_hash.clone(), LinkTypes::PublicationToQuality, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[hdk_extern]
@@ -123,7 +142,7 @@ pub fn feature_content(input: FeatureInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::FeaturedContent(featured))?;
     create_link(anchor_hash("featured_content")?, action_hash.clone(), LinkTypes::FeaturedPublications, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -232,7 +251,7 @@ pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<Record> {
                     ..collection
                 };
                 let new_hash = update_entry(action_hash, &EntryTypes::Collection(updated))?;
-                return get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -273,7 +292,7 @@ pub fn remove_from_collection(input: RemoveFromCollectionInput) -> ExternResult<
                     ..collection
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Collection(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -311,7 +330,7 @@ pub fn update_collection(input: UpdateCollectionInput) -> ExternResult<Record> {
                     ..collection
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Collection(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }

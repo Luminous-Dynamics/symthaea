@@ -20,6 +20,25 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     hash_entry(&anchor)
 }
 
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_common_resource(input: CreateResourceInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_common_resource")?;
@@ -39,7 +58,7 @@ pub fn create_common_resource(input: CreateResourceInput) -> ExternResult<Record
     for steward in input.stewards {
         create_link(anchor_hash(&steward)?, action_hash.clone(), LinkTypes::StewardToResource, ())?;
     }
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -70,7 +89,7 @@ pub fn grant_usage_right(input: GrantRightInput) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::UsageRight(right))?;
     create_link(anchor_hash(&input.resource_id)?, action_hash.clone(), LinkTypes::ResourceToRights, ())?;
     create_link(anchor_hash(&input.holder_did)?, action_hash.clone(), LinkTypes::HolderToRights, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -98,7 +117,7 @@ pub fn log_usage(input: LogUsageInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::UsageLog(log))?;
     create_link(anchor_hash(&input.resource_id)?, action_hash.clone(), LinkTypes::ResourceToLogs, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -222,7 +241,7 @@ pub fn revoke_usage_right(input: RevokeRightInput) -> ExternResult<Record> {
 
                 let revoked = UsageRight { active: false, ..right };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::UsageRight(revoked))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -261,7 +280,7 @@ pub fn add_steward(input: AddStewardInput) -> ExternResult<Record> {
                 let updated = CommonResource { stewards, ..resource };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonResource(updated))?;
                 create_link(anchor_hash(&input.new_steward_did)?, action_hash.clone(), LinkTypes::StewardToResource, ())?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -306,7 +325,7 @@ pub fn remove_steward(input: RemoveStewardInput) -> ExternResult<Record> {
 
                 let updated = CommonResource { stewards, ..resource };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonResource(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -350,7 +369,7 @@ pub fn update_governance_rules(input: UpdateGovernanceInput) -> ExternResult<Rec
 
                 let updated = CommonResource { governance_rules: input.new_rules, ..resource };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonResource(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -443,7 +462,7 @@ pub fn update_right_quota(input: UpdateQuotaInput) -> ExternResult<Record> {
 
                 let updated = UsageRight { quota: input.new_quota, ..right };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::UsageRight(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }

@@ -27,6 +27,25 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Create a new private space
 ///
 /// The caller becomes the first admin member automatically.
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_space(input: CreateSpaceInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "create_space")?;
@@ -105,7 +124,7 @@ pub fn create_space(input: CreateSpaceInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(space_hash, GetOptions::default())?
+    get_latest_record(space_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Space not found".into())))
 }
 
@@ -175,7 +194,7 @@ pub fn invite_member(input: InviteMemberInput) -> ExternResult<Record> {
             (),
         )?;
 
-        get(inv_hash, GetOptions::default())?
+        get_latest_record(inv_hash)?
             .ok_or(wasm_error!(WasmErrorInner::Guest(
                 "Invitation not found".into()
             )))
@@ -224,7 +243,7 @@ pub fn grant_access(input: GrantAccessInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(cap_hash, GetOptions::default())?
+    get_latest_record(cap_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Capability not found".into()
         )))
@@ -306,7 +325,7 @@ pub fn get_my_spaces(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             spaces.push(record);
         }
     }
@@ -332,7 +351,7 @@ pub fn get_space_members(space_id: String) -> ExternResult<Vec<Record>> {
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             members.push(record);
         }
     }
@@ -364,7 +383,7 @@ pub fn get_spaces_by_type(space_type: SpaceType) -> ExternResult<Vec<Record>> {
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             spaces.push(record);
         }
     }
@@ -391,7 +410,7 @@ pub fn get_space(space_id: String) -> ExternResult<Option<Record>> {
         for link in all_links {
             let ah = ActionHash::try_from(link.target)
                 .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-            if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(record) = get_latest_record(ah)? {
                 if let Some(space) = record
                     .entry()
                     .to_app_option::<Space>()
@@ -475,7 +494,7 @@ pub fn approve_invitation(input: ApproveInvitationInput) -> ExternResult<Record>
         &EntryTypes::SpaceInvitation(invitation),
     )?;
 
-    get(new_hash, GetOptions::default())?
+    get_latest_record(new_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Could not retrieve updated invitation".into()
         )))
@@ -492,7 +511,7 @@ pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "reject_invitation")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
-    let record = get(invitation_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(invitation_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Invitation not found".into()
         )))?;
@@ -519,7 +538,7 @@ pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
         &EntryTypes::SpaceInvitation(invitation),
     )?;
 
-    get(new_hash, GetOptions::default())?
+    get_latest_record(new_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Could not retrieve updated invitation".into()
         )))
@@ -567,7 +586,7 @@ pub fn book_resource(input: BookResourceInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(booking_hash, GetOptions::default())?
+    get_latest_record(booking_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Booking not found".into()
         )))
@@ -588,7 +607,7 @@ pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "cancel_booking")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
-    let record = get(booking_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(booking_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Booking not found".into()
         )))?;
@@ -615,7 +634,7 @@ pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
     booking.status = BookingStatus::Cancelled;
     let new_hash = update_entry(booking_hash, &EntryTypes::ResourceBooking(booking))?;
 
-    get(new_hash, GetOptions::default())?
+    get_latest_record(new_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Could not retrieve updated booking".into()
         )))
@@ -637,7 +656,7 @@ pub fn get_space_bookings(space_id: String) -> ExternResult<Vec<Record>> {
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             bookings.push(record);
         }
     }
@@ -679,7 +698,7 @@ pub fn create_schedule(input: CreateScheduleInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(sched_hash, GetOptions::default())?
+    get_latest_record(sched_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Schedule not found".into()
         )))
@@ -711,7 +730,7 @@ pub fn get_space_schedules(space_id: String) -> ExternResult<Vec<Record>> {
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             schedules.push(record);
         }
     }
@@ -768,7 +787,7 @@ pub fn get_space_invitations(space_id: String) -> ExternResult<Vec<Record>> {
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             invitations.push(record);
         }
     }
@@ -828,7 +847,7 @@ fn get_space_member_records(space_id: &str) -> ExternResult<Vec<(Record, Members
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             if let Some(membership) = record
                 .entry()
                 .to_app_option::<Membership>()
@@ -855,7 +874,7 @@ fn get_space_capability_records(space_id: &str) -> ExternResult<Vec<(Record, Spa
     for link in links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             if let Some(cap) = record
                 .entry()
                 .to_app_option::<SpaceCapability>()
@@ -895,7 +914,7 @@ fn get_space_by_id(space_id: &str) -> ExternResult<Option<Space>> {
     for link in all_links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah, GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah)? {
             if let Some(space) = record.entry().to_app_option::<Space>().ok().flatten() {
                 if space.id == space_id {
                     return Ok(Some(space));
@@ -944,7 +963,7 @@ fn add_member_directly(
     for link in all_links {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(ah.clone(), GetOptions::default())? {
+        if let Some(record) = get_latest_record(ah.clone())? {
             if let Some(space) = record.entry().to_app_option::<Space>().ok().flatten() {
                 if space.id == space_id {
                     create_link(
@@ -959,7 +978,7 @@ fn add_member_directly(
         }
     }
 
-    get(member_hash, GetOptions::default())?
+    get_latest_record(member_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Member not found".into()
         )))

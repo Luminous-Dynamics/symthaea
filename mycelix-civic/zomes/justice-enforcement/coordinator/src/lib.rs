@@ -34,11 +34,30 @@ pub struct CaseVerificationResult {
 }
 
 /// Create an enforcement action
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_enforcement(enforcement: Enforcement) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "create_enforcement")?;
     let action_hash = create_entry(&EntryTypes::Enforcement(enforcement.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created enforcement".into())))?;
 
     // Link from decision
@@ -74,7 +93,7 @@ pub fn get_decision_enforcement(decision_id: String) -> ExternResult<Vec<Record>
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -99,7 +118,7 @@ pub fn record_action(input: RecordActionInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.enforcement_hash, &enforcement)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
 }
 
@@ -151,7 +170,7 @@ pub fn update_enforcement_status(input: UpdateEnforcementStatusInput) -> ExternR
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
 }
 
@@ -183,7 +202,7 @@ pub fn complete_enforcement(input: CompleteEnforcementInput) -> ExternResult<Rec
 
     let action_hash = update_entry(input.enforcement_hash, &enforcement)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
 }
 
@@ -219,7 +238,7 @@ pub fn mark_enforcement_failed(input: FailedEnforcementInput) -> ExternResult<Re
 
     let action_hash = update_entry(input.enforcement_hash, &enforcement)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
 }
 
@@ -241,7 +260,7 @@ pub fn get_pending_enforcements(_: ()) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -256,7 +275,7 @@ pub fn get_pending_enforcements(_: ()) -> ExternResult<Vec<Record>> {
 
     for link in ip_links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -277,7 +296,7 @@ pub fn get_enforcements_by_status(status: EnforcementStatus) -> ExternResult<Vec
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -310,7 +329,7 @@ pub fn execute_cross_happ_action(input: CrossHappActionInput) -> ExternResult<Re
 
     let action_hash = update_entry(input.enforcement_hash, &enforcement)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
 }
 

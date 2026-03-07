@@ -39,6 +39,25 @@ pub struct MemberChargeInfo {
 }
 
 /// Generate monthly charges for all specified members
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn generate_monthly_charges(input: GenerateChargesInput) -> ExternResult<Vec<Record>> {
     let _eligibility = require_consciousness(&requirement_for_constitutional(), "generate_monthly_charges")?;
@@ -83,7 +102,7 @@ pub fn generate_monthly_charges(input: GenerateChargesInput) -> ExternResult<Vec
             (),
         )?;
 
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             records.push(record);
         }
     }
@@ -115,7 +134,7 @@ pub fn record_payment(payment: Payment) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created payment".into()
     )))
 }
@@ -132,7 +151,7 @@ pub fn get_member_payments(member: AgentPubKey) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             payments.push(record);
         }
     }
@@ -160,7 +179,7 @@ pub fn create_reserve_fund(fund: ReserveFund) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created fund".into()
     )))
 }
@@ -197,7 +216,7 @@ pub fn deposit_to_reserve(input: DepositToReserveInput) -> ExternResult<Record> 
 
     let new_hash = update_entry(input.fund_hash, &EntryTypes::ReserveFund(fund))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated fund".into()
     )))
 }
@@ -217,7 +236,7 @@ pub fn create_budget(budget: Budget) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created budget".into()
     )))
 }
@@ -255,7 +274,7 @@ pub fn approve_budget(input: ApproveBudgetInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.budget_hash, &EntryTypes::Budget(budget))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated budget".into()
     )))
 }
@@ -302,7 +321,7 @@ pub fn get_financial_summary(input: FinancialSummaryInput) -> ExternResult<Finan
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
-        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash.clone())? {
             if let Some(charge) = record
                 .entry()
                 .to_app_option::<MonthlyCharge>()
@@ -321,7 +340,7 @@ pub fn get_financial_summary(input: FinancialSummaryInput) -> ExternResult<Finan
                 let p_hash = ActionHash::try_from(plink.target).map_err(|_| {
                     wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
                 })?;
-                if let Some(precord) = get(p_hash, GetOptions::default())? {
+                if let Some(precord) = get_latest_record(p_hash)? {
                     if let Some(payment) = precord
                         .entry()
                         .to_app_option::<Payment>()
@@ -347,7 +366,7 @@ pub fn get_financial_summary(input: FinancialSummaryInput) -> ExternResult<Finan
     for link in fund_links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             if let Some(fund) = record
                 .entry()
                 .to_app_option::<ReserveFund>()

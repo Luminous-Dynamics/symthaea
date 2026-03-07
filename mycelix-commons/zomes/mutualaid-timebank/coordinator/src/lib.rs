@@ -83,6 +83,25 @@ pub struct SearchRequestsInput {
 // =============================================================================
 
 /// Create a new service offer
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_service_offer(input: CreateOfferInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_service_offer")?;
@@ -123,7 +142,7 @@ pub fn create_service_offer(input: CreateOfferInput) -> ExternResult<Record> {
     let all_anchor = all_offers_anchor()?;
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllOffers, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created offer".to_string()
     )))
 }
@@ -152,7 +171,7 @@ pub fn get_offers_by_agent(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
     let mut offers = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 offers.push(record);
             }
         }
@@ -179,7 +198,7 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
         }
 
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(offer) = record
                     .entry()
                     .to_app_option::<ServiceOffer>()
@@ -224,7 +243,7 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn deactivate_offer(hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "deactivate_offer")?;
-    let record = get(hash.clone(), GetOptions::default())?
+    let record = get_latest_record(hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?;
 
     let mut offer: ServiceOffer = record
@@ -246,7 +265,7 @@ pub fn deactivate_offer(hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(hash, EntryTypes::ServiceOffer(offer))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated offer".to_string()
     )))
 }
@@ -294,7 +313,7 @@ pub fn create_service_request(input: CreateRequestInput) -> ExternResult<Record>
     let all_anchor = all_requests_anchor()?;
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllRequests, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created request".to_string()
     )))
 }
@@ -323,7 +342,7 @@ pub fn get_requests_by_agent(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
     let mut requests = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 requests.push(record);
             }
         }
@@ -350,7 +369,7 @@ pub fn search_requests(input: SearchRequestsInput) -> ExternResult<Vec<Record>> 
         }
 
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(request) = record
                     .entry()
                     .to_app_option::<ServiceRequest>()
@@ -459,7 +478,7 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<Record> {
     let credit_hash = create_entry(EntryTypes::TimeCredit(credit))?;
     create_link(input.provider, credit_hash, LinkTypes::AgentToCredits, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created exchange".to_string()
     )))
 }
@@ -488,7 +507,7 @@ pub fn get_exchanges_by_agent(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
     let mut exchanges = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 exchanges.push(record);
             }
         }
@@ -501,7 +520,7 @@ pub fn get_exchanges_by_agent(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn confirm_exchange(hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "confirm_exchange")?;
-    let record = get(hash.clone(), GetOptions::default())?
+    let record = get_latest_record(hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".to_string())))?;
 
     let mut exchange: TimeExchange = record
@@ -521,7 +540,7 @@ pub fn confirm_exchange(hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(hash, EntryTypes::TimeExchange(exchange))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated exchange".to_string()
     )))
 }
@@ -560,7 +579,7 @@ pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.exchange_hash, EntryTypes::TimeExchange(exchange))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated exchange".to_string()
     )))
 }
@@ -588,7 +607,7 @@ pub fn get_balance_for_agent(agent: AgentPubKey) -> ExternResult<f64> {
 
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(credit) = record
                     .entry()
                     .to_app_option::<TimeCredit>()

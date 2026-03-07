@@ -20,6 +20,25 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     hash_entry(&anchor)
 }
 
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn publish(input: PublishInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "publish")?;
@@ -48,7 +67,7 @@ pub fn publish(input: PublishInput) -> ExternResult<Record> {
         create_link(anchor_hash(&tag.to_lowercase())?, action_hash.clone(), LinkTypes::TagToPublications, ())?;
     }
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -75,7 +94,7 @@ pub fn add_content_block(input: AddBlockInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::ContentBlock(block))?;
     create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToBlocks, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -116,7 +135,7 @@ pub fn update_publication(input: UpdateInput) -> ExternResult<Record> {
                     ..pub_entry
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Publication(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -290,7 +309,7 @@ pub fn add_tags(input: AddTagsInput) -> ExternResult<Record> {
                     ..pub_entry
                 };
                 let new_hash = update_entry(action_hash, &EntryTypes::Publication(updated))?;
-                return get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -325,7 +344,7 @@ pub fn update_license(input: UpdateLicenseInput) -> ExternResult<Record> {
                     ..pub_entry
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Publication(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }

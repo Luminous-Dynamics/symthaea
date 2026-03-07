@@ -20,6 +20,25 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     hash_entry(&anchor)
 }
 
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn submit_fact_check(input: SubmitFactCheckInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "submit_fact_check")?;
@@ -43,7 +62,7 @@ pub fn submit_fact_check(input: SubmitFactCheckInput) -> ExternResult<Record> {
     // Link claim text for cross-reference
     create_link(anchor_hash(&input.claim_text)?, action_hash.clone(), LinkTypes::ClaimToFactCheck, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -95,7 +114,7 @@ pub fn update_source_credibility(input: UpdateCredibilityInput) -> ExternResult<
     };
 
     let action_hash = create_entry(&EntryTypes::SourceCredibility(source))?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -173,7 +192,7 @@ pub fn dispute_fact_check(input: DisputeFactCheckInput) -> ExternResult<Record> 
 
     let action_hash = create_entry(&EntryTypes::FactCheckDispute(dispute))?;
     create_link(anchor_hash(&input.fact_check_id)?, action_hash.clone(), LinkTypes::FactCheckToDisputes, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -202,7 +221,7 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
                     ..dispute
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::FactCheckDispute(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -349,7 +368,7 @@ pub fn add_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
 
                 let updated = FactCheck { evidence, ..check };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::FactCheck(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -383,7 +402,7 @@ pub fn update_verdict(input: UpdateVerdictInput) -> ExternResult<Record> {
                     ..check
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::FactCheck(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }

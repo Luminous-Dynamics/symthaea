@@ -21,6 +21,25 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 /// Submit a new membership application
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn submit_application(app: MemberApplication) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "submit_application")?;
@@ -51,7 +70,7 @@ pub fn submit_application(app: MemberApplication) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created application".into()
     )))
 }
@@ -82,7 +101,7 @@ pub fn review_application(input: ReviewApplicationInput) -> ExternResult<Record>
 
     let new_hash = update_entry(input.application_hash, &EntryTypes::MemberApplication(app))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated application".into()
     )))
 }
@@ -162,7 +181,7 @@ pub fn approve_member(input: ApproveMemberInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created member".into()
     )))
 }
@@ -203,7 +222,7 @@ pub fn add_to_waitlist(input: AddToWaitlistInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created waitlist entry".into()
     )))
 }
@@ -220,7 +239,7 @@ pub fn get_waitlist(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             entries.push(record);
         }
     }
@@ -293,7 +312,7 @@ pub fn create_rent_to_own(input: CreateRentToOwnInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created agreement".into()
     )))
 }
@@ -343,7 +362,7 @@ pub fn record_rent_payment(input: RecordRentPaymentInput) -> ExternResult<Record
         &EntryTypes::RentToOwnAgreement(agreement),
     )?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated agreement".into()
     )))
 }
@@ -360,7 +379,7 @@ pub fn get_member_equity(member: AgentPubKey) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             agreements.push(record);
         }
     }
@@ -380,7 +399,7 @@ pub fn get_members(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             members.push(record);
         }
     }

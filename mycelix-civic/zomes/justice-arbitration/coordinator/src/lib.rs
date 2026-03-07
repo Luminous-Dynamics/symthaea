@@ -18,13 +18,32 @@ fn require_consciousness(
 }
 
 /// Create an arbitration panel for a case
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_arbitration(arbitration: Arbitration) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
     let _eligibility = require_consciousness(&requirement_for_proposal(), "create_arbitration")?;
 
     let action_hash = create_entry(&EntryTypes::Arbitration(arbitration.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created arbitration".into())))?;
 
     // Link from case
@@ -83,7 +102,7 @@ pub fn update_arbitration_status(input: UpdateArbStatusInput) -> ExternResult<Re
 
     let action_hash = update_entry(input.arbitration_hash, &arb)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated arbitration".into())))
 }
 
@@ -115,7 +134,7 @@ pub fn record_arbitrator_response(input: ArbitratorResponseInput) -> ExternResul
 
     let action_hash = update_entry(input.arbitration_hash, &arb)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated arbitration".into())))
 }
 
@@ -135,7 +154,7 @@ pub fn render_decision(decision: Decision) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "render_decision")?;
 
     let action_hash = create_entry(&EntryTypes::Decision(decision.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created decision".into())))?;
 
     // Link from case
@@ -162,7 +181,7 @@ pub fn get_case_decisions(case_id: String) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -178,7 +197,7 @@ pub fn file_appeal(appeal: Appeal) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "file_appeal")?;
 
     let action_hash = create_entry(&EntryTypes::Appeal(appeal.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created appeal".into())))?;
 
     // Link from decision
@@ -205,7 +224,7 @@ pub fn get_decision_appeals(decision_id: String) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -229,7 +248,7 @@ pub fn update_appeal_status(input: UpdateAppealStatusInput) -> ExternResult<Reco
 
     let action_hash = update_entry(input.appeal_hash, &appeal)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated appeal".into())))
 }
 
@@ -257,7 +276,7 @@ pub fn finalize_decision(input: FinalizeDecisionInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.decision_hash, &decision)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated decision".into())))
 }
 
@@ -278,7 +297,7 @@ pub fn get_arbitrator_cases(arbitrator_did: String) -> ExternResult<Vec<Record>>
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }

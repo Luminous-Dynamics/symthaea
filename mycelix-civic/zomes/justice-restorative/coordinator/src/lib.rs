@@ -18,11 +18,30 @@ fn require_consciousness(
 }
 
 /// Create a restorative circle
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_circle(circle: RestorativeCircle) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "create_circle")?;
     let action_hash = create_entry(&EntryTypes::RestorativeCircle(circle.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created circle".into())))?;
 
     // Link from case
@@ -100,7 +119,7 @@ pub fn record_consent(input: ConsentInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
 }
 
@@ -137,7 +156,7 @@ pub fn record_session(input: RecordSessionInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
 }
 
@@ -164,7 +183,7 @@ pub fn add_agreement(input: AddAgreementInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
 }
 
@@ -190,7 +209,7 @@ pub fn update_circle_status(input: UpdateCircleStatusInput) -> ExternResult<Reco
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
 }
 
@@ -223,7 +242,7 @@ pub fn complete_circle(input: CompleteCircleInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
 }
 
@@ -245,7 +264,7 @@ pub fn get_facilitator_circles(facilitator_did: String) -> ExternResult<Vec<Reco
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -266,7 +285,7 @@ pub fn get_circles_by_status(status: CircleStatus) -> ExternResult<Vec<Record>> 
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }

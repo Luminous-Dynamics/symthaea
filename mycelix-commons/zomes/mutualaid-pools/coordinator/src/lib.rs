@@ -149,6 +149,25 @@ fn get_member_anchor(did: &str) -> ExternResult<EntryHash> {
 }
 
 /// Create a new mutual aid pool
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_pool(input: CreatePoolInput) -> ExternResult<PoolWithHash> {
     // Validate pool name is not empty or whitespace-only
@@ -239,7 +258,7 @@ pub fn create_pool(input: CreatePoolInput) -> ExternResult<PoolWithHash> {
 /// Get a pool by its action hash
 #[hdk_extern]
 pub fn get_pool(action_hash: ActionHash) -> ExternResult<Option<PoolWithHash>> {
-    match get(action_hash.clone(), GetOptions::default())? {
+    match get_latest_record(action_hash.clone())? {
         Some(record) => {
             let pool: MutualAidPool = record
                 .entry()
@@ -565,7 +584,7 @@ pub fn process_disbursement(disbursement_hash: ActionHash) -> ExternResult<Disbu
     let now = sys_time()?;
 
     // Get the disbursement
-    let disb_record = get(disbursement_hash.clone(), GetOptions::default())?
+    let disb_record = get_latest_record(disbursement_hash.clone())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Disbursement not found".to_string())))?;
 
     let mut disbursement: Disbursement = disb_record
@@ -610,7 +629,7 @@ pub fn get_pool_contributions(pool_hash: ActionHash) -> ExternResult<Vec<Contrib
     let mut contributions = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash.clone())? {
                 if let Ok(Some(contribution)) = record.entry().to_app_option::<Contribution>() {
                     contributions.push(ContributionWithHash {
                         hash: action_hash,
@@ -638,7 +657,7 @@ pub fn get_pool_disbursements(pool_hash: ActionHash) -> ExternResult<Vec<Disburs
     let mut disbursements = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash.clone())? {
                 if let Ok(Some(disbursement)) = record.entry().to_app_option::<Disbursement>() {
                     disbursements.push(DisbursementWithHash {
                         hash: action_hash,
@@ -666,7 +685,7 @@ pub fn get_pending_disbursements(pool_hash: ActionHash) -> ExternResult<Vec<Disb
     let mut disbursements = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash.clone())? {
                 if let Ok(Some(disbursement)) = record.entry().to_app_option::<Disbursement>() {
                     if disbursement.status == DisbursementStatus::Pending {
                         disbursements.push(DisbursementWithHash {
@@ -699,7 +718,7 @@ pub fn get_member_pools(member_did: String) -> ExternResult<Vec<PoolWithHash>> {
 
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 if let Ok(Some(membership)) = record.entry().to_app_option::<PoolMembership>() {
                     // Avoid duplicates
                     if !seen_pools.contains(&membership.pool_id) {

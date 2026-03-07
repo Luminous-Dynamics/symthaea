@@ -92,6 +92,25 @@ fn require_consciousness(
 // =============================================================================
 
 /// Create a new shared resource
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_resource(input: CreateResourceInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_resource")?;
@@ -133,7 +152,7 @@ pub fn create_resource(input: CreateResourceInput) -> ExternResult<Record> {
     let avail_anchor = available_resources_anchor()?;
     create_link(avail_anchor, action_hash.clone(), LinkTypes::AvailableResources, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created resource".to_string()
     )))
 }
@@ -162,7 +181,7 @@ pub fn get_resources_by_owner(owner: AgentPubKey) -> ExternResult<Vec<Record>> {
     let mut resources = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 resources.push(record);
             }
         }
@@ -197,7 +216,7 @@ pub fn search_resources(input: SearchResourcesInput) -> ExternResult<Vec<Record>
         }
 
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(resource) = record
                     .entry()
                     .to_app_option::<SharedResource>()
@@ -244,7 +263,7 @@ pub fn set_resource_availability(input: SetResourceAvailabilityInput) -> ExternR
     let _eligibility = require_consciousness(&requirement_for_proposal(), "set_resource_availability")?;
     let hash = input.hash;
     let available = input.available;
-    let record = get(hash.clone(), GetOptions::default())?
+    let record = get_latest_record(hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())))?;
 
     let mut resource: SharedResource = record
@@ -266,7 +285,7 @@ pub fn set_resource_availability(input: SetResourceAvailabilityInput) -> ExternR
 
     let new_hash = update_entry(hash, EntryTypes::SharedResource(resource))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated resource".to_string()
     )))
 }
@@ -325,7 +344,7 @@ pub fn create_booking(input: CreateBookingInput) -> ExternResult<Record> {
     create_link(input.resource_hash, action_hash.clone(), LinkTypes::ResourceToBookings, ())?;
     create_link(booker, action_hash.clone(), LinkTypes::BookerToBookings, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created booking".to_string()
     )))
 }
@@ -345,7 +364,7 @@ fn check_booking_conflicts(
 
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash.clone(), GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash.clone())? {
                 if let Some(booking) = record
                     .entry()
                     .to_app_option::<Booking>()
@@ -381,7 +400,7 @@ pub fn get_resource_bookings(resource_hash: ActionHash) -> ExternResult<Vec<Reco
     let mut bookings = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 bookings.push(record);
             }
         }
@@ -402,7 +421,7 @@ pub fn get_my_bookings(_: ()) -> ExternResult<Vec<Record>> {
     let mut bookings = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 bookings.push(record);
             }
         }
@@ -415,7 +434,7 @@ pub fn get_my_bookings(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn confirm_booking(booking_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "confirm_booking")?;
-    let record = get(booking_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(booking_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
 
     let mut booking: Booking = record
@@ -445,7 +464,7 @@ pub fn confirm_booking(booking_hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(booking_hash, EntryTypes::Booking(booking))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated booking".to_string()
     )))
 }
@@ -454,7 +473,7 @@ pub fn confirm_booking(booking_hash: ActionHash) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "cancel_booking")?;
-    let record = get(booking_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(booking_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
 
     let mut booking: Booking = record
@@ -486,7 +505,7 @@ pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(booking_hash, EntryTypes::Booking(booking))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated booking".to_string()
     )))
 }
@@ -538,7 +557,7 @@ pub fn start_usage(input: RecordUsageInput) -> ExternResult<Record> {
 
     create_link(booking.resource_hash, action_hash.clone(), LinkTypes::ResourceToUsage, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created usage record".to_string()
     )))
 }
@@ -570,7 +589,7 @@ pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
 
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash.clone(), GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash.clone())? {
                 if let Some(usage) = record
                     .entry()
                     .to_app_option::<Usage>()
@@ -618,7 +637,7 @@ pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
     booking.status = BookingStatus::Completed;
     update_entry(input.booking_hash, EntryTypes::Booking(booking))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated usage record".to_string()
     )))
 }
@@ -759,7 +778,7 @@ pub fn record_maintenance(input: RecordMaintenanceInput) -> ExternResult<Record>
     // Link to resource
     create_link(input.resource_hash, action_hash.clone(), LinkTypes::ResourceToMaintenance, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created maintenance record".to_string()
     )))
 }
@@ -775,7 +794,7 @@ pub fn get_maintenance_history(resource_hash: ActionHash) -> ExternResult<Vec<Re
     let mut records = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 records.push(record);
             }
         }

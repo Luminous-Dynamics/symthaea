@@ -40,6 +40,25 @@ fn require_consciousness(
 }
 
 /// Form a new response team
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn form_team(input: FormTeamInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "form_team")?;
@@ -104,7 +123,7 @@ pub fn form_team(input: FormTeamInput) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created team".into()
     )))
 }
@@ -197,7 +216,7 @@ pub fn assign_to_zone(input: AssignToZoneInput) -> ExternResult<Record> {
         &EntryTypes::Team(updated_team),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created assignment".into()
     )))
 }
@@ -261,7 +280,7 @@ pub fn submit_sitrep(input: SubmitSitrepInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created SITREP".into()
     )))
 }
@@ -317,7 +336,7 @@ pub fn checkin(input: CheckinInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created checkpoint".into()
     )))
 }
@@ -344,7 +363,7 @@ pub fn get_team_sitreps(team_hash: ActionHash) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             sitreps.push(record);
         }
     }
@@ -365,7 +384,7 @@ pub fn get_zone_teams(zone_hash: ActionHash) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             teams.push(record);
         }
     }
@@ -490,7 +509,7 @@ pub fn get_agent_location(agent: AgentPubKey) -> ExternResult<Option<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             let ts = record.action().timestamp();
             if ts > latest_ts {
                 latest_ts = ts;

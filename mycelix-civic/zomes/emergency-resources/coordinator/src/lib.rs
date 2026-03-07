@@ -23,6 +23,25 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 /// Register a new emergency resource
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn register_resource(input: RegisterResourceInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "register_resource")?;
@@ -96,7 +115,7 @@ pub fn register_resource(input: RegisterResourceInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created resource".into()
     )))
 }
@@ -163,7 +182,7 @@ pub fn deploy_resource(input: DeployResourceInput) -> ExternResult<Record> {
         }
     }
 
-    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated resource".into()
     )))
 }
@@ -216,7 +235,7 @@ pub fn request_resource(input: RequestResourceInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created request".into()
     )))
 }
@@ -274,7 +293,7 @@ pub fn fulfill_request(input: FulfillRequestInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated request".into()
     )))
 }
@@ -301,7 +320,7 @@ pub fn get_available_resources(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             resources.push(record);
         }
     }
@@ -322,7 +341,7 @@ pub fn get_resource_requests(disaster_hash: ActionHash) -> ExternResult<Vec<Reco
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             requests.push(record);
         }
     }

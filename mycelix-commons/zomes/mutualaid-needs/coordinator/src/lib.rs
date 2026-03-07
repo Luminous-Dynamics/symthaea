@@ -86,6 +86,25 @@ pub struct SearchOffersInput {
 // =============================================================================
 
 /// Create a new need
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_need(input: CreateNeedInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_need")?;
@@ -127,7 +146,7 @@ pub fn create_need(input: CreateNeedInput) -> ExternResult<Record> {
         create_link(emergency_anchor, action_hash.clone(), LinkTypes::EmergencyNeeds, ())?;
     }
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created need".to_string()
     )))
 }
@@ -150,7 +169,7 @@ pub fn get_my_needs(_: ()) -> ExternResult<Vec<Record>> {
     let mut needs = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 needs.push(record);
             }
         }
@@ -185,7 +204,7 @@ pub fn search_needs(input: SearchNeedsInput) -> ExternResult<Vec<Record>> {
         }
 
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(need) = record
                     .entry()
                     .to_app_option::<Need>()
@@ -247,7 +266,7 @@ pub fn get_emergency_needs(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn withdraw_need(hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "withdraw_need")?;
-    let record = get(hash.clone(), GetOptions::default())?
+    let record = get_latest_record(hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Need not found".to_string())))?;
 
     let mut need: Need = record
@@ -268,7 +287,7 @@ pub fn withdraw_need(hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(hash, EntryTypes::Need(need))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated need".to_string()
     )))
 }
@@ -312,7 +331,7 @@ pub fn create_offer(input: CreateOfferInput) -> ExternResult<Record> {
     let all_anchor = all_offers_anchor()?;
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllOffers, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created offer".to_string()
     )))
 }
@@ -335,7 +354,7 @@ pub fn get_my_offers(_: ()) -> ExternResult<Vec<Record>> {
     let mut offers = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 offers.push(record);
             }
         }
@@ -362,7 +381,7 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
         }
 
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 if let Some(offer) = record
                     .entry()
                     .to_app_option::<Offer>()
@@ -406,7 +425,7 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn withdraw_offer(hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "withdraw_offer")?;
-    let record = get(hash.clone(), GetOptions::default())?
+    let record = get_latest_record(hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?;
 
     let mut offer: Offer = record
@@ -427,7 +446,7 @@ pub fn withdraw_offer(hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(hash, EntryTypes::Offer(offer))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated offer".to_string()
     )))
 }
@@ -489,7 +508,7 @@ pub fn propose_match(input: ProposeMatchInput) -> ExternResult<Record> {
     create_link(input.need_hash, action_hash.clone(), LinkTypes::NeedToMatches, ())?;
     create_link(input.offer_hash, action_hash.clone(), LinkTypes::OfferToMatches, ())?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created match".to_string()
     )))
 }
@@ -498,7 +517,7 @@ pub fn propose_match(input: ProposeMatchInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn accept_match(match_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "accept_match")?;
-    let record = get(match_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(match_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".to_string())))?;
 
     let mut m: Match = record
@@ -519,7 +538,7 @@ pub fn accept_match(match_hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(match_hash, EntryTypes::Match(m))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated match".to_string()
     )))
 }
@@ -538,7 +557,7 @@ pub fn schedule_handoff(input: ScheduleHandoffInput) -> ExternResult<Record> {
     let match_hash = input.match_hash;
     let scheduled_time = input.scheduled_time;
     let location = input.location;
-    let record = get(match_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(match_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".to_string())))?;
 
     let mut m: Match = record
@@ -561,7 +580,7 @@ pub fn schedule_handoff(input: ScheduleHandoffInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(match_hash, EntryTypes::Match(m))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated match".to_string()
     )))
 }
@@ -577,7 +596,7 @@ pub fn get_need_matches(need_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let mut matches = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 matches.push(record);
             }
         }
@@ -597,7 +616,7 @@ pub fn get_offer_matches(offer_hash: ActionHash) -> ExternResult<Vec<Record>> {
     let mut matches = Vec::new();
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
-            if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(hash)? {
                 matches.push(record);
             }
         }
@@ -676,7 +695,7 @@ pub fn fulfill_match(input: FulfillMatchInput) -> ExternResult<Record> {
     offer.status = OfferStatus::Completed;
     update_entry(m.offer_hash, EntryTypes::Offer(offer))?;
 
-    get(fulfillment_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(fulfillment_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created fulfillment".to_string()
     )))
 }
@@ -685,7 +704,7 @@ pub fn fulfill_match(input: FulfillMatchInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn confirm_fulfillment(fulfillment_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "confirm_fulfillment")?;
-    let record = get(fulfillment_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(fulfillment_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Fulfillment not found".to_string())))?;
 
     let mut fulfillment: Fulfillment = record
@@ -718,7 +737,7 @@ pub fn confirm_fulfillment(fulfillment_hash: ActionHash) -> ExternResult<Record>
 
     let new_hash = update_entry(fulfillment_hash, EntryTypes::Fulfillment(fulfillment))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve updated fulfillment".to_string()
     )))
 }

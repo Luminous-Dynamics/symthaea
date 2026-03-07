@@ -24,6 +24,25 @@ fn require_consciousness(
 const MIN_VOTING_PERIOD_MS: i64 = 5 * 60 * 1_000_000; // 5 minutes in microseconds
 
 /// Create a governance proposal
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
@@ -73,7 +92,7 @@ pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
     }
 
     let action_hash = create_entry(&EntryTypes::Proposal(proposal))?;
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created proposal".into())))
 }
 
@@ -101,7 +120,7 @@ pub fn cast_vote(vote: Vote) -> ExternResult<Record> {
     // Check each existing vote to see if this voter already voted
     for link in existing_vote_links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 if let Ok(Some(existing_vote)) = record.entry().to_app_option::<Vote>() {
                     if existing_vote.voter == vote.voter {
                         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -124,7 +143,7 @@ pub fn cast_vote(vote: Vote) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created vote".into())))
 }
 

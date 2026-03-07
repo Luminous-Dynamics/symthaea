@@ -18,12 +18,31 @@ fn require_consciousness(
 }
 
 /// File a new case
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn file_case(case: Case) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "file_case")?;
 
     let action_hash = create_entry(&EntryTypes::Case(case.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created case".into())))?;
 
     // Link from complainant
@@ -79,7 +98,7 @@ pub fn update_case_phase(input: UpdatePhaseInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.case_hash, &case)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated case".into())))
 }
 
@@ -106,7 +125,7 @@ pub fn update_case_status(input: UpdateStatusInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.case_hash, &case)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated case".into())))
 }
 
@@ -138,7 +157,7 @@ pub fn add_party(input: AddPartyInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.case_hash, &case)?;
 
-    get(action_hash, GetOptions::default())?
+    get_latest_record(action_hash)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated case".into())))
 }
 
@@ -155,7 +174,7 @@ pub fn submit_evidence(evidence: Evidence) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "submit_evidence")?;
 
     let action_hash = create_entry(&EntryTypes::Evidence(evidence.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created evidence".into())))?;
 
     // Link from case
@@ -182,7 +201,7 @@ pub fn get_case_evidence(case_id: String) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -195,7 +214,7 @@ pub fn get_case_evidence(case_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn initiate_mediation(mediation: Mediation) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Mediation(mediation.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
+    let record = get_latest_record(action_hash.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created mediation".into())))?;
 
     // Link from case
@@ -222,7 +241,7 @@ pub fn get_my_cases(did: String) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }
@@ -236,7 +255,7 @@ pub fn get_my_cases(did: String) -> ExternResult<Vec<Record>> {
 
     for link in respondent_links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 // Avoid duplicates
                 if !records.iter().any(|r| r.action_address() == record.action_address()) {
                     records.push(record);
@@ -260,7 +279,7 @@ pub fn get_all_cases(_: ()) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(record) = get_latest_record(action_hash)? {
                 records.push(record);
             }
         }

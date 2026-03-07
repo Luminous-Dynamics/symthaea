@@ -38,6 +38,25 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 }
 
 /// Create a new community land trust
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_land_trust")?;
@@ -57,7 +76,7 @@ pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created trust".into()
     )))
 }
@@ -221,7 +240,7 @@ pub fn issue_ground_lease(lease: GroundLease) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created lease".into()
     )))
 }
@@ -325,7 +344,7 @@ pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<R
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created resale calculation".into()
     )))
 }
@@ -378,7 +397,7 @@ pub fn transfer_lease(input: TransferLeaseInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated lease".into()
     )))
 }
@@ -426,7 +445,7 @@ pub fn generate_affordability_report(input: GenerateAffordabilityInput) -> Exter
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created report".into()
     )))
 }
@@ -443,7 +462,7 @@ pub fn get_trust_leases(trust_hash: ActionHash) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             leases.push(record);
         }
     }
@@ -482,7 +501,7 @@ pub fn update_trust_board(input: UpdateTrustBoardInput) -> ExternResult<Record> 
 
     let new_hash = update_entry(input.trust_hash, &EntryTypes::LandTrust(trust))?;
 
-    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated trust".into()
     )))
 }

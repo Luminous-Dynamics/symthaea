@@ -20,6 +20,25 @@ fn require_consciousness(
     gate_consciousness("civic_bridge", requirement, action_name)
 }
 
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn add_attribution(input: AddAttributionInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "add_attribution")?;
@@ -37,7 +56,7 @@ pub fn add_attribution(input: AddAttributionInput) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Attribution(attribution))?;
     create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToAttributions, ())?;
     create_link(anchor_hash(&input.contributor_did)?, action_hash.clone(), LinkTypes::ContributorToAttributions, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -64,7 +83,7 @@ pub fn set_royalty_rule(input: SetRoyaltyInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::RoyaltyRule(rule))?;
     create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToRoyalties, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -91,7 +110,7 @@ pub fn record_usage(input: RecordUsageInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::UsageRecord(usage))?;
     create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToUsage, ())?;
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -164,7 +183,7 @@ pub fn verify_attribution(input: VerifyAttributionInput) -> ExternResult<Record>
                     ..attr
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Attribution(verified))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -193,7 +212,7 @@ pub fn update_share_percentage(input: UpdateShareInput) -> ExternResult<Record> 
                     ..attr
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Attribution(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -282,7 +301,7 @@ pub fn deactivate_royalty_rule(input: DeactivateRoyaltyInput) -> ExternResult<Re
                     ..rule
                 };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::RoyaltyRule(updated))?;
-                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }

@@ -22,6 +22,25 @@ fn require_consciousness(
 }
 
 /// Send an emergency message (works offline - stored locally, synced later)
+
+fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let Some(details) = get_details(action_hash, GetOptions::default())? else {
+        return Ok(None);
+    };
+    match details {
+        Details::Record(record_details) => {
+            if record_details.updates.is_empty() {
+                Ok(Some(record_details.record))
+            } else {
+                let latest_update = &record_details.updates[record_details.updates.len() - 1];
+                let latest_hash = latest_update.action_address().clone();
+                get_latest_record(latest_hash)
+            }
+        }
+        Details::Entry(_) => Ok(None),
+    }
+}
+
 #[hdk_extern]
 pub fn send_message(input: SendMessageInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "send_message")?;
@@ -80,7 +99,7 @@ pub fn send_message(input: SendMessageInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created message".into()
     )))
 }
@@ -130,7 +149,7 @@ pub fn create_channel(input: CreateChannelInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created channel".into()
     )))
 }
@@ -184,7 +203,7 @@ pub fn broadcast(input: BroadcastInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created broadcast".into()
     )))
 }
@@ -262,7 +281,7 @@ pub fn get_channel_messages(channel_hash: ActionHash) -> ExternResult<Vec<Record
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             messages.push(record);
         }
     }
@@ -288,7 +307,7 @@ pub fn get_active_broadcasts(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash.clone())? {
             if let Some(broadcast) = record
                 .entry()
                 .to_app_option::<Broadcast>()
@@ -322,7 +341,7 @@ pub fn get_unsynced_messages(_: ()) -> ExternResult<Vec<Record>> {
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             messages.push(record);
         }
     }
@@ -336,7 +355,7 @@ pub fn get_unsynced_messages(_: ()) -> ExternResult<Vec<Record>> {
 pub fn mark_synced(message_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "mark_synced")?;
     // Get and update the message
-    let current_record = get(message_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+    let current_record = get_latest_record(message_hash.clone())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Message not found".into())
     ))?;
 
@@ -375,7 +394,7 @@ pub fn mark_synced(message_hash: ActionHash) -> ExternResult<Record> {
         }
     }
 
-    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+    get_latest_record(new_action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated message".into()
     )))
 }
