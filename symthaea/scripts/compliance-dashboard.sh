@@ -81,13 +81,13 @@ if ! $JSON_MODE; then
 fi
 
 run_suite "Safety Agent (unit tests)" \
-    "cargo test --lib safety::agent --features safety-agents 2>&1 | tail -5"
+    "cargo test --lib --features safety-agents -- safety::agent 2>&1"
 
 run_suite "Safety Agent (escalation soak)" \
-    "cargo test --test safety_agent_escalation_soak --features safety-agents 2>&1 | tail -5"
+    "cargo test --test safety_agent_escalation_soak --features safety-agents 2>&1"
 
 run_suite "Safety Audit Report" \
-    "cargo test --lib safety::audit --features safety-agents 2>&1 | tail -5"
+    "cargo test --lib --features safety-agents -- safety::audit 2>&1"
 
 if ! $JSON_MODE; then
     echo ""
@@ -95,13 +95,13 @@ if ! $JSON_MODE; then
 fi
 
 run_suite "Adversarial Moral Algebra" \
-    "cargo test --test adversarial_moral_algebra 2>&1 | tail -5"
+    "cargo test --test adversarial_moral_algebra 2>&1"
 
 run_suite "Moral Algebra (unit tests)" \
-    "cargo test --lib hdc::moral_algebra 2>&1 | tail -5"
+    "cargo test --lib -- hdc::moral_algebra 2>&1"
 
 run_suite "Ethics Engine" \
-    "cargo test --lib cognitive_loop::ethics_engine 2>&1 | tail -5"
+    "cargo test --lib -- cognitive_loop::ethics_engine 2>&1"
 
 if ! $JSON_MODE; then
     echo ""
@@ -109,13 +109,13 @@ if ! $JSON_MODE; then
 fi
 
 run_suite "Substrate Independence" \
-    "cargo test -p symthaea-core --lib substrate_independence 2>&1 | tail -5"
+    "cargo test -p symthaea-core --lib substrate_independence 2>&1"
 
 run_suite "Substrate Validation" \
-    "cargo test -p symthaea-core --lib substrate_validation 2>&1 | tail -5"
+    "cargo test -p symthaea-core --lib substrate_validation 2>&1"
 
 run_suite "Consciousness Engine" \
-    "cargo test --lib cognitive_loop::consciousness_engine 2>&1 | tail -5"
+    "cargo test --lib -- cognitive_loop::consciousness_engine 2>&1"
 
 if ! $JSON_MODE; then
     echo ""
@@ -123,13 +123,13 @@ if ! $JSON_MODE; then
 fi
 
 run_suite "Proptest Feedback Stability" \
-    "cargo test --test proptest_feedback_stability 2>&1 | tail -5"
+    "cargo test --test proptest_feedback_stability 2>&1"
 
 run_suite "Proptest Threshold Sensitivity" \
-    "cargo test --test proptest_threshold_sensitivity 2>&1 | tail -5"
+    "cargo test --test proptest_threshold_sensitivity 2>&1"
 
 run_suite "Calibration E2E" \
-    "cargo test --test calibration_e2e 2>&1 | tail -5"
+    "cargo test --test calibration_e2e 2>&1"
 
 if ! $JSON_MODE; then
     echo ""
@@ -166,7 +166,10 @@ for doc in \
     "docs/compliance/DATA_GOVERNANCE.md" \
     "docs/compliance/INCIDENT_RUNBOOK.md" \
     "docs/compliance/TECHNICAL_DOSSIER.md" \
-    "docs/compliance/CONFORMITY_ASSESSMENT.md"; do
+    "docs/compliance/CONFORMITY_ASSESSMENT.md" \
+    "docs/compliance/SDLC.md" \
+    "docs/compliance/RISK_TREATMENT_PLAN.md" \
+    "docs/compliance/EXPLAINABILITY_FRAMEWORK.md"; do
     DOCS_CHECKED=$((DOCS_CHECKED + 1))
     if [ ! -f "$doc" ]; then
         DOCS_MISSING=$((DOCS_MISSING + 1))
