@@ -405,6 +405,10 @@ pub struct Symthaea {
     /// Code generator: CfC-planned code structure with HDC verification.
     #[cfg(feature = "code_generation")]
     code_generator: crate::language::code_generator::CodeGenerator,
+    /// Cache of recent successful code generations for few-shot retrieval.
+    /// Stores (purpose, source_code) pairs, capped at 32 entries.
+    #[cfg(feature = "code_generation")]
+    code_generation_cache: Vec<(String, String)>,
 
     // ── Nociception: Pain & Infrastructure Health ──────────────────────
     /// Somatic error bridge: drains infrastructure errors → felt stress.
@@ -728,6 +732,8 @@ impl Symthaea {
             code_generator: crate::language::code_generator::CodeGenerator::new(
                 crate::hdc::code_encoder::CodeHDEncoder::new(hdc_dim),
             ),
+            #[cfg(feature = "code_generation")]
+            code_generation_cache: Vec::new(),
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -1008,6 +1014,8 @@ impl Symthaea {
             code_generator: crate::language::code_generator::CodeGenerator::new(
                 crate::hdc::code_encoder::CodeHDEncoder::new(hdc_dim),
             ),
+            #[cfg(feature = "code_generation")]
+            code_generation_cache: Vec::new(),
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -1567,7 +1575,10 @@ impl Symthaea {
                 }
             };
 
-            let gen_ctx = crate::language::code_generator::CodeContext::default();
+            let gen_ctx = crate::language::code_generator::CodeContext {
+                past_examples: self.code_generation_cache.clone(),
+                ..Default::default()
+            };
             let generated = self.code_generator.generate(&intent, &gen_ctx);
 
             // Extract spec fields for the structured thought
@@ -1582,6 +1593,10 @@ impl Symthaea {
                 } else {
                     (None, None, Vec::new(), Vec::new())
                 };
+
+            // Detect if the native emitter left unresolved placeholders
+            let needs_llm = generated.source.contains("todo!(")
+                || generated.source.contains("NotImplementedError");
 
             thought.code_context = Some(crate::mind::structured_thought::CodeContext {
                 language: lang,
@@ -1599,7 +1614,15 @@ impl Symthaea {
                 intent_similarity: Some(generated.intent_similarity),
                 syntactically_valid: None, // Set in Phase 5.5
                 notes: generated.notes,
+                needs_llm_completion: needs_llm,
             });
+
+            if needs_llm {
+                tracing::debug!(
+                    target: "symthaea::code",
+                    "Phase 3.6: Native emitter has unresolved placeholders — LLM completion mode"
+                );
+            }
 
             thought.semantic_intent = crate::mind::SemanticIntent::Answer;
             thought.epistemic_status = generated.epistemic_status;
@@ -1839,10 +1862,26 @@ impl Symthaea {
                         timestamp,
                     );
                     self.episodic_memory.store_if_significant(episode);
+
+                    // Cache the successful generation for few-shot retrieval
+                    let purpose = thought
+                        .code_context
+                        .as_ref()
+                        .and_then(|c| c.spec_purpose.clone())
+                        .unwrap_or_default();
+                    if !purpose.is_empty() {
+                        self.code_generation_cache.push((purpose, code_block.clone()));
+                        // Cap cache at 32 entries (FIFO)
+                        if self.code_generation_cache.len() > 32 {
+                            self.code_generation_cache.remove(0);
+                        }
+                    }
+
                     tracing::info!(
                         target: "symthaea::code",
                         phi = phi,
-                        "Phase 5.5: Successful code stored in episodic memory"
+                        cache_size = self.code_generation_cache.len(),
+                        "Phase 5.5: Successful code stored in episodic memory + cache"
                     );
                 }
             }

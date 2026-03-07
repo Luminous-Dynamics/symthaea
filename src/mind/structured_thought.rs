@@ -496,6 +496,10 @@ pub struct CodeContext {
     pub syntactically_valid: Option<bool>,
     /// Notes from the generation process (uncertainties, TODOs)
     pub notes: Vec<String>,
+    /// Whether the native emitter output contains unresolved placeholders
+    /// (todo!(), NotImplementedError) that the LLM should fill in.
+    #[serde(default)]
+    pub needs_llm_completion: bool,
 }
 
 impl StructuredThought {
@@ -649,6 +653,12 @@ impl StructuredThought {
             }
             if let Some(valid) = ctx.syntactically_valid {
                 prompt.push_str(&format!("CODE_VALID: {valid}\n"));
+            }
+            if ctx.needs_llm_completion {
+                prompt.push_str("NEEDS_COMPLETION: true\n");
+                prompt.push_str("The GENERATED_CODE contains todo!() or NotImplementedError placeholders.\n");
+                prompt.push_str("Replace ONLY the placeholder bodies with real implementations.\n");
+                prompt.push_str("Keep the function signatures, struct definitions, and test assertions exactly as-is.\n");
             }
             if !ctx.notes.is_empty() {
                 prompt.push_str("CODE_NOTES:\n");
@@ -873,5 +883,54 @@ mod tests {
         assert!(ETier::E4 > ETier::E0);
         assert!(NTier::N3 > NTier::N1);
         assert!(MTier::M3 > MTier::M0);
+    }
+
+    #[test]
+    fn test_needs_llm_completion_in_prompt() {
+        let mut thought = StructuredThought::default();
+        thought.code_context = Some(CodeContext {
+            language: "rust".to_string(),
+            spec_purpose: Some("Complex algorithm".to_string()),
+            spec_signature: Some("fn solve(input: &str) -> Vec<i32>".to_string()),
+            spec_constraints: vec![],
+            spec_examples: vec![],
+            plan_steps: vec!["DefineFunction".to_string()],
+            generated_code: Some(r#"pub fn solve(input: &str) -> Vec<i32> {
+    todo!("Implement: Complex algorithm → Vec<i32>")
+}"#.to_string()),
+            phi_score: Some(0.5),
+            intent_similarity: Some(0.6),
+            syntactically_valid: None,
+            notes: vec![],
+            needs_llm_completion: true,
+        });
+
+        let prompt = thought.to_translation_prompt();
+        assert!(prompt.contains("NEEDS_COMPLETION: true"));
+        assert!(prompt.contains("Replace ONLY the placeholder bodies"));
+        assert!(prompt.contains("GENERATED_CODE"));
+    }
+
+    #[test]
+    fn test_complete_code_no_completion_flag() {
+        let mut thought = StructuredThought::default();
+        thought.code_context = Some(CodeContext {
+            language: "rust".to_string(),
+            spec_purpose: Some("Add two numbers".to_string()),
+            spec_signature: Some("fn add(a: i32, b: i32) -> i32".to_string()),
+            spec_constraints: vec![],
+            spec_examples: vec![],
+            plan_steps: vec!["DefineFunction".to_string()],
+            generated_code: Some("pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}".to_string()),
+            phi_score: Some(0.8),
+            intent_similarity: Some(0.9),
+            syntactically_valid: None,
+            notes: vec![],
+            needs_llm_completion: false,
+        });
+
+        let prompt = thought.to_translation_prompt();
+        assert!(!prompt.contains("NEEDS_COMPLETION"));
+        assert!(prompt.contains("GENERATED_CODE"));
     }
 }

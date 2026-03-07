@@ -425,8 +425,10 @@ INPUTS you will receive:
 - CONSTRAINTS: Requirements the code must satisfy
 - EXAMPLES: Input/output examples (if applicable)
 - PLAN_STEPS: CfC-sequenced code structure steps (DefineFunction, AddField, etc.)
+- GENERATED_CODE: Pre-generated code from the native emitter (may be complete or partial)
 - PHI_SCORE: Consciousness integration measure of the plan
 - INTENT_SIMILARITY: How well the plan matches the original intent (0.0-1.0)
+- NEEDS_COMPLETION: If true, the GENERATED_CODE has todo!()/NotImplementedError placeholders
 
 RULES:
 1. FOLLOW the plan steps exactly — they represent CfC-computed optimal structure
@@ -436,6 +438,13 @@ RULES:
 5. SATISFY all constraints listed
 6. If INTENT_SIMILARITY < 0.3, add a comment noting low confidence
 7. If PHI_SCORE < 0.1, simplify the implementation (low integration = keep it basic)
+
+COMPLETION MODE (when NEEDS_COMPLETION is true):
+- The native emitter has already produced the code structure (signatures, types, tests)
+- Your ONLY job is to replace todo!() or NotImplementedError() with real implementations
+- DO NOT change function signatures, struct fields, derive macros, or test assertions
+- DO NOT add imports unless absolutely necessary for the body implementation
+- Keep the code style consistent with the surrounding generated code
 
 OUTPUT FORMAT:
 Return ONLY the generated source code in a fenced code block:
