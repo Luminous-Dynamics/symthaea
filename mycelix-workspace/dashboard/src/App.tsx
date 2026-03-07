@@ -12,20 +12,10 @@ export default function App() {
     agents,
     loading,
     error,
+    isLive,
     lookupProfile,
     refreshData,
   } = useConsciousness();
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-red-900/30 border border-red-800 rounded-lg p-6 max-w-md text-center">
-          <h2 className="text-lg font-semibold text-red-300 mb-2">Connection Error</h2>
-          <p className="text-sm text-red-400">{error}</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen p-4 max-w-screen-2xl mx-auto">
@@ -38,8 +28,18 @@ export default function App() {
           <p className="text-sm text-gray-400 mt-1">
             4D consciousness gating system -- community operator view
           </p>
+          {error && (
+            <p className="text-xs text-amber-400 mt-1">{error}</p>
+          )}
         </div>
         <div className="flex items-center gap-3">
+          <span className={`text-xs px-2 py-0.5 rounded-full ${
+            isLive
+              ? 'bg-green-900/50 text-green-400 border border-green-800'
+              : 'bg-gray-800 text-gray-500 border border-gray-700'
+          }`}>
+            {isLive ? 'LIVE' : 'MOCK'}
+          </span>
           {loading && (
             <span className="text-xs text-gray-500 animate-pulse">Loading...</span>
           )}

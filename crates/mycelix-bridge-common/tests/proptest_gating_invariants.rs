@@ -498,11 +498,11 @@ fn infinity_safety_combined_score() {
     }
 }
 
-/// NaN inputs are NOT safe through clamped() -- f64::NAN.clamp(0.0, 1.0) returns NaN.
-/// This test documents the known limitation: callers MUST use is_finite() guards
-/// before constructing a ConsciousnessProfile with untrusted f64 values.
+/// NaN/Infinity inputs are now sanitized by clamped() → 0.0.
+/// Previously NaN survived clamp(), but the sanitize() helper now catches it.
+/// Callers SHOULD still use is_finite() guards at system boundaries for defense-in-depth.
 #[test]
-fn nan_passes_through_clamp_known_limitation() {
+fn nan_sanitized_by_clamped() {
     let nan_cases = [
         (f64::NAN, 0.5, 0.5, 0.5),
         (0.5, f64::NAN, 0.5, 0.5),
@@ -518,11 +518,11 @@ fn nan_passes_through_clamp_known_limitation() {
         };
         let clamped = profile.clamped();
         let score = clamped.combined_score();
-        // Document: NaN survives clamp(), making combined_score NaN.
+        // NaN dimensions are sanitized to 0.0 by clamped()
         assert!(
-            score.is_nan(),
-            "Expected NaN to survive clamped().combined_score() but got {} \
-             for profile ({}, {}, {}, {}) -- if this fails, NaN handling was fixed!",
+            score.is_finite(),
+            "Expected clamped() to sanitize NaN but got {} \
+             for profile ({}, {}, {}, {})",
             score, identity, reputation, community, engagement,
         );
     }

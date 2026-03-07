@@ -956,6 +956,73 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
     Ok(credential)
 }
 
+/// Refresh a consciousness credential by re-fetching from the identity cluster.
+///
+/// Called by `gate_consciousness()` when a credential is nearing expiry (within
+/// 2 hours). Fetches a fresh credential from the identity bridge, updates the
+/// local engagement dimension, and caches the result.
+///
+/// If the identity cluster is unreachable, logs a warning and returns the
+/// existing cached credential (or a fallback if no cache exists).
+#[hdk_extern]
+pub fn refresh_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
+    debug!("hearth-bridge: refreshing consciousness credential for {}", did);
+
+    // Attempt cross-cluster call to identity bridge
+    let payload = ExternIO::encode(did.clone())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "identity_bridge".to_string(),
+        fn_name: "issue_consciousness_credential".to_string(),
+        payload,
+    };
+    let result = bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES);
+
+    let mut credential: ConsciousnessCredential = match result {
+        Ok(r) if r.success => {
+            let response_bytes = r.response.ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Empty response from identity bridge during refresh".into()
+                ))
+            })?;
+            ExternIO(response_bytes).decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode refreshed consciousness credential: {:?}",
+                    e
+                )))
+            })?
+        }
+        _ => {
+            // Identity cluster unreachable — return existing cached credential if available
+            debug!("hearth-bridge: identity cluster unreachable during refresh for {}", did);
+            if let Some(cached) = get_cached_credential(&did)? {
+                return Ok(cached);
+            }
+            // No cache either — return Observer-tier fallback
+            let now_us = sys_time()?.as_micros() as u64;
+            ConsciousnessCredential::from_unified_consciousness(
+                did.clone(),
+                0.0, 0.0, 0.0, 0.0,
+                "did:mycelix:hearth-bridge-fallback".to_string(),
+                now_us,
+            )
+        }
+    };
+
+    // Fill in engagement dimension locally
+    credential.profile.engagement = calculate_local_engagement()?;
+
+    // Recalculate tier with engagement included
+    credential.tier = ConsciousnessTier::from_score(credential.profile.combined_score());
+
+    // Cache the refreshed credential
+    let _ = cache_credential(&credential);
+
+    Ok(credential)
+}
+
 /// Calculate local engagement score from this cluster's activity.
 fn calculate_local_engagement() -> ExternResult<f64> {
     let agent = agent_info()?.agent_initial_pubkey;

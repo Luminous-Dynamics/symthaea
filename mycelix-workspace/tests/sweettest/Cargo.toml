@@ -135,3 +135,7 @@ path = "tests/cross_cluster_consciousness.rs"
 [[test]]
 name = "food_transport_workflow"
 path = "tests/food_transport_workflow.rs"
+
+[[test]]
+name = "sweettest_cross_cluster_consciousness"
+path = "../../tests/sweettest_cross_cluster_consciousness.rs"

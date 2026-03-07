@@ -81,14 +81,32 @@ impl ConsciousnessProfile {
         }
     }
 
-    /// Clamp all dimensions to 0.0–1.0.
+    /// Sanitize a single f64 dimension: NaN/Infinity → 0.0, then clamp to [0, 1].
+    #[inline]
+    fn sanitize(v: f64) -> f64 {
+        if v.is_finite() {
+            v.clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Clamp all dimensions to 0.0–1.0, replacing NaN/Infinity with 0.0.
     pub fn clamped(&self) -> Self {
         Self {
-            identity: self.identity.clamp(0.0, 1.0),
-            reputation: self.reputation.clamp(0.0, 1.0),
-            community: self.community.clamp(0.0, 1.0),
-            engagement: self.engagement.clamp(0.0, 1.0),
+            identity: Self::sanitize(self.identity),
+            reputation: Self::sanitize(self.reputation),
+            community: Self::sanitize(self.community),
+            engagement: Self::sanitize(self.engagement),
         }
+    }
+
+    /// Returns true if all dimensions are finite (not NaN or Infinity).
+    pub fn is_valid(&self) -> bool {
+        self.identity.is_finite()
+            && self.reputation.is_finite()
+            && self.community.is_finite()
+            && self.engagement.is_finite()
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -706,6 +724,30 @@ pub fn gate_consciousness(
             Ok(_) => {}
             Err(e) => {
                 debug!("Audit log failed ({}): {:?}", bridge_zome, e);
+            }
+        }
+    }
+
+    // Best-effort refresh: if credential is nearing expiry, trigger a
+    // background refresh call so the next gate check gets a fresh credential.
+    // This does NOT block the current check — the credential is still valid.
+    if needs_refresh(&credential, now_us) {
+        debug!(
+            "gate_consciousness: credential nearing expiry, triggering best-effort refresh via {}",
+            bridge_zome
+        );
+        match call(
+            CallTargetCell::Local,
+            ZomeName::new(bridge_zome),
+            FunctionName::new("refresh_consciousness_credential"),
+            None,
+            credential.did.clone(),
+        ) {
+            Ok(_) => {
+                debug!("gate_consciousness: refresh triggered successfully via {}", bridge_zome);
+            }
+            Err(e) => {
+                debug!("gate_consciousness: refresh failed (non-fatal) via {}: {:?}", bridge_zome, e);
             }
         }
     }
@@ -1777,6 +1819,137 @@ mod tests {
         assert!(!needs_refresh(&cred, NOW));
     }
 
+    #[test]
+    fn needs_refresh_exactly_at_boundary() {
+        // Credential expires exactly 2 hours from now — just inside the window
+        let profile = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        };
+        let mut cred = fresh_credential(profile.clone());
+        // Exactly at REFRESH_WINDOW_US boundary (2 hours = 7_200_000_000 us)
+        cred.expires_at = NOW + REFRESH_WINDOW_US;
+        // At exactly the boundary, expires_at - now == REFRESH_WINDOW_US,
+        // so the condition (expires_at - now < REFRESH_WINDOW_US) is false
+        assert!(!needs_refresh(&cred, NOW));
+
+        // One microsecond inside the window
+        cred.expires_at = NOW + REFRESH_WINDOW_US - 1;
+        assert!(needs_refresh(&cred, NOW));
+    }
+
+    #[test]
+    fn needs_refresh_just_expired_not_refreshable() {
+        // Credential expired 1 microsecond ago — should NOT trigger refresh
+        let profile = ConsciousnessProfile {
+            identity: 0.8,
+            reputation: 0.7,
+            community: 0.6,
+            engagement: 0.5,
+        };
+        let mut cred = fresh_credential(profile);
+        cred.expires_at = NOW; // expires exactly at NOW
+        assert!(!needs_refresh(&cred, NOW));
+    }
+
+    #[test]
+    fn needs_refresh_far_future_not_refreshable() {
+        // Credential expires 23 hours from now — well outside 2-hour window
+        let profile = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        };
+        let mut cred = fresh_credential(profile);
+        cred.expires_at = NOW + 82_800_000_000; // 23 hours
+        assert!(!needs_refresh(&cred, NOW));
+    }
+
+    #[test]
+    fn refresh_on_gate_check_flow() {
+        // Simulate the gate_consciousness flow: credential nearing expiry
+        // should still pass the gate check (it's valid) but needs_refresh
+        // returns true so refresh would be triggered.
+        let profile = ConsciousnessProfile {
+            identity: 0.8,
+            reputation: 0.7,
+            community: 0.6,
+            engagement: 0.5,
+        };
+        let mut cred = fresh_credential(profile);
+        // Expires in 30 minutes — within 2-hour refresh window
+        cred.expires_at = NOW + 1_800_000_000;
+
+        // Step 1: Gate check — credential is still valid
+        assert!(!cred.is_expired(NOW), "credential should NOT be expired");
+
+        // Step 2: Evaluate governance — should be eligible
+        let requirement = GovernanceRequirement {
+            min_tier: ConsciousnessTier::Participant,
+            min_identity: None,
+            min_community: None,
+        };
+        let eligibility = evaluate_governance(&cred, &requirement, NOW);
+        assert!(eligibility.eligible, "nearing-expiry credential should still pass gate");
+
+        // Step 3: needs_refresh should be true — triggering background refresh
+        assert!(needs_refresh(&cred, NOW), "credential nearing expiry should trigger refresh");
+    }
+
+    #[test]
+    fn refresh_on_gate_check_fresh_credential_no_refresh() {
+        // Fresh credential: gate passes and NO refresh triggered
+        let profile = ConsciousnessProfile {
+            identity: 0.8,
+            reputation: 0.7,
+            community: 0.6,
+            engagement: 0.5,
+        };
+        let cred = fresh_credential(profile); // expires in 24 hours
+
+        // Gate check passes
+        let requirement = GovernanceRequirement {
+            min_tier: ConsciousnessTier::Participant,
+            min_identity: None,
+            min_community: None,
+        };
+        let eligibility = evaluate_governance(&cred, &requirement, NOW);
+        assert!(eligibility.eligible);
+
+        // No refresh needed — credential is fresh
+        assert!(!needs_refresh(&cred, NOW), "fresh credential should NOT trigger refresh");
+    }
+
+    #[test]
+    fn refresh_on_gate_check_expired_credential_no_refresh() {
+        // Expired credential past grace period: gate FAILS and no refresh triggered
+        // (refresh is pointless for already-expired credentials)
+        let profile = ConsciousnessProfile {
+            identity: 0.8,
+            reputation: 0.7,
+            community: 0.6,
+            engagement: 0.5,
+        };
+        let mut cred = fresh_credential(profile);
+        // Expired well past the 30-minute grace period
+        cred.expires_at = NOW - GRACE_PERIOD_US - 1;
+
+        // Gate check fails (expired past grace)
+        let requirement = GovernanceRequirement {
+            min_tier: ConsciousnessTier::Participant,
+            min_identity: None,
+            min_community: None,
+        };
+        let eligibility = evaluate_governance(&cred, &requirement, NOW);
+        assert!(!eligibility.eligible, "expired credential should fail gate");
+
+        // No refresh for expired credentials
+        assert!(!needs_refresh(&cred, NOW), "expired credential should NOT trigger refresh");
+    }
+
     // -- GateAuditInput with correlation_id --
 
     #[test]
@@ -2014,5 +2187,100 @@ mod tests {
         let cred2: ConsciousnessCredential = serde_json::from_str(&json).unwrap();
         assert_eq!(cred.did, cred2.did);
         assert_eq!(cred.tier, cred2.tier);
+    }
+
+    // -- NaN/Infinity defense --
+
+    #[test]
+    fn clamped_sanitizes_nan_to_zero() {
+        let p = ConsciousnessProfile {
+            identity: f64::NAN,
+            reputation: f64::NAN,
+            community: f64::NAN,
+            engagement: f64::NAN,
+        };
+        let c = p.clamped();
+        assert_eq!(c.identity, 0.0);
+        assert_eq!(c.reputation, 0.0);
+        assert_eq!(c.community, 0.0);
+        assert_eq!(c.engagement, 0.0);
+        assert_eq!(c.tier(), ConsciousnessTier::Observer);
+    }
+
+    #[test]
+    fn clamped_sanitizes_infinity_to_bounds() {
+        let p = ConsciousnessProfile {
+            identity: f64::INFINITY,
+            reputation: f64::NEG_INFINITY,
+            community: f64::INFINITY,
+            engagement: f64::NEG_INFINITY,
+        };
+        let c = p.clamped();
+        // Infinity → 0.0 (not 1.0), because non-finite values are untrusted
+        assert_eq!(c.identity, 0.0);
+        assert_eq!(c.reputation, 0.0);
+        assert_eq!(c.community, 0.0);
+        assert_eq!(c.engagement, 0.0);
+    }
+
+    #[test]
+    fn clamped_mixed_nan_and_valid() {
+        let p = ConsciousnessProfile {
+            identity: 0.75,
+            reputation: f64::NAN,
+            community: 0.50,
+            engagement: f64::INFINITY,
+        };
+        let c = p.clamped();
+        assert_eq!(c.identity, 0.75);
+        assert_eq!(c.reputation, 0.0);
+        assert_eq!(c.community, 0.50);
+        assert_eq!(c.engagement, 0.0);
+    }
+
+    #[test]
+    fn is_valid_detects_nan() {
+        let valid = ConsciousnessProfile { identity: 0.5, reputation: 0.5, community: 0.5, engagement: 0.5 };
+        assert!(valid.is_valid());
+
+        let nan_id = ConsciousnessProfile { identity: f64::NAN, ..valid.clone() };
+        assert!(!nan_id.is_valid());
+
+        let inf_rep = ConsciousnessProfile { reputation: f64::INFINITY, ..valid.clone() };
+        assert!(!inf_rep.is_valid());
+
+        let neg_inf = ConsciousnessProfile { community: f64::NEG_INFINITY, ..valid };
+        assert!(!neg_inf.is_valid());
+    }
+
+    #[test]
+    fn nan_credential_evaluates_to_observer() {
+        let cred = fresh_credential(ConsciousnessProfile {
+            identity: f64::NAN,
+            reputation: f64::NAN,
+            community: f64::NAN,
+            engagement: f64::NAN,
+        });
+        let result = evaluate_governance(&cred, &requirement_for_basic(), NOW);
+        // NaN dimensions → clamped to 0.0 → Observer tier → rejected for Participant requirement
+        assert!(!result.eligible);
+        assert_eq!(result.tier, ConsciousnessTier::Observer);
+    }
+
+    #[test]
+    fn nan_does_not_bypass_gate() {
+        // Ensure NaN can never produce a passing gate check
+        let cred = fresh_credential(ConsciousnessProfile {
+            identity: f64::NAN,
+            reputation: 0.9,
+            community: 0.9,
+            engagement: 0.9,
+        });
+        let result = evaluate_governance(&cred, &requirement_for_voting(), NOW);
+        // Even with high rep/community/engagement, NaN identity → 0.0 identity
+        // combined = 0.0*0.25 + 0.9*0.25 + 0.9*0.30 + 0.9*0.20 = 0.675 → Steward
+        // BUT min_identity is Some(0.25), and clamped identity is 0.0 → rejected
+        assert!(!result.eligible);
+        assert!(result.reasons.iter().any(|r| r.contains("Identity")));
     }
 }
