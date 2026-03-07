@@ -64,11 +64,15 @@ pub enum PlotStatus {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum PlotType { Garden, FoodForest, Orchard, Greenhouse, Raised, Rooftop }
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Plot {
     pub id: String,
     pub name: String,
     pub area_sqm: f64,
     pub soil_type: SoilType,
+    pub plot_type: PlotType,
     pub location_lat: f64,
     pub location_lon: f64,
     pub steward: AgentPubKey,
@@ -93,6 +97,8 @@ pub struct Crop {
     pub planted_at: u64,
     pub expected_harvest: u64,
     pub status: CropStatus,
+    pub allergen_flags: Vec<String>,
+    pub organic_certified: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -118,12 +124,9 @@ pub struct YieldRecord {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum VehicleType {
-    Car,
-    Van,
-    Bike,
-    Bus,
-    Cargo,
-    ElectricScooter,
+    Car, Van, Bike, Bus, Cargo, ElectricScooter,
+    Helicopter, EVTOL, AirTaxi, Ferry, Boat, Train, Tram,
+    Skateboard, Wheelchair, Segway, AutonomousVehicle, Drone,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -146,11 +149,7 @@ pub struct Vehicle {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum TransportMode {
-    Driving,
-    Cycling,
-    Walking,
-    Transit,
-    Mixed,
+    Driving, Cycling, Walking, Transit, Mixed, Flying, Water, Rail, Micromobility, Autonomous,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -172,12 +171,8 @@ pub struct Route {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum TripMode {
-    Driving,
-    Cycling,
-    Walking,
-    Transit,
-    Carpool,
-    ElectricVehicle,
+    Driving, Cycling, Walking, Transit, Carpool, ElectricVehicle,
+    Flying, Water, Rail, Micromobility, Autonomous,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -219,6 +214,9 @@ pub struct CommunityImpactSummary {
 // ============================================================================
 
 fn commons_dna_path() -> PathBuf {
+    if let Ok(custom) = std::env::var("COMMONS_DNA_PATH") {
+        return PathBuf::from(custom);
+    }
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.pop(); // tests/ -> mycelix-commons/
     path.push("dna");
@@ -250,6 +248,7 @@ async fn test_food_register_plot_and_plant_crop() {
         name: "Community Garden A".to_string(),
         area_sqm: 200.0,
         soil_type: SoilType::Loam,
+        plot_type: PlotType::Garden,
         location_lat: 32.9483,
         location_lon: -96.7299,
         steward: agent.clone(),
@@ -270,6 +269,8 @@ async fn test_food_register_plot_and_plant_crop() {
         planted_at: 1700000000,
         expected_harvest: 1707000000,
         status: CropStatus::Planted,
+        allergen_flags: vec![],
+        organic_certified: false,
     };
 
     let crop_record: Record = conductor
@@ -308,6 +309,7 @@ async fn test_food_harvest_and_yield_record() {
         name: "Herb Garden".to_string(),
         area_sqm: 50.0,
         soil_type: SoilType::Sandy,
+        plot_type: PlotType::Garden,
         location_lat: 33.0,
         location_lon: -96.8,
         steward: agent.clone(),
@@ -325,6 +327,8 @@ async fn test_food_harvest_and_yield_record() {
         planted_at: 1700000000,
         expected_harvest: 1703000000,
         status: CropStatus::Growing,
+        allergen_flags: vec![],
+        organic_certified: false,
     };
 
     let crop_record: Record = conductor

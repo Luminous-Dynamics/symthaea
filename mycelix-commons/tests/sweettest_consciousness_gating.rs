@@ -59,6 +59,9 @@ pub struct BridgeHealth {
 // ============================================================================
 
 fn commons_dna_path() -> PathBuf {
+    if let Ok(custom) = std::env::var("COMMONS_DNA_PATH") {
+        return PathBuf::from(custom);
+    }
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.pop(); // tests/ -> mycelix-commons/
     path.push("dna");

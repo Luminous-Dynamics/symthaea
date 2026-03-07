@@ -9,6 +9,49 @@
 //!
 //! Communities with >10 members require a governance proposal to create a currency.
 //! The proposal ID is recorded in the CurrencyDefinition for audit.
+//!
+//! ## API Surface (30 externs)
+//!
+//! ### Lifecycle (7)
+//! - `create_currency(CreateCurrencyInput) -> CurrencyDefinition`
+//! - `activate_currency(ActivateCurrencyInput) -> CurrencyDefinition`
+//! - `suspend_currency(String) -> CurrencyDefinition`
+//! - `reactivate_currency(String) -> CurrencyDefinition`
+//! - `retire_currency(String) -> CurrencyDefinition`
+//! - `get_currency(String) -> Option<CurrencyDefinition>`
+//! - `get_dao_currencies(String) -> Vec<CurrencyDefinition>`
+//!
+//! ### Discovery (1)
+//! - `list_active_currencies(()) -> Vec<CurrencyDefinition>`
+//!
+//! ### Exchanges (6)
+//! - `record_minted_exchange(RecordMintedExchangeInput) -> MintedExchange`
+//! - `confirm_minted_exchange(String) -> MintedExchange`
+//! - `cancel_expired_exchange(String) -> bool`
+//! - `list_pending_exchanges(String) -> Vec<MintedExchange>`
+//! - `list_pending_for_receiver(String) -> Vec<MintedExchange>`
+//! - `get_currency_exchanges(PaginatedCurrencyInput) -> Vec<MintedExchange>`
+//!
+//! ### Balances & Portfolio (3)
+//! - `get_minted_balance(GetMintedBalanceInput) -> MintedBalanceInfo`
+//! - `get_member_portfolio(String) -> Vec<MintedBalanceInfo>`
+//! - `get_member_exchanges(GetMemberExchangesInput) -> Vec<MintedExchange>`
+//!
+//! ### Stats & Reports (3)
+//! - `get_currency_stats(String) -> CurrencyStats`
+//! - `get_demurrage_report(String) -> DemurrageReport`
+//! - `get_compost_balance(String) -> CompostBalance`
+//!
+//! ### Demurrage & Compost (2)
+//! - `apply_minted_demurrage(ApplyDemurrageInput) -> DemurrageResult`
+//! - `redistribute_compost(String) -> RedistributeCompostResult`
+//!
+//! ### Disputes (2)
+//! - `open_minted_dispute(OpenDisputeInput) -> MintedDispute`
+//! - `resolve_minted_dispute(ResolveDisputeInput) -> MintedDispute`
+//!
+//! ### Governance (1)
+//! - `amend_currency_params(AmendCurrencyParamsInput) -> CurrencyDefinition`
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
@@ -983,6 +1026,8 @@ pub struct CurrencyStats {
 }
 
 /// Get all exchanges for a specific member in a currency (as provider or receiver).
+///
+/// Supports cursor-based pagination via `after_timestamp`. Results sorted newest-first.
 #[hdk_extern]
 pub fn get_member_exchanges(input: GetMemberExchangesInput) -> ExternResult<Vec<MintedExchange>> {
     let limit = input.limit.unwrap_or(100);
@@ -996,9 +1041,6 @@ pub fn get_member_exchanges(input: GetMemberExchangesInput) -> ExternResult<Vec<
 
     let mut exchanges = Vec::new();
     for link in links {
-        if exchanges.len() >= limit {
-            break;
-        }
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(ex) = record
@@ -1007,13 +1049,22 @@ pub fn get_member_exchanges(input: GetMemberExchangesInput) -> ExternResult<Vec<
                     .ok()
                     .flatten()
                 {
-                    if ex.provider_did == input.member_did || ex.receiver_did == input.member_did {
-                        exchanges.push(ex);
+                    if ex.provider_did != input.member_did && ex.receiver_did != input.member_did {
+                        continue;
                     }
+                    if let Some(cursor) = &input.after_timestamp {
+                        if ex.timestamp.as_micros() <= cursor.as_micros() {
+                            continue;
+                        }
+                    }
+                    exchanges.push(ex);
                 }
             }
         }
     }
+
+    exchanges.sort_by(|a, b| b.timestamp.as_micros().cmp(&a.timestamp.as_micros()));
+    exchanges.truncate(limit);
     Ok(exchanges)
 }
 
@@ -1291,6 +1342,260 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
         remainder_kept: remainder,
     })
 }
+
+// =============================================================================
+// DISPUTE FLOW
+// =============================================================================
+
+/// Open a dispute on a confirmed exchange.
+///
+/// Only the provider or receiver of the exchange can open a dispute.
+/// Creates a MintedDispute entry linked to the exchange. A dispute does
+/// not reverse balances — that only happens on resolution (accept).
+#[hdk_extern]
+pub fn open_minted_dispute(input: OpenDisputeInput) -> ExternResult<MintedDispute> {
+    let (exchange, _) = find_minted_exchange(&input.exchange_id)?;
+
+    if !exchange.confirmed {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot dispute an unconfirmed exchange — cancel it instead".into()
+        )));
+    }
+
+    // Only participants can open disputes
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if caller_did != exchange.provider_did && caller_did != exchange.receiver_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only exchange participants can open a dispute".into()
+        )));
+    }
+
+    // Check no existing dispute
+    let dispute_anchor = format!("dispute:{}", input.exchange_id);
+    let existing = get_links(
+        LinkQuery::try_new(anchor_hash(&dispute_anchor)?, LinkTypes::ExchangeToDispute)?,
+        GetStrategy::default(),
+    )?;
+    if !existing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "A dispute already exists for this exchange".into()
+        )));
+    }
+
+    let now = sys_time()?;
+    let dispute = MintedDispute {
+        exchange_id: input.exchange_id.clone(),
+        opener_did: caller_did,
+        reason: input.reason,
+        resolved: None,
+        resolver_did: None,
+        resolution_reason: None,
+        opened_at: now,
+        resolved_at: None,
+    };
+
+    let hash = create_entry(&EntryTypes::MintedDispute(dispute.clone()))?;
+    create_link(
+        anchor_hash(&dispute_anchor)?,
+        hash,
+        LinkTypes::ExchangeToDispute,
+        (),
+    )?;
+
+    Ok(dispute)
+}
+
+/// Resolve a dispute on a confirmed exchange.
+///
+/// - `accept = true`: reverses the exchange balances (provider -hours, receiver +hours)
+/// - `accept = false`: keeps original balances (dispute rejected)
+///
+/// Requires governance authorization for communities with >10 members.
+#[hdk_extern]
+pub fn resolve_minted_dispute(input: ResolveDisputeInput) -> ExternResult<MintedDispute> {
+    let (exchange, _) = find_minted_exchange(&input.exchange_id)?;
+
+    // Find the dispute
+    let dispute_anchor = format!("dispute:{}", input.exchange_id);
+    let dispute_links = get_links(
+        LinkQuery::try_new(anchor_hash(&dispute_anchor)?, LinkTypes::ExchangeToDispute)?,
+        GetStrategy::default(),
+    )?;
+
+    let dispute_link = dispute_links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No dispute found for this exchange".into()
+        )))?;
+
+    let dispute_hash = dispute_link
+        .target
+        .clone()
+        .into_action_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid dispute link target".into()
+        )))?;
+
+    let dispute_record = get(dispute_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Dispute record not found".into())
+    ))?;
+
+    let dispute = dispute_record
+        .entry()
+        .to_app_option::<MintedDispute>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Dispute entry missing".into()
+        )))?;
+
+    if dispute.resolved.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "This dispute has already been resolved".into()
+        )));
+    }
+
+    // Governance gate: communities with >10 members require authorization
+    let (_, def) = get_currency_inner(&exchange.currency_id)?;
+    let community_size = fetch_community_size(&def.creator_dao_did);
+    if community_size > 10 {
+        match call(
+            CallTargetCell::Local,
+            ZomeName::from("tend"),
+            FunctionName::from("verify_governance_agent"),
+            None,
+            (),
+        ) {
+            Ok(ZomeCallResponse::Ok(_)) => {}
+            _ => {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Dispute resolution requires governance authorization for communities >10 members"
+                        .into()
+                )));
+            }
+        }
+    }
+
+    let caller = agent_info()?.agent_initial_pubkey;
+    let resolver_did = format!("did:mycelix:{}", caller);
+    let now = sys_time()?;
+
+    // If accepted, reverse the balances
+    if input.accept {
+        // Reverse: provider loses what they gained, receiver gets back what they lost
+        update_minted_balance(
+            &exchange.provider_did,
+            &exchange.currency_id,
+            exchange.hours,
+            false, // provider now "receives" (balance decreases)
+        )?;
+        update_minted_balance(
+            &exchange.receiver_did,
+            &exchange.currency_id,
+            exchange.hours,
+            true, // receiver now "provides" (balance increases)
+        )?;
+    }
+
+    let resolved_dispute = MintedDispute {
+        resolved: Some(input.accept),
+        resolver_did: Some(resolver_did),
+        resolution_reason: Some(input.resolution_reason),
+        resolved_at: Some(now),
+        ..dispute
+    };
+
+    update_entry(
+        dispute_record.action_address().clone(),
+        &EntryTypes::MintedDispute(resolved_dispute.clone()),
+    )?;
+
+    Ok(resolved_dispute)
+}
+
+// =============================================================================
+// PARAMETER AMENDMENT
+// =============================================================================
+
+/// Amend the parameters of an existing currency.
+///
+/// Validates the new parameters against constitutional limits. Only Draft or Active
+/// currencies can be amended. Communities with >10 members require governance
+/// authorization (proposal ID).
+#[hdk_extern]
+pub fn amend_currency_params(input: AmendCurrencyParamsInput) -> ExternResult<CurrencyDefinition> {
+    let (record, def) = get_currency_inner(&input.currency_id)?;
+
+    match def.status {
+        CurrencyStatus::Draft | CurrencyStatus::Active => {}
+        CurrencyStatus::Suspended => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Cannot amend parameters while currency is Suspended".into()
+            )));
+        }
+        CurrencyStatus::Retired => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Cannot amend parameters of a Retired currency".into()
+            )));
+        }
+    }
+
+    // Validate new params against constitutional limits
+    if let Err(e) = input.new_params.validate() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "New parameters violate constitutional limits: {}",
+            e
+        ))));
+    }
+
+    // Governance gate
+    let community_size = fetch_community_size(&def.creator_dao_did);
+    if community_size > 10 {
+        if input.governance_proposal_id.is_none() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Communities with >10 members require a governance proposal to amend parameters"
+                    .into()
+            )));
+        }
+        match call(
+            CallTargetCell::Local,
+            ZomeName::from("tend"),
+            FunctionName::from("verify_governance_agent"),
+            None,
+            (),
+        ) {
+            Ok(ZomeCallResponse::Ok(_)) => {}
+            _ => {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Parameter amendment requires governance authorization for communities >10 members"
+                        .into()
+                )));
+            }
+        }
+    }
+
+    let updated = CurrencyDefinition {
+        params: input.new_params,
+        governance_proposal_id: input.governance_proposal_id.or(def.governance_proposal_id),
+        ..def
+    };
+
+    update_entry(
+        record.action_address().clone(),
+        &EntryTypes::CurrencyDefinition(updated.clone()),
+    )?;
+
+    Ok(updated)
+}
+
+// =============================================================================
+// PORTFOLIO
+// =============================================================================
 
 /// Get all minted currency balances for a member across all currencies.
 ///

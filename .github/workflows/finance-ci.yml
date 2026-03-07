@@ -1,5 +1,5 @@
 # Mycelix Finance - Three-Currency Economic System CI
-# Zomes: Payments, Treasury, Bridge, Staking, TEND, Recognition, Currency Mint (~27 externs)
+# Zomes: Payments, Treasury, Bridge, Staking, TEND, Recognition, Currency Mint (30 externs)
 # Currencies: SAP (circulation), TEND (mutual credit), MYCEL (reputation), Community-minted (Currency Factory)
 
 name: Finance
@@ -459,7 +459,7 @@ jobs:
           echo "| staking | SAP | Collateral staking, MYCEL-weighted, escrow |" >> $GITHUB_STEP_SUMMARY
           echo "| tend | TEND | Time exchange, counter-cyclical limits, disputes |" >> $GITHUB_STEP_SUMMARY
           echo "| recognition | MYCEL | Weighted recognition, apprentice lifecycle |" >> $GITHUB_STEP_SUMMARY
-          echo "| currency-mint | Community | Currency Factory, confirmation, demurrage, compost, rate limits, discovery |" >> $GITHUB_STEP_SUMMARY
+          echo "| currency-mint | Community | Currency Factory, confirmation, demurrage, compost, disputes, amendments, rate limits, discovery |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "### Infrastructure" >> $GITHUB_STEP_SUMMARY
