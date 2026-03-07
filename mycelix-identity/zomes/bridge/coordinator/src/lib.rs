@@ -326,8 +326,8 @@ pub fn query_identity(input: QueryIdentityInput) -> ExternResult<IdentityVerific
     )?;
 
     let should_audit = !recent_queries.iter().any(|link| {
-        let age = now.as_micros() as i64 - link.timestamp.as_micros() as i64;
-        age >= 0 && age < QUERY_RATE_LIMIT_MICROS
+        let age = now.as_micros() as i64 - link.timestamp.as_micros();
+        (0..QUERY_RATE_LIMIT_MICROS).contains(&age)
     });
 
     if should_audit {
@@ -1422,14 +1422,13 @@ fn get_community_trust_score(did: &str) -> ExternResult<f64> {
         let cred_data: Option<serde_json::Value> = record
             .entry()
             .as_option()
-            .map(|entry| {
+            .and_then(|entry| {
                 serde_json::from_slice(
                     &holochain_serialized_bytes::encode(entry)
                         .unwrap_or_default(),
                 )
                 .ok()
-            })
-            .flatten();
+            });
 
         if let Some(cred) = cred_data {
             // Skip revoked or self-attested (issuer == subject)
@@ -1457,10 +1456,10 @@ fn get_community_trust_score(did: &str) -> ExternResult<f64> {
             // Get trust score from range midpoint
             let score = cred
                 .get("trust_score_range")
-                .and_then(|r| {
+                .map(|r| {
                     let lower = r.get("lower").and_then(|v| v.as_f64()).unwrap_or(0.0);
                     let upper = r.get("upper").and_then(|v| v.as_f64()).unwrap_or(0.0);
-                    Some((lower + upper) / 2.0)
+                    (lower + upper) / 2.0
                 })
                 .unwrap_or(0.0);
 

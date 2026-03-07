@@ -1,0 +1,14 @@
+[package]
+name = "mycelix-zome-helpers"
+version = "0.1.0"
+edition = "2021"
+description = "Shared helper functions for Mycelix zome coordinators (anchor hashing, link resolution, consciousness gating)"
+license = "MIT"
+
+[dependencies]
+hdk = "0.6.0"
+holo_hash = "0.6.0"
+serde = { version = "1.0", features = ["derive"] }
+mycelix-bridge-common = { path = "../../../crates/mycelix-bridge-common" }
+
+[dev-dependencies]

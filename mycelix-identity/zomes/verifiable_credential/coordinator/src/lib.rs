@@ -942,7 +942,7 @@ fn generate_merkle_proof(
 
     while current_level.len() > 1 {
         // Sibling index
-        let sibling_idx = if idx % 2 == 0 { idx + 1 } else { idx - 1 };
+        let sibling_idx = if idx.is_multiple_of(2) { idx + 1 } else { idx - 1 };
 
         if sibling_idx < current_level.len() {
             proof.push(current_level[sibling_idx].clone());
@@ -1222,7 +1222,7 @@ pub fn verify_derived_credential(action_hash: ActionHash) -> ExternResult<Derive
                         let mut idx = leaf_idx;
 
                         for sibling in path {
-                            let combined = if idx % 2 == 0 {
+                            let combined = if idx.is_multiple_of(2) {
                                 let mut c = current_hash.clone();
                                 c.extend(sibling);
                                 c

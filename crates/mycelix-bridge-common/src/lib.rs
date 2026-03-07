@@ -18,7 +18,8 @@ pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
 
 pub mod consciousness_profile;
 pub use consciousness_profile::{
-    evaluate_governance, gate_consciousness, needs_refresh, requirement_for_basic,
+    bootstrap_credential, evaluate_bootstrap_governance, evaluate_governance,
+    gate_consciousness, is_bootstrap_eligible, needs_refresh, requirement_for_basic,
     requirement_for_constitutional, requirement_for_guardian, requirement_for_proposal,
     requirement_for_voting, should_audit, ConsciousnessCredential, ConsciousnessProfile,
     ConsciousnessTier, GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult,

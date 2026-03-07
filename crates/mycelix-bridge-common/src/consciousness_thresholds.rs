@@ -44,6 +44,14 @@ pub struct ConsciousnessThresholds {
     pub consciousness_gate_voting: f64,
     /// Constitutional change threshold (default 0.6)
     pub consciousness_gate_constitutional: f64,
+
+    // Bootstrap gating (cold-start communities)
+    /// Maximum community size for bootstrap eligibility (default 5)
+    pub bootstrap_community_threshold: u32,
+    /// TTL for bootstrap credentials in microseconds (default 1 hour = 3_600_000_000)
+    pub bootstrap_ttl_us: u64,
+    /// Minimum identity score for bootstrap eligibility (default 0.25 = Basic MFA)
+    pub bootstrap_min_identity: f64,
 }
 
 impl Default for ConsciousnessThresholds {
@@ -58,9 +66,21 @@ impl Default for ConsciousnessThresholds {
             consciousness_gate_proposal: 0.3,
             consciousness_gate_voting: 0.4,
             consciousness_gate_constitutional: 0.6,
+            bootstrap_community_threshold: BOOTSTRAP_COMMUNITY_THRESHOLD,
+            bootstrap_ttl_us: BOOTSTRAP_TTL_US,
+            bootstrap_min_identity: BOOTSTRAP_MIN_IDENTITY,
         }
     }
 }
+
+/// Maximum community member count for bootstrap eligibility.
+pub const BOOTSTRAP_COMMUNITY_THRESHOLD: u32 = 5;
+
+/// TTL for bootstrap credentials: 1 hour in microseconds.
+pub const BOOTSTRAP_TTL_US: u64 = 3_600_000_000;
+
+/// Minimum identity score required for bootstrap eligibility (Basic MFA = 0.25).
+pub const BOOTSTRAP_MIN_IDENTITY: f64 = 0.25;
 
 /// Backward-compatible type alias.
 pub type PhiThresholds = ConsciousnessThresholds;
@@ -89,10 +109,8 @@ mod tests {
     #[test]
     fn default_thresholds_are_consistent() {
         let t = ConsciousnessThresholds::default();
-        // FL thresholds are ordered: veto < dampen < boost
         assert!(t.fl_veto < t.fl_dampen);
         assert!(t.fl_dampen < t.fl_boost);
-        // Governance thresholds are ordered: basic < proposal < voting < constitutional
         assert!(t.consciousness_gate_basic < t.consciousness_gate_proposal);
         assert!(t.consciousness_gate_proposal < t.consciousness_gate_voting);
         assert!(t.consciousness_gate_voting < t.consciousness_gate_constitutional);
@@ -110,6 +128,14 @@ mod tests {
         assert_eq!(t.consciousness_gate_proposal, 0.3);
         assert_eq!(t.consciousness_gate_voting, 0.4);
         assert_eq!(t.consciousness_gate_constitutional, 0.6);
+    }
+
+    #[test]
+    fn bootstrap_thresholds_defaults() {
+        let t = ConsciousnessThresholds::default();
+        assert_eq!(t.bootstrap_community_threshold, 5);
+        assert_eq!(t.bootstrap_ttl_us, 3_600_000_000);
+        assert_eq!(t.bootstrap_min_identity, 0.25);
     }
 
     #[test]

@@ -715,11 +715,13 @@ pub fn bulk_record_usage(receipts: Vec<UsageReceipt>) -> ExternResult<BulkUsageR
 }
 
 /// Pure computation of has_more flag (testable without HDK).
+#[cfg(test)]
 fn compute_has_more(offset: u64, limit: u64, total: u64) -> bool {
     offset + limit < total
 }
 
 /// Pure validation of pagination limit (testable without HDK).
+#[cfg(test)]
 fn validate_page_limit(limit: u64) -> Result<(), String> {
     if limit > MAX_PAGE_SIZE {
         Err(format!(
@@ -732,6 +734,7 @@ fn validate_page_limit(limit: u64) -> Result<(), String> {
 }
 
 /// Pure validation of verifier pubkey length.
+#[cfg(test)]
 fn validate_verifier_pubkey_len(len: usize) -> Result<(), String> {
     if len != 32 {
         Err(format!(
@@ -744,6 +747,7 @@ fn validate_verifier_pubkey_len(len: usize) -> Result<(), String> {
 }
 
 /// Pure validation of verifier signature length.
+#[cfg(test)]
 fn validate_verifier_signature_len(len: usize) -> Result<(), String> {
     if len != 64 {
         Err(format!(
@@ -756,11 +760,13 @@ fn validate_verifier_signature_len(len: usize) -> Result<(), String> {
 }
 
 /// Pure computation of renewal depth from attestation ID.
+#[cfg(test)]
 fn compute_renewal_depth(id: &str) -> u32 {
     id.matches("-renewed").count() as u32
 }
 
 /// Check whether renewal depth exceeds the limit.
+#[cfg(test)]
 fn exceeds_renewal_depth(id: &str) -> bool {
     compute_renewal_depth(id) >= MAX_RENEWAL_DEPTH
 }

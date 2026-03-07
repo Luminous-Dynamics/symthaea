@@ -891,9 +891,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     "Delete link tag too long (max 256 bytes)".into(),
                 ));
             }
-            match link_type {
-                _ => Ok(ValidateCallbackResult::Valid),
-            }
+            let _ = link_type;
+            Ok(ValidateCallbackResult::Valid)
         }
         FlatOp::RegisterDelete(OpDelete { action, .. }) => {
             let original_action = must_get_action(action.deletes_address.clone())?;

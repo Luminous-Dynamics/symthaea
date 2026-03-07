@@ -7,10 +7,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::commitment::{Commitment, CommitmentSet};
 use crate::dealer::Deal;
+use crate::hash_commitment::{CommitmentScheme, HashCommitmentSet, HashReveal};
 use crate::participant::{Participant, ParticipantId, ParticipantState};
 use crate::polynomial::lagrange_interpolate_at_zero;
+use crate::refresh::RefreshRound;
 use crate::scalar::Scalar;
 use crate::share::CombinedShare;
+use crate::violation::{ViolationTracker, ViolationType};
 use crate::error::{DkgError, DkgResult};
 
 /// Default phase timeout in seconds (5 minutes)
@@ -23,6 +26,9 @@ pub struct DkgConfig {
     pub threshold: usize,
     /// Total number of participants
     pub num_participants: usize,
+    /// Commitment scheme (Feldman, HashBased, or Hybrid)
+    #[serde(default)]
+    pub commitment_scheme: CommitmentScheme,
 }
 
 impl DkgConfig {
@@ -49,7 +55,14 @@ impl DkgConfig {
         Ok(Self {
             threshold,
             num_participants,
+            commitment_scheme: CommitmentScheme::Feldman,
         })
+    }
+
+    /// Set the commitment scheme
+    pub fn with_commitment_scheme(mut self, scheme: CommitmentScheme) -> Self {
+        self.commitment_scheme = scheme;
+        self
     }
 }
 
@@ -58,6 +71,8 @@ impl DkgConfig {
 pub enum CeremonyPhase {
     /// Participants are being registered
     Registration,
+    /// Participants are submitting hash commitments (commit-reveal protocol)
+    CommitmentCollection,
     /// Participants are generating and distributing deals
     Dealing,
     /// Participants are verifying shares and filing complaints
@@ -72,6 +87,7 @@ impl std::fmt::Display for CeremonyPhase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Registration => write!(f, "Registration"),
+            Self::CommitmentCollection => write!(f, "CommitmentCollection"),
             Self::Dealing => write!(f, "Dealing"),
             Self::Verification => write!(f, "Verification"),
             Self::Complete => write!(f, "Complete"),
@@ -106,6 +122,14 @@ pub struct DkgCeremony {
     disqualified: Vec<ParticipantId>,
     /// Complaints: (complainer, accused)
     complaints: Vec<(ParticipantId, ParticipantId)>,
+    /// Hash commitments for commit-reveal protocol (dealer -> commitment set)
+    hash_commitments: HashMap<ParticipantId, HashCommitmentSet>,
+    /// Hash reveals for commit-reveal protocol (dealer -> reveal)
+    hash_reveals: HashMap<ParticipantId, HashReveal>,
+    /// Protocol violation tracker
+    violation_tracker: ViolationTracker,
+    /// Current epoch for proactive refresh
+    epoch: u64,
     /// M-04 remediation: When the current phase started (unix seconds)
     phase_started_at_secs: Option<u64>,
     /// M-04 remediation: Timeout for each phase in seconds
@@ -133,6 +157,10 @@ impl DkgCeremony {
             deals: HashMap::new(),
             disqualified: Vec::new(),
             complaints: Vec::new(),
+            hash_commitments: HashMap::new(),
+            hash_reveals: HashMap::new(),
+            violation_tracker: ViolationTracker::new(),
+            epoch: 0,
             phase_started_at_secs: Some(now_secs),
             phase_timeout_secs,
         }
@@ -207,13 +235,19 @@ impl DkgCeremony {
             });
         }
 
-        // Mark excluded participants as disqualified
+        // Mark excluded participants as disqualified and record violations
         for id in excluded {
             if !self.disqualified.contains(id) {
                 self.disqualified.push(*id);
                 if let Some(p) = self.participants.get_mut(id) {
                     p.disqualify();
                 }
+                self.violation_tracker.record_violation(
+                    *id,
+                    ViolationType::DealTimeout,
+                    self.epoch,
+                    now_secs,
+                );
             }
         }
 
@@ -263,9 +297,17 @@ impl DkgCeremony {
         let participant = Participant::new(id, self.config.threshold, self.config.num_participants)?;
         self.participants.insert(id, participant);
 
-        // Auto-transition to dealing when all participants registered
+        // Auto-transition when all participants registered
         if self.participants.len() == self.config.num_participants {
-            self.phase = CeremonyPhase::Dealing;
+            // If using hash-based or hybrid commitments, go to CommitmentCollection first
+            match self.config.commitment_scheme {
+                CommitmentScheme::HashBased | CommitmentScheme::Hybrid => {
+                    self.phase = CeremonyPhase::CommitmentCollection;
+                }
+                CommitmentScheme::Feldman => {
+                    self.phase = CeremonyPhase::Dealing;
+                }
+            }
             self.reset_phase_timer(now_secs); // M-04: Reset timer on phase transition
         }
 
@@ -486,6 +528,149 @@ impl DkgCeremony {
         Ok(CombinedShare::new(id.0, combined_value))
     }
 
+    /// Submit a hash commitment for the commit-reveal protocol
+    pub fn submit_hash_commitment(
+        &mut self,
+        dealer: ParticipantId,
+        commitment_set: HashCommitmentSet,
+        now_secs: u64,
+    ) -> DkgResult<()> {
+        if self.phase != CeremonyPhase::CommitmentCollection {
+            return Err(DkgError::WrongPhase {
+                expected: CeremonyPhase::CommitmentCollection.to_string(),
+                actual: self.phase.to_string(),
+            });
+        }
+
+        if !self.participants.contains_key(&dealer) {
+            return Err(DkgError::ParticipantNotFound(dealer.0));
+        }
+
+        if self.hash_commitments.contains_key(&dealer) {
+            return Err(DkgError::DuplicateShare(dealer.0));
+        }
+
+        self.hash_commitments.insert(dealer, commitment_set);
+
+        // Auto-transition to dealing when all commitments received
+        let active = self.participants.len() - self.disqualified.len();
+        if self.hash_commitments.len() >= active {
+            self.phase = CeremonyPhase::Dealing;
+            self.phase_started_at_secs = Some(now_secs);
+        }
+
+        Ok(())
+    }
+
+    /// Submit a hash reveal (the actual deal + salt) for verification
+    pub fn submit_hash_reveal(
+        &mut self,
+        dealer: ParticipantId,
+        reveal: HashReveal,
+        _now_secs: u64,
+    ) -> DkgResult<()> {
+        if !self.hash_commitments.contains_key(&dealer) {
+            return Err(DkgError::MissingHashCommitment(dealer.0));
+        }
+
+        self.hash_reveals.insert(dealer, reveal);
+        Ok(())
+    }
+
+    /// Verify all hash reveals against their commitments
+    ///
+    /// For each dealer, checks that the deal's shares match the hash commitments
+    /// using the revealed salts. Dealers with mismatches are disqualified.
+    pub fn verify_hash_reveals(&mut self) -> DkgResult<()> {
+        let dealer_ids: Vec<ParticipantId> = self.hash_commitments.keys().copied().collect();
+
+        for dealer_id in dealer_ids {
+            let reveal = match self.hash_reveals.get(&dealer_id) {
+                Some(r) => r,
+                None => {
+                    return Err(DkgError::MissingHashCommitment(dealer_id.0));
+                }
+            };
+
+            // Verify each share against its hash commitment using the revealed salt
+            let deal = match self.deals.get(&dealer_id) {
+                Some(d) => d,
+                None => continue, // Deal not yet submitted, skip
+            };
+
+            let commitment_set = &self.hash_commitments[&dealer_id];
+            let mut mismatch = false;
+
+            for share in &deal.shares {
+                if let Some((_, salt)) = reveal.salts.iter().find(|(r, _)| *r == share.index) {
+                    match commitment_set.verify_share(share.index, &share.value, salt) {
+                        Ok(true) => {}
+                        _ => {
+                            mismatch = true;
+                            break;
+                        }
+                    }
+                } else {
+                    mismatch = true;
+                    break;
+                }
+            }
+
+            if mismatch {
+                self.violation_tracker.record_violation(
+                    dealer_id,
+                    ViolationType::CommitRevealMismatch,
+                    self.epoch,
+                    0,
+                );
+                if !self.disqualified.contains(&dealer_id) {
+                    self.disqualified.push(dealer_id);
+                    if let Some(p) = self.participants.get_mut(&dealer_id) {
+                        p.disqualify();
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Start a proactive share refresh round
+    pub fn refresh_shares(&mut self) -> DkgResult<RefreshRound> {
+        if self.phase != CeremonyPhase::Complete {
+            return Err(DkgError::WrongPhase {
+                expected: CeremonyPhase::Complete.to_string(),
+                actual: self.phase.to_string(),
+            });
+        }
+
+        self.epoch += 1;
+        RefreshRound::new(
+            self.config.threshold,
+            self.config.num_participants,
+            self.epoch,
+        )
+    }
+
+    /// Get the current epoch
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    /// Get the violation tracker
+    pub fn violation_tracker(&self) -> &ViolationTracker {
+        &self.violation_tracker
+    }
+
+    /// Get a mutable reference to the violation tracker
+    pub fn violation_tracker_mut(&mut self) -> &mut ViolationTracker {
+        &mut self.violation_tracker
+    }
+
+    /// Get the commitment scheme
+    pub fn commitment_scheme(&self) -> &CommitmentScheme {
+        &self.config.commitment_scheme
+    }
+
     /// Reconstruct the secret from shares (for testing/verification)
     pub fn reconstruct_secret(&self, shares: &[CombinedShare]) -> DkgResult<Scalar> {
         if shares.len() < self.config.threshold {
@@ -497,6 +682,71 @@ impl DkgCeremony {
 
         let points: Vec<_> = shares.iter().map(|s| s.to_point()).collect();
         lagrange_interpolate_at_zero(&points)
+    }
+
+    /// File a cryptographically verified complaint against a dealer
+    ///
+    /// Verifies the accused's share at `share_index` against the deal's
+    /// Feldman VSS commitments. If the share is genuinely invalid, the
+    /// complaint is valid and an `InvalidShare` violation is recorded
+    /// against the accused. If the share is actually valid, the complaint
+    /// is frivolous and an `InvalidCommitment` violation is recorded
+    /// against the complainer.
+    ///
+    /// Returns `Ok(true)` if the complaint was valid (share was bad),
+    /// `Ok(false)` if the complaint was frivolous (share was good).
+    pub fn file_verified_complaint(
+        &mut self,
+        complainer: ParticipantId,
+        accused: ParticipantId,
+        share_index: u32,
+        now_secs: u64,
+    ) -> DkgResult<bool> {
+        if self.phase != CeremonyPhase::Verification {
+            return Err(DkgError::WrongPhase {
+                expected: CeremonyPhase::Verification.to_string(),
+                actual: self.phase.to_string(),
+            });
+        }
+
+        if !self.participants.contains_key(&complainer) {
+            return Err(DkgError::ParticipantNotFound(complainer.0));
+        }
+
+        if !self.participants.contains_key(&accused) {
+            return Err(DkgError::ParticipantNotFound(accused.0));
+        }
+
+        let deal = self.deals.get(&accused).ok_or(
+            DkgError::ParticipantNotFound(accused.0),
+        )?;
+
+        let share = deal.get_share(share_index).ok_or(
+            DkgError::InvalidShareIndex(share_index as usize),
+        )?;
+
+        let share_valid = deal.commitments.verify_share(share_index, share.value());
+
+        if !share_valid {
+            // Complaint is valid — share fails verification
+            self.complaints.push((complainer, accused));
+            self.violation_tracker.record_violation(
+                accused,
+                ViolationType::InvalidShare { recipient: share_index },
+                self.epoch,
+                now_secs,
+            );
+            Ok(true)
+        } else {
+            // Complaint is frivolous — share is actually valid
+            self.violation_tracker.record_violation(
+                complainer,
+                ViolationType::InvalidCommitment,
+                self.epoch,
+                now_secs,
+            );
+            Ok(false)
+        }
     }
 }
 
@@ -940,5 +1190,327 @@ mod tests {
         // Finalize -> transition to Complete
         ceremony.finalize().unwrap();
         assert_eq!(ceremony.phase(), CeremonyPhase::Complete);
+    }
+
+    #[test]
+    fn test_hash_based_commitment_ceremony() {
+        use crate::hash_commitment::HashCommitmentSet;
+
+        // Create a ceremony with hash-based commitments
+        let config = DkgConfig::new(2, 3).unwrap()
+            .with_commitment_scheme(CommitmentScheme::HashBased);
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        // Register all participants
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        // Should be in CommitmentCollection phase, not Dealing
+        assert_eq!(ceremony.phase(), CeremonyPhase::CommitmentCollection);
+
+        // Generate deals and hash commitments
+        let deals: Vec<_> = (1..=3)
+            .map(|i| {
+                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+                dealer.generate_deal()
+            })
+            .collect();
+
+        let mut reveals = Vec::new();
+        for (i, deal) in deals.iter().enumerate() {
+            let (commitment_set, reveal) = HashCommitmentSet::from_deal(deal, &mut OsRng);
+            ceremony
+                .submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0)
+                .unwrap();
+            reveals.push(reveal);
+        }
+
+        // Should have auto-transitioned to Dealing
+        assert_eq!(ceremony.phase(), CeremonyPhase::Dealing);
+
+        // Submit reveals
+        for (i, reveal) in reveals.into_iter().enumerate() {
+            ceremony
+                .submit_hash_reveal(ParticipantId((i + 1) as u32), reveal, 0)
+                .unwrap();
+        }
+
+        // Submit actual deals
+        for (i, deal) in deals.into_iter().enumerate() {
+            ceremony
+                .submit_deal(ParticipantId((i + 1) as u32), deal, 0)
+                .unwrap();
+        }
+
+        // Verify reveals
+        ceremony.verify_hash_reveals().unwrap();
+
+        // Finalize
+        let result = ceremony.finalize().unwrap();
+        assert_eq!(result.qualified_count, 3);
+    }
+
+    #[test]
+    fn test_violation_tracker_integration() {
+        let config = DkgConfig::new(2, 3).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        // Submit deals from only 2 participants
+        for i in 1..=2 {
+            let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+            let deal = dealer.generate_deal();
+            ceremony.submit_deal(ParticipantId(i as u32), deal, 0).unwrap();
+        }
+
+        // Exclude participant 3 (they didn't submit)
+        ceremony.exclude_and_continue(&[ParticipantId(3)], 100).unwrap();
+
+        // Violation should be recorded
+        let violations = ceremony.violation_tracker().violations_for(ParticipantId(3));
+        assert_eq!(violations.len(), 1);
+        assert!(matches!(violations[0].violation_type, ViolationType::DealTimeout));
+    }
+
+    #[test]
+    fn test_refresh_after_ceremony() {
+        let config = DkgConfig::new(2, 3).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        // Use known secrets
+        let secrets = [
+            Scalar::from_u64(100),
+            Scalar::from_u64(200),
+            Scalar::from_u64(300),
+        ];
+
+        for (i, secret) in secrets.iter().enumerate() {
+            let dealer = crate::dealer::Dealer::with_secret(
+                ParticipantId((i + 1) as u32),
+                secret.clone(),
+                2,
+                3,
+                &mut OsRng,
+            )
+            .unwrap();
+            let deal = dealer.generate_deal();
+            ceremony
+                .submit_deal(ParticipantId((i + 1) as u32), deal, 0)
+                .unwrap();
+        }
+        ceremony.finalize().unwrap();
+
+        // Get original combined shares
+        let original_shares: Vec<_> = (1..=3)
+            .map(|i| ceremony.get_combined_share(ParticipantId(i)).unwrap())
+            .collect();
+
+        // Start a refresh round
+        let mut refresh = ceremony.refresh_shares().unwrap();
+        assert_eq!(ceremony.epoch(), 1);
+
+        // Each participant generates a refresh deal
+        for i in 1..=3u32 {
+            let deal = RefreshRound::generate_refresh_deal(
+                ParticipantId(i), 2, 3, 1, &mut OsRng,
+            ).unwrap();
+            refresh.submit_deal(deal).unwrap();
+        }
+
+        // Apply refresh to each share
+        let refreshed_shares: Vec<_> = (1..=3)
+            .map(|i| {
+                let delta = refresh
+                    .compute_refresh_delta(i as u32)
+                    .unwrap();
+                let mut new_value = original_shares[(i - 1) as usize].value.clone();
+                new_value += delta;
+                CombinedShare::new(i as u32, new_value)
+            })
+            .collect();
+
+        // Refreshed shares should reconstruct the same secret
+        let original_secret = ceremony.reconstruct_secret(&original_shares[0..2]).unwrap();
+        let refreshed_secret = ceremony.reconstruct_secret(&refreshed_shares[0..2]).unwrap();
+        assert_eq!(original_secret, refreshed_secret);
+    }
+
+    #[test]
+    fn test_exclude_and_continue_records_violations() {
+        let config = DkgConfig::new(2, 4).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=4 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        // Only participants 1 and 2 submit deals
+        for i in 1..=2 {
+            let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 4, &mut OsRng).unwrap();
+            let deal = dealer.generate_deal();
+            ceremony.submit_deal(ParticipantId(i as u32), deal, 0).unwrap();
+        }
+
+        // Exclude 3 and 4
+        ceremony.exclude_and_continue(&[ParticipantId(3), ParticipantId(4)], 300).unwrap();
+
+        // Both should have violations
+        assert_eq!(ceremony.violation_tracker().violations_for(ParticipantId(3)).len(), 1);
+        assert_eq!(ceremony.violation_tracker().violations_for(ParticipantId(4)).len(), 1);
+
+        // Penalty scores should reflect the severity
+        assert!(ceremony.violation_tracker().penalty_score(ParticipantId(3)) > 0.0);
+        assert!(ceremony.violation_tracker().penalty_score(ParticipantId(4)) > 0.0);
+    }
+
+    #[test]
+    fn test_commitment_scheme_default_is_feldman() {
+        let config = DkgConfig::new(2, 3).unwrap();
+        assert!(matches!(config.commitment_scheme, CommitmentScheme::Feldman));
+
+        let mut ceremony = DkgCeremony::new(config, 0);
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+        // Feldman scheme goes straight to Dealing
+        assert_eq!(ceremony.phase(), CeremonyPhase::Dealing);
+    }
+
+    #[test]
+    fn test_hybrid_commitment_scheme_transitions() {
+        let config = DkgConfig::new(2, 3).unwrap()
+            .with_commitment_scheme(CommitmentScheme::Hybrid);
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+        // Hybrid goes to CommitmentCollection first
+        assert_eq!(ceremony.phase(), CeremonyPhase::CommitmentCollection);
+    }
+
+    #[test]
+    fn test_verified_complaint_valid_against_bad_share() {
+        // 2-of-3 ceremony
+        let config = DkgConfig::new(2, 3).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        // Generate legitimate deals for participants 1 and 2
+        let dealer1 = crate::dealer::Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let dealer2 = crate::dealer::Dealer::new(ParticipantId(2), 2, 3, &mut OsRng).unwrap();
+        ceremony.submit_deal(ParticipantId(1), dealer1.generate_deal(), 0).unwrap();
+        ceremony.submit_deal(ParticipantId(2), dealer2.generate_deal(), 0).unwrap();
+
+        // Generate a tampered deal for participant 3: valid commitments but corrupt one share
+        let dealer3 = crate::dealer::Dealer::new(ParticipantId(3), 2, 3, &mut OsRng).unwrap();
+        let mut bad_deal = dealer3.generate_deal();
+        // Corrupt the share for participant 1 (index=1)
+        bad_deal.shares[0] = crate::share::Share::new(1, 3, Scalar::from_u64(9999999));
+        ceremony.submit_deal(ParticipantId(3), bad_deal, 0).unwrap();
+
+        assert_eq!(ceremony.phase(), CeremonyPhase::Verification);
+
+        // Participant 1 files a verified complaint against participant 3's share at index 1
+        let result = ceremony.file_verified_complaint(
+            ParticipantId(1),
+            ParticipantId(3),
+            1,  // share_index for participant 1
+            100,
+        ).unwrap();
+
+        // Complaint should be valid (share was bad)
+        assert!(result, "complaint should be valid for a bad share");
+
+        // Should have recorded an InvalidShare violation against the accused
+        let violations = ceremony.violation_tracker().violations_for(ParticipantId(3));
+        assert!(!violations.is_empty(), "should have violation for accused");
+        assert!(
+            violations.iter().any(|v| matches!(v.violation_type, ViolationType::InvalidShare { recipient: 1 })),
+            "should record InvalidShare violation"
+        );
+    }
+
+    #[test]
+    fn test_verified_complaint_frivolous_against_good_share() {
+        // 2-of-3 ceremony
+        let config = DkgConfig::new(2, 3).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        // Generate all legitimate deals
+        for i in 1..=3 {
+            let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+            ceremony.submit_deal(ParticipantId(i), dealer.generate_deal(), 0).unwrap();
+        }
+
+        assert_eq!(ceremony.phase(), CeremonyPhase::Verification);
+
+        // Participant 1 files a frivolous complaint against participant 2's share at index 1
+        let result = ceremony.file_verified_complaint(
+            ParticipantId(1),
+            ParticipantId(2),
+            1,  // share_index
+            200,
+        ).unwrap();
+
+        // Complaint should be frivolous (share is valid)
+        assert!(!result, "complaint should be frivolous for a valid share");
+
+        // Should have recorded an InvalidCommitment violation against the COMPLAINER
+        let violations = ceremony.violation_tracker().violations_for(ParticipantId(1));
+        assert!(!violations.is_empty(), "should have violation for frivolous complainer");
+        assert!(
+            violations.iter().any(|v| matches!(v.violation_type, ViolationType::InvalidCommitment)),
+            "should record InvalidCommitment violation against complainer"
+        );
+
+        // No violations against the accused
+        let accused_violations = ceremony.violation_tracker().violations_for(ParticipantId(2));
+        assert!(
+            accused_violations.is_empty(),
+            "accused should have no violations for a frivolous complaint"
+        );
+    }
+
+    #[test]
+    fn test_verified_complaint_wrong_phase() {
+        let config = DkgConfig::new(2, 3).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        // Phase is Dealing, not Verification
+        let result = ceremony.file_verified_complaint(
+            ParticipantId(1),
+            ParticipantId(2),
+            1,
+            0,
+        );
+
+        assert!(result.is_err(), "should fail in wrong phase");
+        match result {
+            Err(DkgError::WrongPhase { expected, actual }) => {
+                assert_eq!(expected, CeremonyPhase::Verification.to_string());
+                assert_eq!(actual, CeremonyPhase::Dealing.to_string());
+            }
+            other => panic!("expected WrongPhase error, got {:?}", other),
+        }
     }
 }

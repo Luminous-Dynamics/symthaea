@@ -22,6 +22,8 @@ on:
       - 'mycelix-marketplace/**'
       - 'mycelix-supplychain/**'
       - 'mycelix-hearth/**'
+      - 'crates/mycelix-bridge-common/**'
+      - 'crates/mycelix-bridge-entry-types/**'
       - 'mycelix-workspace/happs/lucid/ui/**'
       - '.github/workflows/mycelix-ci.yml'
   pull_request:
@@ -44,6 +46,8 @@ on:
       - 'mycelix-marketplace/**'
       - 'mycelix-supplychain/**'
       - 'mycelix-hearth/**'
+      - 'crates/mycelix-bridge-common/**'
+      - 'crates/mycelix-bridge-entry-types/**'
 
 concurrency:
   group: mycelix-ci-${{ github.ref }}
@@ -895,68 +899,88 @@ jobs:
         working-directory: mycelix-workspace/tests/sweettest
 
   # ============================================================================
-  # Consciousness Gating Sweettests (manual trigger only)
+  # Consciousness Gating Sweettests (runs on PRs and pushes to main)
   # ============================================================================
   sweettest-consciousness:
     name: Consciousness Gating Sweettests
     runs-on: ubuntu-latest
     needs: [holochain-zomes]
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     timeout-minutes: 60
-    env:
-      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Nix
-        uses: cachix/install-nix-action@v24
+        uses: cachix/install-nix-action@v27
         with:
           nix_path: nixpkgs=channel:nixos-unstable
           extra_nix_config: |
             experimental-features = nix-command flakes
 
-      - name: Setup Holochain cache
-        run: |
-          nix-env -iA cachix -f https://cachix.org/api/v1/install
-          cachix use holochain-ci
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
         with:
-          toolchain: ${{ env.RUST_VERSION }}
-          targets: wasm32-unknown-unknown
+          name: holochain-ci
+          skipPush: true
 
       - name: Cache cargo
         uses: actions/cache@v4
         with:
           path: |
+            ~/.cargo/bin/
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-consciousness-sweettest-${{ hashFiles('**/Cargo.lock') }}
+            mycelix-commons/target/
+            mycelix-civic/target/
+            mycelix-hearth/target/
+          key: ${{ runner.os }}-cargo-consciousness-sweettest-${{ hashFiles('mycelix-commons/Cargo.lock', 'mycelix-civic/Cargo.lock', 'mycelix-hearth/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-consciousness-sweettest-
 
-      - name: Build WASM for all clusters
+      - name: Build WASM and pack DNAs
         run: |
-          cd mycelix-commons && cargo build --release --target wasm32-unknown-unknown && cd ..
-          cd mycelix-civic && cargo build --release --target wasm32-unknown-unknown && cd ..
-          cd mycelix-hearth && cargo build --release --target wasm32-unknown-unknown && cd ..
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Building Commons cluster ==="
+            cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-commons/Cargo.toml
+            hc dna pack mycelix-commons/dna/ -o mycelix-commons/dna/mycelix_commons.dna
+            echo "  Commons DNA packed"
 
-      - name: Run consciousness gating sweettests (Commons)
+            echo "=== Building Civic cluster ==="
+            cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-civic/Cargo.toml
+            hc dna pack mycelix-civic/dna/ -o mycelix-civic/dna/mycelix_civic.dna
+            echo "  Civic DNA packed"
+
+            echo "=== Building Hearth cluster ==="
+            cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-hearth/Cargo.toml
+            hc dna pack mycelix-hearth/dna/ -o mycelix-hearth/dna/mycelix_hearth.dna
+            echo "  Hearth DNA packed"
+
+            echo ""
+            echo "=== Verifying DNA bundles ==="
+            for dna in mycelix-commons/dna/mycelix_commons.dna \
+                       mycelix-civic/dna/mycelix_civic.dna \
+                       mycelix-hearth/dna/mycelix_hearth.dna; do
+              if [ -f "$dna" ]; then
+                echo "  OK: $dna ($(du -h "$dna" | cut -f1))"
+              else
+                echo "  MISSING: $dna"
+                exit 1
+              fi
+            done
+          '
+
+      - name: Run consciousness gating sweettests (Commons — 10 tests)
         run: |
-          cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
-        working-directory: mycelix-commons
+          nix develop ./mycelix-commons --command bash -c "cd mycelix-commons/tests && cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2 --nocapture"
 
       - name: Run consciousness gating sweettests (Civic)
         run: |
-          cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
-        working-directory: mycelix-civic
+          nix develop ./mycelix-civic --command bash -c "cd mycelix-civic/tests && cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2 --nocapture"
 
       - name: Run consciousness gating sweettests (Hearth)
         run: |
-          cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2
-        working-directory: mycelix-hearth
+          nix develop ./mycelix-hearth --command bash -c "cd mycelix-hearth/tests && cargo test --release --test sweettest_consciousness_gating -- --ignored --test-threads=2 --nocapture"
 
   # ============================================================================
   # Governance Zome Tests
@@ -1267,12 +1291,13 @@ jobs:
       - personal-tests
       - fl-feature-matrix
       - unified-happ
+      - sweettest-consciousness
 
     steps:
       - name: Check all jobs passed
         uses: re-actors/alls-green@release/v1
         with:
-          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest, sweettest-consciousness, fl-feature-matrix, unified-happ
+          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest, fl-feature-matrix, unified-happ
           jobs: ${{ toJSON(needs) }}
 
       - name: Summary
@@ -1299,6 +1324,7 @@ jobs:
           [ "${{ needs.unit-tests.result }}" = "failure" ] && FAILURES="$FAILURES unit-tests"
           [ "${{ needs.integration-tests.result }}" = "failure" ] && FAILURES="$FAILURES integration-tests"
           [ "${{ needs.security.result }}" = "failure" ] && FAILURES="$FAILURES security"
+          [ "${{ needs.sweettest-consciousness.result }}" = "failure" ] && FAILURES="$FAILURES sweettest-consciousness"
 
           if [ -n "$FAILURES" ]; then
             echo "> [!CAUTION]" >> $GITHUB_STEP_SUMMARY
@@ -1317,3 +1343,4 @@ jobs:
           echo "| Integration Tests | $(format_status '${{ needs.integration-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Smoke Tests | $(format_status '${{ needs.smoke-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Security | $(format_status '${{ needs.security.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Consciousness Gating Sweettests** | $(format_status '${{ needs.sweettest-consciousness.result }}') |" >> $GITHUB_STEP_SUMMARY

@@ -154,7 +154,7 @@ fn validate_member(member: Member) -> ExternResult<ValidateCallbackResult> {
         return Ok(ValidateCallbackResult::Invalid("Member cannot have more than 20 roles".into()));
     }
     if let Some(score) = member.matl_score {
-        if !score.is_finite() || score < 0.0 || score > 1.0 {
+        if !score.is_finite() || !(0.0..=1.0).contains(&score) {
             return Ok(ValidateCallbackResult::Invalid("MATL score must be a finite number between 0.0 and 1.0".into()));
         }
     }

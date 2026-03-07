@@ -79,4 +79,35 @@ pub enum DkgError {
     /// Serialization error
     #[error("Serialization error: {0}")]
     SerializationError(String),
+
+    /// Encryption error
+    #[error("Encryption error: {0}")]
+    EncryptionError(String),
+
+    /// Decryption error
+    #[error("Decryption error: {0}")]
+    DecryptionError(String),
+
+    /// Hash commitment mismatch during reveal
+    #[error("Hash commitment mismatch for dealer {dealer}: expected {expected}, got {actual}")]
+    HashCommitmentMismatch {
+        dealer: u32,
+        expected: String,
+        actual: String,
+    },
+
+    /// Missing commitment in commit-reveal protocol
+    #[error("Missing hash commitment from dealer {0}")]
+    MissingHashCommitment(u32),
+
+    /// Refresh protocol error
+    #[error("Refresh error: {0}")]
+    RefreshError(String),
+
+    /// Violation report
+    #[error("Protocol violation by participant {participant}: {violation}")]
+    ProtocolViolation {
+        participant: u32,
+        violation: String,
+    },
 }

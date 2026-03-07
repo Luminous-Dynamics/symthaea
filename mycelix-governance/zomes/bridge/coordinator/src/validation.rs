@@ -104,40 +104,40 @@ pub fn check_transfer_credits_input(input: &TransferCreditsInput) -> Result<(), 
 pub fn check_federated_reputation_input(input: &UpdateFederatedReputationInput) -> Result<(), String> {
     // Validate all f64 fields are in valid range if provided
     if let Some(v) = input.identity_verification {
-        if v < 0.0 || v > 1.0 { return Err("identity_verification must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("identity_verification must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.credential_quality {
-        if v < 0.0 || v > 1.0 { return Err("credential_quality must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("credential_quality must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.epistemic_contributions {
-        if v < 0.0 || v > 1.0 { return Err("epistemic_contributions must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("epistemic_contributions must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.factcheck_accuracy {
-        if v < 0.0 || v > 1.0 { return Err("factcheck_accuracy must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("factcheck_accuracy must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.stake_weight {
-        if v < 0.0 || v > 1.0 { return Err("stake_weight must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("stake_weight must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.payment_reliability {
-        if v < 0.0 || v > 1.0 { return Err("payment_reliability must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("payment_reliability must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.escrow_completion_rate {
-        if v < 0.0 || v > 1.0 { return Err("escrow_completion_rate must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("escrow_completion_rate must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.pogq_score {
-        if v < 0.0 || v > 1.0 { return Err("pogq_score must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("pogq_score must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.byzantine_clean_rate {
-        if v < 0.0 || v > 1.0 { return Err("byzantine_clean_rate must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("byzantine_clean_rate must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.voting_participation {
-        if v < 0.0 || v > 1.0 { return Err("voting_participation must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("voting_participation must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.proposal_success_rate {
-        if v < 0.0 || v > 1.0 { return Err("proposal_success_rate must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("proposal_success_rate must be 0.0-1.0".into()); }
     }
     if let Some(v) = input.consensus_alignment {
-        if v < 0.0 || v > 1.0 { return Err("consensus_alignment must be 0.0-1.0".into()); }
+        if !(0.0..=1.0).contains(&v) { return Err("consensus_alignment must be 0.0-1.0".into()); }
     }
     Ok(())
 }

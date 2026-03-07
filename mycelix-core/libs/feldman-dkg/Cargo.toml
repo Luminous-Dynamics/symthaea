@@ -22,9 +22,14 @@ zeroize = { version = "1.7", features = ["derive"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # Error handling
 thiserror = "2.0"
+
+# Post-quantum KEM (optional, behind feature flag)
+ml-kem = { version = "0.3.0-rc.0", default-features = false, optional = true }
+getrandom = { version = "0.3", default-features = false, features = ["std"], optional = true }
 
 # rand 0.8 only on native (activates getrandom 0.2 which is incompatible with wasm32)
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -36,3 +41,4 @@ rand = "0.8"
 [features]
 default = []
 std = []
+ml-kem-768 = ["dep:ml-kem", "dep:getrandom"]

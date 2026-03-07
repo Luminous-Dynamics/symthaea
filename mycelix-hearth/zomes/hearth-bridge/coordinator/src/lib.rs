@@ -350,28 +350,26 @@ pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult
     let mut entries = Vec::new();
     for record in &records {
         if let Some(_entry) = record.entry().as_option() {
-            if let Ok(event) = record.entry().to_app_option::<HearthEventEntry>() {
-                if let Some(event) = event {
-                    if let Ok(audit) = serde_json::from_str::<GateAuditInput>(&event.payload) {
-                        if let Some(ref action) = filter.action_name {
-                            if &audit.action_name != action { continue; }
-                        }
-                        if let Some(ref zome) = filter.zome_name {
-                            if &audit.zome_name != zome { continue; }
-                        }
-                        if let Some(eligible) = filter.eligible {
-                            if audit.eligible != eligible { continue; }
-                        }
-                        if let Some(from_us) = filter.from_us {
-                            let event_us = event.created_at.as_micros();
-                            if event_us < from_us { continue; }
-                        }
-                        if let Some(to_us) = filter.to_us {
-                            let event_us = event.created_at.as_micros();
-                            if event_us > to_us { continue; }
-                        }
-                        entries.push(audit);
+            if let Ok(Some(event)) = record.entry().to_app_option::<HearthEventEntry>() {
+                if let Ok(audit) = serde_json::from_str::<GateAuditInput>(&event.payload) {
+                    if let Some(ref action) = filter.action_name {
+                        if &audit.action_name != action { continue; }
                     }
+                    if let Some(ref zome) = filter.zome_name {
+                        if &audit.zome_name != zome { continue; }
+                    }
+                    if let Some(eligible) = filter.eligible {
+                        if audit.eligible != eligible { continue; }
+                    }
+                    if let Some(from_us) = filter.from_us {
+                        let event_us = event.created_at.as_micros();
+                        if event_us < from_us { continue; }
+                    }
+                    if let Some(to_us) = filter.to_us {
+                        let event_us = event.created_at.as_micros();
+                        if event_us > to_us { continue; }
+                    }
+                    entries.push(audit);
                 }
             }
         }

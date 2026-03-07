@@ -20,6 +20,10 @@
 use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::consciousness_thresholds::{
+    BOOTSTRAP_COMMUNITY_THRESHOLD, BOOTSTRAP_MIN_IDENTITY, BOOTSTRAP_TTL_US,
+};
+
 // ============================================================================
 // Core types
 // ============================================================================
@@ -340,6 +344,7 @@ pub fn should_audit(
     requirement: &GovernanceRequirement,
     eligible: bool,
     agent_hash: &[u8],
+    action_name: &str,
 ) -> bool {
     // Always log rejections
     if !eligible {
@@ -349,10 +354,13 @@ pub fn should_audit(
         // Always log constitutional and voting actions
         ConsciousnessTier::Steward | ConsciousnessTier::Guardian => true,
         ConsciousnessTier::Citizen => true,
-        // Sample ~10% of basic/proposal approvals using agent hash for determinism
+        // Sample ~10% of basic/proposal approvals using action-salted hash
         _ => {
             let sample_byte = agent_hash.last().copied().unwrap_or(0);
-            sample_byte < 26 // ~10% of 256
+            let salt: u8 = action_name
+                .bytes()
+                .fold(0u8, |acc, b| acc.wrapping_add(b));
+            sample_byte.wrapping_add(salt) < 26 // ~10% of 256
         }
     }
 }
@@ -362,6 +370,89 @@ pub fn needs_refresh(credential: &ConsciousnessCredential, now_us: u64) -> bool 
     !credential.is_expired(now_us)
         && credential.expires_at > now_us
         && credential.expires_at - now_us < REFRESH_WINDOW_US
+}
+
+// ============================================================================
+// Bootstrap (cold-start communities)
+// ============================================================================
+
+/// Check whether an agent is eligible for a bootstrap credential.
+pub fn is_bootstrap_eligible(agent_count: u32, identity_score: f64) -> bool {
+    agent_count < BOOTSTRAP_COMMUNITY_THRESHOLD
+        && identity_score >= BOOTSTRAP_MIN_IDENTITY
+}
+
+/// Create a bootstrap credential for cold-start communities.
+pub fn bootstrap_credential(
+    did: String,
+    identity_score: f64,
+    now_us: u64,
+) -> ConsciousnessCredential {
+    let clamped_identity = identity_score.clamp(0.0, 1.0);
+    ConsciousnessCredential {
+        did,
+        profile: ConsciousnessProfile {
+            identity: clamped_identity,
+            reputation: 0.0,
+            community: 0.0,
+            engagement: 0.0,
+        },
+        tier: ConsciousnessTier::Participant,
+        issued_at: now_us,
+        expires_at: now_us.saturating_add(BOOTSTRAP_TTL_US),
+        issuer: "did:mycelix:bootstrap".to_string(),
+    }
+}
+
+/// Evaluate a bootstrap credential against a governance requirement.
+/// Capped at Participant tier — voting/constitutional/guardian always rejected.
+pub fn evaluate_bootstrap_governance(
+    credential: &ConsciousnessCredential,
+    requirement: &GovernanceRequirement,
+    now_us: u64,
+) -> GovernanceEligibility {
+    if credential.is_expired(now_us) {
+        return GovernanceEligibility {
+            eligible: false,
+            weight_bp: 0,
+            tier: ConsciousnessTier::Observer,
+            profile: credential.profile.clone(),
+            reasons: vec!["Bootstrap credential expired".into()],
+        };
+    }
+    if requirement.min_tier > ConsciousnessTier::Participant {
+        return GovernanceEligibility {
+            eligible: false,
+            weight_bp: 0,
+            tier: credential.tier,
+            profile: credential.profile.clone(),
+            reasons: vec![format!(
+                "Bootstrap credentials are capped at Participant; {:?} required",
+                requirement.min_tier,
+            )],
+        };
+    }
+    if let Some(min_id) = requirement.min_identity {
+        if credential.profile.identity < min_id {
+            return GovernanceEligibility {
+                eligible: false,
+                weight_bp: 0,
+                tier: credential.tier,
+                profile: credential.profile.clone(),
+                reasons: vec![format!(
+                    "Identity {:.2} below required {:.2}",
+                    credential.profile.identity, min_id,
+                )],
+            };
+        }
+    }
+    GovernanceEligibility {
+        eligible: true,
+        weight_bp: 5_000,
+        tier: ConsciousnessTier::Participant,
+        profile: credential.profile.clone(),
+        reasons: vec!["Bootstrap credential: temporary Participant access".into()],
+    }
 }
 
 /// Evaluate a consciousness credential against a governance requirement.
@@ -595,7 +686,7 @@ pub fn gate_consciousness(
     let eligibility = evaluate_governance(&credential, requirement, now_us);
 
     // Fire audit log (best-effort, rate-limited via should_audit)
-    if should_audit(requirement, eligibility.eligible, agent.as_ref()) {
+    if should_audit(requirement, eligibility.eligible, agent.as_ref(), action_name) {
         let audit = GateAuditInput {
             action_name: action_name.to_string(),
             zome_name: zome_info()?.name.to_string(),
@@ -1616,40 +1707,37 @@ mod tests {
 
     #[test]
     fn should_audit_always_logs_rejections() {
-        assert!(should_audit(&requirement_for_basic(), false, &[0u8]));
-        assert!(should_audit(&requirement_for_basic(), false, &[255u8]));
+        assert!(should_audit(&requirement_for_basic(), false, &[0u8], "any"));
+        assert!(should_audit(&requirement_for_basic(), false, &[255u8], "any"));
     }
 
     #[test]
     fn should_audit_always_logs_constitutional() {
-        assert!(should_audit(
-            &requirement_for_constitutional(),
-            true,
-            &[0u8]
-        ));
-        assert!(should_audit(
-            &requirement_for_constitutional(),
-            true,
-            &[255u8]
-        ));
+        assert!(should_audit(&requirement_for_constitutional(), true, &[0u8], "amend"));
+        assert!(should_audit(&requirement_for_constitutional(), true, &[255u8], "amend"));
     }
 
     #[test]
     fn should_audit_always_logs_voting() {
-        assert!(should_audit(&requirement_for_voting(), true, &[0u8]));
-        assert!(should_audit(&requirement_for_voting(), true, &[255u8]));
+        assert!(should_audit(&requirement_for_voting(), true, &[0u8], "vote"));
+        assert!(should_audit(&requirement_for_voting(), true, &[255u8], "vote"));
     }
 
     #[test]
     fn should_audit_samples_basic_approvals() {
-        // Agent hash ending in 0 → 0 < 26 → sampled
-        assert!(should_audit(&requirement_for_basic(), true, &[0u8]));
-        // Agent hash ending in 25 → 25 < 26 → sampled
-        assert!(should_audit(&requirement_for_basic(), true, &[25u8]));
-        // Agent hash ending in 26 → 26 >= 26 → NOT sampled
-        assert!(!should_audit(&requirement_for_basic(), true, &[26u8]));
-        // Agent hash ending in 255 → NOT sampled
-        assert!(!should_audit(&requirement_for_basic(), true, &[255u8]));
+        let z = ""; // zero salt
+        assert!(should_audit(&requirement_for_basic(), true, &[0u8], z));
+        assert!(should_audit(&requirement_for_basic(), true, &[25u8], z));
+        assert!(!should_audit(&requirement_for_basic(), true, &[26u8], z));
+        assert!(!should_audit(&requirement_for_basic(), true, &[255u8], z));
+    }
+
+    #[test]
+    fn should_audit_salt_varies_by_action() {
+        let agent = &[30u8];
+        assert!(!should_audit(&requirement_for_basic(), true, agent, ""));
+        // "qq" salt = 226. 30 + 226 = 256 → 0 mod 256 → sampled
+        assert!(should_audit(&requirement_for_basic(), true, agent, "qq"));
     }
 
     // -- needs_refresh --
@@ -1793,7 +1881,7 @@ mod tests {
         assert!(result.weight_bp > 0);
 
         // Step 4: Audit logging (verify audit input can be constructed)
-        let should_log = should_audit(&requirement_for_proposal(), result.eligible, b"agent_high");
+        let should_log = should_audit(&requirement_for_proposal(), result.eligible, b"agent_high", "submit_proposal");
         // 100% of basic approvals sampled at 10%, but we just verify the function works
         let _audit = GateAuditInput {
             action_name: "submit_proposal".into(),
@@ -1836,7 +1924,7 @@ mod tests {
         assert_eq!(result.weight_bp, 0);
 
         // Rejections are always logged (100% audit rate)
-        assert!(should_audit(&requirement_for_proposal(), false, b"agent_low"));
+        assert!(should_audit(&requirement_for_proposal(), false, b"agent_low", "submit_proposal"));
     }
 
     #[test]
@@ -1857,5 +1945,74 @@ mod tests {
         // This test verifies the profile correctly reflects zero state.
         assert_eq!(cred.tier, ConsciousnessTier::Observer);
         assert_eq!(cred.profile.combined_score(), 0.0);
+    }
+
+    // -- Bootstrap tests --
+
+    #[test]
+    fn bootstrap_eligible_small_community() {
+        assert!(is_bootstrap_eligible(0, 0.25));
+        assert!(is_bootstrap_eligible(4, 0.50));
+    }
+
+    #[test]
+    fn bootstrap_ineligible_large_community() {
+        assert!(!is_bootstrap_eligible(5, 0.50));
+        assert!(!is_bootstrap_eligible(100, 1.0));
+    }
+
+    #[test]
+    fn bootstrap_ineligible_low_identity() {
+        assert!(!is_bootstrap_eligible(2, 0.24));
+        assert!(!is_bootstrap_eligible(0, 0.0));
+    }
+
+    #[test]
+    fn bootstrap_boundary() {
+        assert!(!is_bootstrap_eligible(BOOTSTRAP_COMMUNITY_THRESHOLD, 0.5));
+        assert!(is_bootstrap_eligible(BOOTSTRAP_COMMUNITY_THRESHOLD - 1, 0.5));
+        assert!(is_bootstrap_eligible(2, BOOTSTRAP_MIN_IDENTITY));
+    }
+
+    #[test]
+    fn bootstrap_credential_properties() {
+        let cred = bootstrap_credential("did:mycelix:first".into(), 0.5, NOW);
+        assert_eq!(cred.tier, ConsciousnessTier::Participant);
+        assert_eq!(cred.profile.identity, 0.5);
+        assert_eq!(cred.profile.reputation, 0.0);
+        assert_eq!(cred.issuer, "did:mycelix:bootstrap");
+        assert_eq!(cred.expires_at, NOW + BOOTSTRAP_TTL_US);
+    }
+
+    #[test]
+    fn bootstrap_governance_basic_eligible() {
+        let cred = bootstrap_credential("did:mycelix:first".into(), 0.5, NOW);
+        let result = evaluate_bootstrap_governance(&cred, &requirement_for_basic(), NOW);
+        assert!(result.eligible);
+        assert_eq!(result.weight_bp, 5_000);
+    }
+
+    #[test]
+    fn bootstrap_governance_voting_rejected() {
+        let cred = bootstrap_credential("did:mycelix:first".into(), 0.5, NOW);
+        let result = evaluate_bootstrap_governance(&cred, &requirement_for_voting(), NOW);
+        assert!(!result.eligible);
+        assert!(result.reasons[0].contains("capped at Participant"));
+    }
+
+    #[test]
+    fn bootstrap_governance_expired_rejected() {
+        let cred = bootstrap_credential("did:mycelix:first".into(), 0.5, NOW);
+        let result = evaluate_bootstrap_governance(&cred, &requirement_for_basic(), NOW + BOOTSTRAP_TTL_US + 1);
+        assert!(!result.eligible);
+    }
+
+    #[test]
+    fn bootstrap_serde_roundtrip() {
+        let cred = bootstrap_credential("did:mycelix:first".into(), 0.5, NOW);
+        let json = serde_json::to_string(&cred).unwrap();
+        let cred2: ConsciousnessCredential = serde_json::from_str(&json).unwrap();
+        assert_eq!(cred.did, cred2.did);
+        assert_eq!(cred.tier, cred2.tier);
     }
 }

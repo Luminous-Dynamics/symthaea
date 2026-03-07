@@ -19,8 +19,10 @@ use mycelix_bridge_common::{
     RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
 };
 use personal_types::{
-    CredentialType, CredentialPresentation, DisclosureScope, PresentationRequest,
+    CredentialType, CredentialPresentation, DisclosureScope,
 };
+#[cfg(test)]
+use personal_types::PresentationRequest;
 
 // ============================================================================
 // Allowed zome names — security boundary for dispatch

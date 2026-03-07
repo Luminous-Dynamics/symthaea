@@ -122,6 +122,7 @@ pub fn create_committee(input: CreateCommitteeInput) -> ExternResult<Record> {
         active: true,
         epoch: 1,
         min_phi: input.min_phi,
+        signature_algorithm: input.signature_algorithm.unwrap_or_default(),
     };
 
     let action_hash = create_entry(&EntryTypes::SigningCommittee(committee))?;
@@ -166,6 +167,9 @@ pub struct CreateCommitteeInput {
     /// Minimum Φ score for committee membership (consciousness gate)
     #[serde(default)]
     pub min_phi: Option<f64>,
+    /// Signature algorithm (defaults to ECDSA for backwards compatibility)
+    #[serde(default)]
+    pub signature_algorithm: Option<ThresholdSignatureAlgorithm>,
 }
 
 /// Pure validation for create_committee input — testable without HDK
@@ -245,6 +249,21 @@ pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
         }
     }
 
+    // Check violation history — reject participants with excessive penalties
+    let cumulative_penalty = compute_participant_penalty(
+        &input.committee_id,
+        input.participant_id,
+    )?;
+    if cumulative_penalty > MAX_CUMULATIVE_PENALTY {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Participant {} barred from committee: cumulative violation penalty ({:.2}) exceeds maximum ({:.2})",
+            input.participant_id, cumulative_penalty, MAX_CUMULATIVE_PENALTY
+        ))));
+    }
+
+    // Reduce effective trust score by violation penalty
+    let effective_trust = (input.trust_score - cumulative_penalty).max(0.0);
+
     let signal_member_did = input.member_did.clone();
 
     let member = CommitteeMember {
@@ -252,7 +271,7 @@ pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
         participant_id: input.participant_id,
         agent: caller.clone(),
         member_did: input.member_did,
-        trust_score: input.trust_score,
+        trust_score: effective_trust,
         public_share: None,
         vss_commitment: None,
         deal_submitted: false,
@@ -296,6 +315,9 @@ pub struct RegisterMemberInput {
     pub member_did: String,
     pub trust_score: f64,
 }
+
+/// Maximum cumulative violation penalty before a participant is barred from committees
+pub const MAX_CUMULATIVE_PENALTY: f64 = 0.5;
 
 /// Pure validation for register_member input — testable without HDK
 pub fn check_register_member_input(input: &RegisterMemberInput) -> Result<(), String> {
@@ -742,6 +764,8 @@ pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record>
         signed_content_hash: input.content_hash,
         signed_content_description: content_description,
         signature: input.combined_signature,
+        pq_signature: input.pq_signature,
+        signature_algorithm: committee.signature_algorithm.clone(),
         signer_count: input.signers.len() as u32,
         signers: input.signers,
         verified,
@@ -794,6 +818,61 @@ pub struct CombineSignaturesInput {
     pub combined_signature: Vec<u8>,
     pub signers: Vec<u32>,
     pub verified: bool,
+    /// Post-quantum signature (ML-DSA-65), required for MlDsa65 or Hybrid algorithms
+    #[serde(default)]
+    pub pq_signature: Option<Vec<u8>>,
+}
+
+/// Compute cumulative violation penalty for a participant across a committee's history
+///
+/// Sums all penalty_score values from DkgViolationReport entries linked to the committee
+/// that match the given participant_id.
+fn compute_participant_penalty(
+    committee_id: &str,
+    participant_id: u32,
+) -> ExternResult<f64> {
+    let committee_anchor = format!("committee:{}", committee_id);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&committee_anchor)?,
+            LinkTypes::CommitteeToViolation,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut cumulative = 0.0f64;
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(report) = record
+                .entry()
+                .to_app_option::<DkgViolationReport>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if report.participant_id == participant_id {
+                    cumulative += report.penalty_score;
+                }
+            }
+        }
+    }
+
+    Ok(cumulative.min(1.0))
+}
+
+/// Pure helper: check if a participant's penalty bars them from joining
+pub fn check_penalty_eligibility(
+    cumulative_penalty: f64,
+    trust_score: f64,
+    max_penalty: f64,
+) -> Result<f64, String> {
+    if cumulative_penalty > max_penalty {
+        return Err(format!(
+            "Cumulative violation penalty ({:.2}) exceeds maximum ({:.2})",
+            cumulative_penalty, max_penalty
+        ));
+    }
+    Ok((trust_score - cumulative_penalty).max(0.0))
 }
 
 /// Validate a string ID (non-empty, max 256 chars)
@@ -952,6 +1031,7 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
         active: true,
         epoch: current_committee.epoch + 1,
         min_phi: current_committee.min_phi,
+        signature_algorithm: current_committee.signature_algorithm,
     };
 
     let new_epoch = current_committee.epoch + 1;
@@ -1104,6 +1184,84 @@ pub fn get_proposal_signature(proposal_id: String) -> ExternResult<Option<Record
     Ok(best.map(|(_, r)| r))
 }
 
+// ============================================================================
+// DKG VIOLATION REPORTING
+// ============================================================================
+
+/// Input for reporting a DKG protocol violation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ReportViolationInput {
+    pub committee_id: String,
+    pub participant_id: u32,
+    pub violation_type: String,
+    pub severity: String,
+    pub penalty_score: f64,
+    pub epoch: u32,
+}
+
+/// Report a DKG protocol violation
+///
+/// Records a violation report on-chain for accountability and reputation slashing.
+/// The reporter is automatically set to the calling agent.
+#[hdk_extern]
+pub fn report_dkg_violation(input: ReportViolationInput) -> ExternResult<Record> {
+    validate_id(&input.committee_id, "Committee ID")?;
+
+    let now = sys_time()?;
+    let reporter = agent_info()?.agent_initial_pubkey;
+
+    let report = DkgViolationReport {
+        committee_id: input.committee_id.clone(),
+        participant_id: input.participant_id,
+        violation_type: input.violation_type,
+        severity: input.severity,
+        penalty_score: input.penalty_score,
+        epoch: input.epoch,
+        reporter,
+        reported_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::DkgViolationReport(report))?;
+
+    // Link committee to violation report
+    let committee_anchor = format!("committee:{}", input.committee_id);
+    create_link(
+        anchor_hash(&committee_anchor)?,
+        action_hash.clone(),
+        LinkTypes::CommitteeToViolation,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find violation report".into()
+        )))
+}
+
+/// Get all violation reports for a committee
+#[hdk_extern]
+pub fn get_committee_violations(committee_id: String) -> ExternResult<Vec<Record>> {
+    validate_id(&committee_id, "Committee ID")?;
+    let committee_anchor = format!("committee:{}", committee_id);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&committee_anchor)?,
+            LinkTypes::CommitteeToViolation,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -1123,6 +1281,7 @@ mod tests {
             member_count: 3,
             scope: CommitteeScope::Treasury,
             min_phi: Some(0.4),
+            signature_algorithm: None,
         }
     }
 
@@ -1295,6 +1454,49 @@ mod tests {
         assert!(check_register_member_input(&input).is_ok());
         input.trust_score = 1.0;
         assert!(check_register_member_input(&input).is_ok());
+    }
+
+    // =========================================================================
+    // violation penalty eligibility
+    // =========================================================================
+
+    #[test]
+    fn test_penalty_eligibility_no_violations() {
+        let result = check_penalty_eligibility(0.0, 0.85, MAX_CUMULATIVE_PENALTY);
+        assert!(result.is_ok());
+        assert!((result.unwrap() - 0.85).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_penalty_eligibility_minor_violation() {
+        // 0.05 penalty reduces trust from 0.85 to 0.80
+        let result = check_penalty_eligibility(0.05, 0.85, MAX_CUMULATIVE_PENALTY);
+        assert!(result.is_ok());
+        assert!((result.unwrap() - 0.80).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_penalty_eligibility_barred() {
+        // 0.6 penalty exceeds MAX_CUMULATIVE_PENALTY (0.5)
+        let result = check_penalty_eligibility(0.6, 0.85, MAX_CUMULATIVE_PENALTY);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("exceeds maximum"));
+    }
+
+    #[test]
+    fn test_penalty_eligibility_at_boundary() {
+        // Exactly at MAX_CUMULATIVE_PENALTY — still allowed
+        let result = check_penalty_eligibility(0.5, 0.85, MAX_CUMULATIVE_PENALTY);
+        assert!(result.is_ok());
+        assert!((result.unwrap() - 0.35).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_penalty_eligibility_trust_floor_zero() {
+        // Penalty exceeds trust — effective trust floors at 0.0
+        let result = check_penalty_eligibility(0.4, 0.3, MAX_CUMULATIVE_PENALTY);
+        assert!(result.is_ok());
+        assert!((result.unwrap() - 0.0).abs() < 1e-10);
     }
 
     // =========================================================================
@@ -1479,6 +1681,7 @@ mod tests {
             member_count: n_members as u32,
             scope: CommitteeScope::All,
             min_phi: Some(0.3),
+            signature_algorithm: None,
         };
         assert!(check_create_committee_input(&create_input).is_ok());
 

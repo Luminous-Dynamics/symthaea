@@ -15,6 +15,25 @@ use hdi::prelude::*;
 #[derive(Clone, PartialEq)]
 pub struct Anchor(pub String);
 
+/// Threshold signature algorithm selection
+///
+/// Supports classical ECDSA, post-quantum ML-DSA-65, or hybrid (both).
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum ThresholdSignatureAlgorithm {
+    /// Classical ECDSA (secp256k1)
+    Ecdsa,
+    /// Post-quantum ML-DSA-65 (FIPS 204)
+    MlDsa65,
+    /// Hybrid: both ECDSA and ML-DSA-65 (defense-in-depth)
+    HybridEcdsaMlDsa65,
+}
+
+impl Default for ThresholdSignatureAlgorithm {
+    fn default() -> Self {
+        Self::Ecdsa
+    }
+}
+
 /// A signing committee formed through DKG
 ///
 /// Members coordinate off-chain using feldman-dkg to generate threshold keys.
@@ -44,9 +63,12 @@ pub struct SigningCommittee {
     pub active: bool,
     /// Epoch number (for key rotation)
     pub epoch: u32,
-    /// Minimum Φ (consciousness) score required to join committee (0.0-1.0)
+    /// Minimum Phi (consciousness) score required to join committee (0.0-1.0)
     #[serde(default)]
     pub min_phi: Option<f64>,
+    /// Signature algorithm used by this committee
+    #[serde(default)]
+    pub signature_algorithm: ThresholdSignatureAlgorithm,
 }
 
 /// DKG ceremony phases
@@ -117,8 +139,14 @@ pub struct ThresholdSignature {
     pub signed_content_hash: Vec<u8>,
     /// Human-readable description of signed content
     pub signed_content_description: String,
-    /// Combined threshold signature
+    /// Combined threshold signature (ECDSA)
     pub signature: Vec<u8>,
+    /// Post-quantum signature (ML-DSA-65), if using hybrid or PQ-only
+    #[serde(default)]
+    pub pq_signature: Option<Vec<u8>>,
+    /// Signature algorithm used
+    #[serde(default)]
+    pub signature_algorithm: ThresholdSignatureAlgorithm,
     /// Number of signers who contributed
     pub signer_count: u32,
     /// IDs of participating signers
@@ -147,6 +175,30 @@ pub struct SignatureShare {
     pub submitted_at: Timestamp,
 }
 
+/// A violation report from a DKG ceremony
+///
+/// Records protocol violations for reputation slashing and accountability.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct DkgViolationReport {
+    /// Committee where violation occurred
+    pub committee_id: String,
+    /// Participant who committed the violation
+    pub participant_id: u32,
+    /// Type of violation
+    pub violation_type: String,
+    /// Severity level (minor, moderate, severe, critical)
+    pub severity: String,
+    /// Penalty score (0.0-1.0)
+    pub penalty_score: f64,
+    /// Epoch when violation occurred
+    pub epoch: u32,
+    /// Agent reporting the violation
+    pub reporter: AgentPubKey,
+    /// Timestamp of report
+    pub reported_at: Timestamp,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -155,6 +207,7 @@ pub enum EntryTypes {
     CommitteeMember(CommitteeMember),
     ThresholdSignature(ThresholdSignature),
     SignatureShare(SignatureShare),
+    DkgViolationReport(DkgViolationReport),
 }
 
 #[hdk_link_types]
@@ -171,6 +224,8 @@ pub enum LinkTypes {
     EpochToCommittee,
     /// Proposal ID to its threshold signature
     ProposalToSignature,
+    /// Committee to violation reports
+    CommitteeToViolation,
 }
 
 /// Validation callback using FlatOp pattern
@@ -186,6 +241,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::CommitteeMember(member) => validate_create_member(action, member),
                 EntryTypes::ThresholdSignature(sig) => validate_create_signature(action, sig),
                 EntryTypes::SignatureShare(share) => validate_create_share(action, share),
+                EntryTypes::DkgViolationReport(report) => {
+                    validate_create_violation_report(action, report)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, original_action_hash, ..
@@ -200,6 +258,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 )),
                 EntryTypes::SignatureShare(_) => Ok(ValidateCallbackResult::Invalid(
                     "Signature shares cannot be updated".into(),
+                )),
+                EntryTypes::DkgViolationReport(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Violation reports cannot be updated".into(),
                 )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -217,6 +278,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::AgentToCommittee => Ok(ValidateCallbackResult::Valid),
             LinkTypes::EpochToCommittee => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ProposalToSignature => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::CommitteeToViolation => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
@@ -271,7 +333,7 @@ fn validate_create_committee(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Pure validation for committee update — testable without HDI
+/// Pure validation for committee update -- testable without HDI
 pub fn check_committee_update_validity(committee: &SigningCommittee) -> Result<(), String> {
     if committee.phase == DkgPhase::Disbanded && committee.active {
         return Err("Cannot reactivate disbanded committee".into());
@@ -318,7 +380,7 @@ fn validate_update_committee(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Pure validation for committee member — testable without HDI
+/// Pure validation for committee member -- testable without HDI
 pub fn check_member_validity(member: &CommitteeMember) -> Result<(), String> {
     if !member.member_did.starts_with("did:") {
         return Err("Member must have a valid DID".into());
@@ -373,21 +435,21 @@ fn validate_update_member(
             "Original member record has no entry".into()
         )))?;
 
-    // participant_id is immutable — cannot change after creation
+    // participant_id is immutable -- cannot change after creation
     if member.participant_id != original_member.participant_id {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot change participant_id after creation".into(),
         ));
     }
 
-    // committee_id is immutable — cannot move member between committees
+    // committee_id is immutable -- cannot move member between committees
     if member.committee_id != original_member.committee_id {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot change committee_id after creation".into(),
         ));
     }
 
-    // agent is immutable — cannot reassign member identity
+    // agent is immutable -- cannot reassign member identity
     if member.agent != original_member.agent {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot change agent after creation".into(),
@@ -404,7 +466,7 @@ fn validate_update_member(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Pure validation for threshold signature — testable without HDI
+/// Pure validation for threshold signature -- testable without HDI
 pub fn check_signature_validity(sig: &ThresholdSignature) -> Result<(), String> {
     if sig.signer_count == 0 {
         return Err("Signature must have at least one signer".into());
@@ -415,15 +477,55 @@ pub fn check_signature_validity(sig: &ThresholdSignature) -> Result<(), String> 
     if sig.signed_content_hash.is_empty() {
         return Err("Signed content hash cannot be empty".into());
     }
-    if sig.signature.is_empty() {
-        return Err("Signature cannot be empty".into());
+
+    // Algorithm-specific signature validation
+    match sig.signature_algorithm {
+        ThresholdSignatureAlgorithm::Ecdsa => {
+            if sig.signature.is_empty() {
+                return Err("Signature cannot be empty".into());
+            }
+            if sig.signature.len() < 64 {
+                return Err(format!(
+                    "ECDSA signature too short: expected at least 64 bytes (r||s), got {}",
+                    sig.signature.len()
+                ));
+            }
+        }
+        ThresholdSignatureAlgorithm::MlDsa65 => {
+            let pq_sig = sig.pq_signature.as_ref().ok_or(
+                "ML-DSA-65 algorithm requires pq_signature field".to_string(),
+            )?;
+            if pq_sig.len() < 3309 {
+                return Err(format!(
+                    "ML-DSA-65 signature too short: expected at least 3309 bytes, got {}",
+                    pq_sig.len()
+                ));
+            }
+        }
+        ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65 => {
+            // ECDSA part
+            if sig.signature.is_empty() {
+                return Err("Hybrid mode requires ECDSA signature".into());
+            }
+            if sig.signature.len() < 64 {
+                return Err(format!(
+                    "Hybrid ECDSA signature too short: expected at least 64 bytes, got {}",
+                    sig.signature.len()
+                ));
+            }
+            // ML-DSA-65 part
+            let pq_sig = sig.pq_signature.as_ref().ok_or(
+                "Hybrid mode requires pq_signature field for ML-DSA-65".to_string(),
+            )?;
+            if pq_sig.len() < 3309 {
+                return Err(format!(
+                    "Hybrid ML-DSA-65 signature too short: expected at least 3309 bytes, got {}",
+                    pq_sig.len()
+                ));
+            }
+        }
     }
-    if sig.signature.len() < 64 {
-        return Err(format!(
-            "Signature too short: expected at least 64 bytes (ECDSA r||s), got {}",
-            sig.signature.len()
-        ));
-    }
+
     Ok(())
 }
 
@@ -464,6 +566,56 @@ fn validate_create_share(
         ));
     }
 
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Pure validation for violation report -- testable without HDI
+pub fn check_violation_report_validity(report: &DkgViolationReport) -> Result<(), String> {
+    // Severity must be one of the known levels
+    match report.severity.as_str() {
+        "minor" | "moderate" | "severe" | "critical" => {}
+        other => {
+            return Err(format!(
+                "Invalid severity '{}': must be minor, moderate, severe, or critical",
+                other
+            ));
+        }
+    }
+
+    // Penalty score must be in [0.0, 1.0]
+    if !report.penalty_score.is_finite() || report.penalty_score < 0.0 || report.penalty_score > 1.0 {
+        return Err(format!(
+            "Penalty score must be between 0.0 and 1.0, got {}",
+            report.penalty_score
+        ));
+    }
+
+    // Participant ID must be positive
+    if report.participant_id == 0 {
+        return Err("Participant ID must be positive".into());
+    }
+
+    // Committee ID must not be empty
+    if report.committee_id.is_empty() {
+        return Err("Committee ID cannot be empty".into());
+    }
+
+    // Violation type must not be empty
+    if report.violation_type.is_empty() {
+        return Err("Violation type cannot be empty".into());
+    }
+
+    Ok(())
+}
+
+/// Validate violation report creation
+fn validate_create_violation_report(
+    _action: Create,
+    report: DkgViolationReport,
+) -> ExternResult<ValidateCallbackResult> {
+    if let Err(reason) = check_violation_report_validity(&report) {
+        return Ok(ValidateCallbackResult::Invalid(reason));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -518,6 +670,24 @@ mod tests {
             active: true,
             epoch: 1,
             min_phi: None,
+            signature_algorithm: ThresholdSignatureAlgorithm::default(),
+        }
+    }
+
+    /// Helper: create a minimal ThresholdSignature for testing
+    fn make_test_signature(algorithm: ThresholdSignatureAlgorithm) -> ThresholdSignature {
+        ThresholdSignature {
+            id: "sig-1".into(),
+            committee_id: "test".into(),
+            signed_content_hash: vec![1; 32],
+            signed_content_description: "test".into(),
+            signature: vec![0u8; 64],
+            pq_signature: None,
+            signature_algorithm: algorithm,
+            signer_count: 1,
+            signers: vec![1],
+            verified: false,
+            signed_at: Timestamp::from_micros(0),
         }
     }
 
@@ -561,7 +731,7 @@ mod tests {
 
     #[test]
     fn test_complete_committee_invalid_public_key() {
-        // 33 garbage bytes — not a valid curve point
+        // 33 garbage bytes -- not a valid curve point
         let committee = make_test_committee_complete(
             Some(vec![0xFF; 33]),
             vec![make_valid_commitment_set_bytes(2)],
@@ -598,44 +768,178 @@ mod tests {
     // --- Signature Validation Tests ---
 
     #[test]
-    fn test_signature_too_short_rejected() {
-        let sig = ThresholdSignature {
-            id: "sig-1".into(),
-            committee_id: "test".into(),
-            signed_content_hash: vec![1; 32],
-            signed_content_description: "test".into(),
-            signature: vec![0u8; 32], // too short
-            signer_count: 1,
-            signers: vec![1],
-            verified: false,
-            signed_at: Timestamp::from_micros(0),
-        };
+    fn test_ecdsa_signature_too_short_rejected() {
+        let mut sig = make_test_signature(ThresholdSignatureAlgorithm::Ecdsa);
+        sig.signature = vec![0u8; 32]; // too short
         let result = check_signature_validity(&sig);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("too short"));
     }
 
     #[test]
-    fn test_signature_minimum_length_accepted() {
-        let sig = ThresholdSignature {
-            id: "sig-1".into(),
-            committee_id: "test".into(),
-            signed_content_hash: vec![1; 32],
-            signed_content_description: "test".into(),
-            signature: vec![0u8; 64], // minimum valid length
-            signer_count: 1,
-            signers: vec![1],
-            verified: false,
-            signed_at: Timestamp::from_micros(0),
-        };
+    fn test_ecdsa_signature_minimum_length_accepted() {
+        let sig = make_test_signature(ThresholdSignatureAlgorithm::Ecdsa);
         assert!(check_signature_validity(&sig).is_ok());
+    }
+
+    #[test]
+    fn test_ml_dsa65_signature_accepted() {
+        let mut sig = make_test_signature(ThresholdSignatureAlgorithm::MlDsa65);
+        sig.pq_signature = Some(vec![0u8; 3309]); // ML-DSA-65 minimum
+        assert!(check_signature_validity(&sig).is_ok());
+    }
+
+    #[test]
+    fn test_ml_dsa65_signature_too_short_rejected() {
+        let mut sig = make_test_signature(ThresholdSignatureAlgorithm::MlDsa65);
+        sig.pq_signature = Some(vec![0u8; 100]); // too short
+        let result = check_signature_validity(&sig);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("ML-DSA-65 signature too short"));
+    }
+
+    #[test]
+    fn test_ml_dsa65_missing_pq_signature_rejected() {
+        let sig = make_test_signature(ThresholdSignatureAlgorithm::MlDsa65);
+        // pq_signature is None
+        let result = check_signature_validity(&sig);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("requires pq_signature"));
+    }
+
+    #[test]
+    fn test_hybrid_signature_accepted() {
+        let mut sig = make_test_signature(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65);
+        sig.pq_signature = Some(vec![0u8; 3309]);
+        assert!(check_signature_validity(&sig).is_ok());
+    }
+
+    #[test]
+    fn test_hybrid_missing_ecdsa_rejected() {
+        let mut sig = make_test_signature(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65);
+        sig.signature = vec![]; // empty ECDSA
+        sig.pq_signature = Some(vec![0u8; 3309]);
+        let result = check_signature_validity(&sig);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("requires ECDSA"));
+    }
+
+    #[test]
+    fn test_hybrid_missing_pq_rejected() {
+        let sig = make_test_signature(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65);
+        // pq_signature is None
+        let result = check_signature_validity(&sig);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("requires pq_signature"));
+    }
+
+    // --- Violation Report Tests ---
+
+    #[test]
+    fn test_valid_violation_report() {
+        let report = DkgViolationReport {
+            committee_id: "committee-1".into(),
+            participant_id: 3,
+            violation_type: "InvalidShare".into(),
+            severity: "moderate".into(),
+            penalty_score: 0.15,
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        assert!(check_violation_report_validity(&report).is_ok());
+    }
+
+    #[test]
+    fn test_violation_report_invalid_severity() {
+        let report = DkgViolationReport {
+            committee_id: "committee-1".into(),
+            participant_id: 3,
+            violation_type: "InvalidShare".into(),
+            severity: "extreme".into(), // invalid
+            penalty_score: 0.15,
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        let result = check_violation_report_validity(&report);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid severity"));
+    }
+
+    #[test]
+    fn test_violation_report_penalty_out_of_range() {
+        let report = DkgViolationReport {
+            committee_id: "committee-1".into(),
+            participant_id: 3,
+            violation_type: "InvalidShare".into(),
+            severity: "severe".into(),
+            penalty_score: 1.5, // out of range
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        let result = check_violation_report_validity(&report);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("between 0.0 and 1.0"));
+    }
+
+    #[test]
+    fn test_violation_report_nan_penalty_rejected() {
+        let report = DkgViolationReport {
+            committee_id: "committee-1".into(),
+            participant_id: 3,
+            violation_type: "InvalidShare".into(),
+            severity: "minor".into(),
+            penalty_score: f64::NAN,
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        assert!(check_violation_report_validity(&report).is_err());
+    }
+
+    #[test]
+    fn test_violation_report_zero_participant_rejected() {
+        let report = DkgViolationReport {
+            committee_id: "committee-1".into(),
+            participant_id: 0, // invalid
+            violation_type: "InvalidShare".into(),
+            severity: "minor".into(),
+            penalty_score: 0.05,
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        assert!(check_violation_report_validity(&report).is_err());
+    }
+
+    #[test]
+    fn test_all_severity_levels_accepted() {
+        for severity in &["minor", "moderate", "severe", "critical"] {
+            let report = DkgViolationReport {
+                committee_id: "committee-1".into(),
+                participant_id: 1,
+                violation_type: "DealTimeout".into(),
+                severity: severity.to_string(),
+                penalty_score: 0.1,
+                epoch: 1,
+                reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                reported_at: Timestamp::from_micros(0),
+            };
+            assert!(
+                check_violation_report_validity(&report).is_ok(),
+                "Severity '{}' should be accepted",
+                severity
+            );
+        }
     }
 
     // =========================================================================
     // END-TO-END DKG INTEGRATION TEST
     // =========================================================================
     // Runs a real 3-of-5 feldman-dkg ceremony and validates all outputs
-    // through the integrity validators — proving the full crypto pipeline.
+    // through the integrity validators -- proving the full crypto pipeline.
 
     #[test]
     fn test_e2e_dkg_ceremony_through_validators() {
@@ -723,6 +1027,7 @@ mod tests {
             active: true,
             epoch: 1,
             min_phi: Some(0.4),
+            signature_algorithm: ThresholdSignatureAlgorithm::default(),
         };
         assert!(
             check_committee_update_validity(&committee).is_ok(),
@@ -792,6 +1097,7 @@ mod tests {
             active: true,
             epoch: 1,
             min_phi: Some(0.4),
+            signature_algorithm: ThresholdSignatureAlgorithm::default(),
         };
         assert!(check_committee_update_validity(&committee).is_ok());
 
@@ -801,5 +1107,13 @@ mod tests {
             ..committee.clone()
         };
         assert!(check_committee_update_validity(&no_phi).is_ok());
+    }
+
+    #[test]
+    fn test_signature_algorithm_default_is_ecdsa() {
+        assert_eq!(
+            ThresholdSignatureAlgorithm::default(),
+            ThresholdSignatureAlgorithm::Ecdsa,
+        );
     }
 }

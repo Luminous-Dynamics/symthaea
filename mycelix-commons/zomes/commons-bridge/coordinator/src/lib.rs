@@ -507,28 +507,26 @@ pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult
     let mut entries = Vec::new();
     for record in &records {
         if let Some(_entry) = record.entry().as_option() {
-            if let Ok(event) = record.entry().to_app_option::<StoredEvent>() {
-                if let Some(event) = event {
-                    if let Ok(audit) = serde_json::from_str::<GateAuditInput>(&event.payload) {
-                        if let Some(ref action) = filter.action_name {
-                            if &audit.action_name != action { continue; }
-                        }
-                        if let Some(ref zome) = filter.zome_name {
-                            if &audit.zome_name != zome { continue; }
-                        }
-                        if let Some(eligible) = filter.eligible {
-                            if audit.eligible != eligible { continue; }
-                        }
-                        if let Some(from_us) = filter.from_us {
-                            let event_us = event.created_at.as_micros();
-                            if event_us < from_us { continue; }
-                        }
-                        if let Some(to_us) = filter.to_us {
-                            let event_us = event.created_at.as_micros();
-                            if event_us > to_us { continue; }
-                        }
-                        entries.push(audit);
+            if let Ok(Some(event)) = record.entry().to_app_option::<StoredEvent>() {
+                if let Ok(audit) = serde_json::from_str::<GateAuditInput>(&event.payload) {
+                    if let Some(ref action) = filter.action_name {
+                        if &audit.action_name != action { continue; }
                     }
+                    if let Some(ref zome) = filter.zome_name {
+                        if &audit.zome_name != zome { continue; }
+                    }
+                    if let Some(eligible) = filter.eligible {
+                        if audit.eligible != eligible { continue; }
+                    }
+                    if let Some(from_us) = filter.from_us {
+                        let event_us = event.created_at.as_micros();
+                        if event_us < from_us { continue; }
+                    }
+                    if let Some(to_us) = filter.to_us {
+                        let event_us = event.created_at.as_micros();
+                        if event_us > to_us { continue; }
+                    }
+                    entries.push(audit);
                 }
             }
         }
@@ -768,7 +766,7 @@ pub fn check_justice_disputes_for_property(input: CheckJusticeDisputesInput) -> 
             // In production, we'd decode and filter; for now, presence of
             // justice events is a signal to proceed with caution.
             Ok(JusticeDisputeCheckResult {
-                has_pending_cases: result.response.map_or(false, |r| r.len() > 4),
+                has_pending_cases: result.response.is_some_and(|r| r.len() > 4),
                 recommendation: Some(format!(
                     "Verify resource '{}' is not subject to active enforcement before transfer",
                     input.resource_id
@@ -1080,18 +1078,16 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in cached credential record".into())))?;
 
-        if cached.did == did {
-            if now - cached.cached_at_us < CREDENTIAL_CACHE_TTL_US {
-                let credential: ConsciousnessCredential = serde_json::from_str(&cached.credential_json)
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-                        "Credential cache decode error: {}", e
-                    ))))?;
-                // Check credential expiry — don't serve expired credentials from cache
-                if credential.is_expired(now as u64) {
-                    return Ok(None);
-                }
-                return Ok(Some(credential));
+        if cached.did == did && now - cached.cached_at_us < CREDENTIAL_CACHE_TTL_US {
+            let credential: ConsciousnessCredential = serde_json::from_str(&cached.credential_json)
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                    "Credential cache decode error: {}", e
+                ))))?;
+            // Check credential expiry — don't serve expired credentials from cache
+            if credential.is_expired(now as u64) {
+                return Ok(None);
             }
+            return Ok(Some(credential));
         }
     }
 
@@ -1184,14 +1180,14 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
             // Identity role unavailable (single-DNA mode or network partition).
             // Return a permissive fallback credential so single-cluster operations
             // can proceed. In production, the identity role will provide real scores.
-            debug!("Identity role unavailable, using fallback consciousness credential for {}", did);
+            debug!("Identity role unavailable, using Observer-tier fallback credential for {}", did);
             let now_us = sys_time()?.as_micros() as u64;
             ConsciousnessCredential::from_unified_consciousness(
                 did.clone(),
-                0.5,   // unified_consciousness — mid-range default
-                0.5,   // identity — above Participant threshold (0.25)
-                0.5,   // reputation
-                0.5,   // community
+                0.0,   // unified_consciousness — Observer tier
+                0.0,   // identity — unverified
+                0.0,   // reputation — unknown
+                0.0,   // community — no attestations
                 "did:mycelix:commons-bridge-fallback".to_string(),
                 now_us,
             )

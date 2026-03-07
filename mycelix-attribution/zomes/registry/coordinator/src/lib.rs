@@ -373,6 +373,7 @@ pub fn get_all_dependencies_paginated(
 }
 
 /// Pure computation of has_more flag (testable without HDK).
+#[cfg(test)]
 fn compute_has_more(offset: u64, limit: u64, total: u64) -> bool {
     offset + limit < total
 }

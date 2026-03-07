@@ -81,7 +81,7 @@ fn demo_agent(
         }
 
         // Step 4: Audit decision
-        let audit_required = should_audit(req, result.eligible, name.as_bytes());
+        let audit_required = should_audit(req, result.eligible, name.as_bytes(), action);
         if audit_required {
             let audit = GateAuditInput {
                 action_name: format!("demo_{}", action),

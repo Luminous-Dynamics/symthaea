@@ -36,6 +36,12 @@ pub mod share;
 pub mod dealer;
 pub mod participant;
 pub mod ceremony;
+pub mod encrypted_deal;
+pub mod hash_commitment;
+#[cfg(feature = "ml-kem-768")]
+pub mod pq_kem;
+pub mod refresh;
+pub mod violation;
 
 pub use error::{DkgError, DkgResult};
 pub use scalar::Scalar;
@@ -45,6 +51,10 @@ pub use share::{Share, ShareSet};
 pub use dealer::Dealer;
 pub use participant::{Participant, ParticipantId};
 pub use ceremony::{DkgCeremony, DkgConfig, CeremonyPhase};
+pub use encrypted_deal::{EncryptedDeal, EncryptedSharePayload, EncryptResult};
+pub use hash_commitment::{HashCommitment, HashCommitmentSet, HashReveal, CommitmentSalt, CommitmentScheme};
+pub use refresh::{RefreshDeal, RefreshRound, EpochShare};
+pub use violation::{Violation, ViolationTracker, ViolationType, ViolationSeverity};
 
 /// Re-export curve types for convenience
 pub use k256::{ProjectivePoint, AffinePoint};

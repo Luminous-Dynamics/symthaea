@@ -417,7 +417,7 @@ fn validate_preemptive_alert(alert: PreemptiveAlert) -> ExternResult<ValidateCal
             "PreemptiveAlert free_energy must be finite".into(),
         ));
     }
-    if !(alert.free_energy > 0.0) {
+    if alert.free_energy <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "PreemptiveAlert free_energy must be positive".into(),
         ));

@@ -562,11 +562,13 @@ fn compute_type_weight(pledge_type: &PledgeType) -> f64 {
 }
 
 /// Pure computation of has_more flag (testable without HDK).
+#[cfg(test)]
 fn compute_has_more(offset: u64, limit: u64, total: u64) -> bool {
     offset + limit < total
 }
 
 /// Pure validation of pagination limit (testable without HDK).
+#[cfg(test)]
 fn validate_page_limit(limit: u64) -> Result<(), String> {
     if limit > MAX_PAGE_SIZE {
         Err(format!(
@@ -579,6 +581,7 @@ fn validate_page_limit(limit: u64) -> Result<(), String> {
 }
 
 /// Pure stewardship ratio computation (testable without HDK).
+#[cfg(test)]
 fn compute_ratio(pledge_count: u64, usage_count: u64) -> f64 {
     if usage_count == 0 {
         if pledge_count > 0 {
@@ -592,6 +595,7 @@ fn compute_ratio(pledge_count: u64, usage_count: u64) -> f64 {
 }
 
 /// Pure weighted score normalization (testable without HDK).
+#[cfg(test)]
 fn normalize_weighted_score(weighted_sum: f64, usage_count: u64) -> f64 {
     if usage_count == 0 {
         weighted_sum

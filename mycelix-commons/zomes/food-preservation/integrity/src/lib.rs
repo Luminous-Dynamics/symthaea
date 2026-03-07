@@ -116,10 +116,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::PreservationMethod(m) => validate_method(m),
                 EntryTypes::StorageUnit(s) => validate_storage(s),
             },
-            OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
-                EntryTypes::PreservationBatch(b) => validate_batch(b),
-                _ => Ok(ValidateCallbackResult::Valid),
-            },
+            OpEntry::UpdateEntry { app_entry: EntryTypes::PreservationBatch(b), .. } => validate_batch(b),
+            OpEntry::UpdateEntry { .. } => Ok(ValidateCallbackResult::Valid),
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink { link_type, tag, .. } => {

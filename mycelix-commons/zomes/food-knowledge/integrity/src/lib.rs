@@ -372,7 +372,7 @@ fn validate_seed_stock(s: SeedStock) -> ExternResult<ValidateCallbackResult> {
         if !rate.is_finite() {
             return Ok(ValidateCallbackResult::Invalid("Germination rate must be a finite number".into()));
         }
-        if rate < 0.0 || rate > 100.0 {
+        if !(0.0..=100.0).contains(&rate) {
             return Ok(ValidateCallbackResult::Invalid("Germination rate must be between 0 and 100".into()));
         }
     }
@@ -408,7 +408,7 @@ fn validate_seed_quality_rating(r: SeedQualityRating) -> ExternResult<ValidateCa
         return Ok(ValidateCallbackResult::Invalid("SeedQualityRating rated_at cannot be zero".into()));
     }
     if let Some(pct) = r.germination_observed_pct {
-        if pct < 0.0 || pct > 100.0 {
+        if !(0.0..=100.0).contains(&pct) {
             return Ok(ValidateCallbackResult::Invalid("Observed germination rate must be between 0 and 100".into()));
         }
     }
