@@ -595,6 +595,14 @@ impl TemporalSignatureEncoder {
 
         if best_sim >= self.config.match_threshold {
             (best_pattern, best_sim)
+        } else if self.tau_history.len() >= self.config.history_length {
+            // After a full history window without matching any pattern, fall back to
+            // Resting rather than Uncertain. An unclassified steady-state is more
+            // accurately described as "resting" than "uncertain" — the system is stable,
+            // just not strongly expressing any canonical pattern.
+            // This prevents the Uncertain death spiral where prediction_confidence
+            // decays continuously and exploration_factor locks at 0.5.
+            (ConsciousnessPattern::Resting, best_sim)
         } else {
             (ConsciousnessPattern::Uncertain, best_sim)
         }

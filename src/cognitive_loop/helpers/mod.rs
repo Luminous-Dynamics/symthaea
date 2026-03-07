@@ -467,8 +467,14 @@ impl CognitiveLoopService {
         // Update with bounds
         self.adjust_confidence("consciousness_pattern", scaled_delta);
 
-        // Additional penalty for very high prediction errors
-        if prediction_error > 0.7 {
+        // Additional penalty for very high prediction errors — but only after warmup.
+        // During the first STARTUP_WARMUP_CYCLES cycles PE=1.0 is a bootstrap artifact
+        // (no prediction exists yet), not a genuine prediction failure.
+        // Penalizing during warmup creates a death spiral: prediction_confidence→0 →
+        // MCE knowledge input→0 → consciousness crushed → pattern stays Uncertain.
+        if prediction_error > 0.7
+            && self.stats.total_cycles > crate::cognitive_loop::thresholds::STARTUP_WARMUP_CYCLES
+        {
             self.scale_confidence("high_pred_error", 0.95);
         }
     }

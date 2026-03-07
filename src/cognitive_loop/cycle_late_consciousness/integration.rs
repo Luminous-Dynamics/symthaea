@@ -581,7 +581,14 @@ impl CognitiveLoopService {
                 // of its own state. Prevents softmin death spiral where knowledge→0
                 // crushes consciousness, preventing the learning that would raise it.
                 knowledge: self.prediction_confidence.max(0.2),
-                synchrony: (0.3 + self.flow_state.intensity as f64 * 0.7).clamp(0.1, 1.0),
+                // Synchrony: baseline from CfC coherence + flow boost.
+                // Neural synchrony exists independent of flow state — coherence
+                // reflects ongoing temporal coordination across CfC neurons.
+                // Science: Buzsáki (2006) — neural oscillatory synchrony is a
+                // fundamental feature of all active neural networks.
+                synchrony: (0.3 + ctx.coherence as f64 * 0.4
+                    + self.flow_state.intensity as f64 * 0.3)
+                    .clamp(0.1, 1.0),
             };
             let level = self.master_equation.compute(&inputs).consciousness_level;
 
