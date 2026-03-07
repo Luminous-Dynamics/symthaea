@@ -9,8 +9,8 @@ Based on comprehensive review of all subsystems (March 6, 2026).
 |-------|-------|-----------|----------------|
 | Code Perception | 7/10 | Tree-sitter (Rust/Python/Nix), CodeHDEncoder (16,384D), CodebaseMemory | No dataflow/CFG, types are string labels |
 | Code Planning | 5/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine with 5 code actions | Composition inference, but no deep code reasoning yet |
-| Code Generation | 5/10 | Emitters produce real code (~40 patterns); LLM fallback for `todo!()` bodies | Complex algorithms still need LLM; no SSM distillation yet |
-| Code Verification | 5/10 | CodeVerifier (semantic), tree-sitter (syntax), CodeExecutor (compile), iterative 3-attempt retry loop with error feedback | No test execution, no behavioral verification |
+| Code Generation | 6/10 | Emitters produce real code (~55+ Rust, ~25 Python patterns); LLM fallback for `todo!()` bodies; composition inference | Complex algorithms still need LLM; no SSM distillation yet |
+| Code Verification | 6/10 | CodeVerifier (semantic), tree-sitter (syntax), CodeExecutor (compile+test), iterative 3-attempt retry with error+test feedback, smoke test binary | No property-based test generation |
 | Language Output | 7/10 | LLM Organ translates StructuredThought; CodeContext populated in Phase 3.6 | LLM completion mode for complex bodies |
 | Learning | 7/10 | FEP surprise → LR boost, School lookahead, episodic code cache (32 entries), HDC-similarity top-3 retrieval | No SSM distillation yet |
 
@@ -454,6 +454,49 @@ Expanded single-retry into structured `while` loop (`MAX_CODE_RETRIES = 3`):
 
 Each retry includes the attempt number (`RETRY 1/3`, `RETRY 2/3`) for progressive specificity.
 Only stores in episodic cache after BOTH tree-sitter AND compilation pass.
+
+## Phase 3e: Behavioral Test Execution + Emitter Expansion — DONE (2026-03-07)
+
+**Status**: COMPLETE. Test execution in verification loop, ~55 Rust + ~25 Python emitter patterns, smoke test binary.
+
+### 3e.1 Behavioral Test Execution in Verification Loop
+
+**File**: `src/language/code_executor.rs`
+
+Added `execute_rust_with_inline_tests()` — compiles source with `--test` flag WITHOUT wrapping in duplicate `mod tests {}`. Used when generated code already contains `#[test]` assertions.
+
+**File**: `src/symthaea.rs` (Phase 5.5 verification loop)
+
+Updated the iterative verification loop to detect inline tests and execute them:
+- `has_inline_tests = current_code.contains("#[test]")`
+- Routes to `execute_rust_with_inline_tests()` when tests present
+- On test failure: injects actual vs expected values (from assert panics) into retry context
+- Retry prompt: "The function body is WRONG. Fix the logic so tests pass."
+- Tests that pass → higher confidence in code quality than compile-only
+
+### 3e.2 Python Emitter Expansion (~25 new patterns)
+
+**File**: `src/language/emitters.rs`
+
+New Python patterns: subtract, multiply, divide, max, min, abs, clamp, contains, concatenate/join, split, trim/strip, replace, starts_with, ends_with, filter even/odd, is_empty, is_even, is_odd, is_positive, is_negative, fibonacci, power, sqrt, flatten, unique.
+
+Fixed false positive: `purpose.contains("min")` matched "programming" (substrings). Now uses `"minimum"`, `"min of"`, `"smaller"` for specificity.
+
+### 3e.3 Rust Emitter Expansion (~15 new patterns)
+
+New Rust patterns: binary_search, collection sum/max/min, zip, enumerate, take, skip, chunks, repeat, char_at, capitalize, count occurrences, gcd, average/mean.
+
+### 3e.4 Smoke Test Binary
+
+**File**: `src/bin/code_gen_smoke.rs` (138 LOC)
+
+`cargo run --bin code-gen-smoke --features code_generation` — validates:
+- 8 native Rust emitter cases (add, reverse, factorial, is_even, sort, uppercase, fibonacci, abs)
+- 2 composition cases (filter+sum, sort+take)
+- 2 LLM detection cases (dijkstra, knapsack → correctly produce `todo!()`)
+- 3 Python generation cases (add, reverse, factorial)
+
+All 15 cases pass.
 
 ---
 
