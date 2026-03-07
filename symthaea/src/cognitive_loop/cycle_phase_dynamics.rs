@@ -1,10 +1,33 @@
 //! Core dynamics phase of the cognitive cycle.
 //!
-//! Extracts Phases A–11 from the original `cycle()` method:
-//! CycleSnapshot build, subsystem manager computation, self-model tracking,
-//! resonator recall, semantic memory, CfC step, prediction, world model,
-//! emotion, FEP active inference, moral modulation, training, parallel
-//! post-processing.
+//! Single method `phase_dynamics()` (~1900 LOC) that runs Phases A–11.
+//! Ordering is load-bearing — do not reorder sections.
+//!
+//! ## Section index
+//!
+//! | Line  | Section | Description |
+//! |-------|---------|-------------|
+//! |  ~75  | Phase A: OBSERVE | Build immutable CycleSnapshot |
+//! | ~100  | Phase B: COMPUTE | Run subsystem managers via trait |
+//! | ~133  | Self-model | Accuracy tracking (EMA) |
+//! | ~180  | Foveation | Vision-manifold coupling (cfg) |
+//! | ~223  | 1a: Memory | Episodic recall + resonator + goals |
+//! | ~270  | Binding | Phenomenal binding → threshold/confidence |
+//! | ~426  | 1b+15+18: Emotion | Contagion + homeostasis (→ `apply_emotional_homeostasis`) |
+//! | ~476  | 1c: Emotion | Unified emotional bridge (VAD) |
+//! | ~490  | 2a: Semantic | Semantic memory lookup + LR modulation |
+//! | ~677  | CfC step | Temporal network forward + prediction |
+//! | ~785  | 6b: World model | World model stiffness → LR scaling |
+//! | ~846  | MCTS | Plan evaluation + application |
+//! | ~891  | FEP decomp | Free energy → accuracy/complexity/pragmatic |
+//! | ~998  | 10d.5: AI bridge | Active inference bridge update |
+//! | ~1022 | 10d.6: FEP | Active inference step + policy |
+//! | ~1112 | 10d.7: Moral | Moral modulation of inference |
+//! | ~1136 | Attention | Budget check + substrate tau scaling |
+//! | ~1231 | Training | CfC weight update + async dispatch |
+//! | ~1391 | Parallel | rayon::join post-processing (stability, episodic) |
+//! | ~1691 | Broca | SSM language generation + feedback (cfg) |
+//! | ~1850 | Result | Assemble DynamicsPhaseResult |
 
 use crate::consciousness::fep_active_inference::{MotorCommandType, Observation};
 use ndarray::Array1;
@@ -443,35 +466,8 @@ impl CognitiveLoopService {
         self.emotion_contagion.analyze(input);
 
         // ── Phase 15+18: Emotional homeostasis ──
-        let valence_homeostasis_pull;
-        let arousal_homeostasis_pull;
-        let homeostasis_pull_strength;
-        {
-            let _prev_v = self.carryover.history.last_emotion_valence;
-            let _prev_a = self.carryover.history.last_emotion_arousal;
-            let curr_v = self.emotion_contagion.valence;
-            let curr_a = self.emotion_contagion.prosody_arousal();
-
-            let pull_mult = match self.carryover.urgency.urgency {
-                super::CycleUrgency::Cruise => HOMEOSTASIS_PULL_CRUISE,
-                super::CycleUrgency::Normal => HOMEOSTASIS_PULL_NORMAL,
-                super::CycleUrgency::Critical => HOMEOSTASIS_PULL_CRITICAL,
-            };
-            homeostasis_pull_strength = pull_mult;
-
-            let v_pull = -curr_v * 0.05 * pull_mult;
-            let a_pull = (HOMEOSTASIS_AROUSAL_TARGET - curr_a) * 0.05 * pull_mult;
-            self.emotion_contagion.valence = (curr_v + v_pull).clamp(-1.0, 1.0);
-
-            valence_homeostasis_pull = v_pull;
-            arousal_homeostasis_pull = a_pull;
-
-            self.stats.avg_valence_homeostasis =
-                self.stats.avg_valence_homeostasis * 0.95 + v_pull.abs() * 0.05;
-
-            self.carryover.history.last_emotion_valence = self.emotion_contagion.valence;
-            self.carryover.history.last_emotion_arousal = curr_a;
-        }
+        let (valence_homeostasis_pull, arousal_homeostasis_pull, homeostasis_pull_strength) =
+            self.apply_emotional_homeostasis();
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1c. Update Unified Emotional Bridge (VAD-based)
@@ -1170,6 +1166,41 @@ impl CognitiveLoopService {
             * depth_budget_scale
             * epistemic_budget_scale as f64
             * stillness_budget_scale) as u64;
+
+        // Active Rest Mode: track Sacred Stillness dominance streak
+        {
+            let ss_coord = self.ethics_engine.last_harmony_coordinates()[7];
+            let dominant_idx = self.ethics_engine.last_harmony_coordinates()
+                .iter()
+                .enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            if dominant_idx == 7 && ss_coord > 0.3 {
+                self.stats.stillness_dominance_streak += 1;
+            } else {
+                self.stats.stillness_dominance_streak = 0;
+                self.stats.in_active_rest = false;
+            }
+            if self.stats.stillness_dominance_streak >= super::thresholds::ACTIVE_REST_THRESHOLD {
+                if !self.stats.in_active_rest {
+                    tracing::info!(
+                        streak = self.stats.stillness_dominance_streak,
+                        "Entering active rest mode — redirecting computation to consolidation"
+                    );
+                    self.stats.in_active_rest = true;
+                }
+                // Active rest: trigger dream consolidation and memory defragmentation
+                if let Some(ref mut dream) = self.dream_engine {
+                    if let Ok(result) = dream.dream() {
+                        if result.insights > 0 {
+                            tracing::debug!(insights = result.insights, "Active rest dream consolidation");
+                        }
+                    }
+                }
+            }
+        }
+
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
@@ -1901,6 +1932,31 @@ impl CognitiveLoopService {
             },
             epistemic_budget_scale,
         }
+    }
+
+    /// Apply emotional homeostasis: pull valence toward neutral, arousal toward target.
+    /// Returns (valence_pull, arousal_pull, pull_strength).
+    fn apply_emotional_homeostasis(&mut self) -> (f32, f32, f32) {
+        let curr_v = self.emotion_contagion.valence;
+        let curr_a = self.emotion_contagion.prosody_arousal();
+
+        let pull_mult = match self.carryover.urgency.urgency {
+            super::CycleUrgency::Cruise => HOMEOSTASIS_PULL_CRUISE,
+            super::CycleUrgency::Normal => HOMEOSTASIS_PULL_NORMAL,
+            super::CycleUrgency::Critical => HOMEOSTASIS_PULL_CRITICAL,
+        };
+
+        let v_pull = -curr_v * 0.05 * pull_mult;
+        let a_pull = (HOMEOSTASIS_AROUSAL_TARGET - curr_a) * 0.05 * pull_mult;
+        self.emotion_contagion.valence = (curr_v + v_pull).clamp(-1.0, 1.0);
+
+        self.stats.avg_valence_homeostasis =
+            self.stats.avg_valence_homeostasis * 0.95 + v_pull.abs() * 0.05;
+
+        self.carryover.history.last_emotion_valence = self.emotion_contagion.valence;
+        self.carryover.history.last_emotion_arousal = curr_a;
+
+        (v_pull, a_pull, pull_mult)
     }
 }
 

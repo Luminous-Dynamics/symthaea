@@ -142,3 +142,109 @@ fn full_service_reset_restores_all_managers() {
     assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
     assert!(service.voice_coherence.bridge.smoothed_coherence().is_finite());
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Constructor profile variants (Item 5)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn construct_minimal_profile_succeeds() {
+    let config = CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Minimal);
+    let service = CognitiveLoopService::new(config);
+    assert!(service.is_ok(), "Minimal profile construction failed: {:?}", service.err());
+}
+
+#[test]
+fn construct_standard_profile_succeeds() {
+    let config = CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Standard);
+    let service = CognitiveLoopService::new(config);
+    assert!(service.is_ok(), "Standard profile construction failed: {:?}", service.err());
+}
+
+#[test]
+fn construct_full_profile_succeeds() {
+    let config = CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Full);
+    let service = CognitiveLoopService::new(config);
+    assert!(service.is_ok(), "Full profile construction failed: {:?}", service.err());
+}
+
+#[test]
+fn construct_research_profile_succeeds() {
+    let config = CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Research);
+    let service = CognitiveLoopService::new(config);
+    assert!(service.is_ok(), "Research profile construction failed: {:?}", service.err());
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Soak tests: manager extraction behavioral equivalence (Item 2)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn soak_500_cycles_all_metadata_finite() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let inputs = [
+        "the cat sat on the mat",
+        "quantum mechanics describes wave functions",
+        "consciousness emerges from integrated information",
+        "ethical reasoning requires empathy",
+        "",
+    ];
+    for i in 0..500 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+
+        // Core metrics must be finite every cycle
+        assert!(
+            m.valence_homeostasis_pull.is_finite(),
+            "valence_homeostasis_pull NaN at cycle {i}"
+        );
+        assert!(
+            m.voice_articulation_quality.is_finite(),
+            "voice_articulation_quality NaN at cycle {i}"
+        );
+        assert!(
+            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            "social_trust_current out of range at cycle {i}: {}",
+            m.social_trust_current
+        );
+        assert!(
+            m.social_cooperation_current >= 0.0 && m.social_cooperation_current <= 1.0,
+            "social_cooperation_current out of range at cycle {i}: {}",
+            m.social_cooperation_current
+        );
+
+        // Biorhythm modulation must be positive (not in CycleMetadata, check manager directly)
+        let plasticity = service.biorhythm_mgr.rhythm.plasticity_mod;
+        assert!(
+            plasticity > 0.0 && plasticity.is_finite(),
+            "biorhythm plasticity_mod invalid at cycle {i}: {plasticity}"
+        );
+    }
+}
+
+#[test]
+fn soak_social_signals_survive_500_cycles() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    // Inject social signals
+    service.set_social_signals(0.8, 0.6, 0.7, 3, 0.75);
+    service.provide_reward(0.5);
+
+    for i in 0..500 {
+        let result = service.cycle("social context test");
+        let m = &result.metadata;
+
+        // Social trust should persist (set once, not reset per cycle)
+        assert!(
+            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            "social_trust out of range at cycle {i}"
+        );
+
+        // External reward is consumed on first use, should be ~0 afterward
+        if i > 0 {
+            assert!(
+                service.social_mgr.social.external_reward.abs() < f32::EPSILON,
+                "external_reward not consumed by cycle {i}"
+            );
+        }
+    }
+}
