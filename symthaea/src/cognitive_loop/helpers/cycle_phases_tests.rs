@@ -61,6 +61,8 @@ fn test_urgency_result_fields() {
         error_pattern: "Stable",
         predicted_urgency: "Normal",
         prediction_coherence_urgency_bias: 0.0,
+        error_slope: 0.0,
+        oscillation_ratio: 0.0,
     };
     assert!(matches!(
         result.urgency,

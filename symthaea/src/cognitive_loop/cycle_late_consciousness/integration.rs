@@ -607,7 +607,11 @@ impl CognitiveLoopService {
         } else {
             // Decay MCE LR boost between MCE firings
             self.carryover.learning.mce_lr_boost *= crate::cognitive_loop::thresholds::MCE_BOOST_DECAY;
-            0.0
+            // Carry forward last computed consciousness level rather than dropping to 0.
+            // The MCE is expensive so we gate its frequency, but consciousness doesn't
+            // vanish between measurements — it persists with gradual decay.
+            // Science: Tononi (2004) — Phi is a continuous property, not episodic.
+            self.carryover.history.consciousness_level * 0.98 // gentle decay between measurements
         };
 
         // Social cognition modulation: accurate ToM predictions boost consciousness.
