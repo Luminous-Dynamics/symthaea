@@ -103,18 +103,33 @@ fn parse_rust_signature(sig: &str) -> Option<ParsedSignature> {
 }
 
 /// Parse field definitions from purpose/constraints text.
-/// Looks for patterns like "x: f64", "name: String" etc.
+/// Looks for patterns like "x: f64", "name: String", "x:f64" etc.
 fn extract_fields_from_text(text: &str) -> Vec<(String, String)> {
     let mut fields = Vec::new();
-    // Common patterns: "with x, y fields", "fields x and y", "x: Type, y: Type"
-    for word in text.split_whitespace() {
+    let words: Vec<&str> = text.split_whitespace().collect();
+
+    let mut i = 0;
+    while i < words.len() {
+        let word = words[i];
         if let Some(colon_pos) = word.find(':') {
             let name = word[..colon_pos].trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
-            let typ = word[colon_pos + 1..].trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '<' && c != '>');
-            if !name.is_empty() && !typ.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
-                fields.push((name.to_string(), typ.to_string()));
+            let after_colon = word[colon_pos + 1..].trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '<' && c != '>');
+
+            // Type is in same word (e.g. "x:f64")
+            if !after_colon.is_empty() {
+                if !name.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
+                    fields.push((name.to_string(), after_colon.to_string()));
+                }
+            } else if !name.is_empty() && i + 1 < words.len() {
+                // Type is in next word (e.g. "x: f64")
+                let typ = words[i + 1].trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '<' && c != '>');
+                if !typ.is_empty() && name.chars().next().map_or(false, |c| c.is_lowercase()) {
+                    fields.push((name.to_string(), typ.to_string()));
+                    i += 1; // skip the type word
+                }
             }
         }
+        i += 1;
     }
     fields
 }
@@ -622,6 +637,118 @@ fn infer_from_examples(examples: &[(String, String)], params: &[(String, String)
     None
 }
 
+/// Auto-generate test assertions from purpose and signature when no examples are provided.
+///
+/// Returns a Vec of assertion lines (one per test case).
+fn generate_auto_tests(func_name: &str, purpose: &str, sig: Option<&ParsedSignature>) -> Vec<String> {
+    let purpose_lower = purpose.to_lowercase();
+    let mut tests = Vec::new();
+
+    let sig = match sig {
+        Some(s) => s,
+        None => return tests,
+    };
+
+    let has_i32_params = sig.params.iter().any(|(_, t)| t.contains("i32") || t.contains("i64") || t.contains("u32") || t.contains("u64"));
+    let has_str_param = sig.params.iter().any(|(_, t)| t.contains("str") || t.contains("String"));
+    let has_vec_param = sig.params.iter().any(|(_, t)| t.contains("Vec") || t.contains("&["));
+    let returns_bool = sig.return_type.as_ref().map_or(false, |r| r.contains("bool"));
+    let returns_string = sig.return_type.as_ref().map_or(false, |r| r.contains("String"));
+    let returns_vec = sig.return_type.as_ref().map_or(false, |r| r.contains("Vec"));
+
+    // Arithmetic: two numeric params → test with small values
+    if sig.params.len() == 2 && has_i32_params && !returns_bool && !returns_vec {
+        if purpose_lower.contains("add") || purpose_lower.contains("sum") {
+            tests.push(format!("assert_eq!({}(2, 3), 5);", func_name));
+            tests.push(format!("assert_eq!({}(0, 0), 0);", func_name));
+            tests.push(format!("assert_eq!({}(-1, 1), 0);", func_name));
+        } else if purpose_lower.contains("subtract") || purpose_lower.contains("difference") {
+            tests.push(format!("assert_eq!({}(5, 3), 2);", func_name));
+            tests.push(format!("assert_eq!({}(0, 0), 0);", func_name));
+        } else if purpose_lower.contains("multiply") || purpose_lower.contains("product") {
+            tests.push(format!("assert_eq!({}(3, 4), 12);", func_name));
+            tests.push(format!("assert_eq!({}(0, 5), 0);", func_name));
+        } else if purpose_lower.contains("divide") || purpose_lower.contains("quotient") {
+            tests.push(format!("assert_eq!({}(10, 2), 5);", func_name));
+            tests.push(format!("assert_eq!({}(7, 3), 2);", func_name));
+        } else if purpose_lower.contains("max") || purpose_lower.contains("larger") {
+            tests.push(format!("assert_eq!({}(3, 7), 7);", func_name));
+            tests.push(format!("assert_eq!({}(5, 5), 5);", func_name));
+        } else if purpose_lower.contains("min") || purpose_lower.contains("smaller") {
+            tests.push(format!("assert_eq!({}(3, 7), 3);", func_name));
+            tests.push(format!("assert_eq!({}(5, 5), 5);", func_name));
+        } else if purpose_lower.contains("gcd") || purpose_lower.contains("greatest common") {
+            tests.push(format!("assert_eq!({}(12, 8), 4);", func_name));
+            tests.push(format!("assert_eq!({}(7, 5), 1);", func_name));
+        }
+    }
+
+    // Single numeric param
+    if sig.params.len() == 1 && has_i32_params {
+        if returns_bool {
+            if purpose_lower.contains("is even") || purpose_lower.contains("even") {
+                tests.push(format!("assert!({}(4));", func_name));
+                tests.push(format!("assert!(!{}(3));", func_name));
+                tests.push(format!("assert!({}(0));", func_name));
+            } else if purpose_lower.contains("is odd") || purpose_lower.contains("odd") {
+                tests.push(format!("assert!({}(3));", func_name));
+                tests.push(format!("assert!(!{}(4));", func_name));
+            } else if purpose_lower.contains("is positive") || purpose_lower.contains("positive") {
+                tests.push(format!("assert!({}(5));", func_name));
+                tests.push(format!("assert!(!{}(-3));", func_name));
+            } else if purpose_lower.contains("is negative") || purpose_lower.contains("negative") {
+                tests.push(format!("assert!({}(-5));", func_name));
+                tests.push(format!("assert!(!{}(3));", func_name));
+            }
+        }
+        if purpose_lower.contains("factorial") {
+            tests.push(format!("assert_eq!({}(0), 1);", func_name));
+            tests.push(format!("assert_eq!({}(5), 120);", func_name));
+        } else if purpose_lower.contains("fibonacci") {
+            tests.push(format!("assert_eq!({}(0), 0);", func_name));
+            tests.push(format!("assert_eq!({}(1), 1);", func_name));
+            tests.push(format!("assert_eq!({}(10), 55);", func_name));
+        } else if purpose_lower.contains("absolute") || purpose_lower.contains("abs") {
+            tests.push(format!("assert_eq!({}(-5), 5);", func_name));
+            tests.push(format!("assert_eq!({}(3), 3);", func_name));
+        }
+    }
+
+    // String operations
+    if has_str_param && sig.params.len() == 1 {
+        if returns_string {
+            if purpose_lower.contains("reverse") {
+                tests.push(format!("assert_eq!({}(\"hello\"), \"olleh\");", func_name));
+                tests.push(format!("assert_eq!({}(\"\"), \"\");", func_name));
+            } else if purpose_lower.contains("uppercase") {
+                tests.push(format!("assert_eq!({}(\"hello\"), \"HELLO\");", func_name));
+            } else if purpose_lower.contains("lowercase") {
+                tests.push(format!("assert_eq!({}(\"HELLO\"), \"hello\");", func_name));
+            } else if purpose_lower.contains("trim") || purpose_lower.contains("strip") {
+                tests.push(format!("assert_eq!({}(\"  hi  \"), \"hi\");", func_name));
+            } else if purpose_lower.contains("capitalize") {
+                tests.push(format!("assert_eq!({}(\"hello\"), \"Hello\");", func_name));
+            }
+        }
+        if returns_bool {
+            if purpose_lower.contains("is empty") || purpose_lower.contains("is_empty") {
+                tests.push(format!("assert!({}(\"\"));", func_name));
+                tests.push(format!("assert!(!{}(\"hi\"));", func_name));
+            }
+        }
+    }
+
+    // Vec operations
+    if has_vec_param && sig.params.len() == 1 {
+        if returns_vec && (purpose_lower.contains("sort") || purpose_lower.contains("order")) {
+            tests.push(format!("assert_eq!({}(vec![3, 1, 2]), vec![1, 2, 3]);", func_name));
+            tests.push(format!("assert_eq!({}(vec![]), vec![]);", func_name));
+        }
+    }
+
+    tests
+}
+
 // ============================================================================
 // Rust Emitter
 // ============================================================================
@@ -702,15 +829,16 @@ impl CodeEmitter for RustEmitter {
             }
             parts.push(String::new());
 
-            // Emit constructor if we have impl steps
-            if has_impl || method_steps > 0 {
+            // Emit constructor + methods if we have impl steps or MULTI_ENTITY constraint
+            let is_multi_entity = spec.constraints.iter().any(|c| c.starts_with("MULTI_ENTITY"));
+            if has_impl || method_steps > 0 || is_multi_entity {
                 parts.push(format!("impl {} {{", spec.name));
                 let fields = extract_fields_from_text(&spec.purpose);
                 if !fields.is_empty() {
                     let params: Vec<String> = fields.iter().map(|(n, t)| format!("{}: {}", n, t)).collect();
                     let assigns: Vec<String> = fields.iter().map(|(n, _)| format!("            {}", n)).collect();
                     parts.push(format!("    pub fn new({}) -> Self {{", params.join(", ")));
-                    parts.push(format!("        Self {{"));
+                    parts.push("        Self {".to_string());
                     for a in &assigns {
                         parts.push(format!("{},", a));
                     }
@@ -721,6 +849,49 @@ impl CodeEmitter for RustEmitter {
                     parts.push("        Self {}".to_string());
                     parts.push("    }".to_string());
                 }
+
+                // Auto-generate methods from purpose when MULTI_ENTITY
+                if is_multi_entity {
+                    let purpose_lower = spec.purpose.to_lowercase();
+                    if purpose_lower.contains("distance") && fields.len() >= 2 {
+                        let f0 = &fields[0].0;
+                        let f1 = &fields[1].0;
+                        parts.push(String::new());
+                        parts.push("    pub fn distance(&self, other: &Self) -> f64 {".to_string());
+                        parts.push(format!(
+                            "        (((self.{f0} - other.{f0}).powi(2) + (self.{f1} - other.{f1}).powi(2)) as f64).sqrt()"
+                        ));
+                        parts.push("    }".to_string());
+                    }
+                    if purpose_lower.contains("area") && fields.len() >= 2 {
+                        let f0 = &fields[0].0;
+                        let f1 = &fields[1].0;
+                        parts.push(String::new());
+                        parts.push("    pub fn area(&self) -> f64 {".to_string());
+                        parts.push(format!("        (self.{f0} * self.{f1}) as f64"));
+                        parts.push("    }".to_string());
+                    }
+                    if purpose_lower.contains("display") || purpose_lower.contains("to_string") || purpose_lower.contains("format") {
+                        parts.push(String::new());
+                        let field_fmts: Vec<String> = fields.iter()
+                            .map(|(n, _)| format!("{}: {{}}", n))
+                            .collect();
+                        let field_refs: Vec<String> = fields.iter()
+                            .map(|(n, _)| format!("self.{}", n))
+                            .collect();
+                        if !fields.is_empty() {
+                            parts.push("    pub fn display(&self) -> String {".to_string());
+                            parts.push(format!(
+                                "        format!(\"{}({})\", {})",
+                                spec.name,
+                                field_fmts.join(", "),
+                                field_refs.join(", ")
+                            ));
+                            parts.push("    }".to_string());
+                        }
+                    }
+                }
+
                 parts.push("}".to_string());
             }
         }
@@ -794,25 +965,42 @@ impl CodeEmitter for RustEmitter {
             }
         }
 
-        // Emit tests from examples
-        if !spec.examples.is_empty() {
+        // Emit tests: from explicit examples first, then auto-generate from purpose
+        let func_name = parsed_sig.as_ref()
+            .map(|s| s.name.as_str())
+            .unwrap_or(&spec.name);
+
+        let auto_tests = if spec.examples.is_empty() {
+            generate_auto_tests(func_name, &spec.purpose, parsed_sig.as_ref())
+        } else {
+            Vec::new()
+        };
+
+        if !spec.examples.is_empty() || !auto_tests.is_empty() {
             parts.push(String::new());
             parts.push("#[cfg(test)]".to_string());
             parts.push("mod tests {".to_string());
             parts.push("    use super::*;".to_string());
             parts.push(String::new());
 
-            let func_name = parsed_sig.as_ref()
-                .map(|s| s.name.as_str())
-                .unwrap_or(&spec.name);
-
+            // Explicit examples
             for (i, (input, output)) in spec.examples.iter().enumerate() {
                 parts.push("    #[test]".to_string());
                 parts.push(format!("    fn test_example_{}() {{", i));
-                // Try to generate a real assertion
                 parts.push(format!("        assert_eq!({}, {});", input, output));
                 parts.push("    }".to_string());
-                if i + 1 < spec.examples.len() {
+                if i + 1 < spec.examples.len() || !auto_tests.is_empty() {
+                    parts.push(String::new());
+                }
+            }
+
+            // Auto-generated tests
+            for (i, test_line) in auto_tests.iter().enumerate() {
+                parts.push("    #[test]".to_string());
+                parts.push(format!("    fn test_auto_{}() {{", i));
+                parts.push(format!("        {}", test_line));
+                parts.push("    }".to_string());
+                if i + 1 < auto_tests.len() {
                     parts.push(String::new());
                 }
             }
@@ -1445,5 +1633,104 @@ mod tests {
         assert_eq!(extract_number_from_text("take first 3 elements"), Some(3));
         assert_eq!(extract_number_from_text("top five items"), Some(5));
         assert_eq!(extract_number_from_text("no number here"), None);
+    }
+
+    #[test]
+    fn test_auto_tests_add() {
+        let sig = ParsedSignature {
+            name: "add".to_string(),
+            params: vec![("a".to_string(), "i32".to_string()), ("b".to_string(), "i32".to_string())],
+            return_type: Some("i32".to_string()),
+            is_method: false,
+        };
+        let tests = generate_auto_tests("add", "Add two numbers", Some(&sig));
+        assert!(!tests.is_empty(), "Should generate tests for add");
+        assert!(tests.iter().any(|t| t.contains("assert_eq!(add(2, 3), 5)")));
+    }
+
+    #[test]
+    fn test_auto_tests_is_even() {
+        let sig = ParsedSignature {
+            name: "is_even".to_string(),
+            params: vec![("n".to_string(), "i32".to_string())],
+            return_type: Some("bool".to_string()),
+            is_method: false,
+        };
+        let tests = generate_auto_tests("is_even", "Check if a number is even", Some(&sig));
+        assert!(!tests.is_empty(), "Should generate tests for is_even");
+        assert!(tests.iter().any(|t| t.contains("assert!(is_even(4))")));
+        assert!(tests.iter().any(|t| t.contains("assert!(!is_even(3))")));
+    }
+
+    #[test]
+    fn test_auto_tests_reverse() {
+        let sig = ParsedSignature {
+            name: "reverse".to_string(),
+            params: vec![("s".to_string(), "&str".to_string())],
+            return_type: Some("String".to_string()),
+            is_method: false,
+        };
+        let tests = generate_auto_tests("reverse", "Reverse a string", Some(&sig));
+        assert!(!tests.is_empty(), "Should generate tests for reverse");
+        assert!(tests.iter().any(|t| t.contains("\"olleh\"")));
+    }
+
+    #[test]
+    fn test_auto_tests_factorial() {
+        let sig = ParsedSignature {
+            name: "factorial".to_string(),
+            params: vec![("n".to_string(), "u64".to_string())],
+            return_type: Some("u64".to_string()),
+            is_method: false,
+        };
+        let tests = generate_auto_tests("factorial", "Compute factorial", Some(&sig));
+        assert!(!tests.is_empty(), "Should generate tests for factorial");
+        assert!(tests.iter().any(|t| t.contains("120")));
+    }
+
+    #[test]
+    fn test_auto_tests_sort() {
+        let sig = ParsedSignature {
+            name: "sort".to_string(),
+            params: vec![("items".to_string(), "Vec<i32>".to_string())],
+            return_type: Some("Vec<i32>".to_string()),
+            is_method: false,
+        };
+        let tests = generate_auto_tests("sort", "Sort a vector", Some(&sig));
+        assert!(!tests.is_empty(), "Should generate tests for sort");
+        assert!(tests.iter().any(|t| t.contains("vec![1, 2, 3]")));
+    }
+
+    #[test]
+    fn test_auto_tests_no_sig_no_tests() {
+        let tests = generate_auto_tests("foo", "Do something", None);
+        assert!(tests.is_empty(), "No sig → no auto tests");
+    }
+
+    #[test]
+    fn test_rust_emit_with_auto_tests() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "add", "Add two numbers")
+            .with_signature("fn add(a: i32, b: i32) -> i32");
+        let result = emitter.emit_from_spec(&spec, &[
+            CodePlanStep { action: PlanAction::DefineFunction, name: None, context: vec![], confidence: 0.9 },
+        ]);
+        // Should have auto-generated tests since no examples provided
+        assert!(result.contains("#[test]"), "Should contain auto-generated tests");
+        assert!(result.contains("assert_eq!(add(2, 3), 5)"), "Should have add(2,3)=5 assertion");
+    }
+
+    #[test]
+    fn test_multi_entity_struct_with_distance() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "Point", "Point struct with x: f64 and y: f64 with distance method")
+            .with_constraint("MULTI_ENTITY: generate struct + impl block + methods");
+        let result = emitter.emit_from_spec(&spec, &[
+            CodePlanStep { action: PlanAction::DefineStruct, name: None, context: vec![], confidence: 0.9 },
+        ]);
+        assert!(result.contains("pub struct Point"), "Should have struct: {}", result);
+        assert!(result.contains("impl Point"), "Should have impl block: {}", result);
+        assert!(result.contains("fn new("), "Should have constructor: {}", result);
+        assert!(result.contains("fn distance("), "Should have distance method: {}", result);
     }
 }

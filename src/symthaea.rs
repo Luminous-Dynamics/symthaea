@@ -409,6 +409,10 @@ pub struct Symthaea {
     /// Stores (purpose, source_code) pairs, capped at 32 entries.
     #[cfg(feature = "code_generation")]
     code_generation_cache: Vec<(String, String)>,
+    /// Error pattern memory: (error_substring, fix_hint) pairs from past failures.
+    /// Injected as "AVOID" notes into future generations.
+    #[cfg(feature = "code_generation")]
+    error_pattern_memory: Vec<(String, String)>,
 
     // ── Nociception: Pain & Infrastructure Health ──────────────────────
     /// Somatic error bridge: drains infrastructure errors → felt stress.
@@ -734,6 +738,8 @@ impl Symthaea {
             ),
             #[cfg(feature = "code_generation")]
             code_generation_cache: Vec::new(),
+            #[cfg(feature = "code_generation")]
+            error_pattern_memory: Vec::new(),
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -1016,6 +1022,8 @@ impl Symthaea {
             ),
             #[cfg(feature = "code_generation")]
             code_generation_cache: Vec::new(),
+            #[cfg(feature = "code_generation")]
+            error_pattern_memory: Vec::new(),
             somatic_bridge,
             pain_tx,
             task_supervisor,
@@ -1555,22 +1563,39 @@ impl Symthaea {
                 .map(|e| e.value.clone())
                 .unwrap_or_else(|| "rust".to_string());
 
+            // Extract function name, entity kind, and signature from NL input.
+            let (func_name, entity_kind, inferred_sig) =
+                Self::extract_code_metadata(content, &lang);
+
             // Build a CodeIntent::Create for generation tasks; for other
             // categories, populate code_context with plan steps only.
+            let content_lower = content.to_lowercase();
             let intent = match category {
                 CodeIntentCategory::Create => {
-                    let target = CodeTarget::new(
-                        content.split_whitespace().take(4).collect::<Vec<_>>().join("_"),
-                        EntityKind::Function,
-                    )
-                    .with_language(lang.clone());
-                    let spec = CodeSpec::new(&lang, "generated", content);
+                    let target = CodeTarget::new(&func_name, entity_kind)
+                        .with_language(lang.clone());
+                    let mut spec = CodeSpec::new(&lang, &func_name, content);
+                    if let Some(ref sig) = inferred_sig {
+                        spec = spec.with_signature(sig.as_str());
+                    }
+                    // Detect multi-entity patterns: "struct with method(s)"
+                    if entity_kind == EntityKind::Struct {
+                        if content_lower.contains("method") || content_lower.contains("impl")
+                            || content_lower.contains("distance") || content_lower.contains("area")
+                            || content_lower.contains("display") || content_lower.contains("calculate")
+                        {
+                            spec = spec.with_constraint("MULTI_ENTITY: generate struct + impl block + methods");
+                        }
+                    }
                     crate::language::code_intent::CodeIntent::Create { target, spec }
                 }
                 _ => {
-                    let target = CodeTarget::new("target", EntityKind::Function)
+                    let target = CodeTarget::new(&func_name, entity_kind)
                         .with_language(lang.clone());
-                    let spec = CodeSpec::new(&lang, "target", content);
+                    let mut spec = CodeSpec::new(&lang, &func_name, content);
+                    if let Some(ref sig) = inferred_sig {
+                        spec = spec.with_signature(sig.as_str());
+                    }
                     crate::language::code_intent::CodeIntent::Create { target, spec }
                 }
             };
@@ -1620,6 +1645,12 @@ impl Symthaea {
             let needs_llm = generated.source.contains("todo!(")
                 || generated.source.contains("NotImplementedError");
 
+            // Inject error avoidance hints from past failures
+            let mut notes = generated.notes;
+            for (error_pat, fix_hint) in &self.error_pattern_memory {
+                notes.push(format!("AVOID_ERROR: {} — {}", error_pat, fix_hint));
+            }
+
             thought.code_context = Some(crate::mind::structured_thought::CodeContext {
                 language: lang,
                 spec_purpose,
@@ -1635,7 +1666,7 @@ impl Symthaea {
                 phi_score: Some(generated.phi_score),
                 intent_similarity: Some(generated.intent_similarity),
                 syntactically_valid: None, // Set in Phase 5.5
-                notes: generated.notes,
+                notes,
                 needs_llm_completion: needs_llm,
             });
 
@@ -1933,6 +1964,23 @@ impl Symthaea {
                     compile_ok,
                     "Phase 5.5: Verification loop completed"
                 );
+
+                // Learn from errors: extract common error patterns for future avoidance
+                if !compile_ok {
+                    if let Some(ref ctx) = thought.code_context {
+                        for note in &ctx.notes {
+                            if note.starts_with("  error") || note.contains("expected") {
+                                let pattern = note.trim().chars().take(80).collect::<String>();
+                                let hint = "Check types and borrow rules".to_string();
+                                if self.error_pattern_memory.len() < 64
+                                    && !self.error_pattern_memory.iter().any(|(p, _)| *p == pattern)
+                                {
+                                    self.error_pattern_memory.push((pattern, hint));
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Store successful generation in episodic memory + cache
@@ -2530,6 +2578,222 @@ impl Symthaea {
     /// - MustInclude constraints → translation should contain required content
     /// - MustExclude constraints → translation should not contain forbidden content
     /// Extract a fenced code block from LLM output.
+    /// Extract function name, entity kind, and optional signature from NL input.
+    ///
+    /// Parses patterns like:
+    /// - "Write a function that reverses a string" → (reverse, Function, Some("fn reverse(s: &str) -> String"))
+    /// - "Create a Point struct with x and y" → (Point, Struct, None)
+    /// - "Implement fibonacci" → (fibonacci, Function, None)
+    #[cfg(feature = "code_generation")]
+    fn extract_code_metadata(
+        content: &str,
+        lang: &str,
+    ) -> (String, crate::language::code_parser::EntityKind, Option<String>) {
+        use crate::language::code_parser::EntityKind;
+        let lower = content.to_lowercase();
+        let words: Vec<&str> = content.split_whitespace().collect();
+
+        // Detect entity kind
+        let entity_kind = if lower.contains("struct") || lower.contains("class") || lower.contains("type ") {
+            EntityKind::Struct
+        } else if lower.contains("trait") || lower.contains("interface") {
+            EntityKind::Trait
+        } else if lower.contains("module") || lower.contains("mod ") {
+            EntityKind::Module
+        } else {
+            EntityKind::Function
+        };
+
+        // Extract function name — look for known patterns
+        let func_name = Self::extract_func_name_from_nl(&lower, &words);
+
+        // Try to infer a signature from NL description
+        let signature = if entity_kind == EntityKind::Function {
+            Self::infer_signature_from_nl(&lower, &func_name, lang)
+        } else {
+            None
+        };
+
+        (func_name, entity_kind, signature)
+    }
+
+    /// Extract a plausible function/entity name from natural language.
+    #[cfg(feature = "code_generation")]
+    fn extract_func_name_from_nl(lower: &str, words: &[&str]) -> String {
+        // Pattern 1: explicit "called X" or "named X"
+        for (i, w) in words.iter().enumerate() {
+            let wl = w.to_lowercase();
+            if (wl == "called" || wl == "named") && i + 1 < words.len() {
+                let name = words[i + 1]
+                    .trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                if !name.is_empty() {
+                    return name.to_lowercase();
+                }
+            }
+        }
+
+        // Pattern 2: look for a verb phrase that maps to a function name
+        // "reverses a string" → "reverse", "checks if even" → "is_even"
+        let verb_mappings: &[(&[&str], &str)] = &[
+            (&["reverse", "reverses", "reversing"], "reverse"),
+            (&["sort", "sorts", "sorting"], "sort"),
+            (&["add", "adds", "adding", "sum"], "add"),
+            (&["subtract", "subtracts"], "subtract"),
+            (&["multiply", "multiplies"], "multiply"),
+            (&["divide", "divides"], "divide"),
+            (&["check if even", "checks if even", "is even"], "is_even"),
+            (&["check if odd", "checks if odd", "is odd"], "is_odd"),
+            (&["check if empty", "is empty"], "is_empty"),
+            (&["check if positive", "is positive"], "is_positive"),
+            (&["check if negative", "is negative"], "is_negative"),
+            (&["factorial"], "factorial"),
+            (&["fibonacci"], "fibonacci"),
+            (&["uppercase", "to uppercase", "upper case"], "to_uppercase"),
+            (&["lowercase", "to lowercase", "lower case"], "to_lowercase"),
+            (&["contains", "includes"], "contains"),
+            (&["starts with", "begins with"], "starts_with"),
+            (&["ends with"], "ends_with"),
+            (&["trim", "strip"], "trim"),
+            (&["replace"], "replace"),
+            (&["split"], "split"),
+            (&["join", "concatenate"], "join"),
+            (&["flatten"], "flatten"),
+            (&["unique", "deduplicate"], "unique"),
+            (&["filter"], "filter"),
+            (&["clamp"], "clamp"),
+            (&["absolute value", "abs"], "abs"),
+            (&["power", "exponent"], "power"),
+            (&["square root", "sqrt"], "sqrt"),
+            (&["greatest common", "gcd"], "gcd"),
+            (&["average", "mean"], "average"),
+            (&["binary search", "bsearch"], "binary_search"),
+            (&["dijkstra"], "dijkstra"),
+            (&["knapsack"], "solve_knapsack"),
+            (&["capitalize"], "capitalize"),
+            (&["repeat"], "repeat"),
+            (&["enumerate"], "enumerate"),
+            (&["zip"], "zip"),
+            (&["count"], "count"),
+            (&["length", "len"], "length"),
+        ];
+
+        for (triggers, name) in verb_mappings {
+            for trigger in *triggers {
+                if lower.contains(trigger) {
+                    return name.to_string();
+                }
+            }
+        }
+
+        // Pattern 3: "function/fn X" or "implement X"
+        let prefix_words = ["function", "fn", "implement", "create", "write", "build", "make"];
+        for (i, w) in words.iter().enumerate() {
+            let wl = w.to_lowercase();
+            if prefix_words.contains(&wl.as_str()) && i + 1 < words.len() {
+                // Skip articles: "a", "an", "the", "that"
+                let mut j = i + 1;
+                while j < words.len() {
+                    let next = words[j].to_lowercase();
+                    if ["a", "an", "the", "that", "which", "to"].contains(&next.as_str()) {
+                        j += 1;
+                    } else {
+                        break;
+                    }
+                }
+                if j < words.len() {
+                    let candidate = words[j]
+                        .trim_matches(|c: char| !c.is_alphanumeric() && c != '_')
+                        .to_lowercase();
+                    if candidate.len() >= 2 && candidate.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                        return candidate;
+                    }
+                }
+            }
+        }
+
+        // Fallback: use first meaningful word after removing stop words
+        let stop = ["write", "create", "implement", "make", "build", "a", "an",
+                     "the", "that", "which", "to", "for", "in", "rust", "python",
+                     "function", "method", "struct", "class", "new"];
+        for w in words {
+            let wl = w.to_lowercase();
+            let clean = wl.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+            if clean.len() >= 2 && !stop.contains(&clean) {
+                return clean.to_string();
+            }
+        }
+
+        "generated".to_string()
+    }
+
+    /// Infer a Rust/Python function signature from NL description.
+    ///
+    /// Matches patterns like "takes two integers", "returns a boolean",
+    /// "accepts a string and returns a vector of integers".
+    #[cfg(feature = "code_generation")]
+    fn infer_signature_from_nl(lower: &str, func_name: &str, lang: &str) -> Option<String> {
+        // Only infer for Rust currently
+        if lang != "rust" {
+            return None;
+        }
+
+        // Detect parameter types from NL
+        let mut params: Vec<(&str, &str)> = Vec::new();
+
+        // "two numbers/integers" → (a: i32, b: i32)
+        if lower.contains("two number") || lower.contains("two integer") || lower.contains("2 number") {
+            params.push(("a", "i32"));
+            params.push(("b", "i32"));
+        } else if lower.contains("two float") || lower.contains("two decimal") {
+            params.push(("a", "f64"));
+            params.push(("b", "f64"));
+        } else if lower.contains("two string") {
+            params.push(("a", "&str"));
+            params.push(("b", "&str"));
+        } else if lower.contains("a string") || lower.contains("a str") || lower.contains("given string") {
+            params.push(("s", "&str"));
+        } else if lower.contains("a number") || lower.contains("an integer") || lower.contains("given number") {
+            params.push(("n", "i32"));
+        } else if lower.contains("a vector") || lower.contains("a list") || lower.contains("an array") || lower.contains("a vec") {
+            if lower.contains("string") || lower.contains("str") {
+                params.push(("items", "Vec<String>"));
+            } else {
+                params.push(("items", "Vec<i32>"));
+            }
+        } else if lower.contains("three number") || lower.contains("three integer") {
+            params.push(("a", "i32"));
+            params.push(("b", "i32"));
+            params.push(("c", "i32"));
+        }
+
+        if params.is_empty() {
+            return None;
+        }
+
+        // Detect return type from NL
+        let ret = if lower.contains("return") && lower.contains("bool") || lower.contains("check if") || lower.contains("is even") || lower.contains("is odd") || lower.contains("is empty") || lower.contains("is positive") || lower.contains("is negative") {
+            " -> bool"
+        } else if lower.contains("return") && lower.contains("string") || lower.contains("reverse a string") || lower.contains("uppercase") || lower.contains("lowercase") || lower.contains("capitalize") {
+            " -> String"
+        } else if lower.contains("return") && lower.contains("vector") || lower.contains("return") && lower.contains("vec") || lower.contains("sort") && params.iter().any(|(_, t)| t.contains("Vec")) {
+            " -> Vec<i32>"
+        } else if lower.contains("return") && lower.contains("float") {
+            " -> f64"
+        } else if params.iter().any(|(_, t)| t.contains("Vec")) && (lower.contains("sum") || lower.contains("count") || lower.contains("max") || lower.contains("min")) {
+            " -> i32"
+        } else if params.iter().any(|(_, t)| *t == "i32" || *t == "f64") {
+            if params[0].1 == "f64" { " -> f64" } else { " -> i32" }
+        } else {
+            ""
+        };
+
+        let params_str: Vec<String> = params.iter()
+            .map(|(n, t)| format!("{}: {}", n, t))
+            .collect();
+
+        Some(format!("fn {}({}){}", func_name, params_str.join(", "), ret))
+    }
+
     ///
     /// Returns the content between the first ``` and the closing ```,
     /// stripping the optional language tag. Falls back to the full text
