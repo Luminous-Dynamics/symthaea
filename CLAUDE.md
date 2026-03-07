@@ -23,6 +23,7 @@ Full allocation: @.claude/rules/PORTS.md
 3. **Test what exists** - No aspirational tests
 4. **Edit, don't duplicate** - One implementation per feature
 5. **No custom CARGO_TARGET_DIR** - Use the project's default `target/` directory. Do NOT create unique target dirs in `/tmp`. sccache handles caching; cargo's built-in locking handles concurrency. Multiple sessions waiting on the same lock is fine — the second build is incremental and fast.
+6. **One session per workspace** - Do NOT run multiple Claude Code sessions editing the same workspace simultaneously. Concurrent sessions cause: (a) cargo lock contention (60+ rustc processes), (b) edits in one session overwritten by another, (c) build times 10-50x slower. Use git worktrees (`isolation: "worktree"`) for parallel work.
 
 Full rules: @.claude/rules/DEVELOPMENT.md
 
