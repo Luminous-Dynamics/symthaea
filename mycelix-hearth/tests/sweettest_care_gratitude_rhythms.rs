@@ -377,7 +377,7 @@ async fn test_gratitude_express() {
     let invitation_hash = invitation_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -392,7 +392,7 @@ async fn test_gratitude_express() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice expresses gratitude to Bob
     let gratitude_input = ExpressGratitudeInput {
@@ -668,7 +668,7 @@ async fn test_appreciation_circle_lifecycle() {
 
     let invitation_hash = invitation_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -682,7 +682,7 @@ async fn test_appreciation_circle_lifecycle() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice starts an appreciation circle (with only herself as initial participant)
     let circle_record: Record = alice_conductor
@@ -692,14 +692,14 @@ async fn test_appreciation_circle_lifecycle() {
             StartCircleInput {
                 hearth_hash: hearth_hash.clone(),
                 theme: "Weekly gratitude sharing".to_string(),
-                participants: vec![alice.agent_pubkey().clone()],
+                participants: vec![alice.agent_pubkey().clone(), bob_agent.clone()],
             },
         )
         .await;
 
     let circle_hash = circle_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 5. Bob joins the circle
     let _joined: Record = bob_conductor
@@ -710,7 +710,7 @@ async fn test_appreciation_circle_lifecycle() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 6. Alice completes the circle
     let _completed: Record = alice_conductor

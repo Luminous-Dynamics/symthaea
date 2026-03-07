@@ -199,7 +199,7 @@ async fn test_emergency_lifecycle() {
     let invitation_hash = invitation_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -214,7 +214,7 @@ async fn test_emergency_lifecycle() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice creates an emergency plan
     let plan_input = CreateEmergencyPlanInput {
@@ -264,7 +264,7 @@ async fn test_emergency_lifecycle() {
     let alert_hash = alert_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 6. Bob checks in
     let checkin_input = CheckInInput {
@@ -282,7 +282,7 @@ async fn test_emergency_lifecycle() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 7. Alice resolves the alert
     let _resolve: Record = alice_conductor

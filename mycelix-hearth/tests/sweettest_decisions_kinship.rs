@@ -214,7 +214,7 @@ async fn test_decision_lifecycle() {
     let invitation_hash = invitation_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -229,13 +229,13 @@ async fn test_decision_lifecycle() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice creates a decision with a short deadline (1 second in the past
     //    so finalization can proceed immediately). Using a past deadline means
     //    no votes can be cast (deadline check), so we set deadline to be 10
     //    seconds in the future, cast votes, then wait.
-    let deadline_micros = Timestamp::now().as_micros() + 5_000_000; // 5 seconds from now
+    let deadline_micros = Timestamp::now().as_micros() + 60_000_000; // 60 seconds from now
     let deadline = Timestamp::from_micros(deadline_micros);
 
     let decision_input = CreateDecisionInput {
@@ -273,7 +273,7 @@ async fn test_decision_lifecycle() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 6. Bob votes for Pizza (choice 0)
     let _bob_vote: Record = bob_conductor
@@ -288,8 +288,8 @@ async fn test_decision_lifecycle() {
         )
         .await;
 
-    // 7. Wait for deadline to pass
-    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+    // 7. Wait for deadline to pass (60s deadline from creation)
+    tokio::time::sleep(std::time::Duration::from_secs(50)).await;
 
     // 8. Alice finalizes
     let outcome_record: Record = alice_conductor
@@ -408,7 +408,7 @@ async fn test_close_and_amend_decision() {
 
     let invitation_hash = invitation_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -422,7 +422,7 @@ async fn test_close_and_amend_decision() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice creates a decision with a 30-second deadline
     let deadline = Timestamp::from_micros(
@@ -465,7 +465,7 @@ async fn test_close_and_amend_decision() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 6. Alice amends her vote to Drama (choice 1)
     let _amended_vote: Record = alice_conductor
@@ -576,7 +576,7 @@ async fn test_tally_and_query_votes() {
 
     let invitation_hash = invitation_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -590,7 +590,7 @@ async fn test_tally_and_query_votes() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice creates a decision with 30-second deadline
     let deadline = Timestamp::from_micros(
@@ -629,7 +629,7 @@ async fn test_tally_and_query_votes() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 6. Bob votes for Waffles (choice 1)
     let _bob_vote: Record = bob_conductor
@@ -644,7 +644,7 @@ async fn test_tally_and_query_votes() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 7. tally_votes should return tallies for both options
     let tallies: Vec<(u32, u32)> = alice_conductor

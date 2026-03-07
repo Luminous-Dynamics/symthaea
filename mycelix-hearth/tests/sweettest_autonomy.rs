@@ -198,7 +198,7 @@ async fn test_autonomy_profile_and_capability() {
     let invitation_hash = invitation_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -213,7 +213,7 @@ async fn test_autonomy_profile_and_capability() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice creates an autonomy profile for Bob at Dependent tier
     let profile_input = CreateAutonomyProfileInput {
@@ -237,7 +237,7 @@ async fn test_autonomy_profile_and_capability() {
     assert!(profile_record.action().author() == alice.agent_pubkey());
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 5. Bob requests a capability
     let request_input = RequestCapabilityInput {
@@ -257,7 +257,7 @@ async fn test_autonomy_profile_and_capability() {
     let request_hash = request_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 6. Alice approves the capability request
     let approve_input = ApproveCapabilityInput {
@@ -275,7 +275,7 @@ async fn test_autonomy_profile_and_capability() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 7. check_capability returns true for Bob
     let check_input = CheckCapabilityInput {
@@ -367,7 +367,7 @@ async fn test_advance_tier_and_get_transitions() {
 
     let invitation_hash = invitation_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -381,7 +381,7 @@ async fn test_advance_tier_and_get_transitions() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice creates autonomy profile for Bob at Dependent tier
     let profile_record: Record = alice_conductor
@@ -402,7 +402,7 @@ async fn test_advance_tier_and_get_transitions() {
 
     let profile_hash = profile_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 5. Alice advances Bob's tier from Dependent to Supervised
     let transition_record: Record = alice_conductor
@@ -507,7 +507,7 @@ async fn test_deny_capability_and_get_pending() {
 
     let invitation_hash = invitation_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -521,7 +521,7 @@ async fn test_deny_capability_and_get_pending() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice creates autonomy profile for Bob
     let _: Record = alice_conductor
@@ -540,7 +540,7 @@ async fn test_deny_capability_and_get_pending() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 5. Bob requests a capability
     let request_record: Record = bob_conductor
@@ -557,7 +557,7 @@ async fn test_deny_capability_and_get_pending() {
 
     let request_hash = request_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 6. get_pending_requests should return 1
     let pending_before: Vec<Record> = alice_conductor
@@ -587,7 +587,7 @@ async fn test_deny_capability_and_get_pending() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 8. get_pending_requests should return 0 (denied request is no longer pending)
     let pending_after: Vec<Record> = alice_conductor

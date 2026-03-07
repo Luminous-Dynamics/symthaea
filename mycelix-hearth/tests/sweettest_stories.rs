@@ -499,7 +499,7 @@ async fn test_membership_required() {
     let hearth_hash = hearth_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 2. Bob tries to create a story — should fail (not a member)
     let result: Result<Record, _> = bob_conductor

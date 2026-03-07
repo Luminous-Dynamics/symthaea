@@ -1153,7 +1153,32 @@ test-sweettest-commons:
     cd ../mycelix-commons && cargo test --release --test sweettest_integration -- --ignored --nocapture
 
 test-sweettest-civic:
-    cd ../mycelix-civic && cargo test --release --test sweettest_integration -- --ignored --nocapture
+    cd ../mycelix-civic/tests && cargo test --release --test sweettest_integration -- --ignored --test-threads=1
+
+# Run hearth sweettests (specify TEST=sweettest_kinship for single file, or omit for all)
+test-sweettest-hearth TEST='':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd /srv/luminous-dynamics/mycelix-hearth/tests
+    if [ -n "{{TEST}}" ]; then
+        rm -rf /tmp/holochain-test-environments* 2>/dev/null || true
+        cargo test --release --test "{{TEST}}" -- --ignored --test-threads=1
+    else
+        echo "Hearth sweettest (all files, sequential with /tmp cleanup)..."
+        for bin in sweettest_bridge sweettest_digest_sync sweettest_emergency sweettest_autonomy sweettest_milestones sweettest_resources sweettest_stories sweettest_kinship sweettest_decisions_kinship sweettest_care_gratitude_rhythms sweettest_multi_hearth; do
+            echo "  Running $bin ..."
+            rm -rf /tmp/holochain-test-environments* 2>/dev/null || true
+            cargo test --release --test "$bin" -- --ignored --test-threads=1
+            echo "  ✓ $bin done"
+        done
+        echo "All hearth sweettest files passed!"
+    fi
+
+# Clean stale Holochain test environments from /tmp (each test leaves ~500MB-2GB)
+clean-test-envs:
+    rm -rf /tmp/holochain-test-environments* 2>/dev/null || true
+    @echo "Cleaned holochain test environments from /tmp"
+    @df -h /tmp | tail -1
 
 # Memory-safe sweettest runner: runs each test binary sequentially with --test-threads=1.
 # Each [[test]] binary is a separate OS process, so memory is fully reclaimed between binaries.

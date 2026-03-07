@@ -227,7 +227,7 @@ async fn test_invite_and_accept() {
     let invitation_hash = invitation_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // Bob accepts the invitation
     let accept_input = AcceptInvitationInput {
@@ -244,7 +244,7 @@ async fn test_invite_and_accept() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // get_hearth_members should return 2
     let members: Vec<Record> = alice_conductor
@@ -327,7 +327,7 @@ async fn test_create_bond_and_query() {
     let invitation_hash = invitation_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // Bob accepts
     let _: Record = bob_conductor
@@ -342,7 +342,7 @@ async fn test_create_bond_and_query() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // Alice creates a bond to Bob
     let bond_input = CreateBondInput {
@@ -494,7 +494,7 @@ async fn test_tend_bond_and_get_health() {
 
     let invitation_hash = invitation_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -508,7 +508,7 @@ async fn test_tend_bond_and_get_health() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice creates a kinship bond to Bob
     let bond_record: Record = alice_conductor
@@ -637,7 +637,7 @@ async fn test_decline_invitation_and_leave_hearth() {
 
     let invitation_hash_1 = invitation_1.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob declines the first invitation
     let _declined: Record = bob_conductor
@@ -648,7 +648,7 @@ async fn test_decline_invitation_and_leave_hearth() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice invites Bob again (second time)
     let invitation_2: Record = alice_conductor
@@ -669,7 +669,7 @@ async fn test_decline_invitation_and_leave_hearth() {
 
     let invitation_hash_2 = invitation_2.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 5. Bob accepts the second invitation
     let membership_record: Record = bob_conductor
@@ -685,7 +685,7 @@ async fn test_decline_invitation_and_leave_hearth() {
 
     let membership_hash = membership_record.action_address().clone();
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 6. Verify 2 members (Alice + Bob)
     let members_before: Vec<Record> = alice_conductor
@@ -711,7 +711,7 @@ async fn test_decline_invitation_and_leave_hearth() {
         )
         .await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 8. get_hearth_members still returns 2 records (the link is still there),
     //    but Bob's membership status is Departed. The count of records

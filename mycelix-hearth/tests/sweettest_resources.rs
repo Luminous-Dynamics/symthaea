@@ -262,7 +262,7 @@ async fn test_lend_and_return_resource() {
     let invitation_hash = invitation_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 3. Bob accepts
     let _: Record = bob_conductor
@@ -277,7 +277,7 @@ async fn test_lend_and_return_resource() {
         .await;
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 4. Alice registers a resource
     let resource_record: Record = alice_conductor
@@ -328,7 +328,7 @@ async fn test_lend_and_return_resource() {
     assert_eq!(loans.len(), 1, "Resource should have exactly 1 loan");
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 7. Bob returns the resource (borrower can return)
     let returned_record: Record = bob_conductor
@@ -473,7 +473,7 @@ async fn test_membership_required_for_register() {
     let hearth_hash = hearth_record.action_address().clone();
 
     // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
     // 2. Bob tries to register a resource -- should fail (not a member)
     let result: Result<Record, _> = bob_conductor
