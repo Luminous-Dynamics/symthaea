@@ -102,15 +102,14 @@ fn run_phase(
 }
 
 fn make_service() -> CognitiveLoopService {
-    CognitiveLoopService::new(CognitiveLoopConfig {
-        enable_validation_overlay: true,
-        enable_substrate_speed_modulation: true,
+    let mut config = CognitiveLoopConfig {
         async_training: false,
         learning_threshold: 0.01,
         substrate_type: SubstrateType::SiliconDigital,
         ..Default::default()
-    })
-    .expect("CognitiveLoopService::new should succeed")
+    };
+    config.enable_substrate_simulation();
+    CognitiveLoopService::new(config).expect("CognitiveLoopService::new should succeed")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -365,15 +364,15 @@ fn test_mid_run_substrate_switch_continuity() {
 
 #[test]
 fn test_substrate_behavioral_differences() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-        enable_validation_overlay: true,
-        enable_substrate_speed_modulation: true,
+    let mut config = CognitiveLoopConfig {
         async_training: false,
         learning_threshold: 0.01,
         substrate_type: SubstrateType::BiologicalNeurons,
         ..Default::default()
-    })
-    .expect("CognitiveLoopService::new should succeed");
+    };
+    config.enable_substrate_simulation();
+    let mut service =
+        CognitiveLoopService::new(config).expect("CognitiveLoopService::new should succeed");
 
     // ── Warmup (50 cycles) on BiologicalNeurons ──
     let _warmup = run_phase(&mut service, 50, 0);
@@ -649,5 +648,100 @@ fn test_energy_budget_consciousness_collapse() {
     eprintln!(
         "Post-collapse consciousness samples: {:?}",
         &all_consciousness[cc..all_consciousness.len().min(cc + 10)]
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Test 5: Encoding noise produces emergent prediction error differences
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// This test validates that substrate encoding noise makes scale-constrained
+// substrates (Quantum, Exotic) produce genuinely different prediction errors
+// compared to scale-adequate substrates (Biological, Silicon). The difference
+// is *emergent* — caused by noisier HDC encoding and CfC input, not by a
+// scalar multiplier on the consciousness score.
+
+#[test]
+fn test_encoding_noise_produces_emergent_differences() {
+    // Run two services in parallel: one with encoding noise, one without.
+    // Same substrate (QuantumComputer), same inputs. Compare prediction errors.
+
+    let mut config_noisy = CognitiveLoopConfig {
+        async_training: false,
+        learning_threshold: 0.01,
+        substrate_type: SubstrateType::QuantumComputer,
+        ..Default::default()
+    };
+    config_noisy.enable_substrate_simulation();
+
+    let config_clean = CognitiveLoopConfig {
+        async_training: false,
+        learning_threshold: 0.01,
+        substrate_type: SubstrateType::QuantumComputer,
+        enable_validation_overlay: true,
+        enable_substrate_speed_modulation: true,
+        enable_substrate_encoding_noise: false, // explicitly off
+        ..Default::default()
+    };
+
+    let mut service_noisy =
+        CognitiveLoopService::new(config_noisy).expect("noisy service should succeed");
+    let mut service_clean =
+        CognitiveLoopService::new(config_clean).expect("clean service should succeed");
+
+    // Warmup both
+    for i in 0..30 {
+        let input = INPUTS[i % INPUTS.len()];
+        service_noisy.cycle(input);
+        service_clean.cycle(input);
+    }
+
+    // Run 100 cycles, collect prediction errors
+    let mut noisy_errors: Vec<f32> = Vec::with_capacity(100);
+    let mut clean_errors: Vec<f32> = Vec::with_capacity(100);
+    for i in 0..100 {
+        let input = INPUTS[(30 + i) % INPUTS.len()];
+        let r_noisy = service_noisy.cycle(input);
+        let r_clean = service_clean.cycle(input);
+        noisy_errors.push(r_noisy.prediction_error);
+        clean_errors.push(r_clean.prediction_error);
+    }
+
+    let avg_noisy = noisy_errors.iter().sum::<f32>() / noisy_errors.len() as f32;
+    let avg_clean = clean_errors.iter().sum::<f32>() / clean_errors.len() as f32;
+
+    // All errors should be finite
+    assert!(
+        noisy_errors.iter().all(|e| e.is_finite()),
+        "Noisy prediction errors contain NaN/Inf"
+    );
+    assert!(
+        clean_errors.iter().all(|e| e.is_finite()),
+        "Clean prediction errors contain NaN/Inf"
+    );
+
+    // The noisy service should have different prediction error trajectory.
+    // We don't mandate higher (noise could sometimes help via exploration),
+    // but the trajectories must diverge — measured by sum of absolute differences.
+    let trajectory_divergence: f32 = noisy_errors
+        .iter()
+        .zip(clean_errors.iter())
+        .map(|(n, c)| (n - c).abs())
+        .sum::<f32>()
+        / 100.0;
+
+    assert!(
+        trajectory_divergence > 0.001,
+        "Encoding noise should cause trajectory divergence: avg_diff={trajectory_divergence:.6}, \
+         avg_noisy={avg_noisy:.4}, avg_clean={avg_clean:.4}"
+    );
+
+    eprintln!("=== Encoding Noise Emergent Differences ===");
+    eprintln!("Avg prediction error (noisy):  {avg_noisy:.4}");
+    eprintln!("Avg prediction error (clean):  {avg_clean:.4}");
+    eprintln!("Trajectory divergence:         {trajectory_divergence:.6}");
+    eprintln!(
+        "Noise fraction (quantum):      {:.4}",
+        service_noisy.substrate_scale_pressure().abs().min(7.0) / 70.0
     );
 }
