@@ -487,16 +487,16 @@ fn phi_zero_relational_no_oxy() {
 #[test]
 fn phi_trust_grows_with_coherence() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.partner_model = Some(crate::partnership::HumanPartnerModel::new("test_partner"));
-    let initial_trust = service.partner_model.as_ref().unwrap().trust;
+    service.social_mgr.partner_model = Some(crate::partnership::HumanPartnerModel::new("test_partner"));
+    let initial_trust = service.social_mgr.partner_model.as_ref().unwrap().trust;
 
     // Simulate coherence=0.8 → signal = (0.8 - 0.5) * 0.01 = 0.003
-    if let Some(ref mut model) = service.partner_model {
+    if let Some(ref mut model) = service.social_mgr.partner_model {
         let signal = (0.8f64 - 0.5) * 0.01;
         model.trust = ((model.trust as f64 + signal).clamp(0.0, 1.0) * 0.999) as f32;
     }
 
-    let final_trust = service.partner_model.as_ref().unwrap().trust;
+    let final_trust = service.social_mgr.partner_model.as_ref().unwrap().trust;
     assert!(
         final_trust > initial_trust,
         "high coherence should grow trust: before={}, after={}",
@@ -510,15 +510,15 @@ fn phi_trust_decays_slowly() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let mut partner = crate::partnership::HumanPartnerModel::new("test");
     partner.trust = 0.5;
-    service.partner_model = Some(partner);
+    service.social_mgr.partner_model = Some(partner);
 
     // Simulate coherence=0 → signal = (0.0 - 0.5) * 0.01 = -0.005
-    if let Some(ref mut model) = service.partner_model {
+    if let Some(ref mut model) = service.social_mgr.partner_model {
         let signal = (0.0f64 - 0.5) * 0.01;
         model.trust = ((model.trust as f64 + signal).clamp(0.0, 1.0) * 0.999) as f32;
     }
 
-    let final_trust = service.partner_model.as_ref().unwrap().trust;
+    let final_trust = service.social_mgr.partner_model.as_ref().unwrap().trust;
     assert!(
         final_trust < 0.5,
         "zero coherence should decrease trust: {}",

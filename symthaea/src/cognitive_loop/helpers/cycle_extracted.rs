@@ -109,7 +109,7 @@ impl CognitiveLoopService {
     /// Uses temporal signature pattern, prosody valence, and average prediction
     /// error to select Reflex / Cortical / DeepThought processing depth.
     pub(in crate::cognitive_loop) fn update_cognitive_depth(&mut self) {
-        let prior_pattern = self.temporal_signature_encoder.classify_state().0;
+        let prior_pattern = self.voice_coherence.temporal.classify_state().0;
         let prior_valence = self.emotion_contagion.prosody_valence();
         let prior_error = self.stats.avg_prediction_error;
         self.cognitive_depth =
@@ -375,15 +375,15 @@ impl CognitiveLoopService {
     /// dyad + interoceptive body + embodied cognition. Clamps to [0.0, 1.0].
     /// Updates the unification engine with the result.
     pub(in crate::cognitive_loop) fn compute_unified_psi(&mut self) -> f64 {
-        let coherence_psi = self.coherence_bridge.phi_contribution();
-        let voice_psi = self.voice_feedback_bridge.summary().phi_adjustment;
+        let coherence_psi = self.voice_coherence.bridge.phi_contribution();
+        let voice_psi = self.voice_coherence.voice.summary().phi_adjustment;
         let flow_psi = if self.flow_state.in_flow {
             self.flow_state.intensity * FLOW_PSI_WEIGHT
         } else {
             0.0
         };
-        let relational_psi_contrib = if self.social.relational_psi > 0.0 {
-            self.social.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
+        let relational_psi_contrib = if self.social_mgr.social.relational_psi > 0.0 {
+            self.social_mgr.social.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
         } else {
             0.0
         };
@@ -441,10 +441,10 @@ impl CognitiveLoopService {
 
         let enriched_reward = internal_reward + fep_bonus;
 
-        let cycle_reward = if self.social.external_reward.abs() > f32::EPSILON {
+        let cycle_reward = if self.social_mgr.social.external_reward.abs() > f32::EPSILON {
             let blended = enriched_reward * REWARD_EXTERNAL_BLEND
-                + self.social.external_reward * REWARD_EXTERNAL_BLEND;
-            self.social.external_reward = 0.0; // consume
+                + self.social_mgr.social.external_reward * REWARD_EXTERNAL_BLEND;
+            self.social_mgr.social.external_reward = 0.0; // consume
             blended
         } else {
             enriched_reward

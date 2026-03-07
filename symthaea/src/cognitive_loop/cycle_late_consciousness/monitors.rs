@@ -261,8 +261,8 @@ impl CognitiveLoopService {
                     ctx.surprise_triggered,
                     ctx.unified_psi,
                     moral_score,
-                    self.social.social_trust,
-                    self.social.social_cooperation_rate,
+                    self.social_mgr.social.social_trust,
+                    self.social_mgr.social.social_cooperation_rate,
                     0.0, // peer_valence: future — aggregate from social inbox
                 );
                 (affect.valence, affect.arousal)

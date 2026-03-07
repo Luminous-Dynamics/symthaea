@@ -249,7 +249,7 @@ impl CognitiveLoopService {
             };
 
         // ── Social trust → learning rate modulation (Decety & Chaminade 2003) ──
-        let social_learning_rate_factor = 0.8 + 0.4 * self.social.social_trust; // [0.8, 1.2]
+        let social_learning_rate_factor = 0.8 + 0.4 * self.social_mgr.social.social_trust; // [0.8, 1.2]
         if (social_learning_rate_factor - 1.0).abs() > 0.01 {
             self.scale_lr("social_trust", social_learning_rate_factor);
         }
@@ -691,8 +691,8 @@ impl CognitiveLoopService {
 
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
-        if self.recent_ai_hvs.len() >= 2 {
-            if let (Some(ref dyad), Some(ref model)) = (&self.phi_dyad, &self.partner_model) {
+        if self.social_mgr.recent_ai_hvs.len() >= 2 {
+            if let (Some(ref dyad), Some(ref model)) = (&self.social_mgr.phi_dyad, &self.social_mgr.partner_model) {
                 use symthaea_core::hdc::relational_consciousness::{
                     RelationMode, RelationalAssessment,
                 };
@@ -714,14 +714,14 @@ impl CognitiveLoopService {
                     explanation: String::new(),
                 };
                 let input = crate::partnership::DyadInput {
-                    ai_states: &self.recent_ai_hvs,
-                    human_states: &self.recent_input_hvs,
+                    ai_states: &self.social_mgr.recent_ai_hvs,
+                    human_states: &self.social_mgr.recent_input_hvs,
                     relational: &relational,
                     human_model: model,
                     weights: crate::partnership::DyadWeights::default(),
                 };
                 let result = dyad.compute(&input);
-                self.social.relational_psi = result.phi_dyad;
+                self.social_mgr.social.relational_psi = result.phi_dyad;
 
                 // Phi divergence → exploration (novel relational territory)
                 // Science: Friston (2010) — high divergence = high epistemic value
@@ -742,7 +742,7 @@ impl CognitiveLoopService {
 
         // Trust evolution from cycle coherence (Bowlby 1969)
         // Coherence > 0.5 builds trust, < 0.5 erodes it; slow decay prevents runaway
-        if let Some(ref mut model) = self.partner_model {
+        if let Some(ref mut model) = self.social_mgr.partner_model {
             let signal = (dynamics.core.coherence as f64 - 0.5) * 0.01;
             model.trust = ((model.trust as f64 + signal).clamp(0.0, 1.0) * 0.999) as f32;
         }

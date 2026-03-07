@@ -358,7 +358,7 @@ impl CognitiveLoopService {
             #[cfg(feature = "liquid-mamba")]
             liquid_mamba_generation_count: self.stats.liquid_mamba_generation_count,
             // Partnership / Phi-Dyad
-            relational_psi: self.social_coherence.social.relational_psi,
+            relational_psi: self.social_mgr.social.relational_psi,
             // Resonant Speech: response profile from neuromod bath signals.
             response_profile: {
                 let user_state = crate::resonant_speech::UserState::from_neuromod(
@@ -427,13 +427,13 @@ impl CognitiveLoopService {
             metadata.smoothed_epistemic_uncertainty;
 
         // ── Social coherence telemetry ──
-        metadata.social_trust_current = self.social.social_trust;
-        metadata.social_cooperation_current = self.social.social_cooperation_rate;
+        metadata.social_trust_current = self.social_mgr.social.social_trust;
+        metadata.social_cooperation_current = self.social_mgr.social.social_cooperation_rate;
         metadata.social_strategy_bias_applied = perception.strategy.social_strategy_bias;
         metadata.social_learning_rate_factor = feedback.social_learning_rate_factor;
-        metadata.social_prediction_accuracy = self.social.social_prediction_accuracy;
-        metadata.social_models_count = self.social.social_models_count;
-        metadata.social_mean_trust = self.social.social_mean_trust;
+        metadata.social_prediction_accuracy = self.social_mgr.social.social_prediction_accuracy;
+        metadata.social_models_count = self.social_mgr.social.social_models_count;
+        metadata.social_mean_trust = self.social_mgr.social.social_mean_trust;
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
@@ -466,11 +466,11 @@ impl CognitiveLoopService {
 
         // ── Voice telemetry ──
         {
-            let voice_summary = self.voice_feedback_bridge.summary();
-            metadata.voice_articulation_quality = self.voice_feedback_bridge.smoothed_articulation();
-            metadata.voice_rate_stability = self.voice_feedback_bridge.rate_stability();
+            let voice_summary = self.voice_coherence.voice.summary();
+            metadata.voice_articulation_quality = self.voice_coherence.voice.smoothed_articulation();
+            metadata.voice_rate_stability = self.voice_coherence.voice.rate_stability();
             metadata.voice_confidence = voice_summary.voice_confidence;
-            metadata.voice_phi_adjustment = self.voice_feedback_bridge.compute_phi_adjustment();
+            metadata.voice_phi_adjustment = self.voice_coherence.voice.compute_phi_adjustment();
         }
 
         // ── Substrate & convergence telemetry ──

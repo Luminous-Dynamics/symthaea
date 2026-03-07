@@ -118,7 +118,7 @@ impl CognitiveLoopService {
         self.carryover
             .history
             .cached_coherence
-            .unwrap_or_else(|| self.coherence_bridge.smoothed_coherence())
+            .unwrap_or_else(|| self.voice_coherence.bridge.smoothed_coherence())
     }
 
     /// Recall memories similar to input
