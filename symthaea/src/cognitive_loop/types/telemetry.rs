@@ -806,6 +806,68 @@ pub struct CycleMetadata {
     /// Broca SSM language generation telemetry (None when ssm_language feature disabled or not active).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub broca: Option<BrocaGenerationTelemetry>,
+
+    // ── Adaptive Dynamics Telemetry (Sessions 2-4) ───────────────────────
+    /// Epistemic uncertainty: prediction disagreement across horizons (0.0–1.0).
+    /// High = model uncertain (reducible by exploration).
+    #[serde(default)]
+    pub epistemic_uncertainty: f32,
+    /// Aleatoric uncertainty: per-dimension prediction variance (0.0–1.0).
+    /// High = inherent data noise (not reducible).
+    #[serde(default)]
+    pub aleatoric_uncertainty: f32,
+    /// Theta oscillation phase (0–2π). Gates temporal binding strength.
+    #[serde(default)]
+    pub theta_phase: f32,
+    /// Temporal binding strength after theta + salience gating (0.0–1.0).
+    #[serde(default)]
+    pub temporal_binding_strength: f32,
+    /// PE-adaptive prediction horizon scale (0.58–1.30).
+    /// <1.0 = contracted (high PE), >1.0 = expanded (low PE).
+    #[serde(default = "default_one_f32")]
+    pub prediction_horizon_scale: f32,
+    /// FEP surprise → CfC tau modulation factor (0.8–1.0).
+    #[serde(default = "default_one_f32")]
+    pub fep_tau_factor: f32,
+    /// CalibrationValidator: total completed validations.
+    #[serde(default)]
+    pub calibration_validations_total: u32,
+    /// CalibrationValidator: improvement count.
+    #[serde(default)]
+    pub calibration_improvements: u32,
+    /// CalibrationValidator: regression count.
+    #[serde(default)]
+    pub calibration_regressions: u32,
+    /// CalibrationValidator: adjustment damping multiplier (1.0 = no damping).
+    #[serde(default = "default_one_f32")]
+    pub calibration_adjustment_multiplier: f32,
+    /// Causal edges incorporated into world model this cycle.
+    #[serde(default)]
+    pub causal_world_model_edges: usize,
+    /// Epistemic uncertainty → attention budget scale factor (0.9–1.3).
+    #[serde(default = "default_one_f32")]
+    pub epistemic_budget_scale: f32,
+    /// Feedback signals fired this cycle (sum of all proposal collectors).
+    #[serde(default)]
+    pub feedback_signals_fired: u32,
+    /// Error trend slope over last 4 cycles (positive = worsening).
+    #[serde(default)]
+    pub error_slope: f32,
+    /// Oscillation ratio of recent error history (0.0–1.0, high = unstable).
+    #[serde(default)]
+    pub oscillation_ratio: f32,
+    /// Cumulative urgency mode transitions since start.
+    #[serde(default)]
+    pub mode_transitions: u32,
+    /// Smoothed epistemic uncertainty (EMA, 0.0–1.0).
+    #[serde(default)]
+    pub smoothed_epistemic_uncertainty: f32,
+    /// High-water mark of feedback signals in any single cycle.
+    #[serde(default)]
+    pub feedback_signals_high_water: u32,
+    /// Self-assessment adaptive cooldown duration (cycles).
+    #[serde(default)]
+    pub calibration_cooldown_duration: u32,
 }
 
 fn default_response_profile() -> String {

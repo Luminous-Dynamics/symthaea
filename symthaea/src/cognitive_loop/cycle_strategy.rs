@@ -44,6 +44,8 @@ pub(crate) struct EncodingPhaseResult {
     pub(crate) prediction_coherence_urgency_bias: f32,
     pub(crate) prediction_error: f32,
     pub(crate) temporal_binding_strength: f32,
+    pub(crate) error_slope: f32,
+    pub(crate) oscillation_ratio: f32,
 }
 
 impl CognitiveLoopService {
@@ -199,7 +201,8 @@ impl CognitiveLoopService {
             if !recent.is_empty() {
                 // Theta oscillation: simulate 6Hz rhythm at 50Hz loop rate.
                 // Phase advances ~0.75 rad/cycle (6Hz × 2π / 50Hz ≈ 0.754 rad).
-                let theta_phase = (self.stats.total_cycles as f64 * 0.754)
+                let theta_phase = (self.stats.total_cycles as f64
+                    * super::thresholds::THETA_PHASE_ADVANCE)
                     % (2.0 * std::f64::consts::PI);
                 // Theta weight: [0, 1] — peaks = strong binding, troughs = weak
                 let theta_weight = ((theta_phase.sin() + 1.0) / 2.0) as f32;
@@ -454,6 +457,8 @@ impl CognitiveLoopService {
         let error_pattern = urgency_result.error_pattern;
         let predicted_urgency = urgency_result.predicted_urgency;
         let prediction_coherence_urgency_bias = urgency_result.prediction_coherence_urgency_bias;
+        let error_slope = urgency_result.error_slope;
+        let oscillation_ratio = urgency_result.oscillation_ratio;
 
         EncodingPhaseResult {
             encoding_result,
@@ -473,6 +478,8 @@ impl CognitiveLoopService {
             prediction_coherence_urgency_bias,
             prediction_error,
             temporal_binding_strength,
+            error_slope,
+            oscillation_ratio,
         }
     }
 }

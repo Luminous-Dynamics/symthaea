@@ -1,5 +1,108 @@
     use super::*;
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // CalibrationValidator tests (Item #9 from previous session)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_validator_default_no_damping() {
+        let v = CalibrationValidator::default();
+        assert_eq!(v.total_validations(), 0);
+        assert!((v.adjustment_multiplier() - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_validator_records_improvement() {
+        let mut v = CalibrationValidator::default();
+        // Record pre-calibration: PE=0.5, coherence=0.3, confidence_error=0.2
+        v.record_pre_calibration(0.5, 0.3, 0.2, 100);
+        // Check after settling (100 cycles): PE improved, coherence improved
+        let result = v.check_validation(0.3, 0.5, 0.1, 201);
+        assert_eq!(result, Some(true), "should detect improvement");
+        assert_eq!(v.improvements, 1);
+        assert_eq!(v.regressions, 0);
+    }
+
+    #[test]
+    fn test_validator_records_regression() {
+        let mut v = CalibrationValidator::default();
+        v.record_pre_calibration(0.2, 0.7, 0.05, 100);
+        // Check after settling: PE worsened significantly, coherence worsened
+        let result = v.check_validation(0.5, 0.4, 0.1, 201);
+        assert_eq!(result, Some(false), "should detect regression");
+        assert_eq!(v.regressions, 1);
+    }
+
+    #[test]
+    fn test_validator_settling_period() {
+        let mut v = CalibrationValidator::default();
+        v.record_pre_calibration(0.5, 0.3, 0.2, 100);
+        // Check before settling period elapsed (< 100 cycles)
+        let result = v.check_validation(0.3, 0.5, 0.1, 150);
+        assert_eq!(result, None, "should wait for settling period");
+        assert_eq!(v.total_validations(), 0);
+    }
+
+    #[test]
+    fn test_validator_regression_damping() {
+        let mut v = CalibrationValidator::default();
+        // Simulate 4 regressions, 0 improvements → should trigger damping
+        for i in 0..4 {
+            let cycle_base = i * 200;
+            v.record_pre_calibration(0.2, 0.7, 0.05, cycle_base as u64);
+            v.check_validation(0.5, 0.4, 0.1, (cycle_base + 101) as u64);
+        }
+        assert!(v.regressions >= 3);
+        assert!(v.regression_damping > 0.0, "damping should be active after multiple regressions");
+        assert!(v.adjustment_multiplier() < 1.0, "multiplier should reduce adjustments");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Adaptive calibration cadence tests (Item #3)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_adapt_sensitivity_good_ratio_reduces_cooldown() {
+        let mut monitor = SelfAssessmentMonitor::default();
+        let original = monitor.cooldown_duration;
+        monitor.adapt_sensitivity(0.7); // >0.5 → reduce cooldown
+        assert!(monitor.cooldown_duration < original,
+            "good improvement ratio should reduce cooldown: {} < {}", monitor.cooldown_duration, original);
+    }
+
+    #[test]
+    fn test_adapt_sensitivity_bad_ratio_increases_cooldown() {
+        let mut monitor = SelfAssessmentMonitor::default();
+        let original = monitor.cooldown_duration;
+        monitor.adapt_sensitivity(0.2); // <0.3 → increase cooldown
+        assert!(monitor.cooldown_duration > original,
+            "bad improvement ratio should increase cooldown: {} > {}", monitor.cooldown_duration, original);
+    }
+
+    #[test]
+    fn test_adapt_sensitivity_neutral_no_change() {
+        let mut monitor = SelfAssessmentMonitor::default();
+        let original = monitor.cooldown_duration;
+        monitor.adapt_sensitivity(0.4); // 0.3..0.5 → no change
+        assert_eq!(monitor.cooldown_duration, original);
+    }
+
+    #[test]
+    fn test_adapt_sensitivity_floor_cap() {
+        let mut monitor = SelfAssessmentMonitor::default();
+        // Repeatedly reduce → should hit floor of 200
+        for _ in 0..100 {
+            monitor.adapt_sensitivity(0.9);
+        }
+        assert!(monitor.cooldown_duration >= 200, "cooldown floor is 200");
+
+        // Repeatedly increase → should hit cap of 2000
+        for _ in 0..100 {
+            monitor.adapt_sensitivity(0.1);
+        }
+        assert!(monitor.cooldown_duration <= 2000, "cooldown cap is 2000");
+    }
+
     #[test]
     fn test_calibration_from_z_scores() {
         let z_scores = vec![

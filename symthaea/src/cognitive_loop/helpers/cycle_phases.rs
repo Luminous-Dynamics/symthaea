@@ -49,6 +49,8 @@ pub(in crate::cognitive_loop) struct UrgencyResult {
     pub error_pattern: &'static str,
     pub predicted_urgency: &'static str,
     pub prediction_coherence_urgency_bias: f32,
+    pub error_slope: f32,
+    pub oscillation_ratio: f32,
 }
 
 /// Result from the cycle init and preprocessing phase.

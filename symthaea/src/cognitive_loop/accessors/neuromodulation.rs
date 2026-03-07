@@ -218,7 +218,7 @@ impl CognitiveLoopService {
     ///
     /// Use sparingly — normal flow waits for sleep→wake transition.
     pub fn apply_pending_calibration(&mut self) {
-        if let Some(cal) = self.neuromod.pending_calibration.take() {
+        if let Some(mut cal) = self.neuromod.pending_calibration.take() {
             // Record in history before applying (captures the intended adjustment)
             self.neuromod.calibration_history.record(&cal, self.stats.total_cycles as u64);
 
@@ -249,11 +249,31 @@ impl CognitiveLoopService {
                 }
             }
 
+            // Record pre-calibration metrics for closed-loop validation.
+            // Powers & Cisek (2021): closed-loop neuromodulation requires outcome monitoring.
+            self.neuromod.calibration_validator.record_pre_calibration(
+                self.stats.avg_prediction_error as f64,
+                self.coherence_bridge.smoothed_coherence().into(),
+                self.neuromod.self_assessment.confidence_error_ema(),
+                self.stats.total_cycles as u64,
+            );
+
+            // Scale calibration adjustments by validator's damping multiplier.
+            // If previous calibrations caused regressions, dampen future ones.
+            let damping = self.neuromod.calibration_validator.adjustment_multiplier();
+            if damping < 1.0 {
+                for adj in &mut cal.adjustments {
+                    // Move factor toward 1.0 (neutral) by damping proportion
+                    adj.sensitivity_factor = 1.0 + (adj.sensitivity_factor - 1.0) * damping;
+                }
+                tracing::info!(damping, "Calibration adjustments dampened by validator");
+            }
+
             cal.apply(&mut self.neuromod.bath);
             // Apply confidence delta (routed through feedback proposal system).
             // Note: adjust_confidence clamps to [0.01, 0.99], so the 0.01 floor
             // is inherently preserved — no separate .max(0.01) bypass needed.
-            self.adjust_confidence("neuromod_calibration", cal.confidence_delta);
+            self.adjust_confidence("neuromod_calibration", cal.confidence_delta * damping);
             let summary = cal.summary();
             tracing::info!(%summary, "Neuromod calibration applied");
             self.neuromod.last_calibration_summary = Some(summary);

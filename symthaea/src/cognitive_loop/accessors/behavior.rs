@@ -349,4 +349,40 @@ impl CognitiveLoopService {
     pub fn set_relational_psi(&mut self, psi: f64) {
         self.social.relational_psi = psi;
     }
+
+    /// Inject a Mycelix ConsciousnessProfile back into the cognitive loop,
+    /// closing the bidirectional consciousness bridge.
+    ///
+    /// Forward path:  Symthaea C_unified → Mycelix engagement dimension
+    /// Reverse path:  Mycelix 4D profile → Symthaea social state + neuromod
+    ///
+    /// Mapping:
+    /// - `community` → `social_trust` (peer trust attestations → social trust)
+    /// - `reputation` → `social_cooperation_rate` (cross-hApp rep → cooperation)
+    /// - `combined_score` → `social_mean_trust` (overall profile → mean trust)
+    /// - `identity` → `social_prediction_accuracy` (verification → confidence)
+    ///
+    /// When neuromodulators are available, `community` also modulates oxytocin
+    /// (social bonding hormone scales with peer trust).
+    pub fn inject_mycelix_profile(
+        &mut self,
+        identity: f64,
+        reputation: f64,
+        community: f64,
+        engagement: f64,
+    ) {
+        let combined = identity * 0.25 + reputation * 0.25 + community * 0.30 + engagement * 0.20;
+
+        self.social.social_trust = (community as f32).clamp(0.0, 1.0);
+        self.social.social_cooperation_rate = (reputation as f32).clamp(0.0, 1.0);
+        self.social.social_mean_trust = (combined as f32).clamp(0.0, 1.0);
+        self.social.social_prediction_accuracy = (identity as f32).clamp(0.0, 1.0);
+
+        // Modulate oxytocin from community dimension (social bonding).
+        // Community trust maps to 0.0–0.3 oxytocin injection (conservative range).
+        let oxy_dose = (community * 0.3).clamp(0.0, 0.3) as f32;
+        if oxy_dose > 0.01 {
+            self.neuromod.bath.inject("oxytocin", oxy_dose, 50);
+        }
+    }
 }

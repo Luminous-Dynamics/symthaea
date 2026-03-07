@@ -220,6 +220,9 @@ pub(crate) struct FeedbackState {
     /// Last computed consensus result (set by `end_cycle()`).
     pub last_consensus: Option<ConsensusResult>,
 
+    /// High-water mark of total feedback proposals in any single cycle.
+    pub feedback_signals_high_water: u32,
+
     // ── Deferred consensus writeback ────────────────────────────────────
     /// Consensus confidence to apply via helper at the start of the next cycle.
     /// Stored by `store_consensus_for_next_cycle()`, consumed by `apply_pending_consensus()`.
@@ -248,6 +251,7 @@ impl FeedbackState {
             last_exploration_integration: None,
             last_threshold_integration: None,
             last_consensus: None,
+            feedback_signals_high_water: 0,
             pending_consensus_confidence: None,
             pending_consensus_lr: None,
             pending_consensus_exploration: None,
@@ -279,6 +283,12 @@ impl FeedbackState {
         let base_exploration = self.cycle_start_exploration;
         let base_threshold = self.cycle_start_threshold;
 
+        // Update high-water mark of feedback signals per cycle
+        let total_this_cycle = self.total_proposals() as u32;
+        if total_this_cycle > self.feedback_signals_high_water {
+            self.feedback_signals_high_water = total_this_cycle;
+        }
+
         let conf_result = self.confidence.integrate(base_confidence, 0.0, 1.0);
         let lr_result = self.learning_rate.integrate(base_lr, 1.0, 3.0);
         let explore_result = self.exploration.integrate(base_exploration, 0.0, 1.0);
@@ -295,6 +305,29 @@ impl FeedbackState {
         self.last_lr_integration = Some(lr_result);
         self.last_exploration_integration = Some(explore_result);
         self.last_threshold_integration = Some(thresh_result);
+
+        // Adaptive dampening: if consensus diverges >30% from cycle-start on any
+        // channel, dampen toward cycle-start by 50%. Prevents feedback runaway.
+        // Kelso (1995): metastable dynamics resist abrupt transitions.
+        let dampen = |consensus_val: f64, start_val: f64| -> f64 {
+            if start_val.abs() < 1e-10 {
+                return consensus_val;
+            }
+            let ratio = (consensus_val - start_val).abs() / start_val.abs().max(0.1);
+            if ratio > 0.3 {
+                // Blend 50% toward cycle-start
+                consensus_val * 0.5 + start_val * 0.5
+            } else {
+                consensus_val
+            }
+        };
+        let consensus = ConsensusResult {
+            consensus_confidence: dampen(consensus.consensus_confidence, base_confidence),
+            consensus_lr: dampen(consensus.consensus_lr, base_lr),
+            consensus_exploration: dampen(consensus.consensus_exploration, base_exploration),
+            consensus_threshold: dampen(consensus.consensus_threshold, base_threshold),
+        };
+
         self.last_consensus = Some(consensus);
 
         consensus

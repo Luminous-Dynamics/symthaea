@@ -91,6 +91,9 @@ pub(crate) struct UrgencyState {
     /// Remaining cycles of anomaly drift recovery (0 = not active).
     /// Science: Turrigiano (2008) — homeostatic plasticity engages for fixed duration.
     pub(crate) anomaly_drift_recovery: u32,
+    /// Consecutive cycles with prediction coherence < 0.2.
+    /// Science: Bar (2009) — sustained incoherence signals model failure, demands reallocation.
+    pub(crate) consecutive_low_coherence: u32,
 }
 
 impl Default for UrgencyState {
@@ -106,6 +109,7 @@ impl Default for UrgencyState {
             mode_stability_counter: 0,
             discontinuity_streak: 0,
             anomaly_drift_recovery: 0,
+            consecutive_low_coherence: 0,
         }
     }
 }
@@ -191,6 +195,8 @@ pub(crate) struct QualityMetrics {
     /// Last moral score from perception phase (cached for neuromod feedback).
     /// Science: Zak (2012) — moral sentiment drives oxytocin/DA pathways.
     pub(crate) last_moral_score: f32,
+    /// EMA-smoothed epistemic uncertainty (alpha=0.2, damps single-cycle noise).
+    pub(crate) smoothed_epistemic_uncertainty: f32,
 }
 
 impl Default for QualityMetrics {
@@ -220,6 +226,7 @@ impl Default for QualityMetrics {
             last_grid_complexity: 0.0,
             prev_confidence_for_crash: 0.5,
             last_moral_score: 0.0,
+            smoothed_epistemic_uncertainty: 0.0,
         }
     }
 }

@@ -165,7 +165,18 @@ impl CognitiveLoopService {
         let _ = self.temporal_network.step(&input_array, delta_t);
 
         // 5. Multi-scale prediction
-        let (prediction, _raw_predictions) = self.get_multi_scale_prediction(&input_array);
+        let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
+
+        // 5b. Use prediction coherence as confidence signal
+        if raw_predictions.len() >= 2 {
+            let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
+            // High agreement → boost confidence, low → reduce
+            if coh > 0.8 {
+                self.adjust_confidence("embed_pred_coherence_high", (coh - 0.8) * 0.1);
+            } else if coh < 0.4 {
+                self.scale_confidence("embed_pred_coherence_low", 1.0 - (0.4 - coh) * 0.15);
+            }
+        }
 
         // 6. Read CfC output state
         let output = self
@@ -276,7 +287,17 @@ impl CognitiveLoopService {
         let _ = self.temporal_network.step(&input_array, delta_t);
 
         // 3. Multi-scale prediction
-        let (prediction, _raw_predictions) = self.get_multi_scale_prediction(&input_array);
+        let (prediction, raw_predictions) = self.get_multi_scale_prediction(&input_array);
+
+        // 3b. Use prediction coherence as confidence signal
+        if raw_predictions.len() >= 2 {
+            let coh = Self::compute_prediction_coherence_from_cache(&raw_predictions);
+            if coh > 0.8 {
+                self.adjust_confidence("hv_pred_coherence_high", (coh - 0.8) * 0.1);
+            } else if coh < 0.4 {
+                self.scale_confidence("hv_pred_coherence_low", 1.0 - (0.4 - coh) * 0.15);
+            }
+        }
 
         // 4. Read CfC output state
         let output = self

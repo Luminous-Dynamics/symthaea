@@ -329,6 +329,8 @@ impl CognitiveLoopService {
                 predicted_urgency: encoding.predicted_urgency,
                 prediction_coherence_urgency_bias: encoding.prediction_coherence_urgency_bias,
                 prediction_error: encoding.prediction_error,
+                error_slope: encoding.error_slope,
+                oscillation_ratio: encoding.oscillation_ratio,
             },
             startup_suppressed,
             startup_warmup_progress,
