@@ -16,7 +16,7 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use symthaea_seven_harmonies::{SevenHarmonies, Harmony};
+//! use symthaea_harmonies::{SevenHarmonies, Harmony};
 //!
 //! let mut harmonies = SevenHarmonies::new();
 //! let result = harmonies.evaluate("install firefox");

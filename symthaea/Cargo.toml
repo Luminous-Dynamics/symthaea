@@ -21,7 +21,7 @@ members = [
     "crates/symthaea-exploration",
     "crates/symthaea-wisdom",
     "crates/symthaea-types",
-    "crates/symthaea-seven-harmonies",
+    "crates/symthaea-harmonies",
     "crates/symthaea-consciousness-resonance",
     "crates/symthaea-embeddings",
     "crates/symthaea-observability",
@@ -144,7 +144,7 @@ symthaea-consciousness-topology = { path = "crates/symthaea-consciousness-topolo
 symthaea-exploration = { path = "crates/symthaea-exploration" }
 symthaea-wisdom = { path = "crates/symthaea-wisdom" }
 symthaea-types = { path = "crates/symthaea-types" }
-symthaea-seven-harmonies = { path = "crates/symthaea-seven-harmonies" }
+symthaea-harmonies = { path = "crates/symthaea-harmonies" }
 symthaea-consciousness-resonance = { path = "crates/symthaea-consciousness-resonance" }
 symthaea-embeddings = { path = "crates/symthaea-embeddings" }
 symthaea-ssm = { path = "crates/symthaea-ssm", optional = true }
@@ -420,6 +420,7 @@ identity = ["ed25519-dalek", "dep:sha2"]        # Ed25519 signatures, capability
 physics = ["dep:symthaea-physics"]           # Tokamak plasma encoding, C-Mod adapter
 flight = ["dep:symthaea-flight"]            # HDC-LTC quadrotor flight control via FEP Active Inference
 flight-mujoco = ["flight", "symthaea-flight/mujoco"]   # Flight control with MuJoCo physics
+flight-mujoco-renderer = ["flight-mujoco", "symthaea-flight/mujoco-renderer"]  # Offscreen MuJoCo rendering for video capture
 flight-swarm = ["flight", "symthaea-flight/swarm"]     # Parallel swarm training via MuJoCo + rayon
 humanoid = ["dep:symthaea-humanoid"]       # HDC-LTC bipedal humanoid control via FEP Active Inference (DMC benchmark)
 hal = ["dep:symthaea-hal", "humanoid"]    # Hardware abstraction layer (PCA9685 servos, I2C sensors, safety interlocks)
@@ -561,6 +562,11 @@ required-features = ["api_module"]
 name = "symthaea-story"
 path = "src/bin/symthaea-story.rs"
 
+[[bin]]
+name = "code-gen-smoke"
+path = "src/bin/code_gen_smoke.rs"
+required-features = ["code_generation"]
+
 # Examples
 # Examples that need cfg-gated modules are marked with required-features
 # They won't be built by default until the required modules are fixed
@@ -590,6 +596,10 @@ required-features = ["flight-mujoco"]
 [[example]]
 name = "mujoco_swarm_training"
 required-features = ["flight-swarm"]
+
+[[example]]
+name = "moral_drone_video"
+required-features = ["flight-mujoco-renderer"]
 
 [[example]]
 name = "kinetic_sacrifice"
