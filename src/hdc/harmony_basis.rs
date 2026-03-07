@@ -1,7 +1,7 @@
-//! Shared Seven Harmonies basis vectors for moral geometry.
+//! Shared Eight Harmonies basis vectors for moral geometry.
 //!
 //! Provides semantically grounded 16,384-dim `ContinuousHV` basis vectors for
-//! the Seven Harmonies, built by encoding keyword sets through `TextHdcEncoder`.
+//! the Eight Harmonies, built by encoding keyword sets through `TextHdcEncoder`.
 //! These replace the random embeddings previously used in `HarmoniesIntegrator`
 //! and unify with the harmony projection in `MoralTopology`.
 //!
@@ -12,7 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_types::Harmony;
+use symthaea_types::{Harmony, N_HARMONIES};
 
 use super::moral_text_encoder::TextHdcEncoder;
 
@@ -21,7 +21,7 @@ use super::moral_text_encoder::TextHdcEncoder;
 /// Each harmony is encoded as the bundle of its keyword set, producing
 /// a ContinuousHV that responds to semantic similarity rather than
 /// arbitrary random projection.
-pub const HARMONY_KEYWORDS: [&str; 7] = [
+pub const HARMONY_KEYWORDS: [&str; N_HARMONIES] = [
     // ResonantCoherence — Integration-Knowing
     "integrate harmonize unify coherent order luminous resonant balance alignment wholeness",
     // PanSentientFlourishing — Care-Knowing
@@ -36,10 +36,12 @@ pub const HARMONY_KEYWORDS: [&str; 7] = [
     "give share contribute reciprocate exchange generous flow mutual upliftment trust",
     // EvolutionaryProgression — Developmental-Knowing
     "grow evolve improve progress develop transcend becoming evolution advancement consciousness",
+    // SacredStillness — Apophatic-Knowing
+    "stillness silence rest surrender void release contemplation emptiness peace presence apophatic",
 ];
 
-/// Seven Harmony basis vectors for projecting moral scenarios into
-/// semantically meaningful 7D coordinates.
+/// Eight Harmony basis vectors for projecting moral scenarios into
+/// semantically meaningful 8D coordinates.
 ///
 /// Each basis vector is built by encoding a harmony's keyword set through
 /// `TextHdcEncoder`, so projection onto (e.g.) `PanSentientFlourishing` is
@@ -47,7 +49,7 @@ pub const HARMONY_KEYWORDS: [&str; 7] = [
 #[derive(Debug, Clone)]
 pub struct HarmonyBasis {
     /// One ContinuousHV per Harmony (indexed by canonical `Harmony::all()` order).
-    pub vectors: [ContinuousHV; 7],
+    pub vectors: [ContinuousHV; N_HARMONIES],
     /// HDC dimension.
     pub dim: usize,
 }
@@ -60,14 +62,19 @@ impl HarmonyBasis {
             .iter()
             .map(|kw| encoder.encode(kw))
             .collect();
-        // HARMONY_KEYWORDS is a compile-time [&str; 7], so this always produces
-        // exactly 7 vectors. Use debug_assert for loud failure in dev builds.
-        debug_assert_eq!(vectors.len(), 7, "expected 7 harmony vectors, got {}", vectors.len());
+        // HARMONY_KEYWORDS is a compile-time [&str; N_HARMONIES], so this always produces
+        // exactly N_HARMONIES vectors. Use debug_assert for loud failure in dev builds.
+        debug_assert_eq!(
+            vectors.len(),
+            N_HARMONIES,
+            "expected {N_HARMONIES} harmony vectors, got {}",
+            vectors.len()
+        );
         Self {
             vectors: vectors.try_into().unwrap_or_else(|v: Vec<ContinuousHV>| {
-                // Fallback: re-encode with padding/truncation to guarantee [_; 7]
-                let mut arr = [(); 7].map(|_| ContinuousHV::zero(dim));
-                for (i, hv) in v.into_iter().enumerate().take(7) {
+                // Fallback: re-encode with padding/truncation to guarantee [_; N_HARMONIES]
+                let mut arr = [(); N_HARMONIES].map(|_| ContinuousHV::zero(dim));
+                for (i, hv) in v.into_iter().enumerate().take(N_HARMONIES) {
                     arr[i] = hv;
                 }
                 arr
@@ -76,13 +83,13 @@ impl HarmonyBasis {
         }
     }
 
-    /// Project a scenario HV onto the 7 harmony axes (cosine similarity).
+    /// Project a scenario HV onto the N_HARMONIES harmony axes (cosine similarity).
     ///
-    /// Returns coordinates in `[-1, 1]^7` where each component is the
+    /// Returns coordinates in `[-1, 1]^N_HARMONIES` where each component is the
     /// cosine similarity between the scenario and the corresponding harmony
     /// basis vector. The result is a point in the moral manifold.
-    pub fn project(&self, hv: &ContinuousHV) -> [f64; 7] {
-        let mut coords = [0.0f64; 7];
+    pub fn project(&self, hv: &ContinuousHV) -> [f64; N_HARMONIES] {
+        let mut coords = [0.0f64; N_HARMONIES];
         for (i, basis) in self.vectors.iter().enumerate() {
             coords[i] = hv.similarity(basis) as f64;
         }
@@ -101,8 +108,8 @@ impl HarmonyBasis {
     /// Compute the moral free energy of a scenario projection.
     ///
     /// Moral free energy measures how surprising a scenario is relative to an
-    /// expected distribution over the 7 harmony coordinates. Following the
-    /// Free Energy Principle (Friston 2010), a viable moral system minimizes
+    /// expected distribution over the N_HARMONIES harmony coordinates. Following
+    /// the Free Energy Principle (Friston 2010), a viable moral system minimizes
     /// its average free energy — meaning its actions are predictable and
     /// consistent within its moral manifold.
     ///
@@ -118,21 +125,21 @@ impl HarmonyBasis {
     /// High F → moral surprise (novel moral territory or incoherent stance).
     pub fn moral_free_energy(
         &self,
-        scenario_coords: &[f64; 7],
-        expected_coords: &[f64; 7],
+        scenario_coords: &[f64; N_HARMONIES],
+        expected_coords: &[f64; N_HARMONIES],
         temperature: f64,
     ) -> MoralFreeEnergy {
         let inv_temp = 1.0 / temperature.max(0.01);
 
         // Softmax over harmony coordinates → probability distributions
-        let q = softmax_7(scenario_coords, inv_temp);
-        let p = softmax_7(expected_coords, inv_temp);
+        let q = softmax_n(scenario_coords, inv_temp);
+        let p = softmax_n(expected_coords, inv_temp);
 
         // KL divergence: D_KL(q || p) = sum_i q_i * ln(q_i / p_i)
-        let kl_divergence = kl_div_7(&q, &p);
+        let kl_divergence = kl_div_n(&q, &p);
 
         // Entropy: H(q) = -sum_i q_i * ln(q_i)
-        let entropy = entropy_7(&q);
+        let entropy = entropy_n(&q);
 
         // Free energy: F = D_KL + H
         let free_energy = kl_divergence + entropy;
@@ -172,19 +179,20 @@ pub struct MoralFreeEnergy {
     /// Index of the most active harmony in this scenario.
     pub dominant_harmony_idx: u8,
     /// Softmax distribution over harmonies for the scenario.
-    pub scenario_distribution: [f64; 7],
+    pub scenario_distribution: [f64; N_HARMONIES],
     /// Softmax distribution over harmonies for the prior/expected.
-    pub prior_distribution: [f64; 7],
+    pub prior_distribution: [f64; N_HARMONIES],
 }
 
 impl Default for MoralFreeEnergy {
     fn default() -> Self {
-        let uniform = [1.0 / 7.0; 7];
+        let n = N_HARMONIES as f64;
+        let uniform = [1.0 / n; N_HARMONIES];
         Self {
             free_energy: 0.0,
             kl_divergence: 0.0,
-            entropy: -(7.0_f64 * (1.0 / 7.0) * (1.0 / 7.0_f64).ln()),
-            surprise: -(1.0 / 7.0_f64).ln(),
+            entropy: -(n * (1.0 / n) * (1.0 / n).ln()),
+            surprise: -(1.0 / n).ln(),
             dominant_harmony_idx: 0,
             scenario_distribution: uniform,
             prior_distribution: uniform,
@@ -196,12 +204,12 @@ impl Default for MoralFreeEnergy {
 // Internal helpers
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Softmax over 7 values with inverse temperature.
-fn softmax_7(coords: &[f64; 7], inv_temp: f64) -> [f64; 7] {
+/// Softmax over N_HARMONIES values with inverse temperature.
+fn softmax_n(coords: &[f64; N_HARMONIES], inv_temp: f64) -> [f64; N_HARMONIES] {
     let max_val = coords.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let mut exp_vals = [0.0f64; 7];
+    let mut exp_vals = [0.0f64; N_HARMONIES];
     let mut sum = 0.0;
-    for i in 0..7 {
+    for i in 0..N_HARMONIES {
         exp_vals[i] = ((coords[i] - max_val) * inv_temp).exp();
         sum += exp_vals[i];
     }
@@ -210,15 +218,15 @@ fn softmax_7(coords: &[f64; 7], inv_temp: f64) -> [f64; 7] {
             *v /= sum;
         }
     } else {
-        exp_vals = [1.0 / 7.0; 7];
+        exp_vals = [1.0 / N_HARMONIES as f64; N_HARMONIES];
     }
     exp_vals
 }
 
-/// KL divergence D_KL(q || p) for 7-element distributions.
-fn kl_div_7(q: &[f64; 7], p: &[f64; 7]) -> f64 {
+/// KL divergence D_KL(q || p) for N_HARMONIES-element distributions.
+fn kl_div_n(q: &[f64; N_HARMONIES], p: &[f64; N_HARMONIES]) -> f64 {
     let mut kl = 0.0;
-    for i in 0..7 {
+    for i in 0..N_HARMONIES {
         let qi = q[i].max(1e-12);
         let pi = p[i].max(1e-12);
         kl += qi * (qi / pi).ln();
@@ -226,8 +234,8 @@ fn kl_div_7(q: &[f64; 7], p: &[f64; 7]) -> f64 {
     kl.max(0.0) // numerical safety
 }
 
-/// Entropy H(q) for a 7-element distribution.
-fn entropy_7(q: &[f64; 7]) -> f64 {
+/// Entropy H(q) for an N_HARMONIES-element distribution.
+fn entropy_n(q: &[f64; N_HARMONIES]) -> f64 {
     let mut h = 0.0;
     for &qi in q {
         let qi = qi.max(1e-12);
@@ -247,12 +255,12 @@ mod tests {
     #[test]
     fn test_harmony_basis_creation() {
         let basis = HarmonyBasis::new(256);
-        assert_eq!(basis.vectors.len(), 7);
+        assert_eq!(basis.vectors.len(), N_HARMONIES);
         assert_eq!(basis.dim, 256);
 
         // Basis vectors should be distinct (low pairwise similarity)
-        for i in 0..7 {
-            for j in (i + 1)..7 {
+        for i in 0..N_HARMONIES {
+            for j in (i + 1)..N_HARMONIES {
                 let sim = basis.vectors[i].similarity(&basis.vectors[j]).abs();
                 assert!(
                     sim < 0.9,
@@ -263,11 +271,11 @@ mod tests {
     }
 
     #[test]
-    fn test_project_returns_7d() {
+    fn test_project_returns_nd() {
         let basis = HarmonyBasis::new(256);
         let hv = ContinuousHV::random(256, 99);
         let coords = basis.project(&hv);
-        assert_eq!(coords.len(), 7);
+        assert_eq!(coords.len(), N_HARMONIES);
         for c in &coords {
             assert!(c.is_finite());
             assert!(*c >= -1.0 && *c <= 1.0);
@@ -306,7 +314,7 @@ mod tests {
 
     #[test]
     fn test_moral_free_energy_identical() {
-        let coords = [0.3, 0.8, 0.1, 0.2, 0.5, 0.4, 0.1];
+        let coords = [0.3, 0.8, 0.1, 0.2, 0.5, 0.4, 0.1, 0.2];
         let basis = HarmonyBasis::new(256);
         let fe = basis.moral_free_energy(&coords, &coords, 1.0);
 
@@ -322,8 +330,8 @@ mod tests {
 
     #[test]
     fn test_moral_free_energy_divergent() {
-        let scenario = [0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; // extreme ResonantCoherence
-        let expected = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9]; // extreme EvolutionaryProgression
+        let scenario = [0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]; // extreme ResonantCoherence
+        let expected = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9, 0.0]; // extreme EvolutionaryProgression
         let basis = HarmonyBasis::new(256);
         let fe = basis.moral_free_energy(&scenario, &expected, 1.0);
 
@@ -338,18 +346,19 @@ mod tests {
 
     #[test]
     fn test_softmax_sums_to_one() {
-        let coords = [0.3, 0.8, 0.1, 0.2, 0.5, 0.4, 0.1];
-        let dist = softmax_7(&coords, 1.0);
+        let coords = [0.3, 0.8, 0.1, 0.2, 0.5, 0.4, 0.1, 0.0];
+        let dist = softmax_n(&coords, 1.0);
         let sum: f64 = dist.iter().sum();
         assert!((sum - 1.0).abs() < 1e-10);
     }
 
     #[test]
     fn test_entropy_uniform_is_maximum() {
-        let uniform = [1.0 / 7.0; 7];
-        let peaked = softmax_7(&[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 5.0);
-        let h_uniform = entropy_7(&uniform);
-        let h_peaked = entropy_7(&peaked);
+        let n = N_HARMONIES as f64;
+        let uniform = [1.0 / n; N_HARMONIES];
+        let peaked = softmax_n(&[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], 5.0);
+        let h_uniform = entropy_n(&uniform);
+        let h_peaked = entropy_n(&peaked);
         assert!(
             h_uniform > h_peaked,
             "Uniform entropy ({h_uniform}) should exceed peaked ({h_peaked})"

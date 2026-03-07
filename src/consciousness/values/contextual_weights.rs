@@ -921,7 +921,7 @@ mod tests {
             .with_weight(Harmony::InfinitePlay, 1.5);
 
         let weights_vec = profile.as_vec();
-        assert_eq!(weights_vec.len(), 7, "Should have 7 harmonies");
+        assert_eq!(weights_vec.len(), 8, "Should have 8 harmonies");
 
         // Find InfinitePlay in the vector
         let play_entry = weights_vec
@@ -986,8 +986,8 @@ mod tests {
 
         assert_eq!(
             all_weights.len(),
-            7,
-            "Should return weights for all 7 harmonies"
+            8,
+            "Should return weights for all 8 harmonies"
         );
 
         // Basic/General should all be close to 1.0

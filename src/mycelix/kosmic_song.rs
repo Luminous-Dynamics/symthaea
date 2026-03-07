@@ -930,7 +930,7 @@ mod tests {
         let mut profile = HarmonicProfile::balanced();
 
         // All should start equal
-        assert!((profile.activation(Harmony::ResonantCoherence) - 1.0 / 7.0).abs() < 0.001);
+        assert!((profile.activation(Harmony::ResonantCoherence) - 1.0 / 8.0).abs() < 0.001);
 
         // Set and verify
         profile.set_activation(Harmony::IntegralWisdom, 0.5);

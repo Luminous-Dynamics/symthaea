@@ -4,16 +4,19 @@
 //! definitions of types that are used across multiple sub-crates, preventing
 //! duplication and ensuring consistency.
 //!
-//! ## Seven Harmonies
+//! ## Eight Harmonies
 //!
-//! The [`Harmony`] enum represents the Seven Primary Harmonies of the Kosmic Song,
+//! The [`Harmony`] enum represents the Eight Primary Harmonies of the Kosmic Song,
 //! used for value alignment, epistemic analysis, and consciousness evaluation.
 
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
 
-/// The Seven Primary Harmonies of Infinite Love
+/// Number of harmonies (Eight Harmonies including Sacred Stillness).
+pub const N_HARMONIES: usize = 8;
+
+/// The Eight Primary Harmonies of Infinite Love
 ///
 /// Each harmony represents both a value dimension AND an epistemic lens
 /// through which knowledge is perceived and evaluated.
@@ -56,11 +59,15 @@ pub enum Harmony {
     /// Evolutionary Progression — Developmental-Knowing
     /// Wise becoming through time, continuous evolution toward greater consciousness
     EvolutionaryProgression,
+
+    /// Sacred Stillness — Apophatic-Knowing
+    /// Rest, silence, release, surrender, the void from which all arises
+    SacredStillness,
 }
 
 impl Harmony {
     /// Get all harmonies in canonical order
-    pub fn all() -> [Harmony; 7] {
+    pub fn all() -> [Harmony; N_HARMONIES] {
         [
             Harmony::ResonantCoherence,
             Harmony::PanSentientFlourishing,
@@ -69,6 +76,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness,
             Harmony::SacredReciprocity,
             Harmony::EvolutionaryProgression,
+            Harmony::SacredStillness,
         ]
     }
 
@@ -86,6 +94,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "Universal Interconnectedness",
             Harmony::SacredReciprocity => "Sacred Reciprocity",
             Harmony::EvolutionaryProgression => "Evolutionary Progression",
+            Harmony::SacredStillness => "Sacred Stillness",
         }
     }
 
@@ -113,6 +122,9 @@ impl Harmony {
             Harmony::EvolutionaryProgression => {
                 "Wise becoming through time, continuous evolution toward greater consciousness"
             }
+            Harmony::SacredStillness => {
+                "Rest, silence, release, surrender, the void from which all arises"
+            }
         }
     }
 
@@ -126,6 +138,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "Does this honor our fundamental connection?",
             Harmony::SacredReciprocity => "Does this participate in the generous flow of giving?",
             Harmony::EvolutionaryProgression => "Does this contribute to wise evolution?",
+            Harmony::SacredStillness => "Does this honor the need for rest, release, and not-knowing?",
         }
     }
 
@@ -140,13 +153,14 @@ impl Harmony {
     /// Weights sum to 1.0.
     pub fn base_weight(&self) -> f32 {
         match self {
-            Harmony::ResonantCoherence => 0.20,
-            Harmony::PanSentientFlourishing => 0.20,
-            Harmony::IntegralWisdom => 0.15,
-            Harmony::InfinitePlay => 0.10,
-            Harmony::UniversalInterconnectedness => 0.15,
-            Harmony::SacredReciprocity => 0.10,
-            Harmony::EvolutionaryProgression => 0.10,
+            Harmony::ResonantCoherence => 0.17,
+            Harmony::PanSentientFlourishing => 0.17,
+            Harmony::IntegralWisdom => 0.13,
+            Harmony::InfinitePlay => 0.09,
+            Harmony::UniversalInterconnectedness => 0.13,
+            Harmony::SacredReciprocity => 0.09,
+            Harmony::EvolutionaryProgression => 0.09,
+            Harmony::SacredStillness => 0.13,
         }
     }
 
@@ -160,6 +174,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "Relational-Knowing",
             Harmony::SacredReciprocity => "Exchange-Knowing",
             Harmony::EvolutionaryProgression => "Developmental-Knowing",
+            Harmony::SacredStillness => "Apophatic-Knowing",
         }
     }
 
@@ -173,6 +188,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "What connections exist?",
             Harmony::SacredReciprocity => "What flows back?",
             Harmony::EvolutionaryProgression => "What is emerging?",
+            Harmony::SacredStillness => "What must be released?",
         }
     }
 
@@ -186,6 +202,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "UI",
             Harmony::SacredReciprocity => "SR",
             Harmony::EvolutionaryProgression => "EP",
+            Harmony::SacredStillness => "SS",
         }
     }
 }
@@ -201,8 +218,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_harmony_all_returns_seven() {
-        assert_eq!(Harmony::all().len(), 7);
+    fn test_harmony_all_returns_expected_count() {
+        assert_eq!(Harmony::all().len(), N_HARMONIES);
     }
 
     #[test]
