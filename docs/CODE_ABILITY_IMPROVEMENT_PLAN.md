@@ -10,9 +10,9 @@ Based on comprehensive review of all subsystems (March 6, 2026).
 | Code Perception | 7/10 | Tree-sitter (Rust/Python/Nix), CodeHDEncoder (16,384D), CodebaseMemory | No dataflow/CFG, types are string labels |
 | Code Planning | 5/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine with 5 code actions | Composition inference, but no deep code reasoning yet |
 | Code Generation | 5/10 | Emitters produce real code (~40 patterns); LLM fallback for `todo!()` bodies | Complex algorithms still need LLM; no SSM distillation yet |
-| Code Verification | 4/10 | CodeVerifier (semantic), tree-sitter (syntax), CodeExecutor (compile check) | No test execution, no behavioral verification |
+| Code Verification | 5/10 | CodeVerifier (semantic), tree-sitter (syntax), CodeExecutor (compile), iterative 3-attempt retry loop with error feedback | No test execution, no behavioral verification |
 | Language Output | 7/10 | LLM Organ translates StructuredThought; CodeContext populated in Phase 3.6 | LLM completion mode for complex bodies |
-| Learning | 6/10 | FEP surprise → LR boost, School lookahead, episodic code cache (32 entries, few-shot) | Episodic retrieval is FIFO, not HDC-similarity; no SSM distillation |
+| Learning | 7/10 | FEP surprise → LR boost, School lookahead, episodic code cache (32 entries), HDC-similarity top-3 retrieval | No SSM distillation yet |
 
 ### Key Discovery: The Plumbing Exists
 
@@ -423,6 +423,37 @@ Added `infer_composed_body()` — detects multi-step operations and chains them:
 - **Extraction**: `extract_number_from_text()` — "first 3" → 3, "top five" → 5
 - Runs before single-pattern matching to avoid premature returns
 - 5 new composition tests (filter+sum, sort+take, filter+count, sort+dedup, number extraction)
+
+## Phase 3d: Iterative Verification + HDC Similarity Retrieval — DONE (2026-03-07)
+
+**Status**: COMPLETE. Verification is now a structured 3-attempt loop; cache retrieval uses HDC similarity.
+
+### 3d.1 HDC Similarity-Based Cache Retrieval
+
+**File**: `src/symthaea.rs` (Phase 3.6)
+
+Replaced naive `cache.clone()` (dumping all 32 entries) with targeted retrieval:
+- Encode query purpose as `ContinuousHV` via `text_to_hv()`
+- Compute cosine similarity against each cached entry's purpose HV
+- Return top-3 entries with similarity > 0.1
+- Avoids borrow conflict by cloning cache into snapshot first
+
+This ensures LLM few-shot context contains RELEVANT examples, not just recent ones.
+
+### 3d.2 Iterative 3-Attempt Verification Loop
+
+**File**: `src/symthaea.rs` (Phase 5.5)
+
+Expanded single-retry into structured `while` loop (`MAX_CODE_RETRIES = 3`):
+
+1. **Tree-sitter pass**: Parse with tree-sitter, verify via HDC round-trip
+   - On failure: inject up to 3 syntax errors as notes, retry with LLM
+2. **Compilation pass**: Run `CodeExecutor` (sandbox compile/eval)
+   - On failure: inject up to 5 compiler errors, instruct "fix ONLY errors"
+3. **Loop tracking**: `attempt`, `tree_sitter_ok`, `compile_ok`, `last_compiled`, `last_simulated`
+
+Each retry includes the attempt number (`RETRY 1/3`, `RETRY 2/3`) for progressive specificity.
+Only stores in episodic cache after BOTH tree-sitter AND compilation pass.
 
 ---
 
