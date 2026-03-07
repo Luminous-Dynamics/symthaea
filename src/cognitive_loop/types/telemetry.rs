@@ -160,6 +160,19 @@ pub struct NeuromodTelemetry {
 /// Fields are organized by domain (see section comments). Neuromod fields
 /// are nested via `#[serde(flatten)] pub neuromod: NeuromodTelemetry`; assign
 /// the snapshot directly to `metadata.neuromod`.
+///
+/// # Diagnostic-only fields (serialized for dashboards, not read internally)
+///
+/// These fields are populated in `cycle_phase_output.rs` and serialized via
+/// `#[derive(Serialize)]` for API/dashboard consumers, but no internal code
+/// reads them after population:
+///
+/// `broca`, `calibration_improvements`, `calibration_regressions`,
+/// `convergence_cycle`, `eq_v2_limiting_component`, `feedback_signals_fired`,
+/// `liquid_mamba_effective_rank`, `liquid_mamba_semantic_pe`,
+/// `phi_validation_cached`, `social_strategy_bias_applied`,
+/// `speech_empathic_count`, `speech_simplified_count`,
+/// `subsystem_integration_contributors`
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CycleMetadata {
     /// Whether the surprise exploration bridge triggered exploration this cycle
@@ -866,6 +879,15 @@ pub struct CycleMetadata {
     /// High-water mark of feedback signals in any single cycle.
     #[serde(default)]
     pub feedback_signals_high_water: u32,
+    /// Number of feedback channels dampened this cycle (0–4).
+    #[serde(default)]
+    pub feedback_dampened_count: u32,
+    /// Feedback signal diversity: unique sources / total proposals (0.0–1.0).
+    #[serde(default = "default_one_f32")]
+    pub feedback_signal_diversity: f32,
+    /// Average PE cost of mode transitions (EMA, 0.0–1.0).
+    #[serde(default)]
+    pub avg_transition_cost: f32,
     /// Self-assessment adaptive cooldown duration (cycles).
     #[serde(default)]
     pub calibration_cooldown_duration: u32,
