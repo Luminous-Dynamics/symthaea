@@ -37,6 +37,9 @@
             sht_2a_signal: 0.5,
             gaba_a_signal: 0.4,
             substrate_feasibility: 1.0,
+            binding_capability: 1.0,
+            workspace_capability: 1.0,
+            attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
         }
@@ -126,6 +129,9 @@
                 sht_2a_signal: 0.5,
                 gaba_a_signal: 0.4,
                 substrate_feasibility: 1.0,
+                binding_capability: 1.0,
+                workspace_capability: 1.0,
+                attention_capability: 1.0,
                 moral_drift: 0.0,
                 moral_anomaly_score: 0.0,
             };
@@ -191,6 +197,9 @@
                 sht_2a_signal: 0.5,
                 gaba_a_signal: 0.4,
                 substrate_feasibility: 1.0,
+                binding_capability: 1.0,
+                workspace_capability: 1.0,
+                attention_capability: 1.0,
                 moral_drift: 0.0,
                 moral_anomaly_score: 0.0,
             };
@@ -257,6 +266,9 @@
             sht_2a_signal: 0.5,
             gaba_a_signal: 0.4,
             substrate_feasibility: 1.0,
+            binding_capability: 1.0,
+            workspace_capability: 1.0,
+            attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
         };
@@ -294,6 +306,9 @@
             sht_2a_signal: 0.5,
             gaba_a_signal: 0.4,
             substrate_feasibility: 1.0,
+            binding_capability: 1.0,
+            workspace_capability: 1.0,
+            attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
         };
@@ -331,6 +346,9 @@
             sht_2a_signal: 0.5,
             gaba_a_signal: 0.4,
             substrate_feasibility: 1.0,
+            binding_capability: 1.0,
+            workspace_capability: 1.0,
+            attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
         };
@@ -369,6 +387,9 @@
             sht_2a_signal: 2.0, // Extreme
             gaba_a_signal: 0.0, // Low
             substrate_feasibility: 1.0,
+            binding_capability: 1.0,
+            workspace_capability: 1.0,
+            attention_capability: 1.0,
             moral_drift: 0.0,
             moral_anomaly_score: 0.0,
         };
@@ -952,6 +973,9 @@
                 sht_2a_signal: 0.5,
                 gaba_a_signal: 0.4,
                 substrate_feasibility: 1.0,
+                binding_capability: 1.0,
+                workspace_capability: 1.0,
+                attention_capability: 1.0,
                 moral_drift: 0.0,
                 moral_anomaly_score: 0.0,
             };

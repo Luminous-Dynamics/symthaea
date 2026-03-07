@@ -419,7 +419,7 @@ impl CognitiveLoopService {
             }
 
             // Topology completeness still provides structural signal:
-            // When fewer than 3 of 7 harmonies explored, boost regardless of F.
+            // When fewer than 3 of 8 harmonies explored, boost regardless of F.
             // This catches cold-start (prior is zero, F is undefined/zero).
             if scenario_count >= 3 && completeness < 0.3 {
                 let structural_boost = (0.3 - completeness) * 0.3; // up to +0.09

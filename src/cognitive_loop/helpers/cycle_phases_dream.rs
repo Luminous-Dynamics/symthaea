@@ -85,6 +85,16 @@ impl CognitiveLoopService {
             } else {
                 20 // base rate
             };
+            // Sacred Stillness modulates dream depth: high SS activation = deeper consolidation
+            // Science: Walker & Stickgold (2006) — rest quality enhances memory consolidation
+            let stillness_depth_factor = if self.stats.circadian_stillness_boost > 0.1 {
+                0.7 // dream more frequently during rest (reduce interval by 30%)
+            } else {
+                1.0
+            };
+            let dynamic_normal_interval =
+                (dynamic_normal_interval as f32 * stillness_depth_factor) as usize;
+            let dynamic_normal_interval = dynamic_normal_interval.max(3); // never faster than every 3 cycles
             if matches!(urgency, super::super::CycleUrgency::Cruise)
                 || urgency.should_run(
                     self.stats.total_cycles,

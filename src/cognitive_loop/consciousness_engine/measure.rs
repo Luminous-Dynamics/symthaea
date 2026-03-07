@@ -42,17 +42,22 @@ impl ConsciousnessEngine {
                 self.cache.last_sigma = phi;
             }
 
-            // Adaptive dimension selection + hierarchical every 194 cycles
+            // Structural hierarchy: compute on every spectral MIP pass (every 97 cycles).
+            // Ensures structural Phi is available within the first 100 cycles for
+            // short benchmarks and cold-start validation.
+            if let Some(ref r) = result {
+                if let Some(structural) =
+                    self.spectral_mip_finder.compute_structural_hierarchy(r)
+                {
+                    self.cache.last_structural_phi = Some(structural);
+                }
+            }
+
+            // Adaptive dimension selection + hierarchical MIP every 194 cycles
+            // (adapt() is expensive — keep at half the structural rate)
             if input.cycle % 194 == 0 {
                 if let Some(ref r) = result {
                     self.spectral_mip_finder.adapt(r);
-
-                    // Structural hierarchy: cluster-level micro/meso/macro decomposition
-                    if let Some(structural) =
-                        self.spectral_mip_finder.compute_structural_hierarchy(r)
-                    {
-                        self.cache.last_structural_phi = Some(structural);
-                    }
                 }
                 if let Some(hier) = self.spectral_mip_finder.compute_hierarchical() {
                     self.cache.last_hierarchical_mip_phi = Some(hier.phi);
@@ -170,9 +175,20 @@ impl ConsciousnessEngine {
                     CoreComponent::Integration,
                     input.unified_psi.clamp(0.0, 1.0),
                 );
-                core_values.insert(CoreComponent::Binding, input.coherence as f64);
-                core_values.insert(CoreComponent::Workspace, input.coherence as f64 * 0.8);
-                core_values.insert(CoreComponent::Attention, input.phi_attention_weight as f64);
+                // Substrate-modulated: binding/workspace/attention capabilities
+                // scale the respective consciousness components.
+                core_values.insert(
+                    CoreComponent::Binding,
+                    input.coherence as f64 * input.binding_capability,
+                );
+                core_values.insert(
+                    CoreComponent::Workspace,
+                    input.coherence as f64 * 0.8 * input.workspace_capability,
+                );
+                core_values.insert(
+                    CoreComponent::Attention,
+                    input.phi_attention_weight as f64 * input.attention_capability,
+                );
                 core_values.insert(CoreComponent::Recursion, 0.5); // Placeholder: HOT depth
                 core_values.insert(CoreComponent::Efficacy, 1.0 - input.prediction_error as f64);
 

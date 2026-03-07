@@ -681,6 +681,23 @@ impl CognitiveLoopConfig {
             ..Default::default()
         }
     }
+
+    /// Enable full substrate simulation: speed modulation, encoding noise,
+    /// validation overlay, and energy budget tracking.
+    ///
+    /// When enabled, switching substrate types via `SubstrateManager::reconfigure_substrate()`
+    /// produces *emergent* behavioral differences:
+    /// - CfC temporal dynamics scale with substrate operation speed (tau_factor)
+    /// - HDC encoding degrades on scale-constrained substrates (bit-flip + Gaussian noise)
+    /// - Consciousness feasibility is tempered by honest evidence confidence
+    /// - Energy budget tracks cumulative joules per substrate
+    pub fn enable_substrate_simulation(&mut self) -> &mut Self {
+        self.enable_substrate_speed_modulation = true;
+        self.enable_substrate_encoding_noise = true;
+        self.enable_validation_overlay = true;
+        self.enable_energy_budget = true;
+        self
+    }
 }
 
 /// Named consciousness profiles that set sensible defaults for module groups.

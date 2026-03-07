@@ -264,6 +264,11 @@ impl ClosedLearningLoop {
         self.exploration_rate
     }
 
+    /// Set exploration rate (clamped to [EXPLORATION_RATE_MIN, 1.0]).
+    pub fn set_exploration_rate(&mut self, rate: f32) {
+        self.exploration_rate = rate.clamp(EXPLORATION_RATE_MIN, 1.0);
+    }
+
     /// Get total interactions
     pub fn total_interactions(&self) -> u64 {
         self.total_interactions

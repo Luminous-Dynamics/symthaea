@@ -72,6 +72,18 @@ impl ProposalCollector {
         &self.proposals
     }
 
+    /// Count unique source names among proposals.
+    #[allow(dead_code)]
+    pub fn unique_sources(&self) -> usize {
+        let mut seen: Vec<&'static str> = Vec::with_capacity(self.proposals.len());
+        for ap in &self.proposals {
+            if !seen.contains(&ap.source) {
+                seen.push(ap.source);
+            }
+        }
+        seen.len()
+    }
+
     /// Dump all proposals as `(source, description)` pairs for trace logging.
     ///
     /// Each entry describes the proposal kind and magnitude, e.g.
@@ -223,6 +235,9 @@ pub(crate) struct FeedbackState {
     /// High-water mark of total feedback proposals in any single cycle.
     pub feedback_signals_high_water: u32,
 
+    /// Number of channels dampened this cycle (0–4).
+    pub feedback_dampened_count: u32,
+
     // ── Deferred consensus writeback ────────────────────────────────────
     /// Consensus confidence to apply via helper at the start of the next cycle.
     /// Stored by `store_consensus_for_next_cycle()`, consumed by `apply_pending_consensus()`.
@@ -252,6 +267,7 @@ impl FeedbackState {
             last_threshold_integration: None,
             last_consensus: None,
             feedback_signals_high_water: 0,
+            feedback_dampened_count: 0,
             pending_consensus_confidence: None,
             pending_consensus_lr: None,
             pending_consensus_exploration: None,
@@ -306,27 +322,37 @@ impl FeedbackState {
         self.last_exploration_integration = Some(explore_result);
         self.last_threshold_integration = Some(thresh_result);
 
-        // Adaptive dampening: if consensus diverges >30% from cycle-start on any
+        // Adaptive dampening: if consensus diverges too much from cycle-start on any
         // channel, dampen toward cycle-start by 50%. Prevents feedback runaway.
         // Kelso (1995): metastable dynamics resist abrupt transitions.
-        let dampen = |consensus_val: f64, start_val: f64| -> f64 {
+        //
+        // Item 3: If most channels were dampened last cycle (>2), tighten threshold
+        // from 30% to 20% — self-tightening prevents sustained runaway.
+        let divergence_threshold = if self.feedback_dampened_count > 2 { 0.2 } else { 0.3 };
+        // Item 2: Low signal diversity → extra dampening blend (60% toward start).
+        let diversity = self.signal_diversity();
+        let blend_toward_start = if diversity < 0.3 { 0.6 } else { 0.5 };
+        let mut dampened_count = 0u32;
+        let dampen = |consensus_val: f64, start_val: f64, count: &mut u32| -> f64 {
             if start_val.abs() < 1e-10 {
                 return consensus_val;
             }
             let ratio = (consensus_val - start_val).abs() / start_val.abs().max(0.1);
-            if ratio > 0.3 {
-                // Blend 50% toward cycle-start
-                consensus_val * 0.5 + start_val * 0.5
+            if ratio > divergence_threshold as f64 {
+                *count += 1;
+                consensus_val * (1.0 - blend_toward_start as f64)
+                    + start_val * blend_toward_start as f64
             } else {
                 consensus_val
             }
         };
         let consensus = ConsensusResult {
-            consensus_confidence: dampen(consensus.consensus_confidence, base_confidence),
-            consensus_lr: dampen(consensus.consensus_lr, base_lr),
-            consensus_exploration: dampen(consensus.consensus_exploration, base_exploration),
-            consensus_threshold: dampen(consensus.consensus_threshold, base_threshold),
+            consensus_confidence: dampen(consensus.consensus_confidence, base_confidence, &mut dampened_count),
+            consensus_lr: dampen(consensus.consensus_lr, base_lr, &mut dampened_count),
+            consensus_exploration: dampen(consensus.consensus_exploration, base_exploration, &mut dampened_count),
+            consensus_threshold: dampen(consensus.consensus_threshold, base_threshold, &mut dampened_count),
         };
+        self.feedback_dampened_count = dampened_count;
 
         self.last_consensus = Some(consensus);
 
@@ -383,6 +409,41 @@ impl FeedbackState {
             + self.learning_rate.len()
             + self.exploration.len()
             + self.threshold.len()
+    }
+
+    /// Return the source name that contributed the most proposals this cycle.
+    /// Ties broken arbitrarily. Returns "" if no proposals.
+    pub fn dominant_source(&self) -> &'static str {
+        let mut counts: Vec<(&'static str, usize)> = Vec::new();
+        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+            for ap in collector.proposals() {
+                if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == ap.source) {
+                    entry.1 += 1;
+                } else {
+                    counts.push((ap.source, 1));
+                }
+            }
+        }
+        counts.iter().max_by_key(|(_, c)| *c).map(|(s, _)| *s).unwrap_or("")
+    }
+
+    /// Feedback signal diversity: unique sources / total proposals.
+    /// High diversity (>0.7) = many subsystems contributing = healthy.
+    /// Low diversity (<0.3) = few subsystems dominating = potential bias.
+    pub fn signal_diversity(&self) -> f32 {
+        let total = self.total_proposals();
+        if total == 0 {
+            return 1.0; // No proposals = maximally diverse (vacuously)
+        }
+        let mut seen: Vec<&'static str> = Vec::with_capacity(total);
+        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+            for ap in collector.proposals() {
+                if !seen.contains(&ap.source) {
+                    seen.push(ap.source);
+                }
+            }
+        }
+        (seen.len() as f32 / total as f32).min(1.0)
     }
 }
 

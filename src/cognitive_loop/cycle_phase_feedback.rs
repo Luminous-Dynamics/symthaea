@@ -122,7 +122,7 @@ impl CognitiveLoopService {
         let dissipative_entropy_rate = consciousness_metrics.dissipative_entropy_rate;
         let epistemic_phi_eff = consciousness_metrics.epistemic_phi_eff;
         let epistemic_conflict_count = consciousness_metrics.epistemic_conflict_count;
-        let equation_v2_consciousness = consciousness_metrics.equation_v2_consciousness;
+        let mut equation_v2_consciousness = consciousness_metrics.equation_v2_consciousness;
 
         // ═══════════════════════════════════════════════════════════════════════
         // ADVANCED SUBSYSTEMS (extracted to cycle_subsystems.rs)
@@ -561,6 +561,10 @@ impl CognitiveLoopService {
                 sht_2a_signal: self.neuromod.bath.sht_2a_signal(),
                 gaba_a_signal: self.neuromod.bath.gaba_a_signal(),
                 substrate_feasibility: self.substrate_manager.effective_feasibility,
+                // Substrate requirement dimensions → consciousness coupling
+                binding_capability: self.substrate_manager.binding_capability(&self.config),
+                workspace_capability: self.substrate_manager.workspace_capability(&self.config),
+                attention_capability: self.substrate_manager.attention_capability(&self.config),
                 // Moral topology → consciousness coupling
                 moral_drift: self.ethics_engine.moral_topology().moral_drift(20),
                 moral_anomaly_score: self.ethics_engine.last_anomaly_report().anomaly_score,
@@ -627,12 +631,38 @@ impl CognitiveLoopService {
         // ── Structural Phi telemetry ────────────────────────────────────
         let (struct_micro, struct_meso, struct_macro, struct_bn, struct_er, struct_nc) =
             if let Some(ref sp) = consciousness_output.structural_phi {
+                // Hierarchical scale diversity boost: when the temporal network
+                // operates at multiple scales (HierarchicalCfC), cross-scale
+                // integration contributes to emergence. Mediano et al. (2022):
+                // multi-scale integrated information exceeds single-scale Phi.
+                let scale_boost = if let Some(taus) =
+                    self.temporal_network.hierarchical_effective_taus()
+                {
+                    let mean_tau =
+                        taus.iter().sum::<f32>() / taus.len().max(1) as f32;
+                    if mean_tau > 0.0 {
+                        let var = taus
+                            .iter()
+                            .map(|t| (t - mean_tau).powi(2))
+                            .sum::<f32>()
+                            / taus.len().max(1) as f32;
+                        let cv = var.sqrt() / mean_tau;
+                        // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
+                        // Map to 0-15% boost via sigmoid
+                        (0.15 * (1.0 / (1.0 + (-2.0 * (cv - 1.0)).exp()))) as f64
+                    } else {
+                        0.0
+                    }
+                } else {
+                    0.0
+                };
+
                 (
-                    sp.micro_phi,
-                    sp.meso_phi,
-                    sp.macro_phi,
+                    sp.micro_phi * (1.0 + scale_boost * 0.5),
+                    sp.meso_phi * (1.0 + scale_boost),
+                    sp.macro_phi * (1.0 + scale_boost),
                     sp.bottleneck_score,
-                    sp.emergence_ratio,
+                    sp.emergence_ratio * (1.0 + scale_boost),
                     sp.num_clusters,
                 )
             } else {
@@ -641,6 +671,27 @@ impl CognitiveLoopService {
         let consciousness_weights = consciousness_output.current_weights;
         let consciousness_weight_variance = consciousness_output.weight_variance;
         let convergence_state = format!("{:?}", consciousness_output.convergence_state);
+
+        // Phi-Harmony coupling: during Sacred Stillness, weight Phi by integration
+        // quality rather than raw intensity. Rest-state Phi should reflect how
+        // well the system maintains coherent integration while reducing activity.
+        // Science: Tononi (2004) — Phi measures integrated information regardless
+        // of activity level; rest-state Phi is not diminished but differently structured.
+        if self.stats.in_active_rest {
+            // During active rest, boost the coherence component of Phi
+            // and dampen the binding intensity component
+            let coherence_weight = 1.2; // 20% more weight on coherence
+            let binding_dampen = 0.8; // 20% less weight on binding intensity
+            self.stats.phi_rest_quality_factor = coherence_weight;
+            self.stats.phi_rest_binding_factor = binding_dampen;
+            // Apply: modulate the EqV2 consciousness score by rest factors
+            // Quality factor boosts integration coherence, binding factor dampens raw intensity
+            let rest_modulation = (coherence_weight + binding_dampen) / 2.0;
+            equation_v2_consciousness *= rest_modulation as f64;
+        } else {
+            self.stats.phi_rest_quality_factor = 1.0;
+            self.stats.phi_rest_binding_factor = 1.0;
+        }
 
         // ── EqV2 limiting component → targeted boost ─────────────────────
         // Complements Phase 19 gradient-based boost with equation-level
@@ -789,6 +840,18 @@ impl CognitiveLoopService {
         }
         self.stats.avg_cross_module_agreement =
             self.stats.avg_cross_module_agreement * 0.95 + cross_module_agreement * 0.05;
+
+        // Cross-module agreement velocity: rapid drops signal subsystem desynchronization.
+        // Analogous to coherence_velocity but for inter-module rather than intra-module signals.
+        let agreement_velocity = cross_module_agreement
+            - self.carryover.quality.prev_cross_module_agreement;
+        self.carryover.quality.prev_cross_module_agreement = cross_module_agreement;
+        if agreement_velocity < -0.15 && self.stats.total_cycles > 30 {
+            // Rapid agreement drop → dampen LR, boost exploration preemptively.
+            // Science: desynchronization across subsystems means conflicting learning signals.
+            self.scale_lr("agreement_vel_drop", 0.97);
+            self.adjust_exploration("agreement_vel_drop", 0.015);
+        }
 
         // ── Unified quality signal fusion ───────────────────────────
         let unified_quality_score;

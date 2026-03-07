@@ -400,6 +400,10 @@ pub struct LoopStats {
     /// Average mode stability duration (EMA, alpha=0.1).
     pub avg_mode_stability: f32,
 
+    /// Average PE spike after mode transitions (EMA, alpha=0.2).
+    /// Science: Kelso (1995) — transitions between attractor states incur transient costs.
+    pub avg_transition_cost: f32,
+
     /// Average self-model accuracy (EMA, alpha=0.1).
     pub avg_self_model_accuracy: f32,
 
@@ -481,6 +485,21 @@ pub struct LoopStats {
     pub avg_serotonin: f32,
     /// Running average acetylcholine effective level (EMA, alpha=0.05).
     pub avg_acetylcholine: f32,
+
+    /// Circadian stillness boost for Sacred Stillness harmony.
+    /// Science: Tononi & Cirelli (2006) — synaptic homeostasis hypothesis;
+    /// rest is not absence of function but active consolidation.
+    pub circadian_stillness_boost: f32,
+
+    /// Consecutive cycles where Sacred Stillness was the dominant harmony.
+    /// When >= ACTIVE_REST_THRESHOLD, the system enters active rest mode.
+    pub stillness_dominance_streak: u16,
+    /// Whether the system is currently in active rest mode.
+    pub in_active_rest: bool,
+    /// Phi quality weighting during active rest (1.0 = normal, 1.2 = rest emphasis).
+    pub phi_rest_quality_factor: f32,
+    /// Phi binding weighting during active rest (1.0 = normal, 0.8 = rest dampen).
+    pub phi_rest_binding_factor: f32,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)

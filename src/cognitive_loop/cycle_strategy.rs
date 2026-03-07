@@ -306,12 +306,18 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 0.5 Phi-Guided Attention Gating
         // ═══════════════════════════════════════════════════════════════════════
-        let phi_attention_weight = if let Some(ref mut gate) = self.phi_attention_gate {
-            let phi_vals = [self.stats.unified_psi as f64];
-            let result = gate.forward(std::slice::from_ref(&encoding_result.hdv), &phi_vals);
-            result.weights.first().copied().unwrap_or(1.0)
-        } else {
-            1.0
+        let phi_attention_weight = {
+            let raw = if let Some(ref mut gate) = self.phi_attention_gate {
+                let phi_vals = [self.stats.unified_psi as f64];
+                let result =
+                    gate.forward(std::slice::from_ref(&encoding_result.hdv), &phi_vals);
+                result.weights.first().copied().unwrap_or(1.0)
+            } else {
+                1.0
+            };
+            // Substrate modulation: attention_capability scales gate gain.
+            // Biological (1.0) = full, biochemical (0.3) = 30% gain.
+            raw * self.substrate_manager.attention_capability(&self.config) as f32
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -353,6 +359,53 @@ impl CognitiveLoopService {
                 raw
             }
         };
+
+        // ── AST Causal Loop: attention self-model modulates perception ────
+        // Graziano (2013): the attention schema is a simplified, predictive
+        // model of the system's own attention process. By injecting the AST
+        // encoding into compressed_state, the system's beliefs about its own
+        // attention causally shape what it perceives next — closing the loop
+        // from observation to top-down control.
+        let compressed_state = if let Some(ref schema) = self.self_model_tier.attention_schema {
+            let ast_encoding = schema.encode_for_thought_vector();
+            let ast_weight = 0.05; // Small modulation — AST guides, doesn't overwhelm
+            let mut modulated = compressed_state;
+            for (i, &ast_val) in ast_encoding.iter().enumerate() {
+                if i < modulated.len() {
+                    modulated[i] += ast_val * ast_weight;
+                }
+            }
+            modulated
+        } else {
+            compressed_state
+        };
+
+        // Substrate encoding noise on compressed state (256D CfC input path).
+        // Mirrors the BinaryHV noise above — constrained substrates get Gaussian
+        // noise on continuous representations too. This ensures the main CfC network
+        // sees degraded input, not just the stability regime primitives.
+        let compressed_state = if self.config.enable_substrate_encoding_noise
+            && self.substrate_manager.scale_pressure < 0.0
+        {
+            let noise_std =
+                (-self.substrate_manager.scale_pressure).min(7.0) / 35.0; // [0.0, 0.2]
+            let seed = self.stats.total_cycles as u64;
+            compressed_state
+                .into_iter()
+                .enumerate()
+                .map(|(i, v)| {
+                    // Simple deterministic pseudo-noise from seed + index
+                    let hash = seed.wrapping_mul(6364136223846793005)
+                        .wrapping_add(i as u64)
+                        .wrapping_mul(1442695040888963407);
+                    let uniform = (hash >> 33) as f32 / (1u64 << 31) as f32 - 1.0; // [-1, 1]
+                    v + uniform * noise_std
+                })
+                .collect()
+        } else {
+            compressed_state
+        };
+
         let (surprise_triggered, exploration_action) =
             self.run_surprise_exploration(&compressed_state);
         module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
@@ -391,6 +444,16 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // UNIFIED ETHICS ENGINE
         // ═══════════════════════════════════════════════════════════════════════
+        // Sacred Stillness neuromod grounding: GABA + adenosine boost SS coordinate.
+        // Science: Bhatt et al. (2020) — GABAergic tone ↔ resting-state activity;
+        // Porkka-Heiskanen et al. (1997) — adenosine accumulation signals rest need.
+        // Circadian stillness from init phase adds to the neurochemical signal.
+        let stillness_boost = {
+            let gaba = self.neuromod.bath.gaba.effective();
+            let adenosine = self.neuromod.bath.adenosine.effective();
+            let neuromod_stillness = (gaba * 0.6 + adenosine * 0.4 - 0.3).clamp(0.0, 0.3);
+            (neuromod_stillness + self.stats.circadian_stillness_boost).clamp(0.0, 0.5)
+        };
         let ethics_output = self
             .ethics_engine
             .evaluate(&super::ethics_engine::EthicsEngineInput {
@@ -398,6 +461,7 @@ impl CognitiveLoopService {
                 cycle: self.stats.total_cycles as u64,
                 unified_psi: self.stats.unified_psi as f64,
                 compressed_state: &compressed_state,
+                stillness_boost,
             });
         module_timings.ethics_engine = ethics_output.total_us;
         module_timings.ethics_engine_moral = ethics_output.moral_us;

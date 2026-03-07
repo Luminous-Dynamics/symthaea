@@ -110,6 +110,11 @@ impl CognitiveLoopService {
                 self.scale_threshold("coherence_vel_drop", 1.0 + severity * 0.2);
                 coherence_velocity_gated = true;
                 self.stats.coherence_velocity_gated_count += 1;
+            } else if coherence_velocity > 0.1 {
+                // Rapidly improving coherence → mild confidence boost (proactive).
+                // Bar (2009): rising prediction consistency signals successful model update.
+                self.adjust_confidence("coherence_vel_rise", 0.01);
+                coherence_velocity_gated = false;
             } else {
                 coherence_velocity_gated = false;
             }
