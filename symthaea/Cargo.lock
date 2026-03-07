@@ -1206,9 +1206,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-rs"
-version = "1.15.4"
+version = "1.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b7b6141e96a8c160799cc2d5adecd5cbbe5054cb8c7c4af53da0f83bb7ad256"
+checksum = "94bffc006df10ac2a68c83692d734a465f8ee6c5b384d8545a636f81d858f4bf"
 dependencies = [
  "aws-lc-sys",
  "zeroize",
@@ -1216,9 +1216,9 @@ dependencies = [
 
 [[package]]
 name = "aws-lc-sys"
-version = "0.37.0"
+version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c34dda4df7017c8db52132f0f8a2e0f8161649d15723ed63fc00c82d0f2081a"
+checksum = "4321e568ed89bb5a7d291a7f37997c2c0df89809d7b6d12062c81ddb54aa782e"
 dependencies = [
  "cc",
  "cmake",
@@ -9382,6 +9382,7 @@ dependencies = [
  "glutin-winit",
  "paste",
  "pkg-config",
+ "png 0.18.0",
  "winit",
 ]
 
@@ -11630,7 +11631,7 @@ version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "itertools 0.14.0",
  "log",
  "multimap",
@@ -13596,7 +13597,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2",
  "quote",
  "syn 2.0.114",
@@ -14097,6 +14098,7 @@ dependencies = [
  "symthaea-foveation",
  "symthaea-genomics",
  "symthaea-hal",
+ "symthaea-harmonies",
  "symthaea-hodge",
  "symthaea-humanoid",
  "symthaea-materials",
@@ -14113,7 +14115,6 @@ dependencies = [
  "symthaea-population",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
- "symthaea-seven-harmonies",
  "symthaea-ssm",
  "symthaea-stt",
  "symthaea-support",
@@ -14387,6 +14388,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-harmonies"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-core",
+ "symthaea-types",
+]
+
+[[package]]
 name = "symthaea-hodge"
 version = "0.1.0"
 
@@ -14635,15 +14645,6 @@ dependencies = [
  "rustfft",
  "symphonia",
  "walkdir",
-]
-
-[[package]]
-name = "symthaea-seven-harmonies"
-version = "0.1.0"
-dependencies = [
- "serde",
- "symthaea-core",
- "symthaea-types",
 ]
 
 [[package]]
