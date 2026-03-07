@@ -209,6 +209,10 @@ fn infer_rust_body(purpose: &str, params: &[(String, String)], return_type: Opti
             return format!("{}.to_lowercase()", params[0].0);
         }
     }
+    // Contains in collection (Vec-specific, before generic string contains)
+    if (purpose_lower.contains("contains") || purpose_lower.contains("includes")) && params.len() == 2 && params[0].1.contains("Vec") {
+        return format!("{}.contains(&{})", params[0].0, params[1].0);
+    }
     if purpose_lower.contains("contains") || purpose_lower.contains("has") {
         if params.len() == 2 {
             return format!("{}.contains({})", params[0].0, params[1].0);
@@ -244,6 +248,28 @@ fn infer_rust_body(purpose: &str, params: &[(String, String)], return_type: Opti
             return format!("{}.ends_with({})", params[0].0, params[1].0);
         }
     }
+    // Repeat string
+    if purpose_lower.contains("repeat") {
+        if params.len() == 2 {
+            return format!("{}.repeat({})", params[0].0, params[1].0);
+        }
+    }
+    // Char at index
+    if purpose_lower.contains("char at") || purpose_lower.contains("nth char") {
+        if params.len() == 2 {
+            return format!("{}.chars().nth({})", params[0].0, params[1].0);
+        }
+    }
+    // Count occurrences in string
+    if purpose_lower.contains("count") && params.len() == 2 && (params[0].1.contains("str") || params[0].1.contains("String")) {
+        return format!("{}.matches({}).count()", params[0].0, params[1].0);
+    }
+    // Capitalize / title case
+    if purpose_lower.contains("capitalize") || purpose_lower.contains("title") {
+        if params.len() == 1 {
+            return format!("let mut c = {}.chars();\n    match c.next() {{\n        None => String::new(),\n        Some(f) => f.to_uppercase().to_string() + &c.as_str().to_lowercase(),\n    }}", params[0].0);
+        }
+    }
 
     // Collection operations
     if purpose_lower.contains("sort") {
@@ -273,6 +299,54 @@ fn infer_rust_body(purpose: &str, params: &[(String, String)], return_type: Opti
         if params.len() == 1 {
             return format!("let mut result = {}.to_vec();\n    result.sort();\n    result.dedup();\n    result", params[0].0);
         }
+    }
+    // Binary search
+    if purpose_lower.contains("binary search") || purpose_lower.contains("bsearch") {
+        if params.len() == 2 {
+            return format!("{}.binary_search(&{}).ok()", params[0].0, params[1].0);
+        }
+    }
+    // Sum of collection
+    if (purpose_lower.contains("sum") || purpose_lower.contains("total")) && params.len() == 1 && params[0].1.contains("Vec") {
+        return format!("{}.iter().sum()", params[0].0);
+    }
+    // Max of collection
+    if (purpose_lower.contains("max") || purpose_lower.contains("largest") || purpose_lower.contains("biggest")) && params.len() == 1 && params[0].1.contains("Vec") {
+        return format!("{}.iter().max().copied()", params[0].0);
+    }
+    // Min of collection
+    if (purpose_lower.contains("min") || purpose_lower.contains("smallest")) && params.len() == 1 && params[0].1.contains("Vec") {
+        return format!("{}.iter().min().copied()", params[0].0);
+    }
+    // Count elements matching condition
+    if purpose_lower.contains("count") && params.len() == 1 && params[0].1.contains("Vec") {
+        return format!("{}.len()", params[0].0);
+    }
+    // Zip two collections
+    if purpose_lower.contains("zip") {
+        if params.len() == 2 {
+            return format!("{}.iter().zip({}.iter()).collect()", params[0].0, params[1].0);
+        }
+    }
+    // Enumerate
+    if purpose_lower.contains("enumerate") || purpose_lower.contains("with index") {
+        if params.len() == 1 {
+            return format!("{}.iter().enumerate().collect()", params[0].0);
+        }
+    }
+    // Take first N
+    if (purpose_lower.contains("take") || purpose_lower.contains("first")) && params.len() == 2 {
+        if params[1].1.contains("usize") || params[1].1.contains("u") || params[1].1.contains("i") {
+            return format!("{}.iter().take({}).cloned().collect()", params[0].0, params[1].0);
+        }
+    }
+    // Skip first N
+    if purpose_lower.contains("skip") && params.len() == 2 {
+        return format!("{}.iter().skip({}).cloned().collect()", params[0].0, params[1].0);
+    }
+    // Chunk/windows
+    if purpose_lower.contains("chunk") && params.len() == 2 {
+        return format!("{}.chunks({}).map(|c| c.to_vec()).collect()", params[0].0, params[1].0);
     }
 
     // Boolean/check operations
@@ -324,6 +398,18 @@ fn infer_rust_body(purpose: &str, params: &[(String, String)], return_type: Opti
     if purpose_lower.contains("square root") || purpose_lower.contains("sqrt") {
         if params.len() == 1 {
             return format!("({} as f64).sqrt()", params[0].0);
+        }
+    }
+    // GCD
+    if purpose_lower.contains("gcd") || purpose_lower.contains("greatest common") {
+        if params.len() == 2 {
+            return format!("let (mut a, mut b) = ({}, {});\n    while b != 0 {{\n        let t = b;\n        b = a % b;\n        a = t;\n    }}\n    a", params[0].0, params[1].0);
+        }
+    }
+    // Average / mean
+    if purpose_lower.contains("average") || purpose_lower.contains("mean") {
+        if params.len() == 1 && params[0].1.contains("Vec") {
+            return format!("{}.iter().sum::<f64>() / {}.len() as f64", params[0].0, params[0].0);
         }
     }
 
@@ -845,6 +931,62 @@ impl CodeEmitter for PythonEmitter {
             } else if purpose_lower.contains("factorial") {
                 parts.push("    import math".to_string());
                 parts.push("    return math.factorial(n)".to_string());
+            } else if purpose_lower.contains("subtract") || purpose_lower.contains("difference") {
+                parts.push("    return a - b".to_string());
+            } else if purpose_lower.contains("multiply") || purpose_lower.contains("product") {
+                parts.push("    return a * b".to_string());
+            } else if purpose_lower.contains("divide") || purpose_lower.contains("quotient") {
+                parts.push("    return a / b".to_string());
+            } else if purpose_lower.contains("maximum") || purpose_lower.contains("max of") || purpose_lower.contains("larger") {
+                parts.push("    return max(a, b)".to_string());
+            } else if purpose_lower.contains("minimum") || purpose_lower.contains("min of") || purpose_lower.contains("smaller") {
+                parts.push("    return min(a, b)".to_string());
+            } else if purpose_lower.contains("absolute") || purpose_lower.contains("abs") {
+                parts.push("    return abs(n)".to_string());
+            } else if purpose_lower.contains("clamp") {
+                parts.push("    return max(min_val, min(max_val, n))".to_string());
+            } else if purpose_lower.contains("contains") || purpose_lower.contains("has") {
+                parts.push("    return needle in haystack".to_string());
+            } else if purpose_lower.contains("concatenate") || purpose_lower.contains("join") {
+                parts.push("    return a + b".to_string());
+            } else if purpose_lower.contains("split") {
+                parts.push("    return s.split(sep)".to_string());
+            } else if purpose_lower.contains("trim") || purpose_lower.contains("strip") {
+                parts.push("    return s.strip()".to_string());
+            } else if purpose_lower.contains("replace") {
+                parts.push("    return s.replace(old, new)".to_string());
+            } else if purpose_lower.contains("starts_with") || purpose_lower.contains("prefix") {
+                parts.push("    return s.startswith(prefix)".to_string());
+            } else if purpose_lower.contains("ends_with") || purpose_lower.contains("suffix") {
+                parts.push("    return s.endswith(suffix)".to_string());
+            } else if purpose_lower.contains("filter") && purpose_lower.contains("even") {
+                parts.push("    return [x for x in items if x % 2 == 0]".to_string());
+            } else if purpose_lower.contains("filter") && purpose_lower.contains("odd") {
+                parts.push("    return [x for x in items if x % 2 != 0]".to_string());
+            } else if purpose_lower.contains("is_empty") {
+                parts.push("    return len(s) == 0".to_string());
+            } else if purpose_lower.contains("is_even") {
+                parts.push("    return n % 2 == 0".to_string());
+            } else if purpose_lower.contains("is_odd") {
+                parts.push("    return n % 2 != 0".to_string());
+            } else if purpose_lower.contains("is_positive") {
+                parts.push("    return n > 0".to_string());
+            } else if purpose_lower.contains("is_negative") {
+                parts.push("    return n < 0".to_string());
+            } else if purpose_lower.contains("fibonacci") {
+                parts.push("    a, b = 0, 1".to_string());
+                parts.push("    for _ in range(n):".to_string());
+                parts.push("        a, b = b, a + b".to_string());
+                parts.push("    return a".to_string());
+            } else if purpose_lower.contains("power") || purpose_lower.contains("pow") {
+                parts.push("    return a ** b".to_string());
+            } else if purpose_lower.contains("sqrt") || purpose_lower.contains("square root") {
+                parts.push("    import math".to_string());
+                parts.push("    return math.sqrt(n)".to_string());
+            } else if purpose_lower.contains("flatten") {
+                parts.push("    return [x for sub in items for x in sub]".to_string());
+            } else if purpose_lower.contains("unique") || purpose_lower.contains("deduplicate") {
+                parts.push("    return list(set(items))".to_string());
             } else if !spec.constraints.is_empty() {
                 for c in &spec.constraints {
                     parts.push(format!("    # {}", c));
