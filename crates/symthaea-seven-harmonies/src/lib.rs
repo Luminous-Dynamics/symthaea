@@ -333,6 +333,11 @@ impl SevenHarmonies {
                 let negative = ["regress", "stagnate", "decline", "deteriorate"];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
+            Harmony::SacredStillness => {
+                let positive = ["rest", "release", "stillness", "silence", "pause", "let go"];
+                let negative = ["rush", "force", "grasp", "cling", "overwhelm"];
+                self.keyword_score(&text_lower, &positive, &negative)
+            }
         };
 
         HarmonyAlignment::new(harmony, score, confidence).with_evidence(evidence)
