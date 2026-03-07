@@ -1073,9 +1073,19 @@ jobs:
         run: cargo test --all
         working-directory: ${{ matrix.lib.path }}
 
+      - name: Run tests (all features)
+        if: steps.check_path.outputs.exists == 'true'
+        run: cargo test --all-features
+        working-directory: ${{ matrix.lib.path }}
+
       - name: Clippy
         if: steps.check_path.outputs.exists == 'true'
         run: cargo clippy -- -D warnings
+        working-directory: ${{ matrix.lib.path }}
+
+      - name: Clippy (all features)
+        if: steps.check_path.outputs.exists == 'true'
+        run: cargo clippy --all-features -- -D warnings
         working-directory: ${{ matrix.lib.path }}
 
   # ============================================================================

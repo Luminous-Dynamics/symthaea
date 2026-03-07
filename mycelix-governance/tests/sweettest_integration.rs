@@ -718,6 +718,8 @@ pub struct SigningCommittee {
     pub min_phi: Option<f64>,
     #[serde(default)]
     pub signature_algorithm: ThresholdSignatureAlgorithm,
+    #[serde(default)]
+    pub pq_required: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -765,6 +767,8 @@ pub struct CreateCommitteeInput {
     pub min_phi: Option<f64>,
     #[serde(default)]
     pub signature_algorithm: Option<ThresholdSignatureAlgorithm>,
+    #[serde(default)]
+    pub pq_required: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

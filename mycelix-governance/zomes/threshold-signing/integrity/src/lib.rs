@@ -69,6 +69,9 @@ pub struct SigningCommittee {
     /// Signature algorithm used by this committee
     #[serde(default)]
     pub signature_algorithm: ThresholdSignatureAlgorithm,
+    /// If true, PQ signature is mandatory (no graceful degradation to ECDSA-only)
+    #[serde(default)]
+    pub pq_required: bool,
 }
 
 /// DKG ceremony phases
@@ -866,6 +869,7 @@ mod tests {
             epoch: 1,
             min_phi: None,
             signature_algorithm: ThresholdSignatureAlgorithm::default(),
+            pq_required: false,
         }
     }
 
@@ -1223,6 +1227,7 @@ mod tests {
             epoch: 1,
             min_phi: Some(0.4),
             signature_algorithm: ThresholdSignatureAlgorithm::default(),
+            pq_required: false,
         };
         assert!(
             check_committee_update_validity(&committee).is_ok(),
@@ -1293,6 +1298,7 @@ mod tests {
             epoch: 1,
             min_phi: Some(0.4),
             signature_algorithm: ThresholdSignatureAlgorithm::default(),
+            pq_required: false,
         };
         assert!(check_committee_update_validity(&committee).is_ok());
 

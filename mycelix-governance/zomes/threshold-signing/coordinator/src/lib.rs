@@ -123,6 +123,7 @@ pub fn create_committee(input: CreateCommitteeInput) -> ExternResult<Record> {
         epoch: 1,
         min_phi: input.min_phi,
         signature_algorithm: input.signature_algorithm.unwrap_or_default(),
+        pq_required: input.pq_required,
     };
 
     let action_hash = create_entry(&EntryTypes::SigningCommittee(committee))?;
@@ -170,6 +171,9 @@ pub struct CreateCommitteeInput {
     /// Signature algorithm (defaults to ECDSA for backwards compatibility)
     #[serde(default)]
     pub signature_algorithm: Option<ThresholdSignatureAlgorithm>,
+    /// If true, PQ signature is mandatory for Hybrid committees (no ECDSA-only fallback)
+    #[serde(default)]
+    pub pq_required: bool,
 }
 
 /// Pure validation for create_committee input — testable without HDK
@@ -603,7 +607,7 @@ pub fn submit_hash_reveal(input: SubmitHashRevealInput) -> ExternResult<Record> 
     let now = sys_time()?;
 
     // Validate the reveal deserializes
-    let _reveal: feldman_dkg::HashReveal = serde_json::from_slice(&input.reveal_bytes)
+    let reveal: feldman_dkg::HashReveal = serde_json::from_slice(&input.reveal_bytes)
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(
             format!("Invalid hash reveal: {}", e)
         )))?;
@@ -621,6 +625,63 @@ pub fn submit_hash_reveal(input: SubmitHashRevealInput) -> ExternResult<Record> 
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Committee must be in Verification phase for reveals, currently in {:?}",
             committee.phase
+        ))));
+    }
+
+    // Verify the reveal's dealer matches a submitted commitment
+    let commitment_anchor = format!("committee:{}", input.committee_id);
+    let commitment_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&commitment_anchor)?,
+            LinkTypes::CommitteeToHashCommitment,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut found_matching_commitment = false;
+    for link in &commitment_links {
+        let ah = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            let commitment: DkgHashCommitment = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid commitment entry".into())))?;
+
+            if commitment.dealer_participant_id == input.participant_id {
+                // Verify the reveal is from the same dealer as the commitment
+                if reveal.dealer.0 != commitment.dealer_participant_id {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Reveal dealer {} doesn't match commitment dealer {}",
+                        reveal.dealer.0, commitment.dealer_participant_id
+                    ))));
+                }
+
+                // Verify the commitment set can be parsed and salt count matches
+                let commitment_set = feldman_dkg::HashCommitmentSet::from_bytes(
+                    &commitment.commitment_set_bytes
+                ).map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                    format!("Failed to parse stored commitment set: {}", e)
+                )))?;
+
+                if reveal.salts.len() != commitment_set.commitments.len() {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Reveal has {} salts but commitment has {} entries",
+                        reveal.salts.len(), commitment_set.commitments.len()
+                    ))));
+                }
+
+                found_matching_commitment = true;
+                break;
+            }
+        }
+    }
+
+    if !found_matching_commitment {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "No hash commitment found for participant {} — cannot reveal without prior commitment",
+            input.participant_id
         ))));
     }
 
@@ -1038,8 +1099,16 @@ pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record>
                         ).map_err(|e| wasm_error!(WasmErrorInner::Guest(
                             format!("Hybrid ML-DSA-65 signature verification failed: {}", e)
                         )))?;
+                    } else if committee.pq_required {
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "PQ attestor required but not registered for this committee epoch".into()
+                        )));
                     }
-                    // If no attestor registered yet, ECDSA-only (graceful degradation)
+                    // If no attestor registered and !pq_required: ECDSA-only (graceful degradation)
+                } else if committee.pq_required {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "PQ signature required for this committee but pq_signature field is missing".into()
+                    )));
                 }
 
                 verified = true;
@@ -1324,6 +1393,7 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
         epoch: current_committee.epoch + 1,
         min_phi: current_committee.min_phi,
         signature_algorithm: current_committee.signature_algorithm,
+        pq_required: current_committee.pq_required,
     };
 
     let new_epoch = current_committee.epoch + 1;
@@ -1749,6 +1819,7 @@ mod tests {
             scope: CommitteeScope::Treasury,
             min_phi: Some(0.4),
             signature_algorithm: None,
+            pq_required: false,
         }
     }
 
@@ -2150,6 +2221,7 @@ mod tests {
             scope: CommitteeScope::All,
             min_phi: Some(0.3),
             signature_algorithm: None,
+            pq_required: false,
         };
         assert!(check_create_committee_input(&create_input).is_ok());
 
@@ -2340,6 +2412,51 @@ mod tests {
             message,
             &signature,
         ).is_ok());
+    }
+
+    #[test]
+    fn test_ml_kem_encrypted_deal_roundtrip() {
+        use feldman_dkg::{Dealer, ParticipantId};
+        use rand::rngs::OsRng;
+
+        // Generate ML-KEM keypairs for 3 recipients
+        let kp1 = feldman_dkg::pq_kem::generate_keypair();
+        let kp2 = feldman_dkg::pq_kem::generate_keypair();
+        let kp3 = feldman_dkg::pq_kem::generate_keypair();
+
+        // Verify EK sizes match what the integrity zome validates (1184 bytes)
+        assert_eq!(kp1.encapsulation_key_bytes().len(), 1184);
+
+        // Generate a real deal
+        let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let deal = dealer.generate_deal();
+
+        // Encrypt with recipient 1's EK
+        let mut encrypt_fn = feldman_dkg::pq_kem::ml_kem_encrypt_fn(
+            &kp1.encapsulation_key_bytes()
+        );
+        let encrypted_deal = feldman_dkg::EncryptedDeal::from_deal(
+            &deal,
+            |recipient, plaintext| encrypt_fn(recipient, plaintext),
+        ).unwrap();
+
+        // Serialize → validate via from_bytes (same path as integrity zome)
+        let deal_bytes = encrypted_deal.to_bytes().unwrap();
+        let parsed = feldman_dkg::EncryptedDeal::from_bytes(&deal_bytes).unwrap();
+        assert_eq!(parsed.dealer.0, 1);
+        assert_eq!(parsed.encrypted_shares.len(), deal.shares.len());
+
+        // Decrypt with recipient 1's DK
+        let mut decrypt_fn = feldman_dkg::pq_kem::ml_kem_decrypt_fn(&kp1.dk);
+        let share0 = &parsed.encrypted_shares[0];
+        let decrypted = decrypt_fn(
+            &share0.encapsulated_key,
+            &share0.nonce,
+            &share0.ciphertext,
+        ).unwrap();
+
+        // Decrypted share should be 32 bytes (a scalar)
+        assert_eq!(decrypted.len(), 32);
     }
 
     #[test]
