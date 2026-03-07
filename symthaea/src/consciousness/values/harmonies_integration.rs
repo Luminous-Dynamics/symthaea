@@ -10,6 +10,7 @@ use std::sync::Arc;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
+use symthaea_types::N_HARMONIES;
 
 /// Configuration for harmonies integration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,6 +37,7 @@ impl Default for HarmoniesIntegrationConfig {
         weights.insert(Harmony::UniversalInterconnectedness, 1.0);
         weights.insert(Harmony::SacredReciprocity, 1.0);
         weights.insert(Harmony::EvolutionaryProgression, 1.0);
+        weights.insert(Harmony::SacredStillness, 1.0);
 
         Self {
             alignment_threshold: 0.7,
@@ -105,7 +107,7 @@ pub struct ValueEvaluation {
     /// Suggestions for improvement
     pub suggestions: Vec<String>,
     /// 7D harmony coordinates (projection onto moral manifold)
-    pub harmony_coordinates: [f64; 7],
+    pub harmony_coordinates: [f64; N_HARMONIES],
     /// Moral free energy decomposition (FEP)
     pub moral_free_energy: MoralFreeEnergy,
 }
@@ -122,7 +124,7 @@ pub struct HarmoniesIntegrator {
     /// Shared semantic basis for harmony projection and free energy
     harmony_basis: Arc<HarmonyBasis>,
     /// Running mean of harmony coordinates (prior for moral free energy)
-    harmony_prior: [f64; 7],
+    harmony_prior: [f64; N_HARMONIES],
     /// Number of evaluations contributing to the prior (for EMA)
     prior_count: u64,
     /// Evaluation history
@@ -174,7 +176,7 @@ impl HarmoniesIntegrator {
             harmonies,
             harmony_embeddings,
             harmony_basis,
-            harmony_prior: [0.0; 7], // uniform prior until data arrives
+            harmony_prior: [0.0; N_HARMONIES], // uniform prior until data arrives
             prior_count: 0,
             history: Vec::new(),
             stats: IntegratorStats::default(),
@@ -231,7 +233,7 @@ impl HarmoniesIntegrator {
         let coords_finite = coords.iter().all(|c| c.is_finite());
         if coords_finite {
             let alpha = if self.prior_count == 0 { 1.0 } else { 0.1 };
-            for i in 0..7 {
+            for i in 0..N_HARMONIES {
                 self.harmony_prior[i] = self.harmony_prior[i] * (1.0 - alpha) + coords[i] * alpha;
             }
         }
@@ -343,6 +345,9 @@ impl HarmoniesIntegrator {
                     Harmony::EvolutionaryProgression => {
                         "Consider how this contributes to evolutionary growth."
                     }
+                    Harmony::SacredStillness => {
+                        "Honor the need for rest, release, and apophatic not-knowing."
+                    }
                 };
                 suggestions.push(suggestion.to_string());
             }
@@ -392,7 +397,7 @@ impl HarmoniesIntegrator {
     }
 
     /// Access the current harmony prior (running mean of coordinates).
-    pub fn harmony_prior(&self) -> &[f64; 7] {
+    pub fn harmony_prior(&self) -> &[f64; N_HARMONIES] {
         &self.harmony_prior
     }
 
@@ -406,7 +411,7 @@ impl HarmoniesIntegrator {
     /// harmony to stabilize.
     pub fn apply_topology_feedback(
         &mut self,
-        harmony_variance: &[f64; 7],
+        harmony_variance: &[f64; N_HARMONIES],
         dominant_harmony_idx: u8,
         completeness: f64,
     ) {
@@ -421,7 +426,7 @@ impl HarmoniesIntegrator {
     /// Extended topology feedback that also considers KL divergence.
     pub fn apply_topology_feedback_with_kl(
         &mut self,
-        harmony_variance: &[f64; 7],
+        harmony_variance: &[f64; N_HARMONIES],
         dominant_harmony_idx: u8,
         completeness: f64,
         kl_divergence: f64,
@@ -429,7 +434,7 @@ impl HarmoniesIntegrator {
         let all = Harmony::all();
 
         // Boost weights for under-represented harmonies (low variance = blind spot)
-        for i in 0..7 {
+        for i in 0..N_HARMONIES {
             let harmony = all[i];
             let weight = self
                 .config
@@ -537,7 +542,7 @@ mod tests {
         }
 
         // Simulate low variance on ResonantCoherence (idx 0) = blind spot
-        let mut variance = [0.1; 7];
+        let mut variance = [0.1; N_HARMONIES];
         variance[0] = 0.0; // blind spot
 
         integrator.apply_topology_feedback(&variance, 3, 0.5);

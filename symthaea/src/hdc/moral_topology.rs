@@ -22,6 +22,7 @@ use symthaea_core::hdc::ContinuousHV;
 
 use super::geometric_ops::{HypersphereOps, PGAResult};
 use super::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
+use symthaea_types::N_HARMONIES;
 use symthaea_hodge::{HodgeLaplacian, SimplicialComplex};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -367,13 +368,13 @@ pub struct MoralTopologyAssessment {
     /// Completeness score: fraction of harmonies with non-trivial variance.
     pub completeness: f64,
     /// 7D harmony coordinates for each scenario in the window.
-    pub harmony_coordinates: Vec<[f64; 7]>,
+    pub harmony_coordinates: Vec<[f64; N_HARMONIES]>,
     /// PGA result on the 7D harmony coordinates.
     pub pga: PGAResult,
     /// Index into `Harmony::all()` of the dominant PGA axis.
     pub dominant_harmony_idx: u8,
     /// Per-harmony variance (indexed by `Harmony::all()` order).
-    pub harmony_variance: [f64; 7],
+    pub harmony_variance: [f64; N_HARMONIES],
     /// Number of scenarios in the window at analysis time.
     pub scenario_count: usize,
     /// Moral free energy (FEP surprise on the harmony manifold).
@@ -432,7 +433,7 @@ pub struct MoralTopology {
     /// Summary from the LATEST `analyze()` call.
     last_summary: MoralTopologySummary,
     /// EMA of harmony coordinates (running prior for moral free energy).
-    harmony_prior: [f64; 7],
+    harmony_prior: [f64; N_HARMONIES],
     /// Number of updates to the prior (0 = uninitialised).
     prior_count: usize,
     /// Cached persistent features from last `analyze()` call.
@@ -447,7 +448,7 @@ pub struct MoralTopology {
 #[derive(Debug, Clone, Serialize)]
 pub struct MoralTrajectoryPoint {
     /// 7D harmony coordinates at this point.
-    pub coordinates: [f64; 7],
+    pub coordinates: [f64; N_HARMONIES],
     /// Moral free energy at this point.
     pub free_energy: f64,
 }
@@ -498,7 +499,7 @@ impl MoralTopology {
             basis,
             prev_summary: MoralTopologySummary::default(),
             last_summary: MoralTopologySummary::default(),
-            harmony_prior: [0.0; 7],
+            harmony_prior: [0.0; N_HARMONIES],
             prior_count: 0,
             last_persistent_features: Vec::new(),
             trajectory: VecDeque::new(),
@@ -524,7 +525,7 @@ impl MoralTopology {
             basis,
             prev_summary: MoralTopologySummary::default(),
             last_summary: MoralTopologySummary::default(),
-            harmony_prior: [0.0; 7],
+            harmony_prior: [0.0; N_HARMONIES],
             prior_count: 0,
             last_persistent_features: Vec::new(),
             trajectory: VecDeque::new(),
@@ -540,7 +541,7 @@ impl MoralTopology {
         // Update harmony prior via EMA before evicting the oldest entry
         let coords = self.basis.project(&hv);
         let alpha = if self.prior_count == 0 { 1.0 } else { 0.05 };
-        for i in 0..7 {
+        for i in 0..N_HARMONIES {
             self.harmony_prior[i] = alpha * coords[i] + (1.0 - alpha) * self.harmony_prior[i];
         }
         self.prior_count += 1;
@@ -612,10 +613,10 @@ impl MoralTopology {
             return 0.0;
         }
         let mid = points.len() / 2;
-        let mean_half = |slice: &[&MoralTrajectoryPoint]| -> [f64; 7] {
-            let mut m = [0.0; 7];
+        let mean_half = |slice: &[&MoralTrajectoryPoint]| -> [f64; N_HARMONIES] {
+            let mut m = [0.0; N_HARMONIES];
             for p in slice {
-                for i in 0..7 {
+                for i in 0..N_HARMONIES {
                     m[i] += p.coordinates[i];
                 }
             }
@@ -628,7 +629,7 @@ impl MoralTopology {
         let first_half = mean_half(&points[mid..]);
         let second_half = mean_half(&points[..mid]);
         let mut dist_sq = 0.0;
-        for i in 0..7 {
+        for i in 0..N_HARMONIES {
             let d = first_half[i] - second_half[i];
             dist_sq += d * d;
         }
@@ -744,12 +745,12 @@ impl MoralTopology {
                 completeness: 0.0,
                 harmony_coordinates: Vec::new(),
                 pga: PGAResult {
-                    mean: vec![0.0; 7],
+                    mean: vec![0.0; N_HARMONIES],
                     principal_directions: Vec::new(),
                     variances: Vec::new(),
                 },
                 dominant_harmony_idx: 0,
-                harmony_variance: [0.0; 7],
+                harmony_variance: [0.0; N_HARMONIES],
                 scenario_count: 0,
                 moral_free_energy: MoralFreeEnergy::default(),
             };
@@ -777,7 +778,7 @@ impl MoralTopology {
         let persistent_features = self.persistent_features(&similarities, n);
 
         // ── Step 5: Harmony projection ──────────────────────────────────
-        let harmony_coordinates: Vec<[f64; 7]> = self
+        let harmony_coordinates: Vec<[f64; N_HARMONIES]> = self
             .window
             .iter()
             .map(|hv| self.basis.project(hv))
@@ -805,7 +806,7 @@ impl MoralTopology {
             HypersphereOps::principal_geodesic_analysis(&points_f64, pga_components)
         } else {
             PGAResult {
-                mean: vec![0.0; 7],
+                mean: vec![0.0; N_HARMONIES],
                 principal_directions: Vec::new(),
                 variances: Vec::new(),
             }
@@ -849,15 +850,15 @@ impl MoralTopology {
         };
         let completeness = {
             let active = harmony_variance.iter().filter(|&&v| v > 1e-6).count();
-            active as f64 / 7.0
+            active as f64 / N_HARMONIES as f64
         };
 
         // ── Step 9: Moral free energy (FEP on harmony manifold) ───────
         let moral_free_energy = {
             // Mean of current window's harmony coordinates
-            let mut mean_coords = [0.0f64; 7];
+            let mut mean_coords = [0.0f64; N_HARMONIES];
             for c in &harmony_coordinates {
-                for i in 0..7 {
+                for i in 0..N_HARMONIES {
                     mean_coords[i] += c[i];
                 }
             }
@@ -1140,12 +1141,12 @@ impl MoralTopology {
     }
 
     /// Compute per-harmony variance across all 7D coordinates.
-    fn harmony_variance(coords: &[[f64; 7]]) -> [f64; 7] {
+    fn harmony_variance(coords: &[[f64; N_HARMONIES]]) -> [f64; N_HARMONIES] {
         let n = coords.len();
         if n == 0 {
-            return [0.0; 7];
+            return [0.0; N_HARMONIES];
         }
-        let mut mean = [0.0f64; 7];
+        let mut mean = [0.0f64; N_HARMONIES];
         for c in coords {
             for (i, v) in c.iter().enumerate() {
                 mean[i] += v;
@@ -1154,7 +1155,7 @@ impl MoralTopology {
         for m in &mut mean {
             *m /= n as f64;
         }
-        let mut var = [0.0f64; 7];
+        let mut var = [0.0f64; N_HARMONIES];
         for c in coords {
             for (i, v) in c.iter().enumerate() {
                 let d = v - mean[i];
@@ -1271,7 +1272,7 @@ mod tests {
     fn test_harmony_basis_low_mutual_similarity() {
         let basis = HarmonyBasis::new(TEST_DIM);
         let mut max_sim = 0.0f32;
-        for i in 0..7 {
+        for i in 0..N_HARMONIES {
             for j in (i + 1)..7 {
                 let sim = basis.vectors[i].similarity(&basis.vectors[j]);
                 if sim > max_sim {

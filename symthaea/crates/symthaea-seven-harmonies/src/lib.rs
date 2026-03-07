@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // Canonical Harmony type from shared types crate
-pub use symthaea_types::Harmony;
+pub use symthaea_types::{Harmony, N_HARMONIES};
 
 /// Alignment result for a single harmony
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,7 +140,7 @@ impl AlignmentResult {
             0.0
         };
 
-        let overall_confidence = total_confidence / 7.0;
+        let overall_confidence = total_confidence / N_HARMONIES as f64;
         let recommended = overall_score > 0.0;
 
         let summary = if overall_score > 0.5 {
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn test_harmony_all() {
         let all = Harmony::all();
-        assert_eq!(all.len(), 7);
+        assert_eq!(all.len(), N_HARMONIES);
     }
 
     #[test]

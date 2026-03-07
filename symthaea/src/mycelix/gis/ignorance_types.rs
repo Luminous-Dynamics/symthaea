@@ -540,12 +540,12 @@ mod tests {
     #[test]
     fn test_harmonic_impact_calculation() {
         let mut hi = HarmonicIgnorance::new(IgnoranceType::KnownUnknown);
-        hi.add_affected_harmony(Harmony::PanSentientFlourishing, 1.0); // weight 0.20
+        hi.add_affected_harmony(Harmony::PanSentientFlourishing, 1.0); // weight 0.17
 
         let impact = hi.total_harmonic_impact();
         assert!(
-            (impact - 0.20).abs() < 0.01,
-            "Impact should be ~0.20, got {}",
+            (impact - 0.17).abs() < 0.01,
+            "Impact should be ~0.17, got {}",
             impact
         );
     }
