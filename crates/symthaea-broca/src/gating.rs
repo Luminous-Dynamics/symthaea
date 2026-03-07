@@ -626,6 +626,118 @@ mod tests {
         );
     }
 
+    // =========================================================================
+    // Edge case tests: NaN/Inf, boundary values, extreme inputs
+    // =========================================================================
+
+    #[test]
+    fn test_epistemic_gate_nan_logits_no_panic() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let gate = EpistemicGate::new(&tok, &config);
+        let mut logits = vec![f32::NAN; tok.vocab_size()];
+        gate.apply(&mut logits, 3.0);
+    }
+
+    #[test]
+    fn test_epistemic_gate_inf_logits_no_panic() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let gate = EpistemicGate::new(&tok, &config);
+        let mut logits = vec![f32::INFINITY; tok.vocab_size()];
+        gate.apply(&mut logits, 3.0);
+    }
+
+    #[test]
+    fn test_epistemic_gate_empty_logits_no_panic() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let gate = EpistemicGate::new(&tok, &config);
+        let mut logits: Vec<f32> = vec![];
+        gate.apply(&mut logits, 3.0);
+    }
+
+    #[test]
+    fn test_epistemic_gate_nan_epistemic_ordinal() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let gate = EpistemicGate::new(&tok, &config);
+        let mut logits = vec![0.5; tok.vocab_size()];
+        gate.apply(&mut logits, f32::NAN);
+    }
+
+    #[test]
+    fn test_epistemic_gate_boundary_ordinals() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let gate = EpistemicGate::new(&tok, &config);
+        for ordinal in [1.5_f32, 2.5, 3.5] {
+            let mut logits = vec![0.5; tok.vocab_size()];
+            gate.apply(&mut logits, ordinal);
+        }
+    }
+
+    #[test]
+    fn test_epistemic_gate_out_of_domain() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let gate = EpistemicGate::new(&tok, &config);
+        let mut logits = vec![0.5; tok.vocab_size()];
+        gate.apply(&mut logits, 4.0); // OutOfDomain
+        let is_id = tok.token_id("is");
+        if is_id != tok.unk_id {
+            assert!(logits[is_id as usize] < 0.5, "Factual tokens penalized under OOD");
+        }
+    }
+
+    #[test]
+    fn test_emotional_modulator_nan_channels_no_panic() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let modulator = EmotionalModulator::new(&tok, &config);
+        let mut channels = ThoughtChannels::default();
+        channels.set_emotion(f32::NAN, f32::NAN, f32::NAN);
+        let mut logits = vec![0.5; tok.vocab_size()];
+        modulator.apply(&mut logits, &channels, 15);
+    }
+
+    #[test]
+    fn test_emotional_modulator_inf_channels_no_panic() {
+        let tok = test_tokenizer();
+        let config = test_config();
+        let modulator = EmotionalModulator::new(&tok, &config);
+        let mut channels = ThoughtChannels::default();
+        channels.set_emotion(f32::INFINITY, f32::NEG_INFINITY, f32::NEG_INFINITY);
+        let mut logits = vec![0.5; tok.vocab_size()];
+        modulator.apply(&mut logits, &channels, 15);
+    }
+
+    #[test]
+    fn test_coherence_feedback_exact_veto_threshold() {
+        let mut feedback = CoherenceFeedback::new(0.3);
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-veto");
+        let hv = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let weight = feedback.update(&hv, &hv);
+        assert!(!feedback.should_veto(), "Self-similar should not veto");
+        assert!((weight - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_consciousness_gated_verbosity_extreme_values() {
+        assert_eq!(consciousness_gated_max_tokens(100, -5.0), 50);
+        assert_eq!(consciousness_gated_max_tokens(100, 5.0), 150);
+        let result = consciousness_gated_max_tokens(100, f32::NAN);
+        assert_eq!(result, 0, "NaN psi → 0 tokens (NaN as usize = 0)");
+    }
+
+    #[test]
+    fn test_consciousness_gated_verbosity_zero_base() {
+        assert_eq!(consciousness_gated_max_tokens(0, 0.5), 0);
+        assert_eq!(consciousness_gated_max_tokens(0, 1.0), 0);
+    }
+
     #[cfg(feature = "mamba")]
     mod backend_tests {
         use super::*;

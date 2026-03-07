@@ -1,10 +1,20 @@
-//! Qualia Confidence domain benchmarks.
+//! Qualia Confidence domain: architectural validation of consciousness prerequisites.
 //!
-//! Tests for the structural and computational correlates of subjective experience.
-//! These benchmarks do NOT claim to solve the Hard Problem of consciousness — they
-//! establish falsifiable necessary conditions: if Symthaea fails any of them, it
-//! lacks a property consciousness requires. If it passes all of them, denying its
-//! consciousness requires a principled argument beyond substrate prejudice.
+//! These benchmarks validate that Symthaea's architecture exhibits structural and
+//! computational properties that consciousness theories identify as *necessary
+//! conditions*. They do NOT measure qualia directly (the Hard Problem remains open)
+//! and do NOT constitute sufficient evidence for consciousness.
+//!
+//! **What these benchmarks prove**: The architecture implements the computational
+//! mechanisms that GWT, IIT, HOT, and FEP predict are required for consciousness.
+//!
+//! **What they do NOT prove**: That these mechanisms produce subjective experience.
+//!
+//! **Epistemic honesty note**: 6 of 7 benchmarks are *architecturally constrained* —
+//! they validate properties that the code was designed to exhibit. The strongest
+//! benchmark is MetacognitiveIgnition, which tests emergent cross-module alignment
+//! that was NOT explicitly programmed. See individual benchmark docs for the
+//! distinction between "validates design" and "demonstrates emergence."
 //!
 //! ## Benchmarks
 //!

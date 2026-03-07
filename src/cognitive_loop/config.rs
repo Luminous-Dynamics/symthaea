@@ -436,6 +436,14 @@ pub struct CognitiveLoopConfig {
     /// Default: false.
     pub enable_substrate_speed_modulation: bool,
 
+    /// Enable substrate encoding noise on HDC representations.
+    /// When enabled, substrates with negative scale_pressure (fewer computational
+    /// units than biological neurons) degrade HDC encoding quality via bit-flip noise.
+    /// This makes substrate differences *emergent* — constrained substrates produce
+    /// noisier representations, leading to higher prediction error and lower Phi.
+    /// Default: false.
+    pub enable_substrate_encoding_noise: bool,
+
     /// Substrate type for consciousness feasibility calculation.
     /// Determines how substrate-specific requirements (causality, integration,
     /// binding, workspace) affect the Consciousness Equation V2 output.
@@ -603,6 +611,7 @@ impl Default for CognitiveLoopConfig {
             enable_validation_overlay: false,
             validation_skepticism_floor: 0.5,
             enable_substrate_speed_modulation: false,
+            enable_substrate_encoding_noise: false,
             substrate_type: SubstrateType::SiliconDigital,
             substrate_composition: None,
             per_region_substrates: None,
