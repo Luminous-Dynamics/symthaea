@@ -174,6 +174,18 @@ pub struct DaemonConfig {
     /// Hebbian learning rate for causal graph.
     #[serde(default = "default_learning_rate")]
     pub learning_rate: f64,
+    /// Ollama API endpoint (default: http://localhost:11434).
+    #[serde(default = "default_ollama_endpoint")]
+    pub ollama_endpoint: String,
+    /// Primary Ollama model to use.
+    #[serde(default = "default_ollama_model")]
+    pub ollama_model: String,
+    /// Ollama request timeout in seconds.
+    #[serde(default = "default_ollama_timeout")]
+    pub ollama_timeout: u64,
+    /// Enable dynamic knowledge learning from resolved incidents.
+    #[serde(default = "default_enable_knowledge_learning")]
+    pub enable_knowledge_learning: bool,
 }
 
 fn default_snapshot_interval() -> u64 {
@@ -194,6 +206,18 @@ fn default_ipc_write_interval() -> u64 {
 fn default_learning_rate() -> f64 {
     0.1
 }
+fn default_ollama_endpoint() -> String {
+    "http://localhost:11434".into()
+}
+fn default_ollama_model() -> String {
+    "gemma3:1b".into()
+}
+fn default_ollama_timeout() -> u64 {
+    30
+}
+fn default_enable_knowledge_learning() -> bool {
+    true
+}
 
 impl Default for DaemonConfig {
     fn default() -> Self {
@@ -204,6 +228,10 @@ impl Default for DaemonConfig {
             journal_batch_size: default_journal_batch_size(),
             ipc_write_interval: default_ipc_write_interval(),
             learning_rate: default_learning_rate(),
+            ollama_endpoint: default_ollama_endpoint(),
+            ollama_model: default_ollama_model(),
+            ollama_timeout: default_ollama_timeout(),
+            enable_knowledge_learning: default_enable_knowledge_learning(),
         }
     }
 }
@@ -368,6 +396,10 @@ mod tests {
         assert_eq!(config.journal_batch_size, 50);
         assert_eq!(config.ipc_write_interval, 10);
         assert!((config.learning_rate - 0.1).abs() < 1e-6);
+        assert_eq!(config.ollama_endpoint, "http://localhost:11434");
+        assert_eq!(config.ollama_model, "gemma3:1b");
+        assert_eq!(config.ollama_timeout, 30);
+        assert!(config.enable_knowledge_learning);
     }
 
     #[test]

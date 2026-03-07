@@ -93,6 +93,32 @@ in {
         '';
       };
     };
+
+    ollama = {
+      endpoint = lib.mkOption {
+        type = lib.types.str;
+        default = "http://localhost:11434";
+        description = "Ollama API endpoint for LLM fallback queries.";
+      };
+
+      model = lib.mkOption {
+        type = lib.types.str;
+        default = "gemma3:1b";
+        description = "Primary Ollama model (approved: gemma3:1b, qwen3:1.7b, gemma3:4b, mistral:7b).";
+      };
+
+      timeout = lib.mkOption {
+        type = lib.types.int;
+        default = 30;
+        description = "Ollama request timeout in seconds.";
+      };
+    };
+
+    knowledgeLearning = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable dynamic knowledge learning from resolved incidents.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -116,6 +142,10 @@ in {
       poll_interval = cfg.pollInterval;
       surprise_threshold = cfg.surpriseThreshold;
       state_dir = cfg.stateDir;
+      ollama_endpoint = cfg.ollama.endpoint;
+      ollama_model = cfg.ollama.model;
+      ollama_timeout = cfg.ollama.timeout;
+      enable_knowledge_learning = cfg.knowledgeLearning;
       support = {
         watchdog = {
           enable = cfg.support.watchdog.enable;

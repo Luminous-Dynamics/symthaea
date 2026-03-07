@@ -23,6 +23,7 @@ use symthaea_nix::mind::{JournalAnomalyDetector, NixWorldModel};
 use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::observe::SystemObserver;
 use symthaea_nix::support::health_check::{HealthAssessor, HealthStatus};
+use symthaea_nix::support::knowledge::{DynamicKnowledgeArticle, KnowledgeBase, KnowledgeCategory};
 use symthaea_nix::support::predictive::{
     AlertThresholds, PredictiveMonitor, SavedPredictiveState, SystemTelemetry,
 };
@@ -44,17 +45,25 @@ struct DaemonState {
     observation_count: u64,
     anomaly_count: u64,
     recent_anomalies: Vec<AnomalyEntry>,
+    knowledge_base: Option<KnowledgeBase>,
 }
 
 impl DaemonState {
-    fn new() -> Self {
+    fn new(enable_knowledge: bool) -> Self {
+        let mut codebook = NixCodebook::new();
         let mut causal_graph = NixCausalGraph::new(42);
         for (cause, effect, _) in NixOSCausalPatterns::known_patterns() {
             causal_graph.add_structural_edge(cause, effect, 0.5);
         }
 
+        let knowledge_base = if enable_knowledge {
+            Some(KnowledgeBase::new(&mut codebook))
+        } else {
+            None
+        };
+
         Self {
-            codebook: NixCodebook::new(),
+            codebook,
             world_model: NixWorldModel::default_dim(),
             causal_graph,
             episodic_memory: NixEpisodicMemory::new(),
@@ -67,7 +76,34 @@ impl DaemonState {
             observation_count: 0,
             anomaly_count: 0,
             recent_anomalies: Vec::new(),
+            knowledge_base,
         }
+    }
+
+    /// Learn from a resolved anomaly by creating a dynamic knowledge article.
+    fn learn_from_resolution(
+        &mut self,
+        symptom: &str,
+        resolution: &str,
+        commands: Vec<String>,
+    ) {
+        let kb = match self.knowledge_base.as_mut() {
+            Some(kb) => kb,
+            None => return,
+        };
+
+        let id = format!("learned_{}", now_secs());
+        let article = DynamicKnowledgeArticle {
+            id,
+            title: format!("Resolved: {}", symptom),
+            category: KnowledgeCategory::ServiceIssue,
+            symptoms: vec![symptom.to_string()],
+            solution: resolution.to_string(),
+            commands,
+            learned_at: now_secs() as i64,
+            hit_count: 0,
+        };
+        kb.add_learned_article(article, &mut self.codebook);
     }
 
     /// Process a system snapshot: encode, detect transitions, learn.
@@ -97,7 +133,7 @@ impl DaemonState {
                 self.causal_graph
                     .observe_outcome(&transitions[0].key, &occurred_keys, &all_keys);
 
-                // Add transitions to working memory
+                // Add transitions to working memory and learn from recoveries
                 for transition in &transitions {
                     let label = format!(
                         "{}: {} → {}",
@@ -109,6 +145,18 @@ impl DaemonState {
                         label,
                     );
                     wm_pushes += 1;
+
+                    // Auto-learn from service recovery: Failed → Active
+                    if transition.is_recovery {
+                        self.learn_from_resolution(
+                            &format!("{} service failure", transition.key),
+                            &format!(
+                                "Service {} recovered automatically ({} → {})",
+                                transition.key, transition.from, transition.to
+                            ),
+                            vec![format!("systemctl status {}", transition.key)],
+                        );
+                    }
                 }
             }
 
@@ -277,6 +325,7 @@ struct StateTransition {
     from: String,
     to: String,
     occurred: bool,
+    is_recovery: bool,
 }
 
 /// Diff two snapshots to find state transitions.
@@ -296,11 +345,14 @@ fn detect_transitions(
     for (name, after_state) in &after.services {
         if let Some(before_state) = before_services.get(name.as_str()) {
             if *before_state != after_state {
+                let is_recovery = **before_state == ServiceState::Failed
+                    && *after_state != ServiceState::Failed;
                 transitions.push(StateTransition {
                     key: name.clone(),
                     from: format!("{:?}", before_state),
                     to: format!("{:?}", after_state),
                     occurred: true,
+                    is_recovery,
                 });
             }
         } else {
@@ -309,6 +361,7 @@ fn detect_transitions(
                 from: "absent".to_string(),
                 to: format!("{:?}", after_state),
                 occurred: true,
+                is_recovery: false,
             });
         }
     }
@@ -320,6 +373,7 @@ fn detect_transitions(
             from: before.generation.map_or("none".into(), |g| g.to_string()),
             to: after.generation.map_or("none".into(), |g| g.to_string()),
             occurred: true,
+            is_recovery: false,
         });
     }
 
@@ -335,7 +389,7 @@ fn now_secs() -> u64 {
 
 fn main() -> ! {
     let config = DaemonConfig::load_default();
-    let mut state = DaemonState::new();
+    let mut state = DaemonState::new(config.enable_knowledge_learning);
     let snapshot_path = default_snapshot_path();
 
     // Restore persisted working memory if available
@@ -348,6 +402,22 @@ fn main() -> ! {
                 "nix-mind-daemon: restored {} working memory items",
                 item_count
             );
+        }
+    }
+
+    // Restore persisted dynamic knowledge articles if available
+    let kb_path = snapshot_path.with_file_name("knowledge_learned.json");
+    if let Ok(json) = std::fs::read_to_string(&kb_path) {
+        if let Some(kb) = state.knowledge_base.as_mut() {
+            let before = kb.dynamic_len();
+            kb.load_dynamic(&json, &mut state.codebook);
+            let loaded = kb.dynamic_len() - before;
+            if loaded > 0 {
+                eprintln!(
+                    "nix-mind-daemon: restored {} learned knowledge articles",
+                    loaded
+                );
+            }
         }
     }
 
@@ -427,6 +497,14 @@ fn main() -> ! {
             let pred_saved = state.predictive_monitor.save();
             if let Ok(json) = serde_json::to_string_pretty(&pred_saved) {
                 let _ = std::fs::write(&pred_path, json);
+            }
+
+            // Persist dynamic knowledge articles
+            if let Some(kb) = &state.knowledge_base {
+                if kb.dynamic_len() > 0 {
+                    let kb_path = snapshot_path.with_file_name("knowledge_learned.json");
+                    let _ = std::fs::write(&kb_path, kb.save_dynamic());
+                }
             }
         }
 

@@ -118,6 +118,10 @@ pub struct App {
     daemon_snapshot_path: std::path::PathBuf,
     /// Last daemon snapshot (if available).
     daemon_snapshot: Option<DaemonSnapshot>,
+    /// Free energy history for sparkline (last 60 samples).
+    fe_history: Vec<f64>,
+    /// Anomaly count history for trend display.
+    anomaly_history: Vec<u64>,
 }
 
 impl App {
@@ -143,6 +147,8 @@ impl App {
             total_count: 0,
             daemon_snapshot_path: ipc::default_snapshot_path(),
             daemon_snapshot: None,
+            fe_history: Vec::with_capacity(60),
+            anomaly_history: Vec::with_capacity(60),
         }
     }
 
@@ -173,8 +179,10 @@ impl App {
 
             if last_tick.elapsed() >= tick_rate {
                 self.tick += 1;
-                // Periodic refresh every ~4 seconds (16 ticks)
-                if self.tick % 16 == 0 {
+                // Refresh faster when daemon is running (every ~2s = 8 ticks),
+                // slower when direct-querying (every ~4s = 16 ticks)
+                let refresh_interval = if self.daemon_snapshot.is_some() { 8 } else { 16 };
+                if self.tick % refresh_interval == 0 {
                     self.refresh_data();
                 }
                 last_tick = Instant::now();
@@ -362,6 +370,16 @@ impl App {
 
     /// Apply daemon snapshot data to TUI state.
     fn apply_daemon_snapshot(&mut self, snap: &DaemonSnapshot) {
+        // Track free energy history for sparkline
+        self.fe_history.push(snap.free_energy);
+        if self.fe_history.len() > 60 {
+            self.fe_history.remove(0);
+        }
+        self.anomaly_history.push(snap.anomaly_count);
+        if self.anomaly_history.len() > 60 {
+            self.anomaly_history.remove(0);
+        }
+
         // Consciousness state from daemon's predictive hierarchy
         self.consciousness = ConsciousnessState {
             phi: snap.free_energy.min(1.0),
@@ -674,13 +692,32 @@ impl App {
         self.draw_output(frame, bottom_chunks[1]);
     }
 
+    /// Render a text-based sparkline of the free energy history.
+    fn fe_sparkline(&self) -> String {
+        if self.fe_history.is_empty() {
+            return String::new();
+        }
+        const SPARKS: &[char] = &[' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}', '\u{2588}'];
+        let max = self.fe_history.iter().cloned().fold(0.01_f64, f64::max);
+        self.fe_history
+            .iter()
+            .map(|v| {
+                let idx = ((v / max) * (SPARKS.len() - 1) as f64).round() as usize;
+                SPARKS[idx.min(SPARKS.len() - 1)]
+            })
+            .collect()
+    }
+
     /// Draw the input bar.
     fn draw_input(&self, frame: &mut ratatui::Frame, area: Rect) {
         let daemon_status = match &self.daemon_snapshot {
-            Some(snap) => format!(
-                " [daemon pid {} | {} obs | {} anomalies]",
-                snap.daemon_pid, snap.observation_count, snap.anomaly_count
-            ),
+            Some(snap) => {
+                let fe_trend = self.fe_sparkline();
+                format!(
+                    " [daemon pid {} | {} obs | {} anomalies | FE:{}]",
+                    snap.daemon_pid, snap.observation_count, snap.anomaly_count, fe_trend
+                )
+            }
             None => " [daemon offline]".to_string(),
         };
         let complexity_tag = format!(" [{}]", self.complexity.name());
