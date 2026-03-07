@@ -24,7 +24,7 @@ impl CognitiveLoopService {
         let _t = Instant::now();
         let (gwt_broadcast, gwt_coalition_size) =
             if ctx.urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut gwt) = self.gwt {
+                if let Some(ref mut gwt) = self.gwt_mgr.gwt {
                     let activation = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
                     // Submit current encoding with activation-weighted salience
                     gwt.submit_strategy(
@@ -572,9 +572,15 @@ impl CognitiveLoopService {
                 broadcast: ctx.coherence as f64, // coherence ~ global workspace broadcast
                 working_memory: self.prefrontal_utilization(),
                 attention: ctx.peak_attention as f64,
-                recurrence: (self.stats.total_cycles.min(100) as f64 / 100.0), // ramp up over 100 cycles
+                // CfC is recurrent from cycle 1 — starting at 0 is dishonest and
+                // crushes the softmin (τ=0.1). Floor at 0.3, ramp to 1.0 over 100 cycles.
+                // Science: Elman (1990) — recurrent networks have temporal integration from t=0.
+                recurrence: (0.3 + 0.7 * self.stats.total_cycles.min(100) as f64 / 100.0),
                 embodiment: late.body_psi_modulation, // virtual body provides embodiment
-                knowledge: self.prediction_confidence,
+                // Floor at 0.2: even with no predictions, the system has SOME knowledge
+                // of its own state. Prevents softmin death spiral where knowledge→0
+                // crushes consciousness, preventing the learning that would raise it.
+                knowledge: self.prediction_confidence.max(0.2),
                 synchrony: (0.3 + self.flow_state.intensity as f64 * 0.7).clamp(0.1, 1.0),
             };
             let level = self.master_equation.compute(&inputs).consciousness_level;

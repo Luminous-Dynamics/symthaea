@@ -395,7 +395,7 @@ impl CognitiveLoopService {
                 // DA-tagged sleep consolidation: Night phase → bigger replay batches
                 // Science: Walker & Stickgold (2006) — DA-tagged memories consolidate during sleep
                 let sleep_boost =
-                    if self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night {
+                    if self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night {
                         let factor = self.neuromod.bath.sleep_consolidation_boost();
                         (base_batch as f32 * (factor - 1.0)).round() as usize
                     } else {

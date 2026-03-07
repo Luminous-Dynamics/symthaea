@@ -73,7 +73,7 @@ impl CognitiveLoopService {
             neuromod_plasticity_gate: self.neuromod.bath.plasticity_gate(),
             neuromod_mcts_exploration_mod: self.neuromod.bath.mcts_exploration_modulation() as f32,
             replay_da_tag_avg: 0.0, // populated by episodic replay phase if applicable
-            circadian_hour: self.biorhythm.hour as f32,
+            circadian_hour: self.biorhythm_mgr.rhythm.hour as f32,
             neuromod_da_d1: self.neuromod.bath.da_d1_effective(),
             neuromod_da_d2: self.neuromod.bath.da_d2_effective(),
             neuromod_ne_alpha: self.neuromod.bath.ne_alpha_effective(),
@@ -110,8 +110,8 @@ impl CognitiveLoopService {
             neuromod_glutamate_effective: self.neuromod.bath.glutamate.effective(),
             neuromod_excitotoxicity_risk: self.neuromod.bath.excitotoxicity_risk(),
             neuromod_learning_fatigue: self.neuromod.bath.learning_fatigue_factor(),
-            circadian_phase_offset: self.biorhythm.phase_offset as f32,
-            circadian_effective_hour: self.biorhythm.effective_hour() as f32,
+            circadian_phase_offset: self.biorhythm_mgr.rhythm.phase_offset as f32,
+            circadian_effective_hour: self.biorhythm_mgr.rhythm.effective_hour() as f32,
             // Phase 5: advanced neuroendocrine dynamics
             neuromod_adenosine_effective: self.neuromod.bath.adenosine.effective(),
             neuromod_sleep_pressure: self.neuromod.bath.sleep_pressure(),
@@ -175,7 +175,7 @@ impl CognitiveLoopService {
     /// Models jet lag / zeitgeber effects (Czeisler et al. 1999).
     /// The phase offset gradually returns to 0 via entrainment each cycle.
     pub fn shift_circadian_phase(&mut self, hours: f64) {
-        self.biorhythm.shift_phase(hours);
+        self.biorhythm_mgr.rhythm.shift_phase(hours);
     }
 
     /// Ingest psych-bench calibration data for deferred application.

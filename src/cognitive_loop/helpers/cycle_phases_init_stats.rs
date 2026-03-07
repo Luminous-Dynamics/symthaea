@@ -15,7 +15,7 @@ impl CognitiveLoopService {
     /// neuromodulator bath update. Run at the very start of each cycle.
     ///
     /// Mutates: `self.stats`, `self.curiosity_drive`, `self.carryover`,
-    /// `self.feedback_state`, `self.subsystem_collector`, `self.biorhythm`,
+    /// `self.feedback_state`, `self.subsystem_collector`, `self.biorhythm_mgr.rhythm`,
     /// `self.neuromod.bath`, `self.somatic_bridge`, `self.emotion_contagion`,
     /// `self.thermodynamic_load`, `self.neuromod.phase_tracker`,
     /// `self.neuromod.drift_tracker`.
@@ -82,16 +82,16 @@ impl CognitiveLoopService {
         self.subsystem_collector.clear();
 
         // Chronobiology: refresh biorhythm every 97 cycles (co-prime amortization)
-        self.biorhythm_refresh_counter += 1;
-        if self.biorhythm_refresh_counter >= super::super::thresholds::BIORHYTHM_INTERVAL {
-            self.biorhythm = crate::chronobiology::Biorhythm::current();
+        self.biorhythm_mgr.refresh_counter += 1;
+        if self.biorhythm_mgr.refresh_counter >= super::super::thresholds::BIORHYTHM_INTERVAL {
+            self.biorhythm_mgr.rhythm = crate::chronobiology::Biorhythm::current();
             // #14: Use effective_hour (with phase offset) for circadian modulation
-            let effective_hour = self.biorhythm.effective_hour();
+            let effective_hour = self.biorhythm_mgr.rhythm.effective_hour();
             self.neuromod
                 .bath
                 .modulate_circadian_continuous(effective_hour);
             // #14: Entrain phase offset toward zero each refresh
-            self.biorhythm.entrain();
+            self.biorhythm_mgr.rhythm.entrain();
             // Record personality profile for drift detection
             let profile = self.neuromod.bath.personality_profile();
             self.neuromod.drift_tracker.record(&profile);
@@ -102,7 +102,7 @@ impl CognitiveLoopService {
                 self.neuromod.bath.engage_anomaly_recovery();
                 self.carryover.urgency.anomaly_drift_recovery = 50;
             }
-            self.biorhythm_refresh_counter = 0;
+            self.biorhythm_mgr.refresh_counter = 0;
         }
         // #4: Countdown and disengage drift recovery
         if self.carryover.urgency.anomaly_drift_recovery > 0 {
@@ -113,7 +113,7 @@ impl CognitiveLoopService {
         }
         // ── Sleep→Wake transition: apply sleep recovery (Xie et al. 2013) ──
         {
-            let is_sleep_now = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            let is_sleep_now = self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             if self.neuromod.was_sleeping && !is_sleep_now {
                 let quality =
                     (self.neuromod.bath.allostatic_recovery_cycles as f32 / 100.0).clamp(0.0, 1.0);
@@ -187,9 +187,19 @@ impl CognitiveLoopService {
 
         // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
         // Halved: bath circadian baselines (Phase 2) provide the other 50%
-        let plasticity_half = 1.0 + (self.biorhythm.plasticity_mod as f32 - 1.0) * 0.5;
+        let plasticity_half = 1.0 + (self.biorhythm_mgr.rhythm.plasticity_mod as f32 - 1.0) * 0.5;
         let circadian_lr = self.stats.adaptive_learning_rate * plasticity_half;
         self.stats.adaptive_learning_rate = circadian_lr.clamp(0.0001, 0.1);
+
+        // Circadian stillness: Night phase naturally elevates Sacred Stillness
+        // Science: Tononi & Cirelli (2006) — synaptic homeostasis hypothesis;
+        // rest is not absence of function but active consolidation.
+        self.stats.circadian_stillness_boost = match self.biorhythm_mgr.rhythm.phase {
+            crate::chronobiology::CircadianPhase::Night => 0.2,
+            crate::chronobiology::CircadianPhase::Dusk => 0.1,
+            crate::chronobiology::CircadianPhase::Dawn => 0.05,
+            _ => 0.0,
+        };
 
         // ═══════════════════════════════════════════════════════════════════════
         // NOCICEPTION: Drain infrastructure errors and convert to felt signals
@@ -239,7 +249,7 @@ impl CognitiveLoopService {
         // Allostatic load accumulation (McEwen 1998)
         {
             let cortisol = self.neuromod.bath.to_hormone_state().cortisol as f32;
-            let is_sleep = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            let is_sleep = self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             self.neuromod
                 .bath
                 .accumulate_allostatic_load(cortisol, is_sleep);

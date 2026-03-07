@@ -654,9 +654,16 @@ impl CognitiveLoopService {
         };
 
         // Only epistemic uncertainty drives exploration (aleatoric is irreducible noise).
-        if epistemic_uncertainty > 0.4 && self.stats.total_cycles % 7 == 0 {
-            let epistemic_explore = (epistemic_uncertainty - 0.4) * 0.1;
+        // Use smoothed epistemic for stability; raw for responsiveness on first cycle.
+        // Depeweg et al. (2018): decomposing uncertainty for active learning.
+        let smoothed_eu = self.carryover.quality.smoothed_epistemic_uncertainty;
+        let eu_for_exploration = if smoothed_eu > 0.0 { smoothed_eu } else { epistemic_uncertainty };
+        if eu_for_exploration > 0.4 && self.stats.total_cycles % 7 == 0 {
+            let epistemic_explore = (eu_for_exploration - 0.4) * 0.1;
             self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
+        } else if eu_for_exploration < 0.15 && self.stats.total_cycles % 7 == 0 {
+            // Low epistemic uncertainty → dampen exploration (model is confident).
+            self.adjust_exploration("epistemic_low", -0.02);
         }
 
         // 6. Get current CfC state as output
@@ -1145,10 +1152,24 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
+        // Sacred Stillness → attention budget contraction: when the dominant
+        // harmony is rest/stillness, reduce computation budget (genuine rest).
+        // Science: Raichle (2010) — default mode network reduces task-positive
+        // resource allocation during rest states.
+        let stillness_budget_scale = {
+            let ss_coord = self.ethics_engine.last_harmony_coordinates()[7]; // SacredStillness
+            if ss_coord > 0.5 {
+                // High stillness activation → contract budget by up to 30%
+                1.0 - (ss_coord - 0.5).min(0.3)
+            } else {
+                1.0
+            }
+        };
         let attention_budget_us = (ATTENTION_BUDGET_US as f64
             * neuromod_attention_alloc as f64
             * depth_budget_scale
-            * epistemic_budget_scale as f64) as u64;
+            * epistemic_budget_scale as f64
+            * stillness_budget_scale) as u64;
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
@@ -1544,7 +1565,7 @@ impl CognitiveLoopService {
 
         // #13: Report learning activity to glutamate channel
         {
-            let is_night = self.biorhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            let is_night = self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             self.neuromod
                 .bath
                 .report_learning(effective_lr, prediction_error, is_night);

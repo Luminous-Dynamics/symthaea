@@ -687,9 +687,7 @@ impl CognitiveLoopService {
             carryover: CycleCarryover::default(),
             prefrontal,
             self_model_tier,
-            gwt,
-            gwt_memory_flag,
-            gwt_perception_count,
+            gwt_mgr: super::gwt_manager::GwtManager::new(gwt, gwt_memory_flag, gwt_perception_count),
             consciousness_monitors: super::consciousness_monitor_tier::ConsciousnessMonitorTier {
                 resonance: consciousness_resonance,
                 quantum_coherence,
@@ -772,8 +770,10 @@ impl CognitiveLoopService {
             },
             #[cfg(feature = "full_consciousness")]
             enactive: EnactiveCognition::new(),
-            biorhythm: crate::chronobiology::Biorhythm::current(),
-            biorhythm_refresh_counter: 0,
+            biorhythm_mgr: super::biorhythm_manager::BiorhythmManager {
+                rhythm: crate::chronobiology::Biorhythm::current(),
+                refresh_counter: 0,
+            },
             phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
