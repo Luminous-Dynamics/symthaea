@@ -138,8 +138,12 @@ struct MfaStateOutput {
 // Test helpers
 // ============================================================================
 
-/// Set up a conductor with identity + commons DNAs installed.
+/// Set up a conductor with identity + commons DNAs installed with correct role names.
 /// Returns (conductor, identity_cell, commons_cell).
+///
+/// Role names must match the constants used in bridge code:
+/// - `IDENTITY_ROLE = "identity"` (used by `CallTargetCell::OtherRole("identity")`)
+/// - Commons uses `"commons_land"` role name
 async fn setup_identity_commons() -> (SweetConductor, SweetCell, SweetCell) {
     let identity_dna = SweetDnaFile::from_bundle(&DnaPaths::identity())
         .await
@@ -149,9 +153,16 @@ async fn setup_identity_commons() -> (SweetConductor, SweetCell, SweetCell) {
         .await
         .expect("Commons DNA required -- run `hc dna pack mycelix-commons/dna/`");
 
+    // Use (RoleName, DnaFile) tuples so CallTargetCell::OtherRole("identity") resolves correctly.
+    // Bare DnaFile uses dna_hash as role name, which breaks cross-cluster calls.
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna),
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app("mycelix-consciousness-test", &[identity_dna, commons_dna])
+        .setup_app("mycelix-consciousness-test", &dnas_with_roles)
         .await
         .unwrap();
 
@@ -469,9 +480,13 @@ async fn test_identity_unreachable_graceful_failure() {
         .await
         .expect("Commons DNA required");
 
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app("mycelix-commons-only", &[commons_dna])
+        .setup_app("mycelix-commons-only", &dnas_with_roles)
         .await
         .unwrap();
 
@@ -576,11 +591,21 @@ async fn test_credential_isolation_between_agents() {
         .await
         .expect("Commons DNA required");
 
+    // Use named roles so CallTargetCell::OtherRole("identity") resolves correctly
+    let alice_dnas: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna.clone()),
+        ("commons_land".to_string(), commons_dna.clone()),
+    ];
+    let bob_dnas: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna),
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     // Set up two agents
     let mut conductor = SweetConductor::from_standard_config().await;
 
     let app_alice = conductor
-        .setup_app("alice-app", &[identity_dna.clone(), commons_dna.clone()])
+        .setup_app("alice-app", &alice_dnas)
         .await
         .unwrap();
     let alice_cells = app_alice.into_cells();
@@ -588,7 +613,7 @@ async fn test_credential_isolation_between_agents() {
     let alice_commons = alice_cells[1].clone();
 
     let app_bob = conductor
-        .setup_app("bob-app", &[identity_dna, commons_dna])
+        .setup_app("bob-app", &bob_dnas)
         .await
         .unwrap();
     let bob_cells = app_bob.into_cells();
@@ -655,9 +680,13 @@ async fn test_per_function_gating() {
         .await
         .expect("Commons DNA required");
 
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app("test-per-fn", &[commons_dna])
+        .setup_app("test-per-fn", &dnas_with_roles)
         .await
         .unwrap();
 

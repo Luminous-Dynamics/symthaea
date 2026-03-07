@@ -702,9 +702,16 @@ async fn test_consciousness_credential_happy_path() {
         .await
         .expect("Civic DNA should exist");
 
+    // Use named roles so CallTargetCell::OtherRole("identity") resolves correctly.
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna),
+        ("commons_land".to_string(), commons_dna),
+        ("civic".to_string(), civic_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app("mycelix-full", &[identity_dna, commons_dna, civic_dna])
+        .setup_app("mycelix-full", &dnas_with_roles)
         .await
         .unwrap();
 
@@ -829,9 +836,14 @@ async fn test_consciousness_tier_escalation() {
         .await
         .expect("Commons DNA required");
 
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna),
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app("mycelix-tier-test", &[identity_dna, commons_dna])
+        .setup_app("mycelix-tier-test", &dnas_with_roles)
         .await
         .unwrap();
 
@@ -955,9 +967,14 @@ async fn test_consciousness_credential_expiry() {
         .await
         .expect("Commons DNA required");
 
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna),
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app("mycelix-expiry-test", &[identity_dna, commons_dna])
+        .setup_app("mycelix-expiry-test", &dnas_with_roles)
         .await
         .unwrap();
 

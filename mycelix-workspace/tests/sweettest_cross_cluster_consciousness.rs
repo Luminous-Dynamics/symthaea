@@ -423,9 +423,15 @@ async fn setup_identity_commons() -> (SweetConductor, SweetCell, SweetCell) {
         .await
         .expect("Commons DNA required -- run `hc dna pack mycelix-commons/dna/`");
 
+    // Use named roles so CallTargetCell::OtherRole("identity") resolves correctly
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna),
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app("mycelix-consciousness-gate-test", &[identity_dna, commons_dna])
+        .setup_app("mycelix-consciousness-gate-test", &dnas_with_roles)
         .await
         .unwrap();
 
@@ -452,12 +458,16 @@ async fn setup_full_cluster() -> (SweetConductor, SweetCell, SweetCell, SweetCel
         .await
         .expect("Civic DNA required");
 
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna),
+        ("commons_land".to_string(), commons_dna),
+        ("hearth".to_string(), hearth_dna),
+        ("civic".to_string(), civic_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor
-        .setup_app(
-            "mycelix-full-cluster-test",
-            &[identity_dna, commons_dna, hearth_dna, civic_dna],
-        )
+        .setup_app("mycelix-full-cluster-test", &dnas_with_roles)
         .await
         .unwrap();
 
@@ -631,11 +641,20 @@ async fn test_cross_cluster_gate_sufficient_vs_insufficient() {
         .await
         .expect("Commons DNA required");
 
+    let alice_dnas: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna.clone()),
+        ("commons_land".to_string(), commons_dna.clone()),
+    ];
+    let bob_dnas: Vec<(String, DnaFile)> = vec![
+        ("identity".to_string(), identity_dna),
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     let mut conductor = SweetConductor::from_standard_config().await;
 
     // Alice: will register DID + MFA (elevated identity dimension)
     let app_alice = conductor
-        .setup_app("alice-gate-test", &[identity_dna.clone(), commons_dna.clone()])
+        .setup_app("alice-gate-test", &alice_dnas)
         .await
         .unwrap();
     let alice_cells = app_alice.into_cells();
@@ -644,7 +663,7 @@ async fn test_cross_cluster_gate_sufficient_vs_insufficient() {
 
     // Bob: will NOT register DID/MFA (zero consciousness)
     let app_bob = conductor
-        .setup_app("bob-gate-test", &[identity_dna, commons_dna])
+        .setup_app("bob-gate-test", &bob_dnas)
         .await
         .unwrap();
     let bob_cells = app_bob.into_cells();
@@ -1134,9 +1153,13 @@ async fn test_audit_trail_gate_decisions() {
         .await
         .expect("Commons DNA required");
 
+    let dnas_with_roles: Vec<(String, DnaFile)> = vec![
+        ("commons_land".to_string(), commons_dna),
+    ];
+
     let mut audit_conductor = SweetConductor::from_standard_config().await;
     let audit_app = audit_conductor
-        .setup_app("audit-test", &[commons_dna])
+        .setup_app("audit-test", &dnas_with_roles)
         .await
         .unwrap();
     let audit_cell = audit_app.cells()[0].clone();
