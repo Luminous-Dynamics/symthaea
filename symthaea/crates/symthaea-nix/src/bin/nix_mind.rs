@@ -1254,11 +1254,26 @@ fn cmd_scrub(file: Option<&str>) {
 
 fn cmd_knowledge(query: &str, limit: usize, format: OutputFormat) {
     use symthaea_nix::encoding::NixCodebook;
+    use symthaea_nix::ipc::default_snapshot_path;
     use symthaea_nix::support::knowledge::KnowledgeBase;
 
     let mut codebook = NixCodebook::new();
-    let kb = KnowledgeBase::new(&mut codebook);
-    let results = kb.search(query, &mut codebook, limit);
+    let mut kb = KnowledgeBase::new(&mut codebook);
+
+    // Load dynamic articles from daemon's learned knowledge if available
+    let kb_path = default_snapshot_path().with_file_name("knowledge_learned.json");
+    if let Ok(json) = std::fs::read_to_string(&kb_path) {
+        let before = kb.dynamic_len();
+        kb.load_dynamic(&json, &mut codebook);
+        let loaded = kb.dynamic_len() - before;
+        if loaded > 0 {
+            eprintln!("  Loaded {} learned articles from daemon", loaded);
+        }
+    }
+
+    let static_count = kb.static_len();
+    let dynamic_count = kb.dynamic_len();
+    let results = kb.search_all(query, &mut codebook, limit);
 
     match format {
         OutputFormat::Json => {
@@ -1266,12 +1281,13 @@ fn cmd_knowledge(query: &str, limit: usize, format: OutputFormat) {
                 .iter()
                 .map(|r| {
                     serde_json::json!({
-                        "id": r.article.id,
-                        "title": r.article.title,
-                        "category": format!("{:?}", r.article.category),
-                        "similarity": r.similarity,
-                        "solution": r.article.solution,
-                        "commands": r.article.commands,
+                        "id": r.id(),
+                        "title": r.title(),
+                        "category": format!("{:?}", r.category()),
+                        "similarity": r.similarity(),
+                        "solution": r.solution(),
+                        "commands": r.commands(),
+                        "learned": r.is_dynamic(),
                     })
                 })
                 .collect();
@@ -1282,22 +1298,31 @@ fn cmd_knowledge(query: &str, limit: usize, format: OutputFormat) {
         }
         _ => {
             println!("  Knowledge Base: \"{}\"", query);
+            if dynamic_count > 0 {
+                println!(
+                    "  ({} static + {} learned articles)",
+                    static_count, dynamic_count
+                );
+            }
             println!();
             if results.is_empty() {
                 println!("  No matching articles found.");
             } else {
                 for (i, r) in results.iter().enumerate() {
+                    let tag = if r.is_dynamic() { " [learned]" } else { "" };
                     println!(
-                        "  {}. {} (similarity: {:.3})",
+                        "  {}. {}{} (similarity: {:.3})",
                         i + 1,
-                        r.article.title,
-                        r.similarity
+                        r.title(),
+                        tag,
+                        r.similarity()
                     );
-                    println!("     Category: {:?}", r.article.category);
-                    println!("     Solution: {}", r.article.solution);
-                    if !r.article.commands.is_empty() {
+                    println!("     Category: {:?}", r.category());
+                    println!("     Solution: {}", r.solution());
+                    let cmds = r.commands();
+                    if !cmds.is_empty() {
                         println!("     Commands:");
-                        for cmd in r.article.commands {
+                        for cmd in cmds {
                             println!("       $ {}", cmd);
                         }
                     }

@@ -18,17 +18,17 @@ use symthaea_nix::ipc::{
 };
 use symthaea_nix::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
 use symthaea_nix::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
+use symthaea_nix::mind::ollama_bridge::{OllamaBridge, OllamaBridgeConfig};
 use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
 use symthaea_nix::mind::{JournalAnomalyDetector, NixWorldModel};
 use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::observe::SystemObserver;
 use symthaea_nix::support::health_check::{HealthAssessor, HealthStatus};
 use symthaea_nix::support::knowledge::{DynamicKnowledgeArticle, KnowledgeBase, KnowledgeCategory};
+use symthaea_nix::support::poml::{PomlContext, PomlProcessor, PomlValue};
 use symthaea_nix::support::predictive::{
     AlertThresholds, PredictiveMonitor, SavedPredictiveState, SystemTelemetry,
 };
-
-// DaemonConfig is now imported from symthaea_nix::ipc
 
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
@@ -46,20 +46,33 @@ struct DaemonState {
     anomaly_count: u64,
     recent_anomalies: Vec<AnomalyEntry>,
     knowledge_base: Option<KnowledgeBase>,
+    ollama: Option<OllamaBridge>,
+    last_health_status: Option<HealthStatus>,
+    last_health_issue_count: usize,
 }
 
 impl DaemonState {
-    fn new(enable_knowledge: bool) -> Self {
+    fn new(config: &DaemonConfig) -> Self {
         let mut codebook = NixCodebook::new();
         let mut causal_graph = NixCausalGraph::new(42);
         for (cause, effect, _) in NixOSCausalPatterns::known_patterns() {
             causal_graph.add_structural_edge(cause, effect, 0.5);
         }
 
-        let knowledge_base = if enable_knowledge {
+        let knowledge_base = if config.enable_knowledge_learning {
             Some(KnowledgeBase::new(&mut codebook))
         } else {
             None
+        };
+
+        let ollama = {
+            let ollama_config = OllamaBridgeConfig {
+                endpoint: config.ollama_endpoint.clone(),
+                model: config.ollama_model.clone(),
+                timeout: Duration::from_secs(config.ollama_timeout),
+                ..OllamaBridgeConfig::default()
+            };
+            Some(OllamaBridge::new(ollama_config))
         };
 
         Self {
@@ -77,6 +90,9 @@ impl DaemonState {
             anomaly_count: 0,
             recent_anomalies: Vec::new(),
             knowledge_base,
+            ollama,
+            last_health_status: None,
+            last_health_issue_count: 0,
         }
     }
 
@@ -120,6 +136,7 @@ impl DaemonState {
 
         // Detect state transitions vs previous snapshot
         let mut wm_pushes = 0usize;
+        let mut recoveries: Vec<(String, String, String)> = Vec::new();
         if let (Some(prev_snap), Some(prev_hv)) = (&self.prev_snapshot, &self.prev_state_hv) {
             let transitions = detect_transitions(prev_snap, &snapshot);
             if !transitions.is_empty() {
@@ -133,7 +150,7 @@ impl DaemonState {
                 self.causal_graph
                     .observe_outcome(&transitions[0].key, &occurred_keys, &all_keys);
 
-                // Add transitions to working memory and learn from recoveries
+                // Add transitions to working memory and collect recoveries
                 for transition in &transitions {
                     let label = format!(
                         "{}: {} → {}",
@@ -146,16 +163,12 @@ impl DaemonState {
                     );
                     wm_pushes += 1;
 
-                    // Auto-learn from service recovery: Failed → Active
                     if transition.is_recovery {
-                        self.learn_from_resolution(
-                            &format!("{} service failure", transition.key),
-                            &format!(
-                                "Service {} recovered automatically ({} → {})",
-                                transition.key, transition.from, transition.to
-                            ),
-                            vec![format!("systemctl status {}", transition.key)],
-                        );
+                        recoveries.push((
+                            transition.key.clone(),
+                            transition.from.clone(),
+                            transition.to.clone(),
+                        ));
                     }
                 }
             }
@@ -176,14 +189,26 @@ impl DaemonState {
             }
         }
 
-        // Graduate evicted items after the immutable borrow on prev_state_hv ends
+        // Graduate evicted items and learn from recoveries after borrows end
         if wm_pushes > 0 {
             self.graduate_evicted(free_energy);
+        }
+        for (key, from, to) in recoveries {
+            self.learn_from_resolution(
+                &format!("{} service failure", key),
+                &format!("Service {} recovered automatically ({} → {})", key, from, to),
+                vec![format!("systemctl status {}", key)],
+            );
         }
 
         // Run health assessment
         let hw = symthaea_nix::observe::hardware::HardwareObserver::probe().ok();
-        let (overall, _checks) = self.health_assessor.assess_all(&snapshot, hw.as_ref());
+        let (overall, checks) = self.health_assessor.assess_all(&snapshot, hw.as_ref());
+        self.last_health_status = Some(overall);
+        self.last_health_issue_count = checks
+            .iter()
+            .filter(|c| c.status != HealthStatus::Healthy)
+            .count();
         if overall == HealthStatus::Critical {
             eprintln!(
                 "nix-mind-daemon: CRITICAL health detected, cycle {}",
@@ -224,10 +249,6 @@ impl DaemonState {
     }
 
     /// Graduate evicted working memory items to episodic memory.
-    ///
-    /// When working memory is full and a new item is pushed, the lowest-activation
-    /// item is evicted. If it survived enough decay cycles (>=3), it's worth
-    /// remembering as a system episode.
     fn graduate_evicted(&mut self, current_phi: f64) {
         const MIN_STEPS_FOR_GRADUATION: u64 = 3;
         if let Some(evicted) = self.working_memory.take_evicted() {
@@ -238,7 +259,7 @@ impl DaemonState {
                     state_after: evicted.content,
                     outcome: EpisodeOutcome::Success,
                     phi_at_encoding: current_phi,
-                    prediction_error: 1.0 - evicted.activation, // Low activation = high surprise
+                    prediction_error: 1.0 - evicted.activation,
                     emotional_valence: 0.0,
                     timestamp: now_secs() as i64,
                 };
@@ -258,17 +279,23 @@ impl DaemonState {
         for anomaly in &anomalies {
             self.anomaly_count += 1;
 
-            // Add to working memory as a concern
             let concern_hv = self.anomaly_detector.encode_entry(&anomaly.entry);
             self.working_memory.push(
                 concern_hv,
                 MemorySource::SystemObservation,
                 format!("anomaly: {}", anomaly.reason),
             );
-            // Graduate evicted items to episodic memory
             self.graduate_evicted(anomaly.anomaly_score as f64);
 
-            // Track for IPC snapshot
+            // High-score anomalies: ask Ollama for diagnosis and learn from it
+            if anomaly.anomaly_score > 0.7 {
+                self.query_ollama_for_anomaly(
+                    &anomaly.entry.unit,
+                    &anomaly.reason,
+                    &anomaly.entry.message,
+                );
+            }
+
             self.recent_anomalies.push(AnomalyEntry {
                 score: anomaly.anomaly_score as f64,
                 reason: anomaly.reason.clone(),
@@ -276,10 +303,31 @@ impl DaemonState {
             });
         }
 
-        // Keep only last 20 anomalies
         if self.recent_anomalies.len() > 20 {
             let excess = self.recent_anomalies.len() - 20;
             self.recent_anomalies.drain(..excess);
+        }
+    }
+
+    /// Query Ollama for anomaly diagnosis and learn from the response.
+    fn query_ollama_for_anomaly(&mut self, unit: &str, reason: &str, message: &str) {
+        let ollama = match self.ollama.as_mut() {
+            Some(o) => o,
+            None => return,
+        };
+
+        let prompt = build_anomaly_prompt(unit, reason, message);
+
+        if let Some(response) = ollama.query(&prompt) {
+            self.learn_from_resolution(
+                &format!("{}: {}", unit, reason),
+                &response.text,
+                vec![format!("journalctl -u {} --since '5 min ago'", unit)],
+            );
+            eprintln!(
+                "nix-mind-daemon: Ollama diagnosed anomaly in {} ({}ms, model: {})",
+                unit, response.duration_ms, response.model_used
+            );
         }
     }
 
@@ -313,8 +361,8 @@ impl DaemonState {
             recent_anomalies: self.recent_anomalies.clone(),
             daemon_running: true,
             daemon_pid: std::process::id(),
-            support_status: None,
-            recommendation_count: 0,
+            support_status: self.last_health_status.map(|s| format!("{:?}", s)),
+            recommendation_count: self.last_health_issue_count,
         }
     }
 }
@@ -335,7 +383,6 @@ fn detect_transitions(
 ) -> Vec<StateTransition> {
     let mut transitions = Vec::new();
 
-    // Service state changes
     let before_services: std::collections::HashMap<&str, &ServiceState> = before
         .services
         .iter()
@@ -366,7 +413,6 @@ fn detect_transitions(
         }
     }
 
-    // Generation change
     if before.generation != after.generation {
         transitions.push(StateTransition {
             key: "generation".to_string(),
@@ -380,6 +426,54 @@ fn detect_transitions(
     transitions
 }
 
+/// POML template for anomaly diagnosis prompts.
+const ANOMALY_DIAGNOSIS_POML: &str = r#"<poml version="2.0">
+  <metadata>
+    <title>Anomaly Diagnosis</title>
+    <model-hints><temperature>0.3</temperature><max-tokens>256</max-tokens></model-hints>
+  </metadata>
+  <variables>
+    <let name="unit">{{ unit }}</let>
+    <let name="reason">{{ reason }}</let>
+    <let name="message">{{ message }}</let>
+  </variables>
+  <prompt>
+    <system>You are a NixOS systemd diagnostician. Be concise (2-3 sentences max).</system>
+    <stepwise-instructions>
+      <step id="s1">Identify the root cause of the anomaly in unit '{{ unit }}'.</step>
+      <step id="s2">Suggest a concrete fix or investigation command.</step>
+    </stepwise-instructions>
+    <output-format>Plain text: diagnosis followed by suggested fix.</output-format>
+  </prompt>
+</poml>"#;
+
+/// Build an anomaly diagnosis prompt using POML template processing.
+fn build_anomaly_prompt(unit: &str, reason: &str, message: &str) -> String {
+    let mut proc = PomlProcessor::new("/dev/null");
+    if proc
+        .load_template_str("anomaly_diagnosis", ANOMALY_DIAGNOSIS_POML)
+        .is_ok()
+    {
+        let mut ctx = PomlContext::default();
+        ctx.variables
+            .insert("unit".into(), PomlValue::from(unit));
+        ctx.variables
+            .insert("reason".into(), PomlValue::from(reason));
+        ctx.variables
+            .insert("message".into(), PomlValue::from(message));
+
+        if let Ok(result) = proc.process("anomaly_diagnosis", &ctx) {
+            return result.prompt;
+        }
+    }
+    format!(
+        "A NixOS systemd unit '{}' has an anomaly.\n\
+         Anomaly reason: {}\nLog message: {}\n\n\
+         Briefly diagnose the likely cause and suggest a fix (2-3 sentences max).",
+        unit, reason, message
+    )
+}
+
 fn now_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -389,10 +483,10 @@ fn now_secs() -> u64 {
 
 fn main() -> ! {
     let config = DaemonConfig::load_default();
-    let mut state = DaemonState::new(config.enable_knowledge_learning);
+    let mut state = DaemonState::new(&config);
     let snapshot_path = default_snapshot_path();
 
-    // Restore persisted working memory if available
+    // Restore persisted working memory
     let wm_path = snapshot_path.with_file_name("working_memory.json");
     if let Ok(json) = std::fs::read_to_string(&wm_path) {
         if let Ok(saved) = serde_json::from_str::<symthaea_nix::mind::SavedWorkingMemory>(&json) {
@@ -405,7 +499,7 @@ fn main() -> ! {
         }
     }
 
-    // Restore persisted dynamic knowledge articles if available
+    // Restore persisted dynamic knowledge articles
     let kb_path = snapshot_path.with_file_name("knowledge_learned.json");
     if let Ok(json) = std::fs::read_to_string(&kb_path) {
         if let Some(kb) = state.knowledge_base.as_mut() {
@@ -421,7 +515,7 @@ fn main() -> ! {
         }
     }
 
-    // Restore persisted predictive history if available
+    // Restore persisted predictive history
     let pred_path = snapshot_path.with_file_name("predictive_history.json");
     if let Ok(json) = std::fs::read_to_string(&pred_path) {
         if let Ok(saved) = serde_json::from_str::<SavedPredictiveState>(&json) {
@@ -447,6 +541,15 @@ fn main() -> ! {
         "  causal graph bootstrapped with {} edges",
         state.causal_graph.edge_count()
     );
+    if let Some(ollama) = state.ollama.as_mut() {
+        let available = ollama.check_available();
+        eprintln!(
+            "  Ollama: {} (endpoint: {}, model: {})",
+            if available { "available" } else { "unavailable" },
+            config.ollama_endpoint,
+            config.ollama_model,
+        );
+    }
 
     let mut last_snapshot = Instant::now() - Duration::from_secs(config.snapshot_interval);
     let mut cycle = 0u64;
@@ -454,7 +557,6 @@ fn main() -> ! {
     loop {
         cycle += 1;
 
-        // Full system snapshot at configured interval
         if last_snapshot.elapsed() >= Duration::from_secs(config.snapshot_interval) {
             match SystemObserver::snapshot() {
                 Ok(snapshot) => {
@@ -475,31 +577,26 @@ fn main() -> ! {
             last_snapshot = Instant::now();
         }
 
-        // Journal anomaly detection on every poll
         state.process_journal(config.journal_batch_size);
 
-        // Write IPC snapshot + persist working memory at configured interval
         if cycle % config.ipc_write_interval == 0 {
             let ipc_snap = state.to_ipc_snapshot();
             if let Err(e) = ipc_snap.write_to(&snapshot_path) {
                 eprintln!("nix-mind-daemon: IPC write failed: {}", e);
             }
 
-            // Persist working memory
             let wm_path = snapshot_path.with_file_name("working_memory.json");
             let saved = state.working_memory.save();
             if let Ok(json) = serde_json::to_string_pretty(&saved) {
                 let _ = std::fs::write(&wm_path, json);
             }
 
-            // Persist predictive history
             let pred_path = snapshot_path.with_file_name("predictive_history.json");
             let pred_saved = state.predictive_monitor.save();
             if let Ok(json) = serde_json::to_string_pretty(&pred_saved) {
                 let _ = std::fs::write(&pred_path, json);
             }
 
-            // Persist dynamic knowledge articles
             if let Some(kb) = &state.knowledge_base {
                 if kb.dynamic_len() > 0 {
                     let kb_path = snapshot_path.with_file_name("knowledge_learned.json");

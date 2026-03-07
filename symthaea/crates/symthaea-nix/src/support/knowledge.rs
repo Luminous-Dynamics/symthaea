@@ -104,6 +104,24 @@ impl<'a> AnyKnowledgeMatch<'a> {
             Self::Dynamic { article, .. } => &article.id,
         }
     }
+
+    pub fn category(&self) -> KnowledgeCategory {
+        match self {
+            Self::Static(m) => m.article.category,
+            Self::Dynamic { article, .. } => article.category,
+        }
+    }
+
+    pub fn commands(&self) -> Vec<&str> {
+        match self {
+            Self::Static(m) => m.article.commands.iter().copied().collect(),
+            Self::Dynamic { article, .. } => article.commands.iter().map(|s| s.as_str()).collect(),
+        }
+    }
+
+    pub fn is_dynamic(&self) -> bool {
+        matches!(self, Self::Dynamic { .. })
+    }
 }
 
 /// Pre-encoded NixOS knowledge base with HDC similarity search.
@@ -248,6 +266,10 @@ impl KnowledgeBase {
                 self.dynamic_hvs.push(hv);
             }
         }
+    }
+
+    pub fn static_len(&self) -> usize {
+        self.articles.len()
     }
 
     /// Number of dynamically learned articles.
@@ -1231,5 +1253,40 @@ mod tests {
         // The hit count may or may not be incremented depending on whether the
         // dynamic article was in the top-k results. Let's just verify it doesn't panic.
         assert!(kb.dynamic_len() == 1);
+    }
+
+    #[test]
+    fn test_any_match_accessors() {
+        let mut codebook = NixCodebook::new();
+        let mut kb = KnowledgeBase::new(&mut codebook);
+        kb.add_learned_article(
+            make_dynamic_article("dyn-acc", "Accessor test article"),
+            &mut codebook,
+        );
+
+        let results = kb.search_all("accessor test", &mut codebook, 20);
+        // Should have both static and dynamic results
+        let has_static = results.iter().any(|r| !r.is_dynamic());
+        let has_dynamic = results.iter().any(|r| r.is_dynamic());
+        assert!(has_static, "should have static articles");
+        assert!(has_dynamic, "should have dynamic articles");
+
+        // Verify accessor methods work on both types
+        for r in &results {
+            assert!(!r.id().is_empty());
+            assert!(!r.title().is_empty());
+            assert!(!r.solution().is_empty());
+            let _ = r.category();
+            let _ = r.commands();
+            assert!(r.similarity() >= 0.0);
+        }
+    }
+
+    #[test]
+    fn test_static_len() {
+        let mut codebook = NixCodebook::new();
+        let kb = KnowledgeBase::new(&mut codebook);
+        assert!(kb.static_len() > 0, "should have static articles");
+        assert_eq!(kb.dynamic_len(), 0, "no dynamic articles yet");
     }
 }

@@ -1228,4 +1228,39 @@ mod tests {
         assert!(result.prompt.contains("<tags>"));
         assert!(result.prompt.contains("& symbols"));
     }
+
+    #[test]
+    fn test_anomaly_diagnosis_template() {
+        let template = r#"<poml version="2.0">
+  <metadata>
+    <title>Anomaly Diagnosis</title>
+    <model-hints><temperature>0.3</temperature><max-tokens>256</max-tokens></model-hints>
+  </metadata>
+  <variables>
+    <let name="unit">{{ unit }}</let>
+    <let name="reason">{{ reason }}</let>
+  </variables>
+  <prompt>
+    <system>You are a NixOS systemd diagnostician.</system>
+    <stepwise-instructions>
+      <step id="s1">Identify the root cause in unit '{{ unit }}'.</step>
+      <step id="s2">Suggest a fix.</step>
+    </stepwise-instructions>
+    <output-format>Plain text diagnosis.</output-format>
+  </prompt>
+</poml>"#;
+
+        let mut proc = PomlProcessor::new("/dev/null");
+        proc.load_template_str("diag", template).unwrap();
+
+        let mut ctx = PomlContext::default();
+        ctx.variables.insert("unit".into(), "nginx.service".into());
+        ctx.variables.insert("reason".into(), "OOM killed".into());
+
+        let result = proc.process("diag", &ctx).unwrap();
+        assert!(result.prompt.contains("nginx.service"));
+        assert!(result.prompt.contains("diagnostician"));
+        assert_eq!(result.metadata.model_hints.temperature, Some(0.3));
+        assert_eq!(result.metadata.model_hints.max_tokens, Some(256));
+    }
 }
