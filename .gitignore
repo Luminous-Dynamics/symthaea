@@ -30,6 +30,9 @@ target/
 *.dll
 *.wasm
 
+# === Proptest Regressions ===
+*.proptest-regressions
+
 # === Compiled Binaries & Model Artifacts ===
 *.joblib
 *.pkl.gz
