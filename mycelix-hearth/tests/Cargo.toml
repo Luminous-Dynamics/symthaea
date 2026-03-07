@@ -6,6 +6,11 @@ description = "Integration tests for mycelix-hearth cluster hApp"
 publish = false
 autotests = false
 
+[features]
+# Enable to run consciousness_gating tests that need the identity bridge DNA.
+# Without this, those tests are cfg-gated out (fallback credential bypasses rejection).
+identity_cluster = []
+
 [lib]
 path = "lib.rs"
 

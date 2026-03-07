@@ -511,9 +511,20 @@ async fn test_complete_transition() {
         "Completed transition should be authored by Alice"
     );
 
-    // 6. Verify the transition was completed (get_active_transitions currently doesn't
-    // follow update chains, so the completed entry still appears as "active" via the
-    // original link target. This is a known limitation — records_from_links uses
-    // GetOptions::default() which returns original entry, not the updated one).
-    // TODO: Fix records_from_links to use GetOptions::latest() or follow update chain.
+    // 6. Verify the transition is no longer active (records_from_links now
+    // follows update chains via get_latest_record, so completed entries are
+    // correctly filtered by get_active_transitions)
+    let active: Vec<Record> = conductor
+        .call(
+            &alice.zome("hearth_milestones"),
+            "get_active_transitions",
+            hearth_hash,
+        )
+        .await;
+
+    assert_eq!(
+        active.len(),
+        0,
+        "Completed transition should not appear in active transitions"
+    );
 }

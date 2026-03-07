@@ -4,7 +4,7 @@
 //! logging rhythm occurrences, and tracking member presence.
 
 use hdk::prelude::*;
-use hearth_coordinator_common::{records_from_links, require_membership};
+use hearth_coordinator_common::{get_latest_record, records_from_links, require_membership};
 use hearth_rhythms_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
@@ -298,7 +298,7 @@ pub fn create_rhythm_digest(input: DigestEpochInput) -> ExternResult<Vec<RhythmS
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid rhythm link target".into())))?;
 
         // Get the rhythm record to know expected participant count
-        let rhythm_record = match get(rhythm_hash.clone(), GetOptions::default())? {
+        let rhythm_record = match get_latest_record(rhythm_hash.clone())? {
             Some(r) => r,
             None => continue,
         };
@@ -328,7 +328,7 @@ pub fn create_rhythm_digest(input: DigestEpochInput) -> ExternResult<Vec<RhythmS
                 ))
             })?;
 
-            let occ_record = match get(occ_hash, GetOptions::default())? {
+            let occ_record = match get_latest_record(occ_hash)? {
                 Some(r) => r,
                 None => continue,
             };

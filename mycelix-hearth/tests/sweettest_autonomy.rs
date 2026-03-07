@@ -309,6 +309,7 @@ async fn test_autonomy_profile_and_capability() {
 /// at Dependent tier. Alice advances Bob's tier to Supervised. get_active_transitions
 /// returns 1 transition (in PreLiminal phase). Alice progresses the transition
 /// forward one phase and verifies advancement.
+#[cfg(feature = "identity_cluster")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor"]
 async fn test_advance_tier_and_get_transitions() {

@@ -353,7 +353,7 @@ pub fn get_alert_checkins(alert_hash: ActionHash) -> ExternResult<Vec<Record>> {
                 "Link target is not an ActionHash".into()
             )))?;
 
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             checkins.push(record);
         }
     }
@@ -379,7 +379,7 @@ pub fn get_emergency_plan(hearth_hash: ActionHash) -> ExternResult<Option<Record
                     "Link target is not an ActionHash".into()
                 )))?;
 
-        let record = get(target, GetOptions::default())?;
+        let record = get_latest_record(target)?;
         Ok(record)
     } else {
         Ok(None)

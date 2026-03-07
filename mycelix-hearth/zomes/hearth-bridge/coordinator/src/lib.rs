@@ -12,7 +12,7 @@
 
 use hdk::prelude::*;
 use hearth_bridge_integrity::*;
-use hearth_coordinator_common::decode_zome_response;
+use hearth_coordinator_common::{decode_zome_response, get_latest_record};
 use hearth_types::{
     BondUpdate, CareSummary, DigestEpochInput, GratitudeSummary, RhythmSummary, SeveranceInput,
     SeveranceSummaryData, WeeklyDigest,
@@ -802,7 +802,7 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
     let target = link.target.into_action_hash().ok_or_else(||
         wasm_error!(WasmErrorInner::Guest("Invalid credential cache link target".into())))?;
 
-    if let Some(record) = get(target, GetOptions::default())? {
+    if let Some(record) = get_latest_record(target)? {
         let cached: CachedCredentialEntry = record.entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?

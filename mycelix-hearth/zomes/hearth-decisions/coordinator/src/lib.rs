@@ -3,7 +3,7 @@
 //! Provides CRUD operations for decisions, voting, tallying, and finalization.
 
 use hdk::prelude::*;
-use hearth_coordinator_common::decode_zome_response;
+use hearth_coordinator_common::{decode_zome_response, get_latest_record};
 use hearth_decisions_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
@@ -105,7 +105,7 @@ fn find_existing_vote_for_decision(
                 .ok_or(wasm_error!(WasmErrorInner::Guest(
                     "Link target is not an ActionHash".into()
                 )))?;
-        if let Some(record) = get(target.clone(), GetOptions::default())? {
+        if let Some(record) = get_latest_record(target.clone())? {
             let existing_vote: Vote = record
                 .entry()
                 .to_app_option()
@@ -385,7 +385,7 @@ pub fn tally_votes(decision_hash: ActionHash) -> ExternResult<Vec<(u32, u32)>> {
                 "Link target is not an ActionHash".into()
             )))?;
 
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let vote: Vote = record
                 .entry()
                 .to_app_option()
@@ -853,7 +853,7 @@ pub fn get_hearth_decisions(hearth_hash: ActionHash) -> ExternResult<Vec<Record>
                 "Link target is not an ActionHash".into()
             )))?;
 
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             decisions.push(record);
         }
     }
@@ -878,7 +878,7 @@ pub fn get_decision_votes(decision_hash: ActionHash) -> ExternResult<Vec<Record>
                 "Link target is not an ActionHash".into()
             )))?;
 
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             votes.push(record);
         }
     }
@@ -904,7 +904,7 @@ pub fn get_vote_history(decision_hash: ActionHash) -> ExternResult<Vec<Record>> 
                 "Link target is not an ActionHash".into()
             )))?;
 
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             votes.push(record);
         }
     }
@@ -933,7 +933,7 @@ pub fn get_decision_outcome(decision_hash: ActionHash) -> ExternResult<Option<Re
                     "Link target is not an ActionHash".into()
                 )))?;
 
-        return get(target, GetOptions::default());
+        return get_latest_record(target);
     }
 
     Ok(None)
@@ -961,7 +961,7 @@ pub fn get_my_pending_votes(hearth_hash: ActionHash) -> ExternResult<Vec<Record>
                 "Link target is not an ActionHash".into()
             )))?;
 
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let vote: Vote = record
                 .entry()
                 .to_app_option()
@@ -997,7 +997,7 @@ pub fn get_my_pending_votes(hearth_hash: ActionHash) -> ExternResult<Vec<Record>
             continue;
         }
 
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let decision: Decision = record
                 .entry()
                 .to_app_option()

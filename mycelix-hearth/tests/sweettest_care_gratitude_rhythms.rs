@@ -743,7 +743,7 @@ async fn test_appreciation_circle_lifecycle() {
 
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-    // 4. Alice starts an appreciation circle (with only herself as initial participant)
+    // 4. Alice starts an appreciation circle with both participants
     let circle_record: Record = alice_conductor
         .call(
             &alice.zome("hearth_gratitude"),
@@ -760,18 +760,7 @@ async fn test_appreciation_circle_lifecycle() {
 
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-    // 5. Bob joins the circle
-    let _joined: Record = bob_conductor
-        .call(
-            &bob.zome("hearth_gratitude"),
-            "join_circle",
-            circle_hash.clone(),
-        )
-        .await;
-
-    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-
-    // 6. Alice completes the circle
+    // 5. Alice completes the circle (Bob already included as participant)
     let _completed: Record = alice_conductor
         .call(
             &alice.zome("hearth_gratitude"),

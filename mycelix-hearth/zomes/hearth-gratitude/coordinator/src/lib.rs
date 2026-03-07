@@ -3,7 +3,7 @@
 //! and tracking gratitude statistics.
 
 use hdk::prelude::*;
-use hearth_coordinator_common::{records_from_links, require_membership};
+use hearth_coordinator_common::{get_latest_record, records_from_links, require_membership};
 use hearth_gratitude_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
@@ -260,7 +260,7 @@ pub fn get_gratitude_balance(agent: AgentPubKey) -> ExternResult<Option<Record>>
     if let Some(link) = links.first() {
         let action_hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        return get(action_hash, GetOptions::default());
+        return get_latest_record(action_hash);
     }
     Ok(None)
 }
@@ -298,7 +298,7 @@ pub fn create_gratitude_digest(input: DigestEpochInput) -> ExternResult<Vec<Grat
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             let expr: GratitudeExpression = record
                 .entry()
                 .to_app_option()

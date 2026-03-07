@@ -4,7 +4,7 @@
 //! This is the CORE membership and relationship zome for the Hearth cluster.
 
 use hdk::prelude::*;
-use hearth_coordinator_common::records_from_links;
+use hearth_coordinator_common::{get_latest_record, records_from_links};
 use hearth_kinship_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
@@ -105,7 +105,7 @@ fn require_guardian_role(hearth_hash: &ActionHash) -> ExternResult<HearthMembers
     for link in links {
         let target = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
             if membership.agent == agent
                 && membership.status == MembershipStatus::Active
@@ -510,7 +510,7 @@ pub fn create_kinship_bond(input: CreateBondInput) -> ExternResult<Record> {
     for link in member_links {
         let target = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
             if membership.status == MembershipStatus::Active {
                 if membership.agent == agent {
@@ -722,7 +722,7 @@ pub fn get_caller_vote_weight(hearth_hash: ActionHash) -> ExternResult<u32> {
     for link in links {
         let target = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
             if membership.agent == agent && membership.status == MembershipStatus::Active {
                 return Ok(membership.role.default_vote_weight_bp());
@@ -747,7 +747,7 @@ pub fn get_caller_role(hearth_hash: ActionHash) -> ExternResult<Option<MemberRol
     for link in links {
         let target = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
             if membership.agent == agent && membership.status == MembershipStatus::Active {
                 return Ok(Some(membership.role));
@@ -771,7 +771,7 @@ pub fn get_active_member_count(hearth_hash: ActionHash) -> ExternResult<u32> {
     for link in links {
         let target = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
             if membership.status == MembershipStatus::Active {
                 count += 1;
@@ -799,7 +799,7 @@ fn propose_auto_recovery(hearth_hash: &ActionHash) -> ExternResult<()> {
     for link in links {
         let target = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(target, GetOptions::default())? {
+        if let Some(record) = get_latest_record(target)? {
             let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
             if membership.status == MembershipStatus::Active && membership.role.is_guardian() {
                 adult_agents.push(membership.agent);
@@ -896,7 +896,7 @@ pub fn get_neglected_bonds(hearth_hash: ActionHash) -> ExternResult<Vec<Record>>
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             let bond: KinshipBond = entry_from_record(&record, "KinshipBond")?;
             let last_tended_micros: i64 = bond.last_tended.as_micros();
             let elapsed_micros: u64 = if now_micros > last_tended_micros {
@@ -932,7 +932,7 @@ pub fn get_bond_snapshots(hearth_hash: ActionHash) -> ExternResult<Vec<BondUpdat
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             let bond: KinshipBond = entry_from_record(&record, "KinshipBond")?;
             let last_tended_micros: i64 = bond.last_tended.as_micros();
             let elapsed_micros: u64 = if now_micros > last_tended_micros {

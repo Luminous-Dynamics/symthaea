@@ -3,7 +3,7 @@
 //! care swaps, and meal planning.
 
 use hdk::prelude::*;
-use hearth_coordinator_common::{decode_zome_response, records_from_links, require_membership};
+use hearth_coordinator_common::{decode_zome_response, get_latest_record, records_from_links, require_membership};
 use hearth_care_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
@@ -352,7 +352,7 @@ pub fn create_care_digest(input: DigestEpochInput) -> ExternResult<Vec<CareSumma
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
+        if let Some(record) = get_latest_record(action_hash)? {
             let schedule: CareSchedule = record
                 .entry()
                 .to_app_option()
