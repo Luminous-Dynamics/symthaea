@@ -1575,8 +1575,30 @@ impl Symthaea {
                 }
             };
 
+            // Retrieve top-3 most similar past examples via HDC similarity
+            let relevant_examples = if !self.code_generation_cache.is_empty() {
+                let query_hv = self.text_to_hv(content);
+                let cache_snapshot = self.code_generation_cache.clone();
+                let mut scored: Vec<(f32, (String, String))> = cache_snapshot
+                    .into_iter()
+                    .map(|entry| {
+                        let sim = query_hv.similarity(&self.text_to_hv(&entry.0));
+                        (sim, entry)
+                    })
+                    .collect();
+                scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+                scored
+                    .into_iter()
+                    .take(3)
+                    .filter(|(sim, _)| *sim > 0.1)
+                    .map(|(_, entry)| entry)
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+
             let gen_ctx = crate::language::code_generator::CodeContext {
-                past_examples: self.code_generation_cache.clone(),
+                past_examples: relevant_examples,
                 ..Default::default()
             };
             let generated = self.code_generator.generate(&intent, &gen_ctx);
@@ -1734,110 +1756,25 @@ impl Symthaea {
                 .map(|c| c.language.clone())
                 .unwrap_or_else(|| "rust".to_string());
 
-            // Step 1: Tree-sitter syntax verification + HDC semantic round-trip
+            // Iterative verification: tree-sitter → HDC → compile, up to 3 attempts
+            const MAX_CODE_RETRIES: usize = 3;
             let mut tree_sitter_ok = false;
-            if let Some(parsed) = Self::parse_code_for_verification(&lang, &code_block) {
-                let verifier = crate::language::code_verifier::CodeVerifier::new(
-                    crate::hdc::code_encoder::CodeHDEncoder::new(self.hdc_dim),
-                );
-                let intent_hv = self.text_to_hv(
-                    thought
-                        .code_context
-                        .as_ref()
-                        .and_then(|c| c.spec_purpose.as_deref())
-                        .unwrap_or(""),
-                );
-                let result = verifier.verify_against_intent(&parsed, &intent_hv);
+            let mut compile_ok = false;
+            let mut last_compiled = false;
+            let mut last_simulated = false;
+            let mut verified_code = code_block.clone();
+            let mut attempt = 0;
 
-                if let Some(ref mut ctx) = thought.code_context {
-                    ctx.syntactically_valid = Some(result.syntactically_valid);
-                    ctx.intent_similarity = Some(result.semantic_similarity);
-                }
+            while attempt < MAX_CODE_RETRIES && !compile_ok {
+                attempt += 1;
+                let current_code = Self::extract_code_block(&generation.text);
+                verified_code = current_code.clone();
 
-                tree_sitter_ok = result.is_acceptable();
-
-                if !tree_sitter_ok {
-                    tracing::warn!(
-                        target: "symthaea::code",
-                        valid = result.syntactically_valid,
-                        similarity = result.semantic_similarity,
-                        errors = result.syntax_errors.len(),
-                        "Phase 5.5: Tree-sitter verification failed, retrying"
+                // Step 1a: Tree-sitter syntax verification + HDC semantic round-trip
+                if let Some(parsed) = Self::parse_code_for_verification(&lang, &current_code) {
+                    let verifier = crate::language::code_verifier::CodeVerifier::new(
+                        crate::hdc::code_encoder::CodeHDEncoder::new(self.hdc_dim),
                     );
-
-                    let error_notes: Vec<String> = result
-                        .syntax_errors
-                        .iter()
-                        .take(3)
-                        .map(|e| {
-                            let line = e.span.as_ref().map_or(0, |s| s.start_line);
-                            format!("Line {}: {}", line, e.message)
-                        })
-                        .collect();
-                    if let Some(ref mut ctx) = thought.code_context {
-                        ctx.notes.extend(error_notes);
-                        ctx.notes
-                            .push("RETRY: Fix the syntax errors above.".to_string());
-                    }
-
-                    let retry = self.llm.translate_thought(&thought, mood_temp).await;
-                    generation = retry;
-                } else {
-                    tracing::debug!(
-                        target: "symthaea::code",
-                        similarity = result.semantic_similarity,
-                        entities = result.entity_count,
-                        "Phase 5.5: Tree-sitter verification passed"
-                    );
-                }
-            }
-
-            // Step 2: Compilation verification via CodeExecutor (sandbox)
-            // Only runs after tree-sitter passes to avoid wasting compile time
-            if tree_sitter_ok {
-                let final_code = Self::extract_code_block(&generation.text);
-                let mut executor = crate::language::code_executor::CodeExecutor::new();
-                let exec_result = match lang.as_str() {
-                    "rust" => executor.execute_rust(&final_code, None),
-                    "python" => executor.execute_python(&final_code),
-                    "nix" => executor.evaluate_nix(&final_code),
-                    _ => executor.execute_rust(&final_code, None),
-                };
-
-                let surprise = exec_result.to_surprise();
-                if surprise > 0.0 {
-                    tracing::info!(
-                        target: "symthaea::code",
-                        compiled = exec_result.compiled,
-                        errors = exec_result.compile_errors.len(),
-                        surprise = surprise,
-                        simulated = exec_result.simulated,
-                        "Phase 5.5: Compilation verification result"
-                    );
-                }
-
-                // Feed compilation errors back for a second retry
-                if !exec_result.compiled && !exec_result.simulated {
-                    if let Some(ref mut ctx) = thought.code_context {
-                        ctx.syntactically_valid = Some(false);
-                        ctx.notes.push("COMPILATION FAILED:".to_string());
-                        for err in exec_result.compile_errors.iter().take(5) {
-                            ctx.notes.push(format!("  {err}"));
-                        }
-                        ctx.notes.push("RETRY: Fix the compilation errors.".to_string());
-                    }
-
-                    let retry = self.llm.translate_thought(&thought, mood_temp).await;
-                    generation = retry;
-
-                    tracing::debug!(
-                        target: "symthaea::code",
-                        "Phase 5.5: Post-compilation retry complete"
-                    );
-                }
-
-                // Store successful code generation in episodic memory
-                if exec_result.is_success() && !exec_result.simulated {
                     let intent_hv = self.text_to_hv(
                         thought
                             .code_context
@@ -1845,45 +1782,169 @@ impl Symthaea {
                             .and_then(|c| c.spec_purpose.as_deref())
                             .unwrap_or(""),
                     );
-                    let code_hv = self.text_to_hv(&final_code);
-                    let phi = thought
-                        .code_context
-                        .as_ref()
-                        .and_then(|c| c.phi_score)
-                        .unwrap_or(0.0);
-                    let timestamp = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs();
-                    let episode = crate::memory::Episode::new(
-                        intent_hv,
-                        code_hv,
-                        phi as f64,
-                        timestamp,
-                    );
-                    self.episodic_memory.store_if_significant(episode);
+                    let result = verifier.verify_against_intent(&parsed, &intent_hv);
 
-                    // Cache the successful generation for few-shot retrieval
-                    let purpose = thought
-                        .code_context
-                        .as_ref()
-                        .and_then(|c| c.spec_purpose.clone())
-                        .unwrap_or_default();
-                    if !purpose.is_empty() {
-                        self.code_generation_cache.push((purpose, code_block.clone()));
-                        // Cap cache at 32 entries (FIFO)
-                        if self.code_generation_cache.len() > 32 {
-                            self.code_generation_cache.remove(0);
-                        }
+                    if let Some(ref mut ctx) = thought.code_context {
+                        ctx.syntactically_valid = Some(result.syntactically_valid);
+                        ctx.intent_similarity = Some(result.semantic_similarity);
                     }
 
+                    tree_sitter_ok = result.is_acceptable();
+
+                    if !tree_sitter_ok {
+                        tracing::warn!(
+                            target: "symthaea::code",
+                            attempt,
+                            valid = result.syntactically_valid,
+                            similarity = result.semantic_similarity,
+                            errors = result.syntax_errors.len(),
+                            "Phase 5.5: Tree-sitter verification failed"
+                        );
+                        if attempt < MAX_CODE_RETRIES {
+                            let error_notes: Vec<String> = result
+                                .syntax_errors
+                                .iter()
+                                .take(3)
+                                .map(|e| {
+                                    let line = e.span.as_ref().map_or(0, |s| s.start_line);
+                                    format!("Line {}: {}", line, e.message)
+                                })
+                                .collect();
+                            if let Some(ref mut ctx) = thought.code_context {
+                                ctx.notes.extend(error_notes);
+                                ctx.notes.push(format!(
+                                    "RETRY {}/{}: Fix the syntax errors above.",
+                                    attempt, MAX_CODE_RETRIES
+                                ));
+                            }
+                            generation = self.llm.translate_thought(&thought, mood_temp).await;
+                        }
+                        continue;
+                    }
+
+                    tracing::debug!(
+                        target: "symthaea::code",
+                        attempt,
+                        similarity = result.semantic_similarity,
+                        entities = result.entity_count,
+                        "Phase 5.5: Tree-sitter verification passed"
+                    );
+                } else {
+                    if attempt < MAX_CODE_RETRIES {
+                        if let Some(ref mut ctx) = thought.code_context {
+                            ctx.notes.push(format!(
+                                "RETRY {}/{}: Code could not be parsed. Regenerate.",
+                                attempt, MAX_CODE_RETRIES
+                            ));
+                        }
+                        generation = self.llm.translate_thought(&thought, mood_temp).await;
+                    }
+                    continue;
+                }
+
+                // Step 1b: Compilation verification via CodeExecutor (sandbox)
+                let mut executor = crate::language::code_executor::CodeExecutor::new();
+                let exec_result = match lang.as_str() {
+                    "rust" => executor.execute_rust(&current_code, None),
+                    "python" => executor.execute_python(&current_code),
+                    "nix" => executor.evaluate_nix(&current_code),
+                    _ => executor.execute_rust(&current_code, None),
+                };
+
+                let surprise = exec_result.to_surprise();
+                if surprise > 0.0 {
                     tracing::info!(
                         target: "symthaea::code",
-                        phi = phi,
-                        cache_size = self.code_generation_cache.len(),
-                        "Phase 5.5: Successful code stored in episodic memory + cache"
+                        attempt,
+                        compiled = exec_result.compiled,
+                        errors = exec_result.compile_errors.len(),
+                        surprise,
+                        simulated = exec_result.simulated,
+                        "Phase 5.5: Compilation verification"
                     );
                 }
+
+                last_compiled = exec_result.compiled;
+                last_simulated = exec_result.simulated;
+
+                if exec_result.compiled || exec_result.simulated {
+                    compile_ok = true;
+                } else if attempt < MAX_CODE_RETRIES {
+                    if let Some(ref mut ctx) = thought.code_context {
+                        ctx.syntactically_valid = Some(false);
+                        ctx.notes.push(format!(
+                            "COMPILATION FAILED (attempt {}/{}):",
+                            attempt, MAX_CODE_RETRIES
+                        ));
+                        for err in exec_result.compile_errors.iter().take(5) {
+                            ctx.notes.push(format!("  {err}"));
+                        }
+                        ctx.notes.push(format!(
+                            "RETRY {}/{}: Fix ONLY the compilation errors.",
+                            attempt, MAX_CODE_RETRIES
+                        ));
+                    }
+                    generation = self.llm.translate_thought(&thought, mood_temp).await;
+                }
+            }
+
+            if attempt > 1 {
+                tracing::info!(
+                    target: "symthaea::code",
+                    attempts = attempt,
+                    tree_sitter_ok,
+                    compile_ok,
+                    "Phase 5.5: Verification loop completed"
+                );
+            }
+
+            // Store successful generation in episodic memory + cache
+            if tree_sitter_ok && compile_ok && last_compiled && !last_simulated {
+                let intent_hv = self.text_to_hv(
+                    thought
+                        .code_context
+                        .as_ref()
+                        .and_then(|c| c.spec_purpose.as_deref())
+                        .unwrap_or(""),
+                );
+                let code_hv = self.text_to_hv(&verified_code);
+                let phi = thought
+                    .code_context
+                    .as_ref()
+                    .and_then(|c| c.phi_score)
+                    .unwrap_or(0.0);
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let episode = crate::memory::Episode::new(
+                    intent_hv,
+                    code_hv,
+                    phi as f64,
+                    timestamp,
+                );
+                self.episodic_memory.store_if_significant(episode);
+
+                // Cache the successful generation for few-shot retrieval
+                let purpose = thought
+                    .code_context
+                    .as_ref()
+                    .and_then(|c| c.spec_purpose.clone())
+                    .unwrap_or_default();
+                if !purpose.is_empty() {
+                    self.code_generation_cache.push((purpose, verified_code.clone()));
+                    // Cap cache at 32 entries (FIFO)
+                    if self.code_generation_cache.len() > 32 {
+                        self.code_generation_cache.remove(0);
+                    }
+                }
+
+                tracing::info!(
+                    target: "symthaea::code",
+                    phi = phi,
+                    cache_size = self.code_generation_cache.len(),
+                    "Phase 5.5: Successful code stored in episodic memory + cache"
+                );
             }
         }
 
