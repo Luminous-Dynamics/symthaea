@@ -32,8 +32,7 @@ use crate::consciousness::temporal_consciousness::{
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::dynamics::cfc::CfCNetwork;
-use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig};
-use crate::dynamics::temporal_signatures::{SignatureConfig, TemporalSignatureEncoder};
+use crate::dynamics::cfc_coherence::CoherenceConfig;
 use crate::exploration::SurpriseExplorationBridge;
 use crate::hdc::moral_algebra::MoralAlgebra;
 use crate::hdc::moral_parser::MoralParser;
@@ -43,7 +42,7 @@ use crate::memory::memory_coordinator::{CoordinatorConfig, MemoryCoordinator};
 use crate::memory::semantic_memory::SemanticMemory;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
-use crate::voice::voice_feedback::{VoiceFeedbackBridge, VoiceFeedbackConfig};
+// VoiceFeedbackBridge now owned by VoiceCoherenceBridge
 // MetaCognitiveLayer now owned by SelfModelTierManager
 use anyhow::Result;
 use rand::Rng;
@@ -110,20 +109,24 @@ impl CognitiveLoopService {
                 };
                 TemporalNetwork::HdcLtc(bridge)
             }
+            TemporalBackend::HierarchicalCfC => {
+                // Create HierarchicalCfC with multi-scale temporal processing (PP-2)
+                let mut hcfc_config = config.hierarchical_cfc_config.clone();
+                // Ensure dimensions match CfC config for compatibility
+                hcfc_config.input_dim = config.cfc_config.input_dim;
+                hcfc_config.output_dim = config.cfc_config.num_neurons;
+                let hcfc =
+                    crate::dynamics::hierarchical_cfc::HierarchicalCfC::new(hcfc_config);
+                TemporalNetwork::HierarchicalCfC(hcfc)
+            }
         };
 
-        // Initialize coherence bridge with learning rate from config
+        // Initialize voice-coherence bridge (CfC coherence + voice feedback + temporal signatures)
         let coherence_config = CoherenceConfig {
             base_learning_rate: config.cfc_config.learning_rate,
             ..Default::default()
         };
-        let coherence_bridge = CfCCoherenceBridge::new(coherence_config);
-
-        // Initialize voice feedback bridge
-        let voice_feedback_bridge = VoiceFeedbackBridge::new(VoiceFeedbackConfig::default());
-
-        // Initialize temporal signature encoder for consciousness pattern detection
-        let temporal_signature_encoder = TemporalSignatureEncoder::new(SignatureConfig::default());
+        let voice_coherence = super::voice_coherence_bridge::VoiceCoherenceBridge::new(coherence_config);
 
         // Initialize adaptive behavior with defaults
         let adaptive_behavior = AdaptiveBehavior::default();
@@ -471,9 +474,7 @@ impl CognitiveLoopService {
             last_prediction: None,
             start_time: Instant::now(),
             is_consolidating: false,
-            coherence_bridge,
-            voice_feedback_bridge,
-            temporal_signature_encoder,
+            voice_coherence,
             adaptive_behavior,
             prediction_confidence: 0.5_f64, // Start neutral
             flow_state: FlowState::default(),
@@ -704,20 +705,7 @@ impl CognitiveLoopService {
                 ..Default::default()
             })),
             attention_visualizer: Some(crate::visualization::AttentionVisualizer::new()),
-            social: super::SocialState::default(),
-            social_coherence: super::SocialCoherenceState::default(),
-            phi_dyad: if enable_primitive_consciousness {
-                Some(crate::partnership::PhiDyadCalculator::new())
-            } else {
-                None
-            },
-            partner_model: if enable_primitive_consciousness {
-                Some(crate::partnership::HumanPartnerModel::new("partner"))
-            } else {
-                None
-            },
-            recent_ai_hvs: Vec::with_capacity(4),
-            recent_input_hvs: Vec::with_capacity(4),
+            social_mgr: super::SocialManager::new(enable_primitive_consciousness),
             user_state: if enable_user_state {
                 Some(crate::user_state_inference::UserStateInference::new())
             } else {

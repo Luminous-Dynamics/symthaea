@@ -496,6 +496,8 @@ impl CognitiveLoopService {
         let hierarchical_total_free_energy = late_result.hierarchical_total_free_energy;
         let predictive_self_safety = late_result.predictive_self_safety;
         let attention_schema_focus = late_result.attention_schema_focus;
+        let attention_fatigue = late_result.attention_fatigue;
+        let attention_prediction_accuracy = late_result.attention_prediction_accuracy;
         let psi_attention_avg = late_result.psi_attention_avg;
 
         let gwt_broadcast = integration_result.gwt_broadcast;
@@ -880,6 +882,8 @@ impl CognitiveLoopService {
                 hierarchical_total_free_energy,
                 predictive_self_safety,
                 attention_schema_focus,
+                attention_fatigue,
+                attention_prediction_accuracy,
                 psi_attention_avg,
                 gwt_broadcast,
                 gwt_coalition_size,

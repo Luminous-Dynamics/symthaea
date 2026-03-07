@@ -475,6 +475,16 @@ pub struct AttentionSchemaStats {
 
     /// Number of attention captures (reflexive shifts)
     pub attention_captures: u64,
+
+    /// Consecutive cycles focused on the same target (vigilance counter).
+    /// Resets on shift, increments on maintenance.
+    pub focus_duration_cycles: u32,
+
+    /// Number of predictions that were validated against outcomes
+    pub predictions_validated: u64,
+
+    /// Number of validated predictions that matched the outcome
+    pub predictions_correct: u64,
 }
 
 impl AttentionSchema {
@@ -564,13 +574,21 @@ impl AttentionSchema {
         let similarity = self.focus_content.similarity(&new_target);
         let is_shift = similarity < (1.0 - self.config.shift_threshold);
 
+        // Validate previous predictions against current outcome
+        self.validate_predictions(is_shift);
+
         if is_shift {
             self.stats.focus_shifts += 1;
+            // Reset vigilance counter on shift
+            self.stats.focus_duration_cycles = 0;
 
             // Check if this is a reflexive capture (high salience, low control)
             if salience > 0.8 && self.current_state.mode != AttentionMode::Vigilant {
                 self.stats.attention_captures += 1;
             }
+        } else {
+            // Increment vigilance counter on maintenance
+            self.stats.focus_duration_cycles = self.stats.focus_duration_cycles.saturating_add(1);
         }
 
         // Update attention state
@@ -592,7 +610,7 @@ impl AttentionSchema {
         }
         self.attention_history.push_back(old_state);
 
-        // Update self model
+        // Update self model (includes fatigue and consequence prediction)
         self.update_self_model(is_shift, salience);
 
         // Generate predictions
@@ -610,6 +628,33 @@ impl AttentionSchema {
             new_mode: self.current_state.mode,
             control_signal: self.control_signal,
             predictions: self.attention_prediction.clone(),
+        }
+    }
+
+    /// Validate previous predictions against actual outcome.
+    ///
+    /// Tracks prediction accuracy for the self-model: did we correctly predict
+    /// whether attention would shift or be maintained?
+    fn validate_predictions(&mut self, did_shift: bool) {
+        if self.attention_prediction.is_empty() {
+            return;
+        }
+        self.stats.predictions_validated += 1;
+
+        // If we predicted intensity would drop below 0.4, we predicted a shift.
+        // Compare against actual outcome.
+        let predicted_shift = self
+            .attention_prediction
+            .iter()
+            .any(|p| p.mode == AttentionMode::Scanning);
+        if predicted_shift == did_shift {
+            self.stats.predictions_correct += 1;
+        }
+
+        // Update running prediction accuracy
+        if self.stats.predictions_validated > 0 {
+            self.stats.prediction_accuracy =
+                self.stats.predictions_correct as f64 / self.stats.predictions_validated as f64;
         }
     }
 
@@ -654,8 +699,14 @@ impl AttentionSchema {
         vec![AttentionChannel::Semantic, AttentionChannel::Executive]
     }
 
-    /// Update the attention self-model
+    /// Update the attention self-model including vigilance fatigue.
+    ///
+    /// Implements the well-known vigilance decrement (Mackworth 1948): sustained
+    /// focus on a single target progressively increases effort and degrades clarity.
+    /// This gives the system a self-model of its own attentional limits.
     fn update_self_model(&mut self, is_shift: bool, salience: f32) {
+        let fatigue = self.stats.focus_duration_cycles;
+
         // Update subjective character
         let sc = &mut self.self_model.subjective_character;
 
@@ -669,44 +720,111 @@ impl AttentionSchema {
             sc.controllability = (sc.controllability + 0.05).min(0.9);
         }
 
-        // Effort increases with focus, decreases with diffuse
+        // Effort: base from mode + vigilance fatigue increment.
+        // Mackworth (1948): sustained attention requires increasing effort over time.
+        // Fatigue contribution: 0.005 per cycle, capping at +0.3 after 60 cycles.
+        let fatigue_effort = (fatigue as f32 * 0.005).min(0.3);
         sc.effort = match self.current_state.mode {
-            AttentionMode::Focused => (sc.effort + 0.1).min(0.9),
+            AttentionMode::Focused => (sc.effort * 0.9 + 0.1 + fatigue_effort).min(0.95),
             AttentionMode::Diffuse => (sc.effort - 0.1).max(0.1),
-            _ => sc.effort,
+            _ => (sc.effort + fatigue_effort * 0.5).min(0.9),
         };
 
-        // Clarity tracks intensity
-        sc.clarity = (sc.clarity * 0.8) + (self.current_state.intensity * 0.2);
+        // Clarity: tracks intensity but degrades with fatigue.
+        // After ~40 cycles of sustained focus, clarity starts dropping.
+        let fatigue_clarity_penalty = if fatigue > 40 {
+            ((fatigue - 40) as f32 * 0.008).min(0.25)
+        } else {
+            0.0
+        };
+        sc.clarity =
+            ((sc.clarity * 0.8) + (self.current_state.intensity * 0.2) - fatigue_clarity_penalty)
+                .clamp(0.1, 1.0);
 
         // Update resource allocation
         let ra = &mut self.self_model.resource_allocation;
         ra.allocated = self.current_state.intensity;
         ra.reserve = 1.0 - ra.allocated;
 
-        // Update predicted consequences
-        self.self_model.predicted_consequences = vec![
-            AttentionConsequence {
-                outcome: if is_shift {
-                    "May miss continued information from previous target".to_string()
+        // Update predicted consequences with richer context-aware predictions.
+        // This is the core AST requirement: predicting what happens if focus
+        // shifts vs. stays, enabling forward-model-based attention control.
+        let mut consequences = Vec::with_capacity(4);
+
+        // Consequence 1: What happens if we STAY focused
+        if is_shift {
+            consequences.push(AttentionConsequence {
+                outcome: "May miss continued information from previous target".to_string(),
+                probability: 0.7,
+                valence: -0.2,
+                time_horizon_ms: 500.0,
+            });
+        } else {
+            let stay_valence = if fatigue > 30 {
+                // Fatigue makes staying less valuable
+                -0.1
+            } else {
+                0.3
+            };
+            consequences.push(AttentionConsequence {
+                outcome: if fatigue > 40 {
+                    "Sustained focus but vigilance declining — clarity degrading".to_string()
                 } else {
                     "Deepening focus on current target".to_string()
                 },
-                probability: 0.7,
-                valence: if is_shift { -0.2 } else { 0.3 },
-                time_horizon_ms: 500.0,
-            },
-            AttentionConsequence {
-                outcome: if salience > 0.7 {
-                    "High importance content captured".to_string()
-                } else {
-                    "Standard processing continues".to_string()
-                },
                 probability: 0.8,
-                valence: salience - 0.3,
-                time_horizon_ms: 200.0,
+                valence: stay_valence,
+                time_horizon_ms: 500.0,
+            });
+        }
+
+        // Consequence 2: What happens if we SHIFT
+        let shift_valence = if fatigue > 30 {
+            // Fatigued: shifting is beneficial (recovery)
+            0.3
+        } else {
+            // Not fatigued: shifting has cost (switching penalty)
+            -0.15
+        };
+        consequences.push(AttentionConsequence {
+            outcome: if fatigue > 30 {
+                "Shifting would relieve vigilance fatigue and restore clarity".to_string()
+            } else {
+                "Shifting would incur switching cost but enable new exploration".to_string()
             },
-        ];
+            probability: 0.6,
+            valence: shift_valence,
+            time_horizon_ms: 300.0,
+        });
+
+        // Consequence 3: Salience-based prediction
+        consequences.push(AttentionConsequence {
+            outcome: if salience > 0.7 {
+                "High importance content captured — processing priority elevated".to_string()
+            } else {
+                "Standard processing continues".to_string()
+            },
+            probability: 0.8,
+            valence: salience - 0.3,
+            time_horizon_ms: 200.0,
+        });
+
+        // Consequence 4: Capacity-based prediction (what we're missing)
+        let unattended_channels =
+            8usize.saturating_sub(self.current_state.active_channels.len());
+        if unattended_channels > 4 {
+            consequences.push(AttentionConsequence {
+                outcome: format!(
+                    "{} sensory channels unmonitored — may miss cross-modal events",
+                    unattended_channels
+                ),
+                probability: 0.5,
+                valence: -0.15,
+                time_horizon_ms: 1000.0,
+            });
+        }
+
+        self.self_model.predicted_consequences = consequences;
     }
 
     /// Generate predictions about future attention states
@@ -961,6 +1079,50 @@ impl AttentionSchema {
     /// Get attention history
     pub fn history(&self) -> impl Iterator<Item = &AttentionState> {
         self.attention_history.iter()
+    }
+
+    /// Encode the attention self-model as a compact feature vector for the thought vector.
+    ///
+    /// Returns 8 floats that summarize the full attention schema state:
+    /// [intensity, mode_code, presence, controllability, effort, clarity,
+    ///  fatigue_normalized, prediction_accuracy]
+    ///
+    /// This enables the language/output pipeline to report on attention state.
+    pub fn encode_for_thought_vector(&self) -> [f32; 8] {
+        let sc = &self.self_model.subjective_character;
+        let mode_code = match self.current_state.mode {
+            AttentionMode::Focused => 1.0,
+            AttentionMode::Divided => 0.6,
+            AttentionMode::Diffuse => 0.3,
+            AttentionMode::Vigilant => 0.8,
+            AttentionMode::Scanning => 0.5,
+            AttentionMode::Reflexive => 0.9,
+            AttentionMode::Inhibited => 0.1,
+        };
+        let fatigue_norm =
+            (self.stats.focus_duration_cycles as f32 / 60.0).min(1.0);
+        let pred_acc = self.stats.prediction_accuracy as f32;
+
+        [
+            self.current_state.intensity,
+            mode_code,
+            sc.presence,
+            sc.controllability,
+            sc.effort,
+            sc.clarity,
+            fatigue_norm,
+            pred_acc,
+        ]
+    }
+
+    /// Get the vigilance fatigue level (0.0 = fresh, 1.0 = fully fatigued).
+    pub fn fatigue_level(&self) -> f32 {
+        (self.stats.focus_duration_cycles as f32 / 60.0).min(1.0)
+    }
+
+    /// Get prediction accuracy from the self-model.
+    pub fn prediction_accuracy(&self) -> f64 {
+        self.stats.prediction_accuracy
     }
 }
 

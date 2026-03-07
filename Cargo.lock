@@ -14609,6 +14609,7 @@ dependencies = [
  "serde_json",
  "symthaea",
  "symthaea-psych-bench",
+ "symthaea-types",
 ]
 
 [[package]]

@@ -155,6 +155,8 @@ pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
 pub(crate) mod substrate_manager;
 pub(crate) mod fep_module;
+pub(crate) mod voice_coherence_bridge;
+pub(crate) mod social_manager;
 
 #[cfg(feature = "ssm_language")]
 pub(crate) mod broca_bridge;
@@ -200,18 +202,17 @@ use crate::consciousness::recursive_improvement::DreamFeedbackBridge;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::unified_living_mind::UnifiedLivingMind;
-use crate::dynamics::cfc_coherence::CfCCoherenceBridge;
-use crate::dynamics::temporal_signatures::TemporalSignatureEncoder;
+// CfCCoherenceBridge + TemporalSignatureEncoder now owned by VoiceCoherenceBridge
 // SurpriseExplorationBridge moved to fep_module.rs
 // MoralAlgebra + MoralParser now solely owned by EthicsEngine
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
 use crate::memory::memory_coordinator::MemoryCoordinator;
 use crate::memory::semantic_memory::SemanticMemory;
-use crate::partnership::{HumanPartnerModel, PhiDyadCalculator};
+// HumanPartnerModel + PhiDyadCalculator now owned by SocialManager
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 use crate::safety::SafetyGateway;
-use crate::voice::voice_feedback::VoiceFeedbackBridge;
+// VoiceFeedbackBridge now owned by VoiceCoherenceBridge
 // MetaCognitiveLayer now owned by SelfModelTierManager
 use std::collections::VecDeque;
 use std::time::Instant;
@@ -237,46 +238,8 @@ struct Experience {
     importance: f32,
 }
 
-/// Social/external signal state.
-pub(crate) struct SocialState {
-    /// Relational Psi from dyad computation (15% blend weight into unified_psi).
-    pub relational_psi: f64,
-    /// External reward signal injected by environment (0.0 = none).
-    pub external_reward: f32,
-    /// Social trust level injected by Mind module's SocialCoherence (0.0–1.0).
-    pub social_trust: f32,
-    /// Social cooperation rate injected by Mind module's SocialCoherence (0.0–1.0).
-    pub social_cooperation_rate: f32,
-    /// Rolling accuracy of social predictions (0.0–1.0).
-    /// Updated when predictions are validated against outcomes.
-    /// Derived from SocialCoherenceStats::successful_predictions / total_predictions.
-    pub social_prediction_accuracy: f32,
-    /// Number of active mental models being tracked by SocialCoherence.
-    pub social_models_count: usize,
-    /// Mean trust across all tracked relationships (from SocialCoherenceStats).
-    pub social_mean_trust: f32,
-}
-
-impl Default for SocialState {
-    fn default() -> Self {
-        Self {
-            relational_psi: 0.0,
-            external_reward: 0.0,
-            social_trust: 0.5,
-            social_cooperation_rate: 0.0,
-            social_prediction_accuracy: 0.5,
-            social_models_count: 0,
-            social_mean_trust: 0.5,
-        }
-    }
-}
-
-/// Wrapper around social coherence state, used by cycle phases that
-/// reference `self.social_coherence.social.*`.
-#[derive(Default)]
-pub(crate) struct SocialCoherenceState {
-    pub social: SocialState,
-}
+// SocialState + SocialCoherenceState moved to social_manager.rs
+pub(crate) use social_manager::{SocialManager, SocialState};
 
 // ── Primary service struct ──────────────────────────────────────────────────
 
@@ -326,14 +289,8 @@ pub struct CognitiveLoopService {
     /// Is currently consolidating (background learning)
     is_consolidating: bool,
 
-    /// Coherence bridge for bidirectional CfC↔consciousness feedback
-    coherence_bridge: CfCCoherenceBridge,
-
-    /// Voice feedback bridge for voice→CfC feedback
-    voice_feedback_bridge: VoiceFeedbackBridge,
-
-    /// Temporal signature encoder for consciousness pattern detection
-    temporal_signature_encoder: TemporalSignatureEncoder,
+    /// Voice-coherence bridge: CfC coherence + voice feedback + temporal signatures.
+    voice_coherence: voice_coherence_bridge::VoiceCoherenceBridge,
 
     /// Current adaptive behavior based on consciousness state
     adaptive_behavior: AdaptiveBehavior,
@@ -598,25 +555,8 @@ pub struct CognitiveLoopService {
     /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
     attention_visualizer: Option<crate::visualization::AttentionVisualizer>,
 
-    /// Social and external signal state (relational psi, reward, trust, cooperation).
-    pub(crate) social: SocialState,
-
-    /// Social coherence wrapper — used by cycle phases that reference
-    /// `self.social_coherence.social.*` for relational psi access.
-    pub(crate) social_coherence: SocialCoherenceState,
-
-    /// Phi-Dyad calculator for relational consciousness.
-    /// Computes Φ_dyad from recent AI + input HVs each cycle.
-    phi_dyad: Option<PhiDyadCalculator>,
-
-    /// Human partner model for relational state tracking.
-    partner_model: Option<HumanPartnerModel>,
-
-    /// Ring buffer of recent AI HDC states (last 4, for dyad computation).
-    recent_ai_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
-
-    /// Ring buffer of recent input HDC states (last 4, as human proxy).
-    recent_input_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    /// Social manager: social signals + phi-dyad + partner model + ring buffers.
+    pub(crate) social_mgr: SocialManager,
 
     /// User state inference for adaptive response generation.
     /// When enabled, infers user cognitive load, frustration, and engagement from input text.

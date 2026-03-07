@@ -588,6 +588,11 @@ impl HierarchicalCfC {
         &self.combination_weights
     }
 
+    /// Get configuration
+    pub fn config(&self) -> &HierarchicalCfCConfig {
+        &self.config
+    }
+
     /// Get time constants for each layer
     pub fn time_constants(&self) -> &[f32] {
         &self.config.time_constants

@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
-use symthaea_types::Harmony;
+use symthaea_types::{Harmony, N_HARMONIES};
 
 use crate::governance::PopulationDecision;
 use crate::types::Population;
@@ -288,7 +288,7 @@ mod tests {
     fn test_harmony_alignment_returns_seven_scores() {
         let tension = EthicalTension::new("test", 0.25, 0.25, 0.25, 0.25);
         let alignments = harmony_alignment(&tension);
-        assert_eq!(alignments.len(), 7, "should return 7 harmony scores");
+        assert_eq!(alignments.len(), N_HARMONIES, "should return N_HARMONIES harmony scores");
     }
 
     #[test]

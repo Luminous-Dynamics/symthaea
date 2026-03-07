@@ -19,6 +19,7 @@ use symthaea_core::hdc::consciousness_topology::PersistentFeature;
 use tokio::sync::Mutex;
 
 use crate::hdc::moral_topology::PersistenceDiagram;
+use symthaea_types::N_HARMONIES;
 
 use super::demo_runner::DemoRunner;
 
@@ -107,7 +108,7 @@ pub struct DemoCycleData {
     // ── Moral Topology: Conscience Radar ──
     /// 7D harmony coordinates: [RC, PSF, IW, IP, UI, SR, EP].
     #[serde(default)]
-    pub harmony_coordinates: [f64; 7],
+    pub harmony_coordinates: [f64; N_HARMONIES],
     /// Harmony axis labels (static, included for self-describing payloads).
     #[serde(default)]
     pub harmony_labels: Vec<String>,
@@ -125,10 +126,10 @@ pub struct DemoCycleData {
     pub moral_surprise: f64,
     /// Softmax distribution over harmonies (observed).
     #[serde(default)]
-    pub moral_scenario_distribution: [f64; 7],
+    pub moral_scenario_distribution: [f64; N_HARMONIES],
     /// Softmax distribution over harmonies (EMA prior).
     #[serde(default)]
-    pub moral_prior_distribution: [f64; 7],
+    pub moral_prior_distribution: [f64; N_HARMONIES],
     /// Betti numbers [β₀, β₁, β₂] — components, cycles, voids.
     #[serde(default)]
     pub moral_betti: [usize; 3],
@@ -151,7 +152,7 @@ pub struct DemoCycleData {
     pub moral_persistence_diagram: PersistenceDiagram,
     /// Moral trajectory: last 20 harmony coordinate snapshots.
     #[serde(default)]
-    pub moral_trajectory: Vec<[f64; 7]>,
+    pub moral_trajectory: Vec<[f64; N_HARMONIES]>,
     /// Moral drift (L2 distance between first/second half of trajectory).
     #[serde(default)]
     pub moral_drift: f64,

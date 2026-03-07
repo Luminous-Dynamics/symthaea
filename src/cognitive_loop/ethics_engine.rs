@@ -28,6 +28,7 @@ use crate::consciousness::unified_value_evaluator::{
     Decision, EvaluationContext, UnifiedValueEvaluator,
 };
 use crate::hdc::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
+use symthaea_types::N_HARMONIES;
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
 use crate::hdc::moral_topology::{
@@ -96,7 +97,7 @@ pub(crate) struct EthicsEngineOutput {
     // ── Stage 3b: Moral Geometry (FEP) ─────────────────────────────────
     /// 7D harmony coordinates for this cycle's action
     #[allow(dead_code)] // Computed by harmonies integrator; read via engine cache
-    pub harmony_coordinates: [f64; 7],
+    pub harmony_coordinates: [f64; N_HARMONIES],
     /// Moral free energy decomposition (FEP on harmony manifold)
     #[allow(dead_code)] // Computed by harmonies integrator; read via engine cache
     pub moral_free_energy: MoralFreeEnergy,
@@ -169,7 +170,7 @@ struct EthicsEngineCache {
     last_value_score: f64,
     last_harmonies_alignment: f32,
     last_harmonies_approved: bool,
-    last_harmony_coordinates: [f64; 7],
+    last_harmony_coordinates: [f64; N_HARMONIES],
     last_moral_free_energy: MoralFreeEnergy,
     /// EMA-smoothed moral free energy (α=0.1).
     /// Tracks trend rather than raw per-cycle spikes.
@@ -196,7 +197,7 @@ impl Default for EthicsEngineCache {
             last_value_score: 0.0,
             last_harmonies_alignment: 0.0,
             last_harmonies_approved: false,
-            last_harmony_coordinates: [0.0; 7],
+            last_harmony_coordinates: [0.0; N_HARMONIES],
             last_moral_free_energy: MoralFreeEnergy::default(),
             moral_fe_ema: 0.0,
             moral_exploration_gain: 0.15,
@@ -464,7 +465,7 @@ impl EthicsEngine {
                     )
                 }
             } else {
-                (0.0, true, [0.0; 7], MoralFreeEnergy::default())
+                (0.0, true, [0.0; N_HARMONIES], MoralFreeEnergy::default())
             };
         let harmonies_us = t.elapsed().as_micros() as u64;
 
@@ -684,7 +685,7 @@ impl EthicsEngine {
     }
 
     /// Cached harmony coordinates from last harmonies evaluation.
-    pub fn last_harmony_coordinates(&self) -> &[f64; 7] {
+    pub fn last_harmony_coordinates(&self) -> &[f64; N_HARMONIES] {
         &self.cache.last_harmony_coordinates
     }
 

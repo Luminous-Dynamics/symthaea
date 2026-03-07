@@ -250,7 +250,7 @@ fn harmonic_profile_balanced_alignment() {
 #[test]
 fn harmonic_profile_dominant_harmony() {
     // Create a profile where IntegralWisdom is dominant
-    let mut activations = [0.1_f32; 7];
+    let mut activations = [0.1_f32; 8];
     activations[2] = 0.9; // Index 2 = IntegralWisdom
     let profile = HarmonicProfile::from_activations(activations);
 
@@ -403,12 +403,12 @@ fn rashomon_generates_seven_perspectives() {
 
     let perspectives = engine.generate_perspectives(&situation);
 
-    // The engine creates frames for all 7 harmonies. With a general situation
-    // and default relevance threshold of 0.3, all 7 pass since domain primaries
+    // The engine creates frames for all 8 harmonies. With a general situation
+    // and default relevance threshold of 0.3, all 8 pass since domain primaries
     // get 0.8 relevance and non-primaries get 0.3 (exactly at threshold).
     assert_eq!(
         perspectives.len(),
-        7,
+        8,
         "should produce one perspective per harmony, got {}",
         perspectives.len(),
     );
@@ -419,13 +419,13 @@ fn rashomon_generates_seven_perspectives() {
     seen_harmonies.dedup();
     assert_eq!(
         seen_harmonies.len(),
-        7,
-        "all 7 harmonies should be represented",
+        8,
+        "all 8 harmonies should be represented",
     );
 
     // Synthesis should combine them
     let synthesis = engine.synthesize(perspectives);
-    assert_eq!(synthesis.contributing_harmonies.len(), 7);
+    assert_eq!(synthesis.contributing_harmonies.len(), 8);
     assert!(!synthesis.unified_view.is_empty());
 }
 

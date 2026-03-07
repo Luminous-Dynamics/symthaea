@@ -414,24 +414,13 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     (dot / (norm_a * norm_b)).clamp(-1.0, 1.0)
 }
 
-/// Hedging tokens that indicate epistemic uncertainty in generated text.
-#[cfg(feature = "mamba")]
-const HEDGING_WORDS: &[&str] = &[
-    "perhaps",
-    "maybe",
-    "might",
-    "possibly",
-    "uncertain",
-    "unclear",
-    "likely",
-    "probably",
-    "could",
-    "seem",
-];
-
 /// Count the fraction of tokens that contain hedging words.
+///
+/// Uses [`CANONICAL_HEDGING_WORDS`](crate::gating::CANONICAL_HEDGING_WORDS)
+/// as the single source of truth, shared with the epistemic gate.
 #[cfg(feature = "mamba")]
 fn hedging_ratio(text: &str) -> f32 {
+    use crate::gating::CANONICAL_HEDGING_WORDS;
     let lower = text.to_lowercase();
     let words: Vec<&str> = lower.split_whitespace().collect();
     if words.is_empty() {
@@ -439,7 +428,7 @@ fn hedging_ratio(text: &str) -> f32 {
     }
     let hedging_count = words
         .iter()
-        .filter(|w| HEDGING_WORDS.iter().any(|h| w.contains(h)))
+        .filter(|w| CANONICAL_HEDGING_WORDS.iter().any(|h| w.contains(h)))
         .count();
     hedging_count as f32 / words.len() as f32
 }

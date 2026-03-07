@@ -1,25 +1,29 @@
 //! Temporal network backend abstraction.
 //!
-//! [`TemporalNetwork`] wraps either a CfC (Closed-form Continuous-time) network
-//! or an HdcLtc bridge, allowing runtime selection of the temporal prediction
-//! backend. All methods delegate to the active backend transparently.
+//! [`TemporalNetwork`] wraps either a CfC (Closed-form Continuous-time) network,
+//! an HdcLtc bridge, or a HierarchicalCfC multi-scale hierarchy, allowing runtime
+//! selection of the temporal prediction backend. All methods delegate to the active
+//! backend transparently.
 
 use super::TemporalBackend;
 use crate::dynamics::cfc::CfCNetwork;
+use crate::dynamics::hierarchical_cfc::HierarchicalCfC;
 use crate::hdc_ltc_bridge::HdcLtcBridge;
 use anyhow::Result;
 use ndarray::Array1;
 
 /// Wrapper enum for temporal network backends.
 ///
-/// This allows the CognitiveLoopService to use either CfC or HdcLtcUnified
-/// as the temporal prediction backend, selected at runtime.
+/// This allows the CognitiveLoopService to use CfC, HdcLtcUnified, or
+/// HierarchicalCfC as the temporal prediction backend, selected at runtime.
 #[allow(dead_code)] // RESERVED(future): temporal network routing
 pub(super) enum TemporalNetwork {
     /// CfC (Closed-form Continuous-time) network
     CfC(CfCNetwork),
     /// HdcLtcUnified network via bridge
     HdcLtc(HdcLtcBridge),
+    /// Hierarchical CfC with multi-scale temporal processing (PP-2: Butlin indicator)
+    HierarchicalCfC(HierarchicalCfC),
 }
 
 impl TemporalNetwork {
@@ -28,6 +32,10 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.step(input, dt),
             Self::HdcLtc(bridge) => bridge.step(input, dt),
+            Self::HierarchicalCfC(hcfc) => {
+                let _ = hcfc.forward_hierarchical(input, dt);
+                Ok(())
+            }
         }
     }
 
@@ -36,6 +44,16 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.read_state(),
             Self::HdcLtc(bridge) => bridge.read_state(),
+            Self::HierarchicalCfC(hcfc) => {
+                // Return the last layer's state (slowest temporal context)
+                let states = hcfc.all_states();
+                if let Some(last_layer) = states.last() {
+                    if let Some(last_cell) = last_layer.last() {
+                        return Ok(last_cell.clone());
+                    }
+                }
+                Ok(Array1::zeros(hcfc.config().output_dim))
+            }
         }
     }
 
@@ -50,11 +68,13 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.train_step(input, target, dt, learning_rate),
             Self::HdcLtc(bridge) => bridge.train_step(input, target, dt, learning_rate),
+            Self::HierarchicalCfC(hcfc) => hcfc.train_step(input, target, dt, learning_rate),
         }
     }
 
     /// Train step using BPTT (analytical gradients).
     /// For HdcLtc this falls through to the default train_step.
+    /// For HierarchicalCfC this uses single-target multi-scale training.
     pub fn train_step_bptt(
         &mut self,
         input: &Array1<f32>,
@@ -67,11 +87,12 @@ impl TemporalNetwork {
                 cfc.train_step_bptt(&[input.clone()], &[target.clone()], &[dt], learning_rate)
             }
             Self::HdcLtc(bridge) => bridge.train_step(input, target, dt, learning_rate),
+            Self::HierarchicalCfC(hcfc) => hcfc.train_step(input, target, dt, learning_rate),
         }
     }
 
     /// Train step using SPSA (perturbation-based gradients).
-    /// For HdcLtc this falls through to the default train_step.
+    /// For HdcLtc and HierarchicalCfC this falls through to the default train_step.
     pub fn train_step_spsa(
         &mut self,
         input: &Array1<f32>,
@@ -82,14 +103,21 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.train_step_spsa(input, target, dt, learning_rate),
             Self::HdcLtc(bridge) => bridge.train_step(input, target, dt, learning_rate),
+            Self::HierarchicalCfC(hcfc) => hcfc.train_step(input, target, dt, learning_rate),
         }
     }
 
-    /// Predict forward at a specific time horizon
+    /// Predict forward at a specific time horizon.
+    ///
+    /// For HierarchicalCfC, this runs the full hierarchy at the given horizon as dt,
+    /// returning the combined multi-scale output.
     pub fn predict_forward(&mut self, input: &Array1<f32>, horizon: f32) -> Result<Array1<f32>> {
         match self {
             Self::CfC(cfc) => cfc.predict_forward(input, horizon),
             Self::HdcLtc(bridge) => bridge.predict_forward(input, horizon),
+            Self::HierarchicalCfC(hcfc) => {
+                Ok(hcfc.forward_hierarchical(input, horizon).combined)
+            }
         }
     }
 
@@ -98,6 +126,10 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.inject(state),
             Self::HdcLtc(bridge) => bridge.inject(state),
+            Self::HierarchicalCfC(hcfc) => {
+                hcfc.reset();
+                Ok(())
+            }
         }
     }
 
@@ -106,6 +138,24 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.state_diversity(),
             Self::HdcLtc(bridge) => bridge.state_diversity(),
+            Self::HierarchicalCfC(hcfc) => {
+                // Compute diversity across all layers as variance of layer norms
+                let states = hcfc.all_states();
+                let norms: Vec<f32> = states
+                    .iter()
+                    .filter_map(|layer| {
+                        layer.last().map(|s| s.iter().map(|v| v * v).sum::<f32>().sqrt())
+                    })
+                    .collect();
+                if norms.len() < 2 {
+                    return 0.5;
+                }
+                let mean = norms.iter().sum::<f32>() / norms.len() as f32;
+                let var =
+                    norms.iter().map(|n| (n - mean).powi(2)).sum::<f32>() / norms.len() as f32;
+                // Normalize: high variance across layers = high diversity
+                (var.sqrt() / (mean.abs() + 1e-6)).min(1.0)
+            }
         }
     }
 
@@ -114,6 +164,13 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.all_tau().into_iter().cloned().collect(),
             Self::HdcLtc(bridge) => bridge.all_tau(),
+            Self::HierarchicalCfC(hcfc) => {
+                // Return one tau per hierarchical level
+                hcfc.time_constants()
+                    .iter()
+                    .map(|&tau| Array1::from_vec(vec![tau]))
+                    .collect()
+            }
         }
     }
 
@@ -122,6 +179,7 @@ impl TemporalNetwork {
         if let Self::CfC(cfc) = self {
             cfc.scale_tau_all(scale);
         }
+        // HierarchicalCfC tau is modulated by top-down feedback internally
     }
 
     /// Set tau values for all layers
@@ -145,25 +203,53 @@ impl TemporalNetwork {
         match self {
             Self::CfC(_) => TemporalBackend::CfC,
             Self::HdcLtc(_) => TemporalBackend::HdcLtcUnified,
+            Self::HierarchicalCfC(_) => TemporalBackend::HierarchicalCfC,
         }
     }
 
     /// Project input directly to HDC space, bypassing CfC temporal dynamics.
     ///
-    /// Returns `None` for CfC backend (no HDC projection available).
+    /// Returns `None` for CfC and HierarchicalCfC backends (no HDC projection available).
     /// Returns `Some(Vec<f32>)` for HdcLtc backend with the raw HDC vector.
     pub fn project_to_hdc_vec(&self, input: &[f32]) -> Option<Vec<f32>> {
         match self {
-            Self::CfC(_) => None,
+            Self::CfC(_) | Self::HierarchicalCfC(_) => None,
             Self::HdcLtc(bridge) => Some(bridge.project_to_hdc_vec(input)),
         }
     }
 
-    /// Get HDC dimension (returns None for CfC backend)
+    /// Get HDC dimension (returns None for CfC and HierarchicalCfC backends)
     pub fn hdc_dim(&self) -> Option<usize> {
         match self {
-            Self::CfC(_) => None,
+            Self::CfC(_) | Self::HierarchicalCfC(_) => None,
             Self::HdcLtc(bridge) => Some(bridge.hdc_dim()),
+        }
+    }
+
+    /// Get per-scale outputs from the last hierarchical forward pass.
+    ///
+    /// Returns `Some(outputs)` only for HierarchicalCfC backend.
+    /// Each element is the output at one temporal scale (fast → slow).
+    #[allow(dead_code)]
+    pub fn hierarchical_scale_outputs(
+        &mut self,
+        input: &Array1<f32>,
+        dt: f32,
+    ) -> Option<Vec<Array1<f32>>> {
+        if let Self::HierarchicalCfC(hcfc) = self {
+            Some(hcfc.forward_hierarchical(input, dt).scale_outputs)
+        } else {
+            None
+        }
+    }
+
+    /// Get effective time constants from hierarchical backend.
+    #[allow(dead_code)]
+    pub fn hierarchical_effective_taus(&self) -> Option<Vec<f32>> {
+        if let Self::HierarchicalCfC(hcfc) = self {
+            Some(hcfc.time_constants().to_vec())
+        } else {
+            None
         }
     }
 }

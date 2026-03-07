@@ -490,6 +490,35 @@ impl ProjectionCheckpoint {
         }
     }
 
+    /// Create a temporal checkpoint with multi-group/adapter metadata.
+    ///
+    /// Group count and adapter flag are stored implicitly in the weight vector;
+    /// the extra parameters are accepted for API compatibility with the training binary.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_temporal_with_groups(
+        spatial_weights: Vec<f32>,
+        temporal_weights: Vec<f32>,
+        hdc_dim: usize,
+        bottleneck_dim: usize,
+        ssm_dim: usize,
+        training_epoch: usize,
+        chunk_dim: usize,
+        num_chunks: usize,
+        _num_groups: usize,
+        _has_adapter: bool,
+    ) -> Self {
+        Self::new_temporal(
+            spatial_weights,
+            temporal_weights,
+            hdc_dim,
+            bottleneck_dim,
+            ssm_dim,
+            training_epoch,
+            chunk_dim,
+            num_chunks,
+        )
+    }
+
     /// Load from a file with integrity and version compatibility checks.
     ///
     /// Tries MessagePack (current format) first, then falls back to bincode

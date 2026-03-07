@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::agent::{SafetyAssessment, SafetyLevel};
+use super::agent::{SafetyAssessment, SafetyLevel, SafetyOverrideEntry};
 
 /// A complete safety audit report covering a window of assessments.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,6 +32,8 @@ pub struct SafetyAuditReport {
     pub top_reasons: Vec<(String, usize)>,
     /// Individual assessments (optional; may be omitted for large reports).
     pub assessments: Vec<SafetyAssessment>,
+    /// Human override events (EU AI Act Article 14 audit trail).
+    pub overrides: Vec<SafetyOverrideEntry>,
 }
 
 /// Count of assessments at each safety level.
@@ -46,6 +48,16 @@ pub struct LevelCounts {
 impl SafetyAuditReport {
     /// Generate a report from a slice of safety assessments.
     pub fn from_assessments(assessments: &[SafetyAssessment]) -> Self {
+        Self::from_assessments_and_overrides(assessments, &[])
+    }
+
+    /// Generate a report from assessments and human override events.
+    ///
+    /// The override log is included verbatim in the report for Article 14 compliance.
+    pub fn from_assessments_and_overrides(
+        assessments: &[SafetyAssessment],
+        overrides: &[SafetyOverrideEntry],
+    ) -> Self {
         let total = assessments.len();
 
         let mut counts = LevelCounts::default();
@@ -108,6 +120,7 @@ impl SafetyAuditReport {
             had_emergency: peak_level == SafetyLevel::Red,
             top_reasons,
             assessments: assessments.to_vec(),
+            overrides: overrides.to_vec(),
         }
     }
 
@@ -155,6 +168,22 @@ impl SafetyAuditReport {
             md.push_str("\n## Top Escalation Reasons\n\n");
             for (reason, count) in &self.top_reasons {
                 md.push_str(&format!("- **{}**: {} occurrences\n", reason, count));
+            }
+        }
+
+        if !self.overrides.is_empty() {
+            md.push_str("\n## Human Override Events (Article 14)\n\n");
+            md.push_str("| Cycle | Operator | Original | Override | Reason |\n");
+            md.push_str("|-------|----------|----------|----------|--------|\n");
+            for entry in &self.overrides {
+                md.push_str(&format!(
+                    "| {} | {} | {} | {} | {} |\n",
+                    entry.cycle,
+                    entry.operator,
+                    entry.original_level.label(),
+                    entry.override_level.label(),
+                    entry.reason,
+                ));
             }
         }
 
@@ -266,5 +295,36 @@ mod tests {
                 report.top_reasons[i].1
             );
         }
+    }
+
+    #[test]
+    fn test_report_with_overrides() {
+        let overrides = vec![SafetyOverrideEntry {
+            timestamp_nanos: 1234567890,
+            cycle: 42,
+            operator: "test-operator".to_string(),
+            reason: "sensor miscalibration".to_string(),
+            original_level: SafetyLevel::Red,
+            override_level: SafetyLevel::Green,
+        }];
+        let report =
+            SafetyAuditReport::from_assessments_and_overrides(&make_assessments(), &overrides);
+        assert_eq!(report.overrides.len(), 1);
+        assert_eq!(report.overrides[0].operator, "test-operator");
+
+        let md = report.to_markdown();
+        assert!(md.contains("Human Override Events"));
+        assert!(md.contains("test-operator"));
+        assert!(md.contains("sensor miscalibration"));
+
+        let json = report.to_json();
+        assert!(json.contains("test-operator"));
+    }
+
+    #[test]
+    fn test_report_no_overrides_section_when_empty() {
+        let report = SafetyAuditReport::from_assessments(&make_assessments());
+        let md = report.to_markdown();
+        assert!(!md.contains("Human Override Events"));
     }
 }

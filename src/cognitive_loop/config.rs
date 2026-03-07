@@ -34,6 +34,8 @@ pub enum TemporalBackend {
     CfC,
     /// New Unified HDC-LTC network with hypervector states
     HdcLtcUnified,
+    /// Hierarchical CfC with multi-scale temporal processing (PP-2)
+    HierarchicalCfC,
 }
 
 /// Training method selection for the cognitive loop
@@ -138,6 +140,11 @@ pub struct CognitiveLoopConfig {
 
     /// HDC-LTC Unified configuration (alternative to CfC)
     pub hdc_ltc_config: HdcLtcBridgeConfig,
+
+    /// Hierarchical CfC configuration for multi-scale temporal processing (PP-2).
+    /// When `temporal_backend` is `HierarchicalCfC`, this config controls the
+    /// multi-level hierarchy (default: 4 layers at tau 0.01/0.1/1.0/10.0).
+    pub hierarchical_cfc_config: crate::dynamics::hierarchical_cfc::HierarchicalCfCConfig,
 
     /// Which temporal backend to use
     pub temporal_backend: TemporalBackend,
@@ -538,6 +545,7 @@ impl Default for CognitiveLoopConfig {
                 ..HdcLtcBridgeConfig::default()
             },
             temporal_backend: TemporalBackend::default(),
+            hierarchical_cfc_config: crate::dynamics::hierarchical_cfc::HierarchicalCfCConfig::default(),
             learning_threshold: 0.05,
             buffer_size: 1000,
             enable_consolidation: true,

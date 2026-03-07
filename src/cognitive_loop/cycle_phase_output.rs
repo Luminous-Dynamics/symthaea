@@ -76,6 +76,8 @@ impl CognitiveLoopService {
                 input_memoized: perception.encoding.input_memoized,
                 attention_budget_gated: feedback.loops.attention_budget_gated,
                 attention_shift_applied: self.stats.attention_shift,
+                attention_fatigue: feedback.self_model.attention_fatigue,
+                attention_prediction_accuracy: feedback.self_model.attention_prediction_accuracy,
             },
             resonance_frequency: feedback.self_model.resonance_frequency,
             quantum_coherence_level: feedback.self_model.quantum_coherence_level,

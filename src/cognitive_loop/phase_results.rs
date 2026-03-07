@@ -273,6 +273,8 @@ pub(super) struct FbSelfModel {
     pub(super) hierarchical_total_free_energy: f64,
     pub(super) predictive_self_safety: f32,
     pub(super) attention_schema_focus: f32,
+    pub(super) attention_fatigue: f32,
+    pub(super) attention_prediction_accuracy: f32,
     pub(super) psi_attention_avg: f32,
     pub(super) gwt_broadcast: bool,
     pub(super) gwt_coalition_size: u32,

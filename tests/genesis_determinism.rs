@@ -134,6 +134,11 @@ fn make_genesis_loop(phrase: &str, backend: TemporalBackend) -> CognitiveLoopSer
     let mut config = match backend {
         TemporalBackend::CfC => CognitiveLoopConfig::with_cfc(),
         TemporalBackend::HdcLtcUnified => CognitiveLoopConfig::with_hdc_ltc_unified(),
+        TemporalBackend::HierarchicalCfC => {
+            let mut cfg = CognitiveLoopConfig::with_cfc();
+            cfg.temporal_backend = TemporalBackend::HierarchicalCfC;
+            cfg
+        }
     };
     config.genesis_phrase = Some(phrase.to_string());
     // Disable async training to ensure deterministic weight updates
