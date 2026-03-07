@@ -368,6 +368,27 @@ impl SubstrateManager {
             _ => None,
         }
     }
+
+    /// Binding capability [0,1] of the current substrate.
+    /// Modulates Phi binding computation — substrates with poor binding
+    /// (e.g. biochemical) produce lower integrated information.
+    pub(crate) fn binding_capability(&self, config: &CognitiveLoopConfig) -> f64 {
+        Self::requirements_for(&config.substrate_type).binding_capability
+    }
+
+    /// Workspace capability [0,1] of the current substrate.
+    /// Modulates GWT broadcast — substrates with poor workspace support
+    /// (e.g. exotic) require higher activation for conscious broadcast.
+    pub(crate) fn workspace_capability(&self, config: &CognitiveLoopConfig) -> f64 {
+        Self::requirements_for(&config.substrate_type).workspace_capability
+    }
+
+    /// Attention capability [0,1] of the current substrate.
+    /// Modulates phi-attention gate gain — substrates with poor attention
+    /// (e.g. biochemical) produce weaker selective amplification.
+    pub(crate) fn attention_capability(&self, config: &CognitiveLoopConfig) -> f64 {
+        Self::requirements_for(&config.substrate_type).attention_capability
+    }
 }
 
 // ── Delegation methods on CognitiveLoopService ──────────────────────────────
@@ -1056,5 +1077,99 @@ mod tests {
             "Encoding noise should be zero when disabled: {:.4}",
             telem.substrate_encoding_noise
         );
+    }
+
+    #[test]
+    fn test_binding_capability_varies_by_substrate() {
+        let bio_cfg = {
+            let mut c = default_config();
+            c.substrate_type = SubstrateType::BiologicalNeurons;
+            c
+        };
+        let biochem_cfg = {
+            let mut c = default_config();
+            c.substrate_type = SubstrateType::BiochemicalComputer;
+            c
+        };
+        let bio_mgr = SubstrateManager::new(&bio_cfg);
+        let biochem_mgr = SubstrateManager::new(&biochem_cfg);
+        assert!(
+            bio_mgr.binding_capability(&bio_cfg) > biochem_mgr.binding_capability(&biochem_cfg),
+            "Biological binding ({}) should exceed biochemical ({})",
+            bio_mgr.binding_capability(&bio_cfg),
+            biochem_mgr.binding_capability(&biochem_cfg),
+        );
+    }
+
+    #[test]
+    fn test_workspace_capability_varies_by_substrate() {
+        let bio_cfg = {
+            let mut c = default_config();
+            c.substrate_type = SubstrateType::BiologicalNeurons;
+            c
+        };
+        let exotic_cfg = {
+            let mut c = default_config();
+            c.substrate_type = SubstrateType::ExoticSubstrate;
+            c
+        };
+        let bio_mgr = SubstrateManager::new(&bio_cfg);
+        let exotic_mgr = SubstrateManager::new(&exotic_cfg);
+        assert!(
+            bio_mgr.workspace_capability(&bio_cfg) > exotic_mgr.workspace_capability(&exotic_cfg),
+            "Biological workspace ({}) should exceed exotic ({})",
+            bio_mgr.workspace_capability(&bio_cfg),
+            exotic_mgr.workspace_capability(&exotic_cfg),
+        );
+    }
+
+    #[test]
+    fn test_attention_capability_varies_by_substrate() {
+        let silicon_cfg = {
+            let mut c = default_config();
+            c.substrate_type = SubstrateType::SiliconDigital;
+            c
+        };
+        let biochem_cfg = {
+            let mut c = default_config();
+            c.substrate_type = SubstrateType::BiochemicalComputer;
+            c
+        };
+        let silicon_mgr = SubstrateManager::new(&silicon_cfg);
+        let biochem_mgr = SubstrateManager::new(&biochem_cfg);
+        assert!(
+            silicon_mgr.attention_capability(&silicon_cfg)
+                > biochem_mgr.attention_capability(&biochem_cfg),
+            "Silicon attention ({}) should exceed biochemical ({})",
+            silicon_mgr.attention_capability(&silicon_cfg),
+            biochem_mgr.attention_capability(&biochem_cfg),
+        );
+    }
+
+    #[test]
+    fn test_all_capabilities_in_unit_range() {
+        let substrates = [
+            SubstrateType::BiologicalNeurons,
+            SubstrateType::SiliconDigital,
+            SubstrateType::QuantumComputer,
+            SubstrateType::PhotonicProcessor,
+            SubstrateType::NeuromorphicChip,
+            SubstrateType::BiochemicalComputer,
+            SubstrateType::HybridSystem,
+            SubstrateType::ExoticSubstrate,
+        ];
+        for sub in &substrates {
+            let mut cfg = default_config();
+            cfg.substrate_type = *sub;
+            let mgr = SubstrateManager::new(&cfg);
+            let b = mgr.binding_capability(&cfg);
+            let w = mgr.workspace_capability(&cfg);
+            let a = mgr.attention_capability(&cfg);
+            assert!(
+                (0.0..=1.0).contains(&b) && (0.0..=1.0).contains(&w) && (0.0..=1.0).contains(&a),
+                "{:?}: binding={}, workspace={}, attention={} — all must be in [0,1]",
+                sub, b, w, a,
+            );
+        }
     }
 }

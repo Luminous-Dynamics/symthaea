@@ -227,6 +227,16 @@ impl CognitiveLoopService {
                 moral_anomaly_response_applied: self.config.enable_moral_anomaly_response
                     && self.ethics_engine.last_topology_fresh()
                     && moral_anomaly_report.anomaly_score > 0.0,
+                harmony_entropy: self
+                    .ethics_engine
+                    .moral_topology()
+                    .last_summary()
+                    .harmony_entropy,
+                moral_attractor_detected: self
+                    .ethics_engine
+                    .moral_topology()
+                    .last_summary()
+                    .attractor_detected,
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
             consciousness_profile_composite: feedback.consciousness.consciousness_profile_composite,
@@ -384,12 +394,23 @@ impl CognitiveLoopService {
                 % (2.0 * std::f64::consts::PI)) as f32,
             temporal_binding_strength: perception.encoding.temporal_binding_strength,
             prediction_horizon_scale: {
-                // Match prediction.rs: PE-adaptive × substrate tau, clamped
+                // Match prediction.rs: PE-adaptive × substrate tau × trend, clamped.
                 let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
                 let pe_scale = if pe > 0.3 { 1.0 - (pe - 0.3) * 0.6 }
                     else if pe < 0.05 { 1.0 + (0.05 - pe) * 6.0 }
                     else { 1.0 };
-                (self.substrate_manager.tau_factor * pe_scale)
+                // Error slope → horizon adjustment: rising errors shorten horizons
+                // (focus near-term), falling errors lengthen them (exploit stability).
+                // Clark (2013): predictive brain adjusts temporal scope to match uncertainty.
+                let slope = perception.urgency.error_slope;
+                let slope_scale = if slope > 0.02 {
+                    1.0 - (slope - 0.02).min(0.1) * 2.0 // up to -20%
+                } else if slope < -0.02 {
+                    1.0 + (-slope - 0.02).min(0.1) * 1.5 // up to +15%
+                } else {
+                    1.0
+                };
+                (self.substrate_manager.tau_factor * pe_scale * slope_scale)
                     .clamp(super::thresholds::PREDICTION_HORIZON_MIN_SCALE,
                            super::thresholds::PREDICTION_HORIZON_MAX_SCALE)
             },
@@ -409,6 +430,7 @@ impl CognitiveLoopService {
             feedback_dampened_count: self.feedback_state.feedback_dampened_count,
             feedback_signal_diversity: self.feedback_state.signal_diversity(),
             avg_transition_cost: self.stats.avg_transition_cost,
+            feedback_dominant_source: self.feedback_state.dominant_source().to_string(),
             error_slope: perception.urgency.error_slope,
             oscillation_ratio: perception.urgency.oscillation_ratio,
             mode_transitions: self.stats.mode_transitions as u32,
@@ -437,6 +459,13 @@ impl CognitiveLoopService {
         metadata.social_prediction_accuracy = self.social_mgr.social.social_prediction_accuracy;
         metadata.social_models_count = self.social_mgr.social.social_models_count;
         metadata.social_mean_trust = self.social_mgr.social.social_mean_trust;
+
+        // ── MCE factor telemetry (from consciousness carryover cache) ──
+        metadata.mce_bottleneck = self.carryover.consciousness.mce_bottleneck_name.clone();
+        metadata.mce_softmin = self.carryover.consciousness.mce_softmin;
+        metadata.mce_weighted_sum = self.carryover.consciousness.mce_weighted_sum;
+        metadata.mce_narrative = self.carryover.consciousness.mce_narrative;
+        metadata.mce_social = self.carryover.consciousness.mce_social;
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self

@@ -716,6 +716,7 @@
             ],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
         cal.apply(&mut bath);
 
@@ -761,6 +762,7 @@
             ],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
         let summary = cal.summary();
         assert!(
@@ -944,6 +946,7 @@
             ],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
         cal.apply(&mut bath);
 
@@ -986,6 +989,7 @@
             ],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
         cal.apply(&mut bath);
 
@@ -1146,6 +1150,7 @@
             }],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
         cal.apply(&mut bath);
 
@@ -1174,6 +1179,7 @@
             }],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
         cal.apply(&mut bath);
 
@@ -1204,6 +1210,7 @@
             }],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
         cal.apply(&mut bath);
 
@@ -1234,6 +1241,7 @@
             }],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
         cal.apply(&mut bath);
 
@@ -1293,6 +1301,7 @@
             }],
             confidence_delta: -0.02,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
 
         let mut peer_factors = std::collections::HashMap::new();
@@ -1333,6 +1342,7 @@
             }],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
 
         let mut peer_factors = std::collections::HashMap::new();
@@ -1368,6 +1378,7 @@
             }],
             confidence_delta: 0.0,
             coverage: 1.0,
+            stillness_quality: 0.5,
         };
 
         // Peer has ACh but not DA

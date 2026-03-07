@@ -46,6 +46,13 @@ pub struct NeuromodCalibration {
     pub confidence_delta: f32,
     /// Overall calibration quality (fraction of benchmarks with valid z-scores).
     pub coverage: f64,
+    /// Sacred Stillness quality: system's capacity for generative rest (0.0–1.0).
+    ///
+    /// Derived from PVT vigilance decrement and GABA/adenosine calibration:
+    /// low vigilance decrement + healthy inhibitory tone = high stillness quality.
+    /// Science: Tononi & Cirelli (2006) — synaptic homeostasis; rest quality
+    /// correlates with GABA-mediated inhibitory balance.
+    pub stillness_quality: f32,
 }
 
 /// Shareable calibration profile for multi-agent coordination.
@@ -450,11 +457,35 @@ impl NeuromodCalibration {
             };
         }
 
+        // Sacred Stillness quality: composite from GABA and adenosine calibration z-scores.
+        // Low vigilance decrement (negative adenosine z) + good inhibitory tone (negative GABA z)
+        // = high stillness quality. Both inverted: negative z = healthier rest capacity.
+        let stillness_quality = {
+            let gaba_z_opt = adjustments.iter()
+                .find(|a| a.transmitter == "GABA")
+                .map(|a| a.z_score);
+            let aden_z_opt = adjustments.iter()
+                .find(|a| a.transmitter == "Adenosine")
+                .map(|a| a.z_score);
+            match (gaba_z_opt, aden_z_opt) {
+                (Some(g), Some(a)) => {
+                    // Both negative z = healthy → quality approaches 1.0
+                    let composite = -(g * 0.5 + a * 0.5); // negate: negative z = good
+                    (0.5 + composite * 0.25).clamp(0.0, 1.0) as f32
+                }
+                (Some(z), None) | (None, Some(z)) => {
+                    (0.5 - z * 0.25).clamp(0.0, 1.0) as f32
+                }
+                (None, None) => 0.5, // no data → neutral
+            }
+        };
+
         let total_benchmarks = z_scores.len().max(1);
         NeuromodCalibration {
             adjustments,
             confidence_delta,
             coverage: valid_count as f64 / total_benchmarks as f64,
+            stillness_quality,
         }
     }
 

@@ -42,6 +42,17 @@ pub(crate) struct ConsciousnessCache {
     /// Last structural Phi result (updated every 194 cycles by consciousness engine).
     pub(crate) last_structural_phi:
         Option<symthaea_core::consciousness_metrics::StructuralPhiResult>,
+    // ── MCE factor telemetry (updated each MCE firing) ──────────────
+    /// MCE bottleneck factor name
+    pub(crate) mce_bottleneck_name: String,
+    /// MCE softmin value
+    pub(crate) mce_softmin: f64,
+    /// MCE weighted sum
+    pub(crate) mce_weighted_sum: f64,
+    /// MCE narrative coherence factor
+    pub(crate) mce_narrative: f64,
+    /// MCE social embedding factor
+    pub(crate) mce_social: f64,
 }
 
 impl Default for ConsciousnessCache {
@@ -62,6 +73,11 @@ impl Default for ConsciousnessCache {
             last_embodied_agency: 0.5,
             last_predictive_free_energy: 0.0,
             last_structural_phi: None,
+            mce_bottleneck_name: String::new(),
+            mce_softmin: 0.0,
+            mce_weighted_sum: 0.0,
+            mce_narrative: 0.0,
+            mce_social: 0.0,
         }
     }
 }
@@ -197,6 +213,8 @@ pub(crate) struct QualityMetrics {
     pub(crate) last_moral_score: f32,
     /// EMA-smoothed epistemic uncertainty (alpha=0.2, damps single-cycle noise).
     pub(crate) smoothed_epistemic_uncertainty: f32,
+    /// Previous cycle's cross-module agreement (for velocity computation).
+    pub(crate) prev_cross_module_agreement: f32,
 }
 
 impl Default for QualityMetrics {
@@ -227,6 +245,7 @@ impl Default for QualityMetrics {
             prev_confidence_for_crash: 0.5,
             last_moral_score: 0.0,
             smoothed_epistemic_uncertainty: 0.0,
+            prev_cross_module_agreement: 0.5,
         }
     }
 }

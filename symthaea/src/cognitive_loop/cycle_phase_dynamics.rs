@@ -466,8 +466,14 @@ impl CognitiveLoopService {
         self.emotion_contagion.analyze(input);
 
         // ── Phase 15+18: Emotional homeostasis ──
-        let (valence_homeostasis_pull, arousal_homeostasis_pull, homeostasis_pull_strength) =
+        let (valence_homeostasis_pull, arousal_homeostasis_pull, mut homeostasis_pull_strength) =
             self.apply_emotional_homeostasis();
+
+        // High transition cost → strengthen homeostasis to resist unnecessary mode changes.
+        // Kelso (1995): costly transitions increase the system's tendency to stay in current attractor.
+        if self.stats.avg_transition_cost > 0.1 {
+            homeostasis_pull_strength *= 1.0 + (self.stats.avg_transition_cost - 0.1).min(0.2) * 1.5;
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1c. Update Unified Emotional Bridge (VAD-based)
@@ -655,7 +661,12 @@ impl CognitiveLoopService {
         let smoothed_eu = self.carryover.quality.smoothed_epistemic_uncertainty;
         let eu_for_exploration = if smoothed_eu > 0.0 { smoothed_eu } else { epistemic_uncertainty };
         if eu_for_exploration > 0.4 && self.stats.total_cycles % 7 == 0 {
-            let epistemic_explore = (eu_for_exploration - 0.4) * 0.1;
+            let mut epistemic_explore = (eu_for_exploration - 0.4) * 0.1;
+            // Oscillation + high uncertainty = confused AND unstable → stronger exploration.
+            // Doya (2002) + Schmidhuber (2010): compound uncertainty warrants aggressive search.
+            if perception.urgency.oscillation_ratio > 0.5 {
+                epistemic_explore *= 1.5;
+            }
             self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
         } else if eu_for_exploration < 0.15 && self.stats.total_cycles % 7 == 0 {
             // Low epistemic uncertainty → dampen exploration (model is confident).
@@ -1199,6 +1210,13 @@ impl CognitiveLoopService {
                     }
                 }
             }
+        }
+
+        // Moral attractor dampening: when a stable moral basin is detected,
+        // reduce exploration rate by 20% — the system has settled on an ethical stance.
+        if self.ethics_engine.moral_topology().last_summary().attractor_detected {
+            let rate = self.fep.closed_learning_loop.exploration_rate();
+            self.fep.closed_learning_loop.set_exploration_rate(rate * 0.8);
         }
 
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;

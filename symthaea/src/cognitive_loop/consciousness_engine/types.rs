@@ -116,6 +116,14 @@ pub(crate) struct ConsciousnessEngineInput<'a> {
     /// Scales Equation V2 consciousness to reflect substrate limitations.
     pub substrate_feasibility: f64,
 
+    // ── Substrate requirement dimensions → consciousness coupling ────
+    /// Binding capability [0,1] — modulates CoreComponent::Binding.
+    pub binding_capability: f64,
+    /// Workspace capability [0,1] — modulates CoreComponent::Workspace.
+    pub workspace_capability: f64,
+    /// Attention capability [0,1] — modulates phi_attention_weight in CoreComponent::Attention.
+    pub attention_capability: f64,
+
     // ── Moral topology → consciousness coupling ─────────────────────
     /// Moral drift magnitude from moral_drift(20). Higher = greater shift.
     /// Used for epistemic quality attenuation in EquationV2 Layer 3.

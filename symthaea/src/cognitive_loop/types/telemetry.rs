@@ -888,9 +888,29 @@ pub struct CycleMetadata {
     /// Average PE cost of mode transitions (EMA, 0.0–1.0).
     #[serde(default)]
     pub avg_transition_cost: f32,
+    /// Subsystem that contributed the most feedback proposals this cycle.
+    #[serde(default)]
+    pub feedback_dominant_source: String,
     /// Self-assessment adaptive cooldown duration (cycles).
     #[serde(default)]
     pub calibration_cooldown_duration: u32,
+
+    // ── MCE Factor Telemetry ──────────────────────────────────────────
+    /// MCE bottleneck: which factor is limiting consciousness (e.g., "Φ (Integration)").
+    #[serde(default)]
+    pub mce_bottleneck: String,
+    /// MCE softmin: the bottleneck score before sigmoid (0.0–1.0).
+    #[serde(default)]
+    pub mce_softmin: f64,
+    /// MCE weighted sum of all 10 components (0.0–1.0).
+    #[serde(default)]
+    pub mce_weighted_sum: f64,
+    /// MCE narrative coherence factor N (0.0–1.0).
+    #[serde(default)]
+    pub mce_narrative: f64,
+    /// MCE social embedding factor Soc (0.0–1.0).
+    #[serde(default)]
+    pub mce_social: f64,
 }
 
 fn default_response_profile() -> String {
@@ -1140,13 +1160,13 @@ pub struct HarmonicMetrics {
     pub harmonies_alignment: f32,
     /// Harmonies integrator: whether the current action was approved.
     pub harmonies_approved: bool,
-    /// Harmonic field coherence — geometric mean of all 7 harmonics (0.0 when off).
+    /// Harmonic field coherence — geometric mean of all 8 harmonics (0.0 when off).
     pub harmonic_field_coherence: f64,
     /// Infinite Love resonance — emergent unity measure (0.0 when off).
     pub harmonic_love_resonance: f64,
     /// Number of harmonic interference patterns detected (0 when off).
     pub harmonic_interferences: usize,
-    /// 7D harmony coordinates: cosine similarity to each Harmony basis.
+    /// 8D harmony coordinates: cosine similarity to each Harmony basis.
     pub harmony_coordinates: [f64; N_HARMONIES],
     /// Softmax distribution over harmonies for the current scenario.
     pub moral_scenario_distribution: [f64; N_HARMONIES],
@@ -1206,7 +1226,7 @@ pub struct EthicalTelemetry {
     pub moral_topo_circularity: f64,
     /// Moral free energy (FEP surprise on harmony manifold, 0.0 when not computed).
     pub moral_topo_free_energy: f64,
-    /// Dominant harmony axis index (0–6, maps to Harmony::all()).
+    /// Dominant harmony axis index (0–7, maps to Harmony::all()).
     pub moral_topo_dominant_harmony: u8,
     /// Number of scenarios in the moral topology sliding window.
     pub moral_topo_scenario_count: usize,
@@ -1222,6 +1242,13 @@ pub struct EthicalTelemetry {
     pub moral_fragmentation_increase: bool,
     /// True when anomaly response modulations were applied this cycle.
     pub moral_anomaly_response_applied: bool,
+    /// Harmony entropy (moral breadth): Shannon entropy of harmony variance distribution.
+    /// Range: [0, ln(8)] ≈ [0, 2.08]. Higher = broader moral engagement.
+    #[serde(default)]
+    pub harmony_entropy: f64,
+    /// Whether a moral attractor basin was detected (low free energy + low drift).
+    #[serde(default)]
+    pub moral_attractor_detected: bool,
 }
 
 /// Free energy principle (FEP) and predictive processing telemetry.

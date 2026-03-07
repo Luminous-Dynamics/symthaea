@@ -119,15 +119,15 @@ impl CognitiveLoopService {
             let newest = self.carryover.history.error_history[error_history_len - 1];
             let oldest_4 = self.carryover.history.error_history[error_history_len - 4];
             let slope = (newest - oldest_4) / 3.0;
+            // Proportional bias: slope magnitude drives threshold adjustment.
+            // Clark (2013): predictive brain scales anticipatory response to trend strength.
             if slope > 0.02 {
-                0.9f32
-            }
-            // Rising → easier to escalate
-            else if slope < -0.02 {
-                1.1
-            }
-            // Falling → easier to de-escalate
-            else {
+                // Rising errors → lower threshold proportionally (easier to escalate)
+                (1.0 - (slope - 0.02).min(0.15) * 0.67).max(0.85)
+            } else if slope < -0.02 {
+                // Falling errors → raise threshold proportionally (easier to de-escalate)
+                (1.0 + (-slope - 0.02).min(0.15) * 0.67).min(1.15)
+            } else {
                 1.0
             }
         } else {
@@ -157,7 +157,14 @@ impl CognitiveLoopService {
             self.carryover.urgency.consecutive_low_coherence = 0;
         }
 
-        let hysteresis_threshold = base_hysteresis * pattern_mod * coherence_mod;
+        // High transition cost → widen hysteresis band to resist unnecessary switching.
+        // Kelso (1995): costly transitions justify stronger hysteresis.
+        let transition_cost_mod = if self.stats.avg_transition_cost > 0.1 {
+            1.0 + (self.stats.avg_transition_cost - 0.1).min(0.2) * 0.5 // up to +10%
+        } else {
+            1.0
+        };
+        let hysteresis_threshold = base_hysteresis * pattern_mod * coherence_mod * transition_cost_mod;
         let error_urgency = super::super::CycleUrgency::from_state(
             smoothed_urgency_error,
             hysteresis_threshold,
@@ -287,7 +294,9 @@ impl CognitiveLoopService {
             urgency = if raw_level > prev_level {
                 raw_urgency // escalating → use new immediately
             } else {
-                // de-escalating → hold old urgency for 1 cycle
+                // De-escalating → hold old urgency for 1 cycle.
+                // High transition cost → require stronger signal (hysteresis tightening).
+                // Kelso (1995): costly transitions justify stronger hysteresis.
                 self.carryover.urgency.prev_urgency
             };
             self.carryover.urgency.prev_urgency = raw_urgency;
@@ -305,6 +314,15 @@ impl CognitiveLoopService {
         self.stats.avg_mode_stability = self.stats.avg_mode_stability * 0.9
             + self.carryover.urgency.mode_stability_counter as f32 * 0.1;
 
+        // Track mode transition cost: PE spike in the cycle immediately after a transition.
+        // Kelso (1995): attractor transitions incur transient processing costs.
+        if self.carryover.urgency.mode_stability_counter == 1 {
+            // Just settled into new mode — measure transition cost as current PE
+            let cost = prediction_error.max(0.0);
+            self.stats.avg_transition_cost =
+                self.stats.avg_transition_cost * 0.8 + cost * 0.2;
+        }
+
         // Sustained Critical urgency → LR boost.
         // If stuck in Critical for >5 cycles, boost learning rate to accelerate adaptation.
         // Science: Yerkes-Dodson (1908) — moderate arousal optimizes performance,
@@ -316,6 +334,14 @@ impl CognitiveLoopService {
                 * 0.01)
                 .min(0.1);
             self.scale_lr("sustained_critical", 1.0 + sustained_boost);
+        }
+
+        // Oscillating error pattern → LR dampening to prevent chaotic weight updates.
+        // Doya (2002): oscillating error signals indicate meta-uncertainty about the
+        // learning target; reducing LR prevents gradient interference.
+        if oscillation_ratio > 0.5 {
+            let osc_dampen = 1.0 - (oscillation_ratio - 0.5) * 0.2; // 0.9–1.0
+            self.scale_lr("error_oscillation", osc_dampen.max(0.9));
         }
 
         UrgencyResult {

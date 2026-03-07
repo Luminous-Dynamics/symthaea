@@ -968,6 +968,14 @@ pub const FEP_TD_ERROR_DISCOVERY_THRESHOLD: f64 = 0.5;
 pub const FEP_LEARNING_PLASTICITY_THRESHOLD: f32 = 0.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ACTIVE REST / SACRED STILLNESS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Consecutive cycles of Sacred Stillness dominance before active rest mode engages.
+/// Science: Tononi & Cirelli (2006) — sustained rest duration determines consolidation depth.
+pub const ACTIVE_REST_THRESHOLD: u16 = 10;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // EMOTIONAL HOMEOSTASIS
 // ═══════════════════════════════════════════════════════════════════════════════
 

@@ -27,7 +27,7 @@ use crate::consciousness::harmonies_integration::{HarmoniesIntegrator, ValuedAct
 use crate::consciousness::unified_value_evaluator::{
     Decision, EvaluationContext, UnifiedValueEvaluator,
 };
-use crate::hdc::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
+use crate::hdc::harmony_basis::{HarmonyBasis, HarmonyInteractionMatrix, MoralFreeEnergy};
 use symthaea_types::N_HARMONIES;
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
@@ -95,7 +95,7 @@ pub(crate) struct EthicsEngineOutput {
     pub anomaly_report: MoralAnomalyReport,
 
     // ── Stage 3b: Moral Geometry (FEP) ─────────────────────────────────
-    /// 7D harmony coordinates for this cycle's action
+    /// 8D harmony coordinates for this cycle's action
     #[allow(dead_code)] // Computed by harmonies integrator; read via engine cache
     pub harmony_coordinates: [f64; N_HARMONIES],
     /// Moral free energy decomposition (FEP on harmony manifold)
@@ -130,6 +130,11 @@ pub(crate) struct EthicsEngineInput<'a> {
     pub unified_psi: f64,
     /// Compressed state (256-dim) for harmonies integrator
     pub compressed_state: &'a [f32],
+    /// Sacred Stillness neuromod + circadian boost (applied to harmony coordinate 7).
+    /// Computed by caller from GABA + adenosine levels and circadian phase.
+    /// Science: Bhatt et al. (2020) — GABAergic tone correlates with resting-state activity;
+    /// Porkka-Heiskanen et al. (1997) — adenosine accumulation signals rest need.
+    pub stillness_boost: f32,
 }
 
 /// Result of Stage 1 moral evaluation only.
@@ -159,6 +164,9 @@ pub(crate) struct EthicsEngine {
 
     // ── Stage 4: Moral topology (persistent homology) ──────────────────
     moral_topology: MoralTopology,
+
+    // ── Stage 5: Harmony interaction matrix (synergies/tensions) ──────
+    interaction_matrix: HarmonyInteractionMatrix,
 
     // ── Cached values ──────────────────────────────────────────────────
     cache: EthicsEngineCache,
@@ -263,12 +271,15 @@ impl EthicsEngine {
             }
         });
 
+        let interaction_matrix = HarmonyInteractionMatrix::from_basis(&shared_basis);
+
         Self {
             moral_parser,
             moral_algebra,
             value_evaluator,
             harmonies_integrator,
             moral_topology,
+            interaction_matrix,
             cache: EthicsEngineCache {
                 last_harmonies_approved: true,
                 ..Default::default()
@@ -433,7 +444,7 @@ impl EthicsEngine {
         // Every 19 cycles (co-prime with value evaluator — same cadence)
         //
         // Now uses semantically grounded basis vectors (not random) and
-        // computes moral free energy (FEP) on the 7D harmony manifold.
+        // computes moral free energy (FEP) on the 8D harmony manifold.
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
         let (harmonies_alignment, harmonies_approved, harmony_coordinates, moral_free_energy) =
@@ -468,6 +479,20 @@ impl EthicsEngine {
                 (0.0, true, [0.0; N_HARMONIES], MoralFreeEnergy::default())
             };
         let harmonies_us = t.elapsed().as_micros() as u64;
+
+        // Sacred Stillness neuromod grounding: GABA + adenosine boost SS coordinate
+        // Index 7 = SacredStillness in Harmony::all() canonical order.
+        // Science: Bhatt et al. (2020) — GABAergic tone correlates with resting-state activity;
+        // Porkka-Heiskanen et al. (1997) — adenosine accumulation signals rest need.
+        let mut harmony_coordinates = harmony_coordinates;
+        if input.stillness_boost > 0.0 {
+            harmony_coordinates[7] =
+                (harmony_coordinates[7] + input.stillness_boost as f64).clamp(-1.0, 1.0);
+        }
+
+        // Harmony interaction matrix: observe co-activations and apply synergies
+        self.interaction_matrix.observe(&harmony_coordinates, 0.05);
+        harmony_coordinates = self.interaction_matrix.apply(&harmony_coordinates, 0.15);
 
         // Harmonies feedback: low alignment → confidence reduction
         if harmonies_alignment > 0.0 && !harmonies_approved {
@@ -758,6 +783,7 @@ mod tests {
             cycle,
             unified_psi: 0.5,
             compressed_state: &[0.0; 256],
+            stillness_boost: 0.0,
         }
     }
 
@@ -813,6 +839,7 @@ mod tests {
             cycle: 7,
             unified_psi: 0.5,
             compressed_state: &[0.0; 256],
+            stillness_boost: 0.0,
         };
         let output = engine.evaluate(&input);
 
@@ -831,6 +858,7 @@ mod tests {
             cycle: 7,
             unified_psi: 0.5,
             compressed_state: &[0.0; 256],
+            stillness_boost: 0.0,
         };
         let output = engine.evaluate(&input);
 
@@ -856,6 +884,7 @@ mod tests {
             cycle: 19,
             unified_psi: 0.6,
             compressed_state: &[0.5; 256],
+            stillness_boost: 0.0,
         };
         let output = engine.evaluate(&input);
 

@@ -590,7 +590,16 @@ impl CognitiveLoopService {
                     + self.flow_state.intensity as f64 * 0.3)
                     .clamp(0.1, 1.0),
             };
-            let level = self.master_equation.compute(&inputs).consciousness_level;
+            let mce_result = self.master_equation.compute(&inputs);
+            let level = mce_result.consciousness_level;
+
+            // Cache MCE factor telemetry for output phase
+            self.carryover.consciousness.mce_bottleneck_name =
+                mce_result.bottleneck_name.clone();
+            self.carryover.consciousness.mce_softmin = mce_result.bottleneck_factor;
+            self.carryover.consciousness.mce_weighted_sum = mce_result.weighted_sum;
+            self.carryover.consciousness.mce_narrative = mce_result.narrative_coherence;
+            self.carryover.consciousness.mce_social = mce_result.social_embedding;
 
             // Track consciousness level for learning gating (Task C)
             self.carryover.history.consciousness_level = level;
