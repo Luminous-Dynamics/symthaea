@@ -618,7 +618,7 @@ impl CognitiveLoopService {
         // Science: Frith & Frith (2006) — social cognition recruits higher-order
         // mentalizing networks that correlate with conscious processing capacity.
         // Scale: 0.95 at accuracy=0.0, 1.05 at accuracy=1.0 (mild +/-5% modulation).
-        let social_accuracy = self.social.social_prediction_accuracy;
+        let social_accuracy = self.social_mgr.social.social_prediction_accuracy;
         let social_mod = 0.95 + 0.1 * social_accuracy as f64;
         let consciousness_level = (consciousness_level * social_mod).clamp(0.0, 1.0);
 

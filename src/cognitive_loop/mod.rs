@@ -239,7 +239,7 @@ struct Experience {
 }
 
 // SocialState + SocialCoherenceState moved to social_manager.rs
-pub(crate) use social_manager::{SocialManager, SocialState};
+pub(crate) use social_manager::SocialManager;
 
 // ── Primary service struct ──────────────────────────────────────────────────
 

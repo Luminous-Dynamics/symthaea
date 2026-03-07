@@ -255,13 +255,13 @@ fn test_compute_reward_signal_clamped() {
 #[test]
 fn test_compute_reward_signal_consumes_external() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.social.external_reward = 0.7;
+    service.social_mgr.social.external_reward = 0.7;
     let _reward = service.compute_reward_signal(0.2, 0.3);
     // external_reward should be consumed (set to 0)
     assert!(
-        service.social.external_reward.abs() < f32::EPSILON,
+        service.social_mgr.social.external_reward.abs() < f32::EPSILON,
         "external_reward not consumed: {}",
-        service.social.external_reward
+        service.social_mgr.social.external_reward
     );
 }
 

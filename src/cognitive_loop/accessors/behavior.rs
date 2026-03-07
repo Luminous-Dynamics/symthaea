@@ -114,10 +114,10 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
 
         /// Get voice quality summary for external systems
-        pub fn voice_feedback_summary(&self) -> VoiceQualitySummary { self.voice_feedback_bridge.summary() }
+        pub fn voice_feedback_summary(&self) -> VoiceQualitySummary { self.voice_coherence.voice.summary() }
 
         /// Check if voice indicates uncertainty
-        pub fn voice_indicates_uncertainty(&self) -> bool { self.voice_feedback_bridge.is_uncertain() }
+        pub fn voice_indicates_uncertainty(&self) -> bool { self.voice_coherence.voice.is_uncertain() }
 
         // ═══════════════════════════════════════════════════════════════════
         // MEGA-UNIFIED ARCHITECTURE
@@ -207,12 +207,12 @@ impl CognitiveLoopService {
 
     /// Update voice feedback with synthesis output metrics
     pub fn update_voice_feedback(&mut self, metrics: VoiceOutputMetrics) {
-        self.voice_feedback_bridge.update(metrics);
+        self.voice_coherence.voice.update(metrics);
     }
 
     /// Update listener prediction feedback
     pub fn update_listener_prediction(&mut self, success: f32) {
-        self.voice_feedback_bridge
+        self.voice_coherence.voice
             .update_listener_prediction(success);
     }
 
@@ -222,11 +222,11 @@ impl CognitiveLoopService {
     /// dissipative health, coherence velocity, and consciousness level —
     /// the signals needed by `CognitivePacing::from_cycle_metadata()`.
     pub fn voice_consciousness_signals(&self) -> VoiceConsciousnessSignals {
-        let (_, pattern_confidence) = self.temporal_signature_encoder.classify_state();
+        let (_, pattern_confidence) = self.voice_coherence.temporal.classify_state();
         let consciousness_level =
             super::super::snapshot::ConsciousnessSnapshot::compute_consciousness_level(
                 self.prediction_confidence as f32,
-                self.coherence_bridge.smoothed_coherence(),
+                self.voice_coherence.bridge.smoothed_coherence(),
                 self.flow_state.intensity,
                 pattern_confidence,
             );
@@ -266,8 +266,8 @@ impl CognitiveLoopService {
             coherence_velocity: signals.coherence_velocity,
             cross_agreement: signals.cross_module_agreement,
             consciousness_level: signals.consciousness_level as f32,
-            articulation_quality: self.voice_feedback_bridge.smoothed_articulation(),
-            rate_stability: self.voice_feedback_bridge.rate_stability(),
+            articulation_quality: self.voice_coherence.voice.smoothed_articulation(),
+            rate_stability: self.voice_coherence.voice.rate_stability(),
             integrated_phi: self
                 .carryover
                 .consciousness
@@ -284,8 +284,8 @@ impl CognitiveLoopService {
 
     /// Get combined phi contribution from all feedback sources
     pub fn combined_phi_contribution(&self) -> f32 {
-        self.coherence_bridge.phi_contribution()
-            + self.voice_feedback_bridge.compute_phi_adjustment()
+        self.voice_coherence.bridge.phi_contribution()
+            + self.voice_coherence.voice.compute_phi_adjustment()
     }
 
     /// Get the prediction-outcome coupling Modulation Index
@@ -311,8 +311,8 @@ impl CognitiveLoopService {
 
     /// Get combined learning rate modifier
     pub fn combined_learning_rate(&self) -> f32 {
-        let coherence_lr = self.coherence_bridge.effective_learning_rate();
-        let voice_modifier = self.voice_feedback_bridge.learning_rate_modifier();
+        let coherence_lr = self.voice_coherence.bridge.effective_learning_rate();
+        let voice_modifier = self.voice_coherence.voice.learning_rate_modifier();
         coherence_lr * voice_modifier
     }
 
@@ -320,7 +320,7 @@ impl CognitiveLoopService {
     /// Blended with internal prediction-error-based reward at 50% weight.
     /// Resets to 0.0 after consumption in the next cycle.
     pub fn provide_reward(&mut self, reward: f32) {
-        self.social.external_reward = reward.clamp(-1.0, 1.0);
+        self.social_mgr.social.external_reward = reward.clamp(-1.0, 1.0);
     }
 
     /// Inject social signals from Mind module's SocialCoherence.
@@ -337,17 +337,17 @@ impl CognitiveLoopService {
         models_count: usize,
         mean_trust: f32,
     ) {
-        self.social.social_trust = trust.clamp(0.0, 1.0);
-        self.social.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
-        self.social.social_prediction_accuracy = prediction_accuracy.clamp(0.0, 1.0);
-        self.social.social_models_count = models_count;
-        self.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
+        self.social_mgr.social.social_trust = trust.clamp(0.0, 1.0);
+        self.social_mgr.social.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
+        self.social_mgr.social.social_prediction_accuracy = prediction_accuracy.clamp(0.0, 1.0);
+        self.social_mgr.social.social_models_count = models_count;
+        self.social_mgr.social.social_mean_trust = mean_trust.clamp(0.0, 1.0);
     }
 
     /// Set the relational Psi from an external dyad computation.
     /// This is called by the Symthaea facade after computing Phi_dyad.
     pub fn set_relational_psi(&mut self, psi: f64) {
-        self.social.relational_psi = psi;
+        self.social_mgr.social.relational_psi = psi;
     }
 
     /// Inject a Mycelix ConsciousnessProfile back into the cognitive loop,
@@ -373,10 +373,10 @@ impl CognitiveLoopService {
     ) {
         let combined = identity * 0.25 + reputation * 0.25 + community * 0.30 + engagement * 0.20;
 
-        self.social.social_trust = (community as f32).clamp(0.0, 1.0);
-        self.social.social_cooperation_rate = (reputation as f32).clamp(0.0, 1.0);
-        self.social.social_mean_trust = (combined as f32).clamp(0.0, 1.0);
-        self.social.social_prediction_accuracy = (identity as f32).clamp(0.0, 1.0);
+        self.social_mgr.social.social_trust = (community as f32).clamp(0.0, 1.0);
+        self.social_mgr.social.social_cooperation_rate = (reputation as f32).clamp(0.0, 1.0);
+        self.social_mgr.social.social_mean_trust = (combined as f32).clamp(0.0, 1.0);
+        self.social_mgr.social.social_prediction_accuracy = (identity as f32).clamp(0.0, 1.0);
 
         // Modulate oxytocin from community dimension (social bonding).
         // Community trust maps to 0.0–0.3 oxytocin injection (conservative range).

@@ -282,17 +282,17 @@ impl CognitiveLoopService {
         // Push encoded HV into ring buffers for Phi-Dyad computation.
         // The encoding hdv represents the AI's cognitive state for this input.
         // We also use it as a human-proxy state (input → perceived partner state).
-        if self.phi_dyad.is_some() {
+        if self.social_mgr.phi_dyad.is_some() {
             let ai_hv = encoding.encoding_result.hdv.clone();
             let input_hv = ai_hv.clone(); // Same encoding as partner proxy
-            if self.recent_ai_hvs.len() >= 4 {
-                self.recent_ai_hvs.remove(0);
+            if self.social_mgr.recent_ai_hvs.len() >= 4 {
+                self.social_mgr.recent_ai_hvs.remove(0);
             }
-            self.recent_ai_hvs.push(ai_hv);
-            if self.recent_input_hvs.len() >= 4 {
-                self.recent_input_hvs.remove(0);
+            self.social_mgr.recent_ai_hvs.push(ai_hv);
+            if self.social_mgr.recent_input_hvs.len() >= 4 {
+                self.social_mgr.recent_input_hvs.remove(0);
             }
-            self.recent_input_hvs.push(input_hv);
+            self.social_mgr.recent_input_hvs.push(input_hv);
         }
 
         Ok(PerceptionPhaseResult {
@@ -393,8 +393,8 @@ mod tests {
         for i in 0..6 {
             let _ = svc.phase_perception(&format!("input {i}"), Instant::now(), &mut timings);
         }
-        assert!(svc.recent_ai_hvs.len() <= 4);
-        assert!(svc.recent_input_hvs.len() <= 4);
+        assert!(svc.social_mgr.recent_ai_hvs.len() <= 4);
+        assert!(svc.social_mgr.recent_input_hvs.len() <= 4);
     }
 
     #[test]

@@ -912,14 +912,14 @@ mod tests {
     fn default_social_signals_are_defaults() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
         // social_trust defaults to 0.5, cooperation_rate defaults to 0.0
-        assert!((service.social.social_trust - 0.5).abs() < f32::EPSILON);
-        assert!((service.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
+        assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
+        assert!((service.social_mgr.social.social_cooperation_rate - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn default_external_reward_is_zero() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-        assert!((service.social.external_reward - 0.0).abs() < f32::EPSILON);
+        assert!((service.social_mgr.social.external_reward - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -931,7 +931,7 @@ mod tests {
     #[test]
     fn default_relational_psi_is_zero() {
         let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-        assert!((service.social.relational_psi - 0.0).abs() < f64::EPSILON);
+        assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
     }
 
     // ── Backend selection ─────────────────────────────────────────────
@@ -1169,11 +1169,11 @@ mod tests {
         config.enable_primitive_consciousness = true;
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(
-            service.phi_dyad.is_some(),
+            service.social_mgr.phi_dyad.is_some(),
             "phi_dyad should be Some when enable_primitive_consciousness=true"
         );
         assert!(
-            service.partner_model.is_some(),
+            service.social_mgr.partner_model.is_some(),
             "partner_model should be Some when enable_primitive_consciousness=true"
         );
     }
@@ -1184,11 +1184,11 @@ mod tests {
         assert!(!config.enable_primitive_consciousness);
         let service = CognitiveLoopService::new(config).unwrap();
         assert!(
-            service.phi_dyad.is_none(),
+            service.social_mgr.phi_dyad.is_none(),
             "phi_dyad should be None when enable_primitive_consciousness=false"
         );
         assert!(
-            service.partner_model.is_none(),
+            service.social_mgr.partner_model.is_none(),
             "partner_model should be None when enable_primitive_consciousness=false"
         );
     }
@@ -1198,7 +1198,7 @@ mod tests {
         let mut config = CognitiveLoopConfig::default();
         config.enable_primitive_consciousness = true;
         let service = CognitiveLoopService::new(config).unwrap();
-        assert!(service.recent_ai_hvs.is_empty());
-        assert!(service.recent_input_hvs.is_empty());
+        assert!(service.social_mgr.recent_ai_hvs.is_empty());
+        assert!(service.social_mgr.recent_input_hvs.is_empty());
     }
 }

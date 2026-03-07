@@ -41,7 +41,7 @@ impl CognitiveLoopService {
         pub fn hdc_bridge_dim(&self) -> Option<usize> { self.temporal_network.hdc_dim() }
 
         /// Get coherence summary for external systems
-        pub fn coherence_summary(&self) -> crate::dynamics::cfc_coherence::CoherenceSummary { self.coherence_bridge.summary() }
+        pub fn coherence_summary(&self) -> crate::dynamics::cfc_coherence::CoherenceSummary { self.voice_coherence.bridge.summary() }
 
         // ═══════════════════════════════════════════════════════════════════
         // SEMANTIC MEMORY / STABILITY ACCESSORS

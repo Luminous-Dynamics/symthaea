@@ -80,7 +80,7 @@ impl CognitiveLoopService {
             self.prediction_confidence,
             self.fep.lr_boost,
             prediction_error,
-            self.coherence_bridge.smoothed_coherence(),
+            self.voice_coherence.bridge.smoothed_coherence(),
             self.stats.unified_psi as f64,
             phi_attention_weight,
             self.emotion_contagion.arousal,
@@ -267,7 +267,7 @@ impl CognitiveLoopService {
         };
 
         // ── Phase 17: Coherence memoization — cache pre-update value ─────
-        let pre_update_coherence = self.coherence_bridge.smoothed_coherence();
+        let pre_update_coherence = self.voice_coherence.bridge.smoothed_coherence();
 
         // ── Phase 20: Phenomenal binding → threshold gating ──────────────────
         let cached_binding = self.carryover.quality.last_phenomenal_binding as f32;
@@ -724,15 +724,15 @@ impl CognitiveLoopService {
         // 10. Update coherence bridge
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
         let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
-        self.coherence_bridge.update(&tau_refs);
+        self.voice_coherence.bridge.update(&tau_refs);
 
         // 10b. Update temporal signature encoder
         let flattened_tau: Vec<f32> = tau_owned.iter().flat_map(|a| a.iter().copied()).collect();
-        self.temporal_signature_encoder.record_batch(&flattened_tau);
+        self.voice_coherence.temporal.record_batch(&flattened_tau);
 
         // 10c. Update adaptive behavior
-        let (pattern, pattern_confidence) = self.temporal_signature_encoder.classify_state();
-        let coherence = self.coherence_bridge.smoothed_coherence();
+        let (pattern, pattern_confidence) = self.voice_coherence.temporal.classify_state();
+        let coherence = self.voice_coherence.bridge.smoothed_coherence();
         self.carryover.history.cached_coherence = Some(coherence);
 
         // Voice feedback heartbeat: synthesize metrics from cognitive state
@@ -755,9 +755,9 @@ impl CognitiveLoopService {
             duration_accuracy: 0.7,
             energy_consistency: 0.8,
         };
-        self.voice_feedback_bridge.update(voice_heartbeat);
+        self.voice_coherence.voice.update(voice_heartbeat);
 
-        let voice_confidence = self.voice_feedback_bridge.summary().voice_confidence;
+        let voice_confidence = self.voice_coherence.voice.summary().voice_confidence;
         self.adaptive_behavior = AdaptiveBehavior::from_consciousness_state(
             pattern,
             pattern_confidence,
@@ -977,9 +977,9 @@ impl CognitiveLoopService {
             }
         }
 
-        if self.social.external_reward.abs() > f32::EPSILON {
+        if self.social_mgr.social.external_reward.abs() > f32::EPSILON {
             let outcome_obs = Observation::from_consciousness_state(
-                self.social.external_reward as f64,
+                self.social_mgr.social.external_reward as f64,
                 coherence as f64,
                 self.prediction_confidence,
                 effective_lr as f64,
@@ -1575,7 +1575,7 @@ impl CognitiveLoopService {
 
         self.stats.temporal_coherence = coherence;
         self.stats.effective_learning_rate = effective_lr;
-        self.stats.coherence_phi_contribution = self.coherence_bridge.phi_contribution();
+        self.stats.coherence_phi_contribution = self.voice_coherence.bridge.phi_contribution();
 
         #[cfg(feature = "school_learning")]
         let school_predicted_phi_gain = if self.stats.total_cycles % 53 == 0 {
@@ -1878,7 +1878,7 @@ impl CognitiveLoopService {
             } else {
                 0
             },
-            epistemic_budget_scale: epistemic_budget_scale as f32,
+            epistemic_budget_scale,
         }
     }
 }

@@ -334,8 +334,8 @@ impl CognitiveLoopService {
         // 8. Update coherence bridge with current tau values
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
         let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
-        self.coherence_bridge.update(&tau_refs);
-        let coherence = self.coherence_bridge.smoothed_coherence();
+        self.voice_coherence.bridge.update(&tau_refs);
+        let coherence = self.voice_coherence.bridge.smoothed_coherence();
 
         // Effective threshold matches cycle() behavior (adaptive scaling)
         let effective_threshold =
@@ -538,7 +538,7 @@ impl CognitiveLoopService {
         self.stats.ltc_consciousness = self.temporal_network.state_diversity();
 
         // Voice feedback stats
-        let voice_summary = self.voice_feedback_bridge.summary();
+        let voice_summary = self.voice_coherence.voice.summary();
         self.stats.voice_articulation_quality = voice_summary.articulation_quality;
         self.stats.voice_rate_stability = voice_summary.rate_stability;
         self.stats.voice_phi_adjustment = voice_summary.phi_adjustment;
@@ -548,7 +548,7 @@ impl CognitiveLoopService {
             self.stats.coherence_phi_contribution + self.stats.voice_phi_adjustment;
 
         // Consciousness pattern from temporal signatures
-        let temporal_summary = self.temporal_signature_encoder.summary();
+        let temporal_summary = self.voice_coherence.temporal.summary();
         self.stats.consciousness_pattern = format!("{:?}", temporal_summary.pattern);
         self.stats.pattern_confidence = temporal_summary.confidence;
         self.stats.tau_mean = temporal_summary.features.mean;
@@ -725,9 +725,7 @@ impl CognitiveLoopService {
         self.last_prediction = None;
         self.stats = LoopStats::default();
         self.start_time = Instant::now();
-        self.coherence_bridge.reset();
-        self.voice_feedback_bridge.reset();
-        self.temporal_signature_encoder.reset();
+        self.voice_coherence.reset();
         self.adaptive_behavior = AdaptiveBehavior::default();
         self.set_confidence("inference_mode_reset", 0.5);
         self.flow_state.reset();
@@ -736,8 +734,7 @@ impl CognitiveLoopService {
         self.self_model_tier.self_reflection.reset(); // Preserves learned thresholds
         self.fep.agent = ActiveInferenceAgent::new(self.fep.agent.config.clone());
         self.coherence_tracker.reset();
-        self.social = super::SocialState::default();
-        self.social_coherence = super::SocialCoherenceState::default();
+        self.social_mgr = super::SocialManager::default();
         if let Some(ref mut usi) = self.user_state {
             usi.reset();
         }
