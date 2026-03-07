@@ -82,28 +82,31 @@ pub enum AlertSeverity {
     Critical,
 }
 
+// Must match hearth_types::AlertType variant ORDER (positional msgpack)
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum AlertType {
-    Fire,
     Medical,
-    Security,
     Natural,
+    Security,
+    Missing,
+    Fire,
     Custom(String),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateEmergencyPlanInput {
     pub hearth_hash: ActionHash,
-    pub title: String,
-    pub description: String,
-    pub contacts: Vec<EmergencyContactInput>,
+    pub contacts: Vec<EmergencyContact>,
+    pub meeting_points: Vec<String>,
+    pub medical_info_hashes: Vec<ActionHash>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct EmergencyContactInput {
+pub struct EmergencyContact {
     pub name: String,
     pub phone: String,
     pub relationship: String,
+    pub priority_order: u32,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -112,13 +115,21 @@ pub struct RaiseAlertInput {
     pub alert_type: AlertType,
     pub severity: AlertSeverity,
     pub message: String,
+    pub location_hint: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum SafetyStatus {
+    Safe,
+    NeedHelp,
+    NoResponse,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CheckInInput {
     pub alert_hash: ActionHash,
-    pub status: String,
-    pub message: Option<String>,
+    pub status: SafetyStatus,
+    pub location_hint: Option<String>,
 }
 
 // ============================================================================
@@ -219,20 +230,22 @@ async fn test_emergency_lifecycle() {
     // 4. Alice creates an emergency plan
     let plan_input = CreateEmergencyPlanInput {
         hearth_hash: hearth_hash.clone(),
-        title: "Fire Evacuation Plan".to_string(),
-        description: "Exit via back door, meet at oak tree".to_string(),
         contacts: vec![
-            EmergencyContactInput {
+            EmergencyContact {
                 name: "Fire Department".to_string(),
                 phone: "911".to_string(),
                 relationship: "Emergency Service".to_string(),
+                priority_order: 1,
             },
-            EmergencyContactInput {
+            EmergencyContact {
                 name: "Neighbor Jane".to_string(),
                 phone: "555-0123".to_string(),
                 relationship: "Neighbor".to_string(),
+                priority_order: 2,
             },
         ],
+        meeting_points: vec!["Oak tree in backyard".to_string()],
+        medical_info_hashes: vec![],
     };
 
     let plan_record: Record = alice_conductor
@@ -251,6 +264,7 @@ async fn test_emergency_lifecycle() {
         alert_type: AlertType::Fire,
         severity: AlertSeverity::High,
         message: "Smoke detected in kitchen".to_string(),
+        location_hint: Some("Kitchen area".to_string()),
     };
 
     let alert_record: Record = alice_conductor
@@ -269,8 +283,8 @@ async fn test_emergency_lifecycle() {
     // 6. Bob checks in
     let checkin_input = CheckInInput {
         alert_hash: alert_hash.clone(),
-        status: "safe".to_string(),
-        message: Some("I'm outside, all clear on my end".to_string()),
+        status: SafetyStatus::Safe,
+        location_hint: Some("Outside, front yard".to_string()),
     };
 
     let _checkin: Record = bob_conductor

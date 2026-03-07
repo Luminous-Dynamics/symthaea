@@ -123,9 +123,11 @@ hc dna pack .
 | SDK cluster integration | 49 | CommonsBridgeClient + CivicBridgeClient + typed convenience + cross-cluster + signal type guards + audit trail |
 | SDK conductor cluster | 22 | Typed convenience, rate limiting, allowlist, audit trail mock tests |
 | Sweettest cross-cluster | 12 | OtherRole dispatch, allowlist enforcement, typed helpers, bidirectional health |
-| Commons sweettest | 14/14 pass | Property, housing, care, mutualaid, water, food, transport, bridge, cross-domain. Run with `--test-threads=2` |
-| Civic sweettest | 14/14 pass | Justice, emergency, media, bridge, cross-domain. Run with `--test-threads=2` |
-| DNA/hApp bundles | 2 | commons (24M, 35 zomes) + civic (12M, 16 zomes) packed and verified |
+| Commons sweettest | 14/14 pass | Property, housing, care, mutualaid, water, food, transport, bridge, cross-domain. Run with `--test-threads=1` |
+| Civic sweettest | 17/17 pass | Justice, emergency, media, bridge, cross-domain. Run with `--test-threads=1` |
+| Hearth sweettest | 48 total (39 run, 9 gated) | All 39 runnable tests pass. 9 consciousness_gating tests cfg-gated behind `identity_cluster` feature (need identity bridge). Run with `--test-threads=1` |
+| Personal sweettest | 8/8 pass | Identity vault, health vault, credential wallet, bridge dispatch, trust credentials |
+| DNA/hApp bundles | 4 | commons (24M, 35 zomes) + civic (12M, 16 zomes) + hearth (8M, 12 zomes) + personal packed and verified |
 | WASM zomes | 66 | Compile to wasm32-unknown-unknown |
 | Sweettest | 15/15 pass | `just test-sweettest` (--release required) |
 | Tryorama | 13 suites | Needs running conductor + hApp bundles |
@@ -135,7 +137,7 @@ See [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md) for full details.
 
 ## Development Priorities
 
-1. **P0**: Sweettests passing (28/28 commons+civic). Fix CI `continue-on-error` flags, expand CI sweettest coverage
+1. **P0**: Sweettests passing (78/82 across 4 clusters: commons 14, civic 17, hearth 39+9 gated, personal 8). Commons blocked by 35-zome DNA memory needs (~8GB+ clean RAM). Fix CI flags, expand CI sweettest coverage
 2. **P1**: Add `cargo doc` + `cargo test --doc` to CI pipeline
 3. **P2**: Tryorama ecosystem test execution, E2E coverage
 

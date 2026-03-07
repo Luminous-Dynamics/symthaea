@@ -523,22 +523,34 @@ async fn test_rhythm_create_and_log() {
 // Additional Care Tests
 // ============================================================================
 
-/// Alice creates hearth, creates a care schedule assigned to herself,
-/// proposes a swap on that schedule, then accepts the swap.
-/// Verifies the full swap lifecycle: propose -> accept.
+/// Alice creates hearth, invites Bob, creates a care schedule assigned to
+/// Alice, Bob proposes a swap, and Alice accepts. Uses 2 conductors to
+/// avoid "requester and responder cannot be the same agent" validation.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor"]
 async fn test_care_swap_lifecycle() {
-    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&hearth_dna_path()).await.unwrap();
-    let (alice,) = conductor
+
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (bob,) = bob_conductor
         .setup_app("test-app", &[dna_file.clone()])
         .await
         .unwrap()
         .into_tuple();
 
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
+
+    let bob_agent = bob.agent_pubkey().clone();
+
     // 1. Alice creates a hearth
-    let hearth_record: Record = conductor
+    let hearth_record: Record = alice_conductor
         .call(
             &alice.zome("hearth_kinship"),
             "create_hearth",
@@ -553,8 +565,45 @@ async fn test_care_swap_lifecycle() {
 
     let hearth_hash = hearth_record.action_address().clone();
 
-    // 2. Alice creates a care schedule
-    let schedule_record: Record = conductor
+    // 2. Alice invites Bob as Adult
+    let invitation_record: Record = alice_conductor
+        .call(
+            &alice.zome("hearth_kinship"),
+            "invite_member",
+            InviteMemberInput {
+                hearth_hash: hearth_hash.clone(),
+                invitee_agent: bob_agent.clone(),
+                proposed_role: MemberRole::Adult,
+                message: "Join for swap testing".to_string(),
+                expires_at: Timestamp::from_micros(
+                    Timestamp::now().as_micros() + 86_400_000_000,
+                ),
+            },
+        )
+        .await;
+
+    let invitation_hash = invitation_record.action_address().clone();
+
+    // Wait for DHT sync
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    // 3. Bob accepts invitation
+    let _: Record = bob_conductor
+        .call(
+            &bob.zome("hearth_kinship"),
+            "accept_invitation",
+            AcceptInvitationInput {
+                invitation_hash,
+                display_name: "Bob".to_string(),
+            },
+        )
+        .await;
+
+    // Wait for DHT sync
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    // 4. Alice creates a care schedule assigned to herself
+    let schedule_record: Record = alice_conductor
         .call(
             &alice.zome("hearth_care"),
             "create_care_schedule",
@@ -572,10 +621,13 @@ async fn test_care_swap_lifecycle() {
 
     let schedule_hash = schedule_record.action_address().clone();
 
-    // 3. Alice proposes a swap on that schedule
-    let swap_record: Record = conductor
+    // Wait for DHT sync
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    // 5. Bob proposes a swap on Alice's schedule
+    let swap_record: Record = bob_conductor
         .call(
-            &alice.zome("hearth_care"),
+            &bob.zome("hearth_care"),
             "propose_swap",
             ProposeSwapInput {
                 hearth_hash: hearth_hash.clone(),
@@ -588,16 +640,23 @@ async fn test_care_swap_lifecycle() {
         .await;
 
     let swap_hash = swap_record.action_address().clone();
-    assert!(swap_record.action().author() == alice.agent_pubkey());
+    assert!(swap_record.action().author() == bob.agent_pubkey());
 
-    // 4. Alice accepts the swap (as the schedule's assignee/responder)
-    let _accepted: Record = conductor
+    // Wait for DHT sync
+    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+    // 6. Alice accepts the swap
+    let _accepted: Record = alice_conductor
         .call(
             &alice.zome("hearth_care"),
             "accept_swap",
             swap_hash,
         )
         .await;
+
+    drop(alice_conductor);
+    drop(bob_conductor);
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 }
 
 // ============================================================================
