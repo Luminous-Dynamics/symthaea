@@ -1842,9 +1842,17 @@ impl Symthaea {
                     continue;
                 }
 
-                // Step 1b: Compilation verification via CodeExecutor (sandbox)
+                // Step 1b: Compile + run tests via CodeExecutor (sandbox)
+                // If the code contains #[test] assertions, compile with --test and
+                // execute them. This catches behavioral errors (wrong output), not
+                // just syntax errors.
+                let has_inline_tests = current_code.contains("#[test]");
                 let mut executor = crate::language::code_executor::CodeExecutor::new();
                 let exec_result = match lang.as_str() {
+                    // Rust with inline tests: compile with --test and run assertions
+                    "rust" if has_inline_tests => {
+                        executor.execute_rust_with_inline_tests(&current_code)
+                    }
                     "rust" => executor.execute_rust(&current_code, None),
                     "python" => executor.execute_python(&current_code),
                     "nix" => executor.evaluate_nix(&current_code),
@@ -1852,37 +1860,66 @@ impl Symthaea {
                 };
 
                 let surprise = exec_result.to_surprise();
-                if surprise > 0.0 {
+                if surprise > 0.0 || exec_result.tests_failed > 0 {
                     tracing::info!(
                         target: "symthaea::code",
                         attempt,
                         compiled = exec_result.compiled,
+                        tests_passed = exec_result.tests_passed,
+                        tests_failed = exec_result.tests_failed,
                         errors = exec_result.compile_errors.len(),
                         surprise,
                         simulated = exec_result.simulated,
-                        "Phase 5.5: Compilation verification"
+                        "Phase 5.5: Compile + test verification"
                     );
                 }
 
                 last_compiled = exec_result.compiled;
                 last_simulated = exec_result.simulated;
 
-                if exec_result.compiled || exec_result.simulated {
+                if (exec_result.compiled || exec_result.simulated)
+                    && exec_result.tests_failed == 0
+                {
                     compile_ok = true;
                 } else if attempt < MAX_CODE_RETRIES {
                     if let Some(ref mut ctx) = thought.code_context {
-                        ctx.syntactically_valid = Some(false);
-                        ctx.notes.push(format!(
-                            "COMPILATION FAILED (attempt {}/{}):",
-                            attempt, MAX_CODE_RETRIES
-                        ));
-                        for err in exec_result.compile_errors.iter().take(5) {
-                            ctx.notes.push(format!("  {err}"));
+                        if !exec_result.compiled {
+                            ctx.syntactically_valid = Some(false);
+                            ctx.notes.push(format!(
+                                "COMPILATION FAILED (attempt {}/{}):",
+                                attempt, MAX_CODE_RETRIES
+                            ));
+                            for err in exec_result.compile_errors.iter().take(5) {
+                                ctx.notes.push(format!("  {err}"));
+                            }
+                            ctx.notes.push(format!(
+                                "RETRY {}/{}: Fix ONLY the compilation errors.",
+                                attempt, MAX_CODE_RETRIES
+                            ));
+                        } else if exec_result.tests_failed > 0 {
+                            // Behavioral failure: code compiles but tests fail
+                            ctx.notes.push(format!(
+                                "TESTS FAILED (attempt {}/{}): {} passed, {} failed",
+                                attempt, MAX_CODE_RETRIES,
+                                exec_result.tests_passed, exec_result.tests_failed
+                            ));
+                            if let Some(ref err) = exec_result.runtime_error {
+                                // Include actual vs expected from test output
+                                for line in err.lines().take(10) {
+                                    if line.contains("assert")
+                                        || line.contains("left")
+                                        || line.contains("right")
+                                        || line.contains("panicked")
+                                    {
+                                        ctx.notes.push(format!("  {}", line.trim()));
+                                    }
+                                }
+                            }
+                            ctx.notes.push(format!(
+                                "RETRY {}/{}: The function body is WRONG. Fix the logic so tests pass.",
+                                attempt, MAX_CODE_RETRIES
+                            ));
                         }
-                        ctx.notes.push(format!(
-                            "RETRY {}/{}: Fix ONLY the compilation errors.",
-                            attempt, MAX_CODE_RETRIES
-                        ));
                     }
                     generation = self.llm.translate_thought(&thought, mood_temp).await;
                 }

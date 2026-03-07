@@ -273,6 +273,118 @@ impl CodeExecutor {
         }
     }
 
+    /// Compile Rust source with `--test` and run inline tests.
+    ///
+    /// Unlike `execute_rust`, this does NOT append a test module wrapper —
+    /// it expects the source to already contain `#[cfg(test)] mod tests { ... }`.
+    /// This is used when the emitters have generated inline assertions.
+    pub fn execute_rust_with_inline_tests(&mut self, source: &str) -> ExecutionResult {
+        let start = std::time::Instant::now();
+
+        if let Err(e) = std::fs::create_dir_all(&self.work_dir) {
+            return ExecutionResult {
+                compiled: false,
+                compile_errors: vec![format!("Failed to create work dir: {e}")],
+                tests_passed: 0,
+                tests_failed: 0,
+                test_output: String::new(),
+                runtime_error: None,
+                elapsed: start.elapsed(),
+                simulated: false,
+            };
+        }
+
+        let source_path = self.work_dir.join("generated_test.rs");
+        if let Err(e) = std::fs::write(&source_path, source) {
+            return ExecutionResult {
+                compiled: false,
+                compile_errors: vec![format!("Failed to write source: {e}")],
+                tests_passed: 0,
+                tests_failed: 0,
+                test_output: String::new(),
+                runtime_error: None,
+                elapsed: start.elapsed(),
+                simulated: false,
+            };
+        }
+
+        let output_path = self.work_dir.join("generated_test");
+        let compile_args: Vec<&str> = vec![
+            "--edition", "2021", "--test",
+            source_path.to_str().unwrap_or("generated_test.rs"),
+            "-o", output_path.to_str().unwrap_or("generated_test"),
+        ];
+
+        match self.sandbox.run("rustc", &compile_args) {
+            Ok(result) => {
+                if !result.success() {
+                    let errors = parse_compile_errors(&result.stderr);
+                    return ExecutionResult {
+                        compiled: false,
+                        compile_errors: if errors.is_empty() {
+                            vec![result.stderr.clone()]
+                        } else {
+                            errors
+                        },
+                        tests_passed: 0,
+                        tests_failed: 0,
+                        test_output: result.stderr,
+                        runtime_error: None,
+                        elapsed: start.elapsed(),
+                        simulated: result.simulated,
+                    };
+                }
+
+                // Run the test binary
+                match self.sandbox.run(
+                    output_path.to_str().unwrap_or("./generated_test"),
+                    &[],
+                ) {
+                    Ok(test_result) => {
+                        let (passed, failed) = parse_test_output(&test_result.stdout);
+                        ExecutionResult {
+                            compiled: true,
+                            compile_errors: Vec::new(),
+                            tests_passed: passed,
+                            tests_failed: failed,
+                            test_output: test_result.combined_output(),
+                            runtime_error: if test_result.success() {
+                                None
+                            } else {
+                                Some(test_result.stderr.clone())
+                            },
+                            elapsed: start.elapsed(),
+                            simulated: test_result.simulated,
+                        }
+                    }
+                    Err(e) => ExecutionResult {
+                        compiled: true,
+                        compile_errors: Vec::new(),
+                        tests_passed: 0,
+                        tests_failed: 0,
+                        test_output: String::new(),
+                        runtime_error: Some(format!("Test execution failed: {e}")),
+                        elapsed: start.elapsed(),
+                        simulated: false,
+                    },
+                }
+            }
+            Err(SandboxError::CommandNotAllowed(_)) | Err(SandboxError::RealExecutionDisabled) => {
+                ExecutionResult::simulated_success()
+            }
+            Err(e) => ExecutionResult {
+                compiled: false,
+                compile_errors: vec![format!("Sandbox error: {e}")],
+                tests_passed: 0,
+                tests_failed: 0,
+                test_output: String::new(),
+                runtime_error: None,
+                elapsed: start.elapsed(),
+                simulated: false,
+            },
+        }
+    }
+
     /// Execute Python source code.
     pub fn execute_python(&mut self, source: &str) -> ExecutionResult {
         let start = std::time::Instant::now();
