@@ -26,7 +26,7 @@ impl CognitiveLoopService {
         };
 
         let value_trend = self.primitive_tier.value_feedback.recent_trend(50);
-        let circadian_phase_str = self.biorhythm.phase.as_str();
+        let circadian_phase_str = self.biorhythm_mgr.rhythm.phase.as_str();
         let selected_strategy_str = perception.strategy.selected_strategy.as_str();
 
         let _t = Instant::now();
@@ -303,7 +303,7 @@ impl CognitiveLoopService {
                 module_timings.clone()
             },
             circadian_phase: circadian_phase_str.into(),
-            circadian_plasticity: self.biorhythm.plasticity_mod as f32,
+            circadian_plasticity: self.biorhythm_mgr.rhythm.plasticity_mod as f32,
             cross_module_agreement: feedback.quality.cross_module_agreement,
             thalamic_depth_score,
             epistemic_gate_gated: !feedback.reasoning.epistemic_gate_approved,
@@ -406,6 +406,9 @@ impl CognitiveLoopService {
             calibration_adjustment_multiplier: self.neuromod.calibration_validator.adjustment_multiplier(),
             calibration_cooldown_duration: self.neuromod.self_assessment.cooldown_duration(),
             feedback_signals_high_water: self.feedback_state.feedback_signals_high_water,
+            feedback_dampened_count: self.feedback_state.feedback_dampened_count,
+            feedback_signal_diversity: self.feedback_state.signal_diversity(),
+            avg_transition_cost: self.stats.avg_transition_cost,
             error_slope: perception.urgency.error_slope,
             oscillation_ratio: perception.urgency.oscillation_ratio,
             mode_transitions: self.stats.mode_transitions as u32,
@@ -437,16 +440,37 @@ impl CognitiveLoopService {
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
-            .gwt_memory_flag
+            .gwt_mgr.memory_flag
             .swap(false, std::sync::atomic::Ordering::Relaxed);
         metadata.gwt_perception_broadcasts = self
-            .gwt_perception_count
+            .gwt_mgr.perception_count
             .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
 
         // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
         // When global workspace broadcasts, record current state for episodic
         // replay so broadcast-worthy content is preferentially consolidated.
         if metadata.gwt_memory_consolidation_requested {
+            if let Some(ref mut dream) = self.dream_engine {
+                let action: Vec<f32> = perception
+                    .encoding.encoding_result
+                    .hdv
+                    .values
+                    .iter()
+                    .take(32)
+                    .copied()
+                    .collect();
+                dream.record_consolidation_event(
+                    &perception.encoding.compressed_state,
+                    action,
+                    perception.urgency.prediction_error,
+                );
+            }
+        }
+
+        // ── Error slope → consolidation priority ──
+        // Rao & Ballard (1999): rising errors signal model inadequacy; replay
+        // recent states to strengthen representations before further degradation.
+        if perception.urgency.error_slope > 0.03 && !metadata.gwt_memory_consolidation_requested {
             if let Some(ref mut dream) = self.dream_engine {
                 let action: Vec<f32> = perception
                     .encoding.encoding_result

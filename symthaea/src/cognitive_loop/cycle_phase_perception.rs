@@ -210,7 +210,7 @@ impl CognitiveLoopService {
 
         // ── GWT injection: feed foveation results into Global Workspace ──
         #[cfg(feature = "foveation")]
-        if let Some(ref mut gwt) = self.gwt {
+        if let Some(ref mut gwt) = self.gwt_mgr.gwt {
             for result in &fov_results {
                 let binary_hv = result.semantic_hv.to_binary(0.0);
                 let activation = result.confidence as f64;

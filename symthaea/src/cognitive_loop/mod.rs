@@ -157,6 +157,8 @@ pub(crate) mod substrate_manager;
 pub(crate) mod fep_module;
 pub(crate) mod voice_coherence_bridge;
 pub(crate) mod social_manager;
+pub(crate) mod gwt_manager;
+pub(crate) mod biorhythm_manager;
 
 #[cfg(feature = "ssm_language")]
 pub(crate) mod broca_bridge;
@@ -190,7 +192,7 @@ use crate::consciousness::dream::DreamEngine;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::enactive_cognition::EnactiveCognition;
 // ActiveInferenceAgent, EnhancedFEPBridge moved to fep_module.rs
-use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
+// UnifiedGlobalWorkspace now owned by GwtManager
 use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
 use crate::consciousness::predictive_processing::PredictiveMind;
@@ -454,14 +456,8 @@ pub struct CognitiveLoopService {
     /// Self-model subsystems: narrative, predictive, attention schema, meta-cognition.
     self_model_tier: self_model_tier::SelfModelTierManager,
 
-    /// Global Workspace Theory integration.
-    /// When enabled, submits encodings to workspace for conscious broadcast.
-    gwt: Option<UnifiedGlobalWorkspace>,
-
-    /// GWT handler flag: memory consolidation requested via broadcast.
-    gwt_memory_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    /// GWT handler counter: perception broadcast events consumed.
-    gwt_perception_count: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    /// GWT manager: workspace + memory flag + perception counter.
+    gwt_mgr: gwt_manager::GwtManager,
 
     /// Consciousness monitoring tier: resonance, quantum, temporal, embodied,
     /// thermodynamics, phenomenal binding, hierarchical free energy.
@@ -632,13 +628,8 @@ pub struct CognitiveLoopService {
     #[cfg(feature = "full_consciousness")]
     enactive: EnactiveCognition,
 
-    /// Chronobiology: circadian/ultradian rhythm modulation.
-    /// Modulates learning rate (plasticity) and exploration (creativity) based on local time.
-    /// Refreshed every 100 cycles to avoid unnecessary chrono calls.
-    biorhythm: crate::chronobiology::Biorhythm,
-
-    /// Cycle counter for biorhythm refresh (refreshes every 100 cycles).
-    biorhythm_refresh_counter: usize,
+    /// Biorhythm manager: circadian/ultradian rhythm + refresh counter.
+    biorhythm_mgr: biorhythm_manager::BiorhythmManager,
 
     /// Phi-guided attention gate for consciousness-aware perception weighting.
     /// When present, weights perception inputs by their integrated information

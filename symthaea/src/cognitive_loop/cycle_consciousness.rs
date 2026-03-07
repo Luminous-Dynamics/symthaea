@@ -155,49 +155,10 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS PROFILE: Multi-dimensional consciousness assessment
-        // Computes 5-axis profile (Phi, gradient, entropy, complexity, coherence).
-        // Amortized: every 10 cycles (involves Phi computation over HDC state).
-        // Science: Tononi (2004), Koch (2012) — multi-dimensional consciousness.
+        // [extracted to compute_consciousness_profile_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        // Maintain ring buffer of last 4 BinaryHVs for multi-component profile
-        // Capacity bound: 4 elements — evict before push to prevent transient over-capacity
-        if self.carryover.history.recent_hvs.len() >= 4 {
-            self.carryover.history.recent_hvs.pop_front();
-        }
-        self.carryover.history.recent_hvs.push_back(hv16_cached);
-        let (
-            consciousness_profile_composite,
-            synergy_enhanced_composite,
-            emergent_properties_count,
-        ) = if self.stats.total_cycles % 47 == 0
-            && self.primitive_tier.primitive_processor.is_some()
-        {
-            let profile =
-                crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
-                    self.carryover.history.recent_hvs.make_contiguous(),
-                );
-            let composite = profile.composite;
-            // Dimension synergies: discover non-linear interactions between consciousness dims
-            let synergy =
-                crate::consciousness::dimension_synergies::SynergyProfile::from_base(profile);
-            self.carryover.history.last_profile_composite = composite;
-            self.carryover.history.last_synergy_composite = synergy.enhanced_composite;
-            self.carryover.history.last_emergent_count = synergy.emergent_properties.len();
-            (
-                composite,
-                synergy.enhanced_composite,
-                synergy.emergent_properties.len(),
-            )
-        } else {
-            // Non-compute cycle: return cached values
-            (
-                self.carryover.history.last_profile_composite,
-                self.carryover.history.last_synergy_composite,
-                self.carryover.history.last_emergent_count,
-            )
-        };
-        module_timings.consciousness_profile = _t.elapsed().as_micros() as u64;
+        let (consciousness_profile_composite, synergy_enhanced_composite, emergent_properties_count) =
+            self.compute_consciousness_profile_phase(hv16_cached, module_timings);
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONTEXT-AWARE EVOLUTION: Dynamic Φ/Harmonic/Epistemic weighting
@@ -397,44 +358,9 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHI VALIDATION: Empirical validation of Phi against synthetic states
-        // EXPENSIVE — runs a validation study very rarely (every 500 cycles).
-        // Results cached as correlation metric for telemetry.
-        // Science: IIT empirical validation (Casali et al. 2013).
+        // [extracted to compute_phi_validation_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
-        let phi_validation_correlation =
-            if let Some(ref mut validator) = self.primitive_tier.phi_validation {
-                if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles >= 499 {
-                    // Phase 16: Run every 499 cycles (co-prime, repeating validation)
-                    // Science: Casali et al. (2013) — empirical Phi validation should be ongoing.
-                    let results = validator.run_validation_study(10);
-                    let r = results.pearson_r;
-                    // Cache for adaptive weighting
-                    self.carryover.quality.phi_validation_correlation = r;
-                    // Adjust spectral weight based on validation quality:
-                    // High correlation → trust spectral MIP more (boost weight)
-                    // Low correlation → reduce spectral weight (trust eq_v2 more)
-                    if r > PHI_VALIDATION_HIGH_THRESHOLD {
-                        self.carryover.quality.phi_spectral_weight =
-                            (SPECTRAL_WEIGHT_BASE
-                                + (r - PHI_VALIDATION_HIGH_THRESHOLD) as f32
-                                    * SPECTRAL_WEIGHT_SCALE)
-                                .clamp(0.4, 0.8);
-                    } else if r < PHI_VALIDATION_LOW_THRESHOLD && r > 0.0 {
-                        self.carryover.quality.phi_spectral_weight =
-                            (SPECTRAL_WEIGHT_BASE
-                                - (PHI_VALIDATION_LOW_THRESHOLD - r) as f32
-                                    * SPECTRAL_WEIGHT_SCALE)
-                                .clamp(0.4, 0.8);
-                    }
-                    r
-                } else {
-                    self.carryover.quality.phi_validation_correlation
-                }
-            } else {
-                0.0
-            };
-        module_timings.phi_validation = _t.elapsed().as_micros() as u64;
+        let phi_validation_correlation = self.compute_phi_validation_phase(module_timings);
 
         // ═══════════════════════════════════════════════════════════════════════
         // DISSIPATIVE CONSCIOUSNESS: Prigogine thermodynamic self-organization
@@ -445,44 +371,10 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // EPISTEMIC CONFLICT: Multi-theory conflict detection + Φ_eff reliability weighting
-        // Compares IIT, GWT, AST, PP, RPT, 4E scores; computes Φ_eff = Φ × R^γ.
-        // Science: IIT (Tononi 2015), GWT (Baars 1988), AST (Graziano 2013).
+        // [extracted to compute_epistemic_conflict_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let _t = Instant::now();
         let (epistemic_phi_eff, epistemic_conflict_count) =
-            if let (Some(ref mut detector), Some(ref calibrator)) = (
-                &mut self.primitive_tier.epistemic_conflict_detector,
-                &self.primitive_tier.theory_calibrator,
-            ) {
-                if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
-                    use crate::consciousness::epistemic_conflict::{
-                        compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
-                    };
-                    let metrics = MultiTheoryMetrics {
-                        phi: unified_psi,
-                        gwt: coherence as f64 * 0.8,
-                        ast: coherence as f64,
-                        pp: 1.0 - prediction_error as f64,
-                        rpt: coherence as f64 * 0.9,
-                        embodiment: self.carryover.consciousness.body_phi_modulation,
-                        unified: unified_psi,
-                    };
-                    let matrix: ConflictMatrix = detector.detect(&metrics);
-                    let phi_eff_result = compute_phi_eff(&metrics, calibrator);
-                    self.carryover.quality.last_phi_eff = phi_eff_result.phi_eff;
-                    // Phase 21: Cache epistemic conflict count for reasoning override
-                    self.carryover.quality.last_epistemic_conflict_count = matrix.conflicts.len();
-                    if matrix.conflicts.len() > 5 {
-                        self.carryover.quality.epistemic_reasoning_override = true;
-                    }
-                    (phi_eff_result.phi_eff, matrix.conflicts.len())
-                } else {
-                    (self.carryover.quality.last_phi_eff, 0)
-                }
-            } else {
-                (0.0, 0)
-            };
-        module_timings.epistemic_conflict = _t.elapsed().as_micros() as u64;
+            self.compute_epistemic_conflict_phase(unified_psi, coherence, prediction_error, module_timings);
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS EQUATION V2: Unified 7-theory formula
@@ -1053,6 +945,142 @@ impl CognitiveLoopService {
         module_timings.causal_explanation = _t.elapsed().as_micros() as u64;
 
         (causal_relations_count, causal_avg_confidence)
+    }
+
+    /// Consciousness Profile: multi-dimensional assessment with synergy detection.
+    ///
+    /// Maintains ring buffer of last 4 BinaryHVs, computes 5-axis profile (Phi,
+    /// gradient, entropy, complexity, coherence) every 47 cycles, then detects
+    /// non-linear dimension synergies.
+    ///
+    /// Science: Tononi (2004), Koch (2012).
+    pub(in crate::cognitive_loop) fn compute_consciousness_profile_phase(
+        &mut self,
+        hv16_cached: symthaea_core::hdc::BinaryHV,
+        module_timings: &mut super::ModuleTimings,
+    ) -> (f64, f64, usize) {
+        let _t = Instant::now();
+        // Maintain ring buffer of last 4 BinaryHVs for multi-component profile
+        // Capacity bound: 4 elements — evict before push to prevent transient over-capacity
+        if self.carryover.history.recent_hvs.len() >= 4 {
+            self.carryover.history.recent_hvs.pop_front();
+        }
+        self.carryover.history.recent_hvs.push_back(hv16_cached);
+        let result = if self.stats.total_cycles % 47 == 0
+            && self.primitive_tier.primitive_processor.is_some()
+        {
+            let profile =
+                crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
+                    self.carryover.history.recent_hvs.make_contiguous(),
+                );
+            let composite = profile.composite;
+            let synergy =
+                crate::consciousness::dimension_synergies::SynergyProfile::from_base(profile);
+            self.carryover.history.last_profile_composite = composite;
+            self.carryover.history.last_synergy_composite = synergy.enhanced_composite;
+            self.carryover.history.last_emergent_count = synergy.emergent_properties.len();
+            (
+                composite,
+                synergy.enhanced_composite,
+                synergy.emergent_properties.len(),
+            )
+        } else {
+            (
+                self.carryover.history.last_profile_composite,
+                self.carryover.history.last_synergy_composite,
+                self.carryover.history.last_emergent_count,
+            )
+        };
+        module_timings.consciousness_profile = _t.elapsed().as_micros() as u64;
+        result
+    }
+
+    /// Phi Validation: empirical validation of Phi against synthetic states.
+    ///
+    /// Runs a validation study every 499 cycles (co-prime, expensive). Adjusts
+    /// spectral weight based on correlation quality.
+    ///
+    /// Science: Casali et al. (2013).
+    pub(in crate::cognitive_loop) fn compute_phi_validation_phase(
+        &mut self,
+        module_timings: &mut super::ModuleTimings,
+    ) -> f64 {
+        let _t = Instant::now();
+        let correlation = if let Some(ref mut validator) = self.primitive_tier.phi_validation {
+            if self.stats.total_cycles % 499 == 0 && self.stats.total_cycles >= 499 {
+                let results = validator.run_validation_study(10);
+                let r = results.pearson_r;
+                self.carryover.quality.phi_validation_correlation = r;
+                // Adjust spectral weight based on validation quality
+                if r > PHI_VALIDATION_HIGH_THRESHOLD {
+                    self.carryover.quality.phi_spectral_weight =
+                        (SPECTRAL_WEIGHT_BASE
+                            + (r - PHI_VALIDATION_HIGH_THRESHOLD) as f32 * SPECTRAL_WEIGHT_SCALE)
+                            .clamp(0.4, 0.8);
+                } else if r < PHI_VALIDATION_LOW_THRESHOLD && r > 0.0 {
+                    self.carryover.quality.phi_spectral_weight =
+                        (SPECTRAL_WEIGHT_BASE
+                            - (PHI_VALIDATION_LOW_THRESHOLD - r) as f32 * SPECTRAL_WEIGHT_SCALE)
+                            .clamp(0.4, 0.8);
+                }
+                r
+            } else {
+                self.carryover.quality.phi_validation_correlation
+            }
+        } else {
+            0.0
+        };
+        module_timings.phi_validation = _t.elapsed().as_micros() as u64;
+        correlation
+    }
+
+    /// Epistemic Conflict: multi-theory conflict detection + Φ_eff reliability weighting.
+    ///
+    /// Compares IIT, GWT, AST, PP, RPT, 4E scores every 97 cycles. Computes
+    /// Φ_eff = Φ × R^γ. High conflict count triggers epistemic reasoning override.
+    ///
+    /// Science: IIT (Tononi 2015), GWT (Baars 1988), AST (Graziano 2013).
+    pub(in crate::cognitive_loop) fn compute_epistemic_conflict_phase(
+        &mut self,
+        unified_psi: f64,
+        coherence: f32,
+        prediction_error: f32,
+        module_timings: &mut super::ModuleTimings,
+    ) -> (f64, usize) {
+        let _t = Instant::now();
+        let result = if let (Some(ref mut detector), Some(ref calibrator)) = (
+            &mut self.primitive_tier.epistemic_conflict_detector,
+            &self.primitive_tier.theory_calibrator,
+        ) {
+            if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
+                use crate::consciousness::epistemic_conflict::{
+                    compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
+                };
+                let metrics = MultiTheoryMetrics {
+                    phi: unified_psi,
+                    gwt: coherence as f64 * 0.8,
+                    ast: coherence as f64,
+                    pp: 1.0 - prediction_error as f64,
+                    rpt: coherence as f64 * 0.9,
+                    embodiment: self.carryover.consciousness.body_phi_modulation,
+                    unified: unified_psi,
+                };
+                let matrix: ConflictMatrix = detector.detect(&metrics);
+                let phi_eff_result = compute_phi_eff(&metrics, calibrator);
+                self.carryover.quality.last_phi_eff = phi_eff_result.phi_eff;
+                self.carryover.quality.last_epistemic_conflict_count = matrix.conflicts.len();
+                if matrix.conflicts.len() > 5 {
+                    self.carryover.quality.epistemic_reasoning_override = true;
+                }
+                (phi_eff_result.phi_eff, matrix.conflicts.len())
+            } else {
+                (self.carryover.quality.last_phi_eff, 0)
+            }
+        } else {
+            (0.0, 0)
+        };
+        module_timings.epistemic_conflict = _t.elapsed().as_micros() as u64;
+        result
     }
 }
 
