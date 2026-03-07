@@ -388,7 +388,17 @@ fn soak_500_cycle_audit_report() {
         agent.assess(normal_metrics(cycle));
     }
 
-    let report = SafetyAuditReport::from_assessments(agent.history());
+    // Record a human override mid-run
+    agent.record_override(
+        "audit-test-operator",
+        "Testing override inclusion in audit report",
+        SafetyLevel::Yellow,
+    );
+
+    let report = SafetyAuditReport::from_assessments_and_overrides(
+        agent.history(),
+        agent.override_log(),
+    );
 
     // Verify report correctness
     assert_eq!(report.total_assessments, 500);
@@ -413,12 +423,20 @@ fn soak_500_cycle_audit_report() {
         "Must have Red during severe degradation"
     );
 
+    // Verify override is included in report
+    assert_eq!(report.overrides.len(), 1);
+    assert_eq!(report.overrides[0].operator, "audit-test-operator");
+
     // Verify export doesn't panic
     let json = report.to_json();
     assert!(!json.is_empty(), "JSON export must produce output");
 
     let md = report.to_markdown();
     assert!(!md.is_empty(), "Markdown export must produce output");
+    assert!(
+        md.contains("Human Override Events"),
+        "Markdown must include override section"
+    );
 }
 
 // =============================================================================
