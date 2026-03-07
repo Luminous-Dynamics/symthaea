@@ -166,23 +166,23 @@ impl Default for ConsciousnessTopology {
     }
 }
 
-/// Harmonic profile - activation levels for all seven harmonies
+/// Harmonic profile - activation levels for all eight harmonies
 #[derive(Debug, Clone)]
 pub struct HarmonicProfile {
     /// Activation levels for each harmony (0.0 - 1.0)
-    activations: [f32; 7],
+    activations: [f32; 8],
 }
 
 impl HarmonicProfile {
     /// Create with default balanced activations
     pub fn balanced() -> Self {
         Self {
-            activations: [1.0 / 7.0; 7],
+            activations: [1.0 / 8.0; 8],
         }
     }
 
-    /// Create with specific activations (must be len 7)
-    pub fn from_activations(activations: [f32; 7]) -> Self {
+    /// Create with specific activations (must be len 8)
+    pub fn from_activations(activations: [f32; 8]) -> Self {
         let mut normalized = activations;
         let sum: f32 = normalized.iter().sum();
         if sum > 0.01 {
@@ -222,13 +222,13 @@ impl HarmonicProfile {
     /// Calculate alignment score (how well-balanced)
     pub fn alignment(&self) -> f32 {
         // Perfect alignment = all equal
-        let balanced = 1.0 / 7.0;
+        let balanced = 1.0 / 8.0;
         let variance: f32 = self
             .activations
             .iter()
             .map(|a| (a - balanced).powi(2))
             .sum::<f32>()
-            / 7.0;
+            / 8.0;
 
         // Convert variance to 0-1 score (lower variance = higher alignment)
         1.0 - (variance * 4.0).min(1.0)
@@ -243,6 +243,7 @@ impl HarmonicProfile {
             Harmony::UniversalInterconnectedness => 4,
             Harmony::SacredReciprocity => 5,
             Harmony::EvolutionaryProgression => 6,
+            Harmony::SacredStillness => 7,
         }
     }
 
@@ -254,7 +255,9 @@ impl HarmonicProfile {
             3 => Harmony::InfinitePlay,
             4 => Harmony::UniversalInterconnectedness,
             5 => Harmony::SacredReciprocity,
-            _ => Harmony::EvolutionaryProgression,
+            6 => Harmony::EvolutionaryProgression,
+            7 => Harmony::SacredStillness,
+            _ => Harmony::SacredStillness,
         }
     }
 }

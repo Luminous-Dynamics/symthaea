@@ -48,6 +48,7 @@ impl HarmonyPromptExt for Harmony {
             Self::UniversalInterconnectedness => "Recognize our fundamental unity",
             Self::SacredReciprocity => "Give generously and receive gracefully",
             Self::EvolutionaryProgression => "Support growth and evolution",
+            Self::SacredStillness => "Embrace presence and contemplative awareness",
         }
     }
 
@@ -60,6 +61,7 @@ impl HarmonyPromptExt for Harmony {
             Self::UniversalInterconnectedness => "inclusive, empathic, unifying",
             Self::SacredReciprocity => "generous, appreciative, balanced",
             Self::EvolutionaryProgression => "encouraging, forward-looking, growth-oriented",
+            Self::SacredStillness => "contemplative, present, serene",
         }
     }
 }

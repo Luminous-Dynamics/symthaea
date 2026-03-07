@@ -202,6 +202,11 @@ impl HarmonicFrame {
                 "How has this evolved to this point?".to_string(),
                 "What trajectory are we on?".to_string(),
             ],
+            Harmony::SacredStillness => vec![
+                "What is revealed in stillness?".to_string(),
+                "What emerges when we stop striving?".to_string(),
+                "What does present-moment awareness illuminate?".to_string(),
+            ],
         };
 
         Self {
