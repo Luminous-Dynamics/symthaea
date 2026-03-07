@@ -13,12 +13,12 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 
 | Framework | Coverage | Status | Notes |
 |-----------|----------|--------|-------|
-| **ISO/IEC 42001:2023** (AI Management System) | 65% | In Progress | Management system documents created; operational procedures pending |
-| **ISO/IEC 23894** (AI Risk Management) | 70% | In Progress | Risk register complete; risk treatment plan pending |
-| **ISO/IEC 42005** (AI Impact Assessment) | 75% | In Progress | FRIA complete; ongoing monitoring not yet established |
-| **IEEE 7000-2021** (Value-Based Design) | 80% | Strong | Seven Harmonies mathematically traced through code; ethics pipeline documented |
-| **EU AI Act** (High-Risk) | 55% | In Progress | Classification + FRIA complete; conformity assessment pending |
-| **NIST AI RMF 1.0** | 60% | In Progress | Map/Measure strong; Manage/Govern partial |
+| **ISO/IEC 42001:2023** (AI Management System) | 75% | In Progress | Management system + data governance + incident procedures; QMS docs pending |
+| **ISO/IEC 23894** (AI Risk Management) | 80% | Strong | Risk register + ADR process + incident runbook; risk treatment plan pending |
+| **ISO/IEC 42005** (AI Impact Assessment) | 80% | Strong | FRIA complete; ongoing monitoring via SafetyAgent + CalibrationHistory |
+| **IEEE 7000-2021** (Value-Based Design) | 85% | Strong | Seven Harmonies mathematically traced; consent detection hardened (R-2.3 fix) |
+| **EU AI Act** (High-Risk) | 70% | In Progress | Classification + FRIA + technical dossier + conformity assessment prep; Art. 14 human oversight added |
+| **NIST AI RMF 1.0** | 70% | In Progress | Map/Measure strong; Manage improved with incident runbook; Govern partial |
 
 ---
 
@@ -38,7 +38,7 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 | **A.4.3** | AI risk treatment | Partial | Per-risk mitigations documented; formal treatment plan not yet written |
 | **A.4.4** | Responsible AI considerations | Done | Ethics Engine (3-stage pipeline); Seven Harmonies; Appendix P (consciousness rights) |
 | **A.4.5** | AI system development processes | Partial | CI with 39 feature matrix, clippy, fmt; formal development procedures not documented |
-| **A.5.2** | Data management | Done | Holochain DHT (no central store); CfC temporal dynamics; identity vaults; GDPR 95% coverage |
+| **A.5.2** | Data management | Done | Holochain DHT (no central store); CfC temporal dynamics; identity vaults; `DATA_GOVERNANCE.md` (6 categories); GDPR 95% coverage |
 | **A.5.3** | Data quality | Partial | Psych-bench normative baselines; no formal data quality framework |
 | **A.6.2** | AI system operation and monitoring | Done | SafetyAgent (NRC-style Green/Yellow/Orange/Red); CycleMetadata 75+ fields/cycle; SelfAssessmentMonitor; CalibrationHistory |
 | **A.6.3** | Performance monitoring | Done | Phi validation (r=0.99); CfC 234Hz; moral classification 91.1%; weekly psych-bench regression |
@@ -214,7 +214,7 @@ Example constants and their compliance relevance:
 | Core pipeline | ~135 | Unit, integration, soak | `cycle.rs`, `prediction.rs`, `hdc_ltc_unified.rs` |
 | Consciousness metrics | ~310 | Unit, integration, validation | `consciousness_engine`, `tiered_phi`, `gwt` |
 | Ethics/moral | ~100 | Unit, proptest, integration | `moral_algebra`, `moral_topology`, `ethics_engine` |
-| Safety | ~46 | Unit | `safety/agent.rs` (28), `safety/gateway.rs` (11), `safety/audit.rs` (7) |
+| Safety | ~55 | Unit, soak | `safety/agent.rs` (33), `safety/gateway.rs` (11), `safety/audit.rs` (7), soak (15) |
 | Substrate | ~74 | Unit, integration, soak | `substrate_independence` (35), `substrate_manager` (39) |
 | Calibration | ~65 | Unit, integration | `calibration/`, `monitor.rs` |
 | Consciousness gating | ~73 | Unit, integration | `consciousness_profile.rs` |
@@ -227,20 +227,31 @@ Example constants and their compliance relevance:
 
 ## Action Items
 
+### Completed
+- ~~Implement adversarial moral input testing for EU AI Act Art. 15~~ — 26 adversarial tests + 15 soak tests
+- ~~Data governance documentation~~ — `DATA_GOVERNANCE.md` (6 categories, ISO 42001 A.10)
+- ~~Incident response procedures~~ — `INCIDENT_RUNBOOK.md` (SEV-1 through SEV-4)
+- ~~Technical dossier~~ — `TECHNICAL_DOSSIER.md` (EU AI Act Annex IV structure)
+- ~~Conformity assessment preparation~~ — `CONFORMITY_ASSESSMENT.md` (Article 43 pathway)
+- ~~Human oversight logging~~ — `SafetyOverrideEntry` (EU AI Act Article 14)
+- ~~Consent violation detection (R-2.3)~~ — `judge_consent_action()` with explicit ConsentState
+- ~~ADR process~~ — ADR-001 written, template and README in place
+
 ### Priority 1 (Complete by Q2 2026)
 1. Write formal AI system lifecycle (SDLC) document for ISO 42001 A.3.3
 2. Complete risk treatment plan for AI_RISK_REGISTER.md top-5 risks
-3. Implement adversarial moral input testing for EU AI Act Art. 15
+3. Formal QMS documentation for ISO 42001 quality management
 
 ### Priority 2 (Complete by Q3 2026)
 4. Formal third-party AI component assessment for ISO 42001 A.7.2
 5. Explainability framework documentation for ISO 42001 A.8.3
 6. External stakeholder feedback mechanism for NIST GOV-6
+7. User-facing transparency documentation for EU AI Act Article 13
 
 ### Priority 3 (Ongoing)
-7. Quarterly compliance matrix review and update
-8. Annual psych-bench regression for NIST MEA-2
-9. Post-market monitoring plan before EU deployment
+8. Quarterly compliance matrix review and update
+9. Annual psych-bench regression for NIST MEA-2
+10. Post-market monitoring plan before EU deployment
 
 ---
 

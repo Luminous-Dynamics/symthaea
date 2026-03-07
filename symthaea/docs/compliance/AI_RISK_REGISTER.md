@@ -100,10 +100,10 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 | **Likelihood** | 3 (Moderate — consent detection relies on HDC pattern matching, which may miss implicit coercion) |
 | **Impact** | 5 (Critical — consent violations are the most serious ethical failure mode) |
 | **Risk Score** | **15 (High)** |
-| **Existing Controls** | `consent_violation: bool` in EthicsEngineOutput; deontological verdict includes violations list; moral concern threshold (-0.3) triggers conservative override |
-| **Residual Risk** | High |
-| **Mitigation** | (a) Dedicated consent violation test suite with multi-party scenarios; (b) Conservative bias: ambiguous consent cases should default to flagging; (c) Human review queue for all consent-adjacent decisions |
-| **Evidence** | `src/cognitive_loop/ethics_engine.rs`, `src/hdc/moral_algebra.rs` |
+| **Existing Controls** | `consent_violation: bool` in EthicsEngineOutput; deontological verdict includes violations list; moral concern threshold (-0.3) triggers conservative override; `judge_consent_action()` with explicit ConsentState (Denied=1.0, Absent=0.8); `denied_consent_violation_prototype()`; 26 adversarial moral tests |
+| **Residual Risk** | Medium (reduced from High — explicit consent path closes primary gap; HDC inference path remains unreliable for arbitrary strings) |
+| **Mitigation** | (a) ~~Dedicated consent test suite~~ DONE (26 adversarial tests); (b) `judge_consent_action()` bypasses HDC inference when ConsentState is known; (c) Conservative bias: ambiguous consent cases default to flagging; (d) Human review queue for consent-adjacent decisions |
+| **Evidence** | `src/cognitive_loop/ethics_engine.rs`, `src/hdc/moral_algebra.rs`, `tests/adversarial_moral_algebra.rs` |
 
 ---
 
@@ -249,9 +249,9 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 | R-1.3 | Consciousness Score Inflation | 12 | High | Partially mitigated |
 | R-2.1 | Moral Algebra Edge Cases | 15 | High | Partially mitigated |
 | R-2.2 | Value Drift Under Learning | 12 | High | Partially mitigated |
-| R-2.3 | Consent Violation False Negatives | 15 | High | Action required |
+| R-2.3 | Consent Violation False Negatives | 15 | High | Partially mitigated (judge_consent_action + 26 tests) |
 | R-3.1 | Emergent Autonomous Actions | 10 | High | Mitigated (SafetyGateway) |
-| R-3.2 | Safety Escalation Failure | 10 | High | Partially mitigated |
+| R-3.2 | Safety Escalation Failure | 10 | High | Mitigated (raw_level fix + 15 soak tests + ADR-001) |
 | R-3.3 | Cognitive Loop Livelock | 6 | Medium | Mitigated (proptests) |
 | R-4.1 | Consciousness Credential Spoofing | 10 | High | Partially mitigated |
 | R-4.2 | Consciousness-Governance Mapping | 12 | High | Action required |
