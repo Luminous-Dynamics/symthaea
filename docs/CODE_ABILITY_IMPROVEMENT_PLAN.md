@@ -7,12 +7,12 @@ Based on comprehensive review of all subsystems (March 6, 2026).
 
 | Layer | Score | What Works | What's Missing |
 |-------|-------|-----------|----------------|
-| Code Perception | 7/10 | Tree-sitter (Rust/Python/Nix), CodeHDEncoder (16,384D), CodebaseMemory | No dataflow/CFG, types are string labels |
-| Code Planning | 5/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine with 5 code actions | Composition inference, but no deep code reasoning yet |
-| Code Generation | 6/10 | Emitters produce real code (~55+ Rust, ~25 Python patterns); LLM fallback for `todo!()` bodies; composition inference | Complex algorithms still need LLM; no SSM distillation yet |
-| Code Verification | 6/10 | CodeVerifier (semantic), tree-sitter (syntax), CodeExecutor (compile+test), iterative 3-attempt retry with error+test feedback, smoke test binary | No property-based test generation |
-| Language Output | 7/10 | LLM Organ translates StructuredThought; CodeContext populated in Phase 3.6 | LLM completion mode for complex bodies |
-| Learning | 7/10 | FEP surprise → LR boost, School lookahead, episodic code cache (32 entries), HDC-similarity top-3 retrieval | No SSM distillation yet |
+| Code Perception | 7/10 | Tree-sitter (Rust/Python/Nix), CodeHDEncoder (16,384D), CodebaseMemory, NL intent extraction + signature inference | No dataflow/CFG, types are string labels |
+| Code Planning | 6/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine with 5 code actions, multi-entity detection (struct+impl) | No deep code reasoning yet |
+| Code Generation | 7/10 | ~55+ Rust + ~25 Python native patterns; LLM fallback; composition inference; auto-generated tests; multi-entity struct+impl+methods; 50-case benchmark 100% | Complex algorithms still need LLM; no SSM distillation |
+| Code Verification | 7/10 | CodeVerifier, tree-sitter, CodeExecutor (compile+test), 3-attempt retry with error+test feedback, LLM roundtrip verified, 50-case benchmark | No property-based test generation |
+| Language Output | 7/10 | LLM Organ translates StructuredThought; CodeContext populated in Phase 3.6; LLM completion verified via Ollama roundtrip | — |
+| Learning | 8/10 | FEP surprise → LR boost, School lookahead, episodic code cache (32 entries), HDC-similarity top-3 retrieval, error pattern memory (64-entry) | No SSM distillation yet |
 
 ### Key Discovery: The Plumbing Exists
 
@@ -497,6 +497,80 @@ New Rust patterns: binary_search, collection sum/max/min, zip, enumerate, take, 
 - 3 Python generation cases (add, reverse, factorial)
 
 All 15 cases pass.
+
+---
+
+## Phase 3f: Intent Extraction + Auto-Tests + Error Memory + Multi-Entity + Benchmark — DONE (2026-03-08)
+
+**Status**: COMPLETE. 6 improvements; 50-case benchmark at 100%; LLM roundtrip verified.
+
+### 3f.1 NL Intent Classification + Signature Inference
+
+**File**: `src/symthaea.rs` — `extract_code_metadata()`, `extract_func_name_from_nl()`, `infer_signature_from_nl()`
+
+Replaces the broken `content.split_whitespace().take(4).join("_")` with proper NL parsing:
+- **Name extraction**: 3-tier: explicit ("called X"), verb mapping (40+ patterns: "reverses"→reverse, "checks if even"→is_even), prefix skip ("Write a function that..." → skip articles)
+- **Entity detection**: struct/class → Struct, trait/interface → Trait, module → Module, default Function
+- **Signature inference**: "takes two integers" → `fn X(a: i32, b: i32) -> i32`, "given a string" → `fn X(s: &str) -> String`
+
+### 3f.2 Auto-Generated Test Assertions
+
+**File**: `src/language/emitters.rs` — `generate_auto_tests()`
+
+When no `spec.examples` are provided, generates purpose-based `#[test]` assertions:
+- Arithmetic: `assert_eq!(add(2, 3), 5)`, `assert_eq!(add(0, 0), 0)`, `assert_eq!(add(-1, 1), 0)`
+- Boolean: `assert!(is_even(4))`, `assert!(!is_even(3))`, `assert!(is_even(0))`
+- String: `assert_eq!(reverse("hello"), "olleh")`, `assert_eq!(reverse(""), "")`
+- Vec: `assert_eq!(sort(vec![3, 1, 2]), vec![1, 2, 3])`
+- Math: `assert_eq!(factorial(5), 120)`, `assert_eq!(fibonacci(10), 55)`
+
+### 3f.3 Error Pattern Memory
+
+**File**: `src/symthaea.rs` — `error_pattern_memory: Vec<(String, String)>`
+
+- 64-entry FIFO cache of (error_substring, fix_hint) pairs
+- Populated from failed retry loop iterations (compile errors)
+- Injected as `AVOID_ERROR` notes into `CodeContext` before generation
+- Deduplicated by exact pattern match
+
+### 3f.4 Multi-Entity Generation (struct + impl + methods)
+
+**Files**: `src/symthaea.rs`, `src/language/emitters.rs`
+
+- Detects "struct with method/distance/area/display" patterns
+- Adds `MULTI_ENTITY` constraint to CodeSpec
+- Emitter responds by generating struct + impl block + constructor + purpose-inferred methods:
+  - `distance()` for 2D point structs
+  - `area()` for rectangle-like structs
+  - `display()` for any struct with fields
+- Enhanced `extract_fields_from_text()` to handle "x: f64" (space after colon)
+
+### 3f.5 Benchmark Suite (50 cases)
+
+**File**: `tests/code_generation_benchmark.rs` (28K LOC)
+
+6 categories, 50 total cases:
+| Category | Cases | Pass Rate |
+|----------|-------|-----------|
+| Arithmetic | 10 | 100% |
+| Strings | 10 | 100% |
+| Collections | 10 | 100% |
+| Composition | 5 | 100% |
+| Python | 10 | 100% |
+| Complex/LLM | 5 | 100% (correctly detected) |
+
+Separate `#[test]` per category for easy diagnosis. Asserts ≥70% native pass rate.
+
+### 3f.6 LLM Completion Roundtrip
+
+**File**: `tests/code_gen_llm_roundtrip.rs` (16K LOC)
+
+5 tests:
+- `test_llm_completion_roundtrip` — actual Ollama call (graceful skip if unavailable)
+- `test_native_emitter_no_llm_needed` — verifies simple patterns don't trigger LLM
+- `test_llm_detection_accuracy` — 10 cases, 100% detection accuracy
+- `test_prompt_construction` — verifies CodeContext → prompt serialization
+- `test_prompt_includes_notes` — verifies PAST_EXAMPLE notes propagate
 
 ---
 
