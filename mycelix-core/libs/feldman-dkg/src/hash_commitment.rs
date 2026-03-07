@@ -208,7 +208,7 @@ pub enum CommitmentScheme {
 
 impl Default for CommitmentScheme {
     fn default() -> Self {
-        Self::Feldman
+        Self::Hybrid
     }
 }
 
@@ -339,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_commitment_scheme_default() {
-        assert_eq!(CommitmentScheme::default(), CommitmentScheme::Feldman);
+        assert_eq!(CommitmentScheme::default(), CommitmentScheme::Hybrid);
     }
 
     #[test]

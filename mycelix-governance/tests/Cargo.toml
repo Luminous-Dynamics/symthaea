@@ -29,7 +29,7 @@ chrono = "0.4"
 uuid = { version = "1.6", features = ["v4"] }
 
 # Crypto for DKG ceremony E2E tests
-feldman-dkg = { path = "../../mycelix-core/libs/feldman-dkg" }
+feldman-dkg = { path = "../../mycelix-core/libs/feldman-dkg", features = ["ml-kem-768", "ml-dsa-65"] }
 k256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa"] }
 rand = "0.8"
 blake3 = "1.5"

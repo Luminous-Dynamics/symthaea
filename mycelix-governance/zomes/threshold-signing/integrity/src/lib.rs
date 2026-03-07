@@ -76,6 +76,8 @@ pub struct SigningCommittee {
 pub enum DkgPhase {
     /// Waiting for members to register
     Registration,
+    /// Collecting hash commitments (PQ commit-reveal protocol)
+    CommitmentCollection,
     /// Collecting deals from members
     Dealing,
     /// Verifying and complaints
@@ -119,6 +121,12 @@ pub struct CommitteeMember {
     pub public_share: Option<Vec<u8>>,
     /// Member's VSS commitments
     pub vss_commitment: Option<Vec<u8>>,
+    /// ML-KEM-768 encapsulation (public) key for encrypted DKG deals
+    #[serde(default)]
+    pub ml_kem_encapsulation_key: Option<Vec<u8>>,
+    /// ML-KEM-768 encrypted deal shares (for PQ-protected DKG)
+    #[serde(default)]
+    pub encrypted_shares: Option<Vec<u8>>,
     /// Whether member has submitted their deal
     pub deal_submitted: bool,
     /// Whether member is qualified after verification
@@ -199,6 +207,63 @@ pub struct DkgViolationReport {
     pub reported_at: Timestamp,
 }
 
+/// Hash commitment from a DKG dealer (commit-reveal protocol)
+///
+/// In the Hybrid commitment scheme, each dealer first commits SHA-256 hashes
+/// of their shares before revealing the actual shares. This prevents a quantum
+/// attacker from using Shor's algorithm against Feldman commitments.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct DkgHashCommitment {
+    /// Committee this commitment belongs to
+    pub committee_id: String,
+    /// Participant ID of the dealer
+    pub dealer_participant_id: u32,
+    /// Serialized HashCommitmentSet from feldman-dkg
+    pub commitment_set_bytes: Vec<u8>,
+    /// Submission timestamp
+    pub submitted_at: Timestamp,
+}
+
+/// Hash reveal from a DKG dealer (commit-reveal protocol)
+///
+/// After all commitments are collected, dealers reveal the salts used
+/// to create the hash commitments. Recipients verify H(share || dealer_id || salt)
+/// matches the committed hash.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct DkgHashReveal {
+    /// Committee this reveal belongs to
+    pub committee_id: String,
+    /// Participant ID of the dealer
+    pub dealer_participant_id: u32,
+    /// Serialized HashReveal from feldman-dkg
+    pub reveal_bytes: Vec<u8>,
+    /// Submission timestamp
+    pub submitted_at: Timestamp,
+}
+
+/// Post-quantum attestor registration for hybrid signing
+///
+/// Stores the ML-DSA-65 public key for the designated PQ attestor of a committee.
+/// The attestor is selected deterministically per epoch.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct PqAttestor {
+    /// Committee this attestor serves
+    pub committee_id: String,
+    /// Epoch for which this attestor is designated
+    pub epoch: u32,
+    /// Participant ID of the attestor
+    pub participant_id: u32,
+    /// Agent public key of the attestor
+    pub agent: AgentPubKey,
+    /// ML-DSA-65 public key (2,592 bytes)
+    pub ml_dsa_public_key: Vec<u8>,
+    /// Registration timestamp
+    pub registered_at: Timestamp,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -208,6 +273,9 @@ pub enum EntryTypes {
     ThresholdSignature(ThresholdSignature),
     SignatureShare(SignatureShare),
     DkgViolationReport(DkgViolationReport),
+    PqAttestor(PqAttestor),
+    DkgHashCommitment(DkgHashCommitment),
+    DkgHashReveal(DkgHashReveal),
 }
 
 #[hdk_link_types]
@@ -226,6 +294,14 @@ pub enum LinkTypes {
     ProposalToSignature,
     /// Committee to violation reports
     CommitteeToViolation,
+    /// Participant anchor to violation reports (global, cross-committee)
+    ParticipantToViolation,
+    /// Committee to its PQ attestor
+    CommitteeToAttestor,
+    /// Committee to hash commitments (commit-reveal protocol)
+    CommitteeToHashCommitment,
+    /// Committee to hash reveals (commit-reveal protocol)
+    CommitteeToHashReveal,
 }
 
 /// Validation callback using FlatOp pattern
@@ -244,6 +320,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::DkgViolationReport(report) => {
                     validate_create_violation_report(action, report)
                 }
+                EntryTypes::PqAttestor(attestor) => validate_create_pq_attestor(action, attestor),
+                EntryTypes::DkgHashCommitment(commitment) => validate_create_hash_commitment(action, commitment),
+                EntryTypes::DkgHashReveal(reveal) => validate_create_hash_reveal(action, reveal),
             },
             OpEntry::UpdateEntry {
                 app_entry, action, original_action_hash, ..
@@ -262,6 +341,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::DkgViolationReport(_) => Ok(ValidateCallbackResult::Invalid(
                     "Violation reports cannot be updated".into(),
                 )),
+                EntryTypes::PqAttestor(_) => Ok(ValidateCallbackResult::Invalid(
+                    "PQ attestor registrations cannot be updated".into(),
+                )),
+                EntryTypes::DkgHashCommitment(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Hash commitments cannot be updated".into(),
+                )),
+                EntryTypes::DkgHashReveal(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Hash reveals cannot be updated".into(),
+                )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -279,6 +367,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::EpochToCommittee => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ProposalToSignature => Ok(ValidateCallbackResult::Valid),
             LinkTypes::CommitteeToViolation => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ParticipantToViolation => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::CommitteeToAttestor => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::CommitteeToHashCommitment => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::CommitteeToHashReveal => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
@@ -403,6 +495,23 @@ pub fn check_member_validity(member: &CommitteeMember) -> Result<(), String> {
             }
         }
     }
+    // ML-KEM-768 encapsulation key must be exactly 1,184 bytes if present
+    if let Some(ref ek_bytes) = member.ml_kem_encapsulation_key {
+        if ek_bytes.len() != 1184 {
+            return Err(format!(
+                "ML-KEM-768 encapsulation key must be exactly 1184 bytes, got {}",
+                ek_bytes.len()
+            ));
+        }
+    }
+    // Encrypted shares must be a valid EncryptedDeal if present
+    if let Some(ref enc_bytes) = member.encrypted_shares {
+        if enc_bytes.is_empty() {
+            return Err("Encrypted shares cannot be empty".into());
+        }
+        feldman_dkg::EncryptedDeal::from_bytes(enc_bytes)
+            .map_err(|e| format!("Invalid encrypted shares: {}", e))?;
+    }
     Ok(())
 }
 
@@ -495,9 +604,9 @@ pub fn check_signature_validity(sig: &ThresholdSignature) -> Result<(), String> 
             let pq_sig = sig.pq_signature.as_ref().ok_or(
                 "ML-DSA-65 algorithm requires pq_signature field".to_string(),
             )?;
-            if pq_sig.len() < 3309 {
+            if pq_sig.len() != 3309 {
                 return Err(format!(
-                    "ML-DSA-65 signature too short: expected at least 3309 bytes, got {}",
+                    "ML-DSA-65 signature must be exactly 3309 bytes, got {}",
                     pq_sig.len()
                 ));
             }
@@ -517,9 +626,9 @@ pub fn check_signature_validity(sig: &ThresholdSignature) -> Result<(), String> 
             let pq_sig = sig.pq_signature.as_ref().ok_or(
                 "Hybrid mode requires pq_signature field for ML-DSA-65".to_string(),
             )?;
-            if pq_sig.len() < 3309 {
+            if pq_sig.len() != 3309 {
                 return Err(format!(
-                    "Hybrid ML-DSA-65 signature too short: expected at least 3309 bytes, got {}",
+                    "Hybrid ML-DSA-65 signature must be exactly 3309 bytes, got {}",
                     pq_sig.len()
                 ));
             }
@@ -619,6 +728,90 @@ fn validate_create_violation_report(
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Pure validation for PQ attestor -- testable without HDI
+pub fn check_pq_attestor_validity(attestor: &PqAttestor) -> Result<(), String> {
+    if attestor.committee_id.is_empty() {
+        return Err("Committee ID cannot be empty".into());
+    }
+    if attestor.participant_id == 0 {
+        return Err("Participant ID must be positive".into());
+    }
+    // ML-DSA-65 public key must be exactly 1,952 bytes
+    if attestor.ml_dsa_public_key.len() != 1952 {
+        return Err(format!(
+            "ML-DSA-65 public key must be exactly 1952 bytes, got {}",
+            attestor.ml_dsa_public_key.len()
+        ));
+    }
+    Ok(())
+}
+
+/// Pure validation for DKG hash commitment -- testable without HDI
+pub fn check_hash_commitment_validity(commitment: &DkgHashCommitment) -> Result<(), String> {
+    if commitment.committee_id.is_empty() {
+        return Err("Committee ID cannot be empty".into());
+    }
+    if commitment.dealer_participant_id == 0 {
+        return Err("Dealer participant ID must be positive".into());
+    }
+    if commitment.commitment_set_bytes.is_empty() {
+        return Err("Hash commitment set bytes cannot be empty".into());
+    }
+    feldman_dkg::HashCommitmentSet::from_bytes(&commitment.commitment_set_bytes)
+        .map_err(|e| format!("Invalid hash commitment set: {}", e))?;
+    Ok(())
+}
+
+/// Validate DKG hash commitment creation
+fn validate_create_hash_commitment(
+    _action: Create,
+    commitment: DkgHashCommitment,
+) -> ExternResult<ValidateCallbackResult> {
+    if let Err(reason) = check_hash_commitment_validity(&commitment) {
+        return Ok(ValidateCallbackResult::Invalid(reason));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Pure validation for DKG hash reveal -- testable without HDI
+pub fn check_hash_reveal_validity(reveal: &DkgHashReveal) -> Result<(), String> {
+    if reveal.committee_id.is_empty() {
+        return Err("Committee ID cannot be empty".into());
+    }
+    if reveal.dealer_participant_id == 0 {
+        return Err("Dealer participant ID must be positive".into());
+    }
+    if reveal.reveal_bytes.is_empty() {
+        return Err("Hash reveal bytes cannot be empty".into());
+    }
+    // Validate deserialization
+    serde_json::from_slice::<feldman_dkg::HashReveal>(&reveal.reveal_bytes)
+        .map_err(|e| format!("Invalid hash reveal: {}", e))?;
+    Ok(())
+}
+
+/// Validate DKG hash reveal creation
+fn validate_create_hash_reveal(
+    _action: Create,
+    reveal: DkgHashReveal,
+) -> ExternResult<ValidateCallbackResult> {
+    if let Err(reason) = check_hash_reveal_validity(&reveal) {
+        return Ok(ValidateCallbackResult::Invalid(reason));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate PQ attestor creation
+fn validate_create_pq_attestor(
+    _action: Create,
+    attestor: PqAttestor,
+) -> ExternResult<ValidateCallbackResult> {
+    if let Err(reason) = check_pq_attestor_validity(&attestor) {
+        return Ok(ValidateCallbackResult::Invalid(reason));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -646,6 +839,8 @@ mod tests {
             trust_score: 0.8,
             public_share: None,
             vss_commitment: None,
+            ml_kem_encapsulation_key: None,
+            encrypted_shares: None,
             deal_submitted: false,
             qualified: false,
             registered_at: Timestamp::from_micros(0),
@@ -795,7 +990,7 @@ mod tests {
         sig.pq_signature = Some(vec![0u8; 100]); // too short
         let result = check_signature_validity(&sig);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("ML-DSA-65 signature too short"));
+        assert!(result.unwrap_err().contains("ML-DSA-65 signature must be exactly 3309"));
     }
 
     #[test]
@@ -1115,5 +1310,117 @@ mod tests {
             ThresholdSignatureAlgorithm::default(),
             ThresholdSignatureAlgorithm::Ecdsa,
         );
+    }
+
+    // --- PQ Attestor Validation Tests ---
+
+    #[test]
+    fn test_valid_pq_attestor() {
+        let attestor = PqAttestor {
+            committee_id: "committee-1".into(),
+            epoch: 1,
+            participant_id: 2,
+            agent: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            ml_dsa_public_key: vec![0u8; 1952], // ML-DSA-65 PK size
+            registered_at: Timestamp::from_micros(0),
+        };
+        assert!(check_pq_attestor_validity(&attestor).is_ok());
+    }
+
+    #[test]
+    fn test_pq_attestor_short_key_rejected() {
+        let attestor = PqAttestor {
+            committee_id: "committee-1".into(),
+            epoch: 1,
+            participant_id: 2,
+            agent: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            ml_dsa_public_key: vec![0u8; 100], // too short
+            registered_at: Timestamp::from_micros(0),
+        };
+        let result = check_pq_attestor_validity(&attestor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must be exactly 1952"));
+    }
+
+    #[test]
+    fn test_pq_attestor_oversized_key_rejected() {
+        let attestor = PqAttestor {
+            committee_id: "committee-1".into(),
+            epoch: 1,
+            participant_id: 2,
+            agent: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            ml_dsa_public_key: vec![0u8; 2000], // too long
+            registered_at: Timestamp::from_micros(0),
+        };
+        let result = check_pq_attestor_validity(&attestor);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must be exactly 1952"));
+    }
+
+    #[test]
+    fn test_pq_attestor_zero_participant_rejected() {
+        let attestor = PqAttestor {
+            committee_id: "committee-1".into(),
+            epoch: 1,
+            participant_id: 0,
+            agent: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            ml_dsa_public_key: vec![0u8; 1952],
+            registered_at: Timestamp::from_micros(0),
+        };
+        assert!(check_pq_attestor_validity(&attestor).is_err());
+    }
+
+    // --- ML-KEM Encapsulation Key Validation Tests ---
+
+    #[test]
+    fn test_ml_kem_encapsulation_key_valid() {
+        let mut member = make_test_member();
+        member.ml_kem_encapsulation_key = Some(vec![0u8; 1184]);
+        assert!(check_member_validity(&member).is_ok());
+    }
+
+    #[test]
+    fn test_ml_kem_encapsulation_key_wrong_size_rejected() {
+        let mut member = make_test_member();
+        member.ml_kem_encapsulation_key = Some(vec![0u8; 100]);
+        let result = check_member_validity(&member);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("1184 bytes"));
+    }
+
+    #[test]
+    fn test_ml_kem_encapsulation_key_oversized_rejected() {
+        let mut member = make_test_member();
+        member.ml_kem_encapsulation_key = Some(vec![0u8; 2000]);
+        let result = check_member_validity(&member);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("1184 bytes"));
+    }
+
+    #[test]
+    fn test_ml_kem_encapsulation_key_none_accepted() {
+        let member = make_test_member();
+        assert!(member.ml_kem_encapsulation_key.is_none());
+        assert!(check_member_validity(&member).is_ok());
+    }
+
+    // --- ML-DSA-65 Exact Signature Size Tests ---
+
+    #[test]
+    fn test_ml_dsa65_signature_oversized_rejected() {
+        let mut sig = make_test_signature(ThresholdSignatureAlgorithm::MlDsa65);
+        sig.pq_signature = Some(vec![0u8; 4000]); // too long
+        let result = check_signature_validity(&sig);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must be exactly 3309"));
+    }
+
+    #[test]
+    fn test_hybrid_ml_dsa65_oversized_rejected() {
+        let mut sig = make_test_signature(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65);
+        sig.pq_signature = Some(vec![0u8; 4000]); // too long
+        let result = check_signature_validity(&sig);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must be exactly 3309"));
     }
 }

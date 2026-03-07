@@ -40,6 +40,8 @@ pub mod encrypted_deal;
 pub mod hash_commitment;
 #[cfg(feature = "ml-kem-768")]
 pub mod pq_kem;
+#[cfg(feature = "ml-dsa-65")]
+pub mod pq_sig;
 pub mod refresh;
 pub mod violation;
 

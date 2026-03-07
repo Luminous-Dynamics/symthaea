@@ -3,12 +3,13 @@
 //! Provides ready-to-use encrypt/decrypt callbacks compatible with
 //! [`EncryptedDeal::from_deal`] and [`EncryptedDeal::decrypt_share`].
 //!
-//! # Security Note
+//! # Security
 //!
-//! This module uses XOR encryption with the KEM shared secret as keystream
-//! (derived via SHA-256). This is suitable for demonstration and testing.
-//! Production deployments should replace the XOR step with AES-256-GCM or
-//! XChaCha20-Poly1305 using the shared secret as the symmetric key.
+//! This module uses AES-256-GCM authenticated encryption with the KEM shared
+//! secret as the symmetric key (derived via SHA-256). The 12-byte nonce is
+//! generated from OS randomness and stored alongside the ciphertext. AES-GCM
+//! provides both confidentiality and integrity — any tampering with the
+//! ciphertext, nonce, or auth tag will be detected during decryption.
 //!
 //! # Example
 //!
@@ -31,6 +32,7 @@
 //! let share = encrypted.decrypt_share(1, ml_kem_decrypt_fn(&kp.dk)).unwrap();
 //! ```
 
+use aes_gcm::{Aes256Gcm, Key, Nonce, aead::{Aead, KeyInit}};
 use ml_kem::{
     kem::{Decapsulate, KeyExport},
     MlKem768,
@@ -69,30 +71,10 @@ pub fn generate_keypair() -> MlKemKeyPair {
     MlKemKeyPair { dk, ek }
 }
 
-/// Derive a keystream from the KEM shared secret using SHA-256.
-///
-/// Produces enough bytes to XOR-encrypt `len` bytes of plaintext by
-/// iteratively hashing `shared_secret || counter`.
-fn derive_keystream(shared_secret: &[u8], len: usize) -> Vec<u8> {
-    let mut keystream = Vec::with_capacity(len);
-    let mut counter: u32 = 0;
-    while keystream.len() < len {
-        let mut hasher = Sha256::new();
-        hasher.update(shared_secret);
-        hasher.update(counter.to_le_bytes());
-        keystream.extend_from_slice(&hasher.finalize());
-        counter += 1;
-    }
-    keystream.truncate(len);
-    keystream
-}
-
-/// XOR `data` with `keystream` in place, returning the result.
-fn xor_bytes(data: &[u8], keystream: &[u8]) -> Vec<u8> {
-    data.iter()
-        .zip(keystream.iter())
-        .map(|(a, b)| a ^ b)
-        .collect()
+/// Derive a 32-byte AES-256 key from the KEM shared secret via SHA-256.
+fn derive_aes_key(shared_secret: &[u8]) -> Key<Aes256Gcm> {
+    let hash = Sha256::digest(shared_secret);
+    *Key::<Aes256Gcm>::from_slice(&hash)
 }
 
 /// Create an encryption callback compatible with [`EncryptedDeal::from_deal`].
@@ -100,13 +82,14 @@ fn xor_bytes(data: &[u8], keystream: &[u8]) -> Vec<u8> {
 /// The returned closure:
 /// 1. Parses `recipient_ek` as an ML-KEM-768 encapsulation key
 /// 2. Encapsulates a shared secret using OS randomness
-/// 3. Derives a keystream via SHA-256 from the shared secret
-/// 4. XOR-encrypts the plaintext share
+/// 3. Derives a 32-byte AES key via SHA-256 from the shared secret
+/// 4. Generates a random 12-byte nonce
+/// 5. Encrypts the plaintext with AES-256-GCM (ciphertext includes 16-byte auth tag)
 ///
 /// The `EncryptResult` stores:
 /// - `encapsulated_key`: the KEM ciphertext (needed for decapsulation)
-/// - `nonce`: empty (not used in XOR mode; would hold AEAD nonce in production)
-/// - `ciphertext`: the XOR-encrypted share bytes
+/// - `nonce`: 12-byte AES-GCM nonce
+/// - `ciphertext`: AES-256-GCM encrypted data with appended 16-byte auth tag
 ///
 /// # Arguments
 ///
@@ -130,13 +113,23 @@ pub fn ml_kem_encrypt_fn(
         // Encapsulate: produces (ciphertext, shared_secret)
         let (ct, shared_secret) = ek.encapsulate_deterministic(&m);
 
-        // Derive keystream and XOR-encrypt
-        let keystream = derive_keystream(shared_secret.as_slice(), plaintext.len());
-        let encrypted = xor_bytes(plaintext, &keystream);
+        // Derive AES-256 key from shared secret
+        let aes_key = derive_aes_key(shared_secret.as_slice());
+        let cipher = Aes256Gcm::new(&aes_key);
+
+        // Generate random 12-byte nonce
+        let mut nonce_bytes = [0u8; 12];
+        getrandom::fill(&mut nonce_bytes).map_err(|e| format!("RNG failure: {e}"))?;
+        let nonce = Nonce::from_slice(&nonce_bytes);
+
+        // Encrypt with AES-256-GCM (ciphertext includes 16-byte auth tag)
+        let encrypted = cipher
+            .encrypt(nonce, plaintext)
+            .map_err(|e| format!("AES-GCM encryption failed: {e}"))?;
 
         Ok(EncryptResult {
             encapsulated_key: <_ as AsRef<[u8]>>::as_ref(&ct).to_vec(),
-            nonce: Vec::new(),
+            nonce: nonce_bytes.to_vec(),
             ciphertext: encrypted,
         })
     }
@@ -146,8 +139,10 @@ pub fn ml_kem_encrypt_fn(
 ///
 /// The returned closure:
 /// 1. Decapsulates the KEM ciphertext to recover the shared secret
-/// 2. Derives the same keystream via SHA-256
-/// 3. XOR-decrypts the ciphertext to recover the plaintext share
+/// 2. Derives the same AES-256 key via SHA-256
+/// 3. Decrypts and authenticates the AES-256-GCM ciphertext
+///
+/// Returns an error if the ciphertext has been tampered with (authentication failure).
 ///
 /// # Arguments
 ///
@@ -156,7 +151,7 @@ pub fn ml_kem_decrypt_fn(
     dk: &DecapsulationKey768,
 ) -> impl FnMut(&[u8], &[u8], &[u8]) -> Result<Vec<u8>, String> {
     let dk = dk.clone();
-    move |encapsulated_key, _nonce, ciphertext| {
+    move |encapsulated_key, nonce_bytes, ciphertext| {
         // Parse KEM ciphertext
         let ct = ml_kem::Ciphertext::<MlKem768>::try_from(encapsulated_key)
             .map_err(|_| "Invalid KEM ciphertext length".to_string())?;
@@ -164,9 +159,17 @@ pub fn ml_kem_decrypt_fn(
         // Decapsulate to recover shared secret
         let shared_secret = dk.decapsulate(&ct);
 
-        // Derive keystream and XOR-decrypt
-        let keystream = derive_keystream(shared_secret.as_slice(), ciphertext.len());
-        let plaintext = xor_bytes(ciphertext, &keystream);
+        // Derive AES-256 key from shared secret
+        let aes_key = derive_aes_key(shared_secret.as_slice());
+        let cipher = Aes256Gcm::new(&aes_key);
+
+        // Parse nonce (must be 12 bytes)
+        let nonce = Nonce::from_slice(nonce_bytes);
+
+        // Decrypt and authenticate with AES-256-GCM
+        let plaintext = cipher
+            .decrypt(nonce, ciphertext)
+            .map_err(|_| "AES-GCM decryption failed: authentication tag mismatch (tampered or wrong key)".to_string())?;
 
         Ok(plaintext)
     }
@@ -197,10 +200,13 @@ mod tests {
         let mut encrypt = ml_kem_encrypt_fn(&ek_bytes);
         let result = encrypt(1, plaintext).unwrap();
 
-        // Ciphertext should differ from plaintext
+        // Ciphertext should differ from plaintext (and be 16 bytes longer due to auth tag)
         assert_ne!(result.ciphertext, plaintext.to_vec());
+        assert_eq!(result.ciphertext.len(), plaintext.len() + 16);
         // KEM ciphertext should be 1088 bytes for ML-KEM-768
         assert_eq!(result.encapsulated_key.len(), 1088);
+        // Nonce should be 12 bytes
+        assert_eq!(result.nonce.len(), 12);
 
         let mut decrypt = ml_kem_decrypt_fn(&kp.dk);
         let recovered = decrypt(
@@ -214,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn test_wrong_key_produces_wrong_plaintext() {
+    fn test_wrong_key_produces_auth_error() {
         let kp1 = generate_keypair();
         let kp2 = generate_keypair();
         let ek_bytes = kp1.encapsulation_key_bytes();
@@ -223,17 +229,40 @@ mod tests {
         let mut encrypt = ml_kem_encrypt_fn(&ek_bytes);
         let result = encrypt(1, &plaintext).unwrap();
 
-        // Decrypt with the wrong key
+        // Decrypt with the wrong key — AES-GCM should reject (auth tag mismatch)
         let mut decrypt_wrong = ml_kem_decrypt_fn(&kp2.dk);
         let recovered = decrypt_wrong(
             &result.encapsulated_key,
             &result.nonce,
             &result.ciphertext,
-        )
-        .unwrap();
+        );
 
-        // Should NOT match the original plaintext
-        assert_ne!(recovered, plaintext.to_vec());
+        assert!(recovered.is_err());
+        assert!(recovered.unwrap_err().contains("authentication tag mismatch"));
+    }
+
+    #[test]
+    fn test_tampered_ciphertext_rejected() {
+        let kp = generate_keypair();
+        let ek_bytes = kp.encapsulation_key_bytes();
+
+        let plaintext = b"sensitive DKG share data here!!!"; // 32 bytes
+        let mut encrypt = ml_kem_encrypt_fn(&ek_bytes);
+        let mut result = encrypt(1, plaintext).unwrap();
+
+        // Tamper with one byte of the ciphertext
+        result.ciphertext[0] ^= 0xFF;
+
+        // Decryption should fail due to authentication tag mismatch
+        let mut decrypt = ml_kem_decrypt_fn(&kp.dk);
+        let recovered = decrypt(
+            &result.encapsulated_key,
+            &result.nonce,
+            &result.ciphertext,
+        );
+
+        assert!(recovered.is_err());
+        assert!(recovered.unwrap_err().contains("authentication tag mismatch"));
     }
 
     #[test]
@@ -266,19 +295,6 @@ mod tests {
             assert_eq!(share.value, original.value);
             assert_eq!(share.index, recipient_id);
         }
-    }
-
-    #[test]
-    fn test_keystream_determinism() {
-        let secret = [42u8; 32];
-        let ks1 = derive_keystream(&secret, 64);
-        let ks2 = derive_keystream(&secret, 64);
-        assert_eq!(ks1, ks2);
-
-        // Different secret produces different keystream
-        let secret2 = [43u8; 32];
-        let ks3 = derive_keystream(&secret2, 64);
-        assert_ne!(ks1, ks3);
     }
 
     #[test]

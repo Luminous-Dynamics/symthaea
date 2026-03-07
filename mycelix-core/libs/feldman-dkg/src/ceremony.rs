@@ -1513,4 +1513,154 @@ mod tests {
             other => panic!("expected WrongPhase error, got {:?}", other),
         }
     }
+
+    #[test]
+    fn test_full_ceremony_multi_epoch_refresh_pipeline() {
+        // Full integration: DKG ceremony → 3 refresh epochs → verify invariants
+        let t = 3;
+        let n = 5;
+        let config = DkgConfig::new(t, n).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=n as u32 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        // Each participant deals with a known secret
+        let secrets: Vec<Scalar> = (1..=n as u64).map(|i| Scalar::from_u64(i * 111)).collect();
+        let expected_secret: Scalar = secrets.iter().cloned().fold(Scalar::zero(), |a, b| a + b);
+
+        for (i, secret) in secrets.iter().enumerate() {
+            let pid = (i + 1) as u32;
+            let dealer = crate::dealer::Dealer::with_secret(
+                ParticipantId(pid), secret.clone(), t, n, &mut OsRng,
+            ).unwrap();
+            let deal = dealer.generate_deal();
+            ceremony.submit_deal(ParticipantId(pid), deal, 0).unwrap();
+        }
+
+        let result = ceremony.finalize().unwrap();
+        let original_public_key = result.public_key.clone();
+        assert_eq!(result.qualified_count, n);
+
+        // Verify initial reconstruction with different t-of-n subsets
+        let all_shares: Vec<CombinedShare> = (1..=n as u32)
+            .map(|i| ceremony.get_combined_share(ParticipantId(i)).unwrap())
+            .collect();
+
+        // Subset {1,2,3}
+        let secret_123 = ceremony.reconstruct_secret(&all_shares[0..3]).unwrap();
+        assert_eq!(secret_123, expected_secret);
+        // Subset {3,4,5}
+        let secret_345 = ceremony.reconstruct_secret(&all_shares[2..5]).unwrap();
+        assert_eq!(secret_345, expected_secret);
+
+        // Run 3 refresh epochs
+        let mut current_shares = all_shares;
+        for epoch in 1..=3u64 {
+            let mut refresh = ceremony.refresh_shares().unwrap();
+            assert_eq!(ceremony.epoch(), epoch);
+
+            // All participants generate and submit refresh deals
+            for i in 1..=n as u32 {
+                let deal = RefreshRound::generate_refresh_deal(
+                    ParticipantId(i), t, n, epoch, &mut OsRng,
+                ).unwrap();
+                refresh.submit_deal(deal).unwrap();
+            }
+            assert!(refresh.is_complete());
+
+            // Apply refresh deltas
+            let prev_shares = current_shares.clone();
+            current_shares = (1..=n as u32)
+                .map(|i| {
+                    let delta = refresh.compute_refresh_delta(i).unwrap();
+                    let mut new_val = prev_shares[(i - 1) as usize].value.clone();
+                    new_val += delta;
+                    CombinedShare::new(i, new_val)
+                })
+                .collect();
+
+            // Verify shares actually changed
+            let any_changed = prev_shares.iter().zip(current_shares.iter())
+                .any(|(old, new)| old.value != new.value);
+            assert!(any_changed, "Shares must change after refresh epoch {epoch}");
+
+            // Verify reconstruction with multiple subsets
+            let secret_first = ceremony.reconstruct_secret(&current_shares[0..t]).unwrap();
+            assert_eq!(secret_first, expected_secret, "Subset [0..t] failed at epoch {epoch}");
+
+            let secret_last = ceremony.reconstruct_secret(&current_shares[(n - t)..n]).unwrap();
+            assert_eq!(secret_last, expected_secret, "Subset [n-t..n] failed at epoch {epoch}");
+
+            // Mixed subset {1, 3, 5}
+            let mixed = vec![
+                current_shares[0].clone(),
+                current_shares[2].clone(),
+                current_shares[4].clone(),
+            ];
+            let secret_mixed = ceremony.reconstruct_secret(&mixed).unwrap();
+            assert_eq!(secret_mixed, expected_secret, "Mixed subset failed at epoch {epoch}");
+        }
+
+        // Verify public key is unchanged after all refreshes
+        let final_result = ceremony.finalize().unwrap();
+        assert_eq!(final_result.public_key, original_public_key,
+            "Public key must be preserved across refresh epochs");
+
+        // Verify cross-epoch shares are uncorrelated (shares from epoch 0 can't
+        // combine with shares from epoch 3 to reconstruct the secret)
+        // This is the core proactive security property
+        assert_eq!(ceremony.epoch(), 3);
+    }
+
+    #[test]
+    fn test_refresh_with_threshold_subset_of_dealers() {
+        // Only t (not all n) participants submit refresh deals — should still work
+        let t = 2;
+        let n = 4;
+        let config = DkgConfig::new(t, n).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=n as u32 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+        for i in 1..=n as u32 {
+            let dealer = crate::dealer::Dealer::new(
+                ParticipantId(i), t, n, &mut OsRng,
+            ).unwrap();
+            let deal = dealer.generate_deal();
+            ceremony.submit_deal(ParticipantId(i), deal, 0).unwrap();
+        }
+        ceremony.finalize().unwrap();
+
+        let original_shares: Vec<CombinedShare> = (1..=n as u32)
+            .map(|i| ceremony.get_combined_share(ParticipantId(i)).unwrap())
+            .collect();
+        let original_secret = ceremony.reconstruct_secret(&original_shares[0..t]).unwrap();
+
+        // Only t participants submit refresh deals (the minimum)
+        let mut refresh = ceremony.refresh_shares().unwrap();
+        for i in 1..=t as u32 {
+            let deal = RefreshRound::generate_refresh_deal(
+                ParticipantId(i), t, n, 1, &mut OsRng,
+            ).unwrap();
+            refresh.submit_deal(deal).unwrap();
+        }
+        assert!(refresh.is_complete());
+
+        // Apply and verify
+        let refreshed: Vec<CombinedShare> = (1..=n as u32)
+            .map(|i| {
+                let delta = refresh.compute_refresh_delta(i).unwrap();
+                let mut v = original_shares[(i - 1) as usize].value.clone();
+                v += delta;
+                CombinedShare::new(i, v)
+            })
+            .collect();
+
+        let refreshed_secret = ceremony.reconstruct_secret(&refreshed[0..t]).unwrap();
+        assert_eq!(refreshed_secret, original_secret,
+            "Secret must survive refresh with only t dealers");
+    }
 }

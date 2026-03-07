@@ -672,6 +672,7 @@ pub struct AddContributionInput {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum DkgPhase {
     Registration,
+    CommitmentCollection,
     Dealing,
     Verification,
     Complete,
@@ -728,6 +729,10 @@ pub struct CommitteeMember {
     pub trust_score: f64,
     pub public_share: Option<Vec<u8>>,
     pub vss_commitment: Option<Vec<u8>>,
+    #[serde(default)]
+    pub ml_kem_encapsulation_key: Option<Vec<u8>>,
+    #[serde(default)]
+    pub encrypted_shares: Option<Vec<u8>>,
     pub deal_submitted: bool,
     pub qualified: bool,
     pub registered_at: Timestamp,
@@ -768,12 +773,16 @@ pub struct RegisterMemberInput {
     pub participant_id: u32,
     pub member_did: String,
     pub trust_score: f64,
+    #[serde(default)]
+    pub ml_kem_encapsulation_key: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SubmitDkgDealInput {
     pub committee_id: String,
     pub vss_commitment: Vec<u8>,
+    #[serde(default)]
+    pub encrypted_shares: Option<Vec<u8>>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -835,6 +844,46 @@ pub struct SignatureShare {
     pub share: Vec<u8>,
     pub content_hash: Vec<u8>,
     pub submitted_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SubmitHashCommitmentInput {
+    pub committee_id: String,
+    pub participant_id: u32,
+    pub commitment_set_bytes: Vec<u8>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SubmitHashRevealInput {
+    pub committee_id: String,
+    pub participant_id: u32,
+    pub reveal_bytes: Vec<u8>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RegisterPqAttestorInput {
+    pub committee_id: String,
+    pub epoch: u32,
+    pub participant_id: u32,
+    pub ml_dsa_public_key: Vec<u8>,
+    #[serde(default)]
+    pub proof_of_possession: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetPqAttestorInput {
+    pub committee_id: String,
+    pub epoch: u32,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PqAttestor {
+    pub committee_id: String,
+    pub epoch: u32,
+    pub participant_id: u32,
+    pub agent: AgentPubKey,
+    pub ml_dsa_public_key: Vec<u8>,
+    pub registered_at: Timestamp,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1722,6 +1771,7 @@ mod lifecycle_e2e_tests {
             combined_signature: sig_bytes,
             signers: vec![1, 2],
             verified: false, // Let coordinator verify via ECDSA
+            pq_signature: None,
         };
         let sig_record: Record = conductor
             .call(&cells[0].zome("threshold_signing"), "combine_signatures", combine_input)
@@ -1952,6 +2002,7 @@ mod council_tests {
             supermajority: 0.67,
             can_spawn_children: true,
             max_delegation_depth: 3,
+            signing_committee_id: None,
         };
 
         let council_record: Record = conductor
@@ -1996,6 +2047,7 @@ mod council_tests {
             supermajority: 0.67,
             can_spawn_children: false,
             max_delegation_depth: 2,
+            signing_committee_id: None,
         };
 
         let council_record: Record = conductor
@@ -2063,6 +2115,7 @@ mod council_tests {
                 supermajority: 0.67,
                 can_spawn_children: false,
                 max_delegation_depth: 1,
+                signing_committee_id: None,
             };
 
             let _: Record = conductor
@@ -2239,7 +2292,7 @@ mod execution_tests {
         let member_input = RegisterMemberInput {
             committee_id: committee.id.clone(),
             participant_id: 1,
-            member_did: format!("did:mycelix:{}", app.agent_pubkey()),
+            member_did: format!("did:mycelix:{}", app.agent()),
             trust_score: 0.85,
         };
         let member_record: Record = conductor
@@ -2361,7 +2414,7 @@ mod execution_tests {
         let cell = app.cells()[0].clone();
 
         // Create a proposal (must start as Draft per Phase 4 integrity validation)
-        let author_did = format!("did:mycelix:{}", app.agent_pubkey());
+        let author_did = format!("did:mycelix:{}", app.agent());
         let proposal = make_proposal("MIP-DRAFT-01", &author_did, ProposalType::Standard);
         assert_eq!(proposal.status, ProposalStatus::Draft, "Helper should create Draft proposals");
 
@@ -2443,7 +2496,7 @@ mod execution_tests {
         let member_input = RegisterMemberInput {
             committee_id: committee.id.clone(),
             participant_id: 1,
-            member_did: format!("did:mycelix:{}", app.agent_pubkey()),
+            member_did: format!("did:mycelix:{}", app.agent()),
             trust_score: 0.9,
         };
         let member_record: Record = conductor
@@ -2637,7 +2690,7 @@ mod threshold_signing_dkg_tests {
             let member_input = RegisterMemberInput {
                 committee_id: committee.id.clone(),
                 participant_id: (i + 1) as u32,
-                member_did: format!("did:mycelix:{}", app.agent_pubkey()),
+                member_did: format!("did:mycelix:{}", app.agent()),
                 trust_score: 0.85,
             };
             let member_record: Record = conductor
@@ -2723,6 +2776,7 @@ mod threshold_signing_dkg_tests {
             combined_signature: sig_bytes,
             signers: vec![1, 2],
             verified: false, // Will be overridden by actual ECDSA verification
+            pq_signature: None,
         };
         let sig_record: Record = conductor
             .call(&cells[0].zome("threshold_signing"), "combine_signatures", combine_input)
@@ -2830,7 +2884,7 @@ mod threshold_signing_dkg_tests {
             RegisterMemberInput {
                 committee_id: committee.id.clone(),
                 participant_id: 1,
-                member_did: format!("did:mycelix:{}", app.agent_pubkey()),
+                member_did: format!("did:mycelix:{}", app.agent()),
                 trust_score: 0.9,
             },
         ).await;
@@ -2929,6 +2983,285 @@ mod threshold_signing_dkg_tests {
 
         println!("=== test_signature_shares_flow PASSED ===\n");
     }
+
+    // ========================================================================
+    // Post-Quantum ML-DSA-65 Integration Tests
+    // ========================================================================
+
+    /// Helper: set up 3 agents, create a Hybrid committee, complete DKG, register PQ attestor.
+    /// Returns (conductor, cells, committee_id, ecdsa_signing_key, ml_dsa_keypair).
+    async fn setup_completed_hybrid_dkg(dna: &DnaFile) -> (
+        SweetConductor,
+        Vec<SweetCell>,
+        String,
+        SigningKey,
+        feldman_dkg::pq_sig::MlDsaKeyPair,
+    ) {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app1 = conductor.setup_app("pq-a1", &[dna.clone()]).await.unwrap();
+        let app2 = conductor.setup_app("pq-a2", &[dna.clone()]).await.unwrap();
+        let app3 = conductor.setup_app("pq-a3", &[dna.clone()]).await.unwrap();
+
+        let cells = vec![
+            app1.cells()[0].clone(),
+            app2.cells()[0].clone(),
+            app3.cells()[0].clone(),
+        ];
+        let agents: Vec<_> = vec![app1.agent(), app2.agent(), app3.agent()]
+            .into_iter().cloned().collect();
+
+        // Create Hybrid committee
+        let record: Record = conductor
+            .call(&cells[0].zome("threshold_signing"), "create_committee", CreateCommitteeInput {
+                name: "PQ Hybrid DKG Committee".to_string(),
+                threshold: 2,
+                member_count: 3,
+                scope: CommitteeScope::Treasury,
+                min_phi: None,
+                signature_algorithm: Some(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65),
+            })
+            .await;
+        let committee: SigningCommittee = decode_entry(&record).unwrap();
+        assert_eq!(committee.signature_algorithm, ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65);
+
+        // Register members (no ML-KEM EK for now — optional field)
+        for (i, (cell, agent)) in cells.iter().zip(agents.iter()).enumerate() {
+            let _: Record = conductor.call(
+                &cell.zome("threshold_signing"),
+                "register_member",
+                RegisterMemberInput {
+                    committee_id: committee.id.clone(),
+                    participant_id: (i + 1) as u32,
+                    member_did: format!("did:mycelix:{}", agent),
+                    trust_score: 0.9,
+                    ml_kem_encapsulation_key: None,
+                },
+            ).await;
+        }
+
+        // Generate real DKG data and submit deals
+        // (For Hybrid committees, submit_dkg_deal auto-advances
+        // CommitmentCollection→Dealing when all deals arrive.)
+        let (combined_pk, commitments, signing_key) = run_local_dkg();
+        for (i, cell) in cells.iter().enumerate() {
+            let _: Record = conductor.call(
+                &cell.zome("threshold_signing"),
+                "submit_dkg_deal",
+                SubmitDkgDealInput {
+                    committee_id: committee.id.clone(),
+                    vss_commitment: commitments[i].clone(),
+                    encrypted_shares: None,
+                },
+            ).await;
+        }
+
+        // Finalize DKG
+        let _: Record = conductor.call(
+            &cells[0].zome("threshold_signing"),
+            "finalize_dkg",
+            FinalizeDkgInput {
+                committee_id: committee.id.clone(),
+                combined_public_key: combined_pk,
+                public_commitments: commitments,
+                qualified_members: vec![1, 2, 3],
+            },
+        ).await;
+
+        // Generate ML-DSA-65 keypair and register PQ attestor with proof-of-possession
+        let ml_dsa_kp = feldman_dkg::pq_sig::generate_signing_keypair();
+        let challenge = format!(
+            "PQ_ATTESTOR_REGISTRATION:{}:{}:{}",
+            committee.id, 1, 1 // committee_id, epoch, participant_id
+        );
+        let pop = feldman_dkg::pq_sig::sign(&ml_dsa_kp.signing_key, challenge.as_bytes());
+
+        let _: Record = conductor.call(
+            &cells[0].zome("threshold_signing"),
+            "register_pq_attestor",
+            RegisterPqAttestorInput {
+                committee_id: committee.id.clone(),
+                epoch: 1,
+                participant_id: 1,
+                ml_dsa_public_key: ml_dsa_kp.verifying_key_bytes(),
+                proof_of_possession: Some(pop),
+            },
+        ).await;
+
+        (conductor, cells, committee.id, signing_key, ml_dsa_kp)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle
+    async fn test_hybrid_combine_signatures_pq_verified() {
+        println!("=== test_hybrid_combine_signatures_pq_verified ===");
+
+        let dna = load_dna().await;
+        let (mut conductor, cells, committee_id, ecdsa_key, ml_dsa_kp) =
+            setup_completed_hybrid_dkg(&dna).await;
+
+        // Sign content with both ECDSA and ML-DSA-65
+        let content = b"MIP-99 post-quantum governance treasury release".to_vec();
+
+        // ECDSA signature
+        let ecdsa_sig: k256::ecdsa::Signature = ecdsa_key.sign(&content);
+        let ecdsa_bytes = ecdsa_sig.to_bytes().to_vec();
+
+        // ML-DSA-65 signature
+        let pq_sig = feldman_dkg::pq_sig::sign(&ml_dsa_kp.signing_key, &content);
+        assert_eq!(pq_sig.len(), 3309, "ML-DSA-65 signature must be 3309 bytes");
+
+        // Submit combined signature — coordinator verifies both
+        let combine_input = CombineSignaturesInput {
+            committee_id: committee_id.clone(),
+            content_hash: content.clone(),
+            content_description: "MIP-99".to_string(),
+            combined_signature: ecdsa_bytes,
+            signers: vec![1, 2],
+            verified: false, // Will be overridden by on-chain verification
+            pq_signature: Some(pq_sig),
+        };
+        let sig_record: Record = conductor
+            .call(&cells[0].zome("threshold_signing"), "combine_signatures", combine_input)
+            .await;
+        let threshold_sig: ThresholdSignature = decode_entry(&sig_record).unwrap();
+
+        assert!(threshold_sig.verified, "Hybrid signature must be verified (ECDSA + ML-DSA-65)");
+        assert_eq!(threshold_sig.signer_count, 2);
+        assert_eq!(threshold_sig.committee_id, committee_id);
+        println!("  Hybrid ECDSA + ML-DSA-65 verification confirmed on-chain");
+
+        println!("=== test_hybrid_combine_signatures_pq_verified PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle
+    async fn test_invalid_ml_dsa_signature_rejected() {
+        println!("=== test_invalid_ml_dsa_signature_rejected ===");
+
+        let dna = load_dna().await;
+        let (mut conductor, cells, committee_id, ecdsa_key, _ml_dsa_kp) =
+            setup_completed_hybrid_dkg(&dna).await;
+
+        let content = b"MIP-100 should fail PQ verification".to_vec();
+
+        // Valid ECDSA signature
+        let ecdsa_sig: k256::ecdsa::Signature = ecdsa_key.sign(&content);
+        let ecdsa_bytes = ecdsa_sig.to_bytes().to_vec();
+
+        // Garbage ML-DSA-65 signature (correct length, wrong content)
+        let garbage_pq_sig = vec![0xABu8; 3309];
+
+        let combine_input = CombineSignaturesInput {
+            committee_id: committee_id.clone(),
+            content_hash: content.clone(),
+            content_description: "MIP-100".to_string(),
+            combined_signature: ecdsa_bytes,
+            signers: vec![1, 2],
+            verified: false,
+            pq_signature: Some(garbage_pq_sig),
+        };
+
+        // This should fail — the conductor call returns an error for invalid PQ sig
+        let result: Result<Record, _> = conductor
+            .call_fallible(&cells[0].zome("threshold_signing"), "combine_signatures", combine_input)
+            .await;
+
+        assert!(result.is_err(), "Garbage ML-DSA-65 signature must be rejected");
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(
+            err_msg.contains("ML-DSA-65") || err_msg.contains("signature verification failed"),
+            "Error should mention ML-DSA-65 verification failure, got: {}", err_msg
+        );
+        println!("  Invalid ML-DSA-65 signature correctly rejected");
+
+        println!("=== test_invalid_ml_dsa_signature_rejected PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle
+    async fn test_pq_attestor_registration_with_pop() {
+        println!("=== test_pq_attestor_registration_with_pop ===");
+
+        let dna = load_dna().await;
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app = conductor.setup_app("pop-test", &[dna.clone()]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create Hybrid committee
+        let record: Record = conductor
+            .call(&cell.zome("threshold_signing"), "create_committee", CreateCommitteeInput {
+                name: "PoP Test Committee".to_string(),
+                threshold: 2,
+                member_count: 3,
+                scope: CommitteeScope::All,
+                min_phi: None,
+                signature_algorithm: Some(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65),
+            })
+            .await;
+        let committee: SigningCommittee = decode_entry(&record).unwrap();
+
+        // Generate ML-DSA-65 keypair
+        let kp = feldman_dkg::pq_sig::generate_signing_keypair();
+        let vk_bytes = kp.verifying_key_bytes();
+        assert_eq!(vk_bytes.len(), 1952, "ML-DSA-65 verifying key must be 1952 bytes");
+
+        // Valid PoP
+        let challenge = format!(
+            "PQ_ATTESTOR_REGISTRATION:{}:{}:{}",
+            committee.id, 1, 1
+        );
+        let pop = feldman_dkg::pq_sig::sign(&kp.signing_key, challenge.as_bytes());
+
+        let attestor_record: Record = conductor.call(
+            &cell.zome("threshold_signing"),
+            "register_pq_attestor",
+            RegisterPqAttestorInput {
+                committee_id: committee.id.clone(),
+                epoch: 1,
+                participant_id: 1,
+                ml_dsa_public_key: vk_bytes.clone(),
+                proof_of_possession: Some(pop),
+            },
+        ).await;
+        let attestor: PqAttestor = decode_entry(&attestor_record).unwrap();
+        assert_eq!(attestor.committee_id, committee.id);
+        assert_eq!(attestor.ml_dsa_public_key, vk_bytes);
+        println!("  PQ attestor registered with valid PoP");
+
+        // Invalid PoP (wrong challenge string)
+        let kp2 = feldman_dkg::pq_sig::generate_signing_keypair();
+        let wrong_pop = feldman_dkg::pq_sig::sign(&kp2.signing_key, b"wrong challenge");
+
+        let result: Result<Record, _> = conductor.call_fallible(
+            &cell.zome("threshold_signing"),
+            "register_pq_attestor",
+            RegisterPqAttestorInput {
+                committee_id: committee.id.clone(),
+                epoch: 1,
+                participant_id: 2,
+                ml_dsa_public_key: kp2.verifying_key_bytes(),
+                proof_of_possession: Some(wrong_pop),
+            },
+        ).await;
+        assert!(result.is_err(), "Invalid PoP must be rejected");
+        println!("  Invalid PoP correctly rejected");
+
+        // Retrieve the attestor
+        let fetched: Option<Record> = conductor.call(
+            &cell.zome("threshold_signing"),
+            "get_pq_attestor",
+            GetPqAttestorInput {
+                committee_id: committee.id.clone(),
+                epoch: 1,
+            },
+        ).await;
+        assert!(fetched.is_some(), "PQ attestor should be retrievable");
+        let fetched_attestor: PqAttestor = decode_entry(&fetched.unwrap()).unwrap();
+        assert_eq!(fetched_attestor.participant_id, 1);
+        println!("  PQ attestor retrieval confirmed");
+
+        println!("=== test_pq_attestor_registration_with_pop PASSED ===\n");
+    }
 }
 
 // ============================================================================
@@ -2999,6 +3332,7 @@ mod unit_tests {
     fn test_dkg_phase_serialization() {
         let phases = vec![
             DkgPhase::Registration,
+            DkgPhase::CommitmentCollection,
             DkgPhase::Dealing,
             DkgPhase::Verification,
             DkgPhase::Complete,
@@ -3143,7 +3477,7 @@ mod veto_fund_tests {
         let dna = load_dna().await;
         let app = conductor.setup_app("veto-test", &[dna.clone()]).await.unwrap();
         let cell = app.cells()[0].clone();
-        let agent_did = format!("did:mycelix:{}", app.agent_pubkey());
+        let agent_did = format!("did:mycelix:{}", app.agent());
 
         // 1. Create a council and join as member (required for veto authorization)
         let council_input = CreateCouncilInput {
@@ -3471,7 +3805,7 @@ mod council_decision_tests {
         let dna = load_dna().await;
         let app = conductor.setup_app("council-dec", &[dna.clone()]).await.unwrap();
         let cell = app.cells()[0].clone();
-        let agent_did = format!("did:mycelix:{}", app.agent_pubkey());
+        let agent_did = format!("did:mycelix:{}", app.agent());
 
         // 1. Create council
         let council_input = CreateCouncilInput {

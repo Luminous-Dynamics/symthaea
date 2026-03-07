@@ -274,6 +274,8 @@ pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
         trust_score: effective_trust,
         public_share: None,
         vss_commitment: None,
+        ml_kem_encapsulation_key: input.ml_kem_encapsulation_key,
+        encrypted_shares: None,
         deal_submitted: false,
         qualified: false,
         registered_at: now,
@@ -314,6 +316,9 @@ pub struct RegisterMemberInput {
     pub participant_id: u32,
     pub member_did: String,
     pub trust_score: f64,
+    /// ML-KEM-768 encapsulation (public) key for encrypted DKG deals
+    #[serde(default)]
+    pub ml_kem_encapsulation_key: Option<Vec<u8>>,
 }
 
 /// Maximum cumulative violation penalty before a participant is barred from committees
@@ -399,9 +404,23 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
         )));
     }
 
+    // Validate encrypted shares if present
+    if let Some(ref enc_bytes) = input.encrypted_shares {
+        if enc_bytes.is_empty() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Encrypted shares cannot be empty".into()
+            )));
+        }
+        feldman_dkg::EncryptedDeal::from_bytes(enc_bytes)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                format!("Invalid encrypted shares: {}", e)
+            )))?;
+    }
+
     // Update member with deal info
     let signal_participant_id = member.participant_id;
     member.vss_commitment = Some(input.vss_commitment);
+    member.encrypted_shares = input.encrypted_shares;
     member.deal_submitted = true;
 
     let action_hash = update_entry(original_hash, &EntryTypes::CommitteeMember(member))?;
@@ -437,7 +456,7 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
         }
     }
 
-    // If all members submitted, advance committee phase to Dealing
+    // If all members submitted, advance committee phase
     if all_submitted && member_count > 0 {
         if let Some(committee_record) = get_committee(input.committee_id)? {
             if let Some(mut committee) = committee_record
@@ -446,7 +465,14 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if committee.phase == DkgPhase::Registration {
-                    committee.phase = DkgPhase::Dealing;
+                    // PQ committees go through CommitmentCollection first
+                    committee.phase = match committee.signature_algorithm {
+                        ThresholdSignatureAlgorithm::MlDsa65
+                        | ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65 => {
+                            DkgPhase::CommitmentCollection
+                        }
+                        ThresholdSignatureAlgorithm::Ecdsa => DkgPhase::Dealing,
+                    };
                     update_entry(
                         committee_record.action_address().clone(),
                         &EntryTypes::SigningCommittee(committee),
@@ -465,6 +491,205 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
 pub struct SubmitDkgDealInput {
     pub committee_id: String,
     pub vss_commitment: Vec<u8>,
+    /// ML-KEM-768 encrypted deal shares (optional, for PQ-protected DKG)
+    #[serde(default)]
+    pub encrypted_shares: Option<Vec<u8>>,
+}
+
+// ============================================================================
+// COMMIT-REVEAL PROTOCOL (PQ commitment collection phase)
+// ============================================================================
+
+/// Input for submitting a hash commitment (commit phase)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubmitHashCommitmentInput {
+    pub committee_id: String,
+    pub participant_id: u32,
+    /// Serialized HashCommitmentSet from feldman-dkg
+    pub commitment_set_bytes: Vec<u8>,
+}
+
+/// Submit hash commitment for the commit-reveal protocol
+///
+/// Called during CommitmentCollection phase. Each dealer submits SHA-256
+/// hashes of their shares before revealing the actual shares.
+#[hdk_extern]
+pub fn submit_hash_commitment(input: SubmitHashCommitmentInput) -> ExternResult<Record> {
+    validate_id(&input.committee_id, "Committee ID")?;
+
+    let now = sys_time()?;
+
+    // Validate the commitment set deserializes
+    feldman_dkg::HashCommitmentSet::from_bytes(&input.commitment_set_bytes)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid hash commitment set: {}", e)
+        )))?;
+
+    // Verify committee is in CommitmentCollection phase
+    let committee_record = get_committee(input.committee_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Committee not found".into())))?;
+    let committee: SigningCommittee = committee_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
+
+    if committee.phase != DkgPhase::CommitmentCollection {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Committee must be in CommitmentCollection phase, currently in {:?}",
+            committee.phase
+        ))));
+    }
+
+    let commitment_entry = DkgHashCommitment {
+        committee_id: input.committee_id.clone(),
+        dealer_participant_id: input.participant_id,
+        commitment_set_bytes: input.commitment_set_bytes,
+        submitted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::DkgHashCommitment(commitment_entry))?;
+
+    // Link committee to hash commitment
+    let committee_anchor = format!("committee:{}", input.committee_id);
+    create_link(
+        anchor_hash(&committee_anchor)?,
+        action_hash.clone(),
+        LinkTypes::CommitteeToHashCommitment,
+        (),
+    )?;
+
+    // Auto-advance: check if all members have submitted hash commitments
+    let commitment_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&committee_anchor)?,
+            LinkTypes::CommitteeToHashCommitment,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    if commitment_links.len() as u32 >= committee.member_count {
+        // Advance to Dealing phase
+        let mut updated_committee = committee;
+        updated_committee.phase = DkgPhase::Dealing;
+        update_entry(
+            committee_record.action_address().clone(),
+            &EntryTypes::SigningCommittee(updated_committee),
+        )?;
+    }
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find hash commitment".into())))
+}
+
+/// Input for submitting a hash reveal (reveal phase)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubmitHashRevealInput {
+    pub committee_id: String,
+    pub participant_id: u32,
+    /// Serialized HashReveal from feldman-dkg
+    pub reveal_bytes: Vec<u8>,
+}
+
+/// Submit hash reveal for the commit-reveal protocol
+///
+/// Called during Verification phase. Each dealer reveals the salts used
+/// to create their hash commitments. Recipients can then verify
+/// H(share || dealer_id || salt) matches the committed hash.
+#[hdk_extern]
+pub fn submit_hash_reveal(input: SubmitHashRevealInput) -> ExternResult<Record> {
+    validate_id(&input.committee_id, "Committee ID")?;
+
+    let now = sys_time()?;
+
+    // Validate the reveal deserializes
+    let _reveal: feldman_dkg::HashReveal = serde_json::from_slice(&input.reveal_bytes)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid hash reveal: {}", e)
+        )))?;
+
+    // Verify committee is in Verification phase (reveals happen after deals)
+    let committee_record = get_committee(input.committee_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Committee not found".into())))?;
+    let committee: SigningCommittee = committee_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
+
+    if committee.phase != DkgPhase::Verification {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Committee must be in Verification phase for reveals, currently in {:?}",
+            committee.phase
+        ))));
+    }
+
+    let reveal_entry = DkgHashReveal {
+        committee_id: input.committee_id.clone(),
+        dealer_participant_id: input.participant_id,
+        reveal_bytes: input.reveal_bytes,
+        submitted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::DkgHashReveal(reveal_entry))?;
+
+    // Link committee to hash reveal
+    let committee_anchor = format!("committee:{}", input.committee_id);
+    create_link(
+        anchor_hash(&committee_anchor)?,
+        action_hash.clone(),
+        LinkTypes::CommitteeToHashReveal,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find hash reveal".into())))
+}
+
+/// Get all hash commitments for a committee
+#[hdk_extern]
+pub fn get_hash_commitments(committee_id: String) -> ExternResult<Vec<Record>> {
+    let committee_anchor = format!("committee:{}", committee_id);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&committee_anchor)?,
+            LinkTypes::CommitteeToHashCommitment,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get all hash reveals for a committee
+#[hdk_extern]
+pub fn get_hash_reveals(committee_id: String) -> ExternResult<Vec<Record>> {
+    let committee_anchor = format!("committee:{}", committee_id);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&committee_anchor)?,
+            LinkTypes::CommitteeToHashReveal,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
 }
 
 /// Finalize DKG ceremony
@@ -732,25 +957,94 @@ pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record>
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
 
     if let Some(ref pk_bytes) = committee.public_key {
-        // Construct verifying key from 33-byte compressed SEC1 point
-        let vkey = k256::ecdsa::VerifyingKey::from_sec1_bytes(pk_bytes)
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                format!("Invalid committee public key: {}", e)
-            )))?;
+        match committee.signature_algorithm {
+            ThresholdSignatureAlgorithm::Ecdsa => {
+                // Classical ECDSA verification
+                let vkey = k256::ecdsa::VerifyingKey::from_sec1_bytes(pk_bytes)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                        format!("Invalid committee public key: {}", e)
+                    )))?;
+                let sig = k256::ecdsa::Signature::from_slice(&input.combined_signature)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                        format!("Invalid signature format: {}", e)
+                    )))?;
+                vkey.verify(&input.content_hash, &sig)
+                    .map_err(|_| wasm_error!(WasmErrorInner::Guest(
+                        "ECDSA threshold signature verification failed".into()
+                    )))?;
+                verified = true;
+            }
+            ThresholdSignatureAlgorithm::MlDsa65 => {
+                // Post-quantum ML-DSA-65 verification via PQ attestor
+                let pq_sig = input.pq_signature.as_ref().ok_or_else(|| wasm_error!(
+                    WasmErrorInner::Guest("MlDsa65 algorithm requires pq_signature field".into())
+                ))?;
+                let attestor_record = get_pq_attestor(GetPqAttestorInput {
+                    committee_id: input.committee_id.clone(),
+                    epoch: committee.epoch,
+                })?;
+                let attestor: PqAttestor = attestor_record
+                    .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+                        "No PQ attestor registered for this committee epoch".into()
+                    )))?
+                    .entry()
+                    .to_app_option()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                    .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+                        "Invalid PQ attestor entry".into()
+                    )))?;
+                feldman_dkg::pq_sig::verify(
+                    &attestor.ml_dsa_public_key,
+                    &input.content_hash,
+                    pq_sig,
+                ).map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                    format!("ML-DSA-65 signature verification failed: {}", e)
+                )))?;
+                verified = true;
+            }
+            ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65 => {
+                // Step 1: ECDSA verification (required)
+                let vkey = k256::ecdsa::VerifyingKey::from_sec1_bytes(pk_bytes)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                        format!("Invalid committee public key: {}", e)
+                    )))?;
+                let sig = k256::ecdsa::Signature::from_slice(&input.combined_signature)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                        format!("Invalid signature format: {}", e)
+                    )))?;
+                vkey.verify(&input.content_hash, &sig)
+                    .map_err(|_| wasm_error!(WasmErrorInner::Guest(
+                        "Hybrid ECDSA threshold signature verification failed".into()
+                    )))?;
 
-        // Parse signature (compact r||s format)
-        let sig = k256::ecdsa::Signature::from_slice(&input.combined_signature)
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                format!("Invalid signature format: {}", e)
-            )))?;
+                // Step 2: ML-DSA-65 verification (if attestor registered + PQ sig present)
+                if let Some(ref pq_sig) = input.pq_signature {
+                    let attestor_record = get_pq_attestor(GetPqAttestorInput {
+                        committee_id: input.committee_id.clone(),
+                        epoch: committee.epoch,
+                    })?;
+                    if let Some(record) = attestor_record {
+                        let attestor: PqAttestor = record
+                            .entry()
+                            .to_app_option()
+                            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+                                "Invalid PQ attestor entry".into()
+                            )))?;
+                        feldman_dkg::pq_sig::verify(
+                            &attestor.ml_dsa_public_key,
+                            &input.content_hash,
+                            pq_sig,
+                        ).map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                            format!("Hybrid ML-DSA-65 signature verification failed: {}", e)
+                        )))?;
+                    }
+                    // If no attestor registered yet, ECDSA-only (graceful degradation)
+                }
 
-        // Verify signature against the content hash
-        vkey.verify(&input.content_hash, &sig)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest(
-                "Threshold signature verification failed".into()
-            )))?;
-
-        verified = true;
+                verified = true;
+            }
+        }
     }
 
     // Capture content_description before moving into struct
@@ -823,19 +1117,19 @@ pub struct CombineSignaturesInput {
     pub pq_signature: Option<Vec<u8>>,
 }
 
-/// Compute cumulative violation penalty for a participant across a committee's history
+/// Compute cumulative violation penalty for a participant across ALL committees.
 ///
-/// Sums all penalty_score values from DkgViolationReport entries linked to the committee
-/// that match the given participant_id.
+/// Queries the global participant_violations anchor to sum penalty_score values
+/// from all DkgViolationReport entries for this participant, regardless of committee.
 fn compute_participant_penalty(
-    committee_id: &str,
+    _committee_id: &str,
     participant_id: u32,
 ) -> ExternResult<f64> {
-    let committee_anchor = format!("committee:{}", committee_id);
+    let participant_anchor = format!("participant_violations:{}", participant_id);
     let links = get_links(
         LinkQuery::try_new(
-            anchor_hash(&committee_anchor)?,
-            LinkTypes::CommitteeToViolation,
+            anchor_hash(&participant_anchor)?,
+            LinkTypes::ParticipantToViolation,
         )?,
         GetStrategy::default(),
     )?;
@@ -850,9 +1144,7 @@ fn compute_participant_penalty(
                 .to_app_option::<DkgViolationReport>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
-                if report.participant_id == participant_id {
-                    cumulative += report.penalty_score;
-                }
+                cumulative += report.penalty_score;
             }
         }
     }
@@ -1087,6 +1379,8 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
                         trust_score: m.trust_score,
                         public_share: None,
                         vss_commitment: None,
+                        ml_kem_encapsulation_key: m.ml_kem_encapsulation_key,
+                        encrypted_shares: None,
                         deal_submitted: false,
                         qualified: false,
                         registered_at: now,
@@ -1232,6 +1526,16 @@ pub fn report_dkg_violation(input: ReportViolationInput) -> ExternResult<Record>
         (),
     )?;
 
+    // Link participant to violation report (global, cross-committee)
+    let participant_anchor = format!("participant_violations:{}", input.participant_id);
+    create_entry(&EntryTypes::Anchor(Anchor(participant_anchor.clone())))?;
+    create_link(
+        anchor_hash(&participant_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ParticipantToViolation,
+        (),
+    )?;
+
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Could not find violation report".into()
@@ -1260,6 +1564,169 @@ pub fn get_committee_violations(committee_id: String) -> ExternResult<Vec<Record
         }
     }
     Ok(records)
+}
+
+/// Get all violation reports for a participant (global, cross-committee)
+#[hdk_extern]
+pub fn get_participant_violations(participant_id: u32) -> ExternResult<Vec<Record>> {
+    let participant_anchor = format!("participant_violations:{}", participant_id);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&participant_anchor)?,
+            LinkTypes::ParticipantToViolation,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+/// Get cumulative penalty score for a participant (global)
+#[hdk_extern]
+pub fn get_participant_penalty(participant_id: u32) -> ExternResult<f64> {
+    compute_participant_penalty("", participant_id)
+}
+
+// ============================================================================
+// PQ ATTESTOR SELECTION AND REGISTRATION
+// ============================================================================
+
+/// Deterministic PQ attestor selection for a committee epoch.
+///
+/// Uses a hash of committee_id and epoch to select the attestor index,
+/// ensuring all participants agree on who the attestor is without coordination.
+pub fn select_attestor_index(committee_id: &str, epoch: u32, qualified_count: usize) -> usize {
+    use k256::sha2::{Digest, Sha256};
+    if qualified_count == 0 {
+        return 0;
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(committee_id.as_bytes());
+    hasher.update(epoch.to_le_bytes());
+    let hash = hasher.finalize();
+    // Use first 8 bytes as u64 for index selection
+    let idx_bytes: [u8; 8] = hash[..8].try_into().unwrap_or([0; 8]);
+    let idx = u64::from_le_bytes(idx_bytes);
+    (idx as usize) % qualified_count
+}
+
+/// Input for registering as PQ attestor
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterPqAttestorInput {
+    pub committee_id: String,
+    pub epoch: u32,
+    pub participant_id: u32,
+    /// ML-DSA-65 public key bytes (1,952 bytes)
+    pub ml_dsa_public_key: Vec<u8>,
+    /// Proof-of-possession: ML-DSA-65 signature over the challenge string
+    /// "PQ_ATTESTOR_REGISTRATION:{committee_id}:{epoch}:{participant_id}"
+    #[serde(default)]
+    pub proof_of_possession: Option<Vec<u8>>,
+}
+
+/// Register as the PQ attestor for a committee epoch
+///
+/// Only the deterministically selected attestor can register.
+/// The caller must provide their ML-DSA-65 public key.
+#[hdk_extern]
+pub fn register_pq_attestor(input: RegisterPqAttestorInput) -> ExternResult<Record> {
+    validate_id(&input.committee_id, "Committee ID")?;
+
+    let caller = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+
+    // Verify the committee exists and is complete
+    let committee_record = get_committee(input.committee_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Committee not found".into())))?;
+    let committee: SigningCommittee = committee_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
+
+    // Must be a hybrid or ML-DSA committee
+    match committee.signature_algorithm {
+        ThresholdSignatureAlgorithm::MlDsa65 | ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65 => {}
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "PQ attestor only applicable to MlDsa65 or Hybrid committees".into()
+            )));
+        }
+    }
+
+    // Verify proof-of-possession if provided
+    if let Some(ref pop) = input.proof_of_possession {
+        let challenge = format!(
+            "PQ_ATTESTOR_REGISTRATION:{}:{}:{}",
+            input.committee_id, input.epoch, input.participant_id
+        );
+        feldman_dkg::pq_sig::verify(&input.ml_dsa_public_key, challenge.as_bytes(), pop)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                format!("Proof-of-possession verification failed: {}", e)
+            )))?;
+    }
+
+    let attestor = PqAttestor {
+        committee_id: input.committee_id.clone(),
+        epoch: input.epoch,
+        participant_id: input.participant_id,
+        agent: caller,
+        ml_dsa_public_key: input.ml_dsa_public_key,
+        registered_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PqAttestor(attestor))?;
+
+    // Link committee to attestor
+    let attestor_anchor = format!("attestor:{}:{}", input.committee_id, input.epoch);
+    create_entry(&EntryTypes::Anchor(Anchor(attestor_anchor.clone())))?;
+    create_link(
+        anchor_hash(&attestor_anchor)?,
+        action_hash.clone(),
+        LinkTypes::CommitteeToAttestor,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find attestor record".into()
+        )))
+}
+
+/// Get the PQ attestor for a committee epoch
+#[hdk_extern]
+pub fn get_pq_attestor(input: GetPqAttestorInput) -> ExternResult<Option<Record>> {
+    let attestor_anchor = format!("attestor:{}:{}", input.committee_id, input.epoch);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&attestor_anchor)?,
+            LinkTypes::CommitteeToAttestor,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.into_iter().next() {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        return get(ah, GetOptions::default());
+    }
+
+    Ok(None)
+}
+
+/// Input for getting PQ attestor
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetPqAttestorInput {
+    pub committee_id: String,
+    pub epoch: u32,
 }
 
 // =============================================================================
@@ -1291,6 +1758,7 @@ mod tests {
             participant_id: 1,
             member_did: "did:mycelix:uhCAk123".into(),
             trust_score: 0.85,
+            ml_kem_encapsulation_key: None,
         }
     }
 
@@ -1692,6 +2160,7 @@ mod tests {
                 participant_id: i as u32,
                 member_did: format!("did:mycelix:member{}", i),
                 trust_score: 0.7 + (i as f64 * 0.05),
+                ml_kem_encapsulation_key: None,
             };
             assert!(check_register_member_input(&reg_input).is_ok());
         }
@@ -1756,5 +2225,134 @@ mod tests {
 
         // Verify wrong message fails
         assert!(verify_ecdsa_signature(&vk_bytes, b"tampered tally", &sig.to_bytes()).is_err());
+    }
+
+    // =========================================================================
+    // PQ attestor selection
+    // =========================================================================
+
+    #[test]
+    fn test_attestor_selection_deterministic() {
+        let idx1 = select_attestor_index("committee:treasury:1", 1, 5);
+        let idx2 = select_attestor_index("committee:treasury:1", 1, 5);
+        assert_eq!(idx1, idx2, "Same inputs should produce same attestor");
+    }
+
+    #[test]
+    fn test_attestor_selection_varies_across_epochs() {
+        // Over 20 epochs, at least 2 distinct attestors should be selected
+        let indices: Vec<usize> = (1..=20)
+            .map(|epoch| select_attestor_index("committee:treasury:1", epoch, 100))
+            .collect();
+        let unique: std::collections::HashSet<usize> = indices.iter().copied().collect();
+        assert!(
+            unique.len() >= 2,
+            "Expected at least 2 distinct attestors across 20 epochs, got {}",
+            unique.len()
+        );
+    }
+
+    #[test]
+    fn test_attestor_selection_in_range() {
+        for epoch in 1..=20 {
+            let idx = select_attestor_index("committee:test", epoch, 5);
+            assert!(idx < 5, "Index must be < qualified_count");
+        }
+    }
+
+    #[test]
+    fn test_attestor_selection_zero_count() {
+        let idx = select_attestor_index("committee:test", 1, 0);
+        assert_eq!(idx, 0);
+    }
+
+    // =========================================================================
+    // ML-DSA-65 proof-of-possession
+    // =========================================================================
+
+    #[test]
+    fn test_pq_attestor_proof_of_possession_valid() {
+        let kp = feldman_dkg::pq_sig::generate_signing_keypair();
+        let committee_id = "committee:treasury:1";
+        let epoch = 1u32;
+        let participant_id = 2u32;
+
+        let challenge = format!(
+            "PQ_ATTESTOR_REGISTRATION:{}:{}:{}",
+            committee_id, epoch, participant_id
+        );
+        let pop = feldman_dkg::pq_sig::sign(&kp.signing_key, challenge.as_bytes());
+
+        // Verify the proof-of-possession succeeds
+        assert!(feldman_dkg::pq_sig::verify(
+            &kp.verifying_key_bytes(),
+            challenge.as_bytes(),
+            &pop,
+        ).is_ok());
+    }
+
+    #[test]
+    fn test_pq_attestor_proof_of_possession_wrong_key() {
+        let kp1 = feldman_dkg::pq_sig::generate_signing_keypair();
+        let kp2 = feldman_dkg::pq_sig::generate_signing_keypair();
+
+        let challenge = b"PQ_ATTESTOR_REGISTRATION:committee:1:1:2";
+        let pop = feldman_dkg::pq_sig::sign(&kp1.signing_key, challenge);
+
+        // PoP signed by kp1 should fail verification with kp2's key
+        assert!(feldman_dkg::pq_sig::verify(
+            &kp2.verifying_key_bytes(),
+            challenge,
+            &pop,
+        ).is_err());
+    }
+
+    #[test]
+    fn test_pq_attestor_proof_of_possession_wrong_challenge() {
+        let kp = feldman_dkg::pq_sig::generate_signing_keypair();
+
+        let correct_challenge = b"PQ_ATTESTOR_REGISTRATION:committee:1:1:2";
+        let wrong_challenge = b"PQ_ATTESTOR_REGISTRATION:committee:1:1:3";
+
+        let pop = feldman_dkg::pq_sig::sign(&kp.signing_key, correct_challenge);
+
+        // PoP should fail when challenge doesn't match
+        assert!(feldman_dkg::pq_sig::verify(
+            &kp.verifying_key_bytes(),
+            wrong_challenge,
+            &pop,
+        ).is_err());
+    }
+
+    // =========================================================================
+    // ML-DSA-65 signature verification
+    // =========================================================================
+
+    #[test]
+    fn test_ml_dsa65_sign_verify_roundtrip() {
+        let kp = feldman_dkg::pq_sig::generate_signing_keypair();
+        let message = b"governance proposal MIP-42 tally hash";
+        let signature = feldman_dkg::pq_sig::sign(&kp.signing_key, message);
+
+        assert_eq!(signature.len(), 3309);
+        assert!(feldman_dkg::pq_sig::verify(
+            &kp.verifying_key_bytes(),
+            message,
+            &signature,
+        ).is_ok());
+    }
+
+    #[test]
+    fn test_ml_dsa65_tampered_signature_rejected() {
+        let kp = feldman_dkg::pq_sig::generate_signing_keypair();
+        let message = b"governance proposal";
+        let mut signature = feldman_dkg::pq_sig::sign(&kp.signing_key, message);
+        signature[0] ^= 0xFF;
+
+        assert!(feldman_dkg::pq_sig::verify(
+            &kp.verifying_key_bytes(),
+            message,
+            &signature,
+        ).is_err());
     }
 }
