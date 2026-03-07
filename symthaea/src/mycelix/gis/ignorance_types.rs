@@ -435,6 +435,7 @@ fn harmony_resolution_strategy(
         (Harmony::UniversalInterconnectedness, _) => HarmonicResolutionStrategy::MapRelationships,
         (Harmony::SacredReciprocity, _) => HarmonicResolutionStrategy::AnalyzeReciprocity,
         (Harmony::EvolutionaryProgression, _) => HarmonicResolutionStrategy::StudyEmergence,
+        (Harmony::SacredStillness, _) => HarmonicResolutionStrategy::SeekIntegration,
     }
 }
 
@@ -453,6 +454,7 @@ fn harmony_resolution_effort(harmony: Harmony, impact: f32) -> f32 {
         // Pattern recognition can be efficient
         Harmony::SacredReciprocity => 0.4,
         Harmony::EvolutionaryProgression => 0.5,
+        Harmony::SacredStillness => 0.3,
     };
 
     (base_effort * impact).clamp(0.1, 1.0)

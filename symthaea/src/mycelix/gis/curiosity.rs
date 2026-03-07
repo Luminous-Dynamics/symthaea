@@ -578,6 +578,9 @@ impl ActiveExplorer {
                     Harmony::EvolutionaryProgression => {
                         "How does this serve growth and evolution?".to_string()
                     }
+                    Harmony::SacredStillness => {
+                        "What does contemplative stillness reveal here?".to_string()
+                    }
                 };
                 explorations.push((*harmony, exploration));
             }

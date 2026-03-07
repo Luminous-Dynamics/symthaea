@@ -1016,6 +1016,7 @@ impl HarmonicContext {
             super::Harmony::UniversalInterconnectedness => 4,
             super::Harmony::SacredReciprocity => 5,
             super::Harmony::EvolutionaryProgression => 6,
+            super::Harmony::SacredStillness => 7,
         }
     }
 }
