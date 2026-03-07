@@ -1232,11 +1232,59 @@ impl CognitiveLoopService {
             let elapsed_us = cycle_start.elapsed().as_micros() as u64;
             let available_us = 20_000u64.saturating_sub(elapsed_us);
 
+            // Populate available actions for MCTS planning.
+            // When the code_generation feature is enabled, include code-specific
+            // actions so the reasoning engine can plan code tasks.
+            #[allow(unused_mut)]
+            let mut actions: Vec<crate::consciousness::temporal_planning::types::PlannedAction> = Vec::new();
+
+            #[cfg(feature = "code_generation")]
+            {
+                use crate::consciousness::temporal_planning::types::PlannedAction;
+                actions.extend([
+                    PlannedAction {
+                        id: "code_generate".to_string(),
+                        description: "Generate code from specification".to_string(),
+                        embedding: vec![0.8, 0.2, 0.1, 0.9],
+                        prior: 0.3,
+                        is_epistemic: false,
+                    },
+                    PlannedAction {
+                        id: "code_verify".to_string(),
+                        description: "Verify generated code via compilation".to_string(),
+                        embedding: vec![0.6, 0.4, 0.3, 0.7],
+                        prior: 0.2,
+                        is_epistemic: true,
+                    },
+                    PlannedAction {
+                        id: "code_refactor".to_string(),
+                        description: "Refactor code for clarity or performance".to_string(),
+                        embedding: vec![0.5, 0.5, 0.6, 0.4],
+                        prior: 0.15,
+                        is_epistemic: false,
+                    },
+                    PlannedAction {
+                        id: "code_explain".to_string(),
+                        description: "Explain code structure and intent".to_string(),
+                        embedding: vec![0.3, 0.7, 0.8, 0.2],
+                        prior: 0.15,
+                        is_epistemic: true,
+                    },
+                    PlannedAction {
+                        id: "code_debug".to_string(),
+                        description: "Debug and diagnose code issues".to_string(),
+                        embedding: vec![0.4, 0.6, 0.5, 0.5],
+                        prior: 0.2,
+                        is_epistemic: true,
+                    },
+                ]);
+            }
+
             let reasoning_ctx = ReasoningContext {
                 theory_metrics: ec_metrics,
                 phi: unified_psi,
                 available_budget_us: available_us,
-                available_actions: Vec::new(),
+                available_actions: actions,
                 tool: None,
                 recent_utility: 0.5,
                 cycle_id: self.stats.total_cycles as u64,
@@ -1830,6 +1878,7 @@ impl CognitiveLoopService {
             } else {
                 0
             },
+            epistemic_budget_scale: epistemic_budget_scale as f32,
         }
     }
 }

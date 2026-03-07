@@ -61,6 +61,9 @@ pub struct CodeContext<'a> {
     pub context_hvs: Vec<ContinuousHV>,
     /// Additional source files for context
     pub source_files: Vec<(String, String)>,
+    /// Past successful code generations (from episodic memory).
+    /// Each entry is (purpose, source_code) for few-shot context.
+    pub past_examples: Vec<(String, String)>,
 }
 
 impl<'a> Default for CodeContext<'a> {
@@ -69,6 +72,7 @@ impl<'a> Default for CodeContext<'a> {
             memory: None,
             context_hvs: Vec::new(),
             source_files: Vec::new(),
+            past_examples: Vec::new(),
         }
     }
 }
@@ -203,13 +207,19 @@ impl CodeGenerator {
             0.0
         };
 
+        // Include past successful examples as notes for LLM few-shot context
+        let mut notes = Vec::new();
+        for (purpose, code) in &context.past_examples {
+            notes.push(format!("PAST_EXAMPLE({}):\n{}", purpose, code));
+        }
+
         GeneratedCode {
             source,
             language: spec.language.clone(),
             plan_steps: plan,
             epistemic_status: spec.epistemic_status,
             intent_similarity,
-            notes: Vec::new(),
+            notes,
             phi_score: primitive_result.phi,
             primitives_used: primitive_result
                 .primitives
