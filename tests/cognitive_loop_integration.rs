@@ -6919,3 +6919,118 @@ fn test_physics_bridge_exploration_feedback() {
         "Physics bridge should modulate exploration differently: with={urge_with}, without={urge_without}"
     );
 }
+
+// ── Circadian Soak: Sacred Stillness Oscillation ─────────────────
+
+/// Verify Sacred Stillness oscillates correctly across day/night transitions
+/// and consciousness metrics remain stable throughout.
+#[test]
+fn test_circadian_stillness_oscillation() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let mut max_stillness_boost = 0.0_f32;
+    let mut min_stillness_boost = 1.0_f32;
+    let mut all_consciousness_finite = true;
+
+    // Run 200 cycles — enough for multiple circadian refreshes
+    for i in 0..200 {
+        let result = service.cycle("circadian stillness soak test");
+
+        let stats = service.stats();
+        let boost = stats.circadian_stillness_boost;
+        if boost > max_stillness_boost {
+            max_stillness_boost = boost;
+        }
+        if boost < min_stillness_boost {
+            min_stillness_boost = boost;
+        }
+
+        // Consciousness should always be finite and non-negative
+        if !result.metadata.consciousness_level.is_finite() || result.metadata.consciousness_level < 0.0 {
+            all_consciousness_finite = false;
+        }
+
+        // Prediction error should remain bounded
+        assert!(
+            result.prediction_error <= 1.01,
+            "Prediction error unbounded at cycle {}: {}",
+            i,
+            result.prediction_error
+        );
+    }
+
+    assert!(
+        all_consciousness_finite,
+        "Consciousness must remain finite across circadian transitions"
+    );
+
+    // Stillness boost should be in valid range [0.0, 0.2]
+    assert!(
+        min_stillness_boost >= 0.0,
+        "Stillness boost should never be negative: {}",
+        min_stillness_boost
+    );
+    assert!(
+        max_stillness_boost <= 0.25,
+        "Stillness boost should be bounded: {}",
+        max_stillness_boost
+    );
+}
+
+// ── Active Rest → Dream → Phi Coupling Chain ────────────────────
+
+#[test]
+fn test_active_rest_dream_phi_chain() {
+    // Verify the full chain: SS dominance streak → active rest → dream depth → phi factors
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_dream_consolidation = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Run enough cycles for active rest to potentially trigger
+    // We can't easily force SS dominance externally, but we can verify
+    // the stats fields exist and are correctly initialized
+    for i in 0..20 {
+        let result = service.cycle("stillness and rest");
+        let m = &result.metadata;
+
+        // All telemetry must be finite
+        assert!(m.prediction_error.is_finite(), "prediction_error NaN at cycle {i}");
+        assert!(m.ethics.moral_topo_free_energy.is_finite(), "moral_topo_free_energy NaN at cycle {i}");
+    }
+
+    // Verify stats fields are properly maintained
+    let stats = service.stats();
+    assert!(stats.phi_rest_quality_factor.is_finite());
+    assert!(stats.phi_rest_binding_factor.is_finite());
+    assert!(stats.phi_rest_quality_factor > 0.0);
+    assert!(stats.phi_rest_binding_factor > 0.0);
+
+    // When not in active rest, factors should be 1.0 (neutral)
+    if !stats.in_active_rest {
+        assert!((stats.phi_rest_quality_factor - 1.0).abs() < f32::EPSILON,
+            "phi_rest_quality_factor should be 1.0 when not in active rest, got {}",
+            stats.phi_rest_quality_factor);
+        assert!((stats.phi_rest_binding_factor - 1.0).abs() < f32::EPSILON,
+            "phi_rest_binding_factor should be 1.0 when not in active rest, got {}",
+            stats.phi_rest_binding_factor);
+    }
+}
+
+// ── Harmony Entropy in Telemetry ─────────────────────────────────
+
+#[test]
+fn test_harmony_entropy_in_telemetry() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let mut saw_nonzero_entropy = false;
+    for i in 0..50 {
+        let result = service.cycle("exploring moral dimensions with care and wisdom");
+        let m = &result.metadata;
+        assert!(m.ethics.harmony_entropy.is_finite(), "harmony_entropy NaN at cycle {i}");
+        assert!(m.ethics.harmony_entropy >= 0.0, "harmony_entropy negative at cycle {i}");
+        if m.ethics.harmony_entropy > 0.0 {
+            saw_nonzero_entropy = true;
+        }
+    }
+    // After 50 cycles with varied moral content, entropy should have been non-zero at least once
+    assert!(saw_nonzero_entropy, "harmony_entropy was never non-zero in 50 cycles");
+}

@@ -1207,14 +1207,25 @@ impl CognitiveLoopService {
                         }
                     }
                 }
+                // Active rest: boost episodic memory consolidation priority.
+                // Rest states are when the brain consolidates recent experiences
+                // (Diekelmann & Born 2010 — memory consolidation during rest).
+                if let Some(ref mut replay) = self.phi_episodic_replay {
+                    replay.boost_recent_consolidation(0.15);
+                }
             }
         }
 
-        // Moral attractor dampening: when a stable moral basin is detected,
+        // Moral attractor dampening: on the rising edge of attractor detection,
         // reduce exploration rate by 20% — the system has settled on an ethical stance.
-        if self.ethics_engine.moral_topology().last_summary().attractor_detected {
-            let rate = self.fep.closed_learning_loop.exploration_rate();
-            self.fep.closed_learning_loop.set_exploration_rate(rate * 0.8);
+        // Only fires once per attractor entry to prevent exponential decay to floor.
+        {
+            let attractor_now = self.ethics_engine.moral_topology().last_summary().attractor_detected;
+            if attractor_now && !self.stats.prev_moral_attractor {
+                let rate = self.fep.closed_learning_loop.exploration_rate();
+                self.fep.closed_learning_loop.set_exploration_rate(rate * 0.8);
+            }
+            self.stats.prev_moral_attractor = attractor_now;
         }
 
         let attention_budget_elapsed_us = cycle_start.elapsed().as_micros() as u64;

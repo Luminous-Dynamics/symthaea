@@ -6,7 +6,7 @@
 //! - **Unity vs fragmentation** (β₀ = connected components)
 //! - **Circular reasoning patterns** (β₁ = 1-cycles)
 //! - **Moral blind spots** (low per-harmony variance)
-//! - **Dominant moral axis** (via PGA on 7D harmony projection)
+//! - **Dominant moral axis** (via PGA on 8D harmony projection)
 //!
 //! Reuses the Betti-number algorithm from [`ConsciousnessTopology`] (adapted
 //! from BinaryHV to ContinuousHV) and PGA from [`geometric_ops`].
@@ -367,9 +367,9 @@ pub struct MoralTopologyAssessment {
     pub circularity: f64,
     /// Completeness score: fraction of harmonies with non-trivial variance.
     pub completeness: f64,
-    /// 7D harmony coordinates for each scenario in the window.
+    /// 8D harmony coordinates for each scenario in the window.
     pub harmony_coordinates: Vec<[f64; N_HARMONIES]>,
-    /// PGA result on the 7D harmony coordinates.
+    /// PGA result on the 8D harmony coordinates.
     pub pga: PGAResult,
     /// Index into `Harmony::all()` of the dominant PGA axis.
     pub dominant_harmony_idx: u8,
@@ -379,6 +379,12 @@ pub struct MoralTopologyAssessment {
     pub scenario_count: usize,
     /// Moral free energy (FEP surprise on the harmony manifold).
     pub moral_free_energy: MoralFreeEnergy,
+    /// Harmony entropy (moral breadth): Shannon entropy of variance distribution.
+    /// High = balanced engagement across harmonies. Low = specialization.
+    /// Range: [0, ln(N_HARMONIES)] ≈ [0, 2.08].
+    pub harmony_entropy: f64,
+    /// Whether a moral attractor basin was detected (low free energy + low variance drift).
+    pub attractor_detected: bool,
 }
 
 /// Compact topology summary for CycleMetadata telemetry.
@@ -393,6 +399,8 @@ pub struct MoralTopologySummary {
     pub moral_free_energy: f64,
     pub dominant_harmony: u8,
     pub scenario_count: usize,
+    pub harmony_entropy: f64,
+    pub attractor_detected: bool,
 }
 
 impl From<&MoralTopologyAssessment> for MoralTopologySummary {
@@ -407,6 +415,8 @@ impl From<&MoralTopologyAssessment> for MoralTopologySummary {
             moral_free_energy: a.moral_free_energy.free_energy,
             dominant_harmony: a.dominant_harmony_idx,
             scenario_count: a.scenario_count,
+            harmony_entropy: a.harmony_entropy,
+            attractor_detected: a.attractor_detected,
         }
     }
 }
@@ -447,7 +457,7 @@ pub struct MoralTopology {
 /// A single point on the moral manifold trajectory.
 #[derive(Debug, Clone, Serialize)]
 pub struct MoralTrajectoryPoint {
-    /// 7D harmony coordinates at this point.
+    /// 8D harmony coordinates at this point.
     pub coordinates: [f64; N_HARMONIES],
     /// Moral free energy at this point.
     pub free_energy: f64,
@@ -543,6 +553,15 @@ impl MoralTopology {
         let alpha = if self.prior_count == 0 { 1.0 } else { 0.05 };
         for i in 0..N_HARMONIES {
             self.harmony_prior[i] = alpha * coords[i] + (1.0 - alpha) * self.harmony_prior[i];
+        }
+        // FEP stillness prior: seed Sacred Stillness expectation so the system
+        // does not treat periodic rest as morally surprising. The prior decays
+        // toward the observed EMA, but we ensure it never drops below a baseline.
+        // Science: Friston (2010) — viable systems must predict their own rest states;
+        // Tononi & Cirelli (2006) — rest is expected, not anomalous.
+        const STILLNESS_PRIOR_FLOOR: f64 = 0.05;
+        if self.harmony_prior[7] < STILLNESS_PRIOR_FLOOR {
+            self.harmony_prior[7] = STILLNESS_PRIOR_FLOOR;
         }
         self.prior_count += 1;
 
@@ -753,6 +772,8 @@ impl MoralTopology {
                 harmony_variance: [0.0; N_HARMONIES],
                 scenario_count: 0,
                 moral_free_energy: MoralFreeEnergy::default(),
+                harmony_entropy: 0.0,
+                attractor_detected: false,
             };
             self.prev_summary = std::mem::replace(
                 &mut self.last_summary,
@@ -872,6 +893,30 @@ impl MoralTopology {
                 .moral_free_energy(&mean_coords, &self.harmony_prior, 1.0)
         };
 
+        // ── Step 10: Harmony entropy (moral breadth) ───────────────────
+        let harmony_entropy = {
+            let total_var: f64 = harmony_variance.iter().sum::<f64>().max(1e-12);
+            harmony_variance
+                .iter()
+                .map(|&v| {
+                    let p = (v / total_var).max(1e-12);
+                    -p * p.ln()
+                })
+                .sum::<f64>()
+        };
+
+        // ── Step 11: Moral attractor detection ──────────────────────────
+        let attractor_detected = {
+            let low_free_energy = moral_free_energy.free_energy < 0.5;
+            // Check if variance drift is small (stable basin)
+            let low_drift = if self.prev_summary.scenario_count > 0 {
+                (moral_free_energy.free_energy - self.prev_summary.moral_free_energy).abs() < 0.1
+            } else {
+                false
+            };
+            low_free_energy && low_drift
+        };
+
         let assessment = MoralTopologyAssessment {
             betti,
             persistent_features,
@@ -884,6 +929,8 @@ impl MoralTopology {
             harmony_variance,
             scenario_count: n,
             moral_free_energy,
+            harmony_entropy,
+            attractor_detected,
         };
         self.prev_summary = std::mem::replace(
             &mut self.last_summary,
@@ -1141,7 +1188,7 @@ impl MoralTopology {
         }
     }
 
-    /// Compute per-harmony variance across all 7D coordinates.
+    /// Compute per-harmony variance across all 8D coordinates.
     fn harmony_variance(coords: &[[f64; N_HARMONIES]]) -> [f64; N_HARMONIES] {
         let n = coords.len();
         if n == 0 {

@@ -122,6 +122,10 @@ pub struct App {
     fe_history: Vec<f64>,
     /// Anomaly count history for trend display.
     anomaly_history: Vec<u64>,
+    /// Consciousness state history for trajectory display (last 20).
+    consciousness_history: Vec<ConsciousnessState>,
+    /// Memory usage history for sparkline (last 30 samples).
+    memory_history: Vec<f64>,
 }
 
 impl App {
@@ -149,6 +153,8 @@ impl App {
             daemon_snapshot: None,
             fe_history: Vec::with_capacity(60),
             anomaly_history: Vec::with_capacity(60),
+            consciousness_history: Vec::with_capacity(20),
+            memory_history: Vec::with_capacity(30),
         }
     }
 
@@ -387,6 +393,20 @@ impl App {
             free_energy: snap.free_energy,
         };
 
+        // Track consciousness trajectory
+        self.consciousness_history.push(self.consciousness);
+        if self.consciousness_history.len() > 20 {
+            self.consciousness_history.remove(0);
+        }
+
+        // Track memory usage for sparkline
+        if let Some(pct) = snap.memory_used_percent {
+            self.memory_history.push(pct);
+            if self.memory_history.len() > 30 {
+                self.memory_history.remove(0);
+            }
+        }
+
         // World model from daemon
         self.world_model = WorldModelSnapshot {
             level_errors: snap.hierarchy_errors,
@@ -399,50 +419,83 @@ impl App {
                 .iter()
                 .map(|c| (c.label.clone(), c.activation))
                 .collect(),
+            drift_similarity: snap.drift_similarity,
+            episodic_count: snap.episodic_count,
             ..Default::default()
         };
 
-        // Causal links — show recent anomalies as causal concerns
-        self.causal_links = snap
-            .recent_anomalies
-            .iter()
-            .map(|a| CausalLink {
-                from: a.unit.clone(),
-                to: a.reason.clone(),
-                confidence: a.score,
-                relationship: "anomaly".to_string(),
-            })
-            .collect();
+        // Causal links — prefer real causal edges, fall back to anomalies
+        if !snap.top_causal_edges.is_empty() {
+            self.causal_links = snap
+                .top_causal_edges
+                .iter()
+                .map(|e| CausalLink {
+                    from: e.from.clone(),
+                    to: e.to.clone(),
+                    confidence: e.confidence,
+                    relationship: "causal".to_string(),
+                })
+                .collect();
+            // Append anomalies as secondary entries
+            for a in &snap.recent_anomalies {
+                self.causal_links.push(CausalLink {
+                    from: a.unit.clone(),
+                    to: a.reason.clone(),
+                    confidence: a.score,
+                    relationship: "anomaly".to_string(),
+                });
+            }
+        } else {
+            self.causal_links = snap
+                .recent_anomalies
+                .iter()
+                .map(|a| CausalLink {
+                    from: a.unit.clone(),
+                    to: a.reason.clone(),
+                    confidence: a.score,
+                    relationship: "anomaly".to_string(),
+                })
+                .collect();
+        }
 
         // Health: merge daemon stats with direct service queries
         self.health.services_failed = snap.anomaly_count as usize;
+        self.health.memory_used_percent = snap.memory_used_percent;
+        self.health.memory_history = self.memory_history.clone();
 
-        // Alerts from daemon snapshot
-        self.alerts.active_alerts = snap
-            .recent_anomalies
-            .iter()
-            .map(|a| crate::ipc::AlertEntry {
-                metric: a.unit.clone(),
-                current_value: a.score * 100.0,
-                predicted_value: a.score * 120.0,
-                hours_ahead: 6.0,
-                threshold: 80.0,
-                confidence: a.score,
-                recommended_action: Some(format!("Investigate {}", a.unit)),
-                severity: if a.score > 0.8 {
-                    crate::ipc::AlertSeverity::Critical
-                } else if a.score > 0.5 {
-                    crate::ipc::AlertSeverity::Warning
-                } else {
-                    crate::ipc::AlertSeverity::Info
-                },
-                first_seen: snap.timestamp,
-                last_seen: snap.timestamp,
-                consecutive_cycles: 1,
-                prev_predicted_value: None,
-                journal_context: vec![a.reason.clone()],
-            })
-            .collect();
+        // Alerts: prefer real predictive alerts from daemon, fall back to anomaly-derived
+        if !snap.alerts.is_empty() {
+            self.alerts.active_alerts = snap.alerts.clone();
+        } else {
+            self.alerts.active_alerts = snap
+                .recent_anomalies
+                .iter()
+                .map(|a| crate::ipc::AlertEntry {
+                    metric: a.unit.clone(),
+                    current_value: a.score * 100.0,
+                    predicted_value: a.score * 120.0,
+                    hours_ahead: 6.0,
+                    threshold: 80.0,
+                    confidence: a.score,
+                    recommended_action: Some(format!("Investigate {}", a.unit)),
+                    severity: if a.score > 0.8 {
+                        crate::ipc::AlertSeverity::Critical
+                    } else if a.score > 0.5 {
+                        crate::ipc::AlertSeverity::Warning
+                    } else {
+                        crate::ipc::AlertSeverity::Info
+                    },
+                    first_seen: snap.timestamp,
+                    last_seen: snap.timestamp,
+                    consecutive_cycles: 1,
+                    prev_predicted_value: None,
+                    journal_context: vec![a.reason.clone()],
+                })
+                .collect();
+        }
+        self.alerts.support_status = snap.support_status.clone();
+        self.alerts.recommendation_count = snap.recommendation_count;
+        self.alerts.watchdog_status = snap.watchdog_status.clone();
 
         self.refresh_generations();
     }
@@ -498,7 +551,7 @@ impl App {
             .title(" Consciousness [Zen] ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        let gauge = ConsciousnessGauge::new(self.consciousness).block(cons_block);
+        let gauge = ConsciousnessGauge::new(self.consciousness).history(self.consciousness_history.clone()).block(cons_block);
         frame.render_widget(gauge, chunks[0]);
 
         self.draw_input(frame, chunks[1]);
@@ -521,7 +574,7 @@ impl App {
             .title(" Consciousness [Beginner] ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        frame.render_widget(ConsciousnessGauge::new(self.consciousness).block(cons_block), chunks[0]);
+        frame.render_widget(ConsciousnessGauge::new(self.consciousness).history(self.consciousness_history.clone()).block(cons_block), chunks[0]);
 
         let health_block = Block::default()
             .title(" System Health ")
@@ -559,7 +612,7 @@ impl App {
             .title(" Consciousness ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        frame.render_widget(ConsciousnessGauge::new(self.consciousness).block(cons_block), left_chunks[0]);
+        frame.render_widget(ConsciousnessGauge::new(self.consciousness).history(self.consciousness_history.clone()).block(cons_block), left_chunks[0]);
 
         let health_block = Block::default()
             .title(" System Health ")
@@ -636,7 +689,7 @@ impl App {
             .title(" Consciousness [Expert] ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        frame.render_widget(ConsciousnessGauge::new(self.consciousness).block(cons_block), left_chunks[0]);
+        frame.render_widget(ConsciousnessGauge::new(self.consciousness).history(self.consciousness_history.clone()).block(cons_block), left_chunks[0]);
 
         let health_block = Block::default()
             .title(" System Health ")
@@ -899,6 +952,7 @@ mod tests {
     fn test_apply_daemon_snapshot() {
         let mut app = App::new(true);
         let snap = DaemonSnapshot {
+            version: ipc::SNAPSHOT_VERSION,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -923,8 +977,13 @@ mod tests {
             }],
             daemon_running: true,
             daemon_pid: 1,
-            support_status: None,
+            support_status: Some("Healthy".into()),
             recommendation_count: 0,
+            alerts: vec![],
+            top_causal_edges: vec![],
+            memory_used_percent: Some(55.0),
+            watchdog_status: Some("stabilized".into()),
+            degraded: false,
         };
 
         app.apply_daemon_snapshot(&snap);
@@ -937,5 +996,11 @@ mod tests {
         assert_eq!(app.world_model.memory_items[0].0, "high memory");
         assert_eq!(app.causal_links.len(), 1);
         assert_eq!(app.causal_links[0].from, "kernel");
+        // Consciousness history should track
+        assert_eq!(app.consciousness_history.len(), 1);
+        assert!((app.consciousness_history[0].free_energy - 0.35).abs() < 1e-6);
+        // Memory history should track
+        assert_eq!(app.memory_history.len(), 1);
+        assert!((app.memory_history[0] - 55.0).abs() < 1e-6);
     }
 }

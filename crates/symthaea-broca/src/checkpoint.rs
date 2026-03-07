@@ -26,7 +26,7 @@ const CHECKPOINT_VERSION: u32 = 2;
 /// v2: v1 + 4 LayerNorm vectors (ln_fwd_gamma, ln_fwd_beta, ln_bwd_gamma, ln_bwd_beta).
 /// v3: v2 + temporal projection fields (temporal, chunk_dim, num_chunks, temporal_weights).
 #[cfg(feature = "mamba")]
-const PROJECTION_CHECKPOINT_VERSION: u32 = 3;
+const PROJECTION_CHECKPOINT_VERSION: u32 = 4;
 
 /// Minimum supported ProjectionCheckpoint version.
 #[cfg(feature = "mamba")]
@@ -376,6 +376,14 @@ pub struct ProjectionCheckpoint {
     /// Added in v3; v1/v2 checkpoints deserialize with `None` via serde(default).
     #[serde(default)]
     pub temporal_weights: Option<Vec<f32>>,
+    /// Number of groups for grouped temporal projection.
+    /// Added in v4; earlier checkpoints deserialize with `0` via serde(default).
+    #[serde(default)]
+    pub num_groups: usize,
+    /// Whether this checkpoint was trained with the whitening adapter.
+    /// Added in v4; earlier checkpoints deserialize with `false` via serde(default).
+    #[serde(default)]
+    pub has_adapter: bool,
     /// Blake3 integrity checksum (zeroed before hashing).
     pub checksum: [u8; 32],
 }
@@ -398,6 +406,8 @@ impl ProjectionCheckpoint {
             chunk_dim: self.chunk_dim,
             num_chunks: self.num_chunks,
             temporal_weights: self.temporal_weights.clone(),
+            num_groups: self.num_groups,
+            has_adapter: self.has_adapter,
             checksum: [0u8; 32],
         };
         let bytes = rmp_serde::to_vec(&copy)
@@ -457,6 +467,8 @@ impl ProjectionCheckpoint {
             chunk_dim: 0,
             num_chunks: 0,
             temporal_weights: None,
+            num_groups: 0,
+            has_adapter: false,
             checksum: [0u8; 32],
         }
     }
@@ -486,14 +498,15 @@ impl ProjectionCheckpoint {
             chunk_dim,
             num_chunks,
             temporal_weights: Some(temporal_weights),
+            num_groups: 0,
+            has_adapter: false,
             checksum: [0u8; 32],
         }
     }
 
     /// Create a temporal checkpoint with multi-group/adapter metadata.
     ///
-    /// Group count and adapter flag are stored implicitly in the weight vector;
-    /// the extra parameters are accepted for API compatibility with the training binary.
+    /// Create a temporal checkpoint with multi-group and adapter metadata.
     #[allow(clippy::too_many_arguments)]
     pub fn new_temporal_with_groups(
         spatial_weights: Vec<f32>,
@@ -504,10 +517,10 @@ impl ProjectionCheckpoint {
         training_epoch: usize,
         chunk_dim: usize,
         num_chunks: usize,
-        _num_groups: usize,
-        _has_adapter: bool,
+        num_groups: usize,
+        has_adapter: bool,
     ) -> Self {
-        Self::new_temporal(
+        let mut ckpt = Self::new_temporal(
             spatial_weights,
             temporal_weights,
             hdc_dim,
@@ -516,7 +529,10 @@ impl ProjectionCheckpoint {
             training_epoch,
             chunk_dim,
             num_chunks,
-        )
+        );
+        ckpt.num_groups = num_groups;
+        ckpt.has_adapter = has_adapter;
+        ckpt
     }
 
     /// Load from a file with integrity and version compatibility checks.

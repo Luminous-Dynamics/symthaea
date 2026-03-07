@@ -993,7 +993,9 @@ fn cmd_health(format: OutputFormat) {
 
 fn cmd_predict(horizons_str: &str, format: OutputFormat) {
     use symthaea_nix::encoding::ServiceState;
-    use symthaea_nix::support::predictive::{PredictiveMonitor, SystemTelemetry};
+    use symthaea_nix::support::predictive::{
+        AlertThresholds, PredictiveMonitor, SavedPredictiveState, SystemTelemetry,
+    };
 
     let snapshot = match symthaea_nix::observe::SystemObserver::snapshot() {
         Ok(s) => s,
@@ -1031,7 +1033,26 @@ fn cmd_predict(horizons_str: &str, format: OutputFormat) {
             .count() as u32,
     };
 
-    let mut monitor = PredictiveMonitor::with_defaults();
+    // Try to load persisted history from daemon for richer predictions
+    let pred_path =
+        symthaea_nix::ipc::default_snapshot_path().with_file_name("predictive_history.json");
+    let mut monitor = if let Ok(json) = std::fs::read_to_string(&pred_path) {
+        if let Ok(saved) = serde_json::from_str::<SavedPredictiveState>(&json) {
+            let count = saved.samples.len();
+            let m = PredictiveMonitor::load(saved, AlertThresholds::default());
+            if matches!(format, OutputFormat::Human) {
+                println!(
+                    "  Loaded {} historical samples from daemon.",
+                    count
+                );
+            }
+            m
+        } else {
+            PredictiveMonitor::with_defaults()
+        }
+    } else {
+        PredictiveMonitor::with_defaults()
+    };
     monitor.ingest(telemetry);
 
     let horizons: Vec<f64> = horizons_str
@@ -1086,7 +1107,11 @@ fn cmd_predict(horizons_str: &str, format: OutputFormat) {
                 }
             }
             println!();
-            println!("  Note: predictions improve with continuous monitoring via the daemon.");
+            if monitor.sample_count() > 1 {
+                println!("  ({} total samples — using daemon history)", monitor.sample_count());
+            } else {
+                println!("  Note: predictions improve with continuous monitoring via the daemon.");
+            }
         }
     }
 }
@@ -1143,6 +1168,16 @@ fn cmd_watch(timeout: u64, interval: u64, format: OutputFormat) {
 
     let watchdog = Watchdog::new(config);
     let verdict = watchdog.monitor(&mut codebook, &baseline_hv, current_gen);
+
+    // Persist verdict for daemon/TUI to pick up
+    let verdict_str = match &verdict {
+        symthaea_nix::support::watchdog::WatchdogVerdict::Stabilized { .. } => "stabilized",
+        symthaea_nix::support::watchdog::WatchdogVerdict::Degraded { .. } => "degraded",
+        symthaea_nix::support::watchdog::WatchdogVerdict::Reverted { .. } => "reverted",
+        symthaea_nix::support::watchdog::WatchdogVerdict::Error { .. } => "error",
+    };
+    let wd_path = symthaea_nix::ipc::default_snapshot_path().with_file_name("watchdog_verdict.txt");
+    let _ = std::fs::write(&wd_path, verdict_str);
 
     match format {
         OutputFormat::Json => {

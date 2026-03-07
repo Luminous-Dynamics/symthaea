@@ -173,14 +173,19 @@ impl LoraAdapter {
     }
 
     /// Apply gradients from the backward pass to the LoRA parameters.
+    ///
+    /// IMPORTANT: We `.detach()` before `Var::set()` to break autograd graph edges.
+    /// Without detach, `Var::set()` keeps a reference to the computation graph that
+    /// produced `updated`, causing RSS to grow unboundedly across training steps
+    /// (observed: 1.2GB → 9.5GB in one epoch with 48 LoRA adapters).
     pub fn apply_grads(&self, grads: &candle_core::backprop::GradStore, lr: f32) -> Result<()> {
         if let Some(grad_a) = grads.get(self.a.as_tensor()) {
             let updated = (self.a.as_tensor() - (grad_a * lr as f64)?)?;
-            self.a.set(&updated)?;
+            self.a.set(&updated.detach())?;
         }
         if let Some(grad_b) = grads.get(self.b.as_tensor()) {
             let updated = (self.b.as_tensor() - (grad_b * lr as f64)?)?;
-            self.b.set(&updated)?;
+            self.b.set(&updated.detach())?;
         }
         Ok(())
     }

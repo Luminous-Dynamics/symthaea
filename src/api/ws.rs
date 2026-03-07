@@ -106,7 +106,7 @@ pub struct DemoCycleData {
     pub bath_phase_label: String,
 
     // ── Moral Topology: Conscience Radar ──
-    /// 7D harmony coordinates: [RC, PSF, IW, IP, UI, SR, EP].
+    /// 8D harmony coordinates: [RC, PSF, IW, IP, UI, SR, EP, SS].
     #[serde(default)]
     pub harmony_coordinates: [f64; N_HARMONIES],
     /// Harmony axis labels (static, included for self-describing payloads).

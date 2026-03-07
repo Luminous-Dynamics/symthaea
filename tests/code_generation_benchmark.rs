@@ -629,6 +629,211 @@ fn build_complex_llm_cases() -> Vec<BenchmarkCase> {
     ]
 }
 
+fn build_advanced_rust_cases() -> Vec<BenchmarkCase> {
+    vec![
+        // 1. Error handling — emitter has a Result+parse path
+        BenchmarkCase {
+            name: "parse_integer",
+            language: "rust",
+            purpose: "Parse a string to integer with error handling",
+            signature: Some("fn parse_integer(s: &str) -> Result<i32, String>"),
+            required_fragments: vec![".parse("],
+            forbidden_fragments: vec!["todo!"],
+            expects_llm: false,
+        },
+        // 2. Option handling — emitter has an Option+find path
+        BenchmarkCase {
+            name: "find_first_even",
+            language: "rust",
+            purpose: "Find first even number in a vector",
+            signature: Some("fn find_first_even(items: Vec<i32>) -> Option<i32>"),
+            required_fragments: vec![".find("],
+            forbidden_fragments: vec!["todo!"],
+            expects_llm: false,
+        },
+        // 3. Closures / map — emitter has a map path but uses placeholder closure
+        BenchmarkCase {
+            name: "apply_transform",
+            language: "rust",
+            purpose: "Apply a function to each element (map a transform over a vector)",
+            signature: Some("fn apply_transform(items: Vec<i32>) -> Vec<i32>"),
+            required_fragments: vec![".map("],
+            forbidden_fragments: vec!["todo!"],
+            expects_llm: false,
+        },
+        // 4. Multiple returns (tuple) — emitter has no tuple-return pattern
+        BenchmarkCase {
+            name: "divide_with_remainder",
+            language: "rust",
+            purpose: "Divide with remainder returning quotient and remainder as a tuple",
+            signature: Some("fn divide_with_remainder(a: i32, b: i32) -> (i32, i32)"),
+            required_fragments: vec!["pub fn divide_with_remainder"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 5. String formatting — emitter has no format!() pattern for greeting
+        BenchmarkCase {
+            name: "format_greeting",
+            language: "rust",
+            purpose: "Format a greeting message for a given name",
+            signature: Some("fn format_greeting(name: &str) -> String"),
+            required_fragments: vec!["pub fn format_greeting"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 6. Nested iteration — emitter has no intersection pattern
+        BenchmarkCase {
+            name: "find_common_elements",
+            language: "rust",
+            purpose: "Find common elements in two vectors (intersection)",
+            signature: Some("fn find_common_elements(a: Vec<i32>, b: Vec<i32>) -> Vec<i32>"),
+            required_fragments: vec!["pub fn find_common_elements"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 7. Pattern matching — emitter has no match expression pattern
+        BenchmarkCase {
+            name: "classify_number",
+            language: "rust",
+            purpose: "Classify number as positive negative or zero using match",
+            signature: Some("fn classify_number(n: i32) -> &'static str"),
+            required_fragments: vec!["pub fn classify_number"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 8. Range operations — emitter handles sum of collection but not range sum
+        BenchmarkCase {
+            name: "sum_range",
+            language: "rust",
+            purpose: "Sum numbers from 1 to n using a range",
+            signature: Some("fn sum_range(n: u64) -> u64"),
+            required_fragments: vec!["pub fn sum_range"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 9. HashMap — emitter has no HashMap pattern
+        BenchmarkCase {
+            name: "count_word_frequencies",
+            language: "rust",
+            purpose: "Count word frequencies in a list of words using a HashMap",
+            signature: Some("fn count_word_frequencies(words: Vec<&str>) -> std::collections::HashMap<String, usize>"),
+            required_fragments: vec!["pub fn count_word_frequencies"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 10. Chained operations — emitter handles sort+dedup+take composition
+        BenchmarkCase {
+            name: "top_3_unique",
+            language: "rust",
+            purpose: "Sort then deduplicate then take first 3 unique sorted values",
+            signature: Some("fn top_3_unique(items: Vec<i32>) -> Vec<i32>"),
+            required_fragments: vec![".sort(", ".dedup("],
+            forbidden_fragments: vec!["todo!"],
+            expects_llm: false,
+        },
+        // 11. Boolean logic all() — emitter has no .all() pattern
+        BenchmarkCase {
+            name: "all_positive",
+            language: "rust",
+            purpose: "Check if all elements are positive in a vector",
+            signature: Some("fn all_positive(items: Vec<i32>) -> bool"),
+            required_fragments: vec!["pub fn all_positive"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 12. Boolean logic any() — emitter has no .any() pattern
+        BenchmarkCase {
+            name: "any_negative",
+            language: "rust",
+            purpose: "Check if any element is negative in a vector",
+            signature: Some("fn any_negative(items: Vec<i32>) -> bool"),
+            required_fragments: vec!["pub fn any_negative"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 13. Conversion — emitter has no map+parse+collect pattern for Vec<String>->Vec<i32>
+        BenchmarkCase {
+            name: "strings_to_integers",
+            language: "rust",
+            purpose: "Convert vector of strings to integers by parsing each one",
+            signature: Some("fn strings_to_integers(items: Vec<String>) -> Vec<i32>"),
+            required_fragments: vec!["pub fn strings_to_integers"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 14. Default values — emitter has no unwrap_or pattern
+        BenchmarkCase {
+            name: "get_or_default",
+            language: "rust",
+            purpose: "Get value at index or return a default value using unwrap_or",
+            signature: Some("fn get_or_default(items: Vec<i32>, index: usize, default: i32) -> i32"),
+            required_fragments: vec!["pub fn get_or_default"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 15. Zip + map + sum — emitter handles zip but not zip+multiply+sum (dot product)
+        BenchmarkCase {
+            name: "dot_product",
+            language: "rust",
+            purpose: "Compute dot product of two vectors by zipping and multiplying",
+            signature: Some("fn dot_product(a: Vec<i32>, b: Vec<i32>) -> i32"),
+            required_fragments: vec!["pub fn dot_product"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 16. Window operations — emitter has no windows() pattern
+        BenchmarkCase {
+            name: "max_adjacent_diff",
+            language: "rust",
+            purpose: "Find maximum difference between adjacent elements using windows",
+            signature: Some("fn max_adjacent_diff(items: Vec<i32>) -> i32"),
+            required_fragments: vec!["pub fn max_adjacent_diff"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 17. Partition — emitter has no partition pattern
+        BenchmarkCase {
+            name: "split_even_odd",
+            language: "rust",
+            purpose: "Split a vector into even and odd numbers using partition",
+            signature: Some("fn split_even_odd(items: Vec<i32>) -> (Vec<i32>, Vec<i32>)"),
+            required_fragments: vec!["pub fn split_even_odd"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 18. Flat map — emitter handles flatten but not flat_map on strings
+        BenchmarkCase {
+            name: "all_characters",
+            language: "rust",
+            purpose: "Get all characters from a list of strings using flat_map",
+            signature: Some("fn all_characters(items: Vec<String>) -> Vec<char>"),
+            required_fragments: vec!["pub fn all_characters"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 19. Reduction — emitter handles max() for i32 but not longest string
+        BenchmarkCase {
+            name: "longest_string",
+            language: "rust",
+            purpose: "Find the longest string in a vector by length",
+            signature: Some("fn longest_string(items: Vec<String>) -> Option<String>"),
+            required_fragments: vec!["pub fn longest_string"],
+            forbidden_fragments: vec![],
+            expects_llm: true,
+        },
+        // 20. Complex composition — emitter handles filter+sum but not filter_positive+square+sum
+        BenchmarkCase {
+            name: "filter_square_sum",
+            language: "rust",
+            purpose: "Filter positive numbers then square each then sum the results",
+            signature: Some("fn filter_square_sum(items: Vec<i32>) -> i32"),
+            required_fragments: vec![".filter(", ".sum()"],
+            forbidden_fragments: vec!["todo!"],
+            expects_llm: false,
+        },
+    ]
+}
+
 fn build_all_cases() -> Vec<BenchmarkCase> {
     let mut all = Vec::new();
     all.extend(build_arithmetic_cases());
@@ -637,6 +842,7 @@ fn build_all_cases() -> Vec<BenchmarkCase> {
     all.extend(build_composition_cases());
     all.extend(build_python_cases());
     all.extend(build_complex_llm_cases());
+    all.extend(build_advanced_rust_cases());
     all
 }
 
@@ -821,5 +1027,90 @@ fn benchmark_complex_llm() {
         passed,
         results.len(),
         "All complex/LLM cases should pass (signature + todo!)"
+    );
+}
+
+#[test]
+fn benchmark_advanced_rust() {
+    let gen = CodeGenerator::with_default_dim();
+    let ctx = CodeContext::default();
+    let cases = build_advanced_rust_cases();
+    let results = run_category(&gen, &ctx, &cases);
+
+    print_results("Advanced Rust", &results);
+
+    let total = results.len();
+    let passed = results.iter().filter(|r| r.passed).count();
+    let rate_pct = (passed as f32 / total as f32 * 100.0) as u32;
+
+    // Regression tracking — parseable output for CI
+    println!(
+        "BENCHMARK_RESULT: category=advanced_rust passed={} total={} rate={}%",
+        passed, total, rate_pct
+    );
+
+    // Print per-case detail for regression tracking
+    for r in &results {
+        let status = if r.passed { "PASS" } else { "FAIL" };
+        let llm_tag = if r.expects_llm { " [llm]" } else { " [native]" };
+        println!(
+            "  CASE: {} {} {}{}",
+            "advanced_rust", r.name, status, llm_tag
+        );
+    }
+
+    // 50% threshold — these are hard cases, many expect LLM
+    assert!(
+        passed as f32 / total as f32 >= 0.50,
+        "Advanced Rust pass rate {}/{} = {}% (minimum 50%)",
+        passed,
+        total,
+        rate_pct
+    );
+}
+
+// ==================================================================================
+// Regression summary — run all categories and emit parseable output
+// ==================================================================================
+
+#[test]
+fn benchmark_regression_summary() {
+    let gen = CodeGenerator::with_default_dim();
+    let ctx = CodeContext::default();
+
+    let categories: Vec<(&str, Vec<BenchmarkCase>)> = vec![
+        ("arithmetic", build_arithmetic_cases()),
+        ("strings", build_string_cases()),
+        ("collections", build_collection_cases()),
+        ("composition", build_composition_cases()),
+        ("python", build_python_cases()),
+        ("complex_llm", build_complex_llm_cases()),
+        ("advanced_rust", build_advanced_rust_cases()),
+    ];
+
+    println!("\n=== Regression Summary ===");
+
+    let mut total_passed = 0usize;
+    let mut total_cases = 0usize;
+
+    for (cat_name, cases) in &categories {
+        let results = run_category(&gen, &ctx, cases);
+        let passed = results.iter().filter(|r| r.passed).count();
+        let total = results.len();
+        let rate_pct = (passed as f32 / total as f32 * 100.0) as u32;
+
+        println!(
+            "BENCHMARK_RESULT: category={} passed={} total={} rate={}%",
+            cat_name, passed, total, rate_pct
+        );
+
+        total_passed += passed;
+        total_cases += total;
+    }
+
+    let overall_pct = (total_passed as f32 / total_cases as f32 * 100.0) as u32;
+    println!(
+        "BENCHMARK_RESULT: category=overall passed={} total={} rate={}%",
+        total_passed, total_cases, overall_pct
     );
 }

@@ -116,7 +116,13 @@ impl Widget for CausalExplorer<'_> {
                 &link.to
             };
 
+            let rel_indicator = match link.relationship.as_str() {
+                "causal" => Span::styled(" C ", Style::default().fg(Color::Cyan)),
+                "anomaly" => Span::styled(" ! ", Style::default().fg(Color::Red)),
+                _ => Span::styled(" ? ", Style::default().fg(Color::DarkGray)),
+            };
             let line = Line::from(vec![
+                rel_indicator,
                 Span::styled(from, Style::default().fg(Color::White)),
                 Span::styled(" -> ", Style::default().fg(Color::DarkGray)),
                 Span::styled(to, Style::default().fg(Color::White)),

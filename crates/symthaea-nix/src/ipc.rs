@@ -10,9 +10,15 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+/// Current IPC schema version. Increment when adding/removing fields.
+pub const SNAPSHOT_VERSION: u32 = 2;
+
 /// Snapshot of daemon cognitive state, serialized to disk for TUI consumption.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DaemonSnapshot {
+    /// Schema version for forward/backward compatibility.
+    #[serde(default = "default_snapshot_version")]
+    pub version: u32,
     /// Seconds since Unix epoch when this snapshot was written.
     pub timestamp: u64,
     /// Total observations processed.
@@ -45,6 +51,29 @@ pub struct DaemonSnapshot {
     /// Number of active support recommendations.
     #[serde(default)]
     pub recommendation_count: usize,
+    /// Predictive alerts from the LTC monitor.
+    #[serde(default)]
+    pub alerts: Vec<AlertEntry>,
+    /// Top causal graph edges by confidence (for CausalExplorer widget).
+    #[serde(default)]
+    pub top_causal_edges: Vec<CausalEdgeEntry>,
+    /// Memory usage percentage (from hardware probe).
+    #[serde(default)]
+    pub memory_used_percent: Option<f64>,
+    /// Last watchdog verdict (written by `nix-mind watch`, read by daemon/TUI).
+    #[serde(default)]
+    pub watchdog_status: Option<String>,
+    /// Whether the daemon is in degraded mode (hardware probe failures cached).
+    #[serde(default)]
+    pub degraded: bool,
+}
+
+/// A causal edge entry for IPC (lightweight copy of CausalEdge).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CausalEdgeEntry {
+    pub from: String,
+    pub to: String,
+    pub confidence: f64,
 }
 
 /// A concern tracked in working memory.
@@ -188,6 +217,10 @@ pub struct DaemonConfig {
     pub enable_knowledge_learning: bool,
 }
 
+fn default_snapshot_version() -> u32 {
+    1 // Old snapshots without version field default to v1
+}
+
 fn default_snapshot_interval() -> u64 {
     60
 }
@@ -308,6 +341,7 @@ mod tests {
 
     fn sample_snapshot() -> DaemonSnapshot {
         DaemonSnapshot {
+            version: SNAPSHOT_VERSION,
             timestamp: 1700000000,
             observation_count: 42,
             anomaly_count: 3,
@@ -331,6 +365,11 @@ mod tests {
             daemon_pid: 12345,
             support_status: None,
             recommendation_count: 0,
+            alerts: vec![],
+            top_causal_edges: vec![],
+            memory_used_percent: None,
+            watchdog_status: None,
+            degraded: false,
         }
     }
 
@@ -467,5 +506,37 @@ mod tests {
     fn test_default_config_path() {
         let path = default_config_path();
         assert!(path.to_string_lossy().contains("daemon.json"));
+    }
+
+    #[test]
+    fn test_snapshot_version_present() {
+        let snap = sample_snapshot();
+        assert_eq!(snap.version, SNAPSHOT_VERSION);
+        let json = serde_json::to_string(&snap).unwrap();
+        assert!(json.contains("\"version\""));
+        let restored: DaemonSnapshot = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.version, SNAPSHOT_VERSION);
+    }
+
+    #[test]
+    fn test_old_snapshot_defaults_version_1() {
+        let old_json = r#"{
+            "timestamp": 1700000000,
+            "observation_count": 1,
+            "anomaly_count": 0,
+            "hierarchy_errors": [0.0, 0.0, 0.0, 0.0],
+            "free_energy": 0.0,
+            "is_surprised": false,
+            "drift_similarity": 1.0,
+            "causal_edge_count": 0,
+            "episodic_count": 0,
+            "concerns": [],
+            "recent_anomalies": [],
+            "daemon_running": true,
+            "daemon_pid": 1
+        }"#;
+        let snap: DaemonSnapshot = serde_json::from_str(old_json).unwrap();
+        assert_eq!(snap.version, 1, "Old snapshots without version field should default to 1");
+        assert!(!snap.degraded, "Old snapshots should default to not degraded");
     }
 }

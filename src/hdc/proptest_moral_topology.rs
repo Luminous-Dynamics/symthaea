@@ -10,6 +10,7 @@ never produce NaN or Infinity in telemetry-bound fields.
 use super::moral_topology::{MoralTopology, MoralTopologyConfig};
 use proptest::prelude::*;
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_types::N_HARMONIES;
 
 const TEST_DIM: usize = 512;
 
@@ -155,5 +156,106 @@ proptest! {
         prop_assert!((assessment.unity - 1.0).abs() < f64::EPSILON);
         prop_assert!((assessment.circularity - 0.0).abs() < f64::EPSILON);
         prop_assert!((assessment.completeness - 0.0).abs() < f64::EPSILON);
+    }
+
+    // =========================================================================
+    // Property 9: FEP stillness prior floor holds after multiple observations
+    // =========================================================================
+    #[test]
+    fn prop_stillness_prior_floor_holds(seed in 0u64..10_000) {
+        let mut topo = MoralTopology::new(test_config());
+        // Feed scenarios that suppress Sacred Stillness (index 7)
+        for i in 0..8 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, seed * 90 + i));
+        }
+        // The harmony_prior[7] should never drop below the floor (0.05)
+        // We can't directly access harmony_prior, but we can verify through
+        // the moral free energy: if the prior has a floor, the free energy
+        // for a stillness-heavy scenario should be bounded
+        topo.analyze();
+        let s = topo.last_summary();
+        prop_assert!(s.moral_free_energy.is_finite(),
+            "moral_free_energy must remain finite with stillness prior floor");
+    }
+
+    // =========================================================================
+    // Property 10: Harmony entropy (moral breadth) is bounded
+    // =========================================================================
+    #[test]
+    fn prop_harmony_entropy_bounded(seed in 0u64..10_000) {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..4 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, seed * 45 + i));
+        }
+        let assessment = topo.analyze();
+        // Compute harmony entropy from variance distribution
+        let total_var: f64 = assessment.harmony_variance.iter().sum::<f64>().max(1e-12);
+        let entropy: f64 = assessment.harmony_variance.iter()
+            .map(|&v| {
+                let p = (v / total_var).max(1e-12);
+                -p * p.ln()
+            })
+            .sum();
+        prop_assert!(entropy.is_finite(), "harmony entropy not finite: {}", entropy);
+        prop_assert!(entropy >= 0.0, "harmony entropy negative: {}", entropy);
+        // Max entropy = ln(8) ≈ 2.08
+        prop_assert!(entropy <= (N_HARMONIES as f64).ln() + 0.01,
+            "harmony entropy exceeds ln(N): {}", entropy);
+    }
+
+    // =========================================================================
+    // Property 11: Attractor detection is stable under similar inputs
+    // =========================================================================
+    #[test]
+    fn prop_attractor_stable_under_similar_inputs(seed in 0u64..10_000) {
+        let mut topo = MoralTopology::new(test_config());
+        // Feed identical scenarios to create a stable basin
+        let base_hv = ContinuousHV::random(TEST_DIM, seed);
+        for _ in 0..8 {
+            topo.add_scenario(base_hv.clone());
+        }
+        let first = topo.analyze();
+        // Feed same scenarios again
+        for _ in 0..4 {
+            topo.add_scenario(base_hv.clone());
+        }
+        let second = topo.analyze();
+        // If first detected attractor, second should too (stable basin)
+        if first.attractor_detected {
+            prop_assert!(second.attractor_detected,
+                "attractor flickered: detected then lost with identical inputs");
+        }
+        // Both assessments should have finite harmony_entropy
+        prop_assert!(first.harmony_entropy.is_finite());
+        prop_assert!(second.harmony_entropy.is_finite());
+    }
+
+    // =========================================================================
+    // Property 12: Repeated analysis with identical inputs maintains stability
+    // =========================================================================
+    #[test]
+    fn prop_repeated_analysis_stable(seed in 0u64..10_000) {
+        let mut topo = MoralTopology::new(test_config());
+        let base_hv = ContinuousHV::random(TEST_DIM, seed);
+        // Feed same HV 8 times, analyze 10 times
+        for _ in 0..8 {
+            topo.add_scenario(base_hv.clone());
+        }
+        let mut prev_entropy = 0.0f64;
+        for round in 0..10 {
+            topo.add_scenario(base_hv.clone());
+            let assessment = topo.analyze();
+            prop_assert!(assessment.harmony_entropy.is_finite(),
+                "harmony_entropy not finite at round {}", round);
+            prop_assert!(assessment.moral_free_energy.free_energy.is_finite(),
+                "moral_free_energy not finite at round {}", round);
+            // Entropy should converge (not diverge)
+            if round > 0 {
+                let drift = (assessment.harmony_entropy - prev_entropy).abs();
+                prop_assert!(drift < 1.0,
+                    "harmony entropy drifted by {} at round {}", drift, round);
+            }
+            prev_entropy = assessment.harmony_entropy;
+        }
     }
 }

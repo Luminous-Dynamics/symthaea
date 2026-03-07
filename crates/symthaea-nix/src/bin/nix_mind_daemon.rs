@@ -8,13 +8,15 @@
 //!
 //! Designed to run as a systemd service via the NixOS module.
 
+use std::collections::HashMap;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_nix::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
 use symthaea_nix::ipc::{
-    default_snapshot_path, AnomalyEntry, ConcernEntry, DaemonConfig, DaemonSnapshot,
+    default_snapshot_path, AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry,
+    DaemonConfig, DaemonSnapshot,
 };
 use symthaea_nix::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
 use symthaea_nix::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
@@ -49,6 +51,25 @@ struct DaemonState {
     ollama: Option<OllamaBridge>,
     last_health_status: Option<HealthStatus>,
     last_health_issue_count: usize,
+    /// Per-unit Ollama query cooldown: unit → last query time.
+    ollama_cooldowns: HashMap<String, Instant>,
+    /// Last observed memory usage percentage.
+    last_memory_pct: Option<f64>,
+    /// Persistent alert state: metric+horizon key → (first_seen, consecutive_cycles, prev_predicted).
+    alert_state: HashMap<String, AlertTracking>,
+    /// Last watchdog verdict (read from disk, written by `nix-mind watch`).
+    watchdog_status: Option<String>,
+    /// Cached last-known hardware probe results (fallback when probe fails).
+    last_hw_probe: Option<symthaea_nix::observe::hardware::HardwareInfo>,
+    /// Whether the daemon is in degraded mode (using cached data).
+    degraded: bool,
+}
+
+/// Tracks alert continuity across IPC cycles.
+struct AlertTracking {
+    first_seen: u64,
+    consecutive_cycles: u32,
+    prev_predicted_value: f64,
 }
 
 impl DaemonState {
@@ -93,6 +114,12 @@ impl DaemonState {
             ollama,
             last_health_status: None,
             last_health_issue_count: 0,
+            ollama_cooldowns: HashMap::new(),
+            last_memory_pct: None,
+            alert_state: HashMap::new(),
+            watchdog_status: None,
+            last_hw_probe: None,
+            degraded: false,
         }
     }
 
@@ -201,8 +228,20 @@ impl DaemonState {
             );
         }
 
-        // Run health assessment
-        let hw = symthaea_nix::observe::hardware::HardwareObserver::probe().ok();
+        // Run health assessment — cache successful probes, fall back to cached on failure
+        let hw = match symthaea_nix::observe::hardware::HardwareObserver::probe() {
+            Ok(info) => {
+                self.last_hw_probe = Some(info.clone());
+                self.degraded = false;
+                Some(info)
+            }
+            Err(_) => {
+                if self.last_hw_probe.is_some() {
+                    self.degraded = true;
+                }
+                self.last_hw_probe.clone()
+            }
+        };
         let (overall, checks) = self.health_assessor.assess_all(&snapshot, hw.as_ref());
         self.last_health_status = Some(overall);
         self.last_health_issue_count = checks
@@ -242,7 +281,13 @@ impl DaemonState {
                 .filter(|(_, s)| *s == ServiceState::Failed)
                 .count() as u32,
         };
+        let mem_pct = telemetry.memory_used_pct;
         self.predictive_monitor.ingest(telemetry);
+        self.last_memory_pct = if mem_pct > 0.0 {
+            Some(mem_pct)
+        } else {
+            None
+        };
 
         self.prev_snapshot = Some(snapshot);
         self.prev_state_hv = Some(state_hv);
@@ -280,6 +325,14 @@ impl DaemonState {
             self.anomaly_count += 1;
 
             let concern_hv = self.anomaly_detector.encode_entry(&anomaly.entry);
+
+            // Retrieve similar past episodes before moving concern_hv
+            let similar_context = if anomaly.anomaly_score > 0.7 {
+                self.recall_similar_episodes(&concern_hv)
+            } else {
+                vec![]
+            };
+
             self.working_memory.push(
                 concern_hv,
                 MemorySource::SystemObservation,
@@ -293,6 +346,7 @@ impl DaemonState {
                     &anomaly.entry.unit,
                     &anomaly.reason,
                     &anomaly.entry.message,
+                    &similar_context,
                 );
             }
 
@@ -309,14 +363,45 @@ impl DaemonState {
         }
     }
 
+    /// Retrieve similar past episodes as context strings.
+    fn recall_similar_episodes(&self, query_hv: &ContinuousHV) -> Vec<String> {
+        self.episodic_memory
+            .retrieve_similar(query_hv, 3)
+            .into_iter()
+            .map(|ep| format!("{} (PE={:.2})", ep.action, ep.prediction_error))
+            .collect()
+    }
+
     /// Query Ollama for anomaly diagnosis and learn from the response.
-    fn query_ollama_for_anomaly(&mut self, unit: &str, reason: &str, message: &str) {
+    ///
+    /// Rate-limited: at most one query per unit every 5 minutes.
+    fn query_ollama_for_anomaly(
+        &mut self,
+        unit: &str,
+        reason: &str,
+        message: &str,
+        past_context: &[String],
+    ) {
+        const COOLDOWN: Duration = Duration::from_secs(300); // 5 minutes
+
+        if let Some(last) = self.ollama_cooldowns.get(unit) {
+            if last.elapsed() < COOLDOWN {
+                return;
+            }
+        }
+
         let ollama = match self.ollama.as_mut() {
             Some(o) => o,
             None => return,
         };
 
-        let prompt = build_anomaly_prompt(unit, reason, message);
+        let mut prompt = build_anomaly_prompt(unit, reason, message);
+        if !past_context.is_empty() {
+            prompt.push_str("\n\nSimilar past events:\n");
+            for ctx in past_context {
+                prompt.push_str(&format!("- {}\n", ctx));
+            }
+        }
 
         if let Some(response) = ollama.query(&prompt) {
             self.learn_from_resolution(
@@ -324,6 +409,8 @@ impl DaemonState {
                 &response.text,
                 vec![format!("journalctl -u {} --since '5 min ago'", unit)],
             );
+            self.ollama_cooldowns
+                .insert(unit.to_string(), Instant::now());
             eprintln!(
                 "nix-mind-daemon: Ollama diagnosed anomaly in {} ({}ms, model: {})",
                 unit, response.duration_ms, response.model_used
@@ -331,8 +418,17 @@ impl DaemonState {
         }
     }
 
+    /// Read the latest watchdog verdict from disk (written by `nix-mind watch`).
+    fn refresh_watchdog_status(&mut self, state_dir: &std::path::Path) {
+        let wd_path = state_dir.with_file_name("watchdog_verdict.txt");
+        self.watchdog_status = std::fs::read_to_string(&wd_path)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+    }
+
     /// Build a DaemonSnapshot for IPC.
-    fn to_ipc_snapshot(&self) -> DaemonSnapshot {
+    fn to_ipc_snapshot(&mut self) -> DaemonSnapshot {
         let hierarchy = self.world_model.prediction_hierarchy();
         let hierarchy_errors = hierarchy.errors();
 
@@ -347,14 +443,79 @@ impl DaemonState {
             })
             .collect();
 
+        // Generate predictive alerts with deduplication and trend tracking
+        let now = now_secs();
+        let mut active_keys = std::collections::HashSet::new();
+        let alerts: Vec<AlertEntry> = self
+            .predictive_monitor
+            .predict_all_horizons()
+            .into_iter()
+            .filter(|p| p.crosses_threshold || p.predicted_value >= p.threshold * 0.9)
+            .map(|p| {
+                let key = format!("{}@{}h", p.metric, p.hours_ahead);
+                active_keys.insert(key.clone());
+
+                let tracking = self.alert_state.entry(key).or_insert(AlertTracking {
+                    first_seen: now,
+                    consecutive_cycles: 0,
+                    prev_predicted_value: p.predicted_value,
+                });
+                tracking.consecutive_cycles += 1;
+                let prev = tracking.prev_predicted_value;
+                tracking.prev_predicted_value = p.predicted_value;
+
+                AlertEntry {
+                    metric: p.metric.to_string(),
+                    current_value: p.current_value,
+                    predicted_value: p.predicted_value,
+                    hours_ahead: p.hours_ahead,
+                    threshold: p.threshold,
+                    confidence: p.confidence as f64,
+                    recommended_action: p.recommended_action,
+                    severity: if p.crosses_threshold {
+                        AlertSeverity::Critical
+                    } else {
+                        AlertSeverity::Warning
+                    },
+                    first_seen: tracking.first_seen,
+                    last_seen: now,
+                    consecutive_cycles: tracking.consecutive_cycles,
+                    prev_predicted_value: if tracking.consecutive_cycles > 1 {
+                        Some(prev)
+                    } else {
+                        None
+                    },
+                    journal_context: vec![],
+                }
+            })
+            .collect();
+
+        // Prune alert state for alerts that are no longer active
+        self.alert_state.retain(|k, _| active_keys.contains(k));
+
+        // Export top-10 strongest causal edges
+        let top_causal_edges: Vec<CausalEdgeEntry> = self
+            .causal_graph
+            .top_edges(10)
+            .into_iter()
+            .map(|e| CausalEdgeEntry {
+                from: e.from,
+                to: e.to,
+                confidence: e.confidence,
+            })
+            .collect();
+
         DaemonSnapshot {
-            timestamp: now_secs(),
+            version: symthaea_nix::ipc::SNAPSHOT_VERSION,
+            timestamp: now,
             observation_count: self.observation_count,
             anomaly_count: self.anomaly_count,
             hierarchy_errors,
             free_energy: self.world_model.free_energy(),
             is_surprised: self.world_model.free_energy() > 0.3,
-            drift_similarity: 0.95,
+            drift_similarity: self.prev_state_hv.as_ref().map_or(1.0, |prev| {
+                self.world_model.system_state().similarity(prev)
+            }),
             causal_edge_count: self.causal_graph.edge_count(),
             episodic_count: self.episodic_memory.len(),
             concerns,
@@ -363,6 +524,11 @@ impl DaemonState {
             daemon_pid: std::process::id(),
             support_status: self.last_health_status.map(|s| format!("{:?}", s)),
             recommendation_count: self.last_health_issue_count,
+            alerts,
+            top_causal_edges,
+            memory_used_percent: self.last_memory_pct,
+            watchdog_status: self.watchdog_status.clone(),
+            degraded: self.degraded,
         }
     }
 }
@@ -528,6 +694,18 @@ fn main() -> ! {
         }
     }
 
+    // Restore persisted causal graph
+    let causal_path = snapshot_path.with_file_name("causal_graph.json");
+    if let Ok(loaded) = state.causal_graph.load(&causal_path) {
+        if loaded > 0 {
+            eprintln!(
+                "nix-mind-daemon: restored {} causal edges (total: {})",
+                loaded,
+                state.causal_graph.edge_count()
+            );
+        }
+    }
+
     eprintln!(
         "nix-mind-daemon: starting continuous awareness (pid {})",
         std::process::id()
@@ -580,6 +758,7 @@ fn main() -> ! {
         state.process_journal(config.journal_batch_size);
 
         if cycle % config.ipc_write_interval == 0 {
+            state.refresh_watchdog_status(&snapshot_path);
             let ipc_snap = state.to_ipc_snapshot();
             if let Err(e) = ipc_snap.write_to(&snapshot_path) {
                 eprintln!("nix-mind-daemon: IPC write failed: {}", e);
@@ -603,6 +782,10 @@ fn main() -> ! {
                     let _ = std::fs::write(&kb_path, kb.save_dynamic());
                 }
             }
+
+            // Persist causal graph
+            let causal_path = snapshot_path.with_file_name("causal_graph.json");
+            let _ = state.causal_graph.save(&causal_path);
         }
 
         thread::sleep(Duration::from_secs(config.poll_interval));

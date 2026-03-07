@@ -145,7 +145,7 @@ pub struct PomlResult {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-struct XmlNode {
+pub(crate) struct XmlNode {
     tag: String,
     attrs: HashMap<String, String>,
     text: String,
@@ -384,7 +384,7 @@ impl PomlProcessor {
     }
 
     /// Load a template by name (with .poml extension).
-    pub fn load_template(&mut self, name: &str) -> Result<&XmlNode, String> {
+    pub(crate) fn load_template(&mut self, name: &str) -> Result<&XmlNode, String> {
         if self.template_cache.contains_key(name) {
             return Ok(&self.template_cache[name]);
         }

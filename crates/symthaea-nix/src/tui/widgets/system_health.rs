@@ -22,6 +22,8 @@ pub struct HealthSnapshot {
     pub current_generation: Option<u32>,
     pub total_generations: usize,
     pub memory_used_percent: Option<f64>,
+    /// Memory usage history for sparkline (last 30 samples, 0-100).
+    pub memory_history: Vec<f64>,
 }
 
 /// System health dashboard widget.
@@ -41,6 +43,32 @@ impl<'a> SystemHealth<'a> {
     pub fn block(mut self, block: Block<'a>) -> Self {
         self.block = Some(block);
         self
+    }
+}
+
+impl SystemHealth<'_> {
+    /// Render a sparkline from a sequence of values (0-100 range).
+    fn render_sparkline(values: &[f64], width: usize) -> String {
+        const BARS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+        if values.is_empty() || width == 0 {
+            return String::new();
+        }
+        // Take the last `width` values (or all if fewer)
+        let slice = if values.len() > width {
+            &values[values.len() - width..]
+        } else {
+            values
+        };
+        let min = slice.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max = slice.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let range = (max - min).max(1.0);
+        slice
+            .iter()
+            .map(|v| {
+                let idx = (((v - min) / range) * 7.0) as usize;
+                BARS[idx.min(7)]
+            })
+            .collect()
     }
 }
 
@@ -132,7 +160,18 @@ impl Widget for SystemHealth<'_> {
                     Span::styled(format!("{:.0}%", pct), Style::default().fg(mem_color)),
                 ]);
                 buf.set_line(x, y, &mem_line, inner.width.saturating_sub(1));
+                y += 1;
             }
+        }
+
+        // Memory sparkline (when history available)
+        if y < inner.y + inner.height && self.snapshot.memory_history.len() >= 2 {
+            let spark = Self::render_sparkline(&self.snapshot.memory_history, inner.width.saturating_sub(12) as usize);
+            let spark_line = Line::from(vec![
+                Span::raw("Mem trend "),
+                Span::styled(spark, Style::default().fg(Color::Cyan)),
+            ]);
+            buf.set_line(x, y, &spark_line, inner.width.saturating_sub(1));
         }
     }
 }
@@ -166,5 +205,51 @@ mod tests {
         let area = Rect::new(0, 0, 10, 2);
         let mut buf = Buffer::empty(area);
         widget.render(area, &mut buf);
+    }
+
+    #[test]
+    fn test_render_with_memory_sparkline() {
+        let snap = HealthSnapshot {
+            services_running: 42,
+            services_failed: 0,
+            services_total: 42,
+            store_size_human: "10 GiB".into(),
+            store_paths: 5000,
+            current_generation: Some(10),
+            total_generations: 10,
+            memory_used_percent: Some(55.0),
+            memory_history: vec![40.0, 45.0, 50.0, 55.0, 60.0, 55.0, 50.0, 48.0],
+        };
+        let widget =
+            SystemHealth::new(snap).block(Block::default().title("Health").borders(Borders::ALL));
+        let area = Rect::new(0, 0, 50, 12);
+        let mut buf = Buffer::empty(area);
+        widget.render(area, &mut buf);
+    }
+
+    #[test]
+    fn test_sparkline_rendering() {
+        let values = vec![0.0, 25.0, 50.0, 75.0, 100.0];
+        let spark = SystemHealth::render_sparkline(&values, 10);
+        assert_eq!(spark.chars().count(), 5);
+        // First should be lowest bar, last should be highest
+        let chars: Vec<char> = spark.chars().collect();
+        assert_eq!(chars[0], '▁');
+        assert_eq!(chars[4], '█');
+    }
+
+    #[test]
+    fn test_sparkline_empty() {
+        assert!(SystemHealth::render_sparkline(&[], 10).is_empty());
+        assert!(SystemHealth::render_sparkline(&[50.0], 0).is_empty());
+    }
+
+    #[test]
+    fn test_sparkline_constant() {
+        let values = vec![50.0, 50.0, 50.0];
+        let spark = SystemHealth::render_sparkline(&values, 10);
+        // All same value → all same bar
+        let chars: Vec<char> = spark.chars().collect();
+        assert!(chars.iter().all(|c| *c == chars[0]));
     }
 }

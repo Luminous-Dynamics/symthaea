@@ -28,6 +28,10 @@ pub struct WorldModelSnapshot {
     pub memory_items: Vec<(String, f64)>,
     /// Whether the system is surprised.
     pub is_surprised: bool,
+    /// HDC world model drift similarity (1.0 = stable).
+    pub drift_similarity: f32,
+    /// Number of episodes in episodic memory.
+    pub episodic_count: usize,
 }
 
 impl Default for WorldModelSnapshot {
@@ -40,6 +44,8 @@ impl Default for WorldModelSnapshot {
             total_observations: 0,
             memory_items: Vec::new(),
             is_surprised: false,
+            drift_similarity: 1.0,
+            episodic_count: 0,
         }
     }
 }
@@ -149,6 +155,25 @@ impl Widget for WorldModelView<'_> {
                 )),
             ]);
             buf.set_line(x, y, &stats, inner.width.saturating_sub(1));
+            y += 1;
+        }
+
+        // Drift + episodic line
+        if y < inner.y + inner.height {
+            let drift = self.snapshot.drift_similarity;
+            let drift_color = if drift > 0.9 {
+                Color::Green
+            } else if drift > 0.7 {
+                Color::Yellow
+            } else {
+                Color::Red
+            };
+            let drift_line = Line::from(vec![
+                Span::raw("Drift: "),
+                Span::styled(format!("{:.2}", drift), Style::default().fg(drift_color)),
+                Span::raw(format!("  Episodes: {}", self.snapshot.episodic_count)),
+            ]);
+            buf.set_line(x, y, &drift_line, inner.width.saturating_sub(1));
             y += 1;
         }
 

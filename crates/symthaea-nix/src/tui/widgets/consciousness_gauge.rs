@@ -59,12 +59,23 @@ impl ConsciousnessState {
 /// The consciousness gauge widget.
 pub struct ConsciousnessGauge<'a> {
     state: ConsciousnessState,
+    /// History of recent states for trajectory rendering (oldest first).
+    history: Vec<ConsciousnessState>,
     block: Option<Block<'a>>,
 }
 
 impl<'a> ConsciousnessGauge<'a> {
     pub fn new(state: ConsciousnessState) -> Self {
-        Self { state, block: None }
+        Self {
+            state,
+            history: Vec::new(),
+            block: None,
+        }
+    }
+
+    pub fn history(mut self, history: Vec<ConsciousnessState>) -> Self {
+        self.history = history;
+        self
     }
 
     pub fn block(mut self, block: Block<'a>) -> Self {
@@ -121,6 +132,30 @@ impl Widget for ConsciousnessGauge<'_> {
                 .fg(Color::Green)
                 .add_modifier(Modifier::DIM),
         );
+
+        // Plot trajectory history (fading trail: most recent = brighter)
+        let trail_len = self.history.len().min(10);
+        if trail_len > 0 {
+            let trail = &self.history[self.history.len() - trail_len..];
+            for (i, point) in trail.iter().enumerate() {
+                let hx = inner.x
+                    + 2
+                    + ((point.confidence * grid_w as f64) as u16).min(grid_w.saturating_sub(1));
+                let hy = inner.y + grid_h.saturating_sub(1)
+                    - ((point.phi * grid_h.saturating_sub(1) as f64) as u16)
+                        .min(grid_h.saturating_sub(1));
+                // Fade: older points dimmer
+                let trail_char = if i >= trail_len.saturating_sub(3) { "o" } else { "." };
+                buf.set_string(
+                    hx,
+                    hy,
+                    trail_char,
+                    Style::default()
+                        .fg(Color::DarkGray)
+                        .add_modifier(Modifier::DIM),
+                );
+            }
+        }
 
         // Plot current state
         let px = inner.x
@@ -202,5 +237,28 @@ mod tests {
         let area = Rect::new(0, 0, 5, 2);
         let mut buf = Buffer::empty(area);
         gauge.render(area, &mut buf);
+    }
+
+    #[test]
+    fn test_render_with_trajectory() {
+        let history: Vec<ConsciousnessState> = (0..8)
+            .map(|i| ConsciousnessState {
+                phi: 0.3 + i as f64 * 0.05,
+                confidence: 0.2 + i as f64 * 0.08,
+                free_energy: 0.5 - i as f64 * 0.03,
+            })
+            .collect();
+        let current = ConsciousnessState {
+            phi: 0.7,
+            confidence: 0.84,
+            free_energy: 0.26,
+        };
+        let gauge = ConsciousnessGauge::new(current)
+            .history(history)
+            .block(Block::default().title("Test").borders(Borders::ALL));
+        let area = Rect::new(0, 0, 40, 15);
+        let mut buf = Buffer::empty(area);
+        gauge.render(area, &mut buf);
+        // Should not panic with trajectory data
     }
 }

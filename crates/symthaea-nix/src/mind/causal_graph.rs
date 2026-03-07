@@ -396,6 +396,18 @@ impl NixCausalGraph {
         self.causal_graph.len()
     }
 
+    /// Return the top-N strongest causal edges, sorted by descending confidence.
+    pub fn top_edges(&self, n: usize) -> Vec<CausalEdge> {
+        let mut edges: Vec<CausalEdge> = self.causal_graph.values().cloned().collect();
+        edges.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        edges.truncate(n);
+        edges
+    }
+
     /// Get the confidence of a specific edge, or None if it doesn't exist.
     pub fn edge_confidence(&self, from: &str, to: &str) -> Option<f64> {
         self.causal_graph

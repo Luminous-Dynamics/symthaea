@@ -567,8 +567,46 @@ impl CognitiveLoopService {
                 );
             }
 
+            // Wire SocialEmbedding self-model from existing cognitive signals.
+            // The system already HAS a self-model — meta-cognition, predictive self,
+            // attention schema — but SocialEmbedding never received it, leaving
+            // Soc permanently at 0.35. Update every 10 cycles (co-prime with narrative).
+            // Science: Gallese (2001) — self-other distinction requires self-model first.
+            if self.stats.total_cycles % 10 == 0 {
+                let self_goals = vec![
+                    "reduce_prediction_error".to_string(),
+                    "maintain_coherence".to_string(),
+                    "integrate_information".to_string(),
+                ];
+                let self_beliefs = vec![
+                    format!("confidence_{:.1}", self.prediction_confidence),
+                    format!("meta_accuracy_{:.1}", late.meta_cognitive_accuracy),
+                    format!("coherence_{:.1}", ctx.coherence),
+                    format!("safety_{:.1}", late.predictive_self_safety),
+                ];
+                let emotional_state = late.affective_valence as f64;
+                self.master_equation
+                    .social_embedding
+                    .update_self_model(self_goals, self_beliefs, emotional_state);
+            }
+
+            // Blend SpectralMIP Phi into the MCE's Φ input when cached.
+            // unified_psi is a lightweight proxy (~0.22) that underestimates actual
+            // information integration. SpectralMIP (expensive, every ~97 cycles) is
+            // the gold-standard measure. Use the higher of the two, discounting
+            // spectral by 0.6 for conservatism (it uses Gaussian MI, not TPM-based IIT).
+            // Science: Tononi (2004) — Φ should reflect the system's best available
+            // estimate of information integration, not just the cheapest proxy.
+            let spectral_boost = self
+                .carryover
+                .consciousness
+                .last_spectral_mip_phi
+                .map(|phi| phi * 0.6)
+                .unwrap_or(0.0);
+            let phi_input = ctx.unified_psi.max(spectral_boost);
+
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
-                phi: ctx.unified_psi,
+                phi: phi_input,
                 broadcast: ctx.coherence as f64, // coherence ~ global workspace broadcast
                 working_memory: self.prefrontal_utilization(),
                 attention: ctx.peak_attention as f64,

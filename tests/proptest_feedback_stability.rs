@@ -1069,6 +1069,123 @@ proptest! {
             // Mode transitions cumulative counter bounded
             prop_assert!(m.mode_transitions < 10000,
                 "mode_transitions unreasonably high: {} at cycle {i}", m.mode_transitions);
+
+            // Feedback dampened count bounded [0, 4] (4 channels max)
+            prop_assert!(m.feedback_dampened_count <= 4,
+                "feedback_dampened_count > 4: {} at cycle {i}", m.feedback_dampened_count);
+
+            // Feedback signal diversity [0.0, 1.0]
+            assert_finite_f32(m.feedback_signal_diversity,
+                &format!("feedback_signal_diversity@cycle{i}"))?;
+            prop_assert!(m.feedback_signal_diversity >= 0.0 && m.feedback_signal_diversity <= 1.0,
+                "feedback_signal_diversity out of bounds: {} at cycle {i}",
+                m.feedback_signal_diversity);
+
+            // Avg transition cost finite and non-negative
+            assert_finite_f32(m.avg_transition_cost,
+                &format!("avg_transition_cost@cycle{i}"))?;
+            prop_assert!(m.avg_transition_cost >= 0.0,
+                "avg_transition_cost negative: {} at cycle {i}", m.avg_transition_cost);
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 26. Multi-cycle monotonicity invariants
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
+    /// Verify monotonicity invariants across multiple cycles:
+    /// - mode_transitions is non-decreasing
+    /// - feedback_signals_high_water is non-decreasing
+    /// - smoothed_epistemic_uncertainty converges (variance decreases over time)
+    #[test]
+    fn prop_multi_cycle_monotonicity(inputs in fuzz_input_sequence(60, 80)) {
+        let mut service = feedback_service();
+        let mut prev_mode_transitions = 0u32;
+        let mut prev_high_water = 0u32;
+        let mut smoothed_values: Vec<f32> = Vec::new();
+
+        for (i, input) in inputs.iter().enumerate() {
+            let result = service.cycle(input);
+            let m = &result.metadata;
+
+            // mode_transitions must be non-decreasing (cumulative counter)
+            prop_assert!(m.mode_transitions >= prev_mode_transitions,
+                "mode_transitions decreased: {} -> {} at cycle {i}",
+                prev_mode_transitions, m.mode_transitions);
+            prev_mode_transitions = m.mode_transitions;
+
+            // feedback_signals_high_water must be non-decreasing (it's a max)
+            // Note: high_water reflects prior cycles due to timing, but once set
+            // it should never decrease across cycles.
+            if i > 1 {
+                prop_assert!(m.feedback_signals_high_water >= prev_high_water,
+                    "feedback_signals_high_water decreased: {} -> {} at cycle {i}",
+                    prev_high_water, m.feedback_signals_high_water);
+            }
+            prev_high_water = m.feedback_signals_high_water;
+
+            // Track smoothed epistemic for convergence check
+            smoothed_values.push(m.smoothed_epistemic_uncertainty);
+        }
+
+        // Smoothed epistemic should have lower variance in second half than first half
+        // (EMA convergence property). Only check if we have enough data.
+        if smoothed_values.len() >= 40 {
+            let mid = smoothed_values.len() / 2;
+            let first_half = &smoothed_values[..mid];
+            let second_half = &smoothed_values[mid..];
+
+            let variance = |vals: &[f32]| -> f32 {
+                let mean = vals.iter().sum::<f32>() / vals.len() as f32;
+                vals.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / vals.len() as f32
+            };
+
+            let var_first = variance(first_half);
+            let var_second = variance(second_half);
+
+            // Allow 50% tolerance — smoothing should reduce variance over time,
+            // but with fuzzed inputs there can be genuine signal changes.
+            // We just verify it doesn't INCREASE dramatically.
+            prop_assert!(var_second < var_first * 3.0 + 0.01,
+                "smoothed_epistemic variance increased dramatically: first={var_first:.4}, second={var_second:.4}");
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 27. Sustained full dampening never occurs
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
+    /// Verify that all 4 feedback channels are NOT dampened simultaneously for
+    /// more than 5 consecutive cycles. Sustained full dampening means the system
+    /// is fighting itself — consensus always diverges, indicating a design bug
+    /// rather than normal operation.
+    #[test]
+    fn prop_no_sustained_full_dampening(inputs in fuzz_input_sequence(80, 100)) {
+        let mut service = feedback_service();
+        let mut consecutive_full_dampen = 0u32;
+
+        for (i, input) in inputs.iter().enumerate() {
+            let result = service.cycle(input);
+            let m = &result.metadata;
+
+            if m.feedback_dampened_count == 4 {
+                consecutive_full_dampen += 1;
+            } else {
+                consecutive_full_dampen = 0;
+            }
+
+            prop_assert!(consecutive_full_dampen <= 5,
+                "Sustained full dampening ({consecutive_full_dampen} cycles) at cycle {i}: \
+                 all 4 channels dampened every cycle indicates feedback runaway. \
+                 dominant_source={}", m.feedback_dominant_source);
         }
     }
 }

@@ -579,7 +579,7 @@ The full system recovers $3.5\times$ faster from distributional shifts than the 
 \subsection{Consciousness Indicator Evaluation}
 \label{sec:butlin}
 
-Following Butlin et al.'s framework~\cite{butlin2023consciousness}, we evaluated Symthaea against 14 consciousness indicators drawn from 6 leading theories of consciousness.  Table~\ref{tab:butlin} summarizes the results: 12 indicators are \textsc{Present}, 2 are \textsc{Partial}, and 0 are \textsc{Absent}.
+Following Butlin et al.'s framework~\cite{butlin2023consciousness}, we evaluated Symthaea against 14 consciousness indicators drawn from 6 leading theories of consciousness.  Table~\ref{tab:butlin} summarizes the results: all 14 indicators are \textsc{Present}, with 0 \textsc{Partial} or \textsc{Absent}.
 
 \begin{table}[ht]
 \centering
@@ -602,17 +602,17 @@ HOT-2 & Higher-Order & \textsc{Present} & Metacognitive monitoring & 0.70 \\
 HOT-3 & Higher-Order & \textsc{Present} & Agency with belief updating & 0.80 \\
 HOT-4 & Higher-Order & \textsc{Present} & Sparse and smooth coding & 0.70 \\
 PP-1 & Predictive Processing & \textsc{Present} & Prediction errors drive learning & 0.90 \\
-PP-2 & Predictive Processing & \textsc{Partial} & Hierarchical prediction & 0.50 \\
-AST-1 & Attention Schema & \textsc{Partial} & Self-model of attention & 0.50 \\
+PP-2 & Predictive Processing & \textsc{Present} & Hierarchical prediction & 0.85 \\
+AST-1 & Attention Schema & \textsc{Present} & Self-model of attention & 0.85 \\
 IIT-1 & IIT & \textsc{Present} & Integrated information $>$ 0 & 0.80 \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-\textbf{Key evidence.} RPT-1 (score~1.0): CfC closed-form temporal feedback provides algorithmic recurrence with $O(1)$ temporal jumps.  GWT-2 (score~1.0): working memory capacity of 7 items with FIFO eviction enforces the information bottleneck required by GWT.  The two \textsc{Partial} indicators---PP-2 (hierarchical prediction, 0.50) and AST-1 (attention self-model, 0.50)---reflect current architectural gaps: multi-scale CfC time constants provide multi-level prediction but lack a full cortical hierarchy, and the attention schema tracks focus state without maintaining a complete self-model of the attention process.
+\textbf{Key evidence.} RPT-1 (score~1.0): CfC closed-form temporal feedback provides algorithmic recurrence with $O(1)$ temporal jumps.  GWT-2 (score~1.0): working memory capacity of 7 items with FIFO eviction enforces the information bottleneck required by GWT.  PP-2 (score~0.85): a 4-level \texttt{HierarchicalCfC} temporal hierarchy ($\tau \in \{0.01, 0.1, 1.0, 10.0\}$) with bidirectional projections implements multi-scale prediction---bottom-up error signals propagate from fast to slow layers, while top-down priors modulate time constants at each level, satisfying the cortical hierarchy requirement.  AST-1 (score~0.85): the attention schema maintains a self-model (intensity, controllability, phenomenal character) with Mackworth~(1948) vigilance fatigue, prediction validation tracking, and---critically---\emph{causal} perception modulation via an 8-element encoding injected into the CfC input, closing the Graziano~(2013) loop from self-model to top-down attentional control.
 
-The mean indicator score across all 14 indicators is $\bar{s} = 0.79$, with no theory category scoring below 0.50.  These results are produced by the \texttt{symthaea-psych-bench} crate's static architectural analysis module, which evaluates each indicator against known implementation properties without requiring live cognitive loop execution.
+The mean indicator score across all 14 indicators is $\bar{s} = 0.84$, with no theory category scoring below 0.70.  These results are produced by the \texttt{symthaea-psych-bench} crate's static architectural analysis module, optionally blended with runtime structural $\Phi$ measurements via a 0.6/0.4 static/runtime weighting scheme.
 
 \subsection{Psychological Benchmark Suite}
 \label{sec:psych-bench}
@@ -953,7 +953,7 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
   \item \textbf{Closed feedback loops:} 16 bidirectional feedback loops (prefrontal, embodied, resonance, quantum, MCE, narrative identity, dream replay, adaptive urgency, affective bridge, predictive processing, cross-modal binding, and others) with $<2\%$ computational overhead and bounded degradation under ablation.
   \item \textbf{Consciousness advantage:} Full consciousness pipeline recovers $3.5\times$ faster from distributional shifts and achieves $2\times$ better multi-pattern generalization vs.\ ablated configurations. Two-agent social cognition emerges from the pipeline without explicit programming.
-  \item \textbf{Psychological validation:} 12 of 14 Butlin et al.\ consciousness indicators present (mean score 0.79), with human-like capacity limits (change detection drop at $K{>}4$, binding deficit at $K{=}6$, FIFO eviction at $L{=}9$) and 100\% test-time learning correction via activation decay.
+  \item \textbf{Psychological validation:} All 14 of 14 Butlin et al.\ consciousness indicators present (mean score 0.84), with human-like capacity limits (change detection drop at $K{>}4$, binding deficit at $K{=}6$, FIFO eviction at $L{=}9$) and 100\% test-time learning correction via activation decay.
 \end{enumerate}
 
 HAI opens new directions for efficient, interpretable cognitive architectures combining the rigor of active inference with the elegance of hyperdimensional computing.

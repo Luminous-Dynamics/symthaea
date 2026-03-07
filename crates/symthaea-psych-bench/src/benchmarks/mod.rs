@@ -12,6 +12,7 @@ pub mod memory_agent;
 pub mod metacognition;
 pub mod motor;
 pub mod neuromod;
+pub mod normative_integration;
 pub mod qualia_confidence;
 pub mod reasoning;
 pub mod social;

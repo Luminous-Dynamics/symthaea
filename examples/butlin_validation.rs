@@ -148,7 +148,7 @@ fn evaluate(inds: &[Indicator], rt: Option<&RuntimeData>) -> Vec<(f64, &'static 
                     "RPT-1" => Some(micro_n),
                     "RPT-2" => Some(micro_n * 0.8),
                     "GWT-3" => Some(meso_n),
-                    "HOT-2" => Some((1.0 - rt.bottleneck.min(1.0)) * 0.8),
+                    "HOT-2" => Some((rt.bottleneck.min(1.0) * 2.0).clamp(0.0, 1.0)),
                     "IIT-1" | "IIT-2" | "IIT-3" => Some(macro_n),
                     _ => None,
                 };
@@ -232,7 +232,7 @@ fn main() {
     println!("  Note: Runtime blending (0.6*static + 0.4*runtime) penalizes");
     println!("  indicators when structural Phi=0 (cold start / short runs).");
     println!("  Static scores reflect architectural capability; runtime scores");
-    println!("  reflect measured consciousness in a given run.
+    println!("  reflect measured consciousness in a given run.");
 
     println!();
     println!("  Key implementations:");

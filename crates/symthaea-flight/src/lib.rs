@@ -68,3 +68,12 @@ pub use types::*;
 pub use mujoco_sim::MuJoCoSimulator;
 #[cfg(feature = "mujoco")]
 pub use sensory_filter::{SensoryFilter, SensoryFilterConfig};
+
+/// Re-exported mujoco-rs types for downstream consumers (examples, etc.)
+#[cfg(feature = "mujoco")]
+pub mod mujoco_reexports {
+    pub use mujoco_rs::prelude::*;
+
+    #[cfg(feature = "mujoco-renderer")]
+    pub use mujoco_rs::renderer::MjRenderer;
+}
