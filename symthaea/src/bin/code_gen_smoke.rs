@@ -28,7 +28,7 @@ fn main() {
         ("add", "Add two numbers", "fn add(a: i32, b: i32) -> i32", "a + b"),
         ("reverse", "Reverse a string", "fn reverse(s: &str) -> String", "chars().rev()"),
         ("factorial", "Compute factorial", "fn factorial(n: u64) -> u64", ".product()"),
-        ("is_even", "Check if even", "fn is_even(n: i32) -> bool", "% 2 == 0"),
+        ("is_even", "Check if a number is even", "fn is_even(n: i32) -> bool", "% 2 == 0"),
         ("sort", "Sort a vector", "fn sort(items: Vec<i32>) -> Vec<i32>", ".sort()"),
         ("uppercase", "Convert to uppercase", "fn uppercase(s: &str) -> String", ".to_uppercase()"),
         ("fibonacci", "Compute fibonacci", "fn fibonacci(n: u64) -> u64", "let (mut a, mut b)"),
