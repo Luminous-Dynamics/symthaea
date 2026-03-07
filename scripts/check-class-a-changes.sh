@@ -29,7 +29,8 @@ CLASS_B_FILES=(
 )
 
 # Approved commit prefixes for Class A changes
-CLASS_A_PREFIXES="safety:|ethics:|emergency-safety:|governance:"
+# Match prefixes with optional scope: safety: or safety(scope):
+CLASS_A_PREFIXES="safety(\\(.*\\))?:|ethics(\\(.*\\))?:|emergency-safety(\\(.*\\))?:|governance(\\(.*\\))?:"
 
 check_staged_files() {
     local class_a_changed=()
