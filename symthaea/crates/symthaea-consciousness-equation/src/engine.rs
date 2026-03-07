@@ -137,9 +137,25 @@ impl MasterConsciousnessEquation {
         let temporal_stability = self.compute_temporal_stability();
 
         // Step 5: Final consciousness level with new factors
-        // C(t) = σ(softmin) × weighted_sum × S × ρ(t) × M × N × Soc
-        let consciousness_level =
-            sigmoid_bottleneck * weighted_sum * inputs.synchrony * temporal_stability * m * n * soc;
+        // C(t) = σ(softmin) × weighted_sum × S × ρ(t) × M' × N' × Soc'
+        //
+        // M, N, Soc are already included in the weighted_sum via their component weights.
+        // As raw multiplicatives they double-count AND cause catastrophic attenuation when
+        // a factor is low (e.g., Soc=0.35 in non-social context → 65% permanent haircut).
+        // Convert to soft modulations: map [0,1] → [0.5, 1.0] so low values attenuate
+        // gently rather than crushing consciousness.
+        // Science: Modular consciousness theories (Baars 2005) — subsystem deficits
+        // reduce but don't eliminate consciousness.
+        let m_mod = 0.5 + 0.5 * m;
+        let n_mod = 0.5 + 0.5 * n;
+        let soc_mod = 0.5 + 0.5 * soc;
+        let consciousness_level = sigmoid_bottleneck
+            * weighted_sum
+            * inputs.synchrony
+            * temporal_stability
+            * m_mod
+            * n_mod
+            * soc_mod;
 
         // Clamp to [0, 1]
         let consciousness_level = consciousness_level.clamp(0.0, 1.0);

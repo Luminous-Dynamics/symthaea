@@ -1249,6 +1249,12 @@ pub struct EthicalTelemetry {
     /// Whether a moral attractor basin was detected (low free energy + low drift).
     #[serde(default)]
     pub moral_attractor_detected: bool,
+    /// Whether the system is in Sacred Stillness active rest mode.
+    #[serde(default)]
+    pub in_active_rest: bool,
+    /// Consecutive cycles of Sacred Stillness dominance.
+    #[serde(default)]
+    pub stillness_dominance_streak: u16,
 }
 
 /// Free energy principle (FEP) and predictive processing telemetry.
