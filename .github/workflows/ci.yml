@@ -504,7 +504,7 @@ jobs:
           - symthaea-narrative-self
           - symthaea-consciousness-equation
           - symthaea-embeddings
-          - symthaea-seven-harmonies
+          - symthaea-harmonies
           - symthaea-observability
           - symthaea-nix
           - symthaea-stt

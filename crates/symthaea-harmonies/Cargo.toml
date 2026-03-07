@@ -1,10 +1,10 @@
 [package]
-name = "symthaea-seven-harmonies"
+name = "symthaea-harmonies"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "Seven Harmonies value alignment framework — evaluate actions against ethical and consciousness principles"
+description = "Eight Harmonies value alignment framework — evaluate actions against ethical and consciousness principles"
 license = "MIT"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 homepage = "https://luminousdynamics.org"
