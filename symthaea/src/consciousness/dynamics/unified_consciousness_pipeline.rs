@@ -436,6 +436,51 @@ impl UnifiedConsciousnessPipeline {
         result
     }
 
+    /// Lightweight advance: HDC encode → LTC step → state update → history.
+    ///
+    /// Skips the expensive oscillatory binding (`bind_for(25ms)` = 25k steps).
+    /// Call this every cycle to build up pipeline state (semantic memory,
+    /// causal accumulator, history) so that the full `process()` call
+    /// produces non-zero consciousness when it fires.
+    pub fn advance(&mut self, sensory_input: &[f64]) -> Result<f64> {
+        // 1. Encode sensory input (builds semantic_memory)
+        let _semantic_hv = self.encode_sensory(sensory_input);
+
+        // 2. Inject into hierarchical LTC (skip binding)
+        let ltc_input: Vec<f32> = sensory_input.iter().map(|&x| x as f32).collect();
+        self.ltc.inject_distributed(&ltc_input);
+
+        // 3. Run LTC dynamics
+        self.ltc.step()?;
+
+        // 4. Update consciousness state from measurements
+        self.update_consciousness_state();
+
+        // 5. Compute consciousness (lightweight — no binding update)
+        let result = self.equation.compute(&self.current_state);
+
+        // 6. Update history
+        let moment = ConsciousMoment {
+            step: self.step,
+            consciousness: result.consciousness,
+            binding: self.binding_network.binding_coherence(),
+            workspace: self.ltc.workspace_access() as f64,
+            phi: self.ltc.estimate_phi() as f64,
+            limiting_factor: result.limiting_factor,
+            workspace_state: self.ltc.global_state().to_vec(),
+        };
+        self.history.push_back(moment);
+        if self.history.len() > self.config.history_length {
+            self.history.pop_front();
+        }
+
+        // 7. Update causal accumulator
+        self.causal_accumulator += result.consciousness * 0.1;
+        self.step += 1;
+
+        Ok(result.consciousness)
+    }
+
     /// Process input through the complete pipeline
     pub fn process(&mut self, sensory_input: &[f64]) -> Result<ConsciousMoment> {
         // 1. Encode sensory input

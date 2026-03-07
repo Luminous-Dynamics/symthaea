@@ -177,6 +177,57 @@ impl CodeGenerator {
         &self.primitive_executor
     }
 
+    /// Generate ONLY the test assertions for a spec, without the implementation.
+    ///
+    /// Used for test-first generation: produce behavioral expectations before
+    /// generating the code. Tests come from spec examples + purpose-based auto-tests.
+    pub fn generate_tests_only(&self, spec: &CodeSpec) -> Option<String> {
+        let emitter: &dyn CodeEmitter = match spec.language.as_str() {
+            "rust" => &self.rust_emitter,
+            "python" => &self.python_emitter,
+            "nix" => &self.nix_emitter,
+            _ => &self.rust_emitter,
+        };
+
+        if spec.language == "rust" {
+            // Generate a test module with a stub function signature
+            let sig = spec.signature.as_deref()?;
+            let parsed = super::emitters::parse_rust_signature_pub(sig)?;
+
+            let mut tests = Vec::new();
+
+            // From explicit examples
+            for (i, (input, output)) in spec.examples.iter().enumerate() {
+                tests.push(format!("    #[test]"));
+                tests.push(format!("    fn test_example_{}() {{", i));
+                tests.push(format!("        assert_eq!({}, {});", input, output));
+                tests.push(format!("    }}"));
+            }
+
+            // From auto-generation
+            let auto = super::emitters::generate_auto_tests_pub(
+                &parsed.name, &spec.purpose, Some(&parsed),
+            );
+            for (i, assertion) in auto.iter().enumerate() {
+                tests.push(format!("    #[test]"));
+                tests.push(format!("    fn test_auto_{}() {{", i));
+                tests.push(format!("        {}", assertion));
+                tests.push(format!("    }}"));
+            }
+
+            if tests.is_empty() {
+                return None;
+            }
+
+            Some(format!(
+                "#[cfg(test)]\nmod tests {{\n    use super::*;\n\n{}\n}}",
+                tests.join("\n")
+            ))
+        } else {
+            None // Python test-first not yet supported
+        }
+    }
+
     /// Generate new code from a specification
     fn generate_create(
         &self,
@@ -229,59 +280,44 @@ impl CodeGenerator {
         }
     }
 
-    /// Generate code modification
+    /// Generate code modification by applying structural transforms.
+    ///
+    /// When existing source code is available (via target.path or context),
+    /// performs real transformations. Otherwise generates a modification spec.
     fn generate_modify(
         &self,
         target: &CodeTarget,
         changes: &[CodeChange],
-        _context: &CodeContext,
+        context: &CodeContext,
         primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
         let mut notes = Vec::new();
+        let lang = target.language.clone().unwrap_or_else(|| "rust".to_string());
 
-        // Build modification description
-        let mut modifications = Vec::new();
-        for change in changes {
-            match change {
-                CodeChange::AddParameter { name, param_type } => {
-                    modifications
-                        .push(format!("// TODO: Add parameter `{}: {}`", name, param_type));
-                }
-                CodeChange::ChangeReturnType { new_type } => {
-                    modifications.push(format!("// TODO: Change return type to `{}`", new_type));
-                }
-                CodeChange::Rename { new_name } => {
-                    modifications.push(format!(
-                        "// TODO: Rename `{}` to `{}`",
-                        target.name, new_name
-                    ));
-                }
-                CodeChange::AddDocumentation { content } => {
-                    modifications.push(format!("/// {}", content));
-                }
-                CodeChange::AddErrorHandling { strategy } => {
-                    modifications.push(format!("// TODO: Add error handling ({})", strategy));
-                }
-                CodeChange::RemoveParameter { name } => {
-                    modifications.push(format!("// TODO: Remove parameter `{}`", name));
-                }
-                CodeChange::Custom { description } => {
-                    modifications.push(format!("// TODO: {}", description));
-                }
-            }
-        }
+        // Try to find existing source code in context
+        let existing_source = context.source_files.iter()
+            .find(|(path, _)| {
+                path.contains(&target.name) ||
+                target.path.as_ref().map_or(false, |p| path.contains(p))
+            })
+            .map(|(_, src)| src.as_str());
 
-        notes.push(format!("Modification plan for `{}`", target.name));
+        let source = if let Some(existing) = existing_source {
+            // Apply modifications to existing source
+            Self::apply_modifications(existing, &target.name, changes, &lang)
+        } else {
+            // No existing source — generate a modification spec
+            Self::generate_modification_spec(&target.name, changes, &lang)
+        };
+
+        notes.push(format!("Modification applied to `{}`", target.name));
 
         GeneratedCode {
-            source: modifications.join("\n"),
-            language: target
-                .language
-                .clone()
-                .unwrap_or_else(|| "rust".to_string()),
+            source,
+            language: lang,
             plan_steps: Vec::new(),
             epistemic_status: EpistemicStatus::Probable,
-            intent_similarity: 0.5,
+            intent_similarity: 0.6,
             notes,
             phi_score: primitive_result.phi,
             primitives_used: primitive_result
@@ -290,6 +326,171 @@ impl CodeGenerator {
                 .map(|p| p.primitive.name.clone())
                 .collect(),
         }
+    }
+
+    /// Apply structural modifications to existing Rust source code.
+    fn apply_modifications(
+        source: &str,
+        func_name: &str,
+        changes: &[CodeChange],
+        _lang: &str,
+    ) -> String {
+        let mut result = source.to_string();
+
+        for change in changes {
+            match change {
+                CodeChange::AddParameter { name, param_type } => {
+                    // Find function signature and add parameter
+                    let fn_pattern = format!("fn {}(", func_name);
+                    if let Some(pos) = result.find(&fn_pattern) {
+                        let after = &result[pos + fn_pattern.len()..];
+                        if let Some(close_paren) = after.find(')') {
+                            let params = &after[..close_paren];
+                            let new_param = format!("{}: {}", name, param_type);
+                            let new_params = if params.trim().is_empty() {
+                                new_param
+                            } else {
+                                format!("{}, {}", params, new_param)
+                            };
+                            let insert_pos = pos + fn_pattern.len();
+                            result = format!(
+                                "{}{}{}",
+                                &result[..insert_pos],
+                                new_params,
+                                &result[insert_pos + close_paren..]
+                            );
+                        }
+                    }
+                }
+                CodeChange::ChangeReturnType { new_type } => {
+                    // Find "-> OldType {" and replace return type
+                    let fn_pattern = format!("fn {}(", func_name);
+                    if let Some(fn_pos) = result.find(&fn_pattern) {
+                        let after_fn = &result[fn_pos..];
+                        if let Some(arrow_pos) = after_fn.find("->") {
+                            let after_arrow = &after_fn[arrow_pos + 2..];
+                            if let Some(brace_pos) = after_arrow.find('{') {
+                                let abs_arrow = fn_pos + arrow_pos + 2;
+                                let abs_brace = abs_arrow + brace_pos;
+                                result = format!(
+                                    "{} {} {}",
+                                    &result[..abs_arrow],
+                                    new_type,
+                                    &result[abs_brace..]
+                                );
+                            }
+                        }
+                    }
+                }
+                CodeChange::Rename { new_name } => {
+                    // Replace all occurrences of the function name
+                    result = result.replace(func_name, new_name);
+                }
+                CodeChange::AddDocumentation { content } => {
+                    // Add doc comment before the function
+                    let fn_pattern = format!("fn {}(", func_name);
+                    if let Some(pos) = result.find(&fn_pattern) {
+                        // Find start of line
+                        let line_start = result[..pos].rfind('\n')
+                            .map(|p| p + 1)
+                            .unwrap_or(0);
+                        let indent = &result[line_start..pos];
+                        let whitespace: String = indent.chars()
+                            .take_while(|c| c.is_whitespace())
+                            .collect();
+                        result.insert_str(line_start, &format!("{}/// {}\n", whitespace, content));
+                    }
+                }
+                CodeChange::AddErrorHandling { strategy } => {
+                    // Wrap return type in Result if not already
+                    let fn_pattern = format!("fn {}(", func_name);
+                    if let Some(fn_pos) = result.find(&fn_pattern) {
+                        let after_fn = &result[fn_pos..];
+                        if let Some(arrow_pos) = after_fn.find("->") {
+                            let after_arrow = &after_fn[arrow_pos + 2..];
+                            if let Some(brace_pos) = after_arrow.find('{') {
+                                let ret_type = after_arrow[..brace_pos].trim();
+                                if !ret_type.starts_with("Result") {
+                                    let abs_arrow = fn_pos + arrow_pos + 2;
+                                    let abs_brace = abs_arrow + brace_pos;
+                                    result = format!(
+                                        "{} Result<{}, Box<dyn std::error::Error>> {}",
+                                        &result[..abs_arrow],
+                                        ret_type,
+                                        &result[abs_brace..]
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    // Error handling transformation applied above
+                }
+                CodeChange::RemoveParameter { name } => {
+                    // Find and remove parameter from signature
+                    let fn_pattern = format!("fn {}(", func_name);
+                    if let Some(pos) = result.find(&fn_pattern) {
+                        let after = &result[pos + fn_pattern.len()..];
+                        if let Some(close_paren) = after.find(')') {
+                            let params = &after[..close_paren];
+                            let new_params: Vec<&str> = params.split(',')
+                                .filter(|p| !p.contains(name))
+                                .collect();
+                            let insert_pos = pos + fn_pattern.len();
+                            result = format!(
+                                "{}{}{}",
+                                &result[..insert_pos],
+                                new_params.join(","),
+                                &result[insert_pos + close_paren..]
+                            );
+                        }
+                    }
+                }
+                CodeChange::Custom { description } => {
+                    // Can't auto-apply custom changes — add as comment
+                    result = format!("// MODIFICATION: {}\n{}", description, result);
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Generate a modification spec when no existing source is available.
+    fn generate_modification_spec(
+        func_name: &str,
+        changes: &[CodeChange],
+        _lang: &str,
+    ) -> String {
+        let mut lines = Vec::new();
+        lines.push(format!("// Modification plan for `{}`:", func_name));
+
+        for change in changes {
+            match change {
+                CodeChange::AddParameter { name, param_type } => {
+                    lines.push(format!("// - Add parameter `{}: {}`", name, param_type));
+                }
+                CodeChange::ChangeReturnType { new_type } => {
+                    lines.push(format!("// - Change return type to `{}`", new_type));
+                }
+                CodeChange::Rename { new_name } => {
+                    lines.push(format!("// - Rename to `{}`", new_name));
+                }
+                CodeChange::AddDocumentation { content } => {
+                    lines.push(format!("/// {}", content));
+                }
+                CodeChange::AddErrorHandling { strategy } => {
+                    lines.push(format!("// - Add error handling: {}", strategy));
+                }
+                CodeChange::RemoveParameter { name } => {
+                    lines.push(format!("// - Remove parameter `{}`", name));
+                }
+                CodeChange::Custom { description } => {
+                    lines.push(format!("// - {}", description));
+                }
+            }
+        }
+
+        lines.join("\n")
     }
 
     /// Generate code explanation

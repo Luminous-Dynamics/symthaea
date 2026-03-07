@@ -1915,6 +1915,24 @@ impl Symthaea {
                 } else if attempt < MAX_CODE_RETRIES {
                     if let Some(ref mut ctx) = thought.code_context {
                         if !exec_result.compiled {
+                            // Try semantic auto-fix before burning an LLM retry
+                            if let Some(auto_fixed) = crate::language::code_executor::try_auto_fix(
+                                &current_code,
+                                &exec_result.compile_errors,
+                            ) {
+                                tracing::debug!(
+                                    target: "symthaea::code",
+                                    attempt,
+                                    "Phase 5.5: Auto-fix applied, re-verifying"
+                                );
+                                ctx.generated_code = Some(auto_fixed.clone());
+                                verified_code = auto_fixed.clone();
+                                // Update generation text so next loop iteration picks up the fix
+                                generation.text = format!("```rust\n{}\n```", auto_fixed);
+                                // Don't burn an LLM retry — continue to re-verify
+                                continue;
+                            }
+
                             ctx.syntactically_valid = Some(false);
                             ctx.notes.push(format!(
                                 "COMPILATION FAILED (attempt {}/{}):",

@@ -3390,6 +3390,8 @@ fn test_moral_topology_packet_roundtrip() {
         moral_free_energy: 0.042,
         dominant_harmony: 2,
         scenario_count: 15,
+        harmony_entropy: 1.5,
+        attractor_detected: false,
     };
 
     let packet = WisdomPacket::from_moral_topology([1, 2, 3, 4, 5, 6, 7, 8], 42, 0.65, &summary);

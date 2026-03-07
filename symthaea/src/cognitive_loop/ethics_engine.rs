@@ -739,6 +739,34 @@ impl EthicsEngine {
         self.cache.last_topology_fresh
     }
 
+    /// Get the current learned harmony interaction weights for serialization.
+    ///
+    /// Returns the 8x8 matrix of synergy/tension weights learned from observed
+    /// co-activation patterns. Persist these across sleep/wake cycles so the
+    /// engine does not lose learned moral synergies on restart.
+    pub fn interaction_matrix_weights(&self) -> &[[f64; N_HARMONIES]; N_HARMONIES] {
+        &self.interaction_matrix.weights
+    }
+
+    /// Restore learned harmony interaction weights from a previous session.
+    ///
+    /// After restoring, the observation count is inferred from the number of
+    /// non-default off-diagonal weights (those that differ from both 0.0 and 1.0),
+    /// giving the engine a rough sense of how much learning has occurred.
+    pub fn restore_interaction_matrix(&mut self, weights: [[f64; N_HARMONIES]; N_HARMONIES]) {
+        self.interaction_matrix.weights = weights;
+        // Recompute observation count from non-default weights.
+        // Default off-diagonal = 0.0 (from Default impl) or semantic similarity
+        // (from from_basis). Either way, weights that deviate from both 0.0 and
+        // 1.0 indicate learning has occurred.
+        let non_default = weights
+            .iter()
+            .flatten()
+            .filter(|&&w| (w - 0.0).abs() > 1e-10 && (w - 1.0).abs() > 1e-10)
+            .count();
+        self.interaction_matrix.observation_count = non_default as u64;
+    }
+
     /// Bidirectional feedback: exploration outcome modulates FE→exploration gain.
     ///
     /// After an FE-driven exploration boost, the prediction error outcome tells
@@ -1010,6 +1038,57 @@ mod tests {
             engine.moral_exploration_gain() >= 0.05,
             "Gain should be clamped at 0.05: {}",
             engine.moral_exploration_gain()
+        );
+    }
+
+    #[test]
+    fn test_interaction_matrix_roundtrip() {
+        // Create an engine and observe some patterns to mutate the matrix.
+        let mut engine = make_engine();
+        for cycle in (7..=133).step_by(7) {
+            let input = make_input(cycle as u64);
+            engine.evaluate(&input);
+        }
+
+        // Extract the learned weights.
+        let saved_weights = *engine.interaction_matrix_weights();
+
+        // Create a fresh engine — its matrix will be from_basis (semantic init).
+        let mut engine2 = make_engine();
+        let fresh_weights = *engine2.interaction_matrix_weights();
+
+        // The two matrices should differ (engine1 had observations applied).
+        let diff: f64 = saved_weights
+            .iter()
+            .flatten()
+            .zip(fresh_weights.iter().flatten())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        assert!(
+            diff > 1e-6,
+            "After observations, weights should differ from fresh init (diff={diff})"
+        );
+
+        // Restore saved weights into engine2.
+        engine2.restore_interaction_matrix(saved_weights);
+        let restored_weights = *engine2.interaction_matrix_weights();
+
+        // Restored weights should exactly match saved weights.
+        for i in 0..N_HARMONIES {
+            for j in 0..N_HARMONIES {
+                assert!(
+                    (restored_weights[i][j] - saved_weights[i][j]).abs() < f64::EPSILON,
+                    "Weight [{i}][{j}] mismatch after restore: {} vs {}",
+                    restored_weights[i][j],
+                    saved_weights[i][j]
+                );
+            }
+        }
+
+        // Observation count should be non-zero after restore (inferred from non-default weights).
+        assert!(
+            engine2.interaction_matrix.observation_count > 0,
+            "Observation count should be inferred from restored weights"
         );
     }
 }

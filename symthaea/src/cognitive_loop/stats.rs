@@ -496,6 +496,8 @@ pub struct LoopStats {
     pub stillness_dominance_streak: u16,
     /// Whether the system is currently in active rest mode.
     pub in_active_rest: bool,
+    /// Whether a moral attractor was detected on the previous cycle (for edge detection).
+    pub prev_moral_attractor: bool,
     /// Phi quality weighting during active rest (1.0 = normal, 1.2 = rest emphasis).
     pub phi_rest_quality_factor: f32,
     /// Phi binding weighting during active rest (1.0 = normal, 0.8 = rest dampen).

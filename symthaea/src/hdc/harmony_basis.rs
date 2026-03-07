@@ -200,6 +200,133 @@ impl Default for MoralFreeEnergy {
     }
 }
 
+/// 8×8 Harmony Interaction Matrix — captures synergies and tensions.
+///
+/// Off-diagonal elements represent interaction strength:
+/// - Positive = synergy (harmonies reinforce each other)
+/// - Negative = tension (harmonies compete)
+/// - Diagonal = self-reinforcement (always 1.0)
+///
+/// Initialized from semantic similarity between harmony basis vectors,
+/// then refined by observed co-activation patterns.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HarmonyInteractionMatrix {
+    /// 8×8 interaction weights. Row i, col j = how harmony i influences harmony j.
+    pub weights: [[f64; N_HARMONIES]; N_HARMONIES],
+    /// Number of observations used to refine the matrix.
+    pub observation_count: u64,
+}
+
+impl HarmonyInteractionMatrix {
+    /// Initialize from semantic similarity between harmony basis vectors.
+    pub fn from_basis(basis: &HarmonyBasis) -> Self {
+        let mut weights = [[0.0f64; N_HARMONIES]; N_HARMONIES];
+        for i in 0..N_HARMONIES {
+            weights[i][i] = 1.0; // self-reinforcement
+            for j in (i + 1)..N_HARMONIES {
+                let sim = basis.vectors[i].similarity(&basis.vectors[j]) as f64;
+                weights[i][j] = sim;
+                weights[j][i] = sim; // symmetric
+            }
+        }
+        Self {
+            weights,
+            observation_count: 0,
+        }
+    }
+
+    /// Update the interaction matrix from observed co-activation patterns.
+    ///
+    /// When two harmonies are simultaneously active (both > threshold),
+    /// their interaction weight is nudged toward +1 (synergy).
+    /// When one is active and the other suppressed, nudged toward -1 (tension).
+    pub fn observe(&mut self, coords: &[f64; N_HARMONIES], learning_rate: f64) {
+        let lr = learning_rate.clamp(0.0, 0.1);
+        let threshold = 0.2;
+        for i in 0..N_HARMONIES {
+            for j in (i + 1)..N_HARMONIES {
+                let both_active = coords[i] > threshold && coords[j] > threshold;
+                let one_suppressed = (coords[i] > threshold && coords[j] < -threshold)
+                    || (coords[j] > threshold && coords[i] < -threshold);
+                let target = if both_active {
+                    1.0 // synergy
+                } else if one_suppressed {
+                    -1.0 // tension
+                } else {
+                    0.0 // neutral
+                };
+                // EMA update (preserve symmetry)
+                let delta = lr * (target - self.weights[i][j]);
+                self.weights[i][j] += delta;
+                self.weights[j][i] += delta;
+                // Clamp to [-1, 1]
+                self.weights[i][j] = self.weights[i][j].clamp(-1.0, 1.0);
+                self.weights[j][i] = self.weights[j][i].clamp(-1.0, 1.0);
+            }
+        }
+        self.observation_count += 1;
+    }
+
+    /// Apply interaction effects to raw harmony coordinates.
+    ///
+    /// Each harmony's coordinate is modulated by its interactions with others:
+    /// coord'[i] = coord[i] + blend * sum_j(w[i][j] * coord[j]) / N
+    pub fn apply(&self, coords: &[f64; N_HARMONIES], blend: f64) -> [f64; N_HARMONIES] {
+        let mut result = *coords;
+        let b = blend.clamp(0.0, 0.5);
+        for i in 0..N_HARMONIES {
+            let mut interaction_sum = 0.0;
+            for j in 0..N_HARMONIES {
+                if i != j {
+                    interaction_sum += self.weights[i][j] * coords[j];
+                }
+            }
+            result[i] += b * interaction_sum / (N_HARMONIES - 1) as f64;
+            result[i] = result[i].clamp(-1.0, 1.0);
+        }
+        result
+    }
+
+    /// Get the strongest synergy pair.
+    pub fn strongest_synergy(&self) -> (usize, usize, f64) {
+        let mut best = (0, 1, f64::NEG_INFINITY);
+        for i in 0..N_HARMONIES {
+            for j in (i + 1)..N_HARMONIES {
+                if self.weights[i][j] > best.2 {
+                    best = (i, j, self.weights[i][j]);
+                }
+            }
+        }
+        best
+    }
+
+    /// Get the strongest tension pair.
+    pub fn strongest_tension(&self) -> (usize, usize, f64) {
+        let mut worst = (0, 1, f64::INFINITY);
+        for i in 0..N_HARMONIES {
+            for j in (i + 1)..N_HARMONIES {
+                if self.weights[i][j] < worst.2 {
+                    worst = (i, j, self.weights[i][j]);
+                }
+            }
+        }
+        worst
+    }
+}
+
+impl Default for HarmonyInteractionMatrix {
+    fn default() -> Self {
+        let mut weights = [[0.0f64; N_HARMONIES]; N_HARMONIES];
+        for i in 0..N_HARMONIES {
+            weights[i][i] = 1.0;
+        }
+        Self {
+            weights,
+            observation_count: 0,
+        }
+    }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // Internal helpers
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -363,5 +490,44 @@ mod tests {
             h_uniform > h_peaked,
             "Uniform entropy ({h_uniform}) should exceed peaked ({h_peaked})"
         );
+    }
+
+    #[test]
+    fn test_interaction_matrix_from_basis() {
+        let basis = HarmonyBasis::new(256);
+        let matrix = HarmonyInteractionMatrix::from_basis(&basis);
+        // Diagonal should be 1.0
+        for i in 0..N_HARMONIES {
+            assert!((matrix.weights[i][i] - 1.0).abs() < f64::EPSILON);
+        }
+        // Should be symmetric
+        for i in 0..N_HARMONIES {
+            for j in 0..N_HARMONIES {
+                assert!((matrix.weights[i][j] - matrix.weights[j][i]).abs() < f64::EPSILON);
+            }
+        }
+    }
+
+    #[test]
+    fn test_interaction_matrix_observe_synergy() {
+        let mut matrix = HarmonyInteractionMatrix::default();
+        // Simulate co-activation of harmonies 0 and 1
+        let coords = [0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        for _ in 0..100 {
+            matrix.observe(&coords, 0.05);
+        }
+        // Should develop synergy between 0 and 1
+        assert!(matrix.weights[0][1] > 0.5, "Co-activated harmonies should develop synergy");
+    }
+
+    #[test]
+    fn test_interaction_matrix_apply_preserves_bounds() {
+        let basis = HarmonyBasis::new(256);
+        let matrix = HarmonyInteractionMatrix::from_basis(&basis);
+        let coords = [0.9, -0.5, 0.3, 0.0, 0.7, -0.2, 0.1, 0.4];
+        let result = matrix.apply(&coords, 0.3);
+        for c in &result {
+            assert!(*c >= -1.0 && *c <= 1.0, "Applied coords should be in [-1, 1]");
+        }
     }
 }

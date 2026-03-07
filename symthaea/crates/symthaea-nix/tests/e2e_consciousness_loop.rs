@@ -401,6 +401,7 @@ fn test_daemon_ipc_snapshot_roundtrip() {
     ];
 
     let snapshot = DaemonSnapshot {
+        version: symthaea_nix::ipc::SNAPSHOT_VERSION,
         timestamp: 1700000000,
         observation_count: 142,
         anomaly_count: 7,
@@ -416,6 +417,11 @@ fn test_daemon_ipc_snapshot_roundtrip() {
         daemon_pid: 99999,
         support_status: None,
         recommendation_count: 0,
+        alerts: vec![],
+        top_causal_edges: vec![],
+        memory_used_percent: None,
+        watchdog_status: None,
+        degraded: false,
     };
 
     // Write atomically
@@ -561,6 +567,7 @@ fn test_cognitive_to_ipc_pipeline() {
         .as_secs();
 
     let ipc_snapshot = DaemonSnapshot {
+        version: symthaea_nix::ipc::SNAPSHOT_VERSION,
         timestamp: now,
         observation_count: 1,
         anomaly_count: 0,
@@ -576,6 +583,11 @@ fn test_cognitive_to_ipc_pipeline() {
         daemon_pid: std::process::id(),
         support_status: None,
         recommendation_count: 0,
+        alerts: vec![],
+        top_causal_edges: vec![],
+        memory_used_percent: None,
+        watchdog_status: None,
+        degraded: false,
     };
 
     // 6. Write to disk and read back
@@ -613,6 +625,7 @@ fn test_cognitive_to_ipc_pipeline() {
 #[test]
 fn test_stale_snapshot_detection() {
     let snapshot = DaemonSnapshot {
+        version: symthaea_nix::ipc::SNAPSHOT_VERSION,
         timestamp: 1000, // ancient
         observation_count: 0,
         anomaly_count: 0,
@@ -628,6 +641,11 @@ fn test_stale_snapshot_detection() {
         daemon_pid: 1, // PID 1 (init) is always alive
         support_status: None,
         recommendation_count: 0,
+        alerts: vec![],
+        top_causal_edges: vec![],
+        memory_used_percent: None,
+        watchdog_status: None,
+        degraded: false,
     };
 
     assert!(

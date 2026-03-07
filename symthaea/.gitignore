@@ -107,6 +107,9 @@ output/
 
 # Audio output from vocal tract demo
 audio_output/
+
+# Video output from MuJoCo demos
+video_output/
 benchmarks/external/**/helm-repo/
 benchmarks/external/**/.git/
 symthaea/

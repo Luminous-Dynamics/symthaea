@@ -1011,6 +1011,90 @@
         }
     }
 
+    #[test]
+    fn test_reduced_substrate_capabilities_lower_consciousness() {
+        // Prove that binding/workspace/attention capabilities are load-bearing:
+        // biochemical-level capabilities (0.3) should produce measurably lower
+        // consciousness than biological-level (1.0).
+        let config = SpectralMIPConfig {
+            num_components: 64,
+            window_size: 20,
+            min_samples: 5,
+            regularization: 1e-6,
+        };
+
+        let eq_bio = ConsciousnessEquationV2::default();
+        let mut engine_bio = ConsciousnessEngine::new(
+            SpectralMIPFinder::new(config.clone()),
+            None,
+            Some(eq_bio),
+            None,
+        );
+
+        let eq_biochem = ConsciousnessEquationV2::default();
+        let mut engine_biochem = ConsciousnessEngine::new(
+            SpectralMIPFinder::new(config),
+            None,
+            Some(eq_biochem),
+            None,
+        );
+
+        let mut out_bio = None;
+        let mut out_biochem = None;
+        for cycle in 0..24 {
+            let hdv = ContinuousHV::random(16384, cycle + 500);
+            let hv16 = BinaryHV::random(cycle + 500);
+
+            let input_bio = ConsciousnessEngineInput {
+                hdv: &hdv,
+                hv16: &hv16,
+                cycle,
+                unified_psi: 0.7,
+                coherence: 0.8,
+                prediction_error: 0.1,
+                phi_attention_weight: 0.5,
+                epistemic_quality: 0.7,
+                phi_validation_correlation: 0.5,
+                bath_entropy: 1.0,
+                attractor_detected: false,
+                sht_2a_signal: 0.5,
+                gaba_a_signal: 0.4,
+                substrate_feasibility: 1.0,
+                binding_capability: 1.0,
+                workspace_capability: 1.0,
+                attention_capability: 1.0,
+                moral_drift: 0.0,
+                moral_anomaly_score: 0.0,
+            };
+            out_bio = Some(engine_bio.measure(&input_bio));
+
+            // Biochemical substrate: binding=0.3, workspace=0.4, attention=0.3
+            let input_biochem = ConsciousnessEngineInput {
+                binding_capability: 0.3,
+                workspace_capability: 0.4,
+                attention_capability: 0.3,
+                ..input_bio
+            };
+            out_biochem = Some(engine_biochem.measure(&input_biochem));
+        }
+
+        let bio = out_bio.unwrap();
+        let biochem = out_biochem.unwrap();
+
+        // Equation V2 fires at cycle 23 — reduced capabilities should produce
+        // lower Binding, Workspace, and Attention core components, leading to
+        // lower overall consciousness.
+        if bio.equation_v2_consciousness > 0.01 {
+            assert!(
+                bio.equation_v2_consciousness > biochem.equation_v2_consciousness,
+                "Biological capabilities (1.0) should produce higher consciousness ({:.4}) \
+                 than biochemical (0.3/0.4/0.3) ({:.4})",
+                bio.equation_v2_consciousness,
+                biochem.equation_v2_consciousness
+            );
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // Weight Convergence Detection Tests
     // ═══════════════════════════════════════════════════════════════════

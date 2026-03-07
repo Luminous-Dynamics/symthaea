@@ -106,7 +106,7 @@ pub struct ValueEvaluation {
     pub reasoning: String,
     /// Suggestions for improvement
     pub suggestions: Vec<String>,
-    /// 7D harmony coordinates (projection onto moral manifold)
+    /// 8D harmony coordinates (projection onto moral manifold)
     pub harmony_coordinates: [f64; N_HARMONIES],
     /// Moral free energy decomposition (FEP)
     pub moral_free_energy: MoralFreeEnergy,
@@ -185,7 +185,7 @@ impl HarmoniesIntegrator {
 
     /// Evaluate an action for value alignment.
     ///
-    /// Projects the action's embedding onto the 7D harmony manifold, computes
+    /// Projects the action's embedding onto the 8D harmony manifold, computes
     /// semantic alignment with each harmony, and measures moral free energy
     /// relative to the running prior (lower F → more consistent moral stance).
     pub fn evaluate(&mut self, action: &ValuedAction) -> ValueEvaluation {

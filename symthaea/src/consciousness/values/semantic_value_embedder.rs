@@ -119,7 +119,7 @@ impl SemanticValueEmbedder {
 
     /// Build harmony bases grounded in primitive tiers
     ///
-    /// Maps each of the 7 Harmonies to a primitive tier, then creates
+    /// Maps each of the 8 Harmonies to a primitive tier, then creates
     /// a basis vector by bundling the tier's primitive encodings.
     fn build_primitive_grounded_bases(
         dim: usize,

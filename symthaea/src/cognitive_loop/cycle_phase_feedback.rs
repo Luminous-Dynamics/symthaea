@@ -679,14 +679,16 @@ impl CognitiveLoopService {
         // of activity level; rest-state Phi is not diminished but differently structured.
         if self.stats.in_active_rest {
             // During active rest, boost the coherence component of Phi
-            // and dampen the binding intensity component
-            let coherence_weight = 1.2; // 20% more weight on coherence
-            let binding_dampen = 0.8; // 20% less weight on binding intensity
+            // and dampen the binding intensity component.
+            // Net effect: rest-state consciousness emphasizes integration quality
+            // over raw binding intensity (~4% net boost).
+            let coherence_weight: f32 = 1.2; // 20% more weight on coherence
+            let binding_dampen: f32 = 0.8; // 20% less weight on binding intensity
             self.stats.phi_rest_quality_factor = coherence_weight;
             self.stats.phi_rest_binding_factor = binding_dampen;
-            // Apply: modulate the EqV2 consciousness score by rest factors
-            // Quality factor boosts integration coherence, binding factor dampens raw intensity
-            let rest_modulation = (coherence_weight + binding_dampen) / 2.0;
+            // Weighted combination: coherence contributes 60%, binding 40%
+            // (coherence matters more during rest than binding)
+            let rest_modulation = coherence_weight * 0.6 + binding_dampen * 0.4;
             equation_v2_consciousness *= rest_modulation as f64;
         } else {
             self.stats.phi_rest_quality_factor = 1.0;
@@ -875,6 +877,22 @@ impl CognitiveLoopService {
             }
             if unified_quality_score < CROSS_MODULE_AGREEMENT_LOW && self.stats.total_cycles > 30 {
                 self.scale_exploration("low_quality_dampen", 0.9);
+            }
+        }
+
+        // Harmony entropy → learning rate modulation: broad moral engagement
+        // (high entropy) slightly boosts learning rate. Specialization (low entropy)
+        // slightly dampens. Range: entropy ∈ [0, ln(8)≈2.08], mapped to [0.95, 1.05].
+        // Science: broader exploration of value space → richer training signal.
+        {
+            let entropy = self.ethics_engine.moral_topology().last_summary().harmony_entropy;
+            let max_entropy = (symthaea_types::N_HARMONIES as f64).ln();
+            if max_entropy > 0.0 && entropy.is_finite() {
+                let normalized = (entropy / max_entropy).clamp(0.0, 1.0); // 0..1
+                let lr_mod = 0.95 + normalized * 0.10; // 0.95..1.05
+                self.carryover.learning.subsystem_lr_factor *= lr_mod as f32;
+                self.carryover.learning.subsystem_lr_factor =
+                    self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.5);
             }
         }
 

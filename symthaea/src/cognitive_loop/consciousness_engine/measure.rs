@@ -239,21 +239,22 @@ impl ConsciousnessEngine {
 
         // ═══════════════════════════════════════════════════════════════════
         // LAYER 4: Unified Consciousness Pipeline — end-to-end
-        // Every 97 cycles (co-prime with Layer 1 SpectralMIP via offset)
+        // advance() every cycle (builds state), process() every 97 (with binding)
         // ═══════════════════════════════════════════════════════════════════
         let t = Instant::now();
         let pipeline_consciousness =
             if let Some(ref mut pipeline) = self.unified_consciousness_pipeline {
+                let sensory: Vec<f64> = (0..64)
+                    .map(|i| {
+                        if input.hv16.get_bit(i) != 0 {
+                            1.0
+                        } else {
+                            -1.0
+                        }
+                    })
+                    .collect();
                 if input.cycle % 97 == 0 && input.cycle > 0 {
-                    let sensory: Vec<f64> = (0..64)
-                        .map(|i| {
-                            if input.hv16.get_bit(i) != 0 {
-                                1.0
-                            } else {
-                                -1.0
-                            }
-                        })
-                        .collect();
+                    // Full process with oscillatory binding
                     match pipeline.process(&sensory) {
                         Ok(moment) => {
                             self.cache.last_pipeline_consciousness = moment.consciousness;
@@ -262,6 +263,10 @@ impl ConsciousnessEngine {
                         Err(_) => self.cache.last_pipeline_consciousness,
                     }
                 } else {
+                    // Lightweight advance: HDC + LTC + state (no binding)
+                    if let Ok(c) = pipeline.advance(&sensory) {
+                        self.cache.last_pipeline_consciousness = c;
+                    }
                     self.cache.last_pipeline_consciousness
                 }
             } else {

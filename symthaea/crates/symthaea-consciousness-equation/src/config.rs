@@ -27,7 +27,12 @@ pub struct MasterEquationConfig {
 impl Default for MasterEquationConfig {
     fn default() -> Self {
         Self {
-            softmin_tau: 0.1,
+            // τ=0.15: slightly softer than hard-min (τ→0) but still strongly
+            // bottleneck-sensitive. Allows partial compensation from strong factors
+            // when one factor is weak, matching neuroscience: consciousness degrades
+            // gracefully, not catastrophically (Baars 2005; Dehaene 2014).
+            // Previously τ=0.1 which was near-hard-min.
+            softmin_tau: 0.15,
             epsilon: 1e-8,
             component_weights: ComponentWeights::default(),
             enable_embodiment_factor: true,

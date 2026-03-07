@@ -40,11 +40,11 @@ pub trait CodeEmitter: Send + Sync {
 // ============================================================================
 
 /// Parsed function signature
-struct ParsedSignature {
-    name: String,
-    params: Vec<(String, String)>, // (name, type)
-    return_type: Option<String>,
-    is_method: bool, // has &self or &mut self
+pub(crate) struct ParsedSignature {
+    pub(crate) name: String,
+    pub(crate) params: Vec<(String, String)>, // (name, type)
+    pub(crate) return_type: Option<String>,
+    pub(crate) is_method: bool, // has &self or &mut self
 }
 
 /// Parse a Rust function signature string like "fn foo(a: i32, b: &str) -> String"
@@ -1007,7 +1007,9 @@ impl CodeEmitter for RustEmitter {
             parts.push("}".to_string());
         }
 
-        parts.join("\n")
+        // Apply import inference — scan generated code for stdlib types and prepend imports
+        let raw = parts.join("\n");
+        infer_rust_imports(&raw)
     }
 
     fn emit_function(&self, name: &str, params: &str, return_type: &str, body: &str) -> String {
@@ -1319,6 +1321,88 @@ impl CodeEmitter for NixEmitter {
     fn language(&self) -> &str {
         "nix"
     }
+}
+
+// ============================================================================
+// Import Inference
+// ============================================================================
+
+/// Scan Rust source code and prepend any needed `use` imports.
+///
+/// Detects common stdlib types and traits used in the code but not imported.
+pub(crate) fn infer_rust_imports(source: &str) -> String {
+    let known_imports: &[(&str, &str)] = &[
+        ("HashMap", "use std::collections::HashMap;"),
+        ("HashSet", "use std::collections::HashSet;"),
+        ("BTreeMap", "use std::collections::BTreeMap;"),
+        ("BTreeSet", "use std::collections::BTreeSet;"),
+        ("VecDeque", "use std::collections::VecDeque;"),
+        ("BinaryHeap", "use std::collections::BinaryHeap;"),
+        ("File", "use std::fs::File;"),
+        ("OpenOptions", "use std::fs::OpenOptions;"),
+        ("Duration", "use std::time::Duration;"),
+        ("Instant", "use std::time::Instant;"),
+        ("BufReader", "use std::io::BufReader;"),
+        ("BufWriter", "use std::io::BufWriter;"),
+        ("Ordering", "use std::cmp::Ordering;"),
+        ("Reverse", "use std::cmp::Reverse;"),
+        ("stdin", "use std::io;"),
+        ("Arc", "use std::sync::Arc;"),
+        ("Mutex", "use std::sync::Mutex;"),
+        ("Rc", "use std::rc::Rc;"),
+        ("RefCell", "use std::cell::RefCell;"),
+        ("Path", "use std::path::Path;"),
+        ("PathBuf", "use std::path::PathBuf;"),
+        ("fmt::Display", "use std::fmt;"),
+        ("fmt::Formatter", "use std::fmt;"),
+    ];
+
+    let mut imports = Vec::new();
+    for (type_name, import_stmt) in known_imports {
+        // Check if the type is used in the source but not already imported
+        if source.contains(type_name) && !source.contains(import_stmt) {
+            // Make sure it's not just a substring (e.g., "HashMap" in a comment)
+            // Simple heuristic: check for type usage patterns
+            let patterns = [
+                format!("{}<", type_name),      // HashMap<K, V>
+                format!("{}::", type_name),      // HashMap::new()
+                format!(": {}", type_name),      // x: HashMap
+                format!("-> {}", type_name),     // -> HashMap
+                format!("{} {{", type_name),     // HashMap {
+                format!("{}(", type_name),       // File(
+                format!("&{}", type_name),       // &Path
+            ];
+            if patterns.iter().any(|p| source.contains(p.as_str())) {
+                if !imports.contains(&import_stmt.to_string()) {
+                    imports.push(import_stmt.to_string());
+                }
+            }
+        }
+    }
+
+    if imports.is_empty() {
+        source.to_string()
+    } else {
+        format!("{}\n\n{}", imports.join("\n"), source)
+    }
+}
+
+// ============================================================================
+// Public API for cross-module use (test-first generation)
+// ============================================================================
+
+/// Parse a Rust function signature (pub wrapper for cross-module use).
+pub(crate) fn parse_rust_signature_pub(sig: &str) -> Option<ParsedSignature> {
+    parse_rust_signature(sig)
+}
+
+/// Generate auto-tests from purpose and signature (pub wrapper for cross-module use).
+pub(crate) fn generate_auto_tests_pub(
+    func_name: &str,
+    purpose: &str,
+    sig: Option<&ParsedSignature>,
+) -> Vec<String> {
+    generate_auto_tests(func_name, purpose, sig)
 }
 
 #[cfg(test)]

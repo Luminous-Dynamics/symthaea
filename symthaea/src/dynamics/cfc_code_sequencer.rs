@@ -22,6 +22,393 @@ use symthaea_core::hdc::ContinuousHV;
 /// Maximum number of planning steps before forcing completion
 const MAX_PLAN_STEPS: usize = 32;
 
+/// HDC dimension used for algorithm pattern prototype encoding
+const ALGORITHM_PATTERN_DIM: usize = 512;
+
+/// Recognized algorithm patterns with their template plan steps
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AlgorithmPattern {
+    /// Sorting: compare-swap-iterate (bubble/insertion) or divide-recurse-merge
+    Sorting,
+    /// Search: check-bounds-compare-recurse (binary) or init-visited-enqueue-process (BFS/DFS)
+    Search,
+    /// Dynamic Programming: init-table, define-recurrence, fill-table, extract-result
+    DynamicProgramming,
+    /// Graph: init-adjacency, init-visited, process-queue, update-distances
+    Graph,
+    /// Accumulation: init-accumulator, iterate, update, return (sum, count, max, filter)
+    Accumulation,
+    /// String processing: iterate-chars, transform, collect
+    StringProcessing,
+}
+
+impl AlgorithmPattern {
+    /// Convert this algorithm pattern into template plan steps with context strings
+    pub fn to_plan_steps(&self) -> Vec<CodePlanStep> {
+        match self {
+            AlgorithmPattern::Sorting => vec![
+                CodePlanStep {
+                    action: PlanAction::DefineFunction,
+                    name: None,
+                    context: vec!["algorithm:sorting".into(), "step:compare-elements".into()],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddParameter,
+                    name: None,
+                    context: vec!["algorithm:sorting".into(), "param:input-collection".into()],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::SetReturnType,
+                    name: None,
+                    context: vec!["algorithm:sorting".into(), "return:sorted-collection".into()],
+                    confidence: 0.85,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddMethod,
+                    name: None,
+                    context: vec![
+                        "algorithm:sorting".into(),
+                        "step:swap-or-merge".into(),
+                        "step:iterate-until-sorted".into(),
+                    ],
+                    confidence: 0.85,
+                },
+            ],
+            AlgorithmPattern::Search => vec![
+                CodePlanStep {
+                    action: PlanAction::DefineFunction,
+                    name: None,
+                    context: vec!["algorithm:search".into(), "step:check-bounds".into()],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddParameter,
+                    name: None,
+                    context: vec![
+                        "algorithm:search".into(),
+                        "param:search-space".into(),
+                        "param:target".into(),
+                    ],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::SetReturnType,
+                    name: None,
+                    context: vec!["algorithm:search".into(), "return:found-index-or-none".into()],
+                    confidence: 0.85,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddMethod,
+                    name: None,
+                    context: vec![
+                        "algorithm:search".into(),
+                        "step:compare-midpoint-or-enqueue".into(),
+                        "step:recurse-or-dequeue".into(),
+                    ],
+                    confidence: 0.85,
+                },
+            ],
+            AlgorithmPattern::DynamicProgramming => vec![
+                CodePlanStep {
+                    action: PlanAction::DefineFunction,
+                    name: None,
+                    context: vec!["algorithm:dp".into(), "step:init-table".into()],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddParameter,
+                    name: None,
+                    context: vec!["algorithm:dp".into(), "param:problem-input".into()],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddMethod,
+                    name: None,
+                    context: vec![
+                        "algorithm:dp".into(),
+                        "step:define-recurrence".into(),
+                        "step:fill-table-bottom-up".into(),
+                    ],
+                    confidence: 0.85,
+                },
+                CodePlanStep {
+                    action: PlanAction::SetReturnType,
+                    name: None,
+                    context: vec!["algorithm:dp".into(), "step:extract-result".into()],
+                    confidence: 0.85,
+                },
+            ],
+            AlgorithmPattern::Graph => vec![
+                CodePlanStep {
+                    action: PlanAction::DefineStruct,
+                    name: None,
+                    context: vec!["algorithm:graph".into(), "step:init-adjacency".into()],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::DefineFunction,
+                    name: None,
+                    context: vec!["algorithm:graph".into(), "step:init-visited".into()],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddMethod,
+                    name: None,
+                    context: vec![
+                        "algorithm:graph".into(),
+                        "step:process-queue".into(),
+                        "step:update-distances".into(),
+                    ],
+                    confidence: 0.85,
+                },
+                CodePlanStep {
+                    action: PlanAction::SetReturnType,
+                    name: None,
+                    context: vec!["algorithm:graph".into(), "return:distances-or-path".into()],
+                    confidence: 0.85,
+                },
+            ],
+            AlgorithmPattern::Accumulation => vec![
+                CodePlanStep {
+                    action: PlanAction::DefineFunction,
+                    name: None,
+                    context: vec![
+                        "algorithm:accumulation".into(),
+                        "step:init-accumulator".into(),
+                    ],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddParameter,
+                    name: None,
+                    context: vec!["algorithm:accumulation".into(), "param:input-collection".into()],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddMethod,
+                    name: None,
+                    context: vec![
+                        "algorithm:accumulation".into(),
+                        "step:iterate-elements".into(),
+                        "step:update-accumulator".into(),
+                    ],
+                    confidence: 0.85,
+                },
+                CodePlanStep {
+                    action: PlanAction::SetReturnType,
+                    name: None,
+                    context: vec![
+                        "algorithm:accumulation".into(),
+                        "return:accumulated-result".into(),
+                    ],
+                    confidence: 0.85,
+                },
+            ],
+            AlgorithmPattern::StringProcessing => vec![
+                CodePlanStep {
+                    action: PlanAction::DefineFunction,
+                    name: None,
+                    context: vec![
+                        "algorithm:string-processing".into(),
+                        "step:iterate-chars".into(),
+                    ],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddParameter,
+                    name: None,
+                    context: vec![
+                        "algorithm:string-processing".into(),
+                        "param:input-string".into(),
+                    ],
+                    confidence: 0.9,
+                },
+                CodePlanStep {
+                    action: PlanAction::AddMethod,
+                    name: None,
+                    context: vec![
+                        "algorithm:string-processing".into(),
+                        "step:transform-char".into(),
+                        "step:collect-result".into(),
+                    ],
+                    confidence: 0.85,
+                },
+                CodePlanStep {
+                    action: PlanAction::SetReturnType,
+                    name: None,
+                    context: vec![
+                        "algorithm:string-processing".into(),
+                        "return:transformed-string".into(),
+                    ],
+                    confidence: 0.85,
+                },
+            ],
+        }
+    }
+}
+
+/// Detects algorithm patterns from intent HVs using HDC similarity
+struct AlgorithmPatternDetector {
+    dim: usize,
+    sorting_prototype: ContinuousHV,
+    search_prototype: ContinuousHV,
+    dp_prototype: ContinuousHV,
+    graph_prototype: ContinuousHV,
+    accumulation_prototype: ContinuousHV,
+    string_prototype: ContinuousHV,
+}
+
+impl AlgorithmPatternDetector {
+    /// Minimum similarity to consider a pattern match
+    const MIN_SIMILARITY: f32 = 0.15;
+
+    fn new(dim: usize) -> Self {
+        let dim = dim.max(1);
+        Self {
+            dim,
+            sorting_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "sort", "order", "compare", "swap", "bubble", "merge", "quick", "insertion",
+                    "ascending", "descending", "partition", "pivot",
+                ],
+            ),
+            search_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "search", "find", "binary", "linear", "lookup", "index", "bfs", "dfs",
+                    "breadth", "depth", "visited", "queue",
+                ],
+            ),
+            dp_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "dynamic",
+                    "programming",
+                    "memoize",
+                    "tabulate",
+                    "subproblem",
+                    "optimal",
+                    "recurrence",
+                    "knapsack",
+                    "fibonacci",
+                    "subsequence",
+                    "cache",
+                    "memo",
+                ],
+            ),
+            graph_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "graph", "node", "edge", "vertex", "adjacent", "dijkstra", "shortest",
+                    "path", "traverse", "neighbor", "connected", "weight",
+                ],
+            ),
+            accumulation_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "sum", "count", "total", "accumulate", "fold", "reduce", "aggregate", "max",
+                    "min", "average", "filter", "collect",
+                ],
+            ),
+            string_prototype: Self::encode_prototype(
+                dim,
+                &[
+                    "string", "char", "parse", "format", "split", "join", "replace", "trim",
+                    "uppercase", "lowercase", "substring", "regex",
+                ],
+            ),
+        }
+    }
+
+    /// Encode a set of keywords into a prototype HV using the same modular hash
+    /// approach as `CodeIntentClassifier`.
+    fn encode_prototype(dim: usize, keywords: &[&str]) -> ContinuousHV {
+        let mut values = vec![0.0f32; dim];
+
+        for keyword in keywords {
+            let keyword_lower = keyword.to_lowercase();
+            for (i, byte) in keyword_lower.bytes().enumerate() {
+                let idx = ((byte as usize)
+                    .wrapping_mul(31)
+                    .wrapping_add(i.wrapping_mul(7)))
+                    % dim;
+                values[idx] += 1.0;
+            }
+        }
+
+        // Normalize
+        let magnitude: f32 = values.iter().map(|v| v * v).sum::<f32>().sqrt();
+        if magnitude > 0.0 {
+            for v in &mut values {
+                *v /= magnitude;
+            }
+        }
+
+        ContinuousHV::from_values(values)
+    }
+
+    /// Encode text into an HV for comparison against prototypes
+    fn encode_text(&self, text: &str) -> ContinuousHV {
+        let mut values = vec![0.0f32; self.dim];
+        let text_lower = text.to_lowercase();
+
+        for (i, byte) in text_lower.bytes().enumerate() {
+            let idx = ((byte as usize)
+                .wrapping_mul(31)
+                .wrapping_add(i.wrapping_mul(7)))
+                % self.dim;
+            values[idx] += 1.0;
+        }
+
+        let magnitude: f32 = values.iter().map(|v| v * v).sum::<f32>().sqrt();
+        if magnitude > 0.0 {
+            for v in &mut values {
+                *v /= magnitude;
+            }
+        }
+
+        ContinuousHV::from_values(values)
+    }
+
+    /// Detect the best-matching algorithm pattern from an intent HV.
+    ///
+    /// Returns `None` if no pattern exceeds the minimum similarity threshold.
+    fn detect(&self, intent_hv: &ContinuousHV) -> Option<AlgorithmPattern> {
+        let scores = [
+            (AlgorithmPattern::Sorting, intent_hv.similarity(&self.sorting_prototype)),
+            (AlgorithmPattern::Search, intent_hv.similarity(&self.search_prototype)),
+            (AlgorithmPattern::DynamicProgramming, intent_hv.similarity(&self.dp_prototype)),
+            (AlgorithmPattern::Graph, intent_hv.similarity(&self.graph_prototype)),
+            (AlgorithmPattern::Accumulation, intent_hv.similarity(&self.accumulation_prototype)),
+            (AlgorithmPattern::StringProcessing, intent_hv.similarity(&self.string_prototype)),
+        ];
+
+        scores
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .filter(|(_, sim)| *sim >= Self::MIN_SIMILARITY)
+            .map(|(pattern, _)| pattern.clone())
+    }
+
+    /// Detect with scores for all patterns (useful for debugging/testing)
+    fn detect_with_scores(&self, intent_hv: &ContinuousHV) -> Vec<(AlgorithmPattern, f32)> {
+        let mut scores = vec![
+            (AlgorithmPattern::Sorting, intent_hv.similarity(&self.sorting_prototype)),
+            (AlgorithmPattern::Search, intent_hv.similarity(&self.search_prototype)),
+            (AlgorithmPattern::DynamicProgramming, intent_hv.similarity(&self.dp_prototype)),
+            (AlgorithmPattern::Graph, intent_hv.similarity(&self.graph_prototype)),
+            (AlgorithmPattern::Accumulation, intent_hv.similarity(&self.accumulation_prototype)),
+            (AlgorithmPattern::StringProcessing, intent_hv.similarity(&self.string_prototype)),
+        ];
+
+        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scores
+    }
+}
+
 /// A single step in a code generation plan
 #[derive(Debug, Clone)]
 pub struct CodePlanStep {
@@ -108,6 +495,8 @@ pub struct CfCCodeSequencer {
     w_h: Vec<f32>,
     /// Action prototypes: each PlanAction maps to a hidden-dim vector
     action_prototypes: Vec<(PlanAction, Vec<f32>)>,
+    /// Algorithm pattern detector for enriching plans
+    pattern_detector: AlgorithmPatternDetector,
 }
 
 impl CfCCodeSequencer {
@@ -146,12 +535,15 @@ impl CfCCodeSequencer {
         // Action prototypes in hidden space
         let action_prototypes = Self::init_action_prototypes(hidden_dim);
 
+        let pattern_detector = AlgorithmPatternDetector::new(hdc_dim);
+
         Self {
             config,
             projection,
             tau,
             w_h,
             action_prototypes,
+            pattern_detector,
         }
     }
 
@@ -254,7 +646,18 @@ impl CfCCodeSequencer {
         (best_action, best_sim.max(0.0))
     }
 
-    /// Plan code structure given an intent and context
+    /// Detect an algorithm pattern from the intent HV using HDC similarity
+    /// against prototype vectors for each known algorithm family.
+    pub fn detect_algorithm_pattern(intent_hv: &ContinuousHV) -> Option<AlgorithmPattern> {
+        let detector = AlgorithmPatternDetector::new(intent_hv.values.len().max(1));
+        detector.detect(intent_hv)
+    }
+
+    /// Plan code structure given an intent and context.
+    ///
+    /// If an algorithm pattern is detected from the intent HV, the plan is
+    /// enriched with algorithm-specific template steps that guide code
+    /// generation toward the recognized pattern.
     pub fn plan_structure(
         &self,
         intent_hv: &ContinuousHV,
@@ -271,9 +674,14 @@ impl CfCCodeSequencer {
             }
         }
 
-        // Evolve CfC and collect plan steps
+        // Detect algorithm pattern and prepend template steps
         let mut plan = Vec::new();
-        let mut prev_action = None;
+        if let Some(pattern) = self.pattern_detector.detect(intent_hv) {
+            plan.extend(pattern.to_plan_steps());
+        }
+
+        // Evolve CfC and collect plan steps
+        let mut prev_action = plan.last().map(|s| s.action.clone());
 
         for _step in 0..self.config.max_steps {
             state = self.cfc_step(&state);
@@ -396,5 +804,158 @@ mod tests {
 
         let c = vec![0.0, 1.0, 0.0];
         assert!(cosine_similarity(&a, &c).abs() < 1e-6);
+    }
+
+    // --- Algorithm Pattern Detection Tests ---
+
+    fn make_keyword_hv(dim: usize, keywords: &[&str]) -> ContinuousHV {
+        AlgorithmPatternDetector::encode_prototype(dim, keywords)
+    }
+
+    #[test]
+    fn test_sorting_pattern_detected() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let detector = AlgorithmPatternDetector::new(dim);
+        let intent = make_keyword_hv(dim, &["sort", "compare", "swap", "ascending", "order"]);
+        let pattern = detector.detect(&intent);
+        assert_eq!(pattern, Some(AlgorithmPattern::Sorting));
+
+        // Verify template steps contain sorting context
+        let steps = AlgorithmPattern::Sorting.to_plan_steps();
+        assert!(steps.len() >= 3);
+        assert!(steps[0].context.iter().any(|c| c.contains("sorting")));
+    }
+
+    #[test]
+    fn test_search_pattern_detected() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let detector = AlgorithmPatternDetector::new(dim);
+        let intent = make_keyword_hv(dim, &["search", "binary", "find", "index", "lookup"]);
+        let pattern = detector.detect(&intent);
+        assert_eq!(pattern, Some(AlgorithmPattern::Search));
+
+        let steps = AlgorithmPattern::Search.to_plan_steps();
+        assert!(steps.len() >= 3);
+        assert!(steps[0].context.iter().any(|c| c.contains("search")));
+    }
+
+    #[test]
+    fn test_dp_pattern_detected() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let detector = AlgorithmPatternDetector::new(dim);
+        let intent = make_keyword_hv(
+            dim,
+            &["dynamic", "programming", "memoize", "subproblem", "optimal"],
+        );
+        let pattern = detector.detect(&intent);
+        assert_eq!(pattern, Some(AlgorithmPattern::DynamicProgramming));
+
+        let steps = AlgorithmPattern::DynamicProgramming.to_plan_steps();
+        assert!(steps.len() >= 3);
+        assert!(steps[0].context.iter().any(|c| c.contains("dp")));
+        // Should include recurrence and table-filling steps
+        let all_context: Vec<&str> = steps
+            .iter()
+            .flat_map(|s| s.context.iter().map(|c| c.as_str()))
+            .collect();
+        assert!(all_context.iter().any(|c| c.contains("recurrence")));
+        assert!(all_context.iter().any(|c| c.contains("table")));
+    }
+
+    #[test]
+    fn test_accumulation_pattern_detected() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let detector = AlgorithmPatternDetector::new(dim);
+        let intent = make_keyword_hv(dim, &["sum", "count", "total", "accumulate", "fold"]);
+        let pattern = detector.detect(&intent);
+        assert_eq!(pattern, Some(AlgorithmPattern::Accumulation));
+
+        let steps = AlgorithmPattern::Accumulation.to_plan_steps();
+        assert!(steps.len() >= 3);
+        assert!(steps[0]
+            .context
+            .iter()
+            .any(|c| c.contains("accumulation")));
+    }
+
+    #[test]
+    fn test_generic_fallback() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let sequencer = CfCCodeSequencer::new(CfCCodeSequencerConfig {
+            hdc_dim: dim,
+            ..Default::default()
+        });
+
+        // A random HV with no algorithm-specific keywords should still produce a plan
+        let intent = ContinuousHV::random(dim, 9999);
+        let plan = sequencer.plan_structure(&intent, &[]);
+        assert!(!plan.is_empty(), "Generic fallback should produce a plan");
+
+        // All steps should have positive confidence
+        for step in &plan {
+            assert!(step.confidence > 0.0);
+        }
+    }
+
+    #[test]
+    fn test_graph_pattern_detected() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let detector = AlgorithmPatternDetector::new(dim);
+        let intent = make_keyword_hv(dim, &["graph", "node", "edge", "dijkstra", "shortest"]);
+        let pattern = detector.detect(&intent);
+        assert_eq!(pattern, Some(AlgorithmPattern::Graph));
+
+        let steps = AlgorithmPattern::Graph.to_plan_steps();
+        assert!(steps.len() >= 3);
+        assert!(steps[0].context.iter().any(|c| c.contains("graph")));
+    }
+
+    #[test]
+    fn test_string_processing_pattern_detected() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let detector = AlgorithmPatternDetector::new(dim);
+        let intent =
+            make_keyword_hv(dim, &["string", "char", "parse", "split", "uppercase"]);
+        let pattern = detector.detect(&intent);
+        assert_eq!(pattern, Some(AlgorithmPattern::StringProcessing));
+    }
+
+    #[test]
+    fn test_pattern_enriches_plan() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let sequencer = CfCCodeSequencer::new(CfCCodeSequencerConfig {
+            hdc_dim: dim,
+            ..Default::default()
+        });
+
+        // Create a sorting-flavored intent HV
+        let intent = make_keyword_hv(dim, &["sort", "compare", "swap", "order", "ascending"]);
+        let plan = sequencer.plan_structure(&intent, &[]);
+
+        // Plan should contain algorithm-specific context strings from the template
+        let has_sorting_context = plan
+            .iter()
+            .any(|step| step.context.iter().any(|c| c.contains("sorting")));
+        assert!(
+            has_sorting_context,
+            "Sorting pattern should inject algorithm-specific context into the plan"
+        );
+    }
+
+    #[test]
+    fn test_detect_with_scores() {
+        let dim = ALGORITHM_PATTERN_DIM;
+        let detector = AlgorithmPatternDetector::new(dim);
+        let intent = make_keyword_hv(dim, &["sort", "compare", "order"]);
+        let scores = detector.detect_with_scores(&intent);
+
+        // Should return all 6 patterns
+        assert_eq!(scores.len(), 6);
+        // Should be sorted descending by score
+        for i in 1..scores.len() {
+            assert!(scores[i - 1].1 >= scores[i].1);
+        }
+        // Top match should be Sorting
+        assert_eq!(scores[0].0, AlgorithmPattern::Sorting);
     }
 }

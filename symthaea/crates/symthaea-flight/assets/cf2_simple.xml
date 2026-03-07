@@ -5,6 +5,12 @@
 <mujoco model="cf2_simple">
   <option integrator="RK4" timestep="0.002" density="1.225" viscosity="1.8e-5"/>
 
+  <!-- Offscreen rendering buffer for MjRenderer video capture -->
+  <visual>
+    <global offwidth="1920" offheight="1080"/>
+    <quality shadowsize="4096"/>
+  </visual>
+
   <worldbody>
     <light pos="0 0 3" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
     <geom type="plane" size="5 5 0.01" rgba="0.3 0.3 0.3 1"/>
