@@ -391,7 +391,16 @@ impl CognitiveLoopService {
             (self.carryover.consciousness.body_phi_modulation - 1.0) * BODY_PSI_WEIGHT;
         let embodied_psi_contrib =
             (self.carryover.consciousness.embodied_phi_modulation - 1.0) * EMBODIED_PSI_WEIGHT;
-        let unified_psi = (coherence_psi
+
+        // Baseline: the CfC network IS integrating information from cycle 1.
+        // Temporal coherence (smoothed) serves as a proxy for ongoing integration
+        // activity — this is the raw coherence, not the doubly-weighted phi_contribution.
+        // Science: Tononi (2004) — Φ reflects the degree of information integration
+        // in a system. An active recurrent network has non-trivial Φ by design.
+        let baseline_integration = self.voice_coherence.bridge.smoothed_coherence() * 0.3;
+
+        let unified_psi = (baseline_integration
+            + coherence_psi
             + voice_psi
             + flow_psi
             + relational_psi_contrib
