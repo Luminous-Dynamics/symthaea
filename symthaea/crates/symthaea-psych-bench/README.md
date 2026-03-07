@@ -37,11 +37,25 @@ GWT, IIT, HOT, and FEP:
 was designed to exhibit. MetacognitiveIgnition tests emergent cross-module
 alignment that was NOT explicitly programmed — it is the strongest benchmark.
 
-### Current Results (seed=42)
+### Published Results
 
-- **Composite score**: 0.683 (MODERATE)
-- **Predictions met**: 7/7
-- **MetacognitiveIgnition highlights**: accuracy=0.842, d'=3.63, ROC AUC=0.998
+| Version | Config | Composite | Level | Predictions |
+|---------|--------|-----------|-------|-------------|
+| v0.8.0 (2026-03-01) | seed=42, dim=512, trials=10 | 0.683 | MODERATE | 7/7 |
+
+Baseline snapshots are in `baselines/`. To compare against published results:
+
+```bash
+cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --compare baselines/v0.8.0.json
+```
+
+To reproduce with a different seed:
+
+```bash
+cargo run -p symthaea-psych-bench --example qualia_confidence_report -- --seed 123
+```
+
+**MetacognitiveIgnition highlights** (seed=42): accuracy=0.842, d'=3.63, ROC AUC=0.998
 
 ## Dependencies
 
