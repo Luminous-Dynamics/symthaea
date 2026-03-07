@@ -13,12 +13,12 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 
 | Framework | Coverage | Status | Notes |
 |-----------|----------|--------|-------|
-| **ISO/IEC 42001:2023** (AI Management System) | 75% | In Progress | Management system + data governance + incident procedures; QMS docs pending |
-| **ISO/IEC 23894** (AI Risk Management) | 80% | Strong | Risk register + ADR process + incident runbook; risk treatment plan pending |
+| **ISO/IEC 42001:2023** (AI Management System) | 85% | Strong | SDLC (A.3.3) + risk treatment (A.4.3) + explainability (A.8.3) added; QMS docs pending |
+| **ISO/IEC 23894** (AI Risk Management) | 90% | Strong | Risk register + ADR process + incident runbook + risk treatment plan (top 5) |
 | **ISO/IEC 42005** (AI Impact Assessment) | 80% | Strong | FRIA complete; ongoing monitoring via SafetyAgent + CalibrationHistory |
 | **IEEE 7000-2021** (Value-Based Design) | 85% | Strong | Seven Harmonies mathematically traced; consent detection hardened (R-2.3 fix) |
-| **EU AI Act** (High-Risk) | 70% | In Progress | Classification + FRIA + technical dossier + conformity assessment prep; Art. 14 human oversight added |
-| **NIST AI RMF 1.0** | 70% | In Progress | Map/Measure strong; Manage improved with incident runbook; Govern partial |
+| **EU AI Act** (High-Risk) | 75% | In Progress | Classification + FRIA + technical dossier + conformity assessment + Art. 14 override audit trail |
+| **NIST AI RMF 1.0** | 75% | In Progress | Map/Measure strong; Manage improved with risk treatment plan; Govern partial |
 
 ---
 
@@ -32,10 +32,10 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 | **A.2.3** | Roles and responsibilities | Done | `GOVERNANCE_CHARTER.md` Section 2 (RACI matrix) |
 | **A.2.4** | Resources | Partial | Single developer; resource plan not formalized |
 | **A.3.2** | AI system impact assessment | Done | `EU_AI_ACT_CLASSIFICATION.md` Part III (FRIA) |
-| **A.3.3** | AI system lifecycle processes | Partial | CI pipeline documented; formal SDLC not yet written |
+| **A.3.3** | AI system lifecycle processes | Done | `SDLC.md` — change classification (A/B/C), verification phases, deployment checklist |
 | **A.3.4** | Documentation of AI systems | Done | `TECHNICAL_STATUS.md` — honest per-capability assessment; 16 capabilities, 4 status levels |
 | **A.4.2** | AI risk assessment | Done | `AI_RISK_REGISTER.md` — 15 risks, 6 categories, scored with mitigations |
-| **A.4.3** | AI risk treatment | Partial | Per-risk mitigations documented; formal treatment plan not yet written |
+| **A.4.3** | AI risk treatment | Done | `RISK_TREATMENT_PLAN.md` — top 5 risks with treatment strategies, residual risk, acceptance criteria |
 | **A.4.4** | Responsible AI considerations | Done | Ethics Engine (3-stage pipeline); Seven Harmonies; Appendix P (consciousness rights) |
 | **A.4.5** | AI system development processes | Partial | CI with 39 feature matrix, clippy, fmt; formal development procedures not documented |
 | **A.5.2** | Data management | Done | Holochain DHT (no central store); CfC temporal dynamics; identity vaults; `DATA_GOVERNANCE.md` (6 categories); GDPR 95% coverage |
@@ -46,24 +46,23 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 | **A.7.2** | Third-party AI considerations | Partial | Approved AI models list (embeddinggemma, gemma3, qwen3, mistral); no formal supplier assessment |
 | **A.7.3** | Outsourced activities | N/A | No outsourced AI processing |
 | **A.8.2** | Transparency | Done | Thresholds.rs with 119 named constants + scientific citations; TECHNICAL_STATUS.md honest assessment; substrate_validation.rs honest_confidence |
-| **A.8.3** | Explainability | Partial | Ethics pipeline outputs interpretable verdicts; consciousness metrics have named components; no formal explainability framework |
+| **A.8.3** | Explainability | Done | `EXPLAINABILITY_FRAMEWORK.md` — per-stage explanations, human/machine-readable formats, transparency of limitations |
 | **A.9.2** | Accountability | Partial | Git audit trail; governance gate logging; no formal accountability matrix beyond RACI |
 | **A.10.2** | AI system documentation | Done | 100+ documentation files; ARCHITECTURE_OVERVIEW.md; MODULE_WIRING_STATUS.md |
 
 ### Gap Summary
 
 **Strong areas** (>75% coverage):
-- Risk identification and assessment (A.4.2)
+- Risk identification, assessment, and treatment (A.4.2, A.4.3)
 - Monitoring and logging (A.6.2-A.6.4)
-- Transparency (A.8.2)
+- Transparency and explainability (A.8.2, A.8.3)
 - Documentation (A.10.2)
 - Value-based design (A.4.4)
+- Lifecycle processes (A.3.3)
 
 **Weak areas** (<50% coverage):
-- Formal lifecycle processes (A.3.3)
-- Risk treatment plans (A.4.3)
 - Third-party management (A.7.2)
-- Explainability framework (A.8.3)
+- Formal QMS documentation
 
 ---
 
@@ -236,17 +235,18 @@ Example constants and their compliance relevance:
 - ~~Human oversight logging~~ — `SafetyOverrideEntry` (EU AI Act Article 14)
 - ~~Consent violation detection (R-2.3)~~ — `judge_consent_action()` with explicit ConsentState
 - ~~ADR process~~ — ADR-001 written, template and README in place
+- ~~SDLC document~~ — `SDLC.md` (ISO 42001 A.3.3, change classification, verification phases)
+- ~~Risk treatment plan~~ — `RISK_TREATMENT_PLAN.md` (top 5 risks, treatment strategies, residual risk, acceptance criteria)
+- ~~Explainability framework~~ — `EXPLAINABILITY_FRAMEWORK.md` (ISO 42001 A.8.3, per-stage explanations, transparency of limitations)
+- ~~SafetyAuditReport override wiring~~ — `from_assessments_and_overrides()` includes Article 14 override log in audit exports
 
 ### Priority 1 (Complete by Q2 2026)
-1. Write formal AI system lifecycle (SDLC) document for ISO 42001 A.3.3
-2. Complete risk treatment plan for AI_RISK_REGISTER.md top-5 risks
-3. Formal QMS documentation for ISO 42001 quality management
+1. Formal QMS documentation for ISO 42001 quality management
 
 ### Priority 2 (Complete by Q3 2026)
-4. Formal third-party AI component assessment for ISO 42001 A.7.2
-5. Explainability framework documentation for ISO 42001 A.8.3
-6. External stakeholder feedback mechanism for NIST GOV-6
-7. User-facing transparency documentation for EU AI Act Article 13
+2. Formal third-party AI component assessment for ISO 42001 A.7.2
+3. External stakeholder feedback mechanism for NIST GOV-6
+4. User-facing transparency documentation for EU AI Act Article 13
 
 ### Priority 3 (Ongoing)
 8. Quarterly compliance matrix review and update
