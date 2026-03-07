@@ -15,6 +15,8 @@ members = [
     "zomes/tend/coordinator",
     "zomes/recognition/integrity",
     "zomes/recognition/coordinator",
+    "zomes/currency-mint/integrity",
+    "zomes/currency-mint/coordinator",
 ]
 exclude = ["tests"]
 

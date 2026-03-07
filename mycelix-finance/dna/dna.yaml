@@ -41,6 +41,8 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/tend_integrity.wasm
     - name: recognition_integrity
       path: ../target/wasm32-unknown-unknown/release/recognition_integrity.wasm
+    - name: currency_mint_integrity
+      path: ../target/wasm32-unknown-unknown/release/currency_mint_integrity.wasm
 
 coordinator:
   zomes:
@@ -71,3 +73,9 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/recognition.wasm
       dependencies:
         - name: recognition_integrity
+    - name: currency_mint
+      path: ../target/wasm32-unknown-unknown/release/currency_mint.wasm
+      dependencies:
+        - name: currency_mint_integrity
+        - name: tend_integrity
+        - name: finance_bridge_integrity

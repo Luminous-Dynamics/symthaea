@@ -69,6 +69,13 @@ pub fn register_governance_agent(agent: AgentPubKey) -> ExternResult<ActionHash>
     )
 }
 
+/// Verify the calling agent is a governance agent (used for cross-zome authorization).
+/// Returns Ok(()) if authorized, Err if not.
+#[hdk_extern]
+pub fn verify_governance_agent(_: ()) -> ExternResult<()> {
+    verify_governance_or_bootstrap()
+}
+
 // =============================================================================
 // CONSTANTS
 // =============================================================================
@@ -108,8 +115,8 @@ pub struct BalanceInfo {
     pub member_did: String,
     pub dao_did: String,
     pub balance: i32,
-    pub can_provide: bool,   // Can still provide (balance < +limit)
-    pub can_receive: bool,   // Can still receive (balance > -limit)
+    pub can_provide: bool, // Can still provide (balance < +limit)
+    pub can_receive: bool, // Can still receive (balance > -limit)
     pub total_provided: f32,
     pub total_received: f32,
     pub exchange_count: u32,
@@ -188,12 +195,18 @@ const ORACLE_STATE_ANCHOR: &str = "tend:oracle_state";
 pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
     verify_governance_or_bootstrap()?;
     if vitality > 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Vitality must be 0-100".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Vitality must be 0-100".into()
+        )));
     }
 
     let now = sys_time()?;
     let tier = OracleState::tier_from_vitality(vitality);
-    let state = OracleState { vitality, tier, updated_at: now };
+    let state = OracleState {
+        vitality,
+        tier,
+        updated_at: now,
+    };
 
     // Check for existing state to update
     let links = get_links(
@@ -202,15 +215,26 @@ pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
     )?;
 
     if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            update_entry(action_hash, &EntryTypes::OracleState(state.clone()))?;
+        if let Some(link_hash) = link.target.clone().into_action_hash() {
+            let record = get(link_hash, GetOptions::default())?.ok_or(wasm_error!(
+                WasmErrorInner::Guest("Oracle state record not found".into())
+            ))?;
+            update_entry(
+                record.action_address().clone(),
+                &EntryTypes::OracleState(state.clone()),
+            )?;
             return Ok(state);
         }
     }
 
     // Create new oracle state
     let hash = create_entry(&EntryTypes::OracleState(state.clone()))?;
-    create_link(anchor_hash(ORACLE_STATE_ANCHOR)?, hash, LinkTypes::AnchorLinks, ())?;
+    create_link(
+        anchor_hash(ORACLE_STATE_ANCHOR)?,
+        hash,
+        LinkTypes::AnchorLinks,
+        (),
+    )?;
 
     Ok(state)
 }
@@ -245,6 +269,375 @@ fn read_current_tier() -> ExternResult<TendLimitTier> {
     Ok(TendLimitTier::Normal)
 }
 
+/// Get the current oracle state (vitality + tier).
+/// Used by bridge coordinator for cross-cluster TEND limit queries.
+#[hdk_extern]
+pub fn get_oracle_state(_: ()) -> ExternResult<OracleStateResponse> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(ORACLE_STATE_ANCHOR)?, LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(state) = record.entry().to_app_option::<OracleState>().ok().flatten() {
+                    return Ok(OracleStateResponse {
+                        vitality: state.vitality,
+                        tier_name: format!("{:?}", state.tier),
+                        limit: state.tier.limit(),
+                    });
+                }
+            }
+        }
+    }
+    // Default: Normal state
+    Ok(OracleStateResponse {
+        vitality: 50,
+        tier_name: "Normal".to_string(),
+        limit: 40,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OracleStateResponse {
+    pub vitality: u32,
+    pub tier_name: String,
+    pub limit: i32,
+}
+
+// =============================================================================
+// HEARTH-SCOPED TEND (Phase 2)
+// =============================================================================
+
+/// Record a TEND exchange within a hearth (family unit).
+///
+/// Hearths use tighter credit limits (±20) and simpler governance.
+/// The same zero-sum mutual credit physics apply.
+#[hdk_extern]
+pub fn record_hearth_exchange(input: RecordHearthExchangeInput) -> ExternResult<ExchangeRecord> {
+    if !input.hours.is_finite() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Hours must be a finite number".into()
+        )));
+    }
+    if input.hours <= 0.0 || input.hours > 8.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Hours must be between 0 and 8".into()
+        )));
+    }
+    if input.hours < 0.25 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Minimum service time is 15 minutes".into()
+        )));
+    }
+    if input.hearth_did.is_empty() || !input.hearth_did.starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Hearth DID must be a valid DID".into()
+        )));
+    }
+
+    let caller = agent_info()?.agent_initial_pubkey;
+    let provider_did = format!("did:mycelix:{}", caller);
+    let now = sys_time()?;
+
+    if provider_did == input.receiver_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot exchange time with yourself".into()
+        )));
+    }
+
+    // Verify both parties are members of this hearth via cross-zome call
+    verify_hearth_membership(&provider_did, &input.hearth_did)?;
+    verify_hearth_membership(&input.receiver_did, &input.hearth_did)?;
+
+    // Check hearth balance limits (±HEARTH_TEND_CREDIT_LIMIT = ±20)
+    let provider_bal =
+        get_or_create_hearth_balance(provider_did.clone(), input.hearth_did.clone())?;
+    let new_provider = provider_bal.balance + (input.hours.round() as i32);
+    if new_provider > HEARTH_TEND_CREDIT_LIMIT {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Would exceed hearth credit limit of +{}. Current: {}",
+            HEARTH_TEND_CREDIT_LIMIT, provider_bal.balance
+        ))));
+    }
+
+    let receiver_bal =
+        get_or_create_hearth_balance(input.receiver_did.clone(), input.hearth_did.clone())?;
+    let new_receiver = receiver_bal.balance - (input.hours.round() as i32);
+    if new_receiver < -HEARTH_TEND_CREDIT_LIMIT {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Receiver would exceed hearth debt limit of -{}. Current: {}",
+            HEARTH_TEND_CREDIT_LIMIT, receiver_bal.balance
+        ))));
+    }
+
+    // Create the exchange (uses DAO-scoped TendExchange with hearth_did as dao_did)
+    let exchange_id = format!(
+        "hearth-tend:{}:{}:{}",
+        provider_did,
+        input.receiver_did,
+        now.as_micros()
+    );
+    let exchange = TendExchange {
+        id: exchange_id.clone(),
+        provider_did: provider_did.clone(),
+        receiver_did: input.receiver_did.clone(),
+        hours: input.hours,
+        service_description: input.service_description.clone(),
+        service_category: input.service_category.clone(),
+        cultural_alias: input.cultural_alias,
+        dao_did: input.hearth_did.clone(), // hearth acts as micro-DAO
+        timestamp: now,
+        status: ExchangeStatus::Confirmed, // Hearths use instant confirmation (high trust)
+        service_date: None,
+    };
+
+    let hash = create_entry(&EntryTypes::TendExchange(exchange))?;
+    create_link(
+        anchor_hash(&format!("exchange:{}", exchange_id))?,
+        hash,
+        LinkTypes::ExchangeIdToExchange,
+        (),
+    )?;
+
+    // Update hearth balances
+    update_hearth_balance(&provider_did, &input.hearth_did, input.hours, true)?;
+    update_hearth_balance(&input.receiver_did, &input.hearth_did, input.hours, false)?;
+
+    Ok(ExchangeRecord {
+        id: exchange_id,
+        provider_did,
+        receiver_did: input.receiver_did,
+        hours: input.hours,
+        service_description: input.service_description,
+        service_category: input.service_category,
+        status: ExchangeStatus::Confirmed,
+        timestamp: now,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordHearthExchangeInput {
+    pub receiver_did: String,
+    pub hearth_did: String,
+    pub hours: f32,
+    pub service_description: String,
+    pub service_category: ServiceCategory,
+    pub cultural_alias: Option<String>,
+}
+
+/// Get a member's hearth TEND balance
+#[hdk_extern]
+pub fn get_hearth_balance(input: GetHearthBalanceInput) -> ExternResult<HearthTendBalance> {
+    get_or_create_hearth_balance(input.member_did, input.hearth_did)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetHearthBalanceInput {
+    pub member_did: String,
+    pub hearth_did: String,
+}
+
+fn get_or_create_hearth_balance(
+    member_did: String,
+    hearth_did: String,
+) -> ExternResult<HearthTendBalance> {
+    let anchor_key = format!("hearth-balance:{}:{}", hearth_did, member_did);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::HearthToBalances)?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(bal) = record
+                    .entry()
+                    .to_app_option::<HearthTendBalance>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(bal);
+                }
+            }
+        }
+    }
+    // Create new zero balance
+    let now = sys_time()?;
+    let bal = HearthTendBalance {
+        member_did: member_did.clone(),
+        hearth_did: hearth_did.clone(),
+        balance: 0,
+        total_provided: 0.0,
+        total_received: 0.0,
+        exchange_count: 0,
+        last_activity: now,
+    };
+    let hash = create_entry(&EntryTypes::HearthTendBalance(bal.clone()))?;
+    create_link(
+        anchor_hash(&anchor_key)?,
+        hash.clone(),
+        LinkTypes::HearthToBalances,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&format!("my-hearths:{}", member_did))?,
+        hash,
+        LinkTypes::MemberToHearthBalance,
+        (),
+    )?;
+    Ok(bal)
+}
+
+/// Verify that a member belongs to a hearth via cross-zome call to hearth zome.
+/// Falls through (allows) if hearth zome is unreachable (bootstrap/standalone mode).
+fn verify_hearth_membership(member_did: &str, hearth_did: &str) -> ExternResult<()> {
+    #[derive(Serialize, Debug)]
+    struct MembershipQuery {
+        member_did: String,
+        hearth_did: String,
+    }
+
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("hearth_bridge"),
+        FunctionName::from("is_hearth_member"),
+        None,
+        MembershipQuery {
+            member_did: member_did.to_string(),
+            hearth_did: hearth_did.to_string(),
+        },
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            match result.decode::<bool>() {
+                Ok(true) => Ok(()),
+                Ok(false) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "{} is not a member of hearth {}",
+                    member_did, hearth_did
+                )))),
+                Err(_) => Ok(()), // Decode error → fall through
+            }
+        }
+        // Hearth zome unreachable → allow (bootstrap/standalone mode)
+        _ => Ok(()),
+    }
+}
+
+fn update_hearth_balance(
+    member_did: &str,
+    hearth_did: &str,
+    hours: f32,
+    is_provider: bool,
+) -> ExternResult<()> {
+    let anchor_key = format!("hearth-balance:{}:{}", hearth_did, member_did);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::HearthToBalances)?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        if let Some(link_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(link_hash, GetOptions::default())? {
+                if let Some(mut bal) = record
+                    .entry()
+                    .to_app_option::<HearthTendBalance>()
+                    .ok()
+                    .flatten()
+                {
+                    let now = sys_time()?;
+                    if is_provider {
+                        bal.balance += hours.round() as i32;
+                        bal.total_provided += hours;
+                    } else {
+                        bal.balance -= hours.round() as i32;
+                        bal.total_received += hours;
+                    }
+                    bal.exchange_count += 1;
+                    bal.last_activity = now;
+                    update_entry(record.action_address().clone(), &bal)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// =============================================================================
+// CULTURAL ALIASES (Phase 3)
+// =============================================================================
+
+/// Register a cultural alias for a community's currency.
+///
+/// A farming co-op might register "Water Credits" as their TEND alias.
+/// A care collective might use "Cuidado". The name is display-only —
+/// the mutual credit physics are identical.
+#[hdk_extern]
+pub fn register_currency_alias(
+    input: RegisterCurrencyAliasInput,
+) -> ExternResult<CurrencyAliasEntry> {
+    if input.alias_name.is_empty() || input.alias_name.len() > 64 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Alias name must be 1-64 characters".into()
+        )));
+    }
+    if !input.dao_did.starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO must be a valid DID".into()
+        )));
+    }
+
+    let now = sys_time()?;
+    let alias = CurrencyAliasEntry {
+        dao_did: input.dao_did.clone(),
+        alias_name: input.alias_name,
+        base_currency: input.base_currency,
+        display_symbol: input.display_symbol,
+        description: input.description,
+        created_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::CurrencyAliasEntry(alias.clone()))?;
+    create_link(
+        anchor_hash(&format!("alias:{}", input.dao_did))?,
+        hash,
+        LinkTypes::DaoToAlias,
+        (),
+    )?;
+
+    Ok(alias)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterCurrencyAliasInput {
+    pub dao_did: String,
+    pub alias_name: String,
+    pub base_currency: Currency,
+    pub display_symbol: Option<String>,
+    pub description: Option<String>,
+}
+
+/// Get the cultural alias registered for a community's currency.
+#[hdk_extern]
+pub fn get_currency_alias(dao_did: String) -> ExternResult<Option<CurrencyAliasEntry>> {
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("alias:{}", dao_did))?,
+            LinkTypes::DaoToAlias,
+        )?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.last() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                return Ok(record
+                    .entry()
+                    .to_app_option::<CurrencyAliasEntry>()
+                    .ok()
+                    .flatten());
+            }
+        }
+    }
+    Ok(None)
+}
+
 // =============================================================================
 // CORE EXCHANGE FUNCTIONS
 // =============================================================================
@@ -264,10 +657,19 @@ fn read_current_tier() -> ExternResult<TendLimitTier> {
 #[hdk_extern]
 pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecord> {
     if input.receiver_did.is_empty() || input.receiver_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Receiver DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Receiver DID must be 1-256 characters".into()
+        )));
+    }
+    if !input.hours.is_finite() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Hours must be a finite number".into()
+        )));
     }
     if input.hours <= 0.0 || input.hours > 8.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Hours must be between 0 and 8 (MAX_SERVICE_HOURS)".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Hours must be between 0 and 8 (MAX_SERVICE_HOURS)".into()
+        )));
     }
     if input.hours < 0.25 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -275,10 +677,14 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
         )));
     }
     if input.service_description.is_empty() || input.service_description.len() > 1024 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Service description must be 1-1024 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Service description must be 1-1024 characters".into()
+        )));
     }
     if input.dao_did.is_empty() || input.dao_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO DID must be 1-256 characters".into()
+        )));
     }
     let caller = agent_info()?.agent_initial_pubkey;
     let provider_did = format!("did:mycelix:{}", caller);
@@ -308,7 +714,8 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
     }
 
     // Check receiver's balance (can still receive if above -limit)
-    let receiver_balance = get_or_create_balance(input.receiver_did.clone(), input.dao_did.clone())?;
+    let receiver_balance =
+        get_or_create_balance(input.receiver_did.clone(), input.dao_did.clone())?;
     let new_receiver_balance = receiver_balance.balance - (input.hours.round() as i32);
     if new_receiver_balance < -receiver_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -318,7 +725,12 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
     }
 
     // Create the exchange
-    let exchange_id = format!("tend:{}:{}:{}", provider_did, input.receiver_did, now.as_micros());
+    let exchange_id = format!(
+        "tend:{}:{}:{}",
+        provider_did,
+        input.receiver_did,
+        now.as_micros()
+    );
     let exchange = TendExchange {
         id: exchange_id.clone(),
         provider_did: provider_did.clone(),
@@ -344,7 +756,10 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
     )?;
 
     create_link(
-        anchor_hash(&format!("receiver:{}:{}", input.dao_did, input.receiver_did))?,
+        anchor_hash(&format!(
+            "receiver:{}:{}",
+            input.dao_did, input.receiver_did
+        ))?,
         exchange_hash.clone(),
         LinkTypes::ReceiverToExchanges,
         (),
@@ -384,14 +799,17 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
 #[hdk_extern]
 pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
     if exchange_id.is_empty() || exchange_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Exchange ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Exchange ID must be 1-256 characters".into()
+        )));
     }
     let caller = agent_info()?.agent_initial_pubkey;
     let caller_did = format!("did:mycelix:{}", caller);
 
     // Find the exchange
-    let exchange = find_exchange_by_id(&exchange_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".into())))?;
+    let exchange = find_exchange_by_id(&exchange_id)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Exchange not found".into()
+    )))?;
 
     // Verify caller is the receiver
     if exchange.receiver_did != caller_did {
@@ -411,7 +829,8 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
     let provider_limit = get_effective_limit_for_member(&exchange.provider_did)?;
     let receiver_limit = get_effective_limit_for_member(&exchange.receiver_did)?;
 
-    let provider_balance = get_or_create_balance(exchange.provider_did.clone(), exchange.dao_did.clone())?;
+    let provider_balance =
+        get_or_create_balance(exchange.provider_did.clone(), exchange.dao_did.clone())?;
     let new_provider_balance = provider_balance.balance + (exchange.hours.round() as i32);
     if new_provider_balance > provider_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -420,7 +839,8 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
         ))));
     }
 
-    let receiver_balance = get_or_create_balance(exchange.receiver_did.clone(), exchange.dao_did.clone())?;
+    let receiver_balance =
+        get_or_create_balance(exchange.receiver_did.clone(), exchange.dao_did.clone())?;
     let new_receiver_balance = receiver_balance.balance - (exchange.hours.round() as i32);
     if new_receiver_balance < -receiver_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -469,13 +889,16 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
 #[hdk_extern]
 pub fn dispute_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
     if exchange_id.is_empty() || exchange_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Exchange ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Exchange ID must be 1-256 characters".into()
+        )));
     }
     let caller = agent_info()?.agent_initial_pubkey;
     let caller_did = format!("did:mycelix:{}", caller);
 
-    let exchange = find_exchange_by_id(&exchange_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".into())))?;
+    let exchange = find_exchange_by_id(&exchange_id)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Exchange not found".into()
+    )))?;
 
     // Either party can dispute
     if exchange.provider_did != caller_did && exchange.receiver_did != caller_did {
@@ -507,13 +930,16 @@ pub fn dispute_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
 #[hdk_extern]
 pub fn cancel_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
     if exchange_id.is_empty() || exchange_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Exchange ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Exchange ID must be 1-256 characters".into()
+        )));
     }
     let caller = agent_info()?.agent_initial_pubkey;
     let caller_did = format!("did:mycelix:{}", caller);
 
-    let exchange = find_exchange_by_id(&exchange_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".into())))?;
+    let exchange = find_exchange_by_id(&exchange_id)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Exchange not found".into()
+    )))?;
 
     // Only provider can cancel a proposed exchange
     if exchange.provider_did != caller_did {
@@ -584,8 +1010,9 @@ pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
     let caller_did = format!("did:mycelix:{}", caller);
 
     // Find the exchange
-    let exchange = find_exchange_by_id(&input.exchange_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".into())))?;
+    let exchange = find_exchange_by_id(&input.exchange_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Exchange not found".into())
+    ))?;
 
     // Exchange must be Confirmed
     if exchange.status != ExchangeStatus::Confirmed {
@@ -646,10 +1073,9 @@ pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
     )?;
 
     // Return the Record
-    let record = get(rating_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to retrieve created rating record".into()
-        )))?;
+    let record = get(rating_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to retrieve created rating record".into())
+    ))?;
 
     Ok(record)
 }
@@ -681,8 +1107,9 @@ pub fn open_dispute(input: OpenDisputeInput) -> ExternResult<Record> {
     let caller_did = format!("did:mycelix:{}", caller);
 
     // Find the exchange
-    let exchange = find_exchange_by_id(&input.exchange_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".into())))?;
+    let exchange = find_exchange_by_id(&input.exchange_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Exchange not found".into())
+    ))?;
 
     // Caller must be a participant
     if exchange.provider_did != caller_did && exchange.receiver_did != caller_did {
@@ -772,10 +1199,9 @@ pub fn open_dispute(input: OpenDisputeInput) -> ExternResult<Record> {
     update_exchange_entry(&input.exchange_id, &updated_exchange)?;
 
     // Return the Record
-    let record = get(dispute_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to retrieve created dispute record".into()
-        )))?;
+    let record = get(dispute_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to retrieve created dispute record".into())
+    ))?;
 
     Ok(record)
 }
@@ -818,8 +1244,9 @@ pub fn escalate_dispute(input: EscalateDisputeInput) -> ExternResult<Record> {
     let caller_did = format!("did:mycelix:{}", caller);
 
     // Find the dispute
-    let (dispute_case, action_hash) = find_dispute_by_id(dispute_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))?;
+    let (dispute_case, action_hash) = find_dispute_by_id(dispute_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Dispute not found".into())
+    ))?;
 
     // Verify caller is a participant
     if dispute_case.complainant_did != caller_did && dispute_case.respondent_did != caller_did {
@@ -841,16 +1268,18 @@ pub fn escalate_dispute(input: EscalateDisputeInput) -> ExternResult<Record> {
 
     // If escalating to MediationPanel, validate and assign mediators
     let mediator_dids = if next_stage == DisputeStage::MediationPanel {
-        let candidates = input.candidate_mediators.ok_or(wasm_error!(
-            WasmErrorInner::Guest(
+        let candidates = input
+            .candidate_mediators
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
                 "candidate_mediators required when escalating to MediationPanel".into()
-            )
-        ))?;
+            )))?;
 
         let mut valid_mediators = Vec::new();
         for candidate in &candidates {
             // Exclude dispute parties
-            if *candidate == dispute_case.complainant_did || *candidate == dispute_case.respondent_did {
+            if *candidate == dispute_case.complainant_did
+                || *candidate == dispute_case.respondent_did
+            {
                 continue;
             }
             // Validate MYCEL score via cross-zome call
@@ -865,7 +1294,9 @@ pub fn escalate_dispute(input: EscalateDisputeInput) -> ExternResult<Record> {
         if valid_mediators.len() < MEDIATOR_PANEL_SIZE {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Need {} eligible mediators (MYCEL > {}), only found {}",
-                MEDIATOR_PANEL_SIZE, MEDIATOR_MIN_MYCEL, valid_mediators.len()
+                MEDIATOR_PANEL_SIZE,
+                MEDIATOR_MIN_MYCEL,
+                valid_mediators.len()
             ))));
         }
 
@@ -894,15 +1325,20 @@ pub fn escalate_dispute(input: EscalateDisputeInput) -> ExternResult<Record> {
         GetStrategy::default(),
     )?;
 
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dispute link not found".into())))?;
-    let hash = link.target.clone().into_action_hash()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid dispute link target".into())))?;
-
-    let record = get(hash, GetOptions::default())?
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Dispute link not found".into()
+    )))?;
+    let hash = link
+        .target
+        .clone()
+        .into_action_hash()
         .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to retrieve updated dispute record".into()
+            "Invalid dispute link target".into()
         )))?;
+
+    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to retrieve updated dispute record".into()
+    )))?;
 
     Ok(record)
 }
@@ -930,8 +1366,9 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
     let caller_did = format!("did:mycelix:{}", caller);
 
     // Find the dispute
-    let (dispute_case, action_hash) = find_dispute_by_id(&input.dispute_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))?;
+    let (dispute_case, action_hash) = find_dispute_by_id(&input.dispute_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Dispute not found".into())
+    ))?;
 
     // Verify caller is a participant
     if dispute_case.complainant_did != caller_did && dispute_case.respondent_did != caller_did {
@@ -977,15 +1414,20 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
         GetStrategy::default(),
     )?;
 
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Dispute link not found".into())))?;
-    let hash = link.target.clone().into_action_hash()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid dispute link target".into())))?;
-
-    let record = get(hash, GetOptions::default())?
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Dispute link not found".into()
+    )))?;
+    let hash = link
+        .target
+        .clone()
+        .into_action_hash()
         .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to retrieve resolved dispute record".into()
+            "Invalid dispute link target".into()
         )))?;
+
+    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Failed to retrieve resolved dispute record".into()
+    )))?;
 
     Ok(record)
 }
@@ -1031,10 +1473,14 @@ fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<Ba
 #[hdk_extern]
 pub fn get_balance(input: GetBalanceInput) -> ExternResult<BalanceInfo> {
     if input.member_did.is_empty() || input.member_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Member DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member DID must be 1-256 characters".into()
+        )));
     }
     if input.dao_did.is_empty() || input.dao_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO DID must be 1-256 characters".into()
+        )));
     }
     get_or_create_balance(input.member_did, input.dao_did)
 }
@@ -1043,7 +1489,9 @@ pub fn get_balance(input: GetBalanceInput) -> ExternResult<BalanceInfo> {
 #[hdk_extern]
 pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
     if dao_did.is_empty() || dao_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO DID must be 1-256 characters".into()
+        )));
     }
     let caller = agent_info()?.agent_initial_pubkey;
     let member_did = format!("did:mycelix:{}", caller);
@@ -1060,8 +1508,18 @@ pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
     )?;
 
     for link in provider_links {
-        if let Some(record) = get(link.target.into_action_hash().ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?, GetOptions::default())? {
-            if let Some(exchange) = record.entry().to_app_option::<TendExchange>().ok().flatten() {
+        if let Some(record) = get(
+            link.target.into_action_hash().ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+            })?,
+            GetOptions::default(),
+        )? {
+            if let Some(exchange) = record
+                .entry()
+                .to_app_option::<TendExchange>()
+                .ok()
+                .flatten()
+            {
                 exchanges.push(exchange_to_record(&exchange));
             }
         }
@@ -1077,8 +1535,18 @@ pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
     )?;
 
     for link in receiver_links {
-        if let Some(record) = get(link.target.into_action_hash().ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?, GetOptions::default())? {
-            if let Some(exchange) = record.entry().to_app_option::<TendExchange>().ok().flatten() {
+        if let Some(record) = get(
+            link.target.into_action_hash().ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+            })?,
+            GetOptions::default(),
+        )? {
+            if let Some(exchange) = record
+                .entry()
+                .to_app_option::<TendExchange>()
+                .ok()
+                .flatten()
+            {
                 // Avoid duplicates (shouldn't happen, but safety)
                 if !exchanges.iter().any(|e| e.id == exchange.id) {
                     exchanges.push(exchange_to_record(&exchange));
@@ -1101,22 +1569,32 @@ pub fn get_my_exchanges(dao_did: String) -> ExternResult<Vec<ExchangeRecord>> {
 #[hdk_extern]
 pub fn create_listing(input: CreateListingInput) -> ExternResult<ServiceListing> {
     if input.title.is_empty() || input.title.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Title must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Title must be 1-256 characters".into()
+        )));
     }
     if input.description.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Description must be under 4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Description must be under 4096 characters".into()
+        )));
     }
     if input.dao_did.is_empty() || input.dao_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO DID must be 1-256 characters".into()
+        )));
     }
     if let Some(hours) = input.estimated_hours {
         if hours <= 0.0 || hours > 168.0 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Estimated hours must be between 0 and 168".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Estimated hours must be between 0 and 168".into()
+            )));
         }
     }
     if let Some(ref avail) = input.availability {
         if avail.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Availability must be under 256 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Availability must be under 256 characters".into()
+            )));
         }
     }
     let caller = agent_info()?.agent_initial_pubkey;
@@ -1177,7 +1655,9 @@ pub struct PaginatedDaoInput {
 #[hdk_extern]
 pub fn get_dao_listings(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceListing>> {
     if input.dao_did.is_empty() || input.dao_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO DID must be 1-256 characters".into()
+        )));
     }
     let limit = input.limit.unwrap_or(100);
     let links = get_links(
@@ -1190,8 +1670,18 @@ pub fn get_dao_listings(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceLis
 
     let mut listings = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target.into_action_hash().ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?, GetOptions::default())? {
-            if let Some(listing) = record.entry().to_app_option::<ServiceListing>().ok().flatten() {
+        if let Some(record) = get(
+            link.target.into_action_hash().ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+            })?,
+            GetOptions::default(),
+        )? {
+            if let Some(listing) = record
+                .entry()
+                .to_app_option::<ServiceListing>()
+                .ok()
+                .flatten()
+            {
                 if listing.active {
                     listings.push(listing);
                     if listings.len() >= limit {
@@ -1209,17 +1699,25 @@ pub fn get_dao_listings(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceLis
 #[hdk_extern]
 pub fn create_request(input: CreateRequestInput) -> ExternResult<ServiceRequest> {
     if input.title.is_empty() || input.title.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Title must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Title must be 1-256 characters".into()
+        )));
     }
     if input.description.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Description must be under 4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Description must be under 4096 characters".into()
+        )));
     }
     if input.dao_did.is_empty() || input.dao_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO DID must be 1-256 characters".into()
+        )));
     }
     if let Some(hours) = input.estimated_hours {
         if hours <= 0.0 || hours > 168.0 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Estimated hours must be between 0 and 168".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Estimated hours must be between 0 and 168".into()
+            )));
         }
     }
     let caller = agent_info()?.agent_initial_pubkey;
@@ -1257,7 +1755,9 @@ pub fn create_request(input: CreateRequestInput) -> ExternResult<ServiceRequest>
 #[hdk_extern]
 pub fn get_dao_requests(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceRequest>> {
     if input.dao_did.is_empty() || input.dao_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO DID must be 1-256 characters".into()
+        )));
     }
     let limit = input.limit.unwrap_or(100);
     let links = get_links(
@@ -1270,8 +1770,18 @@ pub fn get_dao_requests(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceReq
 
     let mut requests = Vec::new();
     for link in links {
-        if let Some(record) = get(link.target.into_action_hash().ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?, GetOptions::default())? {
-            if let Some(request) = record.entry().to_app_option::<ServiceRequest>().ok().flatten() {
+        if let Some(record) = get(
+            link.target.into_action_hash().ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+            })?,
+            GetOptions::default(),
+        )? {
+            if let Some(request) = record
+                .entry()
+                .to_app_option::<ServiceRequest>()
+                .ok()
+                .flatten()
+            {
                 if request.open {
                     requests.push(request);
                     if requests.len() >= limit {
@@ -1330,7 +1840,12 @@ pub fn get_validation_score(input: GetValidationScoreInput) -> ExternResult<f64>
     for link in links.into_iter().take(limit) {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(rating) = record.entry().to_app_option::<QualityRating>().ok().flatten() {
+                if let Some(rating) = record
+                    .entry()
+                    .to_app_option::<QualityRating>()
+                    .ok()
+                    .flatten()
+                {
                     total += rating.rating as f64;
                     count += 1;
                 }
@@ -1363,8 +1878,11 @@ fn find_balance(member_did: &str, dao_did: &str) -> ExternResult<Option<TendBala
     )?;
 
     if let Some(link) = links.first() {
-        let action_hash = link.target.clone().into_action_hash()
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target: expected ActionHash".into())))?;
+        let action_hash = link.target.clone().into_action_hash().ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid link target: expected ActionHash".into()
+            ))
+        })?;
         if let Some(record) = get(action_hash, GetOptions::default())? {
             return Ok(record.entry().to_app_option::<TendBalance>().ok().flatten());
         }
@@ -1388,9 +1906,13 @@ fn update_balance_after_exchange(
     )?;
 
     if let Some(link) = links.first() {
-        let action_hash = link.target.clone().into_action_hash().ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
-        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-            if let Some(mut balance) = record.entry().to_app_option::<TendBalance>().ok().flatten() {
+        let link_hash =
+            link.target.clone().into_action_hash().ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string()))
+            })?;
+        if let Some(record) = get(link_hash, GetOptions::default())? {
+            if let Some(mut balance) = record.entry().to_app_option::<TendBalance>().ok().flatten()
+            {
                 let now = sys_time()?;
 
                 if is_provider {
@@ -1403,7 +1925,7 @@ fn update_balance_after_exchange(
                 balance.exchange_count += 1;
                 balance.last_activity = now;
 
-                update_entry(action_hash, &balance)?;
+                update_entry(record.action_address().clone(), &balance)?;
             }
         }
     }
@@ -1424,7 +1946,11 @@ fn find_exchange_by_id(exchange_id: &str) -> ExternResult<Option<TendExchange>> 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                return Ok(record.entry().to_app_option::<TendExchange>().ok().flatten());
+                return Ok(record
+                    .entry()
+                    .to_app_option::<TendExchange>()
+                    .ok()
+                    .flatten());
             }
         }
     }
@@ -1443,8 +1969,11 @@ fn update_exchange_entry(exchange_id: &str, exchange: &TendExchange) -> ExternRe
     )?;
 
     if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            update_entry(action_hash, exchange)?;
+        if let Some(link_hash) = link.target.clone().into_action_hash() {
+            let record = get(link_hash, GetOptions::default())?.ok_or(wasm_error!(
+                WasmErrorInner::Guest("Exchange record not found".into())
+            ))?;
+            update_entry(record.action_address().clone(), exchange)?;
             return Ok(());
         }
     }
@@ -1459,7 +1988,9 @@ fn update_exchange_entry(exchange_id: &str, exchange: &TendExchange) -> ExternRe
 /// via cross-zome call to the recognition zome.
 fn check_mediator_eligible(mediator_did: &str) -> ExternResult<bool> {
     #[derive(Debug, serde::Deserialize)]
-    struct MycelState { mycel_score: f64 }
+    struct MycelState {
+        mycel_score: f64,
+    }
 
     match call(
         CallTargetCell::Local,
@@ -1468,12 +1999,10 @@ fn check_mediator_eligible(mediator_did: &str) -> ExternResult<bool> {
         None,
         mediator_did.to_string(),
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            match result.decode::<MycelState>() {
-                Ok(state) => Ok(state.mycel_score > MEDIATOR_MIN_MYCEL),
-                Err(_) => Ok(false),
-            }
-        }
+        Ok(ZomeCallResponse::Ok(result)) => match result.decode::<MycelState>() {
+            Ok(state) => Ok(state.mycel_score > MEDIATOR_MIN_MYCEL),
+            Err(_) => Ok(false),
+        },
         _ => Ok(false), // Recognition zome unreachable → ineligible
     }
 }
@@ -1489,10 +2018,12 @@ fn find_dispute_by_id(dispute_id: &str) -> ExternResult<Option<(DisputeCase, Act
     )?;
 
     if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(dispute_case) = record.entry().to_app_option::<DisputeCase>().ok().flatten() {
-                    return Ok(Some((dispute_case, action_hash)));
+        if let Some(link_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(link_hash, GetOptions::default())? {
+                if let Some(dispute_case) =
+                    record.entry().to_app_option::<DisputeCase>().ok().flatten()
+                {
+                    return Ok(Some((dispute_case, record.action_address().clone())));
                 }
             }
         }
@@ -1572,7 +2103,9 @@ pub struct RecordCrossDAOExchangeInput {
 ///
 /// Restricted to authorized governance agents (or any agent during bootstrap).
 #[hdk_extern]
-pub fn record_cross_dao_exchange(input: RecordCrossDAOExchangeInput) -> ExternResult<BilateralBalance> {
+pub fn record_cross_dao_exchange(
+    input: RecordCrossDAOExchangeInput,
+) -> ExternResult<BilateralBalance> {
     verify_governance_or_bootstrap()?;
     if input.provider_dao_did == input.receiver_dao_did {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1603,13 +2136,18 @@ pub fn record_cross_dao_exchange(input: RecordCrossDAOExchangeInput) -> ExternRe
     )?;
 
     if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(mut bal) = record.entry().to_app_option::<BilateralBalance>().ok().flatten() {
+        if let Some(link_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(link_hash, GetOptions::default())? {
+                if let Some(mut bal) = record
+                    .entry()
+                    .to_app_option::<BilateralBalance>()
+                    .ok()
+                    .flatten()
+                {
                     bal.net_balance += delta;
                     bal.total_exchanges += 1;
                     bal.last_updated_at = now;
-                    update_entry(action_hash, &bal)?;
+                    update_entry(record.action_address().clone(), &bal)?;
                     return Ok(bal);
                 }
             }
@@ -1627,7 +2165,12 @@ pub fn record_cross_dao_exchange(input: RecordCrossDAOExchangeInput) -> ExternRe
     };
 
     let hash = create_entry(&EntryTypes::BilateralBalance(bal.clone()))?;
-    create_link(anchor_hash(&anchor_key)?, hash, LinkTypes::DaoToBilateralBalance, ())?;
+    create_link(
+        anchor_hash(&anchor_key)?,
+        hash,
+        LinkTypes::DaoToBilateralBalance,
+        (),
+    )?;
 
     Ok(bal)
 }
@@ -1650,7 +2193,11 @@ pub fn get_bilateral_balance(input: GetBilateralInput) -> ExternResult<Option<Bi
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                return Ok(record.entry().to_app_option::<BilateralBalance>().ok().flatten());
+                return Ok(record
+                    .entry()
+                    .to_app_option::<BilateralBalance>()
+                    .ok()
+                    .flatten());
             }
         }
     }
@@ -1716,26 +2263,27 @@ pub fn settle_bilateral_balance(input: SettleBilateralInput) -> ExternResult<Rec
         GetStrategy::default(),
     )?;
 
-    let (balance_action_hash, bal) = {
-        let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
-            "No bilateral balance found between these DAOs".into()
-        )))?;
-        let action_hash = link.target.clone().into_action_hash().ok_or(
-            wasm_error!(WasmErrorInner::Guest("Invalid bilateral balance link target".into())),
-        )?;
-        let record = get(action_hash.clone(), GetOptions::default())?.ok_or(
-            wasm_error!(WasmErrorInner::Guest("Bilateral balance record not found".into())),
-        )?;
-        let bal = record
-            .entry()
-            .to_app_option::<BilateralBalance>()
-            .ok()
-            .flatten()
-            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                "Failed to deserialize bilateral balance".into()
+    let (balance_action_hash, bal) =
+        {
+            let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+                "No bilateral balance found between these DAOs".into()
             )))?;
-        (action_hash, bal)
-    };
+            let action_hash = link.target.clone().into_action_hash().ok_or(wasm_error!(
+                WasmErrorInner::Guest("Invalid bilateral balance link target".into())
+            ))?;
+            let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+                WasmErrorInner::Guest("Bilateral balance record not found".into())
+            ))?;
+            let bal = record
+                .entry()
+                .to_app_option::<BilateralBalance>()
+                .ok()
+                .flatten()
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Failed to deserialize bilateral balance".into()
+                )))?;
+            (action_hash, bal)
+        };
 
     if bal.net_balance == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1794,10 +2342,7 @@ pub fn settle_bilateral_balance(input: SettleBilateralInput) -> ExternResult<Rec
         transfer_payload,
     );
 
-    let transfer_succeeded = match treasury_result {
-        Ok(ZomeCallResponse::Ok(_)) => true,
-        _ => false,
-    };
+    let transfer_succeeded = matches!(treasury_result, Ok(ZomeCallResponse::Ok(_)));
 
     if transfer_succeeded {
         // Step 4a: Transfer succeeded -- update settlement to Completed, zero bilateral balance
@@ -1829,16 +2374,15 @@ pub fn settle_bilateral_balance(input: SettleBilateralInput) -> ExternResult<Rec
 
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Treasury SAP transfer failed. Settlement marked as Failed. \
-             Bilateral balance remains unchanged -- no debt was lost.".into()
+             Bilateral balance remains unchanged -- no debt was lost."
+                .into()
         )));
     }
 
     // Step 5: Return the settlement record
-    let record = get(settlement_hash, GetOptions::default())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest(
-            "Failed to retrieve settlement record".into()
-        )),
-    )?;
+    let record = get(settlement_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to retrieve settlement record".into())
+    ))?;
 
     Ok(record)
 }
@@ -1851,10 +2395,14 @@ pub fn settle_bilateral_balance(input: SettleBilateralInput) -> ExternResult<Rec
 #[hdk_extern]
 pub fn get_tend_reputation_input(input: GetBalanceInput) -> ExternResult<f32> {
     if input.member_did.is_empty() || input.member_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Member DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member DID must be 1-256 characters".into()
+        )));
     }
     if input.dao_did.is_empty() || input.dao_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DAO DID must be 1-256 characters".into()
+        )));
     }
     let balance = get_or_create_balance(input.member_did, input.dao_did)?;
 
@@ -1877,17 +2425,23 @@ pub fn get_tend_reputation_input(input: GetBalanceInput) -> ExternResult<f32> {
 pub fn forgive_balance(member_did: String) -> ExternResult<Vec<(String, i32)>> {
     verify_governance_or_bootstrap()?;
     if member_did.is_empty() || member_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Member DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member DID must be 1-256 characters".into()
+        )));
     }
     if !member_did.starts_with("did:") {
-        return Err(wasm_error!(WasmErrorInner::Guest("Member must be a valid DID".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member must be a valid DID".into()
+        )));
     }
 
     let mut forgiven = Vec::new();
 
     // Query all TendBalance entries to find ones for this member
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TendBalance)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::TendBalance,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -1900,7 +2454,10 @@ pub fn forgive_balance(member_did: String) -> ExternResult<Vec<(String, i32)>> {
                     last_activity: now,
                     ..balance.clone()
                 };
-                update_entry(record.action_address().clone(), &EntryTypes::TendBalance(zeroed))?;
+                update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::TendBalance(zeroed),
+                )?;
                 forgiven.push((balance.dao_did, forgiven_amount));
             }
         }

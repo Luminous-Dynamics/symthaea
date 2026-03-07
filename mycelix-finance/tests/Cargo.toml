@@ -38,6 +38,10 @@ tend = { path = "../zomes/tend/coordinator" }
 recognition_integrity = { path = "../zomes/recognition/integrity" }
 recognition = { path = "../zomes/recognition/coordinator" }
 
+# Currency Mint zome dependencies
+currency_mint_integrity = { path = "../zomes/currency-mint/integrity" }
+currency_mint = { path = "../zomes/currency-mint/coordinator" }
+
 # Holochain dependencies (0.6 compatible)
 hdk = "0.6"
 hdi = "0.7"
@@ -101,6 +105,11 @@ path = "treasury_test.rs"
 [[test]]
 name = "sweettest_integration"
 path = "sweettest_integration.rs"
+
+# Currency Mint (Currency Factory) Tests
+[[test]]
+name = "currency_mint_test"
+path = "currency_mint_test.rs"
 
 # NOTE: economics_stress_test has been moved to types/tests/ where it compiles
 # without the heavy Holochain dependency. Run with:

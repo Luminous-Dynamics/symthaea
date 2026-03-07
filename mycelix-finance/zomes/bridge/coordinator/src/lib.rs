@@ -3,9 +3,10 @@
 //! Cross-hApp communication for payment processing, collateral management,
 //! and collateral bridge deposits across the Mycelix ecosystem.
 
-use hdk::prelude::*;
 use finance_bridge_integrity::*;
+use hdk::prelude::*;
 use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
+use mycelix_finance_types::{FeeTier, TendLimitTier};
 
 const FINANCE_HAPP_ID: &str = "mycelix-finance";
 
@@ -27,7 +28,12 @@ pub fn process_payment(input: ProcessPaymentInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     let payment = CrossHappPayment {
-        id: format!("payment:{}:{}:{}", input.source_happ, input.from_did, now.as_micros()),
+        id: format!(
+            "payment:{}:{}:{}",
+            input.source_happ,
+            input.from_did,
+            now.as_micros()
+        ),
         source_happ: input.source_happ.clone(),
         from_did: input.from_did.clone(),
         to_did: input.to_did.clone(),
@@ -62,11 +68,13 @@ pub fn process_payment(input: ProcessPaymentInput) -> ExternResult<Record> {
             "to": input.to_did,
             "currency": input.currency,
             "reference": input.reference,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Payment not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Payment not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -86,7 +94,12 @@ pub fn register_collateral(input: RegisterCollateralInput) -> ExternResult<Recor
     let now = sys_time()?;
 
     let collateral = CollateralRegistration {
-        id: format!("collateral:{}:{}:{}", input.owner_did, input.asset_id, now.as_micros()),
+        id: format!(
+            "collateral:{}:{}:{}",
+            input.owner_did,
+            input.asset_id,
+            now.as_micros()
+        ),
         owner_did: input.owner_did.clone(),
         asset_type: input.asset_type,
         asset_id: input.asset_id,
@@ -106,8 +119,9 @@ pub fn register_collateral(input: RegisterCollateralInput) -> ExternResult<Recor
         (),
     )?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Collateral not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Collateral not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -217,7 +231,12 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
     // Enforce rate limit: max 5% of vault per day per member
     enforce_rate_limit(&input.depositor_did, sap_minted, now)?;
 
-    let deposit_id = format!("deposit:{}:{}:{}", input.depositor_did, input.collateral_type, now.as_micros());
+    let deposit_id = format!(
+        "deposit:{}:{}:{}",
+        input.depositor_did,
+        input.collateral_type,
+        now.as_micros()
+    );
     let deposit = CollateralBridgeDeposit {
         id: deposit_id.clone(),
         depositor_did: input.depositor_did.clone(),
@@ -262,19 +281,24 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
         CreditSapPayload {
             member_did: input.depositor_did.clone(),
             amount: sap_minted,
-            reason: format!("Collateral bridge deposit: {} {}", input.collateral_amount, input.collateral_type),
+            reason: format!(
+                "Collateral bridge deposit: {} {}",
+                input.collateral_amount, input.collateral_type
+            ),
         },
     ) {
-        Ok(ZomeCallResponse::Ok(_)) => {},
+        Ok(ZomeCallResponse::Ok(_)) => {}
         Ok(other) => {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Failed to credit SAP: unexpected response {:?}", other)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to credit SAP: unexpected response {:?}",
+                other
+            ))));
         }
         Err(e) => {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Failed to credit SAP for deposit: {:?}", e)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to credit SAP for deposit: {:?}",
+                e
+            ))));
         }
     }
 
@@ -288,17 +312,19 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
             "collateral_amount": input.collateral_amount,
             "oracle_rate": input.oracle_rate,
             "sap_minted": sap_minted,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
-    get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Deposit not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DepositCollateralInput {
     pub depositor_did: String,
-    pub collateral_type: String,  // "ETH" or "USDC"
+    pub collateral_type: String, // "ETH" or "USDC"
     pub collateral_amount: u64,
     pub oracle_rate: f64,
 }
@@ -313,22 +339,34 @@ pub fn confirm_deposit(deposit_id: String) -> ExternResult<Record> {
         LinkQuery::try_new(anchor_hash(&deposit_id)?, LinkTypes::DepositIdToDeposit)?,
         GetStrategy::default(),
     )?;
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Deposit not found".into()
+    )))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-    let record = get(hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
-    let deposit = record.entry().to_app_option::<CollateralBridgeDeposit>()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit entry missing".into())))?;
+    let record = get(hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Deposit not found".into())
+    ))?;
+    let deposit = record
+        .entry()
+        .to_app_option::<CollateralBridgeDeposit>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Deposit entry missing".into()
+        )))?;
 
     verify_caller_is_did(&deposit.depositor_did)?;
 
     if deposit.status != BridgeDepositStatus::Pending {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Deposit is {:?}, only Pending deposits can be confirmed", deposit.status)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Deposit is {:?}, only Pending deposits can be confirmed",
+            deposit.status
+        ))));
     }
 
     let now = sys_time()?;
@@ -357,15 +395,26 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
         LinkQuery::try_new(anchor_hash(&deposit_id)?, LinkTypes::DepositIdToDeposit)?,
         GetStrategy::default(),
     )?;
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Deposit not found".into()
+    )))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-    let record = get(hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
-    let deposit = record.entry().to_app_option::<CollateralBridgeDeposit>()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit entry missing".into())))?;
+    let record = get(hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Deposit not found".into())
+    ))?;
+    let deposit = record
+        .entry()
+        .to_app_option::<CollateralBridgeDeposit>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Deposit entry missing".into()
+        )))?;
 
     verify_caller_is_did(&deposit.depositor_did)?;
 
@@ -408,9 +457,10 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
             reason: format!("Collateral bridge redemption: {}", deposit.collateral_type),
         },
     ) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cannot redeem: failed to debit SAP — {:?}", e)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot redeem: failed to debit SAP — {:?}",
+            e
+        ))));
     }
 
     // Broadcast the redemption event
@@ -422,11 +472,142 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
             "collateral_type": deposit.collateral_type,
             "collateral_amount": deposit.collateral_amount,
             "sap_returned": deposit.sap_minted,
-        }).to_string(),
+        })
+        .to_string(),
     })?;
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+// ---------------------------------------------------------------------------
+// Cross-Cluster Wiring: MYCEL → Fee Tier → TEND Limits
+// ---------------------------------------------------------------------------
+
+/// Get a member's fee tier based on their MYCEL score.
+///
+/// This is the cross-cluster bridge function that other hApps call to determine
+/// what fee rate a member should pay. Fetches MYCEL from recognition zome.
+#[hdk_extern]
+pub fn get_member_fee_tier(member_did: String) -> ExternResult<FeeTierResponse> {
+    let mycel_score = fetch_mycel_score(&member_did);
+    let tier = FeeTier::from_mycel(mycel_score);
+    Ok(FeeTierResponse {
+        member_did,
+        mycel_score,
+        tier_name: format!("{:?}", tier),
+        base_fee_rate: tier.base_fee_rate(),
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FeeTierResponse {
+    pub member_did: String,
+    pub mycel_score: f64,
+    pub tier_name: String,
+    pub base_fee_rate: f64,
+}
+
+/// Get a member's effective TEND limit based on current network vitality.
+///
+/// Cross-cluster bridge function: reads oracle state from tend zome,
+/// computes the TEND limit tier, and returns the effective balance limit.
+#[hdk_extern]
+pub fn get_member_tend_limit(member_did: String) -> ExternResult<TendLimitResponse> {
+    // Fetch current vitality from tend oracle
+    let vitality = fetch_oracle_vitality();
+    let tier = TendLimitTier::from_vitality(vitality);
+    let limit = tier.limit();
+
+    Ok(TendLimitResponse {
+        member_did,
+        vitality,
+        tier_name: format!("{:?}", tier),
+        effective_limit: limit,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TendLimitResponse {
+    pub member_did: String,
+    pub vitality: u32,
+    pub tier_name: String,
+    pub effective_limit: i32,
+}
+
+/// Fetch MYCEL score via cross-zome call to recognition.
+/// Falls back to 0.0 (Newcomer tier) if unavailable.
+fn fetch_mycel_score(member_did: &str) -> f64 {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("recognition"),
+        FunctionName::from("get_mycel_score"),
+        None,
+        member_did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            #[derive(Debug, Deserialize)]
+            struct MycelState {
+                mycel_score: f64,
+            }
+            match result.decode::<MycelState>() {
+                Ok(state) if state.mycel_score.is_finite() => state.mycel_score,
+                _ => 0.0,
+            }
+        }
+        _ => 0.0,
+    }
+}
+
+/// Fetch current oracle vitality via cross-zome call to tend.
+/// Falls back to 50 (Normal tier) if unavailable.
+fn fetch_oracle_vitality() -> u32 {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("tend"),
+        FunctionName::from("get_oracle_state"),
+        None,
+        (),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            #[derive(Debug, Deserialize)]
+            struct OracleResp {
+                vitality: u32,
+            }
+            match result.decode::<OracleResp>() {
+                Ok(state) => state.vitality,
+                _ => 50,
+            }
+        }
+        _ => 50,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Community Membership Queries
+// ---------------------------------------------------------------------------
+
+/// Get the number of members in a community/DAO.
+///
+/// Used by the currency-mint governance gate to determine whether a community
+/// needs a governance proposal to create a currency (>10 members).
+/// Queries the identity/governance cluster via cross-role call.
+#[hdk_extern]
+pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
+    // Try cross-cluster call to governance for membership roster
+    match call(
+        CallTargetCell::OtherRole("governance".into()),
+        ZomeName::from("governance_bridge"),
+        FunctionName::from("get_dao_member_count"),
+        None,
+        dao_did.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => Ok(result.decode::<u32>().unwrap_or(0)),
+        _ => {
+            // Governance cluster unreachable — return 0 (permissive)
+            Ok(0)
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -441,16 +622,24 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
 /// created within the last 24 hours.
 fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> ExternResult<()> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralBridgeDeposit)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::CollateralBridgeDeposit,
+        )?))
         .include_entries(true);
 
     let deposits: Vec<CollateralBridgeDeposit> = query(filter)?
         .into_iter()
-        .filter_map(|r| r.entry().to_app_option::<CollateralBridgeDeposit>().ok().flatten())
+        .filter_map(|r| {
+            r.entry()
+                .to_app_option::<CollateralBridgeDeposit>()
+                .ok()
+                .flatten()
+        })
         .collect();
 
     // Total vault = sum of all confirmed deposit SAP
-    let vault_total: u64 = deposits.iter()
+    let vault_total: u64 = deposits
+        .iter()
         .filter(|d| d.status == BridgeDepositStatus::Confirmed)
         .map(|d| d.sap_minted)
         .fold(0u64, |acc, v| acc.saturating_add(v));
@@ -464,7 +653,8 @@ fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> Exte
 
     // Sum this member's activity in the last 24 hours
     let cutoff = now.as_micros() - DAY_MICROS;
-    let daily_activity: u64 = deposits.iter()
+    let daily_activity: u64 = deposits
+        .iter()
         .filter(|d| d.depositor_did == member_did && d.created_at.as_micros() > cutoff)
         .map(|d| d.sap_minted)
         .fold(0u64, |acc, v| acc.saturating_add(v));

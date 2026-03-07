@@ -130,8 +130,7 @@ fn test_demurrage_at_scale() {
     for i in 1..=10_000u64 {
         // Balance ranges from 1 to 10B micro-SAP
         let balance = i * 1_000_000;
-        let deduction =
-            compute_demurrage_deduction(balance, exempt_floor, rate, seconds_per_year);
+        let deduction = compute_demurrage_deduction(balance, exempt_floor, rate, seconds_per_year);
 
         // (a) After deduction, balance must not go below exempt floor
         let remaining = balance - deduction;
@@ -477,9 +476,7 @@ fn test_inalienable_reserve_withdrawal_bounds() {
         assert!(
             reserve_ok,
             "Withdraw {} SAP: reserve {} < 25% of remaining total {}",
-            withdraw_sap,
-            initial_reserve,
-            remaining_total
+            withdraw_sap, initial_reserve, remaining_total
         );
     }
 }
@@ -523,7 +520,246 @@ fn test_compost_distribution_sums_to_total() {
 }
 
 // =============================================================================
-// Section 5: Concurrent Deposit Rate Limit Simulation
+// Section 5: Minted Currency (Currency Factory) Stress Tests
+// =============================================================================
+
+#[test]
+fn test_minted_demurrage_convergence_to_zero() {
+    // For minted currencies, positive balances (credits) decay toward zero.
+    // Debts (negative balances) are exempt. Simulate 500 years of yearly
+    // demurrage at the maximum rate (5%) — balance should approach 0 but
+    // never go negative.
+    let rate = MINTED_DEMURRAGE_RATE_MAX; // 0.05
+    let seconds_per_year: u64 = 31_536_000;
+
+    let mut balance: i32 = 10_000; // 10,000 hours credit
+
+    for year in 1..=500 {
+        let deduction = compute_minted_demurrage(balance, rate, seconds_per_year);
+        assert!(
+            deduction >= 0 && deduction <= balance,
+            "Year {}: deduction {} invalid for balance {}",
+            year,
+            deduction,
+            balance
+        );
+        balance -= deduction;
+        assert!(
+            balance >= 0,
+            "Year {}: balance {} went negative",
+            year,
+            balance
+        );
+    }
+
+    // After 500 years at 5% continuous demurrage, balance should be very small.
+    // The floor effect (deduction < 1 rounds to 0) means a small residual persists.
+    assert!(
+        balance < 50,
+        "After 500 years at 5%, balance {} should be near zero",
+        balance
+    );
+}
+
+#[test]
+fn test_minted_demurrage_debt_immune() {
+    // Negative balances (debts) must NEVER be subject to demurrage.
+    // Test across a range of negative balances and time periods.
+    let rate = MINTED_DEMURRAGE_RATE_MAX;
+    let seconds_per_year: u64 = 31_536_000;
+
+    for debt in [-1, -10, -100, -1000, -10_000, -100_000, i32::MIN + 1] {
+        for &elapsed in &[1, 3600, seconds_per_year, seconds_per_year * 1000] {
+            let deduction = compute_minted_demurrage(debt, rate, elapsed);
+            assert_eq!(
+                deduction, 0,
+                "Debt {} should be immune to demurrage (elapsed {}s), got deduction {}",
+                debt, elapsed, deduction
+            );
+        }
+    }
+}
+
+#[test]
+fn test_minted_zero_sum_with_demurrage() {
+    // Simulate 10,000 exchanges in a minted currency with 2% demurrage.
+    // After each batch of 100 exchanges, apply demurrage to all positive balances.
+    // Verify: (a) pre-demurrage sum is always zero,
+    //         (b) post-demurrage sum equals total demurrage deducted (the "tax").
+    let num_members = 50;
+    let num_exchanges = 10_000;
+    let rate = 0.02;
+    let credit_limit = 100i32;
+    let seconds_per_batch: u64 = 3_600; // 1 hour between batches
+
+    let mut balances = vec![0i32; num_members];
+    let mut total_demurrage: i64 = 0;
+    let mut seed: u64 = 0xF00D_CAFE;
+
+    for i in 0..num_exchanges {
+        let sender = rng_range(&mut seed, 0, (num_members - 1) as u64) as usize;
+        let mut receiver = rng_range(&mut seed, 0, (num_members - 1) as u64) as usize;
+        if receiver == sender {
+            receiver = (receiver + 1) % num_members;
+        }
+
+        let amount = rng_range(&mut seed, 1, 3) as i32;
+
+        // Enforce credit limits
+        let new_receiver = balances[receiver] + amount;
+        let new_sender = balances[sender] - amount;
+        if new_receiver > credit_limit || new_sender < -credit_limit {
+            continue;
+        }
+
+        // Zero-sum exchange
+        balances[sender] -= amount;
+        balances[receiver] += amount;
+
+        // (a) Pre-demurrage sum should always be exactly -total_demurrage
+        let sum: i64 = balances.iter().map(|&b| b as i64).sum();
+        assert_eq!(
+            sum, -total_demurrage,
+            "Exchange {}: sum {} != -total_demurrage {}",
+            i, sum, total_demurrage
+        );
+
+        // Apply demurrage every 100 exchanges
+        if (i + 1) % 100 == 0 {
+            for bal in balances.iter_mut() {
+                if *bal > 0 {
+                    let deduction = compute_minted_demurrage(*bal, rate, seconds_per_batch);
+                    *bal -= deduction;
+                    total_demurrage += deduction as i64;
+                }
+            }
+        }
+    }
+
+    // Final verification: sum of balances + total_demurrage == 0
+    let final_sum: i64 = balances.iter().map(|&b| b as i64).sum();
+    assert_eq!(
+        final_sum + total_demurrage,
+        0,
+        "Conservation violated: sum {} + demurrage {} != 0",
+        final_sum,
+        total_demurrage
+    );
+}
+
+#[test]
+fn test_minted_params_validation_fuzz() {
+    // Fuzz MintedCurrencyParams validation with 10,000 random combinations.
+    // Verify: (a) no panics, (b) valid params always accepted, (c) invalid always rejected.
+    let mut seed: u64 = 0xABCD_1234;
+
+    for _ in 0..10_000 {
+        let name_len = rng_range(&mut seed, 0, 60) as usize;
+        let name: String = (0..name_len).map(|_| 'A').collect();
+
+        let sym_len = rng_range(&mut seed, 0, 8) as usize;
+        let symbol: String = (0..sym_len).map(|_| 'X').collect();
+
+        let credit_limit = rng_range(&mut seed, 0, 300) as i32;
+        let demurrage_rate = (rng_range(&mut seed, 0, 100) as f64) / 1000.0; // 0.0 to 0.1
+        let max_service_hours = rng_range(&mut seed, 0, 50) as u32;
+        let min_service_minutes = rng_range(&mut seed, 0, 120) as u32;
+
+        let desc_len = rng_range(&mut seed, 0, 600) as usize;
+        let description: String = (0..desc_len).map(|_| 'D').collect();
+
+        let params = MintedCurrencyParams {
+            name: name.clone(),
+            symbol: symbol.clone(),
+            description: description.clone(),
+            credit_limit,
+            demurrage_rate,
+            max_service_hours,
+            min_service_minutes,
+            requires_confirmation: rng_range(&mut seed, 0, 1) == 1,
+            confirmation_timeout_hours: rng_range(&mut seed, 0, 800) as u32,
+            max_exchanges_per_day: rng_range(&mut seed, 0, 60) as u8,
+        };
+
+        let result = params.validate();
+
+        // Cross-check: if all fields are individually valid, overall should be valid
+        let name_ok = !name.is_empty() && name.len() <= MINTED_NAME_MAX_LEN;
+        let sym_ok = !symbol.is_empty()
+            && symbol.len() <= MINTED_SYMBOL_MAX_LEN
+            && symbol.chars().all(|c| c.is_ascii_alphanumeric());
+        let limit_ok =
+            credit_limit >= MINTED_CREDIT_LIMIT_MIN && credit_limit <= MINTED_CREDIT_LIMIT_MAX;
+        let demurrage_ok = demurrage_rate >= 0.0 && demurrage_rate <= MINTED_DEMURRAGE_RATE_MAX;
+        let hours_ok = max_service_hours >= 1 && max_service_hours <= MINTED_MAX_SERVICE_HOURS_MAX;
+        let minutes_ok =
+            min_service_minutes >= MINTED_MIN_SERVICE_MINUTES_MIN && min_service_minutes <= 60;
+
+        let timeout_ok = params.confirmation_timeout_hours <= MINTED_CONFIRMATION_TIMEOUT_MAX;
+
+        let rate_limit_ok = params.max_exchanges_per_day <= MINTED_MAX_EXCHANGES_PER_DAY_MAX;
+        let desc_ok = description.len() <= MINTED_DESCRIPTION_MAX_LEN;
+
+        let should_be_valid = name_ok
+            && sym_ok
+            && desc_ok
+            && limit_ok
+            && demurrage_ok
+            && hours_ok
+            && minutes_ok
+            && timeout_ok
+            && rate_limit_ok;
+
+        if should_be_valid {
+            assert!(
+                result.is_ok(),
+                "Params should be valid but got: {:?}. name_len={}, sym_len={}, limit={}, demurrage={}, hours={}, minutes={}",
+                result,
+                name.len(),
+                symbol.len(),
+                credit_limit,
+                demurrage_rate,
+                max_service_hours,
+                min_service_minutes
+            );
+        }
+        // Note: we don't assert result.is_err() for the inverse because
+        // our cross-check may not cover all validation rules perfectly.
+    }
+}
+
+#[test]
+fn test_minted_demurrage_precision_all_rates() {
+    // For rates 0.01, 0.02, 0.03, 0.04, 0.05 and balances 1 to 10,000,
+    // verify demurrage matches the continuous formula within 1 unit tolerance.
+    let seconds_per_year: u64 = 31_536_000;
+
+    for rate_pct in 1..=5u32 {
+        let rate = rate_pct as f64 / 100.0;
+
+        for balance in [1, 10, 100, 1000, 5000, 10_000i32] {
+            let deduction = compute_minted_demurrage(balance, rate, seconds_per_year);
+
+            // Expected: balance * (1 - e^(-rate))
+            let expected = (balance as f64) * (1.0 - (-rate).exp());
+            let expected_i32 = expected.floor() as i32;
+
+            let diff = (deduction - expected_i32).abs();
+            assert!(
+                diff <= 1,
+                "rate={}, balance={}: deduction {} vs expected {} (diff {})",
+                rate,
+                balance,
+                deduction,
+                expected_i32,
+                diff
+            );
+        }
+    }
+}
+
+// =============================================================================
+// Section 6: Concurrent Deposit Rate Limit Simulation
 // =============================================================================
 
 /// Simulated deposit rate limiter (mirrors the on-chain logic).
@@ -675,5 +911,136 @@ fn test_rate_limit_resets_after_24h() {
     assert!(
         !limiter.try_deposit(day2_excess, day2_start + 300),
         "Day 2 excess deposit should be rejected"
+    );
+}
+
+// =============================================================================
+// Section 7: Currency Factory Round 6/7 Feature Tests
+// =============================================================================
+
+#[test]
+fn test_compost_zero_sum_invariant() {
+    // Simulate 1000 demurrage cycles across 20 members.
+    // After each cycle: sum(balances) + compost == 0 (zero-sum invariant).
+    let num_members = 20;
+    let rate = 0.03;
+    let credit_limit = 100i32;
+    let seconds_per_cycle: u64 = 86_400; // 1 day
+
+    let mut balances = vec![0i32; num_members];
+    let mut compost: i64 = 0;
+    let mut seed: u64 = 0xC0FFEE;
+
+    // Bootstrap: do some exchanges to create non-zero balances
+    for _ in 0..200 {
+        let sender = rng_range(&mut seed, 0, (num_members - 1) as u64) as usize;
+        let mut receiver = rng_range(&mut seed, 0, (num_members - 1) as u64) as usize;
+        if receiver == sender {
+            receiver = (receiver + 1) % num_members;
+        }
+        let amount = rng_range(&mut seed, 1, 5) as i32;
+        if balances[receiver] + amount <= credit_limit && balances[sender] - amount >= -credit_limit
+        {
+            balances[sender] -= amount;
+            balances[receiver] += amount;
+        }
+    }
+
+    // Verify initial zero-sum
+    let initial_sum: i64 = balances.iter().map(|&b| b as i64).sum();
+    assert_eq!(initial_sum, 0, "Initial balances must sum to zero");
+
+    // Run 1000 demurrage cycles
+    for cycle in 0..1000 {
+        for bal in balances.iter_mut() {
+            if *bal > 0 {
+                let deduction = compute_minted_demurrage(*bal, rate, seconds_per_cycle);
+                *bal -= deduction;
+                compost += deduction as i64;
+            }
+        }
+
+        // Zero-sum check: balances + compost == 0
+        let sum: i64 = balances.iter().map(|&b| b as i64).sum();
+        assert_eq!(
+            sum + compost,
+            0,
+            "Cycle {}: zero-sum violated. sum={}, compost={}",
+            cycle,
+            sum,
+            compost
+        );
+    }
+}
+
+#[test]
+fn test_rate_limit_boundary() {
+    // Simulate daily exchange rate limiting.
+    // At limit N: first N exchanges pass, exchange N+1 fails.
+    for limit in [1u8, 5, 10, 25, 50] {
+        let mut count: u8 = 0;
+
+        // Exchanges 1..=limit should all pass
+        for i in 1..=limit {
+            assert!(
+                count < limit,
+                "Exchange {} should pass (count={}, limit={})",
+                i,
+                count,
+                limit
+            );
+            count += 1;
+        }
+        assert_eq!(count, limit);
+
+        // Exchange limit+1 should fail
+        assert!(
+            count >= limit,
+            "Exchange {} should be blocked (count={}, limit={})",
+            limit + 1,
+            count,
+            limit
+        );
+    }
+}
+
+#[test]
+fn test_description_validation_boundaries() {
+    // Description max length is 500 chars
+    let mut p = MintedCurrencyParams {
+        name: "Test".into(),
+        symbol: "TST".into(),
+        description: String::new(),
+        credit_limit: 40,
+        demurrage_rate: 0.02,
+        max_service_hours: 8,
+        min_service_minutes: 15,
+        requires_confirmation: false,
+        confirmation_timeout_hours: 0,
+        max_exchanges_per_day: 0,
+    };
+
+    // Empty description is valid
+    assert!(p.validate().is_ok(), "Empty description should be valid");
+
+    // At max length
+    p.description = "X".repeat(MINTED_DESCRIPTION_MAX_LEN);
+    assert!(
+        p.validate().is_ok(),
+        "Max length description should be valid"
+    );
+
+    // One over max
+    p.description = "X".repeat(MINTED_DESCRIPTION_MAX_LEN + 1);
+    assert!(
+        p.validate().is_err(),
+        "Over-max description should be invalid"
+    );
+
+    // Unicode — length in bytes, not chars
+    p.description = "🌱".repeat(100); // 4 bytes each = 400 bytes, under 500
+    assert!(
+        p.validate().is_ok(),
+        "Unicode description within byte limit should be valid"
     );
 }

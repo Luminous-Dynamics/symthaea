@@ -1,6 +1,6 @@
 # Mycelix Finance - Three-Currency Economic System CI
-# Zomes: Payments, Treasury, Bridge, Staking, TEND, Recognition
-# Currencies: SAP (circulation), TEND (mutual credit), MYCEL (reputation)
+# Zomes: Payments, Treasury, Bridge, Staking, TEND, Recognition, Currency Mint (~27 externs)
+# Currencies: SAP (circulation), TEND (mutual credit), MYCEL (reputation), Community-minted (Currency Factory)
 
 name: Finance
 
@@ -220,13 +220,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-finance-build-
 
-      - name: Run economics stress tests (15 tests)
+      - name: Run economics stress tests (23 tests)
         run: |
           nix develop ./mycelix-finance#ci --command bash -c '
             cd mycelix-finance
 
             echo "=== Economics Stress Tests ==="
-            echo "Testing: demurrage, fee tiers, TEND zero-sum, commons reserve, rate limits"
+            echo "Testing: demurrage, fee tiers, TEND zero-sum, commons reserve, rate limits, Currency Factory, compost invariant, description validation"
             echo ""
 
             cargo test -p mycelix_finance_types --test economics_stress_test -- --nocapture
@@ -392,6 +392,13 @@ jobs:
             cargo test --release recognition_test -- --include-ignored --test-threads=1 --nocapture
           '
 
+      - name: Run sweettest - Currency Mint
+        run: |
+          nix develop ./mycelix-finance#test --command bash -c '
+            cd mycelix-finance/tests
+            cargo test --release currency_mint_test -- --include-ignored --test-threads=1 --nocapture
+          '
+
   # ============================================================================
   # Summary
   # ============================================================================
@@ -437,12 +444,12 @@ jobs:
           echo "| Lint & Format | $(format_status '${{ needs.lint.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Build WASM Zomes | $(format_status '${{ needs.build-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Unit Tests | $(format_status '${{ needs.test-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| Economics Stress Tests (15) | $(format_status '${{ needs.stress-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Economics Stress Tests (23) | $(format_status '${{ needs.stress-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Integration (7 suites) | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package DNA | $(format_status '${{ needs.package-dna.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          echo "### Zomes (6 pairs)" >> $GITHUB_STEP_SUMMARY
+          echo "### Zomes (7 pairs)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Zome | Currency | Role |" >> $GITHUB_STEP_SUMMARY
           echo "|------|----------|------|" >> $GITHUB_STEP_SUMMARY
@@ -452,6 +459,7 @@ jobs:
           echo "| staking | SAP | Collateral staking, MYCEL-weighted, escrow |" >> $GITHUB_STEP_SUMMARY
           echo "| tend | TEND | Time exchange, counter-cyclical limits, disputes |" >> $GITHUB_STEP_SUMMARY
           echo "| recognition | MYCEL | Weighted recognition, apprentice lifecycle |" >> $GITHUB_STEP_SUMMARY
+          echo "| currency-mint | Community | Currency Factory, confirmation, demurrage, compost, rate limits, discovery |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           echo "### Infrastructure" >> $GITHUB_STEP_SUMMARY

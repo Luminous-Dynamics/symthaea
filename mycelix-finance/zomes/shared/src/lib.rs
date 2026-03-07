@@ -28,8 +28,8 @@ use serde::{Deserialize, Serialize};
 pub use mycelix_finance_types;
 
 // Re-export all modules
-pub use batch::*;
 pub use anchors::*;
+pub use batch::*;
 pub use economics::*;
 pub use identity::*;
 pub use types::*;
@@ -112,7 +112,11 @@ pub mod batch {
         let total = hashes.len();
         let mut result = BatchGetResult::new(total);
 
-        let limit = if options.limit == 0 { total } else { options.limit.min(total) };
+        let limit = if options.limit == 0 {
+            total
+        } else {
+            options.limit.min(total)
+        };
 
         for hash in hashes.into_iter().take(limit) {
             match get(hash.clone(), GetOptions::default()) {
@@ -265,7 +269,9 @@ pub mod batch {
     /// let records = links_to_records(links)?;
     /// let loans: Vec<Loan> = extract_entries(&records);
     /// ```
-    pub fn extract_entries<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(records: &[Record]) -> Vec<T> {
+    pub fn extract_entries<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
+        records: &[Record],
+    ) -> Vec<T> {
         records
             .iter()
             .filter_map(|r| r.entry().to_app_option::<T>().ok().flatten())
@@ -358,9 +364,10 @@ pub mod types {
 
         pub fn validate(&self) -> ExternResult<()> {
             if self.limit > Self::MAX_LIMIT {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    format!("Limit cannot exceed {}", Self::MAX_LIMIT)
-                )));
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Limit cannot exceed {}",
+                    Self::MAX_LIMIT
+                ))));
             }
             if self.limit == 0 {
                 return Err(wasm_error!(WasmErrorInner::Guest(
@@ -489,16 +496,22 @@ pub mod validation {
     /// Validate a Decentralized Identifier (DID)
     pub fn validate_did(did: &str) -> ExternResult<()> {
         if did.is_empty() {
-            return Err(wasm_error!(WasmErrorInner::Guest("DID is required".to_string())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "DID is required".to_string()
+            )));
         }
 
         if !did.starts_with("did:") {
-            return Err(wasm_error!(WasmErrorInner::Guest("DID must start with 'did:'".to_string())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "DID must start with 'did:'".to_string()
+            )));
         }
 
         let parts: Vec<&str> = did.splitn(3, ':').collect();
         if parts.len() < 3 {
-            return Err(wasm_error!(WasmErrorInner::Guest("DID must have format 'did:method:specific-id'".to_string())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "DID must have format 'did:method:specific-id'".to_string()
+            )));
         }
 
         Ok(())
@@ -507,24 +520,27 @@ pub mod validation {
     /// Validate an amount is positive
     pub fn validate_positive_amount(amount: f64, field: &str) -> ExternResult<()> {
         if amount <= 0.0 {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("{} must be positive", field)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{} must be positive",
+                field
+            ))));
         }
         if amount.is_nan() || amount.is_infinite() {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("{} must be a valid number", field)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{} must be a valid number",
+                field
+            ))));
         }
         Ok(())
     }
 
     /// Validate a percentage is in valid range (0.0 - 1.0)
     pub fn validate_percentage(value: f64, field: &str) -> ExternResult<()> {
-        if value < 0.0 || value > 1.0 {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("{} must be between 0.0 and 1.0", field)
-            )));
+        if !(0.0..=1.0).contains(&value) {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "{} must be between 0.0 and 1.0",
+                field
+            ))));
         }
         Ok(())
     }
@@ -532,10 +548,14 @@ pub mod validation {
     /// Validate a currency code (ISO 4217 or crypto symbol)
     pub fn validate_currency(currency: &str) -> ExternResult<()> {
         if currency.is_empty() {
-            return Err(wasm_error!(WasmErrorInner::Guest("Currency is required".to_string())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Currency is required".to_string()
+            )));
         }
         if currency.len() > 10 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Currency code too long".to_string())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Currency code too long".to_string()
+            )));
         }
         Ok(())
     }
@@ -551,25 +571,37 @@ mod tests {
 
     #[test]
     fn test_pagination_validation_valid() {
-        let valid = types::PaginationInput { offset: 0, limit: 50 };
+        let valid = types::PaginationInput {
+            offset: 0,
+            limit: 50,
+        };
         assert!(valid.validate().is_ok());
     }
 
     #[test]
     fn test_pagination_validation_limit_zero() {
-        let input = types::PaginationInput { offset: 0, limit: 0 };
+        let input = types::PaginationInput {
+            offset: 0,
+            limit: 0,
+        };
         assert!(input.validate().is_err());
     }
 
     #[test]
     fn test_pagination_validation_limit_exceeds_max() {
-        let input = types::PaginationInput { offset: 0, limit: 101 };
+        let input = types::PaginationInput {
+            offset: 0,
+            limit: 101,
+        };
         assert!(input.validate().is_err());
     }
 
     #[test]
     fn test_pagination_validation_at_max() {
-        let input = types::PaginationInput { offset: 0, limit: 100 };
+        let input = types::PaginationInput {
+            offset: 0,
+            limit: 100,
+        };
         assert!(input.validate().is_ok());
     }
 
@@ -583,7 +615,10 @@ mod tests {
 
     #[test]
     fn test_paginated_result_has_more() {
-        let pagination = types::PaginationInput { offset: 0, limit: 10 };
+        let pagination = types::PaginationInput {
+            offset: 0,
+            limit: 10,
+        };
         let result = types::PaginatedResult::<u32>::new(vec![1, 2, 3], 20, &pagination);
         assert!(result.has_more);
         assert_eq!(result.total, 20);
@@ -592,14 +627,20 @@ mod tests {
 
     #[test]
     fn test_paginated_result_no_more() {
-        let pagination = types::PaginationInput { offset: 0, limit: 10 };
+        let pagination = types::PaginationInput {
+            offset: 0,
+            limit: 10,
+        };
         let result = types::PaginatedResult::<u32>::new(vec![1, 2, 3], 3, &pagination);
         assert!(!result.has_more);
     }
 
     #[test]
     fn test_paginated_result_empty() {
-        let pagination = types::PaginationInput { offset: 0, limit: 10 };
+        let pagination = types::PaginationInput {
+            offset: 0,
+            limit: 10,
+        };
         let result = types::PaginatedResult::<u32>::empty(&pagination);
         assert!(result.items.is_empty());
         assert_eq!(result.total, 0);

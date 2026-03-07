@@ -13,7 +13,9 @@
 //! MIP Template Reference: MIP-C-042
 
 use hdi::prelude::*;
-pub use mycelix_finance_types::TendLimitTier;
+pub use mycelix_finance_types::{
+    Currency, TendLimitTier, HEARTH_MAX_MEMBERS, HEARTH_TEND_CREDIT_LIMIT,
+};
 
 // =============================================================================
 // CONSTANTS (Per MIP-C-042 Template)
@@ -160,7 +162,7 @@ pub struct TendBalance {
     pub dao_did: String,
 
     /// Current balance (can be negative)
-    pub balance: i32,  // Using i32 for negative support
+    pub balance: i32, // Using i32 for negative support
 
     /// Total hours provided (lifetime)
     pub total_provided: f32,
@@ -372,6 +374,59 @@ impl OracleState {
     }
 }
 
+// =============================================================================
+// HEARTH-SCOPED TEND (Phase 2: lightweight sub-ledgers for family units)
+// =============================================================================
+
+/// Hearth-scoped TEND balance (smaller limit than DAO: ±20 instead of ±40).
+///
+/// Hearths are intimate groups (2-50 members) that don't need full DAO
+/// overhead. Their TEND operates with tighter limits and simpler governance.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct HearthTendBalance {
+    /// DID of the member
+    pub member_did: String,
+    /// DID of the hearth (family unit)
+    pub hearth_did: String,
+    /// Current balance (limited to ±HEARTH_TEND_CREDIT_LIMIT)
+    pub balance: i32,
+    /// Total hours provided within this hearth
+    pub total_provided: f32,
+    /// Total hours received within this hearth
+    pub total_received: f32,
+    /// Number of exchanges within this hearth
+    pub exchange_count: u32,
+    /// Last activity timestamp
+    pub last_activity: Timestamp,
+}
+
+// =============================================================================
+// CULTURAL ALIASES (Phase 3: community-named currencies)
+// =============================================================================
+
+/// A registered cultural alias for a community's currency.
+///
+/// Communities can name their local TEND/SAP however they want:
+/// "Cuidado" (care), "Ubuntu Hours", "Horas", "Water Credits".
+/// The alias is display-only — the underlying mutual credit physics are unchanged.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CurrencyAliasEntry {
+    /// The community/DAO that registered this alias
+    pub dao_did: String,
+    /// The human-readable alias name (e.g., "CARE", "HORAS", "UBUNTU")
+    pub alias_name: String,
+    /// Which base currency this aliases
+    pub base_currency: Currency,
+    /// Optional short display symbol (e.g., "C", "H")
+    pub display_symbol: Option<String>,
+    /// Optional description of cultural meaning
+    pub description: Option<String>,
+    /// When this alias was registered
+    pub created_at: Timestamp,
+}
+
 /// Anchor entry for deterministic link bases
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -456,6 +511,8 @@ pub enum EntryTypes {
     OracleState(OracleState),
     BilateralBalance(BilateralBalance),
     BilateralSettlement(BilateralSettlement),
+    HearthTendBalance(HearthTendBalance),
+    CurrencyAliasEntry(CurrencyAliasEntry),
 }
 
 #[hdk_link_types]
@@ -492,6 +549,12 @@ pub enum LinkTypes {
     SettlementRegistry,
     /// Link from governance_agents anchor to authorized agent pubkeys
     GovernanceAgents,
+    /// Link from hearth DID to hearth TEND balances
+    HearthToBalances,
+    /// Link from member DID to hearth TEND balances
+    MemberToHearthBalance,
+    /// Link from DAO to its registered currency alias
+    DaoToAlias,
 }
 
 // =============================================================================
@@ -538,10 +601,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     EntryTypes::BilateralBalance(bal) => {
                         if bal.dao_a_did.len() > MAX_DID_LEN || bal.dao_b_did.len() > MAX_DID_LEN {
-                            return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+                            return Ok(ValidateCallbackResult::Invalid(
+                                "DID exceeds maximum length".into(),
+                            ));
                         }
-                        if !bal.dao_a_did.starts_with("did:") || !bal.dao_b_did.starts_with("did:") {
-                            Ok(ValidateCallbackResult::Invalid("DAO DIDs must be valid".into()))
+                        if !bal.dao_a_did.starts_with("did:") || !bal.dao_b_did.starts_with("did:")
+                        {
+                            Ok(ValidateCallbackResult::Invalid(
+                                "DAO DIDs must be valid".into(),
+                            ))
                         } else if bal.dao_a_did >= bal.dao_b_did {
                             Ok(ValidateCallbackResult::Invalid(
                                 "dao_a_did must be alphabetically before dao_b_did (canonical ordering)".into(),
@@ -553,24 +621,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::BilateralSettlement(settlement) => {
                         validate_create_bilateral_settlement(settlement)
                     }
+                    EntryTypes::HearthTendBalance(bal) => validate_create_hearth_balance(bal),
+                    EntryTypes::CurrencyAliasEntry(alias) => validate_create_currency_alias(alias),
                     // Anchors are always valid (just hash placeholders)
                     EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 }
             }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => {
                 match app_entry {
                     EntryTypes::TendExchange(exchange) => {
                         validate_update_exchange(action, exchange)
                     }
-                    EntryTypes::TendBalance(balance) => {
-                        validate_update_balance(action, balance)
-                    }
-                    EntryTypes::ServiceListing(listing) => {
-                        validate_update_listing(action, listing)
-                    }
-                    EntryTypes::ServiceRequest(request) => {
-                        validate_update_request(action, request)
-                    }
+                    EntryTypes::TendBalance(balance) => validate_update_balance(action, balance),
+                    EntryTypes::ServiceListing(listing) => validate_update_listing(action, listing),
+                    EntryTypes::ServiceRequest(request) => validate_update_request(action, request),
                     EntryTypes::QualityRating(_) => {
                         // Ratings are immutable once created
                         Ok(ValidateCallbackResult::Invalid(
@@ -589,42 +655,44 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                             Ok(ValidateCallbackResult::Valid)
                         }
                     }
-                    EntryTypes::BilateralBalance(_) => {
-                        Ok(ValidateCallbackResult::Valid)
-                    }
+                    EntryTypes::BilateralBalance(_) => Ok(ValidateCallbackResult::Valid),
                     EntryTypes::BilateralSettlement(settlement) => {
                         validate_update_bilateral_settlement(settlement)
                     }
-                    // Anchors cannot be updated
-                    EntryTypes::Anchor(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Anchors cannot be updated".into(),
-                        ))
+                    EntryTypes::HearthTendBalance(bal) => validate_update_hearth_balance(bal),
+                    EntryTypes::CurrencyAliasEntry(_) => {
+                        // Aliases can be updated (e.g., change display name)
+                        Ok(ValidateCallbackResult::Valid)
                     }
+                    // Anchors cannot be updated
+                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
+                        "Anchors cannot be updated".into(),
+                    )),
                 }
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => {
-            match link_type {
-                LinkTypes::ProviderToExchanges => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::ReceiverToExchanges => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::MemberToBalance => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::DaoToExchanges => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::DaoToListings => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::DaoToRequests => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::ProviderToListings => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::CategoryToListings => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::ExchangeIdToExchange => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::AnchorLinks => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::ExchangeToRating => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::MemberToDisputes => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::ExchangeToDispute => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::DaoToBilateralBalance => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::SettlementRegistry => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::GovernanceAgents => Ok(ValidateCallbackResult::Valid),
-            }
-        }
+        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
+            LinkTypes::ProviderToExchanges => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ReceiverToExchanges => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::MemberToBalance => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::DaoToExchanges => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::DaoToListings => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::DaoToRequests => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ProviderToListings => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::CategoryToListings => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ExchangeIdToExchange => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AnchorLinks => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ExchangeToRating => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::MemberToDisputes => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ExchangeToDispute => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::DaoToBilateralBalance => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::SettlementRegistry => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::GovernanceAgents => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::HearthToBalances => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::MemberToHearthBalance => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::DaoToAlias => Ok(ValidateCallbackResult::Valid),
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -642,26 +710,38 @@ fn validate_create_exchange(
         || exchange.receiver_did.len() > MAX_DID_LEN
         || exchange.dao_did.len() > MAX_DID_LEN
     {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if exchange.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Exchange ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange ID exceeds maximum length".into(),
+        ));
     }
     if let Some(ref alias) = exchange.cultural_alias {
         if alias.len() > MAX_CULTURAL_ALIAS_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Cultural alias exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Cultural alias exceeds maximum length".into(),
+            ));
         }
     }
 
     // Validate DIDs
     if !exchange.provider_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Provider must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Provider must be a valid DID".into(),
+        ));
     }
     if !exchange.receiver_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Receiver must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Receiver must be a valid DID".into(),
+        ));
     }
     if !exchange.dao_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("DAO must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DAO must be a valid DID".into(),
+        ));
     }
 
     // Cannot exchange with yourself
@@ -673,19 +753,23 @@ fn validate_create_exchange(
 
     // Hours must be positive and within limits
     if exchange.hours <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours must be positive".into(),
+        ));
     }
 
     let minutes = (exchange.hours * 60.0) as u32;
     if minutes < MIN_SERVICE_MINUTES {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Minimum service duration is {} minutes", MIN_SERVICE_MINUTES),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Minimum service duration is {} minutes",
+            MIN_SERVICE_MINUTES
+        )));
     }
     if exchange.hours > MAX_SERVICE_HOURS as f32 {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Maximum service duration is {} hours per exchange", MAX_SERVICE_HOURS),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Maximum service duration is {} hours per exchange",
+            MAX_SERVICE_HOURS
+        )));
     }
 
     // Description required
@@ -710,7 +794,9 @@ fn validate_update_exchange(
     // Only status can change (Proposed -> Confirmed/Disputed/Cancelled)
     // Core data (provider, receiver, hours) cannot change
     if exchange.hours <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -721,22 +807,29 @@ fn validate_create_balance(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if balance.member_did.len() > MAX_DID_LEN || balance.dao_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
 
     if !balance.member_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member must be a valid DID".into(),
+        ));
     }
     if !balance.dao_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("DAO must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DAO must be a valid DID".into(),
+        ));
     }
 
     // Balance must be within the constitutional maximum (Emergency tier ±120).
     // The coordinator enforces the tighter dynamic limit based on oracle state.
     if balance.balance.abs() > BALANCE_LIMIT_EMERGENCY {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Balance exceeds constitutional maximum of ±{}", BALANCE_LIMIT_EMERGENCY),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Balance exceeds constitutional maximum of ±{}",
+            BALANCE_LIMIT_EMERGENCY
+        )));
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -748,9 +841,10 @@ fn validate_update_balance(
 ) -> ExternResult<ValidateCallbackResult> {
     // Constitutional maximum — coordinator enforces dynamic limit
     if balance.balance.abs() > BALANCE_LIMIT_EMERGENCY {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Balance would exceed constitutional maximum of ±{}", BALANCE_LIMIT_EMERGENCY),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Balance would exceed constitutional maximum of ±{}",
+            BALANCE_LIMIT_EMERGENCY
+        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -761,28 +855,42 @@ fn validate_create_listing(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if listing.provider_did.len() > MAX_DID_LEN || listing.dao_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if listing.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Listing ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Listing ID exceeds maximum length".into(),
+        ));
     }
     if listing.description.len() > MAX_DESCRIPTION_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Description exceeds maximum length of 2000".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description exceeds maximum length of 2000".into(),
+        ));
     }
     if let Some(ref avail) = listing.availability {
         if avail.len() > MAX_AVAILABILITY_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Availability exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Availability exceeds maximum length".into(),
+            ));
         }
     }
 
     if !listing.provider_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Provider must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Provider must be a valid DID".into(),
+        ));
     }
     if !listing.dao_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("DAO must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DAO must be a valid DID".into(),
+        ));
     }
     if listing.title.is_empty() || listing.title.len() > MAX_TITLE_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Title must be 1-200 chars".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Title must be 1-200 chars".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -800,23 +908,35 @@ fn validate_create_request(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if request.requester_did.len() > MAX_DID_LEN || request.dao_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if request.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Request ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request ID exceeds maximum length".into(),
+        ));
     }
     if request.description.len() > MAX_DESCRIPTION_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Description exceeds maximum length of 2000".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description exceeds maximum length of 2000".into(),
+        ));
     }
 
     if !request.requester_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Requester must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Requester must be a valid DID".into(),
+        ));
     }
     if !request.dao_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("DAO must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DAO must be a valid DID".into(),
+        ));
     }
     if request.title.is_empty() || request.title.len() > MAX_TITLE_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Title must be 1-200 chars".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Title must be 1-200 chars".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -834,20 +954,28 @@ fn validate_create_quality_rating(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if rating.rater_did.len() > MAX_DID_LEN || rating.provider_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if rating.exchange_id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Exchange ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange ID exceeds maximum length".into(),
+        ));
     }
 
     // Validate rater DID
     if !rating.rater_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Rater must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rater must be a valid DID".into(),
+        ));
     }
 
     // Validate provider DID
     if !rating.provider_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Provider must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Provider must be a valid DID".into(),
+        ));
     }
 
     // Cannot rate yourself
@@ -889,19 +1017,27 @@ fn validate_create_dispute_case(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if dispute.complainant_did.len() > MAX_DID_LEN || dispute.respondent_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if dispute.id.len() > MAX_ID_LEN || dispute.exchange_id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "ID exceeds maximum length".into(),
+        ));
     }
     if let Some(ref resolution) = dispute.resolution {
         if resolution.len() > MAX_RESOLUTION_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Resolution exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Resolution exceeds maximum length".into(),
+            ));
         }
     }
     for mediator_did in &dispute.mediator_dids {
         if mediator_did.len() > MAX_DID_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Mediator DID exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Mediator DID exceeds maximum length".into(),
+            ));
         }
     }
 
@@ -975,11 +1111,17 @@ fn validate_create_bilateral_settlement(
     settlement: BilateralSettlement,
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
-    if settlement.debtor_dao_did.len() > MAX_DID_LEN || settlement.creditor_dao_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    if settlement.debtor_dao_did.len() > MAX_DID_LEN
+        || settlement.creditor_dao_did.len() > MAX_DID_LEN
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if settlement.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Settlement ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Settlement ID exceeds maximum length".into(),
+        ));
     }
 
     // Amount must be positive
@@ -1056,6 +1198,78 @@ fn validate_update_bilateral_settlement(
         ));
     }
 
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_hearth_balance(bal: HearthTendBalance) -> ExternResult<ValidateCallbackResult> {
+    if bal.member_did.len() > MAX_DID_LEN || bal.hearth_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
+    }
+    if !bal.member_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member must be a valid DID".into(),
+        ));
+    }
+    if !bal.hearth_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hearth must be a valid DID".into(),
+        ));
+    }
+    // Hearth credit limit is tighter than DAO
+    if bal.balance.abs() > HEARTH_TEND_CREDIT_LIMIT {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Hearth TEND balance exceeds limit of ±{}",
+            HEARTH_TEND_CREDIT_LIMIT
+        )));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_hearth_balance(bal: HearthTendBalance) -> ExternResult<ValidateCallbackResult> {
+    if bal.balance.abs() > HEARTH_TEND_CREDIT_LIMIT {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Hearth TEND balance would exceed limit of ±{}",
+            HEARTH_TEND_CREDIT_LIMIT
+        )));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_currency_alias(
+    alias: CurrencyAliasEntry,
+) -> ExternResult<ValidateCallbackResult> {
+    if alias.dao_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
+    }
+    if !alias.dao_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "DAO must be a valid DID".into(),
+        ));
+    }
+    if alias.alias_name.is_empty() || alias.alias_name.len() > MAX_CULTURAL_ALIAS_LEN {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Alias name must be 1-{} characters",
+            MAX_CULTURAL_ALIAS_LEN
+        )));
+    }
+    if let Some(ref sym) = alias.display_symbol {
+        if sym.len() > 6 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Display symbol must be 1-6 characters".into(),
+            ));
+        }
+    }
+    if let Some(ref desc) = alias.description {
+        if desc.len() > MAX_DESCRIPTION_LEN {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Description exceeds maximum length".into(),
+            ));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 

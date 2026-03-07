@@ -7,8 +7,8 @@
 //! - Reward distribution with Merkle proofs
 
 use hdk::prelude::*;
-use staking_integrity::*;
 use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
+use staking_integrity::*;
 
 /// Anchor for active stakes
 const ACTIVE_STAKES_ANCHOR: &str = "active_stakes";
@@ -135,8 +135,9 @@ pub fn create_stake(input: CreateStakeInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find stake".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find stake".into()
+    )))
 }
 
 /// Look up a stake by its ID using the StakeIdToStake link index.
@@ -146,15 +147,26 @@ fn find_stake_by_id(stake_id: &str) -> ExternResult<(CollateralStake, Record)> {
         LinkQuery::try_new(anchor_hash(stake_id)?, LinkTypes::StakeIdToStake)?,
         GetStrategy::default(),
     )?;
-    let link = links.first()
+    let link = links
+        .first()
         .ok_or(wasm_error!(WasmErrorInner::Guest("Stake not found".into())))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-    let record = get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Stake record not found".into())))?;
-    let stake = record.entry().to_app_option::<CollateralStake>()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Stake entry missing".into())))?;
+    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Stake record not found".into()
+    )))?;
+    let stake = record
+        .entry()
+        .to_app_option::<CollateralStake>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Stake entry missing".into()
+        )))?;
     Ok((stake, record))
 }
 
@@ -165,15 +177,26 @@ fn find_escrow_by_id(escrow_id: &str) -> ExternResult<(CryptoEscrow, Record)> {
         LinkQuery::try_new(anchor_hash(escrow_id)?, LinkTypes::EscrowIdToEscrow)?,
         GetStrategy::default(),
     )?;
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Escrow not found".into())))?;
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Escrow not found".into()
+    )))?;
     let hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-    let record = get(hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Escrow record not found".into())))?;
-    let escrow = record.entry().to_app_option::<CryptoEscrow>()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Escrow entry missing".into())))?;
+    let record = get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Escrow record not found".into()
+    )))?;
+    let escrow = record
+        .entry()
+        .to_app_option::<CryptoEscrow>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Escrow entry missing".into()
+        )))?;
     Ok((escrow, record))
 }
 
@@ -182,14 +205,15 @@ fn find_escrow_by_id(escrow_id: &str) -> ExternResult<(CryptoEscrow, Record)> {
 pub fn begin_unbonding(stake_id: String) -> ExternResult<Record> {
     let now = sys_time()?;
     // 21-day unbonding period
-    let unbonding_end = Timestamp::from_micros(
-        now.as_micros() as i64 + (21 * 24 * 3600 * 1_000_000)
-    );
+    let unbonding_end =
+        Timestamp::from_micros(now.as_micros() as i64 + (21 * 24 * 3600 * 1_000_000));
 
     let (stake, record) = find_stake_by_id(&stake_id)?;
 
     if stake.status != StakeStatus::Active {
-        return Err(wasm_error!(WasmErrorInner::Guest("Active stake not found".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Active stake not found".into()
+        )));
     }
 
     let updated = CollateralStake {
@@ -214,7 +238,9 @@ pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
     let (stake, record) = find_stake_by_id(&stake_id)?;
 
     if stake.status != StakeStatus::Unbonding {
-        return Err(wasm_error!(WasmErrorInner::Guest("Unbonding stake not found".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Unbonding stake not found".into()
+        )));
     }
 
     // Check if unbonding period is complete
@@ -246,7 +272,9 @@ pub fn update_stake_mycel(input: UpdateMycelInput) -> ExternResult<Record> {
     let (stake, record) = find_stake_by_id(&input.stake_id)?;
 
     if stake.status != StakeStatus::Active {
-        return Err(wasm_error!(WasmErrorInner::Guest("Active stake not found".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Active stake not found".into()
+        )));
     }
 
     // Fetch verified MYCEL score from recognition zome
@@ -284,7 +312,9 @@ fn fetch_verified_mycel_score(staker_did: &str) -> ExternResult<f32> {
     ) {
         Ok(ZomeCallResponse::Ok(result)) => {
             #[derive(Debug, Deserialize)]
-            struct MycelState { mycel_score: f64 }
+            struct MycelState {
+                mycel_score: f64,
+            }
             match result.decode::<MycelState>() {
                 Ok(state) => Ok((state.mycel_score as f32).clamp(0.0, 1.0)),
                 Err(_) => Ok(0.0),
@@ -323,12 +353,14 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
     let (stake, record) = find_stake_by_id(&input.stake_id)?;
 
     if stake.status != StakeStatus::Active && stake.status != StakeStatus::Unbonding {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cannot slash a {:?} stake — only Active or Unbonding stakes can be slashed", stake.status)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot slash a {:?} stake — only Active or Unbonding stakes can be slashed",
+            stake.status
+        ))));
     }
 
-    let slash_pct = input.custom_slash_percentage
+    let slash_pct = input
+        .custom_slash_percentage
         .unwrap_or_else(|| input.reason.default_slash_percentage());
 
     // Calculate slashed SAP amount
@@ -338,7 +370,7 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
     let jail_release = if jailed {
         // 7-day jail period
         Some(Timestamp::from_micros(
-            now.as_micros() as i64 + (7 * 24 * 3600 * 1_000_000)
+            now.as_micros() as i64 + (7 * 24 * 3600 * 1_000_000),
         ))
     } else {
         None
@@ -416,7 +448,12 @@ pub struct CreateEscrowInput {
 pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
     verify_caller_is_did(&input.depositor_did)?;
     let now = sys_time()?;
-    let escrow_id = format!("escrow:{}:{}:{}", input.depositor_did, input.beneficiary_did, now.as_micros());
+    let escrow_id = format!(
+        "escrow:{}:{}:{}",
+        input.depositor_did,
+        input.beneficiary_did,
+        now.as_micros()
+    );
 
     let timelock = input.timelock.map(Timestamp::from_micros);
 
@@ -475,7 +512,9 @@ pub fn reveal_hash_preimage(input: RevealPreimageInput) -> ExternResult<Record> 
     let (escrow, record) = find_escrow_by_id(&input.escrow_id)?;
 
     if escrow.status != EscrowStatus::Pending {
-        return Err(wasm_error!(WasmErrorInner::Guest("Escrow not found or not pending".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Escrow not found or not pending".into()
+        )));
     }
 
     // Verify hash preimage
@@ -551,7 +590,9 @@ pub fn add_escrow_signature(input: AddSignatureInput) -> ExternResult<Record> {
     let (escrow, record) = find_escrow_by_id(&input.escrow_id)?;
 
     if escrow.status != EscrowStatus::Pending {
-        return Err(wasm_error!(WasmErrorInner::Guest("Escrow not found or not pending".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Escrow not found or not pending".into()
+        )));
     }
 
     // Verify signer is authorized
@@ -562,10 +603,12 @@ pub fn add_escrow_signature(input: AddSignatureInput) -> ExternResult<Record> {
     }
 
     // Check if already signed
-    if escrow.collected_signatures.iter().any(|s| s.signer_did == input.signer_did) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Already signed".into()
-        )));
+    if escrow
+        .collected_signatures
+        .iter()
+        .any(|s| s.signer_did == input.signer_did)
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest("Already signed".into())));
     }
 
     let signature = EscrowSignature {
@@ -629,7 +672,9 @@ pub fn release_escrow(escrow_id: String) -> ExternResult<Record> {
     let (escrow, record) = find_escrow_by_id(&escrow_id)?;
 
     if escrow.status != EscrowStatus::Releasable {
-        return Err(wasm_error!(WasmErrorInner::Guest("Releasable escrow not found".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Releasable escrow not found".into()
+        )));
     }
 
     let updated = CryptoEscrow {
@@ -684,10 +729,7 @@ pub fn get_staker_stakes(input: PaginatedDidInput) -> ExternResult<Vec<Record>> 
 #[hdk_extern]
 pub fn get_active_stakes(limit: Option<usize>) -> ExternResult<Vec<Record>> {
     let limit = limit.unwrap_or(100);
-    let query = LinkQuery::try_new(
-        anchor_hash(ACTIVE_STAKES_ANCHOR)?,
-        LinkTypes::ActiveStakes,
-    )?;
+    let query = LinkQuery::try_new(anchor_hash(ACTIVE_STAKES_ANCHOR)?, LinkTypes::ActiveStakes)?;
     let links = get_links(query, GetStrategy::default())?;
 
     let mut stakes = Vec::new();
@@ -695,7 +737,9 @@ pub fn get_active_stakes(limit: Option<usize>) -> ExternResult<Vec<Record>> {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah.clone(), GetOptions::default())? {
-            if let Some(stake) = record.entry().to_app_option::<CollateralStake>()
+            if let Some(stake) = record
+                .entry()
+                .to_app_option::<CollateralStake>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if stake.status == StakeStatus::Active {
@@ -764,7 +808,9 @@ pub fn get_total_weighted_stake(_: ()) -> ExternResult<f64> {
     let mut total = 0.0;
 
     for record in stakes {
-        if let Some(stake) = record.entry().to_app_option::<CollateralStake>()
+        if let Some(stake) = record
+            .entry()
+            .to_app_option::<CollateralStake>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             total += stake.sap_amount as f64 * stake.stake_weight as f64;

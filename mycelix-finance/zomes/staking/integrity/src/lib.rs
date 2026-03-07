@@ -113,11 +113,11 @@ impl SlashingReason {
     /// Get default slash percentage for this reason
     pub fn default_slash_percentage(&self) -> u8 {
         match self {
-            SlashingReason::DoubleSigning => 100,      // Full slash, jail
-            SlashingReason::Downtime => 5,             // Minor
-            SlashingReason::ByzantineConsensus => 50,  // Severe
-            SlashingReason::InvalidGradient => 10,     // Moderate
-            SlashingReason::CartelActivity => 75,      // Very severe
+            SlashingReason::DoubleSigning => 100,     // Full slash, jail
+            SlashingReason::Downtime => 5,            // Minor
+            SlashingReason::ByzantineConsensus => 50, // Severe
+            SlashingReason::InvalidGradient => 10,    // Moderate
+            SlashingReason::CartelActivity => 75,     // Very severe
             SlashingReason::GovernanceManipulation => 50,
         }
     }
@@ -209,11 +209,18 @@ pub enum ReleaseCondition {
     /// Time-based release
     Timelock { release_time: i64 },
     /// Hash preimage reveal
-    HashLock { hash: Vec<u8>, hash_type: EscrowHashType },
+    HashLock {
+        hash: Vec<u8>,
+        hash_type: EscrowHashType,
+    },
     /// Multi-signature approval
     MultiSig { threshold: u8, signers: Vec<String> },
     /// Oracle price attestation
-    OraclePrice { oracle_id: String, asset: String, min_price: f64 },
+    OraclePrice {
+        oracle_id: String,
+        asset: String,
+        min_price: f64,
+    },
     /// Governance proposal passed
     GovernanceApproval { proposal_id: String },
     /// MYCEL threshold met
@@ -323,14 +330,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::CryptoEscrow(escrow) => validate_escrow(action, escrow),
                 EntryTypes::RewardDistribution(dist) => validate_reward_distribution(action, dist),
             },
-            OpEntry::UpdateEntry { app_entry, action, .. } => match app_entry {
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
                 EntryTypes::CollateralStake(stake) => validate_update_stake(action, stake),
                 EntryTypes::CryptoEscrow(escrow) => validate_update_escrow(action, escrow),
                 EntryTypes::SlashingEvent(_) => Ok(ValidateCallbackResult::Invalid(
-                    "Slashing events are immutable".into()
+                    "Slashing events are immutable".into(),
                 )),
                 EntryTypes::RewardDistribution(_) => Ok(ValidateCallbackResult::Invalid(
-                    "Reward distributions are immutable".into()
+                    "Reward distributions are immutable".into(),
                 )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -351,13 +360,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 /// Validate stake creation
-fn validate_create_stake(_action: Create, stake: CollateralStake) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_stake(
+    _action: Create,
+    stake: CollateralStake,
+) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if stake.staker_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if stake.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Stake ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Stake ID exceeds maximum length".into(),
+        ));
     }
 
     // Validate DID format
@@ -407,7 +423,10 @@ fn validate_create_stake(_action: Create, stake: CollateralStake) -> ExternResul
 }
 
 /// Validate stake update
-fn validate_update_stake(_action: Update, stake: CollateralStake) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_stake(
+    _action: Update,
+    stake: CollateralStake,
+) -> ExternResult<ValidateCallbackResult> {
     // Validate MYCEL score range
     if stake.mycel_score < 0.0 || stake.mycel_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -426,13 +445,20 @@ fn validate_update_stake(_action: Update, stake: CollateralStake) -> ExternResul
 }
 
 /// Validate slashing event
-fn validate_slashing_event(_action: Create, event: SlashingEvent) -> ExternResult<ValidateCallbackResult> {
+fn validate_slashing_event(
+    _action: Create,
+    event: SlashingEvent,
+) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if event.staker_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if event.id.len() > MAX_ID_LEN || event.stake_id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "ID exceeds maximum length".into(),
+        ));
     }
     if event.evidence.len() > MAX_EVIDENCE_BYTES {
         return Ok(ValidateCallbackResult::Invalid(
@@ -468,17 +494,25 @@ fn validate_slashing_event(_action: Create, event: SlashingEvent) -> ExternResul
 fn validate_escrow(_action: Create, escrow: CryptoEscrow) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if escrow.depositor_did.len() > MAX_DID_LEN || escrow.beneficiary_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if escrow.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Escrow ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Escrow ID exceeds maximum length".into(),
+        ));
     }
     if escrow.purpose.len() > MAX_PURPOSE_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Purpose exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Purpose exceeds maximum length".into(),
+        ));
     }
     for signer in &escrow.multisig_signers {
         if signer.len() > MAX_DID_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Signer DID exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Signer DID exceeds maximum length".into(),
+            ));
         }
     }
 
@@ -528,7 +562,10 @@ fn validate_escrow(_action: Create, escrow: CryptoEscrow) -> ExternResult<Valida
 }
 
 /// Validate escrow update
-fn validate_update_escrow(_action: Update, escrow: CryptoEscrow) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_escrow(
+    _action: Update,
+    escrow: CryptoEscrow,
+) -> ExternResult<ValidateCallbackResult> {
     // Basic validation
     if !escrow.depositor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -539,10 +576,15 @@ fn validate_update_escrow(_action: Update, escrow: CryptoEscrow) -> ExternResult
 }
 
 /// Validate reward distribution
-fn validate_reward_distribution(_action: Create, dist: RewardDistribution) -> ExternResult<ValidateCallbackResult> {
+fn validate_reward_distribution(
+    _action: Create,
+    dist: RewardDistribution,
+) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if dist.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Distribution ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Distribution ID exceeds maximum length".into(),
+        ));
     }
     for alloc in &dist.allocations {
         if alloc.stake_id.len() > MAX_ID_LEN || alloc.staker_did.len() > MAX_DID_LEN {

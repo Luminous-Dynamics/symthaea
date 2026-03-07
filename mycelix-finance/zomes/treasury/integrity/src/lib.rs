@@ -146,80 +146,73 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::Treasury(treasury) => {
-                        validate_create_treasury(EntryCreationAction::Create(action), treasury)
-                    }
-                    EntryTypes::Contribution(contribution) => {
-                        validate_create_contribution(EntryCreationAction::Create(action), contribution)
-                    }
-                    EntryTypes::Allocation(allocation) => {
-                        validate_create_allocation(EntryCreationAction::Create(action), allocation)
-                    }
-                    EntryTypes::SavingsPool(pool) => {
-                        validate_create_savings_pool(EntryCreationAction::Create(action), pool)
-                    }
-                    EntryTypes::CommonsPool(pool) => {
-                        validate_create_commons_pool(EntryCreationAction::Create(action), pool)
-                    }
-                    EntryTypes::CompostReceival(receival) => {
-                        validate_create_compost_receival(EntryCreationAction::Create(action), receival)
-                    }
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::Treasury(treasury) => {
+                    validate_create_treasury(EntryCreationAction::Create(action), treasury)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::Treasury(treasury) => {
-                        validate_update_treasury(action, treasury)
-                    }
-                    EntryTypes::Contribution(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Contributions cannot be updated".into(),
-                        ))
-                    }
-                    EntryTypes::Allocation(allocation) => {
-                        validate_update_allocation(action, allocation)
-                    }
-                    EntryTypes::SavingsPool(pool) => {
-                        validate_update_savings_pool(action, pool)
-                    }
-                    EntryTypes::CommonsPool(pool) => {
-                        validate_update_commons_pool(action, pool)
-                    }
-                    EntryTypes::CompostReceival(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Compost receivals cannot be updated -- they are immutable records".into(),
-                        ))
-                    }
+                EntryTypes::Contribution(contribution) => {
+                    validate_create_contribution(EntryCreationAction::Create(action), contribution)
                 }
-            }
+                EntryTypes::Allocation(allocation) => {
+                    validate_create_allocation(EntryCreationAction::Create(action), allocation)
+                }
+                EntryTypes::SavingsPool(pool) => {
+                    validate_create_savings_pool(EntryCreationAction::Create(action), pool)
+                }
+                EntryTypes::CommonsPool(pool) => {
+                    validate_create_commons_pool(EntryCreationAction::Create(action), pool)
+                }
+                EntryTypes::CompostReceival(receival) => {
+                    validate_create_compost_receival(EntryCreationAction::Create(action), receival)
+                }
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::Treasury(treasury) => validate_update_treasury(action, treasury),
+                EntryTypes::Contribution(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Contributions cannot be updated".into(),
+                )),
+                EntryTypes::Allocation(allocation) => {
+                    validate_update_allocation(action, allocation)
+                }
+                EntryTypes::SavingsPool(pool) => validate_update_savings_pool(action, pool),
+                EntryTypes::CommonsPool(pool) => validate_update_commons_pool(action, pool),
+                EntryTypes::CompostReceival(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Compost receivals cannot be updated -- they are immutable records".into(),
+                )),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, base_address, target_address, .. } => {
+        FlatOp::RegisterCreateLink {
+            link_type,
+            base_address,
+            target_address,
+            ..
+        } => {
             // Validate hash lengths (39 bytes for Holochain hashes)
             let base_valid = base_address.as_ref().len() == 39;
             let target_valid = target_address.as_ref().len() == 39;
 
             match link_type {
-                LinkTypes::TreasuryToContributions |
-                LinkTypes::TreasuryToAllocations |
-                LinkTypes::TreasuryToPools => {
+                LinkTypes::TreasuryToContributions
+                | LinkTypes::TreasuryToAllocations
+                | LinkTypes::TreasuryToPools => {
                     // Entry to entry links (treasury to related entries)
                     if !base_valid || !target_valid {
                         return Ok(ValidateCallbackResult::Invalid(
-                            "Treasury links must connect valid entry hashes".into()
+                            "Treasury links must connect valid entry hashes".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
-                LinkTypes::ManagerToTreasury |
-                LinkTypes::ContributorToContributions |
-                LinkTypes::MemberToPool => {
+                LinkTypes::ManagerToTreasury
+                | LinkTypes::ContributorToContributions
+                | LinkTypes::MemberToPool => {
                     // Agent to entry links
                     if !base_valid || !target_valid {
                         return Ok(ValidateCallbackResult::Invalid(
-                            "Link must connect valid agent and entry hashes".into()
+                            "Link must connect valid agent and entry hashes".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -227,7 +220,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::DaoToCommonsPool => {
                     if !base_valid || !target_valid {
                         return Ok(ValidateCallbackResult::Invalid(
-                            "DaoToCommonsPool link must connect valid hashes".into()
+                            "DaoToCommonsPool link must connect valid hashes".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -235,17 +228,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::CommonsPoolToCompost => {
                     if !base_valid || !target_valid {
                         return Ok(ValidateCallbackResult::Invalid(
-                            "CommonsPoolToCompost link must connect valid hashes".into()
+                            "CommonsPoolToCompost link must connect valid hashes".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
-                LinkTypes::TreasuryIdToTreasury |
-                LinkTypes::AllocationIdToAllocation => {
+                LinkTypes::TreasuryIdToTreasury | LinkTypes::AllocationIdToAllocation => {
                     // Anchor-to-entry links for ID-based lookups
                     if !base_valid || !target_valid {
                         return Ok(ValidateCallbackResult::Invalid(
-                            "ID index link must connect valid hashes".into()
+                            "ID index link must connect valid hashes".into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -257,22 +249,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 // Contribution links are immutable (audit trail)
                 LinkTypes::TreasuryToContributions | LinkTypes::ContributorToContributions => {
                     Ok(ValidateCallbackResult::Invalid(
-                        "Contribution links cannot be deleted - audit trail must be preserved".into()
+                        "Contribution links cannot be deleted - audit trail must be preserved"
+                            .into(),
                     ))
                 }
                 // Manager links require governance process (not direct deletion)
-                LinkTypes::ManagerToTreasury => {
-                    Ok(ValidateCallbackResult::Invalid(
-                        "Manager links cannot be directly deleted - use governance process".into()
-                    ))
-                }
+                LinkTypes::ManagerToTreasury => Ok(ValidateCallbackResult::Invalid(
+                    "Manager links cannot be directly deleted - use governance process".into(),
+                )),
                 // Compost receival links are immutable (audit trail)
-                LinkTypes::CommonsPoolToCompost => {
-                    Ok(ValidateCallbackResult::Invalid(
-                        "Compost receival links cannot be deleted - audit trail must be preserved".into()
-                    ))
-                }
-                _ => Ok(ValidateCallbackResult::Valid)
+                LinkTypes::CommonsPoolToCompost => Ok(ValidateCallbackResult::Invalid(
+                    "Compost receival links cannot be deleted - audit trail must be preserved"
+                        .into(),
+                )),
+                _ => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
@@ -288,30 +278,44 @@ fn validate_create_treasury(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if treasury.name.len() > MAX_NAME_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Treasury name exceeds maximum length of 200".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Treasury name exceeds maximum length of 200".into(),
+        ));
     }
     if treasury.description.len() > MAX_DESCRIPTION_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Treasury description exceeds maximum length of 4096".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Treasury description exceeds maximum length of 4096".into(),
+        ));
     }
     if treasury.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Treasury ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Treasury ID exceeds maximum length".into(),
+        ));
     }
     for manager in &treasury.managers {
         if manager.len() > MAX_DID_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Manager DID exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Manager DID exceeds maximum length".into(),
+            ));
         }
     }
 
     if treasury.managers.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Treasury must have at least one manager".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Treasury must have at least one manager".into(),
+        ));
     }
     for manager in &treasury.managers {
         if !manager.starts_with("did:") {
-            return Ok(ValidateCallbackResult::Invalid("Managers must be valid DIDs".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Managers must be valid DIDs".into(),
+            ));
         }
     }
     if treasury.reserve_ratio < 0.0 || treasury.reserve_ratio > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Reserve ratio must be between 0 and 1".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Reserve ratio must be between 0 and 1".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -321,7 +325,9 @@ fn validate_update_treasury(
     treasury: Treasury,
 ) -> ExternResult<ValidateCallbackResult> {
     if treasury.reserve_ratio < 0.0 || treasury.reserve_ratio > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Reserve ratio must be between 0 and 1".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Reserve ratio must be between 0 and 1".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -332,17 +338,25 @@ fn validate_create_contribution(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if contribution.contributor_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if contribution.id.len() > MAX_ID_LEN || contribution.treasury_id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "ID exceeds maximum length".into(),
+        ));
     }
 
     if !contribution.contributor_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Contributor must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contributor must be a valid DID".into(),
+        ));
     }
     if contribution.amount == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Contribution amount must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contribution amount must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -353,25 +367,37 @@ fn validate_create_allocation(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if allocation.recipient_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if allocation.purpose.len() > MAX_PURPOSE_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Purpose exceeds maximum length of 1024".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Purpose exceeds maximum length of 1024".into(),
+        ));
     }
     if allocation.id.len() > MAX_ID_LEN || allocation.treasury_id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "ID exceeds maximum length".into(),
+        ));
     }
     for approver in &allocation.approved_by {
         if approver.len() > MAX_DID_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Approver DID exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Approver DID exceeds maximum length".into(),
+            ));
         }
     }
 
     if !allocation.recipient_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Recipient must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recipient must be a valid DID".into(),
+        ));
     }
     if allocation.amount == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Allocation amount must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Allocation amount must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -381,7 +407,9 @@ fn validate_update_allocation(
     allocation: Allocation,
 ) -> ExternResult<ValidateCallbackResult> {
     if allocation.amount == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Allocation amount must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Allocation amount must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -392,22 +420,32 @@ fn validate_create_savings_pool(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if pool.name.len() > MAX_NAME_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Pool name exceeds maximum length of 200".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Pool name exceeds maximum length of 200".into(),
+        ));
     }
     if pool.id.len() > MAX_ID_LEN || pool.treasury_id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "ID exceeds maximum length".into(),
+        ));
     }
     for member in &pool.members {
         if member.len() > MAX_DID_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Member DID exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Member DID exceeds maximum length".into(),
+            ));
         }
     }
 
     if pool.target_amount == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Target amount must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Target amount must be positive".into(),
+        ));
     }
     if pool.yield_rate < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Yield rate cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Yield rate cannot be negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -417,7 +455,9 @@ fn validate_update_savings_pool(
     pool: SavingsPool,
 ) -> ExternResult<ValidateCallbackResult> {
     if pool.target_amount == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Target amount must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Target amount must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -446,18 +486,24 @@ fn validate_create_commons_pool(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if pool.dao_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if pool.id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Pool ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Pool ID exceeds maximum length".into(),
+        ));
     }
 
     if !pool.dao_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("DAO DID must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DAO DID must be a valid DID".into(),
+        ));
     }
     if !pool.demurrage_exempt {
         return Ok(ValidateCallbackResult::Invalid(
-            "Commons pool must be demurrage exempt (constitutional requirement)".into()
+            "Commons pool must be demurrage exempt (constitutional requirement)".into(),
         ));
     }
     validate_commons_pool_reserve_ratio(&pool)
@@ -469,7 +515,7 @@ fn validate_update_commons_pool(
 ) -> ExternResult<ValidateCallbackResult> {
     if !pool.demurrage_exempt {
         return Ok(ValidateCallbackResult::Invalid(
-            "Commons pool must remain demurrage exempt (constitutional requirement)".into()
+            "Commons pool must remain demurrage exempt (constitutional requirement)".into(),
         ));
     }
     validate_commons_pool_reserve_ratio(&pool)
@@ -481,17 +527,25 @@ fn validate_create_compost_receival(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if receival.source_member_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if receival.id.len() > MAX_ID_LEN || receival.commons_pool_id.len() > MAX_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "ID exceeds maximum length".into(),
+        ));
     }
 
     if receival.amount == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Compost receival amount must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Compost receival amount must be positive".into(),
+        ));
     }
     if !receival.source_member_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Source member must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Source member must be a valid DID".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }

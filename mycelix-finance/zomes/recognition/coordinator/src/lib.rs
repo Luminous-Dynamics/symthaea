@@ -200,17 +200,18 @@ pub fn recognize_member(input: RecognizeMemberInput) -> ExternResult<Record> {
     increment_allocation(&caller_did, &input.cycle_id)?;
 
     // Return the created record
-    let record = get(event_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to retrieve created recognition record".into()
-        )))?;
+    let record = get(event_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to retrieve created recognition record".into())
+    ))?;
 
     Ok(record)
 }
 
 /// Get all recognitions received by a member, optionally filtered by cycle (paginated, default limit 100)
 #[hdk_extern]
-pub fn get_recognition_received(input: GetRecognitionsInput) -> ExternResult<Vec<RecognitionEvent>> {
+pub fn get_recognition_received(
+    input: GetRecognitionsInput,
+) -> ExternResult<Vec<RecognitionEvent>> {
     if input.member_did.is_empty() || input.member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
@@ -230,7 +231,12 @@ pub fn get_recognition_received(input: GetRecognitionsInput) -> ExternResult<Vec
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(event) = record.entry().to_app_option::<RecognitionEvent>().ok().flatten() {
+                if let Some(event) = record
+                    .entry()
+                    .to_app_option::<RecognitionEvent>()
+                    .ok()
+                    .flatten()
+                {
                     // Filter by cycle if specified
                     if let Some(ref cycle) = input.cycle_id {
                         if event.cycle_id == *cycle {
@@ -277,9 +283,12 @@ pub fn initialize_member(input: InitializeMemberInput) -> ExternResult<Record> {
     verify_caller_is_did(&input.member_did)?;
 
     if input.is_apprentice {
-        let mentor = input.mentor_did.as_ref().ok_or(wasm_error!(
-            WasmErrorInner::Guest("Apprentices must have a mentor DID".into())
-        ))?;
+        let mentor = input
+            .mentor_did
+            .as_ref()
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Apprentices must have a mentor DID".into()
+            )))?;
         if mentor.is_empty() || mentor.len() > MAX_DID_LENGTH {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Mentor DID must be 1-256 characters".into()
@@ -323,10 +332,9 @@ pub fn initialize_member(input: InitializeMemberInput) -> ExternResult<Record> {
         (),
     )?;
 
-    let record = get(state_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Failed to retrieve created MYCEL state".into()
-        )))?;
+    let record = get(state_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to retrieve created MYCEL state".into())
+    ))?;
 
     Ok(record)
 }
@@ -343,10 +351,10 @@ pub fn update_mycel_score(input: UpdateMycelInput) -> ExternResult<MemberMycelSt
     // Verify caller is the member (prevents score manipulation by others)
     verify_caller_is_did(&input.member_did)?;
 
-    let (current_state, action_hash) = find_mycel_state_with_hash(&input.member_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Member MYCEL state not found — initialize first".into()
-        )))?;
+    let (current_state, action_hash) =
+        find_mycel_state_with_hash(&input.member_did)?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Member MYCEL state not found — initialize first".into())
+        ))?;
 
     let now = sys_time()?;
     let participation = input.participation.clamp(0.0, 1.0);
@@ -361,10 +369,8 @@ pub fn update_mycel_score(input: UpdateMycelInput) -> ExternResult<MemberMycelSt
 
     let longevity = (input.active_months as f64 / 24.0).min(1.0);
 
-    let composite = participation * 0.40
-        + recognition * 0.20
-        + validation * 0.20
-        + longevity * 0.20;
+    let composite =
+        participation * 0.40 + recognition * 0.20 + validation * 0.20 + longevity * 0.20;
 
     // Check if member should graduate from apprentice
     let is_apprentice = if current_state.is_apprentice && composite >= MYCEL_APPRENTICE_MAX {
@@ -405,14 +411,13 @@ pub fn jubilee_normalize(member_did: String) -> ExternResult<MemberMycelState> {
         )));
     }
 
-    let (current_state, action_hash) = find_mycel_state_with_hash(&member_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Member MYCEL state not found".into()
-        )))?;
+    let (current_state, action_hash) = find_mycel_state_with_hash(&member_did)?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Member MYCEL state not found".into())),
+    )?;
 
     let now = sys_time()?;
-    let normalized_score = (0.3 + (current_state.mycel_score - 0.3) * JUBILEE_COMPRESSION)
-        .clamp(0.0, 1.0);
+    let normalized_score =
+        (0.3 + (current_state.mycel_score - 0.3) * JUBILEE_COMPRESSION).clamp(0.0, 1.0);
 
     let updated_state = MemberMycelState {
         mycel_score: normalized_score,
@@ -440,10 +445,9 @@ pub fn dissolve_mycel(member_did: String) -> ExternResult<()> {
         )));
     }
 
-    let (_, action_hash) = find_mycel_state_with_hash(&member_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Member MYCEL state not found".into()
-        )))?;
+    let (_, action_hash) = find_mycel_state_with_hash(&member_did)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Member MYCEL state not found".into())
+    ))?;
 
     let now = sys_time()?;
 
@@ -489,10 +493,9 @@ pub fn apply_passive_decay(member_did: String) -> ExternResult<MemberMycelState>
         )));
     }
 
-    let (current_state, action_hash) = find_mycel_state_with_hash(&member_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Member MYCEL state not found".into()
-        )))?;
+    let (current_state, action_hash) = find_mycel_state_with_hash(&member_did)?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Member MYCEL state not found".into())),
+    )?;
 
     // Don't decay dissolved members (score already 0)
     if current_state.mycel_score <= 0.0 {
@@ -617,8 +620,8 @@ pub fn graduate_apprentice(apprentice_did: String) -> ExternResult<MemberMycelSt
     let caller = agent_info()?.agent_initial_pubkey;
     let caller_did = format!("{}{}", DID_METHOD_PREFIX, caller);
 
-    let (current_state, action_hash) = find_mycel_state_with_hash(&apprentice_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
+    let (current_state, action_hash) =
+        find_mycel_state_with_hash(&apprentice_did)?.ok_or(wasm_error!(WasmErrorInner::Guest(
             "Apprentice MYCEL state not found".into()
         )))?;
 
@@ -689,7 +692,9 @@ fn find_mycel_state(member_did: &str) -> ExternResult<Option<MemberMycelState>> 
     Ok(find_mycel_state_with_hash(member_did)?.map(|(state, _)| state))
 }
 
-fn find_mycel_state_with_hash(member_did: &str) -> ExternResult<Option<(MemberMycelState, ActionHash)>> {
+fn find_mycel_state_with_hash(
+    member_did: &str,
+) -> ExternResult<Option<(MemberMycelState, ActionHash)>> {
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("mycel:{}", member_did))?,
@@ -699,10 +704,15 @@ fn find_mycel_state_with_hash(member_did: &str) -> ExternResult<Option<(MemberMy
     )?;
 
     if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(state) = record.entry().to_app_option::<MemberMycelState>().ok().flatten() {
-                    return Ok(Some((state, action_hash)));
+        if let Some(link_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(link_hash, GetOptions::default())? {
+                if let Some(state) = record
+                    .entry()
+                    .to_app_option::<MemberMycelState>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(Some((state, record.action_address().clone())));
                 }
             }
         }
@@ -727,7 +737,12 @@ fn get_or_create_allocation(
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(alloc) = record.entry().to_app_option::<RecognitionAllocation>().ok().flatten() {
+                if let Some(alloc) = record
+                    .entry()
+                    .to_app_option::<RecognitionAllocation>()
+                    .ok()
+                    .flatten()
+                {
                     return Ok(alloc);
                 }
             }
@@ -764,11 +779,16 @@ fn increment_allocation(recognizer_did: &str, cycle_id: &str) -> ExternResult<()
     )?;
 
     if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(mut alloc) = record.entry().to_app_option::<RecognitionAllocation>().ok().flatten() {
+        if let Some(link_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(link_hash, GetOptions::default())? {
+                if let Some(mut alloc) = record
+                    .entry()
+                    .to_app_option::<RecognitionAllocation>()
+                    .ok()
+                    .flatten()
+                {
                     alloc.count += 1;
-                    update_entry(action_hash, &alloc)?;
+                    update_entry(record.action_address().clone(), &alloc)?;
                 }
             }
         }
@@ -793,18 +813,23 @@ fn fetch_validation_from_tend(member_did: &str) -> ExternResult<f64> {
         ZomeName::from("tend"),
         FunctionName::from("get_validation_score"),
         None,
-        ValidationScoreInput { member_did: member_did.to_string(), limit: None },
+        ValidationScoreInput {
+            member_did: member_did.to_string(),
+            limit: None,
+        },
     ) {
-        Ok(ZomeCallResponse::Ok(result)) => {
-            result.decode::<f64>().map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode TEND validation score: {:?}", e
-                )))
-            })
-        }
+        Ok(ZomeCallResponse::Ok(result)) => result.decode::<f64>().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode TEND validation score: {:?}",
+                e
+            )))
+        }),
         Ok(other) => {
             // Zome call was routed but returned non-Ok (e.g., Unauthorized)
-            debug!("TEND validation cross-zome call returned {:?}, defaulting to 0.0", other);
+            debug!(
+                "TEND validation cross-zome call returned {:?}, defaulting to 0.0",
+                other
+            );
             Ok(0.0)
         }
         Err(_) => {

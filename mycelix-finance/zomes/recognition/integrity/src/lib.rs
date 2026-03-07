@@ -180,21 +180,21 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::RecognitionEvent(event) => {
-                        validate_create_recognition(EntryCreationAction::Create(action), event)
-                    }
-                    EntryTypes::MemberMycelState(state) => {
-                        validate_create_mycel_state(EntryCreationAction::Create(action), state)
-                    }
-                    EntryTypes::RecognitionAllocation(alloc) => {
-                        validate_create_allocation(EntryCreationAction::Create(action), alloc)
-                    }
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::RecognitionEvent(event) => {
+                    validate_create_recognition(EntryCreationAction::Create(action), event)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
+                EntryTypes::MemberMycelState(state) => {
+                    validate_create_mycel_state(EntryCreationAction::Create(action), state)
+                }
+                EntryTypes::RecognitionAllocation(alloc) => {
+                    validate_create_allocation(EntryCreationAction::Create(action), alloc)
+                }
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => {
                 match app_entry {
                     EntryTypes::RecognitionEvent(_) => {
                         // Recognition events are immutable once created
@@ -208,26 +208,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::RecognitionAllocation(alloc) => {
                         validate_update_allocation(action, alloc)
                     }
-                    EntryTypes::Anchor(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Anchors cannot be updated".into(),
-                        ))
-                    }
+                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
+                        "Anchors cannot be updated".into(),
+                    )),
                 }
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => {
-            match link_type {
-                LinkTypes::RecognizerToEvents => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::RecipientToEvents => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::CycleToEvents => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::MemberToMycelState => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::RecognizerCycleToAllocation => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::AnchorLinks => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::GovernanceAgents => Ok(ValidateCallbackResult::Valid),
-            }
-        }
+        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
+            LinkTypes::RecognizerToEvents => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::RecipientToEvents => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::CycleToEvents => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::MemberToMycelState => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::RecognizerCycleToAllocation => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AnchorLinks => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::GovernanceAgents => Ok(ValidateCallbackResult::Valid),
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -242,20 +238,28 @@ fn validate_create_recognition(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if event.recognizer_did.len() > MAX_DID_LEN || event.recipient_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if event.cycle_id.len() > MAX_CYCLE_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Cycle ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cycle ID exceeds maximum length".into(),
+        ));
     }
 
     // Validate recognizer DID
     if !event.recognizer_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Recognizer must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recognizer must be a valid DID".into(),
+        ));
     }
 
     // Validate recipient DID
     if !event.recipient_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Recipient must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recipient must be a valid DID".into(),
+        ));
     }
 
     // Cannot recognize yourself
@@ -281,9 +285,7 @@ fn validate_create_recognition(
     }
 
     // Cycle ID format check (YYYY-MM): length 7 with dash at position 4
-    if event.cycle_id.len() != 7
-        || event.cycle_id.as_bytes()[4] != b'-'
-    {
+    if event.cycle_id.len() != 7 || event.cycle_id.as_bytes()[4] != b'-' {
         return Ok(ValidateCallbackResult::Invalid(
             "Cycle ID must be in YYYY-MM format".into(),
         ));
@@ -298,20 +300,28 @@ fn validate_create_mycel_state(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if state.member_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if state.current_cycle_id.len() > MAX_CYCLE_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Cycle ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cycle ID exceeds maximum length".into(),
+        ));
     }
     if let Some(ref mentor) = state.mentor_did {
         if mentor.len() > MAX_DID_LEN {
-            return Ok(ValidateCallbackResult::Invalid("Mentor DID exceeds maximum length".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Mentor DID exceeds maximum length".into(),
+            ));
         }
     }
 
     // Validate member DID
     if !state.member_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member must be a valid DID".into(),
+        ));
     }
 
     // MYCEL score must be 0.0-1.0
@@ -328,9 +338,10 @@ fn validate_create_mycel_state(
         ("validation", state.validation),
         ("longevity", state.longevity),
     ] {
-        if value < 0.0 || value > 1.0 {
+        if !(0.0..=1.0).contains(&value) {
             return Ok(ValidateCallbackResult::Invalid(format!(
-                "{} component must be between 0.0 and 1.0", name
+                "{} component must be between 0.0 and 1.0",
+                name
             )));
         }
     }
@@ -345,7 +356,9 @@ fn validate_create_mycel_state(
     // Validate mentor DID if present
     if let Some(ref mentor) = state.mentor_did {
         if !mentor.starts_with("did:") {
-            return Ok(ValidateCallbackResult::Invalid("Mentor must be a valid DID".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Mentor must be a valid DID".into(),
+            ));
         }
     }
 
@@ -358,7 +371,9 @@ fn validate_update_mycel_state(
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate member DID format (must remain a valid DID)
     if !state.member_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member must be a valid DID".into(),
+        ));
     }
 
     // MYCEL score must be 0.0-1.0
@@ -375,9 +390,10 @@ fn validate_update_mycel_state(
         ("validation", state.validation),
         ("longevity", state.longevity),
     ] {
-        if value < 0.0 || value > 1.0 {
+        if !(0.0..=1.0).contains(&value) {
             return Ok(ValidateCallbackResult::Invalid(format!(
-                "{} component must be between 0.0 and 1.0", name
+                "{} component must be between 0.0 and 1.0",
+                name
             )));
         }
     }
@@ -396,7 +412,9 @@ fn validate_update_mycel_state(
     // Validate mentor DID if present
     if let Some(ref mentor) = state.mentor_did {
         if !mentor.starts_with("did:") {
-            return Ok(ValidateCallbackResult::Invalid("Mentor must be a valid DID".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Mentor must be a valid DID".into(),
+            ));
         }
     }
 
@@ -409,18 +427,25 @@ fn validate_create_allocation(
 ) -> ExternResult<ValidateCallbackResult> {
     // String length checks — prevent DHT bloat
     if alloc.recognizer_did.len() > MAX_DID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "DID exceeds maximum length".into(),
+        ));
     }
     if alloc.cycle_id.len() > MAX_CYCLE_ID_LEN {
-        return Ok(ValidateCallbackResult::Invalid("Cycle ID exceeds maximum length".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cycle ID exceeds maximum length".into(),
+        ));
     }
 
     if !alloc.recognizer_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Recognizer must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recognizer must be a valid DID".into(),
+        ));
     }
     if alloc.count > MAX_RECOGNITIONS_PER_CYCLE {
         return Ok(ValidateCallbackResult::Invalid(format!(
-            "Cannot exceed {} recognitions per cycle", MAX_RECOGNITIONS_PER_CYCLE
+            "Cannot exceed {} recognitions per cycle",
+            MAX_RECOGNITIONS_PER_CYCLE
         )));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -432,7 +457,8 @@ fn validate_update_allocation(
 ) -> ExternResult<ValidateCallbackResult> {
     if alloc.count > MAX_RECOGNITIONS_PER_CYCLE {
         return Ok(ValidateCallbackResult::Invalid(format!(
-            "Cannot exceed {} recognitions per cycle", MAX_RECOGNITIONS_PER_CYCLE
+            "Cannot exceed {} recognitions per cycle",
+            MAX_RECOGNITIONS_PER_CYCLE
         )));
     }
     Ok(ValidateCallbackResult::Valid)
