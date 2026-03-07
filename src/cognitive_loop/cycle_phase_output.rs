@@ -237,6 +237,8 @@ impl CognitiveLoopService {
                     .moral_topology()
                     .last_summary()
                     .attractor_detected,
+                in_active_rest: self.stats.in_active_rest,
+                stillness_dominance_streak: self.stats.stillness_dominance_streak,
             },
             multi_obj_frontier_size: feedback.multi_obj_frontier_size,
             consciousness_profile_composite: feedback.consciousness.consciousness_profile_composite,
