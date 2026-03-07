@@ -176,3 +176,119 @@ impl CalibrationHistory {
         Some(total / count as f64)
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CALIBRATION VALIDATOR — closed-loop validation of calibration effectiveness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Pre-calibration metric snapshot for validation comparison.
+#[derive(Debug, Clone)]
+struct MetricSnapshot {
+    pe_ema: f64,
+    coherence_ema: f64,
+    confidence_error_ema: f64,
+    cycle: u64,
+}
+
+/// Validates whether calibration adjustments actually improved performance.
+///
+/// Records a pre-calibration metric snapshot when calibration is applied,
+/// then compares post-calibration metrics after a settling period.
+///
+/// Science: Bayesian model comparison — evaluate whether the posterior
+/// (post-calibration) is a better fit than the prior (pre-calibration).
+/// Powers & Cisek (2021) — closed-loop neuromodulation requires outcome monitoring.
+#[derive(Debug, Clone)]
+pub struct CalibrationValidator {
+    /// Pre-calibration snapshot (set when calibration is applied).
+    pending_validation: Option<MetricSnapshot>,
+    /// Settling period: cycles to wait before comparing metrics.
+    settling_cycles: u64,
+    /// Running count of validations that improved metrics.
+    pub improvements: u32,
+    /// Running count of validations that worsened metrics.
+    pub regressions: u32,
+    /// Running count of neutral outcomes (within noise margin).
+    pub neutral: u32,
+    /// Damping factor applied when regressions exceed improvements.
+    /// 0.0 = no damping, 1.0 = maximum damping.
+    pub regression_damping: f32,
+}
+
+impl Default for CalibrationValidator {
+    fn default() -> Self {
+        Self {
+            pending_validation: None,
+            settling_cycles: 100, // Wait 100 cycles before comparing
+            improvements: 0,
+            regressions: 0,
+            neutral: 0,
+            regression_damping: 0.0,
+        }
+    }
+}
+
+impl CalibrationValidator {
+    /// Record pre-calibration metrics when a calibration is about to be applied.
+    pub fn record_pre_calibration(&mut self, pe_ema: f64, coherence_ema: f64, confidence_error_ema: f64, cycle: u64) {
+        self.pending_validation = Some(MetricSnapshot {
+            pe_ema,
+            coherence_ema,
+            confidence_error_ema,
+            cycle,
+        });
+    }
+
+    /// Check whether enough time has passed to validate the calibration.
+    /// Returns `Some(improved)` if validation window has elapsed.
+    pub fn check_validation(&mut self, pe_ema: f64, coherence_ema: f64, confidence_error_ema: f64, cycle: u64) -> Option<bool> {
+        let pre = self.pending_validation.as_ref()?;
+        if cycle < pre.cycle + self.settling_cycles {
+            return None; // Not enough settling time
+        }
+
+        // Compare: lower PE is better, higher coherence is better, lower confidence error is better
+        let pe_improved = pe_ema < pre.pe_ema - 0.01;
+        let coherence_improved = coherence_ema > pre.coherence_ema + 0.01;
+        let confidence_improved = confidence_error_ema < pre.confidence_error_ema - 0.005;
+
+        // Score: count how many metrics improved vs worsened
+        let pe_worsened = pe_ema > pre.pe_ema + 0.02;
+        let coherence_worsened = coherence_ema < pre.coherence_ema - 0.02;
+
+        let improvement_count = pe_improved as u8 + coherence_improved as u8 + confidence_improved as u8;
+        let worsened_count = pe_worsened as u8 + coherence_worsened as u8;
+
+        let improved = improvement_count > worsened_count;
+
+        if improvement_count > 0 && worsened_count == 0 {
+            self.improvements += 1;
+        } else if worsened_count > improvement_count {
+            self.regressions += 1;
+        } else {
+            self.neutral += 1;
+        }
+
+        // Update regression damping: if regressions outpace improvements, future
+        // calibrations should be dampened (smaller adjustments).
+        let total = self.improvements + self.regressions + self.neutral;
+        if total >= 3 {
+            let regression_ratio = self.regressions as f32 / total as f32;
+            self.regression_damping = (regression_ratio - 0.3).max(0.0).min(0.5);
+        }
+
+        self.pending_validation = None;
+        Some(improved)
+    }
+
+    /// Damping multiplier for future calibration factors.
+    /// Returns 1.0 when no damping, <1.0 when regressions are frequent.
+    pub fn adjustment_multiplier(&self) -> f32 {
+        1.0 - self.regression_damping
+    }
+
+    /// Total number of validations completed.
+    pub fn total_validations(&self) -> u32 {
+        self.improvements + self.regressions + self.neutral
+    }
+}

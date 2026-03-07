@@ -51,6 +51,7 @@ members = [
     "crates/symthaea-vision-manifold",
     "crates/symthaea-foveation",
     "crates/symthaea-phi-oracle",
+    "crates/symthaea-pulse",
 ]
 
 

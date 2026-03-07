@@ -14599,6 +14599,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-pulse"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "serde",
+ "serde_json",
+ "symthaea",
+ "symthaea-psych-bench",
+]
+
+[[package]]
 name = "symthaea-sensorimotor"
 version = "0.1.0"
 dependencies = [

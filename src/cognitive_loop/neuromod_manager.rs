@@ -39,6 +39,9 @@ pub(crate) struct NeuromodManager {
 
     /// Calibration history for drift tracking (sliding window of last N profiles).
     pub calibration_history: super::calibration::CalibrationHistory,
+
+    /// Closed-loop validator: tracks whether calibration adjustments actually improved metrics.
+    pub calibration_validator: super::calibration::CalibrationValidator,
 }
 
 impl Default for NeuromodManager {
@@ -55,6 +58,7 @@ impl Default for NeuromodManager {
             calibration_battery_child: None,
             calibration_battery_spawned_at: None,
             calibration_history: super::calibration::CalibrationHistory::default(),
+            calibration_validator: super::calibration::CalibrationValidator::default(),
         }
     }
 }

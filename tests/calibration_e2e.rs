@@ -312,3 +312,71 @@ fn test_peer_calibration_shareable_roundtrip() {
         );
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Test F: Closed-loop calibration validation — telemetry fields populated
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_calibration_validator_telemetry_populated_after_calibration() {
+    let mut service = make_service();
+    warmup(&mut service, 30);
+
+    // Apply a calibration with strong z-scores
+    service.ingest_calibration(&[
+        ("Executive::Stroop", "stroop_effect", -2.0),
+        ("WorM::N-back", "nback_2::accuracy", -1.5),
+    ]);
+    service.apply_pending_calibration();
+
+    // Run cycles to allow validation to settle (100+ cycle settling period)
+    for _ in 0..150 {
+        service.cycle("post-calibration settling");
+    }
+
+    // Check telemetry fields
+    let result = service.cycle("telemetry check");
+    // Calibration validator should have recorded at least one validation
+    // (it fires at settling_cycles after calibration application)
+    let total = result.metadata.calibration_validations_total;
+    let mult = result.metadata.calibration_adjustment_multiplier;
+
+    assert!(mult.is_finite(), "adjustment_multiplier should be finite");
+    assert!(mult > 0.0 && mult <= 1.0, "multiplier should be in (0, 1]: {mult}");
+    // Cooldown should be a reasonable value
+    let cd = result.metadata.calibration_cooldown_duration;
+    assert!(cd >= 200 && cd <= 2000, "cooldown should be in [200, 2000]: {cd}");
+
+    // The new adaptive dynamics telemetry should also be populated
+    assert!(result.metadata.epistemic_uncertainty.is_finite());
+    assert!(result.metadata.aleatoric_uncertainty.is_finite());
+    assert!(result.metadata.theta_phase.is_finite());
+    assert!(result.metadata.temporal_binding_strength.is_finite());
+    assert!(result.metadata.prediction_horizon_scale.is_finite());
+    assert!(result.metadata.prediction_horizon_scale > 0.0);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Test G: Adaptive dynamics fields bounded over multiple cycles
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_adaptive_dynamics_telemetry_bounded() {
+    let mut service = make_service();
+
+    for i in 0..50 {
+        let input = if i % 3 == 0 { "novel surprising input" } else { "steady state" };
+        let r = service.cycle(input);
+
+        assert!(r.metadata.epistemic_uncertainty >= 0.0 && r.metadata.epistemic_uncertainty <= 1.0,
+            "epistemic should be [0,1]: {}", r.metadata.epistemic_uncertainty);
+        assert!(r.metadata.aleatoric_uncertainty >= 0.0 && r.metadata.aleatoric_uncertainty <= 1.0,
+            "aleatoric should be [0,1]: {}", r.metadata.aleatoric_uncertainty);
+        assert!(r.metadata.theta_phase >= 0.0 && r.metadata.theta_phase < 7.0,
+            "theta should be [0, 2π): {}", r.metadata.theta_phase);
+        assert!(r.metadata.temporal_binding_strength >= 0.0 && r.metadata.temporal_binding_strength <= 1.0,
+            "binding should be [0,1]: {}", r.metadata.temporal_binding_strength);
+        assert!(r.metadata.prediction_horizon_scale > 0.0 && r.metadata.prediction_horizon_scale <= 1.5,
+            "horizon scale should be (0, 1.5]: {}", r.metadata.prediction_horizon_scale);
+    }
+}

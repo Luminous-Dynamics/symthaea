@@ -149,6 +149,14 @@ impl CognitiveLoopService {
         };
         let prediction_coherence_urgency_bias = coherence_mod - 1.0;
 
+        // Track sustained low coherence for forced escalation.
+        // Science: Bar (2009) — persistent incoherence signals model failure needing reallocation.
+        if prev_coherence > 0.0 && prev_coherence < 0.2 {
+            self.carryover.urgency.consecutive_low_coherence += 1;
+        } else {
+            self.carryover.urgency.consecutive_low_coherence = 0;
+        }
+
         let hysteresis_threshold = base_hysteresis * pattern_mod * coherence_mod;
         let error_urgency = super::super::CycleUrgency::from_state(
             smoothed_urgency_error,
@@ -156,6 +164,21 @@ impl CognitiveLoopService {
             surprise_triggered,
             self.carryover.urgency.consecutive_low_error,
         );
+
+        // Sustained low coherence (>10 cycles) forces Critical — model needs full reprocessing.
+        // Also boost exploration: if the model is persistently confused, seek novel inputs.
+        // Schmidhuber (2010): curiosity-driven learning from persistent prediction failure.
+        let error_urgency = if self.carryover.urgency.consecutive_low_coherence
+            > super::super::thresholds::LOW_COHERENCE_EXPLORATION_THRESHOLD
+        {
+            self.adjust_exploration(
+                "sustained_low_coherence",
+                super::super::thresholds::LOW_COHERENCE_EXPLORATION_BOOST,
+            );
+            super::super::CycleUrgency::Critical
+        } else {
+            error_urgency
+        };
 
         // Compose CognitiveDepth with error-based urgency:
         // Reflex → cap at Cruise (skip heavy subsystems for familiar inputs)
@@ -183,7 +206,7 @@ impl CognitiveLoopService {
         }
         error_history.push_back(prediction_error);
 
-        let (error_pattern, predicted_urgency) = if error_history.len() >= 4 {
+        let (error_pattern, predicted_urgency, error_slope, oscillation_ratio) = if error_history.len() >= 4 {
             let len = error_history.len();
             // Direct index: newest = len-1, 4th-newest = len-4 (avoids Vec alloc)
             let newest = error_history[len - 1];
@@ -233,9 +256,9 @@ impl CognitiveLoopService {
                 }
                 _ => "Normal",
             };
-            (pattern, predicted)
+            (pattern, predicted, slope, oscillation_ratio)
         } else {
-            ("Warmup", "Normal")
+            ("Warmup", "Normal", 0.0, 0.0)
         };
 
         // #9: Error trend → DA baseline modulation (Schultz 2016)
@@ -282,11 +305,26 @@ impl CognitiveLoopService {
         self.stats.avg_mode_stability = self.stats.avg_mode_stability * 0.9
             + self.carryover.urgency.mode_stability_counter as f32 * 0.1;
 
+        // Sustained Critical urgency → LR boost.
+        // If stuck in Critical for >5 cycles, boost learning rate to accelerate adaptation.
+        // Science: Yerkes-Dodson (1908) — moderate arousal optimizes performance,
+        // but sustained high arousal should increase plasticity.
+        if matches!(urgency, super::super::CycleUrgency::Critical)
+            && self.carryover.urgency.mode_stability_counter > 5
+        {
+            let sustained_boost = ((self.carryover.urgency.mode_stability_counter - 5) as f32
+                * 0.01)
+                .min(0.1);
+            self.scale_lr("sustained_critical", 1.0 + sustained_boost);
+        }
+
         UrgencyResult {
             urgency,
             error_pattern,
             predicted_urgency,
             prediction_coherence_urgency_bias,
+            error_slope,
+            oscillation_ratio,
         }
     }
 }

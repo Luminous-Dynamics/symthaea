@@ -342,6 +342,37 @@ pub const COHERENCE_HIGH_THRESHOLD: f32 = 0.8;
 pub const COHERENCE_CONFIDENCE_BOOST: f32 = 0.02;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// THETA OSCILLATION & PREDICTION HORIZONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Theta phase advance per cycle (radians).
+/// Basis: Buzsáki (2002) — 6Hz theta at 50Hz loop rate: 6 × 2π / 50 ≈ 0.754 rad.
+pub const THETA_PHASE_ADVANCE: f64 = 0.754;
+
+/// Theta → Phi modulation amplitude (±fraction of Phi).
+/// Basis: Buzsáki (2006) — theta oscillations gate information integration.
+pub const THETA_PHI_MODULATION_AMPLITUDE: f64 = 0.10;
+
+/// EMA alpha for smoothing theta-modulated Phi (prevents 6Hz artifacts).
+/// Basis: Buzsáki (2006) — downstream consumers need stable consciousness metrics.
+pub const THETA_PHI_SMOOTH_ALPHA: f64 = 0.3;
+
+/// Prediction horizon minimum scale (floor).
+/// Prevents extremely short horizons under high PE + slow substrate.
+pub const PREDICTION_HORIZON_MIN_SCALE: f32 = 0.3;
+
+/// Prediction horizon maximum scale (ceiling).
+/// Prevents extremely long horizons under low PE + fast substrate.
+pub const PREDICTION_HORIZON_MAX_SCALE: f32 = 2.0;
+
+/// Sustained low-coherence cycle threshold for exploration boost.
+/// Basis: Schmidhuber (2010) — curiosity from persistent model confusion.
+pub const LOW_COHERENCE_EXPLORATION_THRESHOLD: u32 = 10;
+
+/// Exploration boost per cycle during sustained low coherence.
+pub const LOW_COHERENCE_EXPLORATION_BOOST: f32 = 0.02;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // WORLD MODEL
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1089,5 +1120,22 @@ mod tests {
         assert!(HARMONIC_FIELD_BOOST_THRESHOLD > 0.0);
         assert!(HARMONIC_FIELD_BOOST_THRESHOLD < 1.0);
         assert!(HARMONIC_FIELD_BOOST_FACTOR > 0.0);
+    }
+
+    #[test]
+    fn test_theta_and_horizon_params() {
+        assert!(THETA_PHASE_ADVANCE > 0.0);
+        assert!(THETA_PHASE_ADVANCE < std::f64::consts::PI); // less than half-cycle per step
+        assert!(THETA_PHI_MODULATION_AMPLITUDE > 0.0);
+        assert!(THETA_PHI_MODULATION_AMPLITUDE <= 0.2); // don't modulate >20%
+        assert!(THETA_PHI_SMOOTH_ALPHA > 0.0);
+        assert!(THETA_PHI_SMOOTH_ALPHA < 1.0);
+        assert!(PREDICTION_HORIZON_MIN_SCALE > 0.0);
+        assert!(PREDICTION_HORIZON_MIN_SCALE < 1.0);
+        assert!(PREDICTION_HORIZON_MAX_SCALE > 1.0);
+        assert!(PREDICTION_HORIZON_MIN_SCALE < PREDICTION_HORIZON_MAX_SCALE);
+        assert!(LOW_COHERENCE_EXPLORATION_THRESHOLD > 0);
+        assert!(LOW_COHERENCE_EXPLORATION_BOOST > 0.0);
+        assert!(LOW_COHERENCE_EXPLORATION_BOOST < 0.1); // don't over-explore
     }
 }

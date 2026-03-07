@@ -466,6 +466,12 @@ pub struct CognitiveLoopConfig {
     #[cfg(feature = "ssm_language")]
     pub enable_broca_language: bool,
 
+    /// Path to a pre-trained Broca checkpoint file.
+    /// When None, uses the default checkpoint bundled with the crate.
+    /// Only used when `enable_broca_language` is true.
+    #[cfg(feature = "ssm_language")]
+    pub broca_checkpoint_path: Option<String>,
+
     // ── Per-Region Substrate Types (Phase 4 Foundation) ────────────────
     /// Per-region substrate mapping: allows different cortical regions to run
     /// on different physical substrates. When `None`, all regions use the
@@ -600,6 +606,8 @@ impl Default for CognitiveLoopConfig {
             physics_bridge_blend_weight: 0.1,
             #[cfg(feature = "ssm_language")]
             enable_broca_language: false,
+            #[cfg(feature = "ssm_language")]
+            broca_checkpoint_path: None,
             enable_energy_budget: false,
             energy_budget_joules_per_sec: None,
             #[cfg(feature = "vision-manifold")]

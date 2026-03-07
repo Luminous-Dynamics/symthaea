@@ -992,4 +992,53 @@ proptest! {
                 &format!("arousal_recovery_tau_factor@cycle{i}"))?;
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Adaptive dynamics stability (Sessions 2-4 feedback loops)
+    // ═══════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn prop_epistemic_uncertainty_bounded(inputs in fuzz_input_sequence(30, 80)) {
+        let mut service = feedback_service();
+        for (i, input) in inputs.iter().enumerate() {
+            let result = service.cycle(input);
+            let m = &result.metadata;
+
+            // Epistemic uncertainty must be [0.0, 1.0]
+            assert_finite_f32(m.epistemic_uncertainty,
+                &format!("epistemic_uncertainty@cycle{i}"))?;
+            prop_assert!(m.epistemic_uncertainty >= 0.0 && m.epistemic_uncertainty <= 1.0,
+                "epistemic_uncertainty out of bounds: {} at cycle {i}", m.epistemic_uncertainty);
+
+            // Aleatoric uncertainty must be [0.0, 1.0]
+            assert_finite_f32(m.aleatoric_uncertainty,
+                &format!("aleatoric_uncertainty@cycle{i}"))?;
+            prop_assert!(m.aleatoric_uncertainty >= 0.0 && m.aleatoric_uncertainty <= 1.0,
+                "aleatoric_uncertainty out of bounds: {} at cycle {i}", m.aleatoric_uncertainty);
+
+            // Theta phase must be [0, 2π]
+            assert_finite_f32(m.theta_phase, &format!("theta_phase@cycle{i}"))?;
+            prop_assert!(m.theta_phase >= 0.0 && m.theta_phase <= 7.0,
+                "theta_phase out of bounds: {} at cycle {i}", m.theta_phase);
+
+            // Prediction horizon scale must be [0.5, 1.4]
+            assert_finite_f32(m.prediction_horizon_scale,
+                &format!("prediction_horizon_scale@cycle{i}"))?;
+            prop_assert!(m.prediction_horizon_scale >= 0.5 && m.prediction_horizon_scale <= 1.4,
+                "prediction_horizon_scale out of bounds: {} at cycle {i}", m.prediction_horizon_scale);
+
+            // FEP tau factor must be [0.7, 1.1]
+            assert_finite_f32(m.fep_tau_factor, &format!("fep_tau_factor@cycle{i}"))?;
+            prop_assert!(m.fep_tau_factor >= 0.7 && m.fep_tau_factor <= 1.1,
+                "fep_tau_factor out of bounds: {} at cycle {i}", m.fep_tau_factor);
+
+            // Calibration multiplier must be [0.5, 1.0]
+            assert_finite_f32(m.calibration_adjustment_multiplier,
+                &format!("calibration_adjustment_multiplier@cycle{i}"))?;
+            prop_assert!(m.calibration_adjustment_multiplier >= 0.5
+                && m.calibration_adjustment_multiplier <= 1.0,
+                "calibration_adjustment_multiplier out of bounds: {} at cycle {i}",
+                m.calibration_adjustment_multiplier);
+        }
+    }
 }

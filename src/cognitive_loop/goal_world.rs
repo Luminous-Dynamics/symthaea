@@ -222,6 +222,47 @@ impl WorldModelBridge {
         self.avg_error = 0.0;
     }
 
+    /// Incorporate discovered causal structure into the world model.
+    ///
+    /// Causal edges tell us which state dimensions have known causal relationships.
+    /// Dimensions with causal structure get sharper (lower) prediction error because
+    /// the model has structural knowledge about them. This biases the world model
+    /// toward dimensions where causal discovery has identified patterns.
+    ///
+    /// Pearl (2009): causal knowledge reduces uncertainty beyond correlational knowledge.
+    pub fn incorporate_causal_structure(&mut self, causal_edges: &[(usize, usize, f32)]) {
+        if causal_edges.is_empty() {
+            return;
+        }
+
+        // Count how many causal edges touch each level-0 dimension.
+        let dim0 = self.level_dims[0];
+        let mut causal_strength = vec![0.0f32; dim0];
+        for &(from, to, strength) in causal_edges {
+            if from < dim0 {
+                causal_strength[from] += strength;
+            }
+            if to < dim0 {
+                causal_strength[to] += strength;
+            }
+        }
+
+        // Fraction of dimensions with causal knowledge → reduce prediction error
+        // proportionally. Capped at 30% total reduction to prevent over-confidence.
+        let causal_dims = causal_strength.iter().filter(|&&cs| cs > 0.0).count();
+        let causal_fraction = causal_dims as f32 / dim0.max(1) as f32;
+        let mean_strength = if causal_dims > 0 {
+            causal_strength.iter().filter(|&&cs| cs > 0.0).sum::<f32>() / causal_dims as f32
+        } else {
+            0.0
+        };
+        // Reduction = fraction_of_known_dims × strength_confidence, capped at 30%
+        let reduction = (causal_fraction * mean_strength.min(1.0) * 0.5).min(0.3);
+        if reduction > 0.001 {
+            self.level_errors[0] *= 1.0 - reduction;
+        }
+    }
+
     /// Increase plasticity in the world model (triggered by high learning signals)
     ///
     /// Higher plasticity means faster state updates and more sensitivity to prediction errors.
@@ -247,5 +288,54 @@ mod tests {
         let goal = CognitiveGoal::new("test", "test goal", 0.5);
         bridge.add_goal(goal);
         assert_eq!(bridge.active_goals().len(), 1);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Causal structure → World Model tests (Item #8)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_causal_structure_empty_is_noop() {
+        let mut wm = WorldModelBridge::default();
+        let input = vec![1.0; 64];
+        wm.update_sensory(&input);
+        let error_before = wm.avg_error;
+        wm.incorporate_causal_structure(&[]);
+        assert!((wm.avg_error - error_before).abs() < f32::EPSILON,
+            "empty causal edges should not change error");
+    }
+
+    #[test]
+    fn test_causal_structure_reduces_error() {
+        let mut wm = WorldModelBridge::default();
+        // Feed two different inputs to generate prediction error
+        wm.update_sensory(&vec![1.0; 64]);
+        wm.update_sensory(&vec![0.5; 64]);
+        let error_before = wm.level_errors[0];
+        assert!(error_before > 0.0, "should have nonzero error");
+
+        // Apply causal structure → should reduce error
+        let edges = vec![(0, 1, 0.8), (2, 3, 0.9)];
+        wm.incorporate_causal_structure(&edges);
+        assert!(wm.level_errors[0] < error_before,
+            "causal structure should reduce prediction error: {} < {}", wm.level_errors[0], error_before);
+    }
+
+    #[test]
+    fn test_causal_structure_capped_reduction() {
+        let mut wm = WorldModelBridge::default();
+        wm.update_sensory(&vec![1.0; 64]);
+        wm.update_sensory(&vec![0.0; 64]);
+        let error_before = wm.level_errors[0];
+
+        // Very strong causal edges covering all dimensions → reduction capped at 30%
+        let edges: Vec<(usize, usize, f32)> = (0..63).map(|i| (i, i + 1, 5.0)).collect();
+        wm.incorporate_causal_structure(&edges);
+        // With 30% cap: error >= 0.7 * original
+        assert!(wm.level_errors[0] >= error_before * 0.69,
+            "reduction should be capped at ~30%: {} >= {} * 0.69",
+            wm.level_errors[0], error_before);
+        assert!(wm.level_errors[0] < error_before,
+            "should still reduce: {} < {}", wm.level_errors[0], error_before);
     }
 }

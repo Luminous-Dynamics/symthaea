@@ -592,15 +592,23 @@ impl CognitiveLoopService {
             }
         }
         // Theta phase → Phi modulation (Buzsáki 2006).
-        // 6Hz theta oscillation at 50Hz loop rate (phase advance 0.754 rad/cycle).
-        // Theta peaks (sin > 0) enhance integration; troughs suppress.
-        // Modulation range: ±10% of spectral Phi.
-        let theta_phase = (self.stats.total_cycles as f64 * 0.754)
+        // 6Hz theta oscillation at 50Hz loop rate. Peaks enhance integration; troughs suppress.
+        // EMA-smoothed to prevent 6Hz artifacts in downstream consciousness metrics.
+        let theta_phase = (self.stats.total_cycles as f64
+            * super::thresholds::THETA_PHASE_ADVANCE)
             % (2.0 * std::f64::consts::PI);
-        let theta_phi_mod = theta_phase.sin() * 0.1; // ±10%
+        let theta_phi_mod = theta_phase.sin()
+            * super::thresholds::THETA_PHI_MODULATION_AMPLITUDE;
         let spectral_mip_phi = consciousness_output
             .spectral_mip_phi
-            .map(|phi| (phi * (1.0 + theta_phi_mod)).max(0.0));
+            .map(|phi| {
+                let raw = (phi * (1.0 + theta_phi_mod)).max(0.0);
+                // EMA smooth to prevent rhythmic artifacts in consciousness telemetry.
+                let alpha = super::thresholds::THETA_PHI_SMOOTH_ALPHA;
+                let prev = self.carryover.consciousness.last_spectral_mip_phi
+                    .unwrap_or(raw);
+                prev * (1.0 - alpha) + raw * alpha
+            });
         let sigma = consciousness_output.sigma;
         let eq_v2_limiting_component = consciousness_output
             .limiting_component

@@ -109,8 +109,11 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
     ctx: &EpisodicLearningContext<'_>,
     cycle_learning_result: CycleLearningResult,
 ) -> f32 {
-    // Episodic memory: encode significant experiences
-    if ctx.prediction_error > 0.1 || ctx.in_flow {
+    // Episodic memory: encode significant experiences.
+    // IIT gate: consciousness (Phi) is necessary for memory formation
+    // (Tononi & Koch 2015). Require minimum Phi for consolidation.
+    let phi_sufficient = ctx.phi > 0.2;
+    if phi_sufficient && (ctx.prediction_error > 0.1 || ctx.in_flow) {
         let hdv_sample: Vec<f32> =
             ctx.compressed_state[..64.min(ctx.compressed_state.len())].to_vec();
         episodic_memory.encode(
@@ -186,8 +189,10 @@ pub(in crate::cognitive_loop) fn parallel_episodic_learning(
 
     *prev_primitive_state = Some(prim_state);
 
-    // Closed learning loop: update Q-values from cycle results
-    closed_learning_loop.update(cycle_learning_result);
+    // Closed learning loop: update Q-values, modulated by FEP learning signal.
+    // Friston (2010): plasticity scales with expected information gain.
+    let plasticity = 1.0 + *fep_learning_signal * 0.5; // [-1,1] → [0.5, 1.5]
+    closed_learning_loop.update_with_plasticity(cycle_learning_result, plasticity);
 
     // Return the memory context boost for deferred application via adjust_confidence
     ctx.memory_context_boost

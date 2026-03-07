@@ -59,6 +59,8 @@ pub(super) struct PercUrgency {
     pub(super) predicted_urgency: &'static str,
     pub(super) prediction_coherence_urgency_bias: f32,
     pub(super) prediction_error: f32,
+    pub(super) error_slope: f32,
+    pub(super) oscillation_ratio: f32,
 }
 
 /// Result of the perception phase (Phases 0–1.2).
@@ -190,6 +192,7 @@ pub(super) struct DynamicsPhaseResult {
     pub(super) aleatoric_uncertainty: f32,
     pub(super) fep_tau_factor: f32,
     pub(super) causal_world_model_edges: usize,
+    pub(super) epistemic_budget_scale: f32,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -175,15 +175,27 @@ impl ClosedLearningLoop {
         final_strategy
     }
 
-    /// Update Q-values with cycle result
+    /// Update Q-values with cycle result.
     pub fn update(&mut self, result: CycleLearningResult) {
+        self.update_with_plasticity(result, 1.0);
+    }
+
+    /// Update Q-values, modulated by FEP-derived plasticity factor.
+    ///
+    /// `plasticity` scales the Q-learning rate: >1.0 = faster learning (high FEP
+    /// learning signal), <1.0 = slower (low signal). Clamped to [0.5, 2.0].
+    /// Friston (2010): free energy drives learning rate via expected information gain.
+    pub fn update_with_plasticity(&mut self, result: CycleLearningResult, plasticity: f32) {
+        let plasticity = plasticity.clamp(0.5, 2.0);
+
         // Update strategy count
         let strategy_idx = self.strategy_index(result.strategy_used);
         self.strategy_counts[strategy_idx] += 1;
 
-        // Q-learning update: Q(s,a) <- Q(s,a) + α * (r - Q(s,a))
+        // Q-learning update: Q(s,a) <- Q(s,a) + α*plasticity * (r - Q(s,a))
         let old_q = self.q_values[strategy_idx];
-        let new_q = old_q + self.q_learning_rate * (result.reward - old_q);
+        let effective_lr = self.q_learning_rate * plasticity;
+        let new_q = old_q + effective_lr * (result.reward - old_q);
         self.q_values[strategy_idx] = new_q;
 
         // Update totals
@@ -549,6 +561,42 @@ mod tests {
         assert_eq!(
             strategies_a, strategies_b,
             "two loops with identical ShakeRng seeds should produce identical strategy sequences"
+        );
+    }
+
+    #[test]
+    fn test_plasticity_modulates_learning_rate() {
+        // High plasticity should update Q-values faster than low plasticity.
+        let mut cll_high = ClosedLearningLoop::with_rng(rng_from_seed(42));
+        let mut cll_low = ClosedLearningLoop::with_rng(rng_from_seed(42));
+        let mut cll_neutral = ClosedLearningLoop::with_rng(rng_from_seed(42));
+
+        let result = make_result(ResponseStrategy::Exploratory, 0.9);
+        cll_high.update_with_plasticity(result.clone(), 2.0);
+        cll_low.update_with_plasticity(result.clone(), 0.5);
+        cll_neutral.update_with_plasticity(result, 1.0);
+
+        let q_high = cll_high.q_values()[4];
+        let q_low = cll_low.q_values()[4];
+        let q_neutral = cll_neutral.q_values()[4];
+
+        assert!(q_high > q_neutral, "high plasticity should learn faster: {q_high} > {q_neutral}");
+        assert!(q_neutral > q_low, "low plasticity should learn slower: {q_neutral} > {q_low}");
+    }
+
+    #[test]
+    fn test_plasticity_clamped() {
+        // Extreme plasticity values should be clamped to [0.5, 2.0].
+        let mut cll_extreme = ClosedLearningLoop::with_rng(rng_from_seed(42));
+        let mut cll_max = ClosedLearningLoop::with_rng(rng_from_seed(42));
+
+        let result = make_result(ResponseStrategy::Detailed, 0.7);
+        cll_extreme.update_with_plasticity(result.clone(), 100.0); // Should clamp to 2.0
+        cll_max.update_with_plasticity(result, 2.0);
+
+        assert!(
+            (cll_extreme.q_values()[0] - cll_max.q_values()[0]).abs() < 1e-6,
+            "plasticity > 2.0 should clamp to 2.0"
         );
     }
 }

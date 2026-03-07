@@ -377,24 +377,52 @@ impl CognitiveLoopService {
             // Adaptive dynamics telemetry
             epistemic_uncertainty: dynamics.epistemic_uncertainty,
             aleatoric_uncertainty: dynamics.aleatoric_uncertainty,
-            theta_phase: ((self.stats.total_cycles as f64 * 0.754)
+            theta_phase: ((self.stats.total_cycles as f64
+                * super::thresholds::THETA_PHASE_ADVANCE)
                 % (2.0 * std::f64::consts::PI)) as f32,
             temporal_binding_strength: perception.encoding.temporal_binding_strength,
             prediction_horizon_scale: {
+                // Match prediction.rs: PE-adaptive × substrate tau, clamped
                 let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
-                if pe > 0.3 { 1.0 - (pe - 0.3) * 0.6 }
-                else if pe < 0.05 { 1.0 + (0.05 - pe) * 6.0 }
-                else { 1.0 }
+                let pe_scale = if pe > 0.3 { 1.0 - (pe - 0.3) * 0.6 }
+                    else if pe < 0.05 { 1.0 + (0.05 - pe) * 6.0 }
+                    else { 1.0 };
+                (self.substrate_manager.tau_factor * pe_scale)
+                    .clamp(super::thresholds::PREDICTION_HORIZON_MIN_SCALE,
+                           super::thresholds::PREDICTION_HORIZON_MAX_SCALE)
             },
             fep_tau_factor: dynamics.fep_tau_factor,
             causal_world_model_edges: dynamics.causal_world_model_edges,
+            epistemic_budget_scale: dynamics.epistemic_budget_scale,
+            feedback_signals_fired: (self.feedback_state.confidence.len()
+                + self.feedback_state.learning_rate.len()
+                + self.feedback_state.exploration.len()
+                + self.feedback_state.threshold.len()) as u32,
             calibration_validations_total: self.neuromod.calibration_validator.total_validations(),
             calibration_improvements: self.neuromod.calibration_validator.improvements,
             calibration_regressions: self.neuromod.calibration_validator.regressions,
             calibration_adjustment_multiplier: self.neuromod.calibration_validator.adjustment_multiplier(),
             calibration_cooldown_duration: self.neuromod.self_assessment.cooldown_duration(),
+            feedback_signals_high_water: self.feedback_state.feedback_signals_high_water,
+            error_slope: perception.urgency.error_slope,
+            oscillation_ratio: perception.urgency.oscillation_ratio,
+            mode_transitions: self.stats.mode_transitions as u32,
+            smoothed_epistemic_uncertainty: {
+                // EMA smoothing of epistemic uncertainty (alpha=0.2)
+                let raw = dynamics.epistemic_uncertainty;
+                let prev = self.carryover.quality.smoothed_epistemic_uncertainty;
+                if prev == 0.0 && self.stats.total_cycles <= 1 {
+                    raw // Bootstrap: use raw on first cycle
+                } else {
+                    prev * 0.8 + raw * 0.2
+                }
+            },
             ..Default::default()
         };
+
+        // Store smoothed epistemic uncertainty for next cycle's EMA
+        self.carryover.quality.smoothed_epistemic_uncertainty =
+            metadata.smoothed_epistemic_uncertainty;
 
         // ── Social coherence telemetry ──
         metadata.social_trust_current = self.social.social_trust;
