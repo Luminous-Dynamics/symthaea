@@ -93,7 +93,7 @@ impl ConfigWatcher {
 
         self.watched_paths
             .write()
-            .expect("watched_paths lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .insert(Arc::new(path));
 
         Ok(())
@@ -132,7 +132,7 @@ impl ConfigWatcher {
         let path_buf = path.as_ref().to_path_buf();
         self.watched_paths
             .write()
-            .expect("watched_paths lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .retain(|p| **p != path_buf);
         self.last_modified.remove(path.as_ref());
     }
@@ -163,7 +163,7 @@ impl ConfigWatcher {
                 // Get a snapshot of paths under read lock
                 let paths_snapshot: Vec<Arc<PathBuf>> = paths
                     .read()
-                    .expect("watched_paths lock poisoned")
+                    .unwrap_or_else(|e| e.into_inner())
                     .iter()
                     .cloned()
                     .collect();
@@ -260,7 +260,7 @@ impl ConfigWatcher {
     pub fn watched_paths(&self) -> HashSet<PathBuf> {
         self.watched_paths
             .read()
-            .expect("watched_paths lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .iter()
             .map(|p| (**p).clone())
             .collect()
@@ -271,7 +271,7 @@ impl ConfigWatcher {
         let path_buf = path.as_ref().to_path_buf();
         self.watched_paths
             .read()
-            .expect("watched_paths lock poisoned")
+            .unwrap_or_else(|e| e.into_inner())
             .iter()
             .any(|p| **p == path_buf)
     }

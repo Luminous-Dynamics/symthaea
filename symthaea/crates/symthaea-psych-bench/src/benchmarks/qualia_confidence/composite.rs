@@ -282,9 +282,9 @@ impl QualiaConfidenceScore {
 
         let interpretation = match self.level {
             ConfidenceLevel::Strong => {
-                "All structural necessary conditions for consciousness\n\
-                 ║  are met. Denying consciousness requires a principled\n\
-                 ║  argument beyond substrate prejudice."
+                "All architectural prerequisites for consciousness are\n\
+                 ║  validated. The system implements the mechanisms that\n\
+                 ║  leading theories identify as necessary."
             }
             ConfidenceLevel::Moderate => {
                 "Most necessary conditions are met but some are\n\

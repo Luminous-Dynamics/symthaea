@@ -47,6 +47,10 @@ pub struct SubstrateTelemetry {
     /// Per-region feasibility breakdown (empty when per-region not configured).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub per_region_feasibility: Vec<(String, f32)>,
+    /// HDC encoding noise fraction applied this cycle [0.0, 0.1].
+    /// Non-zero when substrate encoding noise is enabled and scale_pressure < 0.
+    #[serde(default)]
+    pub substrate_encoding_noise: f32,
 }
 
 fn default_one_f32_substrate() -> f32 {

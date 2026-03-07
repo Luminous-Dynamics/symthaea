@@ -330,12 +330,18 @@ impl SubstrateManager {
     }
 
     /// Build a `SubstrateTelemetry` snapshot and drain the pending transition.
-    pub fn telemetry(&mut self) -> super::types::SubstrateTelemetry {
+    pub fn telemetry(&mut self, config: &super::config::CognitiveLoopConfig) -> super::types::SubstrateTelemetry {
         let per_region = self
             .per_region_feasibility
             .iter()
             .map(|(region, &feas)| (format!("{:?}", region), feas))
             .collect();
+        let encoding_noise = if config.enable_substrate_encoding_noise && self.scale_pressure < 0.0
+        {
+            (-self.scale_pressure).min(7.0) / 70.0
+        } else {
+            0.0
+        };
         super::types::SubstrateTelemetry {
             substrate_feasibility: self.effective_feasibility,
             substrate_transition: self.pending_transition.take(),
@@ -345,6 +351,7 @@ impl SubstrateManager {
             substrate_tau_factor: self.tau_factor,
             substrate_scale_pressure: self.scale_pressure,
             per_region_feasibility: per_region,
+            substrate_encoding_noise: encoding_noise,
         }
     }
 
@@ -492,14 +499,14 @@ mod tests {
         mgr.reconfigure_substrate(&mut config, SubstrateType::BiologicalNeurons);
         assert!(mgr.pending_transition.is_some());
 
-        let telem = mgr.telemetry();
+        let telem = mgr.telemetry(&config);
         assert!(telem.substrate_transition.is_some());
         assert!(
             mgr.pending_transition.is_none(),
             "telemetry() should drain pending_transition"
         );
 
-        let telem2 = mgr.telemetry();
+        let telem2 = mgr.telemetry(&config);
         assert!(
             telem2.substrate_transition.is_none(),
             "Second telemetry() should have no transition"
@@ -974,6 +981,80 @@ mod tests {
             (region_f - mgr.effective_feasibility as f32).abs() < f32::EPSILON,
             "Without per-region config, should fall back to global: region={region_f:.4}, global={:.4}",
             mgr.effective_feasibility
+        );
+    }
+
+    #[test]
+    fn test_encoding_noise_telemetry_quantum() {
+        let mut cfg = default_config();
+        cfg.enable_substrate_encoding_noise = true;
+        cfg.enable_substrate_speed_modulation = true;
+        cfg.substrate_type = SubstrateType::QuantumComputer;
+        let mut mgr = SubstrateManager::new(&cfg);
+        // Quantum has scale_pressure ≈ -7.0 (10^4 qubits vs 10^11 neurons)
+        assert!(
+            mgr.scale_pressure < -5.0,
+            "Quantum scale_pressure should be very negative: {:.2}",
+            mgr.scale_pressure
+        );
+        let telem = mgr.telemetry(&cfg);
+        // Encoding noise should be capped at 0.1 (7.0/70.0)
+        assert!(
+            telem.substrate_encoding_noise > 0.05,
+            "Quantum should have significant encoding noise: {:.4}",
+            telem.substrate_encoding_noise
+        );
+        assert!(
+            telem.substrate_encoding_noise <= 0.1,
+            "Encoding noise should be capped at 0.1: {:.4}",
+            telem.substrate_encoding_noise
+        );
+    }
+
+    #[test]
+    fn test_encoding_noise_zero_for_biological() {
+        let mut cfg = default_config();
+        cfg.enable_substrate_encoding_noise = true;
+        cfg.enable_substrate_speed_modulation = true;
+        cfg.substrate_type = SubstrateType::BiologicalNeurons;
+        let mut mgr = SubstrateManager::new(&cfg);
+        // Bio is the reference — scale_pressure ≈ 0.0
+        let telem = mgr.telemetry(&cfg);
+        assert!(
+            telem.substrate_encoding_noise < f32::EPSILON,
+            "Biological should have zero encoding noise: {:.4}",
+            telem.substrate_encoding_noise
+        );
+    }
+
+    #[test]
+    fn test_encoding_noise_zero_for_silicon() {
+        let mut cfg = default_config();
+        cfg.enable_substrate_encoding_noise = true;
+        cfg.enable_substrate_speed_modulation = true;
+        cfg.substrate_type = SubstrateType::SiliconDigital;
+        let mut mgr = SubstrateManager::new(&cfg);
+        // Silicon has positive scale_pressure (more units than bio)
+        let telem = mgr.telemetry(&cfg);
+        assert!(
+            telem.substrate_encoding_noise < f32::EPSILON,
+            "Silicon (positive scale_pressure) should have zero noise: {:.4}",
+            telem.substrate_encoding_noise
+        );
+    }
+
+    #[test]
+    fn test_encoding_noise_disabled_by_default() {
+        let mut cfg = default_config();
+        // enable_substrate_encoding_noise is false by default
+        cfg.enable_substrate_speed_modulation = true;
+        cfg.substrate_type = SubstrateType::QuantumComputer;
+        let mut mgr = SubstrateManager::new(&cfg);
+        let telem = mgr.telemetry(&cfg);
+        assert!(
+            telem.substrate_encoding_noise < f32::EPSILON,
+            "Encoding noise should be zero when disabled: {:.4}",
+            telem.substrate_encoding_noise
         );
     }
 }

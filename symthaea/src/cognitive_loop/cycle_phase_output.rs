@@ -474,7 +474,7 @@ impl CognitiveLoopService {
         }
 
         // ── Substrate & convergence telemetry ──
-        metadata.substrate = self.substrate_manager.telemetry();
+        metadata.substrate = self.substrate_manager.telemetry(&self.config);
         // Populate flat substrate fields for backward-compatible access
         metadata.substrate_transition = metadata.substrate.substrate_transition.clone();
         metadata.substrate_feasibility_raw = metadata.substrate.substrate_feasibility_raw;

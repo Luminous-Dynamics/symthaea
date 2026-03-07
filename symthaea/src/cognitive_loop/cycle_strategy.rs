@@ -238,6 +238,19 @@ impl CognitiveLoopService {
                 }
             }
         }
+        // Substrate encoding noise: degrade HDC representation for scale-constrained
+        // substrates. Negative scale_pressure means fewer computational units than
+        // biological neurons — inject bit-flip noise proportional to the deficit.
+        // Berry & Srivastava (2018): HDC capacity ~ D^(5/3), so noise on fixed-D
+        // vectors simulates reduced effective dimensionality.
+        if self.config.enable_substrate_encoding_noise
+            && self.substrate_manager.scale_pressure < 0.0
+        {
+            let noise_fraction =
+                (-self.substrate_manager.scale_pressure).min(7.0) / 70.0; // [0.0, 0.1]
+            let seed = self.stats.total_cycles as u64;
+            hv16_cached = hv16_cached.add_noise(noise_fraction, seed);
+        }
         module_timings.core_compress = _t_core.elapsed().as_micros() as u64;
 
         // ── Semantic Encoder: collect previous cycle's result, submit current ───
