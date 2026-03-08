@@ -8,6 +8,8 @@
 //! - `NixPipelineResult`: domain-specific result that augments `PipelineResult`
 //! - `NixPipelineHook`: trait the main crate implements to inject NixOS cognition
 
+use std::path::PathBuf;
+
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::action::executor::{NixOSCommand, SafetyLevel};
@@ -162,6 +164,18 @@ pub trait NixPipelineHook: Send + Sync {
 
     /// Provide user feedback for adaptive threshold learning.
     fn feedback(&mut self, was_positive: bool);
+
+    /// Return the causal surprise from the last `post_execute` call.
+    ///
+    /// 0.0 = outcome was expected by the causal model, 1.0 = completely unexpected.
+    fn causal_surprise(&self) -> f32 {
+        0.0
+    }
+
+    /// Return the number of learned causal edges.
+    fn causal_edge_count(&self) -> usize {
+        0
+    }
 }
 
 // =============================================================================
@@ -181,6 +195,12 @@ pub struct NixPipelineProcessor {
     ollama_bridge: Option<crate::mind::OllamaBridge>,
     /// Causal graph for learning package/service dependency relationships.
     causal_graph: NixCausalGraph,
+    /// Counter for learn() calls, used to trigger periodic discover_structure().
+    learn_cycle_count: u64,
+    /// Number of new edges found in the last discover_structure() call.
+    last_discovery_edge_count: usize,
+    /// Path for persisting causal graph checkpoints across restarts.
+    causal_checkpoint_path: Option<PathBuf>,
 }
 
 impl NixPipelineProcessor {
@@ -201,6 +221,9 @@ impl NixPipelineProcessor {
             knowledge_base,
             ollama_bridge: None,
             causal_graph,
+            learn_cycle_count: 0,
+            last_discovery_edge_count: 0,
+            causal_checkpoint_path: None,
         }
     }
 
@@ -232,6 +255,41 @@ impl NixPipelineProcessor {
     pub fn without_knowledge_base(mut self) -> Self {
         self.knowledge_base = None;
         self
+    }
+
+    /// Set a checkpoint path for persisting causal graph state.
+    ///
+    /// If the file already exists, edges and observations are loaded immediately.
+    /// After each `discover_structure()` call (every 50 learn cycles), the graph
+    /// is auto-saved to this path.
+    pub fn set_checkpoint_path(&mut self, path: PathBuf) {
+        if path.exists() {
+            match self.causal_graph.load(&path) {
+                Ok(n) => {
+                    tracing::info!(loaded_edges = n, path = %path.display(), "Loaded causal graph checkpoint");
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, path = %path.display(), "Failed to load causal graph checkpoint");
+                }
+            }
+        }
+        self.causal_checkpoint_path = Some(path);
+    }
+
+    /// Builder variant of `set_checkpoint_path`.
+    pub fn with_checkpoint_path(mut self, path: PathBuf) -> Self {
+        self.set_checkpoint_path(path);
+        self
+    }
+
+    /// How many learn() calls have occurred.
+    pub fn learn_cycle_count(&self) -> u64 {
+        self.learn_cycle_count
+    }
+
+    /// Number of new edges found in the last `discover_structure()` invocation.
+    pub fn last_discovery_edge_count(&self) -> usize {
+        self.last_discovery_edge_count
     }
 
     /// Process user input through the full NixOS cognition pipeline.
@@ -379,6 +437,34 @@ impl NixPipelineProcessor {
         // so discover_structure() can find correlations after enough data.
         self.causal_graph
             .observe(&action_key, if success { 1.0 } else { 0.0 });
+
+        // 3. Periodically run causal discovery to find new structural edges.
+        //    Every 50 learn cycles, discover_structure() examines accumulated
+        //    numeric observations for variable pairs with 20+ data points.
+        self.learn_cycle_count += 1;
+        if self.learn_cycle_count % 50 == 0 {
+            let edges_before = self.causal_graph.edge_count();
+            let new_edges = self.causal_graph.discover_structure();
+            self.last_discovery_edge_count = new_edges.len();
+            let edges_after = self.causal_graph.edge_count();
+            tracing::info!(
+                cycle = self.learn_cycle_count,
+                discovered = new_edges.len(),
+                edges_before,
+                edges_after,
+                net_new = edges_after.saturating_sub(edges_before),
+                "Causal structure discovery completed"
+            );
+
+            // Auto-save checkpoint after discovery if path is configured
+            if let Some(ref path) = self.causal_checkpoint_path {
+                if let Err(e) = self.causal_graph.save(path) {
+                    tracing::warn!(error = %e, "Failed to save causal graph checkpoint");
+                } else {
+                    tracing::debug!(path = %path.display(), "Saved causal graph checkpoint");
+                }
+            }
+        }
     }
 
     /// Access the causal graph (read-only).
@@ -577,5 +663,119 @@ mod tests {
             "GC→success edge should be strengthened after 20 cycles (got {:.3})",
             gc_conf,
         );
+    }
+
+    #[test]
+    fn test_discover_structure_triggered_at_cadence_50() {
+        let mut proc = NixPipelineProcessor::new();
+        let dim = proc.engine().world_model().system_state().dim();
+
+        // Feed two correlated actions so discover_structure() has data.
+        // Each learn() call observes one numeric value per action key.
+        for i in 0..50 {
+            let state_after = ContinuousHV::random(dim, i + 200);
+            if i % 2 == 0 {
+                proc.learn("rebuild switch", true, state_after);
+            } else {
+                proc.learn("nix-collect-garbage", true, state_after);
+            }
+        }
+
+        assert_eq!(proc.learn_cycle_count(), 50);
+        let discovered = proc.last_discovery_edge_count();
+        assert!(
+            discovered > 0,
+            "discover_structure() should find edges between correlated action keys (got {})",
+            discovered,
+        );
+    }
+
+    #[test]
+    fn test_discover_structure_not_triggered_before_50() {
+        let mut proc = NixPipelineProcessor::new();
+        let dim = proc.engine().world_model().system_state().dim();
+
+        for i in 0..49 {
+            let state_after = ContinuousHV::random(dim, i + 300);
+            proc.learn("rebuild switch", true, state_after);
+        }
+
+        assert_eq!(proc.learn_cycle_count(), 49);
+        assert_eq!(proc.last_discovery_edge_count(), 0);
+    }
+
+    #[test]
+    fn test_causal_graph_save_load_roundtrip() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.add_structural_edge("A", "B", 0.9);
+        graph.add_structural_edge("B", "C", 0.7);
+        graph.observe("A", 1.0);
+        graph.observe("A", 2.0);
+
+        let dir = std::env::temp_dir().join("symthaea_nix_test_roundtrip");
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("causal_graph.json");
+
+        graph.save(&path).expect("save should succeed");
+
+        let mut loaded = NixCausalGraph::new(99);
+        let n = loaded.load(&path).expect("load should succeed");
+        assert_eq!(n, 2, "Should load 2 edges");
+        assert_eq!(loaded.edge_count(), 2);
+
+        let ab = loaded.edge_confidence("A", "B");
+        assert!(ab.is_some(), "A->B edge should exist after load");
+        assert!((ab.unwrap() - 0.9).abs() < 1e-6);
+
+        let bc = loaded.edge_confidence("B", "C");
+        assert!(bc.is_some(), "B->C edge should exist after load");
+        assert!((bc.unwrap() - 0.7).abs() < 1e-6);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_checkpoint_survives_restart() {
+        let dir = std::env::temp_dir().join("symthaea_nix_test_checkpoint");
+        std::fs::create_dir_all(&dir).unwrap();
+        let checkpoint_path = dir.join("causal_checkpoint.json");
+        let _ = std::fs::remove_file(&checkpoint_path);
+
+        let edges_after_learning;
+
+        {
+            let mut proc =
+                NixPipelineProcessor::new().with_checkpoint_path(checkpoint_path.clone());
+            let dim = proc.engine().world_model().system_state().dim();
+
+            for i in 0..50 {
+                let state_after = ContinuousHV::random(dim, i + 400);
+                if i % 2 == 0 {
+                    proc.learn("rebuild switch", true, state_after);
+                } else {
+                    proc.learn("nix-collect-garbage", true, state_after);
+                }
+            }
+
+            edges_after_learning = proc.causal_graph().edge_count();
+            assert!(
+                checkpoint_path.exists(),
+                "Checkpoint file should exist after 50 learn cycles"
+            );
+        }
+
+        {
+            let proc =
+                NixPipelineProcessor::new().with_checkpoint_path(checkpoint_path.clone());
+            let edges_after_reload = proc.causal_graph().edge_count();
+            assert!(
+                edges_after_reload >= edges_after_learning,
+                "Reloaded processor should have >= edges (original={}, reloaded={})",
+                edges_after_learning,
+                edges_after_reload,
+            );
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

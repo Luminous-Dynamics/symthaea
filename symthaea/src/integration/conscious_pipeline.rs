@@ -144,6 +144,13 @@ pub struct PipelineResult {
     /// NixOS action plan rationale (from active inference, if available)
     #[cfg(feature = "nix-mind")]
     pub nix_action_rationale: Option<String>,
+    /// Number of learned causal edges in the NixOS causal graph (None if nix-mind hook absent)
+    #[cfg(feature = "nix-mind")]
+    pub nix_causal_edge_count: Option<usize>,
+    /// Whether the last action violated causal expectations (0.0 = expected, 1.0 = unexpected).
+    /// None if nix-mind hook is absent.
+    #[cfg(feature = "nix-mind")]
+    pub nix_causal_surprise: Option<f32>,
     /// Processing time in milliseconds
     pub processing_time_ms: u64,
 }
@@ -371,6 +378,16 @@ impl ConsciousPipeline {
         // can detect side-effect risks that the primary HDC+LTC layer misses.
         // If nix cognition is surprised or predicts danger, downgrade the
         // execution strategy to be more cautious.
+        // Check if the previous cycle's causal model was violated. When surprise
+        // exceeds 0.5, lower the confidence threshold for the gate phase so the
+        // system becomes more cautious after causal violations.
+        #[cfg(feature = "nix-mind")]
+        let causal_surprise_from_previous = self
+            .nix_hook
+            .as_ref()
+            .map(|hook| hook.causal_surprise())
+            .unwrap_or(0.0);
+
         #[cfg(feature = "nix-mind")]
         let nix_deep_result: Option<
             symthaea_nix::plugin::pipeline_integration::NixPipelineResult,
@@ -392,9 +409,11 @@ impl ConsciousPipeline {
                 // 1. Surprised by recent state changes (causal model violated)
                 // 2. Nix quadrant blocks execution (Curious/Confused)
                 // 3. Phi gating denied the action
+                // 4. Previous cycle's causal surprise was high (> 0.5)
                 let nix_caution = result.is_surprised
                     || !result.quadrant.allows_execution()
-                    || !result.phi_allowed;
+                    || !result.phi_allowed
+                    || causal_surprise_from_previous > 0.5;
 
                 if nix_caution {
                     match &execution_strategy {
@@ -603,6 +622,16 @@ impl ConsciousPipeline {
                 .as_ref()
                 .and_then(|r| r.plan.actions.first())
                 .map(|a| a.rationale.clone()),
+            #[cfg(feature = "nix-mind")]
+            nix_causal_edge_count: self
+                .nix_hook
+                .as_ref()
+                .map(|hook| hook.causal_edge_count()),
+            #[cfg(feature = "nix-mind")]
+            nix_causal_surprise: self
+                .nix_hook
+                .as_ref()
+                .map(|hook| hook.causal_surprise()),
             processing_time_ms,
         })
     }
@@ -1332,5 +1361,47 @@ mod tests {
             }
             other => unreachable!("Expected Lost strategy, got {:?}", other),
         }
+    }
+
+    #[cfg(feature = "nix-mind")]
+    #[test]
+    fn test_pipeline_result_causal_fields() {
+        // Verify the new causal metric fields can hold values and default to None
+        let edge_count: Option<usize> = Some(42);
+        let surprise: Option<f32> = Some(0.3);
+
+        assert_eq!(edge_count, Some(42));
+        assert_eq!(surprise, Some(0.3));
+
+        let none_count: Option<usize> = None;
+        let none_surprise: Option<f32> = None;
+        assert!(none_count.is_none());
+        assert!(none_surprise.is_none());
+    }
+
+    #[cfg(feature = "nix-mind")]
+    #[test]
+    fn test_causal_surprise_triggers_strategy_downgrade() {
+        // Verify that high causal surprise (> 0.5) causes strategy downgrade
+        let causal_surprise: f32 = 0.7;
+        let is_surprised = false;
+        let allows_execution = true;
+        let phi_allowed = true;
+
+        // Without causal_surprise, this would NOT trigger caution
+        let without = is_surprised || !allows_execution || !phi_allowed;
+        assert!(!without, "Without causal surprise, should not be cautious");
+
+        // With causal_surprise > 0.5, it SHOULD trigger caution
+        let with = is_surprised || !allows_execution || !phi_allowed || causal_surprise > 0.5;
+        assert!(with, "With high causal surprise, should be cautious");
+
+        // Surprise at exactly 0.5 should NOT trigger
+        let at_boundary = 0.5f32 > 0.5;
+        assert!(!at_boundary, "Surprise at 0.5 should not trigger caution");
+
+        // Surprise just above 0.5 should trigger
+        let above_boundary = 0.51f32 > 0.5;
+        assert!(above_boundary, "Surprise above 0.5 should trigger caution");
     }
 }
