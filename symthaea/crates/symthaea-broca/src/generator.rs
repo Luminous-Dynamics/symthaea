@@ -118,7 +118,10 @@ impl BrocaGenerator {
         let encoder = ThoughtLanguageEncoder::new(genesis);
         let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
         let emotional_modulator = EmotionalModulator::new(&tokenizer, &config.gating);
-        let coherence_feedback = CoherenceFeedback::new(config.gating.coherence_drift_threshold);
+        let coherence_feedback = CoherenceFeedback::with_veto_threshold(
+            config.gating.coherence_drift_threshold,
+            config.gating.veto_threshold,
+        );
 
         Self {
             controller,
@@ -144,7 +147,10 @@ impl BrocaGenerator {
         let encoder = ThoughtLanguageEncoder::new(genesis);
         let epistemic_gate = EpistemicGate::new(&tokenizer, &config.gating);
         let emotional_modulator = EmotionalModulator::new(&tokenizer, &config.gating);
-        let coherence_feedback = CoherenceFeedback::new(config.gating.coherence_drift_threshold);
+        let coherence_feedback = CoherenceFeedback::with_veto_threshold(
+            config.gating.coherence_drift_threshold,
+            config.gating.veto_threshold,
+        );
 
         Self {
             controller,
@@ -578,6 +584,70 @@ mod tests {
     }
 
     #[test]
+    fn test_no_state_leakage_between_generations() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let channels = ThoughtChannels::with_intent(1); // Answer
+
+        // Generate twice with same input — should produce identical output
+        let result1 = gen.generate(&channels);
+        let result2 = gen.generate(&channels);
+
+        assert_eq!(
+            result1.token_ids, result2.token_ids,
+            "Consecutive generations with same input should be identical (no state leakage)"
+        );
+    }
+
+    #[test]
+    fn test_long_horizon_generation() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.gating.base_max_tokens = 64;
+        config.enable_consciousness_gating = false;
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        // Should produce tokens without crashing at 64 token horizon
+        assert!(result.num_tokens > 0, "Should produce tokens");
+        // All token IDs should be valid
+        for &id in &result.token_ids {
+            assert!(
+                (id as usize) < gen.tokenizer().vocab_size(),
+                "Token ID {id} exceeds vocab size {}",
+                gen.tokenizer().vocab_size()
+            );
+        }
+        // Final coherence should be finite
+        assert!(
+            result.final_coherence.is_finite(),
+            "Final coherence should be finite after long generation"
+        );
+    }
+
+    #[test]
+    fn test_nan_channels_dont_crash() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let mut channels = ThoughtChannels::default();
+        channels.channels[9] = f32::NAN; // NaN valence
+        channels.channels[10] = f32::INFINITY; // Inf arousal
+
+        let result = gen.generate(&channels);
+        // Should not crash, should produce some output
+        assert!(
+            result.num_tokens > 0 || result.eos_terminated,
+            "NaN channels should not crash generator"
+        );
+    }
+
+    #[test]
     fn test_coherence_feedback_scales_thought() {
         use crate::gating::CoherenceFeedback;
         use symthaea_core::hdc::ContinuousHV;
@@ -598,5 +668,30 @@ mod tests {
             weight <= 3.0,
             "Binding weight should be capped at 3.0, got {weight}"
         );
+    }
+
+    #[test]
+    fn test_sequential_generation_stability() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        // Generate 50 times with varying intents — no panics, no NaN leakage
+        for i in 0..50 {
+            let channels = ThoughtChannels::with_intent(i % 8);
+            let result = gen.generate(&channels);
+
+            assert!(
+                result.final_coherence.is_finite(),
+                "Coherence should stay finite after {i} generations"
+            );
+            // Token IDs should all be in range
+            for &id in &result.token_ids {
+                assert!(
+                    (id as usize) < gen.tokenizer().vocab_size(),
+                    "Token ID {id} out of range at generation {i}"
+                );
+            }
+        }
     }
 }

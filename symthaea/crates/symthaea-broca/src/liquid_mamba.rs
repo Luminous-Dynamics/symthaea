@@ -241,6 +241,11 @@ pub struct LiquidMambaConfig {
     /// With K=4, each chunk position gets gradient 4× more often than K=1 rotating.
     #[serde(default = "default_e2e_grad_chunks")]
     pub e2e_grad_chunks: usize,
+
+    /// Gating configuration (epistemic boost strengths, coherence thresholds, etc.).
+    /// Override to strengthen or weaken consciousness-gated generation control.
+    #[serde(default)]
+    pub gating_config: GatingConfig,
 }
 
 fn default_grad_clip() -> f32 {
@@ -347,6 +352,7 @@ impl Default for LiquidMambaConfig {
             lora_lr: 0.0001,
             embedding_stats_path: None,
             e2e_grad_chunks: 1,
+            gating_config: GatingConfig::default(),
         }
     }
 }
@@ -487,10 +493,9 @@ impl LiquidMambaGenerator {
 
         // Create gating modules using Mamba's own tokenizer (GPT-2) so that
         // token IDs match the logits produced by forward_one_token().
-        let gating_config = GatingConfig::default();
-        let epistemic_gate = EpistemicGate::new_from_backend(mamba.as_ref(), &gating_config);
+        let epistemic_gate = EpistemicGate::new_from_backend(mamba.as_ref(), &config.gating_config);
         let emotional_modulator =
-            EmotionalModulator::new_from_backend(mamba.as_ref(), &gating_config);
+            EmotionalModulator::new_from_backend(mamba.as_ref(), &config.gating_config);
 
         let enable_ema = config.enable_ema;
         let ema_decay = config.ema_decay;

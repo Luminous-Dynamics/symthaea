@@ -359,6 +359,22 @@ pub struct LiquidMambaEvalResult {
     pub pe_mean: f32,
     /// Standard deviation of PE across all generations in history buffer.
     pub pe_std_dev: f32,
+    /// Sample outputs for qualitative inspection (up to 10).
+    pub sample_outputs: Vec<SampleOutput>,
+}
+
+/// A single sample output for qualitative inspection in eval reports.
+#[cfg(feature = "mamba")]
+#[derive(Debug, Clone)]
+pub struct SampleOutput {
+    /// Semantic intent that was active for this generation.
+    pub intent: String,
+    /// Generated text.
+    pub text: String,
+    /// Semantic prediction error (HDC round-trip reconstruction).
+    pub semantic_pe: f32,
+    /// Fraction of tokens that are real English words.
+    pub english_ratio: f32,
 }
 
 /// Detailed results from the consciousness gating test.
@@ -488,6 +504,7 @@ pub fn evaluate_liquid_mamba(
     let mut all_generated_words: Vec<String> = Vec::new();
     let mut total_thought_output_sim = 0.0f32;
     let mut sim_count = 0usize;
+    let mut sample_outputs: Vec<SampleOutput> = Vec::new();
 
     for pair in &config.dataset.pairs {
         if pair.target_ids.is_empty() && pair.target_text.is_empty() {
@@ -544,6 +561,16 @@ pub fn evaluate_liquid_mamba(
             total_coherence += pair_coherence;
             total_semantic_pe += result.semantic_pe;
             gen_count += 1;
+
+            // Collect sample outputs for qualitative inspection (up to 10, ~1-2 per intent)
+            if sample_outputs.len() < 10 && !result.text.is_empty() {
+                sample_outputs.push(SampleOutput {
+                    intent: intent.clone(),
+                    text: result.text.clone(),
+                    semantic_pe: result.semantic_pe,
+                    english_ratio: pair_english_ratio,
+                });
+            }
 
             // Collect words for distinct-n
             let words: Vec<String> = result
@@ -700,6 +727,7 @@ pub fn evaluate_liquid_mamba(
         pe_trend,
         pe_mean,
         pe_std_dev,
+        sample_outputs,
     }
 }
 
@@ -964,6 +992,20 @@ pub fn format_liquid_mamba_eval_report(
                 score.perplexity,
                 score.english_ratio * 100.0,
                 score.count
+            ));
+        }
+    }
+
+    if !result.sample_outputs.is_empty() {
+        s.push_str("\n--- Sample Outputs ---\n");
+        for (i, sample) in result.sample_outputs.iter().enumerate() {
+            s.push_str(&format!(
+                "\n[{}] Intent: {}  PE: {:.4}  English: {:.1}%\n    \"{}\"\n",
+                i + 1,
+                sample.intent,
+                sample.semantic_pe,
+                sample.english_ratio * 100.0,
+                sample.text.replace('\n', " ").chars().take(120).collect::<String>(),
             ));
         }
     }
@@ -1244,6 +1286,7 @@ mod tests {
                 pe_trend: -0.01,
                 pe_mean: 0.65,
                 pe_std_dev: 0.12,
+                sample_outputs: vec![],
             };
 
             let report = format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
@@ -1339,6 +1382,7 @@ mod tests {
                 pe_trend: 0.0,
                 pe_mean: 0.9,
                 pe_std_dev: 0.0,
+                sample_outputs: vec![],
             };
 
             let report = format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
