@@ -77,14 +77,22 @@ const HAPP_SPECS = {
     bundleRelPath: 'happs/finance/mycelix-finance.happ',
     roleName: 'finance',
   },
-  // Cluster DNAs (Phase 2): commons = property+housing+care+mutualaid+water, civic = justice+emergency+media
+  // Cluster DNAs: commons (2 roles: commons_land + commons_care), civic, hearth
   commons: {
     searchDirRelPath: 'happs/commons',
-    roleName: 'commons',
+    roleName: 'commons_land',
   },
   civic: {
     searchDirRelPath: 'happs/civic',
     roleName: 'civic',
+  },
+  hearth: {
+    searchDirRelPath: 'happs/hearth',
+    roleName: 'hearth',
+  },
+  health: {
+    searchDirRelPath: 'happs/health',
+    roleName: 'health',
   },
   // Not currently packaged into `.happ` bundles in this workspace; keep as "discoverable".
   energy: {
@@ -534,6 +542,20 @@ export function createPropertyScenario(agentCount: number = 3): EcosystemTestHar
   return new EcosystemTestHarness({
     agentCount,
     happs: ['identity', 'property'],
+  });
+}
+
+export function createCommonsScenario(agentCount: number = 3): EcosystemTestHarness {
+  return new EcosystemTestHarness({
+    agentCount,
+    happs: ['identity', 'commons'],
+  });
+}
+
+export function createCivicScenario(agentCount: number = 3): EcosystemTestHarness {
+  return new EcosystemTestHarness({
+    agentCount,
+    happs: ['identity', 'civic'],
   });
 }
 
