@@ -544,9 +544,11 @@ impl CognitiveLoopService {
                 );
             }
 
-            // Wire narrative coherence with lightweight episodes (every 10 cycles)
-            // Science: Damasio (2010) — self emerges from autobiographical narrative continuity
-            if self.stats.total_cycles % 10 == 0 {
+            // Wire narrative coherence with lightweight episodes (every 5 cycles)
+            // Doubled from every-10 for faster autobiographical integration.
+            // Science: Damasio (2010) — self emerges from autobiographical narrative continuity.
+            // Conway (2005) — narrative identity forms from dense episodic sampling.
+            if self.stats.total_cycles % 5 == 0 {
                 let valence = (1.0 - ctx.prediction_error as f64).clamp(-1.0, 1.0);
                 self.master_equation.narrative_coherence.add_episode(
                     format!("cycle_{}", self.stats.total_cycles),
@@ -554,10 +556,10 @@ impl CognitiveLoopService {
                 );
             }
 
-            // Fix 3b: Wire future scenarios from prediction confidence.
-            // add_future_scenario() drives future_simulation_depth in narrative factor.
+            // Wire future scenarios from prediction confidence (every 25 cycles).
+            // Doubled from every-50 for faster future_simulation_depth growth.
             // Science: Schacter et al. (2012) — prospection uses same networks as episodic memory
-            if self.stats.total_cycles % 50 == 0 {
+            if self.stats.total_cycles % 25 == 0 {
                 let horizon = ((1.0 - ctx.prediction_error as f64) * 10.0).max(1.0) as usize;
                 self.master_equation.narrative_coherence.add_future_scenario(
                     format!("prediction_horizon_{}", self.stats.total_cycles),
@@ -638,9 +640,23 @@ impl CognitiveLoopService {
                 .unwrap_or(0.0);
             let phi_input = ctx.unified_psi.max(spectral_boost).clamp(0.0, 1.0);
 
+            // Enrich broadcast: raw CfC coherence (~0.51) is too narrow a proxy
+            // for "global workspace broadcast." GWT broadcast events ARE broadcast
+            // by definition (Baars 1988). Blend coherence with GWT success and
+            // attention focus for a richer broadcast measure.
+            // Science: Dehaene et al. (2006) — conscious access = ignition + broadcast.
+            let gwt_boost = if gwt_broadcast {
+                0.2 + 0.1 * (gwt_coalition_size.min(5) as f64 / 5.0)
+            } else {
+                0.0
+            };
+            let attention_boost = ctx.peak_attention as f64 * 0.15;
+            let broadcast_input = (ctx.coherence as f64 + gwt_boost + attention_boost)
+                .clamp(0.0, 1.0);
+
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
                 phi: phi_input,
-                broadcast: ctx.coherence as f64, // coherence ~ global workspace broadcast
+                broadcast: broadcast_input,
                 working_memory: self.prefrontal_utilization(),
                 attention: ctx.peak_attention as f64,
                 // CfC is recurrent from cycle 1 — starting at 0 is dishonest and
@@ -652,13 +668,15 @@ impl CognitiveLoopService {
                 // of its own state. Prevents softmin death spiral where knowledge→0
                 // crushes consciousness, preventing the learning that would raise it.
                 knowledge: self.prediction_confidence.max(0.2),
-                // Synchrony: baseline from CfC coherence + flow boost.
-                // Neural synchrony exists independent of flow state — coherence
-                // reflects ongoing temporal coordination across CfC neurons.
-                // Science: Buzsáki (2006) — neural oscillatory synchrony is a
-                // fundamental feature of all active neural networks.
-                synchrony: (0.3 + ctx.coherence as f64 * 0.4
-                    + self.flow_state.intensity as f64 * 0.3)
+                // Synchrony: baseline + coherence + attention + flow.
+                // Attention IS synchrony — selective amplification requires
+                // phase-locked neural coordination (Fries 2015). Raised baseline
+                // from 0.3→0.35: idle neural networks exhibit background
+                // synchrony (Buzsáki 2006), but not so high that moral/attentional
+                // perturbations are masked. Attention adds a second source.
+                synchrony: (0.35 + ctx.coherence as f64 * 0.25
+                    + ctx.peak_attention as f64 * 0.15
+                    + self.flow_state.intensity as f64 * 0.25)
                     .clamp(0.1, 1.0),
             };
             let mce_result = self.master_equation.compute(&inputs);
