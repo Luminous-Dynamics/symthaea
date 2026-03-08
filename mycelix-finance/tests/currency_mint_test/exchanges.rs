@@ -5,7 +5,8 @@
 //!                               test_self_exchange_rejected (E1), test_nan_hours_rejected (E2),
 //!                               test_credit_limit_enforcement (E4), test_empty_description_rejected (E5),
 //!                               test_min_service_minutes (E14), test_max_service_hours (E15),
-//!                               test_nan_inf_hours_rejected (E16), test_zero_negative_hours_rejected (E17)
+//!                               test_nan_inf_hours_rejected (E16), test_zero_negative_hours_rejected (E17),
+//!                               test_daily_rate_limit (E20)
 //!   confirm_minted_exchange   → test_confirmation_flow (3.1), test_confirm_blocked_when_suspended (3.2),
 //!                               test_two_party_confirmation_flow (13.1), test_double_confirm_idempotent (E13),
 //!                               test_confirm_on_suspended_currency (E18)

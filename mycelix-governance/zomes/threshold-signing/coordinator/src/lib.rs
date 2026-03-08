@@ -2017,6 +2017,41 @@ mod tests {
     }
 
     // =========================================================================
+    // ML-KEM encapsulation key validation
+    // =========================================================================
+
+    #[test]
+    fn test_register_member_valid_ml_kem_ek() {
+        let mut input = make_valid_register_input();
+        input.ml_kem_encapsulation_key = Some(vec![0xAB; 1184]);
+        assert!(check_register_member_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_register_member_ml_kem_ek_too_short() {
+        let mut input = make_valid_register_input();
+        input.ml_kem_encapsulation_key = Some(vec![0xAB; 100]);
+        let err = check_register_member_input(&input).unwrap_err();
+        assert!(err.contains("1184 bytes"), "Expected 1184 bytes error, got: {err}");
+    }
+
+    #[test]
+    fn test_register_member_ml_kem_ek_too_long() {
+        let mut input = make_valid_register_input();
+        input.ml_kem_encapsulation_key = Some(vec![0xAB; 1185]);
+        let err = check_register_member_input(&input).unwrap_err();
+        assert!(err.contains("1184 bytes"), "Expected 1184 bytes error, got: {err}");
+    }
+
+    #[test]
+    fn test_register_member_ml_kem_ek_none_ok() {
+        // None is valid — ML-KEM is optional for backward compatibility
+        let input = make_valid_register_input();
+        assert!(input.ml_kem_encapsulation_key.is_none());
+        assert!(check_register_member_input(&input).is_ok());
+    }
+
+    // =========================================================================
     // violation penalty eligibility
     // =========================================================================
 
