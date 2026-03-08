@@ -258,7 +258,9 @@ impl CognitiveLoopService {
         // ── ToM accuracy → prediction confidence modulation (Frith & Frith 2006) ──
         // High social prediction accuracy → boost prediction confidence (we understand the user).
         // Low accuracy → dampen confidence (our model is unreliable).
-        {
+        // Guard: only active when social models exist (avoid constant dampening
+        // when no social context has been injected — default accuracy is 0.0).
+        if self.social_mgr.social.social_models_count > 0 {
             let tom_accuracy = self.social_mgr.social.social_prediction_accuracy;
             if tom_accuracy > 0.7 {
                 let boost = (tom_accuracy - 0.7) * 0.05; // [0, 0.015]

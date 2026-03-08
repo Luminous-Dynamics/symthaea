@@ -139,7 +139,9 @@ impl CognitiveLoopService {
         // ── ToM prediction mismatch → exploration boost (Frith & Frith 2006) ──
         // When our mental model of the user is inaccurate (high mismatch),
         // boost exploration to gather more data and refine the model.
-        {
+        // Guard: only active when social models exist (avoid constant boost
+        // when no social context has been injected).
+        if self.social_mgr.social.social_models_count > 0 {
             let accuracy = self.social_mgr.social.social_prediction_accuracy;
             let mismatch = 1.0 - accuracy;
             // Update EMA (alpha = 0.1)
