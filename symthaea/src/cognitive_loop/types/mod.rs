@@ -57,6 +57,28 @@ fn default_one_f32_substrate() -> f32 {
     1.0
 }
 
+// ── Integrity Telemetry ───────────────────────────────────────────────────
+
+/// Integrity telemetry snapshot from IntegrityManager.
+///
+/// Reports tamper detection status: attestation, temporal consistency,
+/// behavioral canaries. Feature-gated behind `integrity`.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct IntegrityTelemetry {
+    /// Whether all BLAKE3 attestation hashes matched.
+    pub attestation_passed: bool,
+    /// Whether temporal consistency (wall clock vs CfC delta_t) passed.
+    pub temporal_passed: bool,
+    /// Whether all behavioral canaries returned expected results.
+    pub canaries_passed: bool,
+    /// Number of anomalies detected this cycle.
+    pub anomaly_count: usize,
+    /// Whether any anomaly has Critical severity.
+    pub has_critical: bool,
+    /// Cycle number of the last integrity check.
+    pub last_check_cycle: usize,
+}
+
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;

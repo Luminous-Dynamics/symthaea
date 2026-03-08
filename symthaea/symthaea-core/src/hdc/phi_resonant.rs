@@ -431,7 +431,10 @@ impl ResonantPhiCalculator {
         let _ = n; // suppress unused warning
 
         if use_parallel {
-            self.resonance_step_parallel(current_state, similarity_matrix)
+            #[cfg(feature = "parallel")]
+            { return self.resonance_step_parallel(current_state, similarity_matrix); }
+            #[cfg(not(feature = "parallel"))]
+            unreachable!()
         } else {
             self.resonance_step_sequential(current_state, similarity_matrix)
         }
@@ -549,10 +552,16 @@ impl ResonantPhiCalculator {
     /// Energy = -Σᵢⱼ similarity(i,j) × similarity(state_i, state_j)
     fn compute_energy(&self, state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> f64 {
         let n = state.len();
+        #[cfg(feature = "parallel")]
         let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
+        #[cfg(not(feature = "parallel"))]
+        let use_parallel = false;
 
         if use_parallel {
-            self.compute_energy_parallel(state, similarity_matrix)
+            #[cfg(feature = "parallel")]
+            { return self.compute_energy_parallel(state, similarity_matrix); }
+            #[cfg(not(feature = "parallel"))]
+            unreachable!()
         } else {
             self.compute_energy_sequential(state, similarity_matrix)
         }
@@ -581,6 +590,7 @@ impl ResonantPhiCalculator {
     /// Parallel energy computation using rayon
     ///
     /// Parallelizes over rows, each row computes its contribution to energy
+    #[cfg(feature = "parallel")]
     fn compute_energy_parallel(
         &self,
         state: &[ContinuousHV],
@@ -729,19 +739,27 @@ impl ResonantPhiCalculator {
     /// Compute total similarity (sum of upper triangle of similarity matrix)
     fn compute_total_similarity(&self, similarity_matrix: &[Vec<f64>]) -> f64 {
         let n = similarity_matrix.len();
+        #[cfg(feature = "parallel")]
         let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
+        #[cfg(not(feature = "parallel"))]
+        let use_parallel = false;
 
         if use_parallel {
-            (0..n)
-                .into_par_iter()
-                .map(|i| {
-                    let mut row_sum = 0.0;
-                    for j in (i + 1)..n {
-                        row_sum += similarity_matrix[i][j];
-                    }
-                    row_sum
-                })
-                .sum()
+            #[cfg(feature = "parallel")]
+            {
+                return (0..n)
+                    .into_par_iter()
+                    .map(|i| {
+                        let mut row_sum = 0.0;
+                        for j in (i + 1)..n {
+                            row_sum += similarity_matrix[i][j];
+                        }
+                        row_sum
+                    })
+                    .sum();
+            }
+            #[cfg(not(feature = "parallel"))]
+            unreachable!()
         } else {
             let mut total = 0.0;
             for i in 0..n {

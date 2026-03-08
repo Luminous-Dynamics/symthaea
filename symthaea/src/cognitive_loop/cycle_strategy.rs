@@ -11,7 +11,20 @@ use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 use symthaea_core::hdc::predictive_encoder::EncodingResult;
 
 use super::helpers;
-use super::thresholds::MORAL_CONCERN_THRESHOLD;
+use super::thresholds::{
+    CONFIDENCE_SCALE_MIDPOINT, CONFIDENCE_SCALE_SENSITIVITY, EXPLORATION_SCALE_MIDPOINT,
+    EXPLORATION_SCALE_SENSITIVITY, MEMO_DIVERSITY_HIGH, MEMO_DIVERSITY_HIGH_SCALE,
+    MEMO_DIVERSITY_LOW, MEMO_DIVERSITY_LOW_SCALE, MEMO_THRESHOLD_CEILING, MEMO_THRESHOLD_FLOOR,
+    MORAL_CONCERN_THRESHOLD, SOCIAL_COOPERATION_THRESHOLD, SOCIAL_TRUST_DEADZONE,
+    SOCIAL_TRUST_EXPLORE_SCALE, SOCIAL_TRUST_EXPLORE_THRESHOLD, SOCIAL_TRUST_MIDPOINT,
+    SOCIAL_TRUST_OVERRIDE_THRESHOLD, SOCIAL_TRUST_STRENGTH_SCALE, SOUL_ALIGNMENT_BOOST_LR_MAX,
+    SOUL_ALIGNMENT_BOOST_LR_MIN, SOUL_ALIGNMENT_BOOST_SCALE, SOUL_ALIGNMENT_BOOST_THRESHOLD,
+    SOUL_ALIGNMENT_DAMPEN_LR_MAX, SOUL_ALIGNMENT_DAMPEN_LR_MIN, SOUL_ALIGNMENT_DAMPEN_SCALE,
+    SOUL_ALIGNMENT_DAMPEN_THRESHOLD, SURPRISE_PE_EXCESS_CAP, SURPRISE_PE_SCALE_FACTOR,
+    SURPRISE_PE_THRESHOLD, THETA_BINDING_BOOST_THRESHOLD, THETA_BINDING_CLAMP_MAX,
+    THETA_BINDING_CLAMP_MIN, THETA_DEFAULT_SALIENCE, THETA_SALIENCE_CLAMP_MIN,
+    TOM_MISMATCH_EMA_DECAY, TOM_MISMATCH_EXPLORE_SCALE, TOM_MISMATCH_THRESHOLD,
+};
 use super::{CognitiveLoopService, ModuleTimings, ResponseStrategy};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -107,35 +120,49 @@ impl CognitiveLoopService {
 
         // ── Social trust → strategy modulation (Decety & Chaminade 2003) ──
         // Proportional: trust deviation from neutral (0.5) scales bias strength
-        let trust_deviation = self.social_mgr.social.social_trust - 0.5; // [-0.5, 0.5]
-        let social_strategy_bias =
-            if trust_deviation > 0.1 && self.social_mgr.social.social_cooperation_rate > 0.3 {
-                // High trust: strength scales [0, 1] over deviation [0.1, 0.5]
-                let strength = ((trust_deviation - 0.1) * 2.5).min(1.0);
-                if strength > 0.5 && selected_strategy == ResponseStrategy::Concise {
-                    selected_strategy = ResponseStrategy::Supportive;
-                    true
-                } else if strength > 0.3 {
-                    self.adjust_exploration("social_trust_high", strength * 0.05);
-                    false
-                } else {
-                    false
-                }
-            } else if trust_deviation < -0.1 {
-                // Low trust: caution scales [0, 1] over deviation [-0.5, -0.1]
-                let caution = ((-trust_deviation - 0.1) * 2.5).min(1.0);
-                if caution > 0.5 && selected_strategy == ResponseStrategy::Exploratory {
-                    selected_strategy = ResponseStrategy::Detailed;
-                    true
-                } else if caution > 0.3 {
-                    self.adjust_exploration("social_trust_low", -caution * 0.05);
-                    false
-                } else {
-                    false
-                }
+        let trust_deviation = self.social_mgr.social.social_trust - SOCIAL_TRUST_MIDPOINT; // [-0.5, 0.5]
+        let social_strategy_bias = if trust_deviation > SOCIAL_TRUST_DEADZONE
+            && self.social_mgr.social.social_cooperation_rate > SOCIAL_COOPERATION_THRESHOLD
+        {
+            // High trust: strength scales [0, 1] over deviation [deadzone, 0.5]
+            let strength =
+                ((trust_deviation - SOCIAL_TRUST_DEADZONE) * SOCIAL_TRUST_STRENGTH_SCALE).min(1.0);
+            if strength > SOCIAL_TRUST_OVERRIDE_THRESHOLD
+                && selected_strategy == ResponseStrategy::Concise
+            {
+                selected_strategy = ResponseStrategy::Supportive;
+                true
+            } else if strength > SOCIAL_TRUST_EXPLORE_THRESHOLD {
+                self.adjust_exploration(
+                    "social_trust_high",
+                    strength * SOCIAL_TRUST_EXPLORE_SCALE,
+                );
+                false
             } else {
                 false
-            };
+            }
+        } else if trust_deviation < -SOCIAL_TRUST_DEADZONE {
+            // Low trust: caution scales [0, 1] over deviation [-0.5, -deadzone]
+            let caution =
+                ((-trust_deviation - SOCIAL_TRUST_DEADZONE) * SOCIAL_TRUST_STRENGTH_SCALE)
+                    .min(1.0);
+            if caution > SOCIAL_TRUST_OVERRIDE_THRESHOLD
+                && selected_strategy == ResponseStrategy::Exploratory
+            {
+                selected_strategy = ResponseStrategy::Detailed;
+                true
+            } else if caution > SOCIAL_TRUST_EXPLORE_THRESHOLD {
+                self.adjust_exploration(
+                    "social_trust_low",
+                    -caution * SOCIAL_TRUST_EXPLORE_SCALE,
+                );
+                false
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         // ── ToM prediction mismatch → exploration boost (Frith & Frith 2006) ──
         // When our mental model of the user is inaccurate (high mismatch),
@@ -145,15 +172,19 @@ impl CognitiveLoopService {
         if self.social_mgr.social.social_models_count > 0 {
             let accuracy = self.social_mgr.social.social_prediction_accuracy;
             let mismatch = 1.0 - accuracy;
-            // Update EMA (alpha = 0.1)
+            // Update EMA (alpha = 1 - decay)
             self.stats.tom_prediction_mismatch_ema = if self.stats.total_cycles < 5 {
                 mismatch
             } else {
-                self.stats.tom_prediction_mismatch_ema * 0.9 + mismatch * 0.1
+                self.stats.tom_prediction_mismatch_ema * TOM_MISMATCH_EMA_DECAY
+                    + mismatch * (1.0 - TOM_MISMATCH_EMA_DECAY)
             };
-            // Trigger exploration when mismatch is high (> 0.4) and sustained
-            if self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10 {
-                let boost = (self.stats.tom_prediction_mismatch_ema - 0.4) * 0.1; // [0, 0.06]
+            // Trigger exploration when mismatch is high and sustained
+            if self.stats.tom_prediction_mismatch_ema > TOM_MISMATCH_THRESHOLD
+                && self.stats.total_cycles > 10
+            {
+                let boost = (self.stats.tom_prediction_mismatch_ema - TOM_MISMATCH_THRESHOLD)
+                    * TOM_MISMATCH_EXPLORE_SCALE;
                 self.adjust_exploration("tom_mismatch", boost);
                 self.stats.tom_exploration_triggers += 1;
             }
@@ -239,8 +270,8 @@ impl CognitiveLoopService {
                         error_hist
                             .get(eh_idx)
                             .copied()
-                            .unwrap_or(0.1)
-                            .clamp(0.05, 1.0)
+                            .unwrap_or(THETA_DEFAULT_SALIENCE)
+                            .clamp(THETA_SALIENCE_CLAMP_MIN, 1.0)
                     })
                     .collect();
 
@@ -254,13 +285,14 @@ impl CognitiveLoopService {
                 // Theta gates access; salience weights the contribution.
                 let mean_salience =
                     salience_weights.iter().sum::<f32>() / salience_weights.len().max(1) as f32;
-                let binding_strength = (mean_salience * theta_weight).clamp(0.1, 0.9);
+                let binding_strength = (mean_salience * theta_weight)
+                    .clamp(THETA_BINDING_CLAMP_MIN, THETA_BINDING_CLAMP_MAX);
                 temporal_binding_strength = binding_strength;
 
                 // Bundle when binding strength exceeds threshold.
                 // At theta troughs (weight~0), binding is suppressed → encoding stays clean.
                 // At theta peaks + high salience → strong temporal integration.
-                if binding_strength > 0.25 {
+                if binding_strength > THETA_BINDING_BOOST_THRESHOLD {
                     hv16_cached = crate::hdc::BinaryHV::bundle(&[hv16_cached, temporal_context]);
                 }
             }
@@ -291,6 +323,10 @@ impl CognitiveLoopService {
                                 let semantic_hv = bridge.project(&emb_result.embedding);
                                 let sim = hv16_cached.similarity(&semantic_hv);
                                 self.stats.semantic_encoder_similarity = sim;
+                                // Store continuous projection for ethics engine
+                                // moral topology (genuine semantic resolution).
+                                self.last_semantic_continuous =
+                                    Some(bridge.project_continuous(&emb_result.embedding));
                             }
                         }
                     }
@@ -313,16 +349,25 @@ impl CognitiveLoopService {
             if alignment.overall_alignment < MORAL_CONCERN_THRESHOLD {
                 self.stats.moral_concerns_detected += 1;
             }
-            if alignment.overall_alignment > 0.3 {
-                let boost = (alignment.overall_alignment - 0.3) * 0.1;
+            if alignment.overall_alignment > SOUL_ALIGNMENT_BOOST_THRESHOLD {
+                let boost = (alignment.overall_alignment - SOUL_ALIGNMENT_BOOST_THRESHOLD)
+                    * SOUL_ALIGNMENT_BOOST_SCALE;
                 self.carryover.learning.subsystem_lr_factor *= 1.0 + boost;
-                self.carryover.learning.subsystem_lr_factor =
-                    self.carryover.learning.subsystem_lr_factor.clamp(0.8, 1.3);
-            } else if alignment.overall_alignment < -0.3 {
-                let dampening = (alignment.overall_alignment + 0.3).abs() * 0.15;
+                self.carryover.learning.subsystem_lr_factor = self
+                    .carryover
+                    .learning
+                    .subsystem_lr_factor
+                    .clamp(SOUL_ALIGNMENT_BOOST_LR_MIN, SOUL_ALIGNMENT_BOOST_LR_MAX);
+            } else if alignment.overall_alignment < SOUL_ALIGNMENT_DAMPEN_THRESHOLD {
+                let dampening = (alignment.overall_alignment - SOUL_ALIGNMENT_DAMPEN_THRESHOLD)
+                    .abs()
+                    * SOUL_ALIGNMENT_DAMPEN_SCALE;
                 self.carryover.learning.subsystem_lr_factor *= 1.0 - dampening;
-                self.carryover.learning.subsystem_lr_factor =
-                    self.carryover.learning.subsystem_lr_factor.clamp(0.7, 1.2);
+                self.carryover.learning.subsystem_lr_factor = self
+                    .carryover
+                    .learning
+                    .subsystem_lr_factor
+                    .clamp(SOUL_ALIGNMENT_DAMPEN_LR_MIN, SOUL_ALIGNMENT_DAMPEN_LR_MAX);
             }
             alignment.overall_alignment
         } else {
@@ -361,11 +406,14 @@ impl CognitiveLoopService {
             // amplify dimensions that differ most from last prediction.
             // Feldman & Friston (2010): precision-weighted prediction errors
             // gate information flow at the dimension level.
-            if prediction_error > 0.2 {
+            if prediction_error > SURPRISE_PE_THRESHOLD {
                 if let Some(ref last_pred) = self.last_prediction {
                     if last_pred.len() == raw.len() {
                         let pred_slice = last_pred.as_slice();
-                        let pe_scale = 1.0 + (prediction_error - 0.2).min(0.5) * 0.3;
+                        let pe_scale = 1.0
+                            + (prediction_error - SURPRISE_PE_THRESHOLD)
+                                .min(SURPRISE_PE_EXCESS_CAP)
+                                * SURPRISE_PE_SCALE_FACTOR;
                         raw.iter()
                             .zip(pred_slice.iter())
                             .map(|(&r, &p)| {
@@ -438,12 +486,14 @@ impl CognitiveLoopService {
         // ── Phase 21: Codebook diversity → memoization threshold adaptation ─
         let base_memo_threshold = super::thresholds::INPUT_MEMO_THRESHOLD;
         let diversity = self.stats.codebook_diversity;
-        let memo_threshold = if diversity < 0.4 && diversity > 0.0 {
-            let t = (base_memo_threshold - (0.4 - diversity) * 0.1).max(0.88);
+        let memo_threshold = if diversity < MEMO_DIVERSITY_LOW && diversity > 0.0 {
+            let t = (base_memo_threshold - (MEMO_DIVERSITY_LOW - diversity) * MEMO_DIVERSITY_LOW_SCALE)
+                .max(MEMO_THRESHOLD_FLOOR);
             self.stats.memo_threshold_adaptations += 1;
             t
-        } else if diversity > 0.8 {
-            let t = (base_memo_threshold + (diversity - 0.8) * 0.05).min(0.98);
+        } else if diversity > MEMO_DIVERSITY_HIGH {
+            let t = (base_memo_threshold + (diversity - MEMO_DIVERSITY_HIGH) * MEMO_DIVERSITY_HIGH_SCALE)
+                .min(MEMO_THRESHOLD_CEILING);
             self.stats.memo_threshold_adaptations += 1;
             t
         } else {
@@ -479,6 +529,12 @@ impl CognitiveLoopService {
             let neuromod_stillness = (gaba * 0.6 + adenosine * 0.4 - 0.3).clamp(0.0, 0.3);
             (neuromod_stillness + self.stats.circadian_stillness_boost).clamp(0.0, 0.5)
         };
+        // Collect semantic embedding for ethics engine (when semantic-encoder enabled).
+        #[cfg(feature = "semantic-encoder")]
+        let semantic_emb_ref = self.last_semantic_continuous.as_deref();
+        #[cfg(not(feature = "semantic-encoder"))]
+        let semantic_emb_ref: Option<&[f32]> = None;
+
         let ethics_output = self
             .ethics_engine
             .evaluate(&super::ethics_engine::EthicsEngineInput {
@@ -487,6 +543,7 @@ impl CognitiveLoopService {
                 unified_psi: self.stats.unified_psi as f64,
                 compressed_state: &compressed_state,
                 stillness_boost,
+                semantic_embedding: semantic_emb_ref,
             });
         module_timings.ethics_engine = ethics_output.total_us;
         module_timings.ethics_engine_moral = ethics_output.moral_us;
@@ -552,8 +609,12 @@ impl CognitiveLoopService {
         // 1.2 Adaptive Learning Threshold + Urgency
         // ═══════════════════════════════════════════════════════════════════════
         // Science: Friston (2010) — precision (inverse uncertainty) modulates PE weighting.
-        let confidence_scale = (1.0 + (self.prediction_confidence - 0.5) * 0.4) as f32;
-        let exploration_scale = (1.0 - (self.curiosity_drive.exploration_urge - 0.5) * 0.2) as f32;
+        let confidence_scale = (1.0
+            + (self.prediction_confidence - CONFIDENCE_SCALE_MIDPOINT as f64)
+                * CONFIDENCE_SCALE_SENSITIVITY as f64) as f32;
+        let exploration_scale = (1.0
+            - (self.curiosity_drive.exploration_urge - EXPLORATION_SCALE_MIDPOINT as f64)
+                * EXPLORATION_SCALE_SENSITIVITY as f64) as f32;
         let effective_threshold = self.config.learning_threshold
             * self.carryover.learning.adaptive_threshold_scale as f32
             * confidence_scale

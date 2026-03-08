@@ -523,6 +523,20 @@ impl CognitiveLoopService {
             }
         }
 
+        // ── Session 12 telemetry ──
+        metadata.epistemic_conflict_exploration = feedback.reasoning.epistemic_conflict_count > 2
+            && self.stats.total_cycles > 20;
+        metadata.phenomenal_fragmentation_recovery = feedback.self_model.phenomenal_fragmented
+            && self.stats.total_cycles > 15;
+        metadata.temporal_discontinuity_recovery = feedback.self_model.temporal_discontinuity
+            && self.stats.total_cycles > 15;
+        metadata.binding_attention_modulated = (feedback.self_model.cross_modal_binding_strength > 0.7
+            || feedback.self_model.cross_modal_binding_strength < 0.3)
+            && self.stats.total_cycles > 10;
+        metadata.resonator_semantic_lr_mod = (dynamics.resonator.resonator_best_sim > 0.8
+            || (dynamics.resonator.resonator_best_sim < 0.3 && dynamics.resonator.resonator_best_sim > 0.0))
+            && self.stats.total_cycles > 10;
+
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
             .gwt_mgr
@@ -598,6 +612,20 @@ impl CognitiveLoopService {
         metadata.substrate_tau_factor = metadata.substrate.substrate_tau_factor;
         metadata.substrate_scale_pressure = metadata.substrate.substrate_scale_pressure;
         metadata.substrate_feasibility = metadata.substrate.substrate_effective_feasibility;
+
+        // Integrity telemetry
+        #[cfg(feature = "integrity")]
+        {
+            let status = &self.integrity_manager.status;
+            metadata.integrity = super::IntegrityTelemetry {
+                attestation_passed: status.attestation_passed,
+                temporal_passed: status.temporal_passed,
+                canaries_passed: status.canaries_passed,
+                anomaly_count: status.anomalies.len(),
+                has_critical: self.integrity_manager.has_critical_anomaly(),
+                last_check_cycle: status.last_check_cycle,
+            };
+        }
 
         // Physics bridge telemetry
         #[cfg(feature = "physics-bridge")]

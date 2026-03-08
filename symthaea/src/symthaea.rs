@@ -55,7 +55,7 @@ use crate::infrastructure::{PainSender, SomaticErrorBridge, TaskSupervisor};
 
 #[cfg(feature = "school_learning")]
 use crate::school::curriculum::Curriculum;
-#[cfg(feature = "web_research_module")]
+#[cfg(all(feature = "web_research_module", feature = "school_learning"))]
 use crate::school::curriculum_extender::CurriculumExtender;
 #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
 use crate::school::curriculum_extender::ResearchSummary;
@@ -383,7 +383,7 @@ pub struct Symthaea {
     #[cfg(feature = "school_learning")]
     curriculum_persistence: CurriculumPersistenceConfig,
     /// Autonomous research bridge for expanding the curriculum.
-    #[cfg(feature = "web_research_module")]
+    #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
     pub curriculum_extender: Option<CurriculumExtender>,
     /// Background research update channel (results).
     #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
@@ -719,7 +719,7 @@ impl Symthaea {
             curriculum_recall: CurriculumRecallConfig::from_env(),
             #[cfg(feature = "school_learning")]
             curriculum_persistence,
-            #[cfg(feature = "web_research_module")]
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
             curriculum_extender: WebResearcher::try_default()
                 .map(|r| CurriculumExtender::new(r, llm.clone())),
             #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
@@ -995,7 +995,7 @@ impl Symthaea {
             curriculum_recall: CurriculumRecallConfig::from_env(),
             #[cfg(feature = "school_learning")]
             curriculum_persistence,
-            #[cfg(feature = "web_research_module")]
+            #[cfg(all(feature = "web_research_module", feature = "school_learning"))]
             curriculum_extender: WebResearcher::try_default().map(|r| {
                 let llm_clone = LLMOrgan::with_backend(
                     LLMOrganConfig {
@@ -1683,16 +1683,37 @@ impl Symthaea {
             let needs_llm = generated.source.contains("todo!(")
                 || generated.source.contains("NotImplementedError");
 
-            // Inject error avoidance hints from past failures
+            // Item 6 (Phase 3i): Structured prompt assembly for LLM completion.
+            // Organize notes into clear sections so the LLM gets a well-formed prompt.
             let mut notes = generated.notes;
-            for (error_pat, fix_hint) in &self.error_pattern_memory {
-                notes.push(format!("AVOID_ERROR: {} — {}", error_pat, fix_hint));
-            }
 
-            // Item 5 (Phase 3h): Inject top-1 cached example as few-shot hint
-            // for LLM prompts when the native emitter can't handle it
             if needs_llm {
-                // Clone cache to avoid borrow conflict with text_to_hv(&mut self)
+                // Section: CONSTRAINTS from spec + algorithm detection
+                if !spec_constraints.is_empty() {
+                    notes.push(format!(
+                        "CONSTRAINTS:\n{}",
+                        spec_constraints
+                            .iter()
+                            .map(|c| format!("  - {}", c))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    ));
+                }
+
+                // Section: ERROR_AVOIDANCE from past failures
+                let error_hints: Vec<String> = self
+                    .error_pattern_memory
+                    .iter()
+                    .map(|(pat, fix)| format!("  - {} → {}", pat, fix))
+                    .collect();
+                if !error_hints.is_empty() {
+                    notes.push(format!(
+                        "ERROR_AVOIDANCE (learned from past failures):\n{}",
+                        error_hints.join("\n")
+                    ));
+                }
+
+                // Section: SIMILAR_EXAMPLE — best HDC match from cache
                 let cache_snapshot = self.code_generation_cache.clone();
                 let query_hv = self.text_to_hv(content);
                 let best_match: Option<(String, String)> = {
@@ -1714,12 +1735,25 @@ impl Symthaea {
                     ));
                 }
 
-                // Also inject test-first tests as behavioral spec for LLM
+                // Section: EXPECTED_TESTS — behavioral oracle from test-first generation
                 if let Some(ref tests) = pregenerated_tests {
                     notes.push(format!(
-                        "EXPECTED_TESTS: The generated code must pass these tests:\n{}",
+                        "EXPECTED_TESTS: The generated code MUST pass these tests:\n{}",
                         tests
                     ));
+                }
+
+                // Section: OUTPUT_FORMAT — clear instructions for the LLM
+                notes.push(
+                    "OUTPUT_FORMAT: Replace each todo!() body with a working implementation. \
+                     Do NOT change the function signature. Do NOT add extra functions or imports \
+                     unless necessary. Keep the code minimal and correct."
+                        .to_string(),
+                );
+            } else {
+                // Non-LLM path: just inject error hints as flat notes
+                for (error_pat, fix_hint) in &self.error_pattern_memory {
+                    notes.push(format!("AVOID_ERROR: {} — {}", error_pat, fix_hint));
                 }
             }
 

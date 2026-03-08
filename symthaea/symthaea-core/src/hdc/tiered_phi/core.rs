@@ -490,16 +490,25 @@ impl TieredPhi {
         let n = components.len();
 
         // Build full similarity matrix
-        let similarity_matrix = if n > 16 {
-            self.build_similarity_matrix_parallel(components)
-        } else {
-            self.build_similarity_matrix_sequential(components)
+        let similarity_matrix = {
+            #[cfg(feature = "parallel")]
+            {
+                if n > 16 {
+                    self.build_similarity_matrix_parallel(components)
+                } else {
+                    self.build_similarity_matrix_sequential(components)
+                }
+            }
+            #[cfg(not(feature = "parallel"))]
+            {
+                self.build_similarity_matrix_sequential(components)
+            }
         };
 
         // Compute degrees
         let degrees: Vec<f64> = similarity_matrix
             .iter()
-            .map(|row| row.iter().sum::<f64>() - 1.0)
+            .map(|row: &Vec<f64>| row.iter().sum::<f64>() - 1.0)
             .collect();
 
         // Compute Φ
@@ -647,10 +656,19 @@ impl TieredPhi {
         }
 
         // Step 1: Build similarity matrix
-        let similarity_matrix = if n > 16 {
-            self.build_similarity_matrix_parallel(components)
-        } else {
-            self.build_similarity_matrix_sequential(components)
+        let similarity_matrix = {
+            #[cfg(feature = "parallel")]
+            {
+                if n > 16 {
+                    self.build_similarity_matrix_parallel(components)
+                } else {
+                    self.build_similarity_matrix_sequential(components)
+                }
+            }
+            #[cfg(not(feature = "parallel"))]
+            {
+                self.build_similarity_matrix_sequential(components)
+            }
         };
 
         // Step 2: Detect natural clusters using simple threshold-based clustering
@@ -671,7 +689,7 @@ impl TieredPhi {
         // Step 5: Compute macro Φ (global integration)
         let degrees: Vec<f64> = similarity_matrix
             .iter()
-            .map(|row| row.iter().sum::<f64>() - 1.0) // Subtract self-similarity
+            .map(|row: &Vec<f64>| row.iter().sum::<f64>() - 1.0) // Subtract self-similarity
             .collect();
         let algebraic_connectivity = self.estimate_fiedler_value(&similarity_matrix, &degrees);
         let macro_phi = (algebraic_connectivity / degrees.iter().sum::<f64>().max(1.0) * n as f64)

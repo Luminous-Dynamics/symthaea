@@ -442,6 +442,8 @@ impl CognitiveLoopService {
             };
 
         let substrate_manager = super::substrate_manager::SubstrateManager::new(&config);
+        #[cfg(feature = "integrity")]
+        let substrate_tau_for_integrity = substrate_manager.tau_factor;
 
         #[cfg(feature = "physics-bridge")]
         let physics_integration = if config.enable_physics_bridge {
@@ -639,6 +641,8 @@ impl CognitiveLoopService {
             },
             #[cfg(feature = "semantic-encoder")]
             pending_semantic_rx: std::sync::Mutex::new(None),
+            #[cfg(feature = "semantic-encoder")]
+            last_semantic_continuous: None,
             async_trainer,
             causal_enhancer,
             phi_episodic_replay,
@@ -863,6 +867,27 @@ impl CognitiveLoopService {
             memory_manager: super::managers::MemoryManager::default(),
             learning_manager: super::managers::LearningManager::default(),
             perception_manager: super::managers::PerceptionManager::default(),
+            #[cfg(feature = "integrity")]
+            integrity_manager: {
+                let mut im = crate::integrity::IntegrityManager::new();
+                // Register safety-critical thresholds for tamper detection (#5)
+                im.register_safety_thresholds(&[
+                    super::thresholds::MORAL_CONCERN_THRESHOLD,
+                    super::thresholds::MORAL_BENEFIT_THRESHOLD,
+                    super::thresholds::MORAL_CONCERN_EXPLORATION_DAMPEN,
+                    super::thresholds::MORAL_CONCERN_PAUSE_BOOST,
+                    super::thresholds::MORAL_BENEFIT_CONFIDENCE_BOOST,
+                ]);
+                im.register_consciousness_weights(&[
+                    super::thresholds::DOMINANCE_FLOW_BASE,
+                    super::thresholds::DOMINANCE_CONFIDENT,
+                    super::thresholds::DOMINANCE_DEFAULT,
+                    super::thresholds::POLICY_SOFT_THRESHOLD,
+                ]);
+                // Apply substrate tau factor for temporal consistency scaling (#3)
+                im.set_substrate_tau_factor(substrate_tau_for_integrity);
+                im
+            },
         })
     }
 

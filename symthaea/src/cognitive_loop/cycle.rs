@@ -36,6 +36,10 @@ impl CognitiveLoopService {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
         self.substrate_manager.tick_energy(&self.config);
+
+        // Integrity: run tamper detection (temporal every cycle, canaries at co-prime intervals)
+        #[cfg(feature = "integrity")]
+        self.integrity_manager.tick(self.stats.total_cycles as usize, self.config.cfc_config.delta_t);
         let mut module_timings = super::ModuleTimings::default();
 
         // ═══════════════════════════════════════════════════════════════════

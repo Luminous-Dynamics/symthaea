@@ -305,6 +305,10 @@ pub(crate) struct CycleHistory {
     pub(crate) self_model_prediction: Option<(usize, f64, CycleUrgency)>,
     /// Cached coherence value for this cycle (computed once, reused everywhere).
     pub(crate) cached_coherence: Option<f32>,
+    /// EMA of consciousness level for adaptive consolidation gating.
+    /// Tracks rolling average so consolidation threshold adapts to the system's
+    /// typical consciousness range rather than using a hardcoded 0.5.
+    pub(crate) consciousness_ema: f64,
 }
 
 impl Default for CycleHistory {
@@ -327,6 +331,7 @@ impl Default for CycleHistory {
             error_history: std::collections::VecDeque::with_capacity(16),
             self_model_prediction: None,
             cached_coherence: None,
+            consciousness_ema: 0.0,
         }
     }
 }

@@ -137,9 +137,10 @@ pub const POLICY_TEMP_RANGE: f64 = 1.5;
 // MCE / CONSCIOUSNESS MEASUREMENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Maximum LR boost from consciousness level (MCE) — up to +10%.
+/// Maximum LR boost from consciousness level (MCE) — up to +20%.
 /// Basis: Dehaene (2014) — conscious access facilitates learning.
-pub const MCE_LR_BOOST_SCALE: f32 = 0.1;
+/// Doubled from 0.1 to strengthen consciousness→learning coupling.
+pub const MCE_LR_BOOST_SCALE: f32 = 0.2;
 
 /// MCE LR boost decay per cycle (multiplicative).
 pub const MCE_BOOST_DECAY: f32 = 0.9;
@@ -1483,6 +1484,121 @@ pub const SPEECH_RATE_CLAMP_MIN: f32 = 0.6;
 pub const SPEECH_RATE_CLAMP_MAX: f32 = 1.5;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// SOCIAL TRUST STRATEGY BIAS
+// Science: Decety & Chaminade (2003) — social trust modulates cooperative strategy.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Trust midpoint — deviation from this triggers social strategy bias.
+pub const SOCIAL_TRUST_MIDPOINT: f32 = 0.5;
+/// Trust deviation deadzone — below this, no strategy bias applied.
+pub const SOCIAL_TRUST_DEADZONE: f32 = 0.1;
+/// Minimum cooperation rate for trust-based strategy upgrade.
+pub const SOCIAL_COOPERATION_THRESHOLD: f32 = 0.3;
+/// Scaling factor for trust deviation → bias strength mapping.
+/// Maps deviation [0.1, 0.5] → strength [0, 1].
+pub const SOCIAL_TRUST_STRENGTH_SCALE: f32 = 2.5;
+/// Minimum strength for strategy override (Concise→Supportive or Exploratory→Detailed).
+pub const SOCIAL_TRUST_OVERRIDE_THRESHOLD: f32 = 0.5;
+/// Minimum strength for exploration adjustment (no strategy override).
+pub const SOCIAL_TRUST_EXPLORE_THRESHOLD: f32 = 0.3;
+/// Exploration adjustment scale from social trust.
+pub const SOCIAL_TRUST_EXPLORE_SCALE: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOM PREDICTION MISMATCH
+// Science: Frith & Frith (2006) — ToM mismatch drives epistemic exploration.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA decay for ToM prediction mismatch tracking.
+pub const TOM_MISMATCH_EMA_DECAY: f32 = 0.9;
+/// ToM mismatch threshold for exploration trigger.
+pub const TOM_MISMATCH_THRESHOLD: f32 = 0.4;
+/// Exploration boost scale from ToM mismatch.
+pub const TOM_MISMATCH_EXPLORE_SCALE: f32 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOUL ALIGNMENT LR MODULATION
+// Science: Haidt (2001) — moral alignment reinforces learning.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Soul alignment threshold for LR boost (positive alignment).
+pub const SOUL_ALIGNMENT_BOOST_THRESHOLD: f32 = 0.3;
+/// LR boost scale from positive soul alignment.
+pub const SOUL_ALIGNMENT_BOOST_SCALE: f32 = 0.1;
+/// LR clamp minimum for positive soul alignment.
+pub const SOUL_ALIGNMENT_BOOST_LR_MIN: f32 = 0.8;
+/// LR clamp maximum for positive soul alignment.
+pub const SOUL_ALIGNMENT_BOOST_LR_MAX: f32 = 1.3;
+/// Soul alignment threshold for LR dampening (negative alignment).
+pub const SOUL_ALIGNMENT_DAMPEN_THRESHOLD: f32 = -0.3;
+/// LR dampening scale from negative soul alignment.
+pub const SOUL_ALIGNMENT_DAMPEN_SCALE: f32 = 0.15;
+/// LR clamp minimum for negative soul alignment.
+pub const SOUL_ALIGNMENT_DAMPEN_LR_MIN: f32 = 0.7;
+/// LR clamp maximum for negative soul alignment.
+pub const SOUL_ALIGNMENT_DAMPEN_LR_MAX: f32 = 1.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SURPRISE-DRIVEN EXPLORATION
+// Science: Friston (2005) — prediction error drives epistemic action.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Prediction error threshold for surprise-driven exploration.
+pub const SURPRISE_PE_THRESHOLD: f32 = 0.2;
+/// Maximum PE excess for scale computation.
+pub const SURPRISE_PE_EXCESS_CAP: f32 = 0.5;
+/// PE scale factor for exploration intensity.
+pub const SURPRISE_PE_SCALE_FACTOR: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MEMO THRESHOLD DIVERSITY ADAPTATION
+// Science: Baddeley (2012) — working memory adapts to stimulus diversity.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Low codebook diversity threshold → lower memo threshold (more memoization).
+pub const MEMO_DIVERSITY_LOW: f32 = 0.4;
+/// Adjustment scale for low diversity → threshold reduction.
+pub const MEMO_DIVERSITY_LOW_SCALE: f32 = 0.1;
+/// Minimum memo threshold floor.
+pub const MEMO_THRESHOLD_FLOOR: f32 = 0.88;
+/// High codebook diversity threshold → raise memo threshold (less memoization).
+pub const MEMO_DIVERSITY_HIGH: f32 = 0.8;
+/// Adjustment scale for high diversity → threshold increase.
+pub const MEMO_DIVERSITY_HIGH_SCALE: f32 = 0.05;
+/// Maximum memo threshold ceiling.
+pub const MEMO_THRESHOLD_CEILING: f32 = 0.98;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THETA-PHASE BINDING
+// Science: Lisman & Jensen (2013) — theta-gamma coupling for feature binding.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default salience when Phi attention returns no weights.
+pub const THETA_DEFAULT_SALIENCE: f32 = 0.1;
+/// Minimum salience clamp for theta-phase binding.
+pub const THETA_SALIENCE_CLAMP_MIN: f32 = 0.05;
+/// Minimum binding strength clamp.
+pub const THETA_BINDING_CLAMP_MIN: f32 = 0.1;
+/// Maximum binding strength clamp.
+pub const THETA_BINDING_CLAMP_MAX: f32 = 0.9;
+/// Binding strength threshold for temporal binding boost.
+pub const THETA_BINDING_BOOST_THRESHOLD: f32 = 0.25;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONFIDENCE / EXPLORATION ADAPTIVE SCALE
+// Science: Daw (2006) — exploitation-exploration tradeoff.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence midpoint for adaptive threshold scaling.
+pub const CONFIDENCE_SCALE_MIDPOINT: f32 = 0.5;
+/// Confidence sensitivity for threshold scaling.
+pub const CONFIDENCE_SCALE_SENSITIVITY: f32 = 0.4;
+/// Exploration midpoint for adaptive threshold scaling.
+pub const EXPLORATION_SCALE_MIDPOINT: f32 = 0.5;
+/// Exploration sensitivity for threshold scaling (negative = more exploration → lower threshold).
+pub const EXPLORATION_SCALE_SENSITIVITY: f32 = 0.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1814,5 +1930,115 @@ mod tests {
         assert!(EMPATHIC_TONE_RATE_SCALE > 0.0);
         assert!(SPEECH_RATE_CLAMP_MIN < 1.0);
         assert!(SPEECH_RATE_CLAMP_MAX > 1.0);
+    }
+
+    #[test]
+    fn test_social_trust_strategy_params() {
+        assert!(SOCIAL_TRUST_MIDPOINT > 0.0 && SOCIAL_TRUST_MIDPOINT < 1.0);
+        assert!(SOCIAL_TRUST_DEADZONE > 0.0);
+        assert!(SOCIAL_TRUST_STRENGTH_SCALE > 0.0);
+        assert!(
+            SOCIAL_TRUST_OVERRIDE_THRESHOLD > SOCIAL_TRUST_EXPLORE_THRESHOLD,
+            "Override ({}) must exceed explore threshold ({})",
+            SOCIAL_TRUST_OVERRIDE_THRESHOLD,
+            SOCIAL_TRUST_EXPLORE_THRESHOLD
+        );
+        assert!(SOCIAL_COOPERATION_THRESHOLD > 0.0 && SOCIAL_COOPERATION_THRESHOLD < 1.0);
+        assert!(SOCIAL_TRUST_EXPLORE_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_tom_mismatch_params() {
+        assert!(
+            TOM_MISMATCH_EMA_DECAY > 0.0 && TOM_MISMATCH_EMA_DECAY < 1.0,
+            "EMA decay must be in (0,1): {}",
+            TOM_MISMATCH_EMA_DECAY
+        );
+        assert!(
+            TOM_MISMATCH_THRESHOLD > 0.0 && TOM_MISMATCH_THRESHOLD < 1.0,
+            "Threshold must be in (0,1): {}",
+            TOM_MISMATCH_THRESHOLD
+        );
+        assert!(TOM_MISMATCH_EXPLORE_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_soul_alignment_params() {
+        assert!(SOUL_ALIGNMENT_BOOST_THRESHOLD > 0.0);
+        assert!(SOUL_ALIGNMENT_DAMPEN_THRESHOLD < 0.0);
+        // Symmetry check: |boost| == |dampen| threshold
+        assert!(
+            (SOUL_ALIGNMENT_BOOST_THRESHOLD - SOUL_ALIGNMENT_DAMPEN_THRESHOLD.abs()).abs() < 1e-6,
+            "Boost ({}) and dampen ({}) thresholds should be symmetric",
+            SOUL_ALIGNMENT_BOOST_THRESHOLD,
+            SOUL_ALIGNMENT_DAMPEN_THRESHOLD
+        );
+        // LR clamp ranges are valid
+        assert!(SOUL_ALIGNMENT_BOOST_LR_MIN < SOUL_ALIGNMENT_BOOST_LR_MAX);
+        assert!(SOUL_ALIGNMENT_DAMPEN_LR_MIN < SOUL_ALIGNMENT_DAMPEN_LR_MAX);
+        assert!(SOUL_ALIGNMENT_BOOST_SCALE > 0.0);
+        assert!(SOUL_ALIGNMENT_DAMPEN_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_surprise_pe_params() {
+        assert!(SURPRISE_PE_THRESHOLD > 0.0);
+        assert!(SURPRISE_PE_EXCESS_CAP > 0.0);
+        assert!(SURPRISE_PE_SCALE_FACTOR > 0.0);
+    }
+
+    #[test]
+    fn test_memo_diversity_params() {
+        assert!(
+            MEMO_DIVERSITY_LOW < MEMO_DIVERSITY_HIGH,
+            "Low diversity ({}) must be < high diversity ({})",
+            MEMO_DIVERSITY_LOW,
+            MEMO_DIVERSITY_HIGH
+        );
+        assert!(
+            MEMO_THRESHOLD_FLOOR < MEMO_THRESHOLD_CEILING,
+            "Floor ({}) must be < ceiling ({})",
+            MEMO_THRESHOLD_FLOOR,
+            MEMO_THRESHOLD_CEILING
+        );
+        assert!(MEMO_DIVERSITY_LOW_SCALE > 0.0);
+        assert!(MEMO_DIVERSITY_HIGH_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_theta_binding_params() {
+        assert!(
+            THETA_BINDING_CLAMP_MIN < THETA_BINDING_CLAMP_MAX,
+            "Clamp min ({}) must be < clamp max ({})",
+            THETA_BINDING_CLAMP_MIN,
+            THETA_BINDING_CLAMP_MAX
+        );
+        assert!(
+            THETA_BINDING_BOOST_THRESHOLD >= THETA_BINDING_CLAMP_MIN
+                && THETA_BINDING_BOOST_THRESHOLD <= THETA_BINDING_CLAMP_MAX,
+            "Boost threshold ({}) must be within clamp range [{}, {}]",
+            THETA_BINDING_BOOST_THRESHOLD,
+            THETA_BINDING_CLAMP_MIN,
+            THETA_BINDING_CLAMP_MAX
+        );
+        assert!(THETA_DEFAULT_SALIENCE > 0.0);
+        assert!(THETA_SALIENCE_CLAMP_MIN > 0.0);
+        assert!(THETA_SALIENCE_CLAMP_MIN < THETA_DEFAULT_SALIENCE);
+    }
+
+    #[test]
+    fn test_confidence_exploration_scale() {
+        assert!(
+            CONFIDENCE_SCALE_MIDPOINT > 0.0 && CONFIDENCE_SCALE_MIDPOINT < 1.0,
+            "Confidence midpoint must be in (0,1): {}",
+            CONFIDENCE_SCALE_MIDPOINT
+        );
+        assert!(CONFIDENCE_SCALE_SENSITIVITY > 0.0);
+        assert!(
+            EXPLORATION_SCALE_MIDPOINT > 0.0 && EXPLORATION_SCALE_MIDPOINT < 1.0,
+            "Exploration midpoint must be in (0,1): {}",
+            EXPLORATION_SCALE_MIDPOINT
+        );
+        assert!(EXPLORATION_SCALE_SENSITIVITY > 0.0);
     }
 }
