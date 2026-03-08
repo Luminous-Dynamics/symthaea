@@ -34,73 +34,110 @@ pub struct Metrics {
     pub episodic_count: Gauge,
 }
 
+/// Errors that can occur during metrics initialization.
+#[derive(Debug)]
+pub struct MetricsInitError(String);
+
+impl std::fmt::Display for MetricsInitError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "metrics initialization failed: {}", self.0)
+    }
+}
+
+impl std::error::Error for MetricsInitError {}
+
 static METRICS: OnceLock<Metrics> = OnceLock::new();
 
 impl Metrics {
+    /// Try to create a new Metrics instance, returning an error if prometheus
+    /// registration fails (e.g. duplicate metric names in the same process).
+    fn try_new() -> Result<Metrics, MetricsInitError> {
+        let phase_buckets = prometheus::exponential_buckets(0.0001, 2.0, 15)
+            .map_err(|e| MetricsInitError(format!("histogram buckets: {e}")))?;
+
+        Ok(Metrics {
+            consciousness_cycles_total: register_counter!(
+                "consciousness_cycles_total",
+                "Total number of consciousness daemon cycles completed"
+            )
+            .map_err(|e| MetricsInitError(format!("consciousness_cycles_total: {e}")))?,
+
+            phase_duration_seconds: register_histogram_vec!(
+                "phase_duration_seconds",
+                "Duration of each pipeline phase in seconds",
+                &["phase"],
+                phase_buckets
+            )
+            .map_err(|e| MetricsInitError(format!("phase_duration_seconds: {e}")))?,
+
+            consciousness_level: register_gauge!(
+                "consciousness_level",
+                "Current consciousness level (0.0-1.0)"
+            )
+            .map_err(|e| MetricsInitError(format!("consciousness_level: {e}")))?,
+
+            phi_value: register_gauge!(
+                "phi_value",
+                "Current Phi (integrated information) value"
+            )
+            .map_err(|e| MetricsInitError(format!("phi_value: {e}")))?,
+
+            gate_vetoes_total: register_counter!(
+                "gate_vetoes_total",
+                "Total number of times the Phi gate vetoed action execution"
+            )
+            .map_err(|e| MetricsInitError(format!("gate_vetoes_total: {e}")))?,
+
+            free_energy: register_gauge!(
+                "free_energy",
+                "Current free energy of the world model"
+            )
+            .map_err(|e| MetricsInitError(format!("free_energy: {e}")))?,
+
+            anomalies_total: register_counter!(
+                "anomalies_total",
+                "Total anomalies detected from journal analysis"
+            )
+            .map_err(|e| MetricsInitError(format!("anomalies_total: {e}")))?,
+
+            causal_edge_count: register_gauge!(
+                "causal_edge_count",
+                "Number of edges in the causal graph"
+            )
+            .map_err(|e| MetricsInitError(format!("causal_edge_count: {e}")))?,
+
+            episodic_count: register_gauge!(
+                "episodic_count",
+                "Number of episodes in episodic memory"
+            )
+            .map_err(|e| MetricsInitError(format!("episodic_count: {e}")))?,
+        })
+    }
+
     /// Get or initialize the global metrics instance.
+    ///
+    /// Panics only if prometheus registration fails — which indicates a
+    /// fundamental configuration error (duplicate metric names). In production
+    /// use `try_global()` instead.
     pub fn global() -> &'static Metrics {
         METRICS.get_or_init(|| {
-            let phase_buckets =
-                prometheus::exponential_buckets(0.0001, 2.0, 15).expect("valid histogram buckets");
-
-            Metrics {
-                consciousness_cycles_total: register_counter!(
-                    "consciousness_cycles_total",
-                    "Total number of consciousness daemon cycles completed"
-                )
-                .expect("register consciousness_cycles_total"),
-
-                phase_duration_seconds: register_histogram_vec!(
-                    "phase_duration_seconds",
-                    "Duration of each pipeline phase in seconds",
-                    &["phase"],
-                    phase_buckets
-                )
-                .expect("register phase_duration_seconds"),
-
-                consciousness_level: register_gauge!(
-                    "consciousness_level",
-                    "Current consciousness level (0.0-1.0)"
-                )
-                .expect("register consciousness_level"),
-
-                phi_value: register_gauge!(
-                    "phi_value",
-                    "Current Phi (integrated information) value"
-                )
-                .expect("register phi_value"),
-
-                gate_vetoes_total: register_counter!(
-                    "gate_vetoes_total",
-                    "Total number of times the Phi gate vetoed action execution"
-                )
-                .expect("register gate_vetoes_total"),
-
-                free_energy: register_gauge!(
-                    "free_energy",
-                    "Current free energy of the world model"
-                )
-                .expect("register free_energy"),
-
-                anomalies_total: register_counter!(
-                    "anomalies_total",
-                    "Total anomalies detected from journal analysis"
-                )
-                .expect("register anomalies_total"),
-
-                causal_edge_count: register_gauge!(
-                    "causal_edge_count",
-                    "Number of edges in the causal graph"
-                )
-                .expect("register causal_edge_count"),
-
-                episodic_count: register_gauge!(
-                    "episodic_count",
-                    "Number of episodes in episodic memory"
-                )
-                .expect("register episodic_count"),
-            }
+            Self::try_new().unwrap_or_else(|e| {
+                panic!("Fatal: cannot register prometheus metrics: {e}")
+            })
         })
+    }
+
+    /// Fallible version of `global()` for contexts where panicking is
+    /// unacceptable. Returns `Err` only on the first call if registration
+    /// fails; subsequent calls always return `Ok`.
+    pub fn try_global() -> Result<&'static Metrics, MetricsInitError> {
+        // If already initialized, return immediately.
+        if let Some(m) = METRICS.get() {
+            return Ok(m);
+        }
+        let metrics = Self::try_new()?;
+        // Another thread might have raced us; that's fine — OnceLock handles it.
+        Ok(METRICS.get_or_init(|| metrics))
     }
 }
 
@@ -183,18 +220,25 @@ pub async fn serve_metrics(port: u16) -> Result<(), Box<dyn std::error::Error + 
                     let encoder = prometheus::TextEncoder::new();
                     let metric_families = prometheus::gather();
                     let mut buffer = Vec::new();
-                    encoder.encode(&metric_families, &mut buffer).unwrap();
-                    Ok::<_, hyper::Error>(
-                        Response::builder()
-                            .header("Content-Type", encoder.format_type())
-                            .body(Full::new(Bytes::from(buffer)))
-                            .unwrap(),
-                    )
+                    if let Err(e) = encoder.encode(&metric_families, &mut buffer) {
+                        eprintln!("nix-mind-daemon: metrics encode error: {e}");
+                        let resp = Response::builder()
+                            .status(500)
+                            .body(Full::new(Bytes::from("Internal Server Error")))
+                            .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
+                        return Ok::<_, hyper::Error>(resp);
+                    }
+                    let resp = Response::builder()
+                        .header("Content-Type", encoder.format_type())
+                        .body(Full::new(Bytes::from(buffer)))
+                        .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
+                    Ok::<_, hyper::Error>(resp)
                 } else {
-                    Ok(Response::builder()
+                    let resp = Response::builder()
                         .status(404)
                         .body(Full::new(Bytes::from("Not Found")))
-                        .unwrap())
+                        .unwrap_or_else(|_| Response::new(Full::new(Bytes::from("error"))));
+                    Ok(resp)
                 }
             });
 
@@ -247,5 +291,22 @@ mod tests {
         let before = m.anomalies_total.get() as u64;
         m.anomalies_total.inc();
         assert_eq!(m.anomalies_total.get() as u64, before + 1);
+    }
+
+    #[test]
+    fn test_try_global_returns_ok() {
+        // try_global() should succeed when metrics can be registered
+        let result = Metrics::try_global();
+        assert!(result.is_ok());
+        // Subsequent calls should also succeed
+        let result2 = Metrics::try_global();
+        assert!(result2.is_ok());
+    }
+
+    #[test]
+    fn test_try_global_same_instance_as_global() {
+        let m1 = Metrics::global();
+        let m2 = Metrics::try_global().unwrap();
+        assert!(std::ptr::eq(m1, m2));
     }
 }

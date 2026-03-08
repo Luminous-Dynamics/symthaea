@@ -108,4 +108,149 @@ mod tests {
             SafetyLevel::SystemCritical
         );
     }
+
+    #[test]
+    fn test_classify_whitespace_handling() {
+        // Leading/trailing whitespace should be trimmed
+        assert_eq!(
+            classify_command_destructiveness("  nix search nixpkgs vim  "),
+            SafetyLevel::ReadOnly
+        );
+        assert_eq!(
+            classify_command_destructiveness("\tnixos-rebuild switch\n"),
+            SafetyLevel::SystemCritical
+        );
+    }
+
+    #[test]
+    fn test_classify_case_insensitive() {
+        assert_eq!(
+            classify_command_destructiveness("NIX SEARCH nixpkgs firefox"),
+            SafetyLevel::ReadOnly
+        );
+        assert_eq!(
+            classify_command_destructiveness("Nix-Collect-Garbage -d"),
+            SafetyLevel::Destructive
+        );
+    }
+
+    #[test]
+    fn test_classify_profile_install_vs_env_install() {
+        // Both nix profile install and nix-env -i should be SystemCritical
+        assert_eq!(
+            classify_command_destructiveness("nix profile install nixpkgs#firefox"),
+            SafetyLevel::SystemCritical
+        );
+        assert_eq!(
+            classify_command_destructiveness("nix-env -i firefox"),
+            SafetyLevel::SystemCritical
+        );
+    }
+
+    #[test]
+    fn test_classify_empty_and_unknown() {
+        // Empty string defaults to SystemCritical (unknown)
+        assert_eq!(
+            classify_command_destructiveness(""),
+            SafetyLevel::SystemCritical
+        );
+        // Unknown command defaults to SystemCritical
+        assert_eq!(
+            classify_command_destructiveness("some-random-tool --flag"),
+            SafetyLevel::SystemCritical
+        );
+    }
+
+    #[test]
+    fn test_classify_destructive_patterns() {
+        assert_eq!(
+            classify_command_destructiveness("nix store delete /nix/store/abc"),
+            SafetyLevel::Destructive
+        );
+        assert_eq!(
+            classify_command_destructiveness("rm -rf /nix/store/old"),
+            SafetyLevel::Destructive
+        );
+        assert_eq!(
+            classify_command_destructiveness("nix store gc --purge"),
+            SafetyLevel::Destructive
+        );
+    }
+
+    #[test]
+    fn test_classify_user_modify_commands() {
+        assert_eq!(
+            classify_command_destructiveness("nix build .#mypackage"),
+            SafetyLevel::UserModify
+        );
+        assert_eq!(
+            classify_command_destructiveness("nix develop"),
+            SafetyLevel::UserModify
+        );
+        assert_eq!(
+            classify_command_destructiveness("nix shell nixpkgs#hello"),
+            SafetyLevel::UserModify
+        );
+    }
+
+    #[test]
+    fn test_classify_read_only_variants() {
+        assert_eq!(
+            classify_command_destructiveness("nix-env -q"),
+            SafetyLevel::ReadOnly
+        );
+        assert_eq!(
+            classify_command_destructiveness("nixos-option services.nginx.enable"),
+            SafetyLevel::ReadOnly
+        );
+        assert_eq!(
+            classify_command_destructiveness("nix flake show github:NixOS/nixpkgs"),
+            SafetyLevel::ReadOnly
+        );
+        assert_eq!(
+            classify_command_destructiveness("nix flake metadata"),
+            SafetyLevel::ReadOnly
+        );
+        assert_eq!(
+            classify_command_destructiveness("systemd-analyze list-dependencies"),
+            SafetyLevel::ReadOnly
+        );
+    }
+
+    #[test]
+    fn test_rollback_known_commands() {
+        // Rebuild → rollback
+        let rb = get_nixos_rollback("nixos-rebuild switch");
+        assert!(rb.is_some());
+        assert!(rb.unwrap().contains("rollback"));
+
+        // nix-env install → remove
+        let rb = get_nixos_rollback("nix-env -i firefox");
+        assert!(rb.is_some());
+        assert!(rb.unwrap().contains("firefox"));
+
+        // nix profile install → remove
+        let rb = get_nixos_rollback("nix profile install nixpkgs#vim");
+        assert!(rb.is_some());
+        assert!(rb.unwrap().contains("vim"));
+
+        // systemctl restart → start
+        let rb = get_nixos_rollback("systemctl restart nginx");
+        assert!(rb.is_some());
+        assert!(rb.unwrap().contains("start"));
+
+        // Unknown → None
+        assert!(get_nixos_rollback("echo hello").is_none());
+    }
+
+    #[test]
+    fn test_rollback_ephemeral_commands() {
+        // nix build/develop/shell are ephemeral
+        let rb = get_nixos_rollback("nix build .#package");
+        assert_eq!(rb.as_deref(), Some("exit"));
+        let rb = get_nixos_rollback("nix develop");
+        assert_eq!(rb.as_deref(), Some("exit"));
+        let rb = get_nixos_rollback("nix shell nixpkgs#hello");
+        assert_eq!(rb.as_deref(), Some("exit"));
+    }
 }

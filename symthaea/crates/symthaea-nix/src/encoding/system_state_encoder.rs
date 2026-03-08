@@ -279,4 +279,111 @@ mod tests {
         // Delta should be non-zero (states differ)
         assert!(delta.norm() > 0.0);
     }
+
+    #[test]
+    fn test_encode_empty_snapshot() {
+        let mut cb = NixCodebook::new();
+        let snap = SystemStateSnapshot::default();
+        let hv = {
+            let mut enc = SystemStateEncoder::new(&mut cb);
+            enc.encode_snapshot(&snap)
+        };
+        assert!(hv.dim() > 0);
+        assert!(
+            hv.norm() < 1e-6,
+            "Empty snapshot should produce zero vector"
+        );
+    }
+
+    #[test]
+    fn test_encode_all_service_states() {
+        let mut cb = NixCodebook::new();
+        let snap = SystemStateSnapshot {
+            services: vec![
+                ("running-svc".to_string(), ServiceState::Running),
+                ("stopped-svc".to_string(), ServiceState::Stopped),
+                ("failed-svc".to_string(), ServiceState::Failed),
+                ("inactive-svc".to_string(), ServiceState::Inactive),
+            ],
+            ..Default::default()
+        };
+        let hv = {
+            let mut enc = SystemStateEncoder::new(&mut cb);
+            enc.encode_snapshot(&snap)
+        };
+        assert!(hv.norm() > 0.0);
+    }
+
+    #[test]
+    fn test_encode_only_config_options() {
+        let mut cb = NixCodebook::new();
+        let snap = SystemStateSnapshot {
+            config_options: vec![
+                (
+                    "services.nginx.enable".to_string(),
+                    "true".to_string(),
+                ),
+                (
+                    "boot.loader.grub.device".to_string(),
+                    "/dev/sda".to_string(),
+                ),
+            ],
+            ..Default::default()
+        };
+        let hv = {
+            let mut enc = SystemStateEncoder::new(&mut cb);
+            enc.encode_snapshot(&snap)
+        };
+        assert!(hv.norm() > 0.0, "Config-only snapshot should encode");
+    }
+
+    #[test]
+    fn test_failed_services_differ_from_running() {
+        let mut cb = NixCodebook::new();
+        let snap_running = SystemStateSnapshot {
+            services: vec![
+                ("nginx".to_string(), ServiceState::Running),
+                ("sshd".to_string(), ServiceState::Running),
+            ],
+            ..Default::default()
+        };
+        let snap_failed = SystemStateSnapshot {
+            services: vec![
+                ("nginx".to_string(), ServiceState::Failed),
+                ("sshd".to_string(), ServiceState::Failed),
+            ],
+            ..Default::default()
+        };
+
+        let hv_running = {
+            let mut enc = SystemStateEncoder::new(&mut cb);
+            enc.encode_snapshot(&snap_running)
+        };
+        let hv_failed = {
+            let mut enc = SystemStateEncoder::new(&mut cb);
+            enc.encode_snapshot(&snap_failed)
+        };
+        let sim = hv_running.similarity(&hv_failed);
+        assert!(
+            sim < 0.99,
+            "All-running vs all-failed should differ (sim={:.3})",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_delta_same_state_is_zero() {
+        let mut cb = NixCodebook::new();
+        let snap = sample_snapshot();
+        let hv = {
+            let mut enc = SystemStateEncoder::new(&mut cb);
+            enc.encode_snapshot(&snap)
+        };
+        let delta = SystemStateEncoder::compute_delta(&hv, &hv);
+        assert!(
+            delta.norm() < 1e-6,
+            "Delta of same state should be zero (got {:.6})",
+            delta.norm()
+        );
+    }
 }
