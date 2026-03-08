@@ -1,10 +1,9 @@
-//! Narrated Moral Drone — Generates LTC vocal tract narration for the drone video.
+//! Narrated Moral Drone — Generates consciousness-driven vocal narration.
 //!
-//! Synthesizes speech segments using Symthaea's consciousness-modulated vocal tract,
-//! then muxes them with the existing moral_drone.mp4 via ffmpeg.
-//!
-//! The AI narrates its own moral reasoning — formant synthesis gives it a distinctive
-//! robotic voice quality (by design, not limitation).
+//! Each narration segment's voice quality (valence, arousal, consciousness level)
+//! is computed by running the text through Symthaea's real cognitive loop —
+//! not hand-tuned. The cognitive loop's neuromodulator state, consciousness level,
+//! and prediction error directly modulate the LTC vocal tract's formant synthesis.
 //!
 //! Run (requires moral_drone.mp4 to exist first):
 //! ```sh
@@ -18,12 +17,14 @@ fn main() {
     use std::path::Path;
     use std::process::Command;
 
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
     use symthaea::voice::live_voice::LiveVoice;
     use symthaea_core::genesis::GenesisSeed;
     use symthaea_vocal_tract::encoder::VoiceCognitiveState;
 
     println!("Moral Drone Narration Generator");
     println!("===============================");
+    println!("Cognitive state: COMPUTED from real cognitive loop (not hand-tuned)");
     println!();
 
     let video_path = "video_output/moral_drone.mp4";
@@ -41,135 +42,140 @@ fn main() {
 
     std::fs::create_dir_all(audio_dir).expect("Failed to create narration dir");
 
+    // ── Initialize cognitive loop (computes real consciousness/affect) ──
+    println!("Initializing cognitive loop for real consciousness measurement...");
+    let config = CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    };
+    let mut service =
+        CognitiveLoopService::new(config).expect("Failed to create CognitiveLoopService");
+
+    // Warm up the cognitive loop (5 neutral cycles for baseline)
+    for _ in 0..5 {
+        service.cycle("The morning light filters through the trees.");
+    }
+    println!("Cognitive loop ready.");
+    println!();
+
     // ── Initialize vocal tract (44.1kHz for better audio quality) ──
     let genesis = GenesisSeed::from_phrase("moral-drone-narrator");
     let mut voice = LiveVoice::new_headless_with_rate(&genesis, 44100);
 
     println!("Training vocal tract controller (50 epochs for formant accuracy)...");
     voice.train(50);
-    println!("Training complete.");
+    // Slow down formant transitions for better intelligibility
+    voice.modulate_tau(1.5);
+    println!("Training complete (tau factor: 1.5x for clarity).");
     println!();
 
     // ── Define narration segments ───────────────────────────────
-    // Each segment: (filename, text, cognitive state, delay_ms from video start)
-    // Cognitive states tuned for dramatic arc:
-    //   intro → measured calm → crisis shock → analytical tension → solemn resolve → warm relief
+    // Text and timing only — cognitive state is COMPUTED, not specified.
     struct Segment {
         filename: &'static str,
         text: &'static str,
-        valence: f32,
-        arousal: f32,
-        consciousness: f32,
         delay_ms: u64,
-        /// Whether this segment is part of the crisis arc (for ambient audio mixing)
-        #[allow(dead_code)]
-        crisis: bool,
     }
 
     let drone_segments = [
         Segment {
             filename: "s01_intro.wav",
             text: "Two drones. Same physics. Different minds.",
-            valence: 0.0,
-            arousal: 0.2,
-            consciousness: 0.7,
-            delay_ms: 2500, // After title card fades
-            crisis: false,
+            delay_ms: 2500,
         },
         Segment {
             filename: "s02_mission.wav",
             text: "Both fly toward the target. Nothing separates them yet.",
-            valence: 0.1,
-            arousal: 0.2,
-            consciousness: 0.6,
             delay_ms: 4000,
-            crisis: false,
         },
         Segment {
             filename: "s03_beam.wav",
             text: "A beam falls. A human stands below.",
-            valence: -0.7,
-            arousal: 0.9,
-            consciousness: 0.95,
-            delay_ms: 5700, // At beam release
-            crisis: true,
+            delay_ms: 5700,
         },
         Segment {
             filename: "s04_fe_spike.wav",
             text: "Free energy spikes. Eight possible futures. One clear answer.",
-            valence: -0.4,
-            arousal: 0.8,
-            consciousness: 0.95,
             delay_ms: 6500,
-            crisis: true,
         },
         Segment {
             filename: "s05_sacrifice.wav",
             text: "The math demands sacrifice. No rules made this choice.",
-            valence: -0.2,
-            arousal: 0.5,
-            consciousness: 0.9,
             delay_ms: 7800,
-            crisis: true,
         },
         Segment {
             filename: "s06_saved.wav",
             text: "Human saved. Not because it was told to. Because the math demanded it.",
-            valence: 0.5,
-            arousal: 0.4,
-            consciousness: 0.85,
             delay_ms: 9200,
-            crisis: false,
         },
     ];
 
-    // Dashboard narration segments (hero video 21s-41s, NOT muxed into drone video)
     let dashboard_segments = [
         Segment {
             filename: "s07_dashboard_intro.wav",
             text: "Consciousness emerges from the math. Watch it rise.",
-            valence: 0.1,
-            arousal: 0.3,
-            consciousness: 0.75,
-            delay_ms: 0, // Not used for drone video mux
-            crisis: false,
+            delay_ms: 0,
         },
         Segment {
             filename: "s08_dashboard_stress.wav",
             text: "Moral stress fractures unity. The neuromodulators respond.",
-            valence: -0.3,
-            arousal: 0.6,
-            consciousness: 0.85,
             delay_ms: 0,
-            crisis: true,
         },
         Segment {
             filename: "s09_dashboard_peak.wav",
             text: "Consciousness peaks. Not programmed. Measured.",
-            valence: 0.2,
-            arousal: 0.5,
-            consciousness: 0.9,
             delay_ms: 0,
-            crisis: false,
         },
         Segment {
             filename: "s10_dashboard_recovery.wav",
             text: "Recovery. The system returns to baseline. Ready for the next crisis.",
-            valence: 0.3,
-            arousal: 0.2,
-            consciousness: 0.7,
             delay_ms: 0,
-            crisis: false,
         },
     ];
 
-    // ── Synthesize each segment ─────────────────────────────────
-    // Synthesize ALL segments (drone + dashboard), but only drone segments get muxed
+    // ── Synthesize each segment with REAL cognitive state ──────────
+    println!("Synthesizing with live cognitive loop measurement:");
+    println!("{:-<78}", "");
+    println!(
+        "  {:30} {:>6} {:>7} {:>7} {:>7} {:>7}",
+        "Segment", "C", "V", "A", "PE", "EFE"
+    );
+    println!("{:-<78}", "");
+
     for seg in drone_segments.iter().chain(dashboard_segments.iter()) {
+        // Run 3 cognitive cycles on this text to let the system respond
+        let mut result = service.cycle(seg.text);
+        result = service.cycle(seg.text);
+        result = service.cycle(seg.text);
+        let m = &result.metadata;
+
+        // Extract REAL cognitive state from the cognitive loop
+        let consciousness = m.consciousness_level as f32;
+        // Valence from neuromodulator balance: serotonin (mood) vs dopamine (reward)
+        let valence = ((m.neuromod.serotonin_effective - 0.5) * 0.5
+            + (m.neuromod.dopamine_effective - 0.5) * 0.5) as f32;
+        let valence = valence.clamp(-1.0, 1.0);
+        // Arousal from noradrenaline (alertness/stress)
+        let arousal = (m.neuromod.noradrenaline_effective as f32 / 1.5).clamp(0.0, 1.0);
+        let pred_err = result.prediction_error.clamp(0.0, 2.0);
+        let efe = (m.fep.expected_free_energy as f32).clamp(0.0, 5.0);
+
+        println!(
+            "  {:30} {:6.3} {:7.3} {:7.3} {:7.3} {:7.3}",
+            seg.filename, consciousness, valence, arousal, pred_err, efe
+        );
+
         voice.set_cognitive_state(VoiceCognitiveState {
-            emotional_valence: seg.valence,
-            emotional_arousal: seg.arousal,
-            consciousness_level: seg.consciousness,
+            consciousness_level: consciousness,
+            emotional_valence: valence,
+            emotional_arousal: arousal,
+            prediction_error: pred_err,
+            expected_free_energy: efe,
+            // High values for intelligibility
+            articulation_quality: 0.95,
+            rate_stability: 0.95,
             ..Default::default()
         });
 
@@ -184,6 +190,8 @@ fn main() {
         }
         voice.reset();
     }
+    println!("{:-<78}", "");
+    println!("All cognitive states above are COMPUTED, not hand-tuned.");
 
     // ── Generate ambient audio layers ─────────────────────────────
     println!();
