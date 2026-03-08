@@ -1074,11 +1074,8 @@ fn benchmark_advanced_rust() {
 // ==================================================================================
 
 #[test]
-fn benchmark_regression_summary() {
-    let gen = CodeGenerator::with_default_dim();
-    let ctx = CodeContext::default();
-
-    let categories: Vec<(&str, Vec<BenchmarkCase>)> = vec![
+fn build_all_categories() -> Vec<(&'static str, Vec<BenchmarkCase>)> {
+    vec![
         ("arithmetic", build_arithmetic_cases()),
         ("strings", build_string_cases()),
         ("collections", build_collection_cases()),
@@ -1086,7 +1083,208 @@ fn benchmark_regression_summary() {
         ("python", build_python_cases()),
         ("complex_llm", build_complex_llm_cases()),
         ("advanced_rust", build_advanced_rust_cases()),
+    ]
+}
+
+/// Real compilation verification: generate code, write to temp file, run `rustc`.
+///
+/// This tests that the native emitter's output is actually valid Rust that compiles,
+/// not just that it contains the right string fragments.
+#[test]
+fn benchmark_compile_verification() {
+    use std::io::Write;
+
+    let gen = CodeGenerator::with_default_dim();
+    let ctx = CodeContext::default();
+    let categories = build_all_categories();
+
+    let tmp_dir = std::env::temp_dir().join("symthaea-compile-bench");
+    let _ = std::fs::create_dir_all(&tmp_dir);
+
+    let mut attempted = 0usize;
+    let mut compiled_ok = 0usize;
+
+    for (_cat_name, cases) in &categories {
+        for case in cases {
+            // Skip non-Rust and LLM-expected cases
+            if case.language != "rust" || case.expects_llm {
+                continue;
+            }
+
+            let intent = CodeIntent::Create {
+                target: CodeTarget::new(case.name, EntityKind::Function)
+                    .with_language(case.language),
+                spec: {
+                    let mut s = CodeSpec::new(case.language, case.name, case.purpose);
+                    if let Some(sig) = case.signature {
+                        s = s.with_signature(sig);
+                    }
+                    s
+                },
+            };
+
+            let result = gen.generate(&intent, &ctx);
+
+            // Skip cases with todo! (LLM would fill these)
+            if result.source.contains("todo!") {
+                continue;
+            }
+
+            attempted += 1;
+
+            // Wrap generated code in a compilable lib
+            let source = format!(
+                "#![allow(unused, dead_code, unused_imports)]\n\
+                 use std::collections::{{HashMap, HashSet}};\n\n\
+                 {}\n",
+                result.source
+            );
+
+            let file_path = tmp_dir.join(format!("{}.rs", case.name));
+            let mut f = std::fs::File::create(&file_path).expect("create temp file");
+            f.write_all(source.as_bytes()).expect("write temp file");
+
+            let output = std::process::Command::new("rustc")
+                .args([
+                    "--edition",
+                    "2021",
+                    "--crate-type",
+                    "lib",
+                    "-o",
+                    "/dev/null",
+                ])
+                .arg(&file_path)
+                .output();
+
+            match output {
+                Ok(o) if o.status.success() => {
+                    compiled_ok += 1;
+                }
+                Ok(o) => {
+                    let stderr = String::from_utf8_lossy(&o.stderr);
+                    println!(
+                        "COMPILE_FAIL: {} — {}",
+                        case.name,
+                        stderr.lines().take(3).collect::<Vec<_>>().join(" | ")
+                    );
+                }
+                Err(e) => {
+                    println!("COMPILE_SKIP: {} — rustc not available: {}", case.name, e);
+                }
+            }
+
+            let _ = std::fs::remove_file(&file_path);
+        }
+    }
+
+    let _ = std::fs::remove_dir(&tmp_dir);
+
+    if attempted > 0 {
+        let rate = compiled_ok as f32 / attempted as f32 * 100.0;
+        println!(
+            "COMPILE_BENCHMARK: {}/{} compiled ({:.0}%)",
+            compiled_ok, attempted, rate
+        );
+        assert!(
+            rate >= 70.0,
+            "Native compilation rate {:.0}% is below 70% threshold ({}/{})",
+            rate,
+            compiled_ok,
+            attempted
+        );
+    }
+}
+
+/// Fuzz-style test: generate code for random purpose strings, verify no panics
+/// and basic structural invariants hold.
+#[test]
+fn benchmark_fuzz_generation_robustness() {
+    let gen = CodeGenerator::with_default_dim();
+    let ctx = CodeContext::default();
+
+    // Pseudo-random purpose strings — mix of valid, edge-case, and adversarial
+    let fuzz_purposes = [
+        // Normal
+        "sum all elements",
+        "find maximum value",
+        "reverse a string",
+        // Edge cases
+        "",
+        "   ",
+        "a",
+        "fn() -> Vec<Vec<Vec<i32>>>",
+        // Long
+        "compute the running average of the last N elements in a sliding window over a stream of floating point numbers",
+        // Special chars
+        "count 'hello' in \"world\"",
+        "x + y * z / w - (a % b)",
+        // Adversarial
+        "todo!()",
+        "unsafe { std::ptr::null() }",
+        "// this is a comment",
+        "use std::collections::HashMap;",
+        // Composite triggers
+        "frequency of each word",
+        "3rd largest element",
+        "count unique items",
+        "zip two lists elementwise",
+        "find all pairs that sum to target",
+        "cartesian product of sets",
+        // Numeric
+        "123456789",
+        "0.0001",
     ];
+
+    let mut generated = 0usize;
+    let mut non_empty = 0usize;
+
+    for purpose in &fuzz_purposes {
+        // Should never panic
+        let spec = CodeSpec::new("rust", "fuzz_fn", purpose);
+        let intent = CodeIntent::Create {
+            target: CodeTarget::new("fuzz_fn", EntityKind::Function),
+            spec,
+        };
+        let result = gen.generate(&intent, &ctx);
+
+        generated += 1;
+        if !result.source.is_empty() {
+            non_empty += 1;
+        }
+
+        // Structural invariants
+        assert_eq!(result.language, "rust");
+        assert!(
+            result.intent_similarity >= 0.0 && result.intent_similarity <= 1.0,
+            "intent_similarity out of range: {}",
+            result.intent_similarity
+        );
+        assert!(
+            result.phi_score >= 0.0,
+            "phi_score negative: {}",
+            result.phi_score
+        );
+    }
+
+    println!(
+        "FUZZ_RESULT: {}/{} generated non-empty output",
+        non_empty, generated
+    );
+    // At minimum, most non-trivial purposes should produce output
+    assert!(
+        non_empty >= generated / 2,
+        "Too many empty outputs: {}/{}",
+        non_empty,
+        generated
+    );
+}
+
+#[test]
+fn benchmark_regression_summary() {
+    let gen = CodeGenerator::with_default_dim();
+    let ctx = CodeContext::default();
+
+    let categories: Vec<(&str, Vec<BenchmarkCase>)> = build_all_categories();
 
     println!("\n=== Regression Summary ===");
 

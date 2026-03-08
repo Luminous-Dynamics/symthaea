@@ -35,6 +35,21 @@ fn main() {
         }
     };
 
+    // Handle --curriculum: generate curriculum JSONL and exit
+    if let Some(ref curriculum_path) = opts.generate_curriculum {
+        let tokenizer = symthaea_broca::BpeTokenizer::default_minimal();
+        match symthaea_broca::training::write_curriculum_jsonl(curriculum_path, &tokenizer) {
+            Ok(count) => {
+                println!("Generated curriculum with {count} pairs → {curriculum_path}");
+                process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("Failed to generate curriculum: {e}");
+                process::exit(1);
+            }
+        }
+    }
+
     // Load dataset
     tracing::info!(path = %opts.data_path, "Loading training data");
     let mut dataset = match TrainingDataset::from_jsonl(&opts.data_path) {
@@ -168,6 +183,33 @@ fn main() {
         println!();
         println!("{}", evaluation::format_eval_report(&result));
     }
+
+    // Generate sample outputs if --samples N
+    if opts.sample_count > 0 {
+        println!("\n--- Sample Generations ---");
+        let thoughts = symthaea_broca::training::generate_diverse_thoughts();
+        let step = thoughts.len() / opts.sample_count.max(1);
+        for i in 0..opts.sample_count.min(thoughts.len()) {
+            let channels = &thoughts[(i * step) % thoughts.len()];
+            let result = generator.generate(&symthaea_broca::ThoughtChannels {
+                channels: channels.channels,
+            });
+            let intent = (0..8)
+                .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
+                .unwrap_or(7);
+            let intent_names = [
+                "Ack", "Ans", "Clr", "Pro", "Unc", "Ref", "Con", "Unk",
+            ];
+            println!(
+                "[{:>3}] intent={} psi={:.1} | {:>3} tok | \"{}\"",
+                i,
+                intent_names[intent],
+                channels.psi(),
+                result.num_tokens,
+                &result.text[..result.text.len().min(80)]
+            );
+        }
+    }
 }
 
 struct TrainOpts {
@@ -182,6 +224,10 @@ struct TrainOpts {
     patience: usize,
     diagnostics: bool,
     genesis_phrase: String,
+    /// Generate a curriculum JSONL and exit (no training).
+    generate_curriculum: Option<String>,
+    /// After training, generate sample text from N random thoughts.
+    sample_count: usize,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -197,6 +243,8 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         patience: 0,
         diagnostics: false,
         genesis_phrase: "broca-training-default".to_string(),
+        generate_curriculum: None,
+        sample_count: 0,
     };
 
     let mut i = 1;
@@ -265,6 +313,19 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                 i += 1;
                 opts.genesis_phrase = args.get(i).cloned().ok_or("--genesis requires a phrase")?;
             }
+            "--curriculum" => {
+                i += 1;
+                opts.generate_curriculum =
+                    Some(args.get(i).cloned().ok_or("--curriculum requires a path")?);
+            }
+            "--samples" => {
+                i += 1;
+                opts.sample_count = args
+                    .get(i)
+                    .ok_or("--samples requires a number")?
+                    .parse()
+                    .map_err(|_| "--samples must be a non-negative integer")?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -274,8 +335,8 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         i += 1;
     }
 
-    if opts.data_path.is_empty() {
-        return Err("--data is required".to_string());
+    if opts.data_path.is_empty() && opts.generate_curriculum.is_none() {
+        return Err("--data is required (or use --curriculum to generate data)".to_string());
     }
 
     Ok(opts)
@@ -298,5 +359,7 @@ fn print_usage() {
     eprintln!("  --patience N         Early stopping patience, 0=disabled (default: 0)");
     eprintln!("  --diagnostics        Enable gradient flow diagnostics");
     eprintln!("  --genesis PHRASE     Genesis seed phrase (default: broca-training-default)");
+    eprintln!("  --curriculum PATH    Generate curriculum JSONL (1800 diverse pairs) and exit");
+    eprintln!("  --samples N          Generate N sample outputs after training");
     eprintln!("  --help, -h           Show this help message");
 }

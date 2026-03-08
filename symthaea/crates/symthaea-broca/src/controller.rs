@@ -13,6 +13,7 @@
 //! 4. logits[i] = cosine_similarity(output_hv, token_emb[i])  // weight-tied
 //! ```
 
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::{
@@ -125,18 +126,18 @@ impl LanguageController {
     /// `logits[i] = cosine_similarity(output_hv, token_embeddings[i])`
     /// Parallelized with rayon for large vocabularies.
     pub fn compute_logits(&self, output_hv: &ContinuousHV) -> Vec<f32> {
+        #[cfg(feature = "parallel")]
         if self.token_embeddings.len() > 128 {
             // Parallel for large vocabularies
-            self.token_embeddings
+            return self.token_embeddings
                 .par_iter()
                 .map(|emb| output_hv.similarity(emb))
-                .collect()
-        } else {
-            self.token_embeddings
-                .iter()
-                .map(|emb| output_hv.similarity(emb))
-                .collect()
+                .collect();
         }
+        self.token_embeddings
+            .iter()
+            .map(|emb| output_hv.similarity(emb))
+            .collect()
     }
 
     /// Forward step: evolve network with composed input, return logits.

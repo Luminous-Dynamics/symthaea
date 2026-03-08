@@ -158,6 +158,11 @@ fn infer_rust_body(
         return body;
     }
 
+    // Try pattern composition (multi-step algorithms: HashMap lookups, sort+nth, etc.)
+    if let Some(body) = compose_patterns(&purpose_lower, params, return_type) {
+        return body;
+    }
+
     // Pattern-match common operations from the purpose
     let ret = return_type.unwrap_or("");
 
@@ -776,6 +781,29 @@ fn infer_composed_body(
         return None;
     }
 
+    // Defer specific multi-step patterns to compose_patterns() which handles
+    // them more precisely than the generic iterator chain builder:
+    //
+    // - "3rd largest" → sort + index (not sort + max)
+    // - "count unique" → HashSet (not sort + dedup + count)
+    // - "frequency"/"occurrences" → HashMap (not iterator chain)
+    let has_nth = purpose.contains("nth")
+        || purpose.contains("kth")
+        || extract_number_from_text(purpose).map_or(false, |n| n > 1);
+    if has_nth
+        && (purpose.contains("largest")
+            || purpose.contains("smallest")
+            || purpose.contains("biggest"))
+    {
+        return None;
+    }
+    if (purpose.contains("unique") || purpose.contains("distinct")) && purpose.contains("count") {
+        return None;
+    }
+    if purpose.contains("frequency") || purpose.contains("occurrences") {
+        return None;
+    }
+
     // Build an iterator chain from recognized verbs in order of appearance
     let mut chain_parts: Vec<(&str, &str)> = Vec::new(); // (verb, code_fragment)
 
@@ -823,6 +851,10 @@ fn infer_composed_body(
     for (keywords, fragment, tag) in ops {
         for kw in *keywords {
             if purpose.contains(kw) {
+                // Guard: "hashmap" contains "map" but shouldn't trigger map transform
+                if *tag == "map" && purpose.contains("hashmap") {
+                    continue;
+                }
                 chain_parts.push((tag, fragment));
                 break; // only match first keyword per operation
             }
@@ -928,6 +960,15 @@ fn extract_number_from_text(text: &str) -> Option<usize> {
         if let Ok(n) = word.parse::<usize>() {
             return Some(n);
         }
+        // Handle ordinals: "3rd", "2nd", "1st", "4th", etc.
+        let trimmed = word
+            .trim_end_matches("st")
+            .trim_end_matches("nd")
+            .trim_end_matches("rd")
+            .trim_end_matches("th");
+        if let Ok(n) = trimmed.parse::<usize>() {
+            return Some(n);
+        }
     }
     // Check for written-out numbers
     let written = &[
@@ -947,6 +988,202 @@ fn extract_number_from_text(text: &str) -> Option<usize> {
             return Some(*n);
         }
     }
+    None
+}
+
+/// Compose multiple atomic patterns into multi-step algorithms.
+///
+/// Handles patterns that are too complex for single-pattern matching but
+/// don't need the generic iterator chain builder in `infer_composed_body`.
+fn compose_patterns(
+    purpose: &str,
+    params: &[(String, String)],
+    _return_type: Option<&str>,
+) -> Option<String> {
+    if params.is_empty() {
+        return None;
+    }
+
+    let p0 = &params[0].0;
+    let p0_is_vec = params[0].1.contains("Vec") || params[0].1.contains("&[");
+
+    // ── 1. HashMap-based lookups: frequency/occurrences/group by ──
+    if (purpose.contains("frequency")
+        || purpose.contains("occurrences")
+        || purpose.contains("group by"))
+        && p0_is_vec
+    {
+        return Some(format!(
+            "let mut map = std::collections::HashMap::new();\n    \
+             for item in {}.iter() {{\n        \
+                 *map.entry(item.clone()).or_insert(0usize) += 1;\n    \
+             }}\n    map",
+            p0
+        ));
+    }
+
+    // ── 2. Sort + select Nth largest/smallest ──
+    if p0_is_vec
+        && (purpose.contains("largest")
+            || purpose.contains("smallest")
+            || purpose.contains("nth")
+            || purpose.contains("kth"))
+        && (purpose.contains("sort")
+            || purpose.contains("element")
+            || purpose.contains("find the"))
+    {
+        let n = extract_number_from_text(purpose).unwrap_or(1);
+        if purpose.contains("smallest") {
+            return Some(format!(
+                "let mut sorted = {}.to_vec();\n    sorted.sort();\n    sorted[{} - 1]",
+                p0, n
+            ));
+        } else {
+            return Some(format!(
+                "let mut sorted = {}.to_vec();\n    sorted.sort();\n    sorted[sorted.len() - {}]",
+                p0, n
+            ));
+        }
+    }
+
+    // ── 3. Accumulate with condition: "sum of even" / "product of positives" ──
+    if p0_is_vec {
+        let has_condition = purpose.contains("even")
+            || purpose.contains("odd")
+            || purpose.contains("positive")
+            || purpose.contains("negative");
+        let has_accumulate = purpose.contains("sum of")
+            || purpose.contains("product of")
+            || purpose.contains("sum the")
+            || purpose.contains("product the");
+        if has_condition && has_accumulate {
+            let predicate = if purpose.contains("even") {
+                "|x| x % 2 == 0"
+            } else if purpose.contains("odd") {
+                "|x| x % 2 != 0"
+            } else if purpose.contains("positive") {
+                "|x| *x > 0"
+            } else {
+                "|x| *x < 0"
+            };
+
+            let accumulator = if purpose.contains("product") {
+                ".product()"
+            } else {
+                ".sum()"
+            };
+
+            return Some(format!(
+                "{}.iter().filter({}).cloned(){}",
+                p0, predicate, accumulator
+            ));
+        }
+    }
+
+    // ── 4. Zip + combine: element-wise operations on two vectors ──
+    if params.len() >= 2
+        && p0_is_vec
+        && (params[1].1.contains("Vec") || params[1].1.contains("&["))
+        && (purpose.contains("element-wise")
+            || purpose.contains("elementwise")
+            || purpose.contains("zip")
+            || purpose.contains("pairwise"))
+    {
+        let p1 = &params[1].0;
+        let op = if purpose.contains("multiply") || purpose.contains("product") {
+            "*"
+        } else if purpose.contains("subtract") || purpose.contains("difference") {
+            "-"
+        } else {
+            "+"
+        };
+        return Some(format!(
+            "{}.iter().zip({}.iter()).map(|(a, b)| a {} b).collect()",
+            p0, p1, op
+        ));
+    }
+
+    // ── 5. Deduplicate + count: "count unique/distinct elements" ──
+    if p0_is_vec
+        && (purpose.contains("unique") || purpose.contains("distinct"))
+        && purpose.contains("count")
+    {
+        return Some(format!(
+            "let set: std::collections::HashSet<_> = {}.iter().collect();\n    set.len()",
+            p0
+        ));
+    }
+
+    // ── 6. Nested iteration: "all pairs" / "combinations" / "cartesian product" ──
+    if p0_is_vec
+        && (purpose.contains("pairs")
+            || purpose.contains("combinations")
+            || purpose.contains("cartesian"))
+    {
+        if params.len() >= 2
+            && (params[1].1.contains("Vec") || params[1].1.contains("&["))
+            && purpose.contains("cartesian")
+        {
+            let p1 = &params[1].0;
+            return Some(format!(
+                "let mut result = Vec::new();\n    \
+                 for a in {}.iter() {{\n        \
+                     for b in {}.iter() {{\n            \
+                         result.push((*a, *b));\n        \
+                     }}\n    \
+                 }}\n    result",
+                p0, p1
+            ));
+        }
+        // Single-vector pairs
+        return Some(format!(
+            "let mut result = Vec::new();\n    \
+             for i in 0..{p}.len() {{\n        \
+                 for j in (i+1)..{p}.len() {{\n            \
+                     result.push(({p}[i], {p}[j]));\n        \
+                 }}\n    \
+             }}\n    result",
+            p = p0
+        ));
+    }
+
+    // ── 7. Filter + transform + collect (combined) ──
+    if p0_is_vec {
+        let has_filter = purpose.contains("filter") || purpose.contains("keep");
+        let has_transform = purpose.contains("double")
+            || purpose.contains("square")
+            || purpose.contains("triple")
+            || purpose.contains("negate");
+        if has_filter && has_transform {
+            let predicate = if purpose.contains("positive") {
+                "|x| **x > 0"
+            } else if purpose.contains("negative") {
+                "|x| **x < 0"
+            } else if purpose.contains("even") {
+                "|x| **x % 2 == 0"
+            } else if purpose.contains("odd") {
+                "|x| **x % 2 != 0"
+            } else {
+                "|x| true /* condition */"
+            };
+
+            let transform = if purpose.contains("double") {
+                "|x| x * 2"
+            } else if purpose.contains("square") {
+                "|x| x * x"
+            } else if purpose.contains("triple") {
+                "|x| x * 3"
+            } else {
+                "|x| -x"
+            };
+
+            return Some(format!(
+                "{}.iter().filter({}).map({}).collect()",
+                p0, predicate, transform
+            ));
+        }
+    }
+
     None
 }
 
@@ -1794,6 +2031,191 @@ pub(crate) fn generate_auto_tests_pub(
     sig: Option<&ParsedSignature>,
 ) -> Vec<String> {
     generate_auto_tests(func_name, purpose, sig)
+}
+
+/// Generate property-based invariant tests (pub wrapper for cross-module use).
+pub(crate) fn generate_property_tests_pub(
+    func_name: &str,
+    purpose: &str,
+    sig: Option<&ParsedSignature>,
+) -> Vec<String> {
+    generate_property_tests(func_name, purpose, sig)
+}
+
+/// Generate property-based invariant tests from purpose and signature.
+///
+/// Unlike `generate_auto_tests` which tests specific input→output pairs,
+/// this generates algebraic property assertions that hold for ANY valid input.
+fn generate_property_tests(
+    func_name: &str,
+    purpose: &str,
+    sig: Option<&ParsedSignature>,
+) -> Vec<String> {
+    let purpose_lower = purpose.to_lowercase();
+    let mut tests = Vec::new();
+
+    let sig = match sig {
+        Some(s) => s,
+        None => return tests,
+    };
+
+    let has_i32_params = sig.params.iter().any(|(_, t)| {
+        t.contains("i32") || t.contains("i64") || t.contains("u32") || t.contains("u64")
+    });
+    let has_str_param = sig
+        .params
+        .iter()
+        .any(|(_, t)| t.contains("str") || t.contains("String"));
+    let has_vec_param = sig
+        .params
+        .iter()
+        .any(|(_, t)| t.contains("Vec") || t.contains("&["));
+    let returns_vec = sig
+        .return_type
+        .as_ref()
+        .map_or(false, |r| r.contains("Vec"));
+    let returns_string = sig
+        .return_type
+        .as_ref()
+        .map_or(false, |r| r.contains("String"));
+
+    // ── Sorting: idempotency — sort(sort(v)) == sort(v) ──
+    if has_vec_param
+        && returns_vec
+        && (purpose_lower.contains("sort") || purpose_lower.contains("order"))
+    {
+        tests.push(format!(
+            "let v = vec![3, 1, 4, 1, 5, 9, 2, 6];\n        \
+             assert_eq!({f}(v.clone()), {f}({f}(v.clone())), \"sort must be idempotent\");",
+            f = func_name
+        ));
+        tests.push(format!(
+            "let v = vec![5, 3, 8, 1];\n        \
+             assert_eq!({f}(v.clone()).len(), v.len(), \"sort must preserve length\");",
+            f = func_name
+        ));
+    }
+
+    // ── Reverse: involution — reverse(reverse(x)) == x ──
+    if purpose_lower.contains("reverse") {
+        if has_str_param && returns_string {
+            tests.push(format!(
+                "let s = \"abcdef\".to_string();\n        \
+                 assert_eq!({f}(&{f}(&s)), s, \"reverse must be an involution\");",
+                f = func_name
+            ));
+        }
+        if has_vec_param && returns_vec {
+            tests.push(format!(
+                "let v = vec![1, 2, 3, 4, 5];\n        \
+                 assert_eq!({f}({f}(v.clone())), v, \"reverse must be an involution\");",
+                f = func_name
+            ));
+        }
+    }
+
+    // ── Filter: size reduction — filter(v).len() <= v.len() ──
+    if has_vec_param
+        && returns_vec
+        && (purpose_lower.contains("filter")
+            || purpose_lower.contains("keep")
+            || purpose_lower.contains("remove")
+            || purpose_lower.contains("select"))
+    {
+        tests.push(format!(
+            "let v = vec![1, 2, 3, 4, 5, 6, 7, 8];\n        \
+             assert!({f}(v.clone()).len() <= v.len(), \"filter must not increase length\");",
+            f = func_name
+        ));
+    }
+
+    // ── Arithmetic commutativity: f(a, b) == f(b, a) ──
+    if sig.params.len() == 2 && has_i32_params {
+        let is_commutative = purpose_lower.contains("add")
+            || purpose_lower.contains("sum")
+            || purpose_lower.contains("multiply")
+            || purpose_lower.contains("product")
+            || purpose_lower.contains("max")
+            || purpose_lower.contains("min")
+            || purpose_lower.contains("gcd");
+        if is_commutative {
+            tests.push(format!(
+                "assert_eq!({f}(7, 13), {f}(13, 7), \"{f} must be commutative\");",
+                f = func_name
+            ));
+        }
+    }
+
+    // ── Identity element: f(x, 0) == x for add, f(x, 1) == x for multiply ──
+    if sig.params.len() == 2 && has_i32_params {
+        if purpose_lower.contains("add") || purpose_lower.contains("sum") {
+            tests.push(format!(
+                "assert_eq!({f}(42, 0), 42, \"0 must be additive identity\");",
+                f = func_name
+            ));
+        }
+        if purpose_lower.contains("multiply") || purpose_lower.contains("product") {
+            tests.push(format!(
+                "assert_eq!({f}(42, 1), 42, \"1 must be multiplicative identity\");",
+                f = func_name
+            ));
+        }
+    }
+
+    // ── Absolute value: |x| >= 0, |x| == |-x| ──
+    if sig.params.len() == 1
+        && has_i32_params
+        && (purpose_lower.contains("absolute") || purpose_lower.contains("abs"))
+    {
+        tests.push(format!(
+            "for x in [-10, -1, 0, 1, 10] {{\n            \
+                 assert!({f}(x) >= 0, \"abs must be non-negative\");\n        \
+             }}",
+            f = func_name
+        ));
+        tests.push(format!(
+            "for x in [-5, -1, 0, 1, 5] {{\n            \
+                 assert_eq!({f}(x), {f}(-x), \"abs must satisfy |x| == |-x|\");\n        \
+             }}",
+            f = func_name
+        ));
+    }
+
+    // ── String case: length preservation ──
+    if has_str_param && returns_string && sig.params.len() == 1 {
+        if purpose_lower.contains("uppercase") || purpose_lower.contains("lowercase") {
+            tests.push(format!(
+                "let s = \"Hello World\";\n        \
+                 assert_eq!({f}(s).len(), s.len(), \"case change must preserve length\");",
+                f = func_name
+            ));
+        }
+        if purpose_lower.contains("trim") || purpose_lower.contains("strip") {
+            tests.push(format!(
+                "let s = \"  hello  \";\n        \
+                 assert!({f}(s).len() <= s.len(), \"trim must not increase length\");",
+                f = func_name
+            ));
+        }
+    }
+
+    // ── Map/transform: output length == input length ──
+    if has_vec_param
+        && returns_vec
+        && (purpose_lower.contains("map")
+            || purpose_lower.contains("double")
+            || purpose_lower.contains("square")
+            || purpose_lower.contains("negate"))
+        && !purpose_lower.contains("filter")
+    {
+        tests.push(format!(
+            "let v = vec![1, 2, 3, 4, 5];\n        \
+             assert_eq!({f}(v.clone()).len(), v.len(), \"map must preserve length\");",
+            f = func_name
+        ));
+    }
+
+    tests
 }
 
 #[cfg(test)]
@@ -2749,5 +3171,125 @@ mod tests {
             "Should not have todo: {}",
             result
         );
+    }
+
+    // ── Property-based test generation tests ──
+
+    #[test]
+    fn test_property_sort_idempotency() {
+        let sig = parse_rust_signature("fn sort(v: Vec<i32>) -> Vec<i32>").unwrap();
+        let props = generate_property_tests("sort", "sort a vector", Some(&sig));
+        assert!(!props.is_empty(), "sort should generate property tests");
+        let joined = props.join("\n");
+        assert!(joined.contains("idempotent"), "sort should test idempotency");
+        assert!(joined.contains("preserve length"), "sort should test length");
+    }
+
+    #[test]
+    fn test_property_reverse_involution() {
+        let sig = parse_rust_signature("fn reverse(s: &str) -> String").unwrap();
+        let props = generate_property_tests("reverse", "reverse a string", Some(&sig));
+        assert!(!props.is_empty(), "reverse should generate property tests");
+        assert!(props.join("\n").contains("involution"), "reverse should test involution");
+    }
+
+    #[test]
+    fn test_property_add_commutativity() {
+        let sig = parse_rust_signature("fn add(a: i32, b: i32) -> i32").unwrap();
+        let props = generate_property_tests("add", "add two numbers", Some(&sig));
+        assert!(!props.is_empty(), "add should generate property tests");
+        let joined = props.join("\n");
+        assert!(joined.contains("commutative"), "add should test commutativity");
+        assert!(joined.contains("additive identity"), "add should test identity");
+    }
+
+    #[test]
+    fn test_property_filter_size_reduction() {
+        let sig = parse_rust_signature("fn filter_pos(v: Vec<i32>) -> Vec<i32>").unwrap();
+        let props = generate_property_tests("filter_pos", "filter positive numbers", Some(&sig));
+        assert!(!props.is_empty(), "filter should generate property tests");
+        assert!(props.join("\n").contains("not increase length"), "filter should test size");
+    }
+
+    #[test]
+    fn test_property_abs_nonnegative() {
+        let sig = parse_rust_signature("fn abs(x: i32) -> i32").unwrap();
+        let props = generate_property_tests("abs", "absolute value", Some(&sig));
+        assert!(!props.is_empty(), "abs should generate property tests");
+        let joined = props.join("\n");
+        assert!(joined.contains("non-negative"), "abs should test non-negativity");
+        assert!(joined.contains("|x| == |-x|"), "abs should test symmetry");
+    }
+
+    #[test]
+    fn test_property_no_properties_for_unknown() {
+        let sig = parse_rust_signature("fn mystery(x: i32) -> i32").unwrap();
+        let props = generate_property_tests("mystery", "do something mysterious", Some(&sig));
+        assert!(props.is_empty(), "unknown purpose should generate no property tests");
+    }
+
+    // ── Pattern composition tests ──
+
+    #[test]
+    fn test_compose_hashmap_frequency() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "freq", "Count frequency of each element")
+            .with_signature("fn freq(items: Vec<i32>) -> std::collections::HashMap<i32, usize>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("HashMap::new()"), "Should use HashMap: {}", result);
+        assert!(result.contains("or_insert"), "Should use or_insert: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_compose_sort_nth_largest() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "third_largest", "Find the 3rd largest element by sort")
+            .with_signature("fn third_largest(nums: Vec<i32>) -> i32");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("sorted.sort()"), "Should sort: {}", result);
+        assert!(result.contains("sorted.len() - 3"), "Should index from end: {}", result);
+    }
+
+    #[test]
+    fn test_compose_count_unique() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "count_unique", "Count unique distinct elements")
+            .with_signature("fn count_unique(items: Vec<i32>) -> usize");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("HashSet"), "Should use HashSet: {}", result);
+        assert!(result.contains(".len()"), "Should get length: {}", result);
+    }
+
+    #[test]
+    fn test_compose_zip_elementwise() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "add_vecs", "Element-wise add two vectors")
+            .with_signature("fn add_vecs(a: Vec<i32>, b: Vec<i32>) -> Vec<i32>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".zip("), "Should zip: {}", result);
+        assert!(result.contains(".collect()"), "Should collect: {}", result);
+    }
+
+    #[test]
+    fn test_compose_find_pairs() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "all_pairs", "Find all pairs from a vector")
+            .with_signature("fn all_pairs(nums: Vec<i32>) -> Vec<(i32, i32)>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("for i in"), "Should have outer loop: {}", result);
+        assert!(result.contains("for j in"), "Should have inner loop: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_compose_cartesian_product() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "cartesian", "Cartesian product of two vectors")
+            .with_signature("fn cartesian(a: Vec<i32>, b: Vec<i32>) -> Vec<(i32, i32)>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("for a in"), "Should iterate first vec: {}", result);
+        assert!(result.contains("for b in"), "Should iterate second vec: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
     }
 }
