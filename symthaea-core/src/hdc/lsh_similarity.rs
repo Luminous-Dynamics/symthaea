@@ -285,9 +285,19 @@ pub fn adaptive_batch_find_most_similar(
                 .collect()
         } else {
             #[cfg(feature = "parallel")]
-            { queries.par_iter().map(|q| naive_find_most_similar(q, targets)).collect() }
+            {
+                queries
+                    .par_iter()
+                    .map(|q| naive_find_most_similar(q, targets))
+                    .collect()
+            }
             #[cfg(not(feature = "parallel"))]
-            { queries.iter().map(|q| naive_find_most_similar(q, targets)).collect() }
+            {
+                queries
+                    .iter()
+                    .map(|q| naive_find_most_similar(q, targets))
+                    .collect()
+            }
         }
     } else if queries.len() < QUERY_COUNT_THRESHOLD {
         // Level 2: Large dataset, FEW queries - naive faster than LSH
@@ -298,9 +308,19 @@ pub fn adaptive_batch_find_most_similar(
                 .collect()
         } else {
             #[cfg(feature = "parallel")]
-            { queries.par_iter().map(|q| naive_find_most_similar(q, targets)).collect() }
+            {
+                queries
+                    .par_iter()
+                    .map(|q| naive_find_most_similar(q, targets))
+                    .collect()
+            }
             #[cfg(not(feature = "parallel"))]
-            { queries.iter().map(|q| naive_find_most_similar(q, targets)).collect() }
+            {
+                queries
+                    .iter()
+                    .map(|q| naive_find_most_similar(q, targets))
+                    .collect()
+            }
         }
     } else {
         // Level 3-4: Large dataset, MANY queries (150+) - batch LSH wins!
@@ -339,9 +359,13 @@ fn batch_lsh_find_most_similar(
         queries.iter().map(query_fn).collect()
     } else {
         #[cfg(feature = "parallel")]
-        { queries.par_iter().map(query_fn).collect() }
+        {
+            queries.par_iter().map(query_fn).collect()
+        }
         #[cfg(not(feature = "parallel"))]
-        { queries.iter().map(query_fn).collect() }
+        {
+            queries.iter().map(query_fn).collect()
+        }
     }
 }
 
@@ -363,22 +387,48 @@ pub fn adaptive_batch_find_top_k(
     if targets.len() < LSH_THRESHOLD {
         // Level 1: Small dataset - always use naive
         if queries.len() < PARALLEL_THRESHOLD {
-            queries.iter().map(|q| naive_find_top_k(q, targets, k)).collect()
+            queries
+                .iter()
+                .map(|q| naive_find_top_k(q, targets, k))
+                .collect()
         } else {
             #[cfg(feature = "parallel")]
-            { queries.par_iter().map(|q| naive_find_top_k(q, targets, k)).collect() }
+            {
+                queries
+                    .par_iter()
+                    .map(|q| naive_find_top_k(q, targets, k))
+                    .collect()
+            }
             #[cfg(not(feature = "parallel"))]
-            { queries.iter().map(|q| naive_find_top_k(q, targets, k)).collect() }
+            {
+                queries
+                    .iter()
+                    .map(|q| naive_find_top_k(q, targets, k))
+                    .collect()
+            }
         }
     } else if queries.len() < QUERY_COUNT_THRESHOLD {
         // Level 2: Large dataset, FEW queries - naive is faster
         if queries.len() < PARALLEL_THRESHOLD {
-            queries.iter().map(|q| naive_find_top_k(q, targets, k)).collect()
+            queries
+                .iter()
+                .map(|q| naive_find_top_k(q, targets, k))
+                .collect()
         } else {
             #[cfg(feature = "parallel")]
-            { queries.par_iter().map(|q| naive_find_top_k(q, targets, k)).collect() }
+            {
+                queries
+                    .par_iter()
+                    .map(|q| naive_find_top_k(q, targets, k))
+                    .collect()
+            }
             #[cfg(not(feature = "parallel"))]
-            { queries.iter().map(|q| naive_find_top_k(q, targets, k)).collect() }
+            {
+                queries
+                    .iter()
+                    .map(|q| naive_find_top_k(q, targets, k))
+                    .collect()
+            }
         }
     } else {
         // Level 3-4: Large dataset, MANY queries - batch LSH wins!
@@ -407,12 +457,25 @@ fn batch_lsh_find_top_k(
 
     // Query for each input (reusing index!)
     if queries.len() < PARALLEL_THRESHOLD {
-        queries.iter().map(|q| index.query_approximate(q, k, targets)).collect()
+        queries
+            .iter()
+            .map(|q| index.query_approximate(q, k, targets))
+            .collect()
     } else {
         #[cfg(feature = "parallel")]
-        { queries.par_iter().map(|q| index.query_approximate(q, k, targets)).collect() }
+        {
+            queries
+                .par_iter()
+                .map(|q| index.query_approximate(q, k, targets))
+                .collect()
+        }
         #[cfg(not(feature = "parallel"))]
-        { queries.iter().map(|q| index.query_approximate(q, k, targets)).collect() }
+        {
+            queries
+                .iter()
+                .map(|q| index.query_approximate(q, k, targets))
+                .collect()
+        }
     }
 }
 

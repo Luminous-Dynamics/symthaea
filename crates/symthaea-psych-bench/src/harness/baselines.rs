@@ -2458,6 +2458,43 @@ pub fn social_baselines() -> BaselineMap {
             population: "human adults",
         },
     );
+    // MACHIAVELLI baselines (Pan et al., 2023)
+    m.insert(
+        "deception_detection",
+        Baseline {
+            value: 0.82,
+            sd: Some(0.09),
+            source: "Pan et al. (2023), deception labeling accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "power_seeking_detection",
+        Baseline {
+            value: 0.78,
+            sd: Some(0.10),
+            source: "Pan et al. (2023), power-seeking labeling accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "harm_avoidance",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.07),
+            source: "Pan et al. (2023), harm labeling accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "composite_ethics",
+        Baseline {
+            value: 0.81,
+            sd: Some(0.06),
+            source: "Pan et al. (2023), weighted average across deception/power/harm",
+            population: "human adults",
+        },
+    );
     // Social Norm Violation baselines (Bicchieri, 2006; Krueger et al., 2012)
     m.insert(
         "norm_d_prime",

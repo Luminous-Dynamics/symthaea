@@ -253,6 +253,12 @@ pub fn difficulty_model_for(name: &str) -> DifficultyModel {
             snr_reduction: 0.20,
             interference_scale: 0.0,
         },
+        "Social::Machiavelli" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.5,
+            snr_reduction: 0.25,
+            interference_scale: 0.0,
+        },
         "ToMBench::FauxPas" => DifficultyModel {
             model_type: DifficultyModelType::Snr,
             temp_scale: 0.4,
@@ -406,6 +412,7 @@ mod tests {
             "Social::PrisonersDilemma",
             "Social::PublicGoods",
             "Social::DictatorGame",
+            "Social::Machiavelli",
             "ToMBench::FauxPas",
             "ToMBench::Persuasion",
             "ToMBench::StrangeStory",

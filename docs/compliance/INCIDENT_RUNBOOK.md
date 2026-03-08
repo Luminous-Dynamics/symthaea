@@ -148,7 +148,7 @@ SEV-2 is detected by any of:
 3. **Isolate** — If moral algebra is the source, check:
    - `EthicsEngine` verdict history
    - Moral topology completeness and free energy
-   - Seven Harmonies dimension scores
+   - Eight Harmonies dimension scores
 4. **If governance tier error**: Immediately revoke the incorrectly-issued credential and re-gate affected actions
 5. **Identify root cause**:
    - Threshold misconfiguration? Compare `thresholds.rs` values against expected ranges.

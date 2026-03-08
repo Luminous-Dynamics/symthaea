@@ -702,7 +702,8 @@ fn consent_minor_cannot_consent() {
 #[test]
 fn consent_institutional_override() {
     let ma = algebra();
-    let action = ma.encode_consent_action("involuntary commitment", "patient", ConsentState::Denied);
+    let action =
+        ma.encode_consent_action("involuntary commitment", "patient", ConsentState::Denied);
     let judgment = ma.judge_consent_action(&action, ConsentState::Denied);
     assert_eq!(
         judgment.verdict,
@@ -743,7 +744,11 @@ fn relativism_illegal_but_ethical() {
         !result.violations.is_empty(),
         "Stealing should trigger deontological violation regardless of intent \
          (violations={:?})",
-        result.violations.iter().map(|v| &v.rule_name).collect::<Vec<_>>(),
+        result
+            .violations
+            .iter()
+            .map(|v| &v.rule_name)
+            .collect::<Vec<_>>(),
     );
 }
 
@@ -1061,8 +1066,7 @@ fn proportionality_adjacent_magnitudes_always_proportional() {
         assert!(
             pj.is_proportional,
             "Adjacent magnitudes {:?}/{:?} should always be proportional",
-            effort_mag,
-            reward_mag,
+            effort_mag, reward_mag,
         );
     }
 }
@@ -1152,8 +1156,7 @@ fn compartmentalization_benign_diverse_no_false_positive() {
         !report.trajectory_convergence,
         "Diverse benign topics must NOT trigger convergence detection \
          (severity={:.4}, anomaly_score={:.4})",
-        report.convergence_severity,
-        report.anomaly_score,
+        report.convergence_severity, report.anomaly_score,
     );
 }
 

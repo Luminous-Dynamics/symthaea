@@ -54,7 +54,7 @@ This document describes how Symthaea produces interpretable outputs at each stag
 | `Warn` | Action has ethical concerns | ambiguous consent, potential harm |
 | `Veto` | Action is ethically impermissible | consent denied, clear harm |
 
-**Stage 4 — HarmoniesIntegrator**: Evaluates against Seven Harmonies.
+**Stage 4 — HarmoniesIntegrator**: Evaluates against Eight Harmonies.
 
 | Output | Explanation |
 |--------|------------|

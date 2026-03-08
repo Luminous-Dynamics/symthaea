@@ -405,9 +405,13 @@ impl ResonantPhiCalculator {
         };
 
         #[cfg(feature = "parallel")]
-        { (0..n).into_par_iter().map(row_fn).collect() }
+        {
+            (0..n).into_par_iter().map(row_fn).collect()
+        }
         #[cfg(not(feature = "parallel"))]
-        { (0..n).map(row_fn).collect() }
+        {
+            (0..n).map(row_fn).collect()
+        }
     }
 
     /// Single resonance step: update all resonators based on current state

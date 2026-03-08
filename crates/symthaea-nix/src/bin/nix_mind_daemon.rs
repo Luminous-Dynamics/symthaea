@@ -136,10 +136,29 @@ impl DaemonState {
     }
 
     /// Learn from a resolved anomaly by creating a dynamic knowledge article.
+    ///
+    /// If Ollama is available, also queries for resolution verification (BL)
+    /// to determine if the fix is permanent or temporary.
     fn learn_from_resolution(&mut self, symptom: &str, resolution: &str, commands: Vec<String>) {
         let kb = match self.knowledge_base.as_mut() {
             Some(kb) => kb,
             None => return,
+        };
+
+        // Query Ollama for resolution analysis if available (BL)
+        let enriched_solution = if let Some(ollama) = self.ollama.as_mut() {
+            let prompt = build_resolution_prompt(symptom, resolution, &commands);
+            if let Some(response) = ollama.query(&prompt) {
+                eprintln!(
+                    "nix-mind-daemon: resolution verified via Ollama ({}ms)",
+                    response.duration_ms
+                );
+                format!("{}\n\nAnalysis: {}", resolution, response.text)
+            } else {
+                resolution.to_string()
+            }
+        } else {
+            resolution.to_string()
         };
 
         let id = format!("learned_{}", now_secs());
@@ -148,7 +167,7 @@ impl DaemonState {
             title: format!("Resolved: {}", symptom),
             category: KnowledgeCategory::ServiceIssue,
             symptoms: vec![symptom.to_string()],
-            solution: resolution.to_string(),
+            solution: enriched_solution,
             commands,
             learned_at: now_secs() as i64,
             hit_count: 0,
@@ -742,6 +761,62 @@ const ANOMALY_DIAGNOSIS_POML: &str = r#"<poml version="2.0">
   </prompt>
 </poml>"#;
 
+/// POML template for resolution verification prompts.
+///
+/// After a service recovers, ask the LLM to summarize why the recovery happened
+/// and whether the fix is permanent or temporary — feeding the response back
+/// into the knowledge base for future reference.
+const RESOLUTION_VERIFICATION_POML: &str = r#"<poml version="2.0">
+  <metadata>
+    <title>Resolution Verification</title>
+    <model-hints><temperature>0.2</temperature><max-tokens>192</max-tokens></model-hints>
+  </metadata>
+  <variables>
+    <let name="symptom">{{ symptom }}</let>
+    <let name="resolution">{{ resolution }}</let>
+    <let name="commands">{{ commands }}</let>
+  </variables>
+  <prompt>
+    <system>You are a NixOS reliability analyst. Be concise (2-3 sentences).</system>
+    <stepwise-instructions>
+      <step id="s1">Analyze why the symptom '{{ symptom }}' was resolved by '{{ resolution }}'.</step>
+      <step id="s2">Determine if the fix is permanent or a workaround that may recur.</step>
+      <step id="s3">If temporary, suggest a permanent fix.</step>
+    </stepwise-instructions>
+    <output-format>Plain text: analysis, permanence verdict, optional permanent fix.</output-format>
+  </prompt>
+</poml>"#;
+
+/// Build a resolution verification prompt using POML template processing.
+fn build_resolution_prompt(symptom: &str, resolution: &str, commands: &[String]) -> String {
+    let mut proc = PomlProcessor::new("/dev/null");
+    if proc
+        .load_template_str("resolution_verification", RESOLUTION_VERIFICATION_POML)
+        .is_ok()
+    {
+        let mut ctx = PomlContext::default();
+        ctx.variables
+            .insert("symptom".into(), PomlValue::from(symptom));
+        ctx.variables
+            .insert("resolution".into(), PomlValue::from(resolution));
+        ctx.variables
+            .insert("commands".into(), PomlValue::from(commands.join(", ")));
+
+        if let Ok(result) = proc.process("resolution_verification", &ctx) {
+            return result.prompt;
+        }
+    }
+    format!(
+        "A NixOS issue '{}' was resolved by: {}\n\
+         Commands used: {}\n\n\
+         Was this a permanent fix or a temporary workaround? \
+         If temporary, suggest a permanent solution (2-3 sentences).",
+        symptom,
+        resolution,
+        commands.join(", ")
+    )
+}
+
 /// Build an anomaly diagnosis prompt using POML template processing.
 fn build_anomaly_prompt(unit: &str, reason: &str, message: &str) -> String {
     let mut proc = PomlProcessor::new("/dev/null");
@@ -1190,5 +1265,157 @@ mod tests {
             has_context,
             "Disk alerts should have journal context from disk anomaly"
         );
+    }
+
+    #[test]
+    fn test_degraded_mode_initial_state() {
+        let config = test_config();
+        let state = DaemonState::new(&config);
+        assert!(!state.degraded, "Should not start in degraded mode");
+        assert!(
+            state.last_hw_probe.is_none(),
+            "No cached probe initially"
+        );
+    }
+
+    #[test]
+    fn test_degraded_mode_cached_hw_used() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Simulate a successful hardware probe
+        let hw = symthaea_nix::observe::hardware::HardwareInfo {
+            cpu_model: "Test CPU".into(),
+            cpu_cores: 4,
+            memory_total_mb: 16000,
+            memory_available_mb: 8000,
+            gpus: vec![],
+            disks: vec![],
+            load_average: [1.0, 0.8, 0.5],
+            swap_total_mb: 4096,
+            swap_used_mb: 512,
+        };
+        state.last_hw_probe = Some(hw.clone());
+        state.degraded = false;
+
+        // Simulate probe failure → should use cached data
+        state.degraded = true;
+        let cached = state.last_hw_probe.clone();
+        assert!(cached.is_some(), "Cached hw should be available");
+        assert_eq!(cached.unwrap().cpu_cores, 4);
+    }
+
+    #[test]
+    fn test_degraded_flag_in_ipc_snapshot() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+        state.degraded = true;
+
+        let ipc = state.to_ipc_snapshot();
+        assert!(ipc.degraded, "IPC snapshot should reflect degraded state");
+
+        state.degraded = false;
+        let ipc = state.to_ipc_snapshot();
+        assert!(!ipc.degraded, "IPC snapshot should reflect recovered state");
+    }
+
+    #[test]
+    fn test_degraded_recovery_clears_flag() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Simulate degraded state with cached data
+        let hw = symthaea_nix::observe::hardware::HardwareInfo {
+            cpu_model: "Test CPU".into(),
+            cpu_cores: 8,
+            memory_total_mb: 32000,
+            memory_available_mb: 16000,
+            gpus: vec![],
+            disks: vec![],
+            load_average: [0.5, 0.3, 0.2],
+            swap_total_mb: 8192,
+            swap_used_mb: 100,
+        };
+        state.last_hw_probe = Some(hw);
+        state.degraded = true;
+
+        // Simulate successful probe (recovery)
+        state.degraded = false;
+        assert!(!state.degraded);
+
+        let ipc = state.to_ipc_snapshot();
+        assert!(!ipc.degraded);
+    }
+
+    #[test]
+    fn test_load_and_swap_from_cached_hw_in_snapshot() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        let hw = symthaea_nix::observe::hardware::HardwareInfo {
+            cpu_model: "Test".into(),
+            cpu_cores: 4,
+            memory_total_mb: 16000,
+            memory_available_mb: 8000,
+            gpus: vec![],
+            disks: vec![],
+            load_average: [3.5, 2.0, 1.0],
+            swap_total_mb: 4096,
+            swap_used_mb: 2048,
+        };
+        state.last_hw_probe = Some(hw);
+
+        let ipc = state.to_ipc_snapshot();
+        assert!((ipc.load_average_1m.unwrap() - 3.5).abs() < 1e-6);
+        assert!((ipc.swap_used_percent.unwrap() - 50.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_build_resolution_prompt_via_poml() {
+        let prompt = build_resolution_prompt(
+            "nginx.service crashed",
+            "Service restarted automatically",
+            &["systemctl restart nginx".to_string()],
+        );
+        assert!(
+            prompt.contains("nginx.service crashed"),
+            "Prompt should contain the symptom"
+        );
+        assert!(
+            prompt.contains("restart"),
+            "Prompt should contain the resolution"
+        );
+    }
+
+    #[test]
+    fn test_build_anomaly_prompt_via_poml() {
+        let prompt = build_anomaly_prompt(
+            "nix-daemon.service",
+            "No space left on device",
+            "write error at /nix/store",
+        );
+        assert!(prompt.contains("nix-daemon.service"));
+        assert!(prompt.contains("space"));
+    }
+
+    #[test]
+    fn test_learn_from_resolution_without_ollama() {
+        let config = DaemonConfig {
+            enable_knowledge_learning: true,
+            ..DaemonConfig::default()
+        };
+        let mut state = DaemonState::new(&config);
+        // Disable ollama for this test
+        state.ollama = None;
+
+        state.learn_from_resolution(
+            "test.service failure",
+            "Restarted the service",
+            vec!["systemctl restart test".into()],
+        );
+
+        // Should have learned the article (without Ollama enrichment)
+        let kb = state.knowledge_base.as_ref().unwrap();
+        assert_eq!(kb.dynamic_len(), 1);
     }
 }

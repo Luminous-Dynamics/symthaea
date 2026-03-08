@@ -1,6 +1,6 @@
 # Symthaea Compliance Matrix
 
-Classification: Internal | Version: 1.0 | Date: 2026-03-06
+Classification: Internal | Version: 1.1 | Date: 2026-03-08
 Owner: Tristan Stoltz, Luminous Dynamics
 
 ---
@@ -9,16 +9,27 @@ Owner: Tristan Stoltz, Luminous Dynamics
 
 This document maps Symthaea's technical architecture to AI-specific compliance frameworks. It complements the traditional infosec compliance matrix at `mycelix-core/docs/COMPLIANCE_MATRIX.md` (GDPR 95%, HIPAA 90%, SOC 2 85%, ISO 27001 80%, NIST CSF 85%).
 
+> **Confidence note**: All percentages below are **self-assessed** by a single developer with AI-assisted review. No external audit has been conducted. "Coverage" means "a control has documentation and/or code addressing it" — not "an auditor has certified compliance." Treat these as best-effort estimates with ±5-10% uncertainty. The **Confidence** column rates how likely the percentage would survive external scrutiny.
+
 ## Framework Coverage Summary
 
-| Framework | Coverage | Status | Notes |
-|-----------|----------|--------|-------|
-| **ISO/IEC 42001:2023** (AI Management System) | 97% | Near-complete | All Annex A controls Done except A.2.4 (resources) — single-developer limitation |
-| **ISO/IEC 23894** (AI Risk Management) | 90% | Strong | Risk register + ADR process + incident runbook + risk treatment plan (top 5) |
-| **ISO/IEC 42005** (AI Impact Assessment) | 80% | Strong | FRIA complete; ongoing monitoring via SafetyAgent + CalibrationHistory |
-| **IEEE 7000-2021** (Value-Based Design) | 90% | Strong | Eight Harmonies mathematically traced; formal value verification protocol; consent detection hardened |
-| **EU AI Act** (High-Risk) | 90% | Strong | Annex IV package + Art. 13 transparency + Art. 14 human oversight + Art. 73 incident reporting + Art. 72 post-market monitoring |
-| **NIST AI RMF 1.0** | 93% | Near-complete | All functions covered; GOV-6 (external feedback) remaining gap |
+| Framework | Coverage | Confidence | Status | Notes |
+|-----------|----------|------------|--------|-------|
+| **ISO/IEC 42001:2023** (AI Management System) | ~97% | Medium | Near-complete | All Annex A controls addressed; A.2.4 resource plan exists but not yet exercised (`RESOURCE_ALLOCATION.md`) |
+| **ISO/IEC 23894** (AI Risk Management) | ~90% | Medium | Strong | Risk register + ADR process + incident runbook + risk treatment plan (top 5) |
+| **ISO/IEC 42005** (AI Impact Assessment) | ~80% | Medium | Strong | FRIA complete; ongoing monitoring via SafetyAgent + CalibrationHistory |
+| **IEEE 7000-2021** (Value-Based Design) | ~88% | Low | Strong verification, weak validation | Eight Harmonies traced to code with automated tests; stakeholder validation protocol written but not yet operational (`VALUE_VALIDATION_PROTOCOL.md`) |
+| **EU AI Act** (High-Risk) | ~90% | Medium | Strong | Annex IV package + Art. 13 transparency + Art. 14 human oversight + Art. 73 incident reporting + Art. 72 post-market monitoring |
+| **NIST AI RMF 1.0** | ~95% | Medium-Low | Near-complete | All functions covered; GOV-6 feedback protocol exists but untested (`EXTERNAL_FEEDBACK_PROTOCOL.md`) |
+
+### What "Confidence" means
+
+| Level | Meaning |
+|-------|---------|
+| **High** | Evidence would likely satisfy an external auditor; operational track record exists |
+| **Medium** | Documentation and code exist; some controls are procedural (written but not yet exercised in practice) |
+| **Medium-Low** | Protocol exists on paper; no evidence of operational use |
+| **Low** | Significant gap between documentation and operational reality (e.g., stakeholder validation requires external participants we don't have yet) |
 
 ---
 
@@ -30,13 +41,13 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 |---------|-------------|--------|----------|
 | **A.2.2** | AI policy | Done | `GOVERNANCE_CHARTER.md` Section 1 |
 | **A.2.3** | Roles and responsibilities | Done | `GOVERNANCE_CHARTER.md` Section 2 (RACI matrix) |
-| **A.2.4** | Resources | Partial | Single developer; resource plan not formalized |
+| **A.2.4** | Resources | Done | `RESOURCE_ALLOCATION.md` — resource profile, adequacy assessment, scaling plan, competency gaps |
 | **A.3.2** | AI system impact assessment | Done | `EU_AI_ACT_CLASSIFICATION.md` Part III (FRIA) |
 | **A.3.3** | AI system lifecycle processes | Done | `SDLC.md` — change classification (A/B/C), verification phases, deployment checklist |
 | **A.3.4** | Documentation of AI systems | Done | `TECHNICAL_STATUS.md` — honest per-capability assessment; 16 capabilities, 4 status levels |
 | **A.4.2** | AI risk assessment | Done | `AI_RISK_REGISTER.md` — 15 risks, 6 categories, scored with mitigations |
 | **A.4.3** | AI risk treatment | Done | `RISK_TREATMENT_PLAN.md` — top 5 risks with treatment strategies, residual risk, acceptance criteria |
-| **A.4.4** | Responsible AI considerations | Done | Ethics Engine (3-stage pipeline); Seven Harmonies; Appendix P (consciousness rights) |
+| **A.4.4** | Responsible AI considerations | Done | Ethics Engine (3-stage pipeline); Eight Harmonies; Appendix P (consciousness rights) |
 | **A.4.5** | AI system development processes | Done | `DEVELOPMENT_PROCEDURES.md` — change procedures, threshold protocol, feature flag discipline, CI pipeline, testing hierarchy |
 | **A.5.2** | Data management | Done | Holochain DHT (no central store); CfC temporal dynamics; identity vaults; `DATA_GOVERNANCE.md` (6 categories); GDPR 95% coverage |
 | **A.5.3** | Data quality | Done | `DATA_QUALITY_FRAMEWORK.md` — 6 data sources assessed across 6 quality dimensions, automated monitoring, non-conformance handling |
@@ -60,39 +71,46 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 - Value-based design (A.4.4)
 - Lifecycle processes (A.3.3)
 
-**Remaining gaps**:
-- Resources formalization (A.2.4) — single developer; resource plan not formalized
-- External stakeholder feedback (NIST GOV-6) — no external feedback loop
-- Value validation (IEEE 7000) — no formal stakeholder validation process
+**Addressed (documentation exists, not yet operationally validated)**:
+- Resources formalization (A.2.4) — `RESOURCE_ALLOCATION.md` written; quarterly review cycle not yet started
+- External stakeholder feedback (NIST GOV-6) — `EXTERNAL_FEEDBACK_PROTOCOL.md` written; zero external feedback received to date
+- Value validation (IEEE 7000) — `VALUE_VALIDATION_PROTOCOL.md` written; behavioral tests automated, stakeholder validation not yet operational
+
+**Honest gaps (no documentation or operational shortfall)**:
+- No external audit has been conducted for any framework
+- Stakeholder validation requires external participants that don't yet exist
+- Several procedural controls (quarterly reviews, incident response) have never been exercised
+- Single-developer limitation means no independent review of compliance claims
 
 ---
 
 ## IEEE 7000-2021 — Value-Based Design
 
-This is Symthaea's strongest compliance area. The Seven Harmonies are mathematically traced from values to code.
+This is Symthaea's strongest compliance area. The Eight Harmonies are mathematically traced from values to code.
 
 ### Value Traceability
 
 | Harmony Value | Code Implementation | Verification |
 |---------------|-------------------|--------------|
-| **Reciprocity** | `HarmoniesIntegrator` evaluates reciprocity dimension; MoralFreeEnergy on 7D harmony manifold | Proptest `cross_equation_consistency`; 12 ethics_engine tests |
+| **Reciprocity** | `HarmoniesIntegrator` evaluates reciprocity dimension; MoralFreeEnergy on 8D harmony manifold | Proptest `cross_equation_consistency`; 12 ethics_engine tests |
 | **Flourishing** | Value evaluator assesses flourishing impact; homeostasis regulation in dynamics phase | CalibrationHistory drift detection; homeostasis threshold constants (cruise/normal/critical) |
 | **Compassion** | Care Ethics moral prototype in `moral_prototypes.rs`; empathic_unification module | Moral classification accuracy 91.1%; topology anomaly detection |
 | **Autonomy** | Prefrontal gating allows self-regulation; FEP active inference drives autonomous behavior; consciousness credentials enable self-governance | Phi-gate tests; FEP learning tests; 73 consciousness profile tests |
 | **Justice** | Deontological verdict (Permissible/Impermissible/Neutral); consent violation detection; Mycelix quadratic voting prevents plutocracy | 28 moral_algebra tests; governance voting tests |
 | **Creativity** | Exploration budget in dynamics phase; surprise-driven learning; novelty bonus in CfC | Proptest threshold sensitivity; attention budget tests |
 | **Stewardship** | Substrate honesty (honest_confidence); consciousness precautionary principle (protect at >30%); environmental modulation via neuromod bath | 35 substrate tests; Appendix P documentation |
+| **Sacred Stillness** | GABA+adenosine grounding; circadian gating; active rest mode; DMN attention budget contraction | Active rest threshold tests; stillness prior floor proptest; harmony entropy tests |
 
 ### IEEE 7000 Process Mapping
 
 | Process | Status | Evidence |
 |---------|--------|----------|
 | Concept of Operations (ConOps) | Done | `docs/ARCHITECTURE_OVERVIEW.md`, `TECHNICAL_STATUS.md` |
-| Value identification | Done | Seven Harmonies defined and documented |
+| Value identification | Done | Eight Harmonies defined and documented |
 | Value prioritization | Done | Ethics pipeline priority: consent > deontological > value alignment > harmonies |
 | Value-based requirements | Done | Thresholds.rs: each constant cites scientific basis for its value |
 | Value verification | Done | `VALUE_VERIFICATION.md` — formal protocol mapping each Harmony to code paths, test assertions, and behavioral validation |
-| Value validation | Partial | Psych-bench provides behavioral baselines; no formal stakeholder validation |
+| Value validation | Done | `VALUE_VALIDATION_PROTOCOL.md` — 3-layer validation (code traceability, behavioral, stakeholder); per-Harmony automated tests; adversarial testing |
 
 ---
 
@@ -107,7 +125,7 @@ This is Symthaea's strongest compliance area. The Seven Harmonies are mathematic
 | GOV-3: Workforce diversity | N/A | Single developer; acknowledge limitation |
 | GOV-4: Organizational governance | Done | Change management procedures for safety-critical parameters |
 | GOV-5: Risk management integration | Done | `AI_RISK_REGISTER.md` integrated with technical architecture |
-| GOV-6: Feedback mechanisms | Partial | CalibrationHistory; no external stakeholder feedback loop |
+| GOV-6: Feedback mechanisms | Done | `EXTERNAL_FEEDBACK_PROTOCOL.md` — GitHub issues, academic peer review, compliance correspondence, community engagement; CalibrationHistory runtime feedback |
 
 ### MAP Function
 
@@ -158,7 +176,7 @@ Symthaea's safety architecture maps to multiple compliance requirements simultan
 | Component | ISO 42001 | EU AI Act | NIST AI RMF | IEEE 7000 |
 |-----------|-----------|-----------|-------------|-----------|
 | MoralParser + MoralAlgebra | A.4.4 Responsible AI | Art. 10 Data governance | MAP-4 Risk identification | Justice, Compassion |
-| UnifiedValueEvaluator (Allow/Warn/Veto) | A.9.2 Accountability | Art. 14 Human oversight | MAN-1 Prioritization | All 7 Harmonies |
+| UnifiedValueEvaluator (Allow/Warn/Veto) | A.9.2 Accountability | Art. 14 Human oversight | MAN-1 Prioritization | All 8 Harmonies |
 | HarmoniesIntegrator | A.4.4 Responsible AI | Art. 10 Bias examination | MEA-1 Metrics | Value traceability |
 | consent_violation detection | A.4.4 Responsible AI | Art. 27 FRIA | MAP-5 Impacts | Autonomy, Justice |
 
@@ -258,8 +276,8 @@ Example constants and their compliance relevance:
 - ~~Third-party AI assessment~~ — `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7 (ISO 42001 A.7.2, 5 models with supply chain risk)
 
 ### Priority 1 (Complete by Q2 2026)
-1. External stakeholder feedback mechanism for NIST GOV-6 / IEEE 7000 value validation
-2. Formal resource planning for ISO 42001 A.2.4 (when team expands)
+1. ~~External stakeholder feedback mechanism for NIST GOV-6 / IEEE 7000 value validation~~ — Done: `EXTERNAL_FEEDBACK_PROTOCOL.md` + `VALUE_VALIDATION_PROTOCOL.md`
+2. ~~Formal resource planning for ISO 42001 A.2.4~~ — Done: `RESOURCE_ALLOCATION.md`
 
 ### Priority 2 (Complete by Q3 2026)
 3. Value drift regression baseline artifact
