@@ -104,6 +104,25 @@ impl SafetyLevel {
 }
 
 impl NixOSCommand {
+    /// Create a Custom command with auto-classified safety level.
+    ///
+    /// Uses `classify_command_destructiveness` from `phi_gate` to infer
+    /// the safety level from the command string, rather than requiring
+    /// the caller to specify it manually.
+    pub fn custom_auto(command: &str, args: Vec<String>) -> Self {
+        let full_cmd = if args.is_empty() {
+            command.to_string()
+        } else {
+            format!("{} {}", command, args.join(" "))
+        };
+        let safety_level = super::phi_gate::classify_command_destructiveness(&full_cmd);
+        Self::Custom {
+            command: command.to_string(),
+            args,
+            safety_level,
+        }
+    }
+
     /// Get the safety level of this command
     pub fn safety_level(&self) -> SafetyLevel {
         match self {
@@ -836,6 +855,31 @@ mod tests {
         };
         let (_, args) = gc_all.to_command();
         assert!(args.contains(&"--delete-old".to_string()));
+    }
+
+    #[test]
+    fn test_custom_auto_classify_search() {
+        let cmd = NixOSCommand::custom_auto("nix", vec!["search".into(), "nixpkgs".into(), "vim".into()]);
+        assert_eq!(cmd.safety_level(), SafetyLevel::ReadOnly);
+    }
+
+    #[test]
+    fn test_custom_auto_classify_rebuild() {
+        let cmd = NixOSCommand::custom_auto("nixos-rebuild", vec!["switch".into()]);
+        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
+    }
+
+    #[test]
+    fn test_custom_auto_classify_gc() {
+        let cmd = NixOSCommand::custom_auto("nix-collect-garbage", vec!["-d".into()]);
+        assert_eq!(cmd.safety_level(), SafetyLevel::Destructive);
+    }
+
+    #[test]
+    fn test_custom_auto_classify_unknown() {
+        // Unknown commands default to SystemCritical (conservative)
+        let cmd = NixOSCommand::custom_auto("some-unknown-tool", vec![]);
+        assert_eq!(cmd.safety_level(), SafetyLevel::SystemCritical);
     }
 
     #[test]

@@ -537,10 +537,9 @@ impl CognitiveLoopService {
                 let confidence = self.prediction_confidence.clamp(0.0, 1.0);
                 // Blended prediction: 60% outcome (near-perfect) + 40% confidence
                 let blended_predicted = outcome * 0.6 + confidence * 0.4;
-                self.master_equation.embodiment_factor.record_prediction(
-                    blended_predicted,
-                    outcome,
-                );
+                self.master_equation
+                    .embodiment_factor
+                    .record_prediction(blended_predicted, outcome);
             }
             // Interoceptive coherence from allostatic regulation.
             // Science: Barrett (2017) — interoceptive accuracy tracks allostatic regulation.

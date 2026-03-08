@@ -182,7 +182,10 @@ for doc in \
     "docs/compliance/DEVELOPMENT_PROCEDURES.md" \
     "docs/compliance/DATA_QUALITY_FRAMEWORK.md" \
     "docs/compliance/ACCOUNTABILITY_MATRIX.md" \
-    "docs/compliance/BENEFITS_COSTS_ANALYSIS.md"; do
+    "docs/compliance/BENEFITS_COSTS_ANALYSIS.md" \
+    "docs/compliance/RESOURCE_ALLOCATION.md" \
+    "docs/compliance/EXTERNAL_FEEDBACK_PROTOCOL.md" \
+    "docs/compliance/VALUE_VALIDATION_PROTOCOL.md"; do
     DOCS_CHECKED=$((DOCS_CHECKED + 1))
     if [ ! -f "$doc" ]; then
         DOCS_MISSING=$((DOCS_MISSING + 1))

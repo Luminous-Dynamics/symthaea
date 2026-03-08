@@ -1764,4 +1764,96 @@ mod tests {
             edge.confidence
         );
     }
+
+    #[test]
+    fn test_edge_confidence_accessor() {
+        let mut graph = NixCausalGraph::new(42);
+
+        // No edge yet
+        assert!(graph.edge_confidence("A", "B").is_none());
+
+        graph.add_structural_edge("A", "B", 0.75);
+        let conf = graph.edge_confidence("A", "B");
+        assert!(conf.is_some());
+        assert!((conf.unwrap() - 0.75).abs() < 1e-6);
+
+        // Reverse direction should not exist
+        assert!(graph.edge_confidence("B", "A").is_none());
+    }
+
+    #[test]
+    fn test_edge_count_tracks_additions_and_pruning() {
+        let mut graph = NixCausalGraph::new(42);
+        assert_eq!(graph.edge_count(), 0);
+
+        graph.add_structural_edge("A", "B", 0.8);
+        assert_eq!(graph.edge_count(), 1);
+
+        graph.add_structural_edge("C", "D", 0.6);
+        assert_eq!(graph.edge_count(), 2);
+
+        // Observe new edge via Hebbian
+        graph.observe_outcome("E", &["F"], &[]);
+        assert_eq!(graph.edge_count(), 3);
+
+        // Weaken C→D below pruning threshold
+        graph.add_structural_edge("X", "Y", 0.06);
+        assert_eq!(graph.edge_count(), 4);
+        // Repeatedly weaken X→Y to get it pruned
+        for _ in 0..10 {
+            graph.observe_outcome("X", &[], &["Y"]);
+        }
+        // X→Y should be pruned, count should decrease
+        assert!(graph.edge_count() < 4, "Pruned edges should reduce count");
+    }
+
+    #[test]
+    fn test_top_edges_sorted_by_confidence() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.add_structural_edge("A", "B", 0.3);
+        graph.add_structural_edge("C", "D", 0.9);
+        graph.add_structural_edge("E", "F", 0.6);
+
+        let top = graph.top_edges(10);
+        assert_eq!(top.len(), 3);
+        assert!((top[0].confidence - 0.9).abs() < 1e-6);
+        assert!((top[1].confidence - 0.6).abs() < 1e-6);
+        assert!((top[2].confidence - 0.3).abs() < 1e-6);
+
+        // top_edges with limit
+        let top1 = graph.top_edges(1);
+        assert_eq!(top1.len(), 1);
+        assert!((top1[0].confidence - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_confidence_bounds_after_random_operations() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.add_structural_edge("A", "B", 0.5);
+        graph.add_structural_edge("A", "C", 0.5);
+        graph.add_structural_edge("B", "D", 0.5);
+
+        // Mix of strengthening and weakening
+        let operations: Vec<(&[&str], &[&str])> = vec![
+            (&["B", "C"], &["B", "C", "D"]),
+            (&["B"], &["B", "C"]),
+            (&[], &["B", "C"]),
+            (&["C", "D"], &["C"]),
+            (&["B", "C"], &["B"]),
+        ];
+        for (observed, predicted) in &operations {
+            graph.observe_outcome("A", observed, predicted);
+        }
+
+        // All remaining edges should have confidence in [0.0, 1.0]
+        for edge in graph.causal_graph.values() {
+            assert!(
+                edge.confidence >= 0.0 && edge.confidence <= 1.0,
+                "Edge {}->{} confidence out of bounds: {}",
+                edge.from,
+                edge.to,
+                edge.confidence
+            );
+        }
+    }
 }

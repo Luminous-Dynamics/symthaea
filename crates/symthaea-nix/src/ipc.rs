@@ -577,7 +577,13 @@ mod tests {
             "daemon_pid": 1
         }"#;
         let snap: DaemonSnapshot = serde_json::from_str(old_json).unwrap();
-        assert_eq!(snap.version, 1, "Old snapshots without version field should default to 1");
-        assert!(!snap.degraded, "Old snapshots should default to not degraded");
+        assert_eq!(
+            snap.version, 1,
+            "Old snapshots without version field should default to 1"
+        );
+        assert!(
+            !snap.degraded,
+            "Old snapshots should default to not degraded"
+        );
     }
 }

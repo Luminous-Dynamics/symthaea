@@ -3,7 +3,7 @@
 //! Integrates the Eight Harmonies value system into consciousness operations.
 //! This provides ethical and value-aligned decision making.
 
-use super::eight_harmonies::{AlignmentResult, Harmony, EightHarmonies};
+use super::eight_harmonies::{AlignmentResult, EightHarmonies, Harmony};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

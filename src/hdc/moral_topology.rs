@@ -147,7 +147,6 @@ pub struct MoralAnomalyConfig {
     // Detects compartmentalized adversarial trajectories where individually
     // benign requests form an emergent hazardous cluster over time.
     // Science: persistent homology on autobiographical moral manifold.
-
     /// Enable trajectory convergence detection (default: true).
     ///
     /// When enabled, monitors for:
@@ -872,8 +871,8 @@ impl MoralTopology {
         } else {
             0.05
         };
-        self.baseline_similarity_ema =
-            baseline_alpha * recent_similarity + (1.0 - baseline_alpha) * self.baseline_similarity_ema;
+        self.baseline_similarity_ema = baseline_alpha * recent_similarity
+            + (1.0 - baseline_alpha) * self.baseline_similarity_ema;
         self.convergence_baseline_count += 1;
 
         let baseline_similarity = self.baseline_similarity_ema;
@@ -959,8 +958,7 @@ impl MoralTopology {
 
         // Flourishing deficit: how far below the floor relative to baseline
         let flourishing_deficit = if baseline_flourishing > 1e-9 {
-            1.0 - (flourishing_score / baseline_flourishing)
-                .clamp(0.0, 1.0)
+            1.0 - (flourishing_score / baseline_flourishing).clamp(0.0, 1.0)
         } else {
             0.0
         };
@@ -970,17 +968,17 @@ impl MoralTopology {
         let ent_triggered = entropy_decline_rate > ac.convergence_entropy_decline_threshold;
         let fl_triggered = flourishing_deficit > ac.convergence_flourishing_floor;
 
-        let signals_triggered =
-            sim_triggered as u8 + ent_triggered as u8 + fl_triggered as u8;
+        let signals_triggered = sim_triggered as u8 + ent_triggered as u8 + fl_triggered as u8;
         let convergence_detected = signals_triggered >= 2;
 
         // Severity: mean of normalized signals (each clamped to [0, 1])
-        let sim_severity = (similarity_anomaly / ac.convergence_similarity_threshold.max(1e-9))
-            .clamp(0.0, 1.0);
-        let ent_severity = (entropy_decline_rate / ac.convergence_entropy_decline_threshold.max(1e-9))
-            .clamp(0.0, 1.0);
-        let fl_severity = (flourishing_deficit / ac.convergence_flourishing_floor.max(1e-9))
-            .clamp(0.0, 1.0);
+        let sim_severity =
+            (similarity_anomaly / ac.convergence_similarity_threshold.max(1e-9)).clamp(0.0, 1.0);
+        let ent_severity = (entropy_decline_rate
+            / ac.convergence_entropy_decline_threshold.max(1e-9))
+        .clamp(0.0, 1.0);
+        let fl_severity =
+            (flourishing_deficit / ac.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
         let severity = ((sim_severity + ent_severity + fl_severity) / 3.0).clamp(0.0, 1.0);
 
         let report = TrajectoryConvergenceReport {
@@ -2718,9 +2716,7 @@ mod tests {
             !report.convergence_detected,
             "Diverse benign topics should not trigger convergence \
              (sim_anomaly={:.4}, ent_decline={:.4}, fl_score={:.4})",
-            report.similarity_anomaly,
-            report.entropy_decline_rate,
-            report.flourishing_score,
+            report.similarity_anomaly, report.entropy_decline_rate, report.flourishing_score,
         );
     }
 
@@ -2775,7 +2771,10 @@ mod tests {
         assert!(config.validate().is_ok());
 
         config.convergence_min_points = 1;
-        assert!(config.validate().is_err(), "min_points=1 should fail validation");
+        assert!(
+            config.validate().is_err(),
+            "min_points=1 should fail validation"
+        );
 
         config.convergence_min_points = 4;
         config.convergence_similarity_threshold = -0.1;
