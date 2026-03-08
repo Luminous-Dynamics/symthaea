@@ -531,7 +531,11 @@ impl MultiScaleEncoder {
             })
             .collect();
 
-        Self { encoders, scales, fine_weight }
+        Self {
+            encoders,
+            scales,
+            fine_weight,
+        }
     }
 
     /// Encode a frame at all scales and return a blended HV.
@@ -746,7 +750,8 @@ impl MotionField {
         }
 
         // Compute temporal difference grid
-        let td: Vec<f32> = current_lum.iter()
+        let td: Vec<f32> = current_lum
+            .iter()
             .zip(prev_lum.iter())
             .map(|(c, p)| (c - p).abs())
             .collect();
@@ -785,8 +790,7 @@ impl MotionField {
                 if magnitude > 0.01 {
                     // Quantize to nearest of 8 directions
                     let angle = dy.atan2(dx);
-                    let dir_idx = ((angle + std::f32::consts::PI)
-                        / (std::f32::consts::PI / 4.0))
+                    let dir_idx = ((angle + std::f32::consts::PI) / (std::f32::consts::PI / 4.0))
                         .round() as usize
                         % 8;
 
@@ -858,7 +862,10 @@ mod tests {
         enc.prev_patch_lum.clear();
         let (hv2, _) = enc.encode_grayscale(&frame, 64, 64);
 
-        assert!((hv1.similarity(&hv2) - 1.0).abs() < 1e-6, "Same frame must produce identical HV");
+        assert!(
+            (hv1.similarity(&hv2) - 1.0).abs() < 1e-6,
+            "Same frame must produce identical HV"
+        );
     }
 
     #[test]
@@ -874,7 +881,10 @@ mod tests {
         let (hv2, _) = enc.encode_grayscale(&frame2, 64, 64);
 
         let sim = hv1.similarity(&hv2);
-        assert!(sim > 0.8, "Similar frames should have high similarity, got {sim}");
+        assert!(
+            sim > 0.8,
+            "Similar frames should have high similarity, got {sim}"
+        );
     }
 
     #[test]
@@ -968,9 +978,15 @@ mod tests {
         let sim_sc = hv_solid.similarity(&hv_checker);
         let sim_sg = hv_solid.similarity(&hv_grad);
         let sim_cg = hv_checker.similarity(&hv_grad);
-        assert!(sim_sc < 1.0, "Solid and checkerboard should differ: {sim_sc}");
+        assert!(
+            sim_sc < 1.0,
+            "Solid and checkerboard should differ: {sim_sc}"
+        );
         assert!(sim_sg < 1.0, "Solid and gradient should differ: {sim_sg}");
-        assert!(sim_cg < 1.0, "Checkerboard and gradient should differ: {sim_cg}");
+        assert!(
+            sim_cg < 1.0,
+            "Checkerboard and gradient should differ: {sim_cg}"
+        );
 
         // Self-similarity is 1.0
         assert!((hv_solid.similarity(&hv_solid) - 1.0).abs() < 1e-5);
@@ -1095,7 +1111,11 @@ mod tests {
                 for x in 0..64u32 {
                     let check = ((x / 4) + (y / 4)) % 2;
                     let grad = (x + y) / 2;
-                    pixels.push(if check == 0 { grad as u8 } else { (255 - grad) as u8 });
+                    pixels.push(if check == 0 {
+                        grad as u8
+                    } else {
+                        (255 - grad) as u8
+                    });
                 }
             }
             pixels
@@ -1181,17 +1201,13 @@ mod tests {
         let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
 
         // Red frame (RGB)
-        let red_frame: Vec<u8> = (0..64 * 64)
-            .flat_map(|_| vec![255u8, 0, 0])
-            .collect();
+        let red_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![255u8, 0, 0]).collect();
         let (hv_red, _) = enc.encode_frame(&red_frame, 64, 64, 3);
 
         enc.prev_patch_lum.clear();
 
         // Blue frame (RGB)
-        let blue_frame: Vec<u8> = (0..64 * 64)
-            .flat_map(|_| vec![0u8, 0, 255])
-            .collect();
+        let blue_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![0u8, 0, 255]).collect();
         let (hv_blue, _) = enc.encode_frame(&blue_frame, 64, 64, 3);
 
         // Red and blue should produce different encodings due to chrominance features
@@ -1255,8 +1271,7 @@ mod tests {
 
         let (hv_static, _, _) = ms.encode_frame(&frame, 64, 64, 1);
         ms = MultiScaleEncoder::new(&cfg, 64, 64);
-        let (hv_saliency, _, _) =
-            ms.encode_frame_saliency_guided(&frame, 64, 64, 1, None);
+        let (hv_saliency, _, _) = ms.encode_frame_saliency_guided(&frame, 64, 64, 1, None);
 
         // Without surprise, saliency-guided should match static
         let sim = hv_static.similarity(&hv_saliency);
@@ -1298,8 +1313,7 @@ mod tests {
         let frame = gradient_frame(64, 64);
 
         // Only 1 surprise value for 2 scales → should fall back to static
-        let (hv_short, _, _) =
-            ms.encode_frame_saliency_guided(&frame, 64, 64, 1, Some(&[0.5]));
+        let (hv_short, _, _) = ms.encode_frame_saliency_guided(&frame, 64, 64, 1, Some(&[0.5]));
         ms = MultiScaleEncoder::new(&cfg, 64, 64);
         let (hv_static, _, _) = ms.encode_frame(&frame, 64, 64, 1);
 
@@ -1352,10 +1366,7 @@ mod tests {
 
         // Same luminance at both times → no motion
         let lum = vec![0.5f32; 64];
-        let (hv, vectors) = mf.compute(
-            &lum, &lum, 8, 8,
-            enc.row_basis(), enc.col_basis(),
-        );
+        let (hv, vectors) = mf.compute(&lum, &lum, 8, 8, enc.row_basis(), enc.col_basis());
         assert_eq!(vectors.len(), 64);
         // All motion vectors should be ~zero
         for v in &vectors {
@@ -1383,13 +1394,13 @@ mod tests {
             }
         }
 
-        let (hv_right, vectors) = mf.compute(
-            &curr, &prev, rows, cols,
-            enc.row_basis(), enc.col_basis(),
-        );
+        let (hv_right, vectors) =
+            mf.compute(&curr, &prev, rows, cols, enc.row_basis(), enc.col_basis());
 
         // Some patches should have non-zero motion
-        let has_motion = vectors.iter().any(|v| v[0].abs() > 0.01 || v[1].abs() > 0.01);
+        let has_motion = vectors
+            .iter()
+            .any(|v| v[0].abs() > 0.01 || v[1].abs() > 0.01);
         assert!(has_motion, "Should detect motion from brightness change");
         assert!(hv_right.norm() > 0.0, "Motion field HV should be non-zero");
 
@@ -1402,8 +1413,12 @@ mod tests {
         }
 
         let (hv_left, _) = mf.compute(
-            &curr_left, &prev, rows, cols,
-            enc.row_basis(), enc.col_basis(),
+            &curr_left,
+            &prev,
+            rows,
+            cols,
+            enc.row_basis(),
+            enc.col_basis(),
         );
 
         // Rightward and leftward motion should produce different HVs
@@ -1489,7 +1504,10 @@ mod tests {
         // Should not panic or produce NaN
         enc.refine_contrastive(&zero_hv, &random_hv, 0.1);
         for &w in enc.feature_weights() {
-            assert!(w.is_finite(), "Weights should remain finite after zero-HV refinement");
+            assert!(
+                w.is_finite(),
+                "Weights should remain finite after zero-HV refinement"
+            );
         }
     }
 
@@ -1497,7 +1515,9 @@ mod tests {
     fn test_encode_frame_rgba() {
         let cfg = VisionConfig::default();
         let mut enc = PatchHdcEncoder::new(&cfg, 64, 64);
-        let frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![128u8, 64, 192, 255]).collect();
+        let frame: Vec<u8> = (0..64 * 64)
+            .flat_map(|_| vec![128u8, 64, 192, 255])
+            .collect();
 
         let (hv, patches) = enc.encode_frame(&frame, 64, 64, 4);
         assert!(hv.norm() > 0.0);

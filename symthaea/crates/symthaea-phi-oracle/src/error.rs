@@ -21,7 +21,10 @@ impl fmt::Display for OracleError {
                 write!(f, "dimension mismatch: expected {expected}, got {got}")
             }
             Self::InsufficientData { have, need } => {
-                write!(f, "insufficient data: have {have} observations, need {need}")
+                write!(
+                    f,
+                    "insufficient data: have {have} observations, need {need}"
+                )
             }
             Self::InvalidCovariance { expected, got } => {
                 write!(

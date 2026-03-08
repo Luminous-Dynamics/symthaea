@@ -34,7 +34,7 @@
 //!
 //! The KosmicSong is the unified identity synthesizing:
 //! - **Consciousness (Φ)**: Integrated information level
-//! - **Seven Harmonies**: Value alignment and epistemic lenses
+//! - **Eight Harmonies**: Value alignment and epistemic lenses
 //! - **Graceful Ignorance**: Epistemic humility and uncertainty
 //!
 //! ## Key Concepts

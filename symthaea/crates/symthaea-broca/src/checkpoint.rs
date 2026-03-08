@@ -159,8 +159,7 @@ impl BrocaCheckpoint {
         // Compute and set checksum before serialization
         self.checksum = self.compute_checksum();
 
-        let serialized =
-            rmp_serde::to_vec(self).context("Failed to serialize BrocaCheckpoint")?;
+        let serialized = rmp_serde::to_vec(self).context("Failed to serialize BrocaCheckpoint")?;
 
         let mut file = std::fs::File::create(path.as_ref())
             .with_context(|| format!("creating checkpoint file: {}", path.as_ref().display()))?;
@@ -300,12 +299,7 @@ impl BrocaGenerator {
     pub fn from_checkpoint<P: AsRef<Path>>(
         path: P,
         genesis: &symthaea_core::genesis::GenesisSeed,
-    ) -> Result<(
-        Self,
-        Option<AdamState>,
-        Option<Vec<f32>>,
-        Option<String>,
-    )> {
+    ) -> Result<(Self, Option<AdamState>, Option<Vec<f32>>, Option<String>)> {
         let checkpoint = BrocaCheckpoint::load_from_file(path)?;
 
         let tokenizer = crate::tokenizer::BpeTokenizer::from_vocab_file(&checkpoint.vocab);
@@ -476,8 +470,8 @@ impl ProjectionCheckpoint {
     /// Save to a file (MessagePack named-map format for forward compatibility).
     pub fn save_to_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.checksum = self.compute_checksum();
-        let serialized = rmp_serde::to_vec_named(self)
-            .context("Failed to serialize ProjectionCheckpoint")?;
+        let serialized =
+            rmp_serde::to_vec_named(self).context("Failed to serialize ProjectionCheckpoint")?;
         let mut file = std::fs::File::create(path.as_ref()).with_context(|| {
             format!(
                 "creating projection checkpoint: {}",
@@ -606,9 +600,7 @@ impl ProjectionCheckpoint {
                 anyhow::bail!("Projection checkpoint integrity check failed: checksum mismatch");
             }
             ckpt
-        } else if let Ok(ckpt) =
-            rmp_serde::from_slice::<ProjectionCheckpointV3>(&buffer)
-        {
+        } else if let Ok(ckpt) = rmp_serde::from_slice::<ProjectionCheckpointV3>(&buffer) {
             // Legacy v3 positional array (14 fields) — upgrade to v4
             tracing::warn!("Loaded legacy v3 positional-array checkpoint — upgrading to v4");
             ckpt.into()
@@ -829,11 +821,9 @@ mod tests {
         gen.save_checkpoint(&path, 7, 1.0, None, None, lm_json)
             .unwrap();
 
-        let (_, _, _, loaded_lm_json) =
-            BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        let (_, _, _, loaded_lm_json) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
         assert!(loaded_lm_json.is_some());
-        let loaded: LiquidMambaConfig =
-            serde_json::from_str(&loaded_lm_json.unwrap()).unwrap();
+        let loaded: LiquidMambaConfig = serde_json::from_str(&loaded_lm_json.unwrap()).unwrap();
         assert!((loaded.surprise_gradient_alpha - 0.8).abs() < 1e-6);
         assert!((loaded.base_lr - 0.005).abs() < 1e-6);
 
@@ -884,15 +874,8 @@ mod tests {
         let dir = std::env::temp_dir();
         let path = dir.join("broca_test_proj_deep.bin");
 
-        let mut ckpt = ProjectionCheckpoint::new(
-            vec![0.1, 0.2, 0.3],
-            16384,
-            256,
-            768,
-            5,
-            true,
-            128,
-        );
+        let mut ckpt =
+            ProjectionCheckpoint::new(vec![0.1, 0.2, 0.3], 16384, 256, 768, 5, true, 128);
         ckpt.save_to_file(&path).unwrap();
 
         let loaded = ProjectionCheckpoint::load_from_file(&path).unwrap();

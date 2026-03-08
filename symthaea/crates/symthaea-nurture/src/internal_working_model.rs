@@ -78,7 +78,10 @@ mod tests {
     fn test_encode_working_model_nonzero() {
         let model = new_working_model();
         let norm = model.model_hv.norm();
-        assert!(norm > 0.5, "Encoded model HV should be normalized, got {norm}");
+        assert!(
+            norm > 0.5,
+            "Encoded model HV should be normalized, got {norm}"
+        );
     }
 
     #[test]
@@ -99,7 +102,10 @@ mod tests {
         let hv2 = encode_working_model(&m2);
         // Same basis vectors but different scales -> different HVs
         let sim = hv1.similarity(&hv2);
-        assert!(sim < 0.99, "Different IWMs should produce different HVs, sim={sim}");
+        assert!(
+            sim < 0.99,
+            "Different IWMs should produce different HVs, sim={sim}"
+        );
     }
 
     #[test]
@@ -109,8 +115,16 @@ mod tests {
         for _ in 0..500 {
             update_working_model(&mut model, &warm_action, 1.0);
         }
-        assert!(model.self_worthy > 0.8, "self_worthy should approach warmth=0.85, got {}", model.self_worthy);
-        assert!(model.other_reliable > 0.8, "other_reliable should approach responsiveness=0.9, got {}", model.other_reliable);
+        assert!(
+            model.self_worthy > 0.8,
+            "self_worthy should approach warmth=0.85, got {}",
+            model.self_worthy
+        );
+        assert!(
+            model.other_reliable > 0.8,
+            "other_reliable should approach responsiveness=0.9, got {}",
+            model.other_reliable
+        );
     }
 
     #[test]
@@ -120,8 +134,16 @@ mod tests {
         for _ in 0..500 {
             update_working_model(&mut model, &cold_action, 1.0);
         }
-        assert!(model.self_worthy < 0.3, "self_worthy should approach warmth=0.2, got {}", model.self_worthy);
-        assert!(model.other_reliable < 0.2, "other_reliable should approach responsiveness=0.1, got {}", model.other_reliable);
+        assert!(
+            model.self_worthy < 0.3,
+            "self_worthy should approach warmth=0.2, got {}",
+            model.self_worthy
+        );
+        assert!(
+            model.other_reliable < 0.2,
+            "other_reliable should approach responsiveness=0.1, got {}",
+            model.other_reliable
+        );
     }
 
     #[test]
@@ -136,8 +158,12 @@ mod tests {
         }
 
         // High plasticity should converge faster
-        assert!(fast.self_worthy > slow.self_worthy,
-            "High plasticity should learn faster: fast={}, slow={}", fast.self_worthy, slow.self_worthy);
+        assert!(
+            fast.self_worthy > slow.self_worthy,
+            "High plasticity should learn faster: fast={}, slow={}",
+            fast.self_worthy,
+            slow.self_worthy
+        );
     }
 
     #[test]
@@ -169,7 +195,9 @@ mod tests {
             update_working_model(&mut model, &action, 1.0);
         }
         // Should be very close to converged
-        assert!((model.self_worthy - sw_before).abs() < 0.01,
-            "Should be near convergence after 2000 steps");
+        assert!(
+            (model.self_worthy - sw_before).abs() < 0.01,
+            "Should be near convergence after 2000 steps"
+        );
     }
 }

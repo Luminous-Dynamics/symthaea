@@ -159,7 +159,9 @@ struct ThresholdResult {
 /// Deterministic jitter from seed: maps to [-JITTER, +JITTER].
 fn jitter_from_seed(seed: u64) -> f64 {
     // Simple hash to [0, 1)
-    let h = seed.wrapping_mul(0x9E3779B97F4A7C15).wrapping_add(0x6A09E667);
+    let h = seed
+        .wrapping_mul(0x9E3779B97F4A7C15)
+        .wrapping_add(0x6A09E667);
     let frac = (h >> 11) as f64 / (1u64 << 53) as f64;
     (frac - 0.5) * 2.0 * JITTER
 }
@@ -199,8 +201,7 @@ fn simulate_threshold(threshold: f64, base_seed: u64) -> ThresholdResult {
             let mut ws = GlobalWorkspace::new(config);
 
             let hv = BinaryHV::random(trial_seed);
-            let content =
-                WorkspaceContent::new(vec![hv], activation, domain.name.to_string());
+            let content = WorkspaceContent::new(vec![hv], activation, domain.name.to_string());
             ws.submit(content);
             let assessment = ws.process();
 
@@ -229,14 +230,14 @@ fn simulate_threshold(threshold: f64, base_seed: u64) -> ThresholdResult {
 
         // Submit content from each domain with jittered activation
         for (di, domain) in DOMAINS.iter().enumerate() {
-            let domain_seed =
-                cycle_seed.wrapping_mul(0x517cc1b727220a95).wrapping_add(di as u64);
+            let domain_seed = cycle_seed
+                .wrapping_mul(0x517cc1b727220a95)
+                .wrapping_add(di as u64);
             let activation =
                 (domain.mean_activation + jitter_from_seed(domain_seed)).clamp(0.0, 1.0);
 
             let hv = BinaryHV::random(domain_seed);
-            let content =
-                WorkspaceContent::new(vec![hv], activation, domain.name.to_string());
+            let content = WorkspaceContent::new(vec![hv], activation, domain.name.to_string());
             ws.submit(content);
         }
 
@@ -329,11 +330,7 @@ fn spearman_rho(x: &[f64], y: &[f64]) -> f64 {
 }
 
 /// Find the threshold at which a value drops below a fraction of its baseline.
-fn find_threshold_for_fraction(
-    thresholds: &[f64],
-    values: &[f64],
-    fraction: f64,
-) -> f64 {
+fn find_threshold_for_fraction(thresholds: &[f64], values: &[f64], fraction: f64) -> f64 {
     if values.is_empty() || values[0] <= 0.0 {
         return thresholds[0];
     }
@@ -420,16 +417,14 @@ impl PsychBenchmark for GwtAsphyxiationBenchmark {
         );
 
         // Half-consciousness threshold: where Phi drops to 50% of baseline
-        let half_threshold =
-            find_threshold_for_fraction(&THRESHOLDS[..], &phi_curve, 0.50);
+        let half_threshold = find_threshold_for_fraction(&THRESHOLDS[..], &phi_curve, 0.50);
         result.insert(
             "half_consciousness_threshold",
             MetricValue::from_samples(&[half_threshold]),
         );
 
         // Extinction threshold: where Phi drops below 5% of baseline
-        let extinction_threshold =
-            find_threshold_for_fraction(&THRESHOLDS[..], &phi_curve, 0.05);
+        let extinction_threshold = find_threshold_for_fraction(&THRESHOLDS[..], &phi_curve, 0.05);
         result.insert(
             "extinction_threshold",
             MetricValue::from_samples(&[extinction_threshold]),
@@ -453,8 +448,7 @@ impl PsychBenchmark for GwtAsphyxiationBenchmark {
         // Extract per-domain survival at each threshold
         let mut domain_death_thresholds = Vec::with_capacity(8);
         for di in 0..8 {
-            let survival_curve: Vec<f64> =
-                results.iter().map(|r| r.domain_survival[di]).collect();
+            let survival_curve: Vec<f64> = results.iter().map(|r| r.domain_survival[di]).collect();
 
             let death_t = domain_death_threshold(&THRESHOLDS[..], &survival_curve);
             domain_death_thresholds.push(death_t);
@@ -593,10 +587,7 @@ impl PsychBenchmark for GwtAsphyxiationBenchmark {
                     extra: {
                         let mut m = BTreeMap::new();
                         for di in 0..8 {
-                            m.insert(
-                                DOMAINS[di].name.to_string(),
-                                r.domain_survival[di],
-                            );
+                            m.insert(DOMAINS[di].name.to_string(), r.domain_survival[di]);
                         }
                         m
                     },
@@ -629,10 +620,7 @@ mod tests {
     fn test_gwt_asphyxiation_runs() {
         let bench = GwtAsphyxiationBenchmark;
         let result = bench.run(&config());
-        assert_eq!(
-            result.benchmark,
-            "QualiaConfidence::GwtAsphyxiation"
-        );
+        assert_eq!(result.benchmark, "QualiaConfidence::GwtAsphyxiation");
         assert!(result.metrics.len() >= 10);
     }
 
@@ -665,10 +653,7 @@ mod tests {
         let bench = GwtAsphyxiationBenchmark;
         let result = bench.run(&config());
         let phi = result.metrics.get("phi_proxy_baseline").unwrap().mean;
-        assert!(
-            phi > 0.0,
-            "Baseline Phi proxy should be positive: {phi}"
-        );
+        assert!(phi > 0.0, "Baseline Phi proxy should be positive: {phi}");
     }
 
     #[test]
@@ -687,11 +672,7 @@ mod tests {
     fn test_domain_collapse_order_correlates() {
         let bench = GwtAsphyxiationBenchmark;
         let result = bench.run(&config());
-        let rho = result
-            .metrics
-            .get("domain_order_correlation")
-            .unwrap()
-            .mean;
+        let rho = result.metrics.get("domain_order_correlation").unwrap().mean;
         assert!(
             rho > 0.5,
             "Domain collapse order should correlate with prediction: ρ={rho}"
@@ -702,16 +683,8 @@ mod tests {
     fn test_social_dies_before_motor() {
         let bench = GwtAsphyxiationBenchmark;
         let result = bench.run(&config());
-        let social_death = result
-            .metrics
-            .get("social_death_threshold")
-            .unwrap()
-            .mean;
-        let motor_death = result
-            .metrics
-            .get("motor_death_threshold")
-            .unwrap()
-            .mean;
+        let social_death = result.metrics.get("social_death_threshold").unwrap().mean;
+        let motor_death = result.metrics.get("motor_death_threshold").unwrap().mean;
         assert!(
             social_death <= motor_death,
             "Social should die before motor: social={social_death}, motor={motor_death}"
@@ -733,11 +706,7 @@ mod tests {
     fn test_motor_survives_at_070() {
         let bench = GwtAsphyxiationBenchmark;
         let result = bench.run(&config());
-        let motor_070 = result
-            .metrics
-            .get("motor_survival_at_70")
-            .unwrap()
-            .mean;
+        let motor_070 = result.metrics.get("motor_survival_at_70").unwrap().mean;
         assert!(
             motor_070 > 0.0,
             "Motor should still have some survival at threshold 0.70: {motor_070}"
@@ -748,11 +717,7 @@ mod tests {
     fn test_sedation_before_general_anesthesia() {
         let bench = GwtAsphyxiationBenchmark;
         let result = bench.run(&config());
-        let sedation = result
-            .metrics
-            .get("sedation_onset_threshold")
-            .unwrap()
-            .mean;
+        let sedation = result.metrics.get("sedation_onset_threshold").unwrap().mean;
         let general = result
             .metrics
             .get("general_anesthesia_threshold")
@@ -856,13 +821,30 @@ mod tests {
         eprintln!("║  ──────────┼─────────┼───────────┼──────────┼────────────── ║");
         for t in &THRESHOLDS {
             let label = format!("{:.0}", t * 100.0);
-            let phi = result.metrics.get(&format!("phi_proxy_at_{label}")).unwrap().mean;
-            let occ = result.metrics.get(&format!("occupancy_at_{label}")).unwrap().mean;
-            let ign = result.metrics.get(&format!("ignition_at_{label}")).unwrap().mean;
-            let status = if phi > 0.3 { "AWAKE" }
-                else if phi > 0.1 { "TWILIGHT" }
-                else if phi > 0.01 { "SEDATED" }
-                else { "EXTINCT" };
+            let phi = result
+                .metrics
+                .get(&format!("phi_proxy_at_{label}"))
+                .unwrap()
+                .mean;
+            let occ = result
+                .metrics
+                .get(&format!("occupancy_at_{label}"))
+                .unwrap()
+                .mean;
+            let ign = result
+                .metrics
+                .get(&format!("ignition_at_{label}"))
+                .unwrap()
+                .mean;
+            let status = if phi > 0.3 {
+                "AWAKE"
+            } else if phi > 0.1 {
+                "TWILIGHT"
+            } else if phi > 0.01 {
+                "SEDATED"
+            } else {
+                "EXTINCT"
+            };
             eprintln!("║     {t:.2}   │ {phi:7.4} │   {occ:7.4} │  {ign:7.4} │ {status:14} ║");
         }
 
@@ -881,14 +863,21 @@ mod tests {
             for &t in &display_thresholds {
                 let label = format!("{:.0}", t * 100.0);
                 let key = format!("{lower}_survival_at_{label}");
-                let surv = result.metrics.get(&key)
+                let surv = result
+                    .metrics
+                    .get(&key)
                     .or_else(|| result.metrics.get(&format!("{lower}_survival_baseline")))
                     .map(|m| m.mean)
                     .unwrap_or(0.0);
-                let cell = if surv > 0.9 { " ██ " }
-                    else if surv > 0.5 { " ▓▓ " }
-                    else if surv > 0.1 { " ░░ " }
-                    else { " ·· " };
+                let cell = if surv > 0.9 {
+                    " ██ "
+                } else if surv > 0.5 {
+                    " ▓▓ "
+                } else if surv > 0.1 {
+                    " ░░ "
+                } else {
+                    " ·· "
+                };
                 cells.push_str(cell);
             }
             eprintln!("║  {:<15} │{cells} ║", name);
@@ -900,16 +889,25 @@ mod tests {
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         eprintln!("║  DOMAIN COLLAPSE ORDER (threshold at <10% survival)         ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
-        let mut deaths: Vec<(&str, f64)> = DOMAINS.iter().map(|d| {
-            let key = format!("{}_death_threshold", d.name.to_lowercase());
-            let t = result.metrics.get(&key).unwrap().mean;
-            (d.name, t)
-        }).collect();
+        let mut deaths: Vec<(&str, f64)> = DOMAINS
+            .iter()
+            .map(|d| {
+                let key = format!("{}_death_threshold", d.name.to_lowercase());
+                let t = result.metrics.get(&key).unwrap().mean;
+                (d.name, t)
+            })
+            .collect();
         deaths.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
         for (rank, (name, threshold)) in deaths.iter().enumerate() {
             let bar_len = ((*threshold - 0.3) / 0.7 * 30.0) as usize;
             let bar: String = "█".repeat(bar_len.min(30));
-            eprintln!("║  {:2}. {:<14} dies at {:.2}  {:<30} ║", rank + 1, name, threshold, bar);
+            eprintln!(
+                "║  {:2}. {:<14} dies at {:.2}  {:<30} ║",
+                rank + 1,
+                name,
+                threshold,
+                bar
+            );
         }
 
         // Key metrics
@@ -918,11 +916,15 @@ mod tests {
         eprintln!("║  KEY METRICS                                                ║");
         eprintln!("╠══════════════════════════════════════════════════════════════╣");
         let keys = [
-            "phi_proxy_baseline", "phi_proxy_terminal",
-            "half_consciousness_threshold", "extinction_threshold",
-            "collapse_monotonicity", "domain_order_correlation",
+            "phi_proxy_baseline",
+            "phi_proxy_terminal",
+            "half_consciousness_threshold",
+            "extinction_threshold",
+            "collapse_monotonicity",
+            "domain_order_correlation",
             "twilight_width",
-            "sedation_onset_threshold", "general_anesthesia_threshold",
+            "sedation_onset_threshold",
+            "general_anesthesia_threshold",
         ];
         for key in &keys {
             if let Some(m) = result.metrics.get(*key) {

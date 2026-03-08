@@ -66,10 +66,7 @@ pub enum RecognizedContent {
     /// OCR result — text found in the region.
     Text(String),
     /// Object classification — label + raw embedding.
-    Object {
-        label: String,
-        embedding: Vec<f32>,
-    },
+    Object { label: String, embedding: Vec<f32> },
     /// Visual question answering caption.
     Caption(String),
     /// Below confidence threshold or stub mode.

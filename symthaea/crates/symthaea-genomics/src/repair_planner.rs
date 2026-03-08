@@ -328,7 +328,10 @@ mod tests {
 
         assert!(plan.repairable_regions.is_empty());
         assert!(plan.irreparable_gaps.is_empty());
-        assert!((plan.confidence - 1.0).abs() < 0.01, "No damage = full confidence");
+        assert!(
+            (plan.confidence - 1.0).abs() < 0.01,
+            "No damage = full confidence"
+        );
     }
 
     #[test]

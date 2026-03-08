@@ -120,7 +120,10 @@ impl Widget for GenerationTimeline<'_> {
                     date_short,
                     Style::default().fg(Color::DarkGray),
                 );
-                if !delta_str.is_empty() && x + date_short.len() as u16 + delta_str.len() as u16 + 1 < inner.x + inner.width {
+                if !delta_str.is_empty()
+                    && x + date_short.len() as u16 + delta_str.len() as u16 + 1
+                        < inner.x + inner.width
+                {
                     buf.set_string(
                         x + date_short.len() as u16,
                         bar_y + 1,

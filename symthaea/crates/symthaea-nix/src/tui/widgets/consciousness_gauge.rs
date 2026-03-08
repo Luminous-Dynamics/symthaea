@@ -145,7 +145,11 @@ impl Widget for ConsciousnessGauge<'_> {
                     - ((point.phi * grid_h.saturating_sub(1) as f64) as u16)
                         .min(grid_h.saturating_sub(1));
                 // Fade: older points dimmer
-                let trail_char = if i >= trail_len.saturating_sub(3) { "o" } else { "." };
+                let trail_char = if i >= trail_len.saturating_sub(3) {
+                    "o"
+                } else {
+                    "."
+                };
                 buf.set_string(
                     hx,
                     hy,

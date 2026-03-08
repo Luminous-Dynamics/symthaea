@@ -120,7 +120,10 @@ impl RmeBenchmark {
 
             // 4-AFC: compare stimulus to target + 3 foils
             let target_sim = stimulus.similarity(target) * (1.0 - noise_degrade) + social_bonus;
-            let foil_sims: Vec<f32> = foils.iter().map(|f| stimulus.similarity(f) * (1.0 - noise_degrade)).collect();
+            let foil_sims: Vec<f32> = foils
+                .iter()
+                .map(|f| stimulus.similarity(f) * (1.0 - noise_degrade))
+                .collect();
 
             // Add noise to all choices
             xor_shift(&mut rng);

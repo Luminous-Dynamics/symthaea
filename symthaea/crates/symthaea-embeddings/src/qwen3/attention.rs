@@ -89,10 +89,12 @@ impl<B: Backend> Qwen3Attention<B> {
                 .unsqueeze_dim::<5>(2) // [b, kv, 1, s, d]
                 .repeat_dim(2, groups) // [b, kv, g, s, d]
                 .reshape([batch, self.num_heads, seq_len, self.head_dim]);
-            let v = v
-                .unsqueeze_dim::<5>(2)
-                .repeat_dim(2, groups)
-                .reshape([batch, self.num_heads, seq_len, self.head_dim]);
+            let v = v.unsqueeze_dim::<5>(2).repeat_dim(2, groups).reshape([
+                batch,
+                self.num_heads,
+                seq_len,
+                self.head_dim,
+            ]);
             (k, v)
         };
 

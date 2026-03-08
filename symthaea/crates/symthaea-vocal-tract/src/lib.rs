@@ -46,9 +46,7 @@ pub use fep::{
     FepTelemetry, VocalAction, VocalTractFepAgent, VocalTractFepResult, VocalTractObservation,
 };
 pub use metrics::{compute_hnr, compute_spectral_tilt, PerceptualMetrics, VocalTractMetrics};
-pub use pipeline::{
-    predict_duration, Intonation, PitchAccent, ProsodyContext, VocalTractPipeline,
-};
+pub use pipeline::{predict_duration, Intonation, PitchAccent, ProsodyContext, VocalTractPipeline};
 pub use types::{FormantFrame, FormantTarget};
 
 #[cfg(feature = "mel-conversion")]

@@ -308,13 +308,13 @@ impl ReliabilityBattery {
             let r = pearson_r(s1, s2);
 
             // Pool SD across all sessions for SEM
-            let all_vals: Vec<f64> = session_data.iter().flat_map(|v| v.iter().copied()).collect();
+            let all_vals: Vec<f64> = session_data
+                .iter()
+                .flat_map(|v| v.iter().copied())
+                .collect();
             let all_mean = all_vals.iter().sum::<f64>() / all_vals.len() as f64;
             let sd = if all_vals.len() > 1 {
-                let var = all_vals
-                    .iter()
-                    .map(|x| (x - all_mean).powi(2))
-                    .sum::<f64>()
+                let var = all_vals.iter().map(|x| (x - all_mean).powi(2)).sum::<f64>()
                     / (all_vals.len() - 1) as f64;
                 var.sqrt()
             } else {

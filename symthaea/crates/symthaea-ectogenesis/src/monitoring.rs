@@ -3,7 +3,9 @@
 //! Maintains a history of fetal measurements and provides population-referenced
 //! growth analysis plus holographic anomaly scoring.
 
-use crate::gestational_encoder::{anomaly_score as hdc_anomaly, encode_fetal_state, encode_normative_trajectory};
+use crate::gestational_encoder::{
+    anomaly_score as hdc_anomaly, encode_fetal_state, encode_normative_trajectory,
+};
 use crate::types::FetalMetrics;
 #[cfg(test)]
 use crate::types::GestationalWeek;
@@ -90,7 +92,9 @@ impl FetalMonitor {
         }
         let start = self.history.len().saturating_sub(window);
         let first = &self.history[start];
-        let Some(last) = self.history.last() else { return 0.0 };
+        let Some(last) = self.history.last() else {
+            return 0.0;
+        };
         let weeks_elapsed = last.week.0 as f64 - first.week.0 as f64;
         if weeks_elapsed < 0.5 {
             return 0.0;
@@ -146,7 +150,10 @@ mod tests {
     fn test_heart_rate_normal_for_normative() {
         let mut m = FetalMonitor::new();
         m.record(normative_metrics(20));
-        assert!(m.heart_rate_normal(), "Normative heart rate should be normal");
+        assert!(
+            m.heart_rate_normal(),
+            "Normative heart rate should be normal"
+        );
     }
 
     #[test]
@@ -164,7 +171,10 @@ mod tests {
         m.record(normative_metrics(20));
         let score = m.anomaly_score();
         // Normative vs normative should be very low
-        assert!(score < 0.1, "Normative should have low anomaly score, got {score}");
+        assert!(
+            score < 0.1,
+            "Normative should have low anomaly score, got {score}"
+        );
     }
 
     #[test]

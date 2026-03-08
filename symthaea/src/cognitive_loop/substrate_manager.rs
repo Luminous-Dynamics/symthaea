@@ -172,8 +172,7 @@ impl SubstrateManager {
         if config.enable_validation_overlay {
             let floor = config.validation_skepticism_floor;
             let confidence = self.honest_confidence;
-            self.effective_feasibility =
-                self.feasibility * (floor + (1.0 - floor) * confidence);
+            self.effective_feasibility = self.feasibility * (floor + (1.0 - floor) * confidence);
         } else {
             self.effective_feasibility = self.feasibility;
         }
@@ -330,7 +329,10 @@ impl SubstrateManager {
     }
 
     /// Build a `SubstrateTelemetry` snapshot and drain the pending transition.
-    pub fn telemetry(&mut self, config: &super::config::CognitiveLoopConfig) -> super::types::SubstrateTelemetry {
+    pub fn telemetry(
+        &mut self,
+        config: &super::config::CognitiveLoopConfig,
+    ) -> super::types::SubstrateTelemetry {
         let per_region = self
             .per_region_feasibility
             .iter()
@@ -508,7 +510,10 @@ mod tests {
 
         let (old, new) = mgr.reconfigure_substrate(&mut config, SubstrateType::BiologicalNeurons);
         assert!((old - initial).abs() < f64::EPSILON);
-        assert!(new > old, "Biological should have higher feasibility than Silicon");
+        assert!(
+            new > old,
+            "Biological should have higher feasibility than Silicon"
+        );
         assert!(
             mgr.pending_transition.is_some(),
             "reconfigure should set pending_transition (drained by telemetry())"
@@ -658,13 +663,26 @@ mod tests {
     #[test]
     fn test_validation_key_returns_none_for_unknown_substrates() {
         // Photonic, neuromorphic, biochemical, exotic → None (fall back to THEORETICAL_CONFIDENCE)
-        assert!(SubstrateManager::substrate_validation_key(&SubstrateType::PhotonicProcessor).is_none());
-        assert!(SubstrateManager::substrate_validation_key(&SubstrateType::NeuromorphicChip).is_none());
-        assert!(SubstrateManager::substrate_validation_key(&SubstrateType::BiochemicalComputer).is_none());
-        assert!(SubstrateManager::substrate_validation_key(&SubstrateType::ExoticSubstrate).is_none());
+        assert!(
+            SubstrateManager::substrate_validation_key(&SubstrateType::PhotonicProcessor).is_none()
+        );
+        assert!(
+            SubstrateManager::substrate_validation_key(&SubstrateType::NeuromorphicChip).is_none()
+        );
+        assert!(
+            SubstrateManager::substrate_validation_key(&SubstrateType::BiochemicalComputer)
+                .is_none()
+        );
+        assert!(
+            SubstrateManager::substrate_validation_key(&SubstrateType::ExoticSubstrate).is_none()
+        );
         // Known substrates → Some
-        assert!(SubstrateManager::substrate_validation_key(&SubstrateType::BiologicalNeurons).is_some());
-        assert!(SubstrateManager::substrate_validation_key(&SubstrateType::SiliconDigital).is_some());
+        assert!(
+            SubstrateManager::substrate_validation_key(&SubstrateType::BiologicalNeurons).is_some()
+        );
+        assert!(
+            SubstrateManager::substrate_validation_key(&SubstrateType::SiliconDigital).is_some()
+        );
     }
 
     #[test]
@@ -1187,7 +1205,10 @@ mod tests {
             assert!(
                 (0.0..=1.0).contains(&b) && (0.0..=1.0).contains(&w) && (0.0..=1.0).contains(&a),
                 "{:?}: binding={}, workspace={}, attention={} — all must be in [0,1]",
-                sub, b, w, a,
+                sub,
+                b,
+                w,
+                a,
             );
         }
     }

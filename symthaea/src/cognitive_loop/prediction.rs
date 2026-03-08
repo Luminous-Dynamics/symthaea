@@ -41,7 +41,9 @@ impl CognitiveLoopService {
         // Scale prediction horizons by substrate tau_factor and PE-adaptive factor.
         // Clamp the combined scale to prevent extreme horizons under edge conditions
         // (e.g., very fast substrate + very low PE → unreasonably long planning).
-        use crate::cognitive_loop::thresholds::{PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE};
+        use crate::cognitive_loop::thresholds::{
+            PREDICTION_HORIZON_MAX_SCALE, PREDICTION_HORIZON_MIN_SCALE,
+        };
         let combined_scale = (self.substrate_manager.tau_factor * pe_horizon_scale)
             .clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE);
         let effective_horizons: Vec<f32> = self
@@ -92,8 +94,12 @@ impl CognitiveLoopService {
                 let graph = enhancer.current_graph();
                 let mut has_edge = vec![false; dim];
                 for e in &graph.edges {
-                    if e.from < dim { has_edge[e.from] = true; }
-                    if e.to < dim { has_edge[e.to] = true; }
+                    if e.from < dim {
+                        has_edge[e.from] = true;
+                    }
+                    if e.to < dim {
+                        has_edge[e.to] = true;
+                    }
                 }
                 has_edge
             } else {
@@ -463,7 +469,10 @@ mod tests {
         let predictions = [v.clone(), v.clone(), v];
         let coherence = CognitiveLoopService::compute_prediction_coherence_from_cache(&predictions);
         let epistemic = 1.0 - coherence;
-        assert!(epistemic < 0.01, "identical predictions → epistemic ≈ 0, got {epistemic}");
+        assert!(
+            epistemic < 0.01,
+            "identical predictions → epistemic ≈ 0, got {epistemic}"
+        );
     }
 
     #[test]
@@ -475,7 +484,10 @@ mod tests {
         let predictions = [a, b, c];
         let coherence = CognitiveLoopService::compute_prediction_coherence_from_cache(&predictions);
         let epistemic = 1.0 - coherence;
-        assert!(epistemic > 0.9, "orthogonal predictions → epistemic ≈ 1.0, got {epistemic}");
+        assert!(
+            epistemic > 0.9,
+            "orthogonal predictions → epistemic ≈ 1.0, got {epistemic}"
+        );
     }
 
     #[test]
@@ -489,11 +501,18 @@ mod tests {
         let mut mean_var = 0.0f32;
         for d in 0..dim {
             let mean: f32 = predictions.iter().map(|p| p[d]).sum::<f32>() / n;
-            let var: f32 = predictions.iter().map(|p| (p[d] - mean).powi(2)).sum::<f32>() / n;
+            let var: f32 = predictions
+                .iter()
+                .map(|p| (p[d] - mean).powi(2))
+                .sum::<f32>()
+                / n;
             mean_var += var;
         }
         let aleatoric = (mean_var / dim as f32).sqrt();
-        assert!(aleatoric > 0.3, "high per-dim variance → aleatoric > 0.3, got {aleatoric}");
+        assert!(
+            aleatoric > 0.3,
+            "high per-dim variance → aleatoric > 0.3, got {aleatoric}"
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -503,38 +522,70 @@ mod tests {
     #[test]
     fn test_consolidation_sort_prefers_high_error() {
         // Simulate the sort logic: importance × (1 + error)
-        struct Exp { importance: f32, error: f32 }
+        struct Exp {
+            importance: f32,
+            error: f32,
+        }
         let mut exps = vec![
-            Exp { importance: 0.8, error: 0.1 }, // score = 0.88
-            Exp { importance: 0.5, error: 0.9 }, // score = 0.95 (high error wins)
-            Exp { importance: 0.9, error: 0.0 }, // score = 0.90
+            Exp {
+                importance: 0.8,
+                error: 0.1,
+            }, // score = 0.88
+            Exp {
+                importance: 0.5,
+                error: 0.9,
+            }, // score = 0.95 (high error wins)
+            Exp {
+                importance: 0.9,
+                error: 0.0,
+            }, // score = 0.90
         ];
         exps.sort_by(|a, b| {
             let a_score = a.importance * (1.0 + a.error);
             let b_score = b.importance * (1.0 + b.error);
-            b_score.partial_cmp(&a_score).unwrap_or(std::cmp::Ordering::Equal)
+            b_score
+                .partial_cmp(&a_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         // First should be the high-error experience (0.95 > 0.90 > 0.88)
-        assert!((exps[0].error - 0.9).abs() < 0.01,
-            "highest-error experience should be first, got error={}", exps[0].error);
-        assert!((exps[1].importance - 0.9).abs() < 0.01,
-            "second should be high-importance/low-error");
+        assert!(
+            (exps[0].error - 0.9).abs() < 0.01,
+            "highest-error experience should be first, got error={}",
+            exps[0].error
+        );
+        assert!(
+            (exps[1].importance - 0.9).abs() < 0.01,
+            "second should be high-importance/low-error"
+        );
     }
 
     #[test]
     fn test_consolidation_sort_equal_importance_high_error_wins() {
-        struct Exp { importance: f32, error: f32 }
+        struct Exp {
+            importance: f32,
+            error: f32,
+        }
         let mut exps = vec![
-            Exp { importance: 1.0, error: 0.1 }, // score = 1.1
-            Exp { importance: 1.0, error: 0.8 }, // score = 1.8
+            Exp {
+                importance: 1.0,
+                error: 0.1,
+            }, // score = 1.1
+            Exp {
+                importance: 1.0,
+                error: 0.8,
+            }, // score = 1.8
         ];
         exps.sort_by(|a, b| {
             let a_score = a.importance * (1.0 + a.error);
             let b_score = b.importance * (1.0 + b.error);
-            b_score.partial_cmp(&a_score).unwrap_or(std::cmp::Ordering::Equal)
+            b_score
+                .partial_cmp(&a_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
-        assert!(exps[0].error > exps[1].error,
-            "with equal importance, high-error should be first");
+        assert!(
+            exps[0].error > exps[1].error,
+            "with equal importance, high-error should be first"
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -546,7 +597,10 @@ mod tests {
         // For non-causal dims, weight per prediction = 1/n → total = 1.0
         let n = 4usize;
         let total: f32 = (0..n).map(|_| 1.0 / n as f32).sum();
-        assert!((total - 1.0).abs() < 1e-5, "non-causal weights should sum to 1.0: {total}");
+        assert!(
+            (total - 1.0).abs() < 1e-5,
+            "non-causal weights should sum to 1.0: {total}"
+        );
     }
 
     #[test]
@@ -565,7 +619,10 @@ mod tests {
             .sum();
         // Verify the bias is bounded and positive (causal dims get MORE weight, not less)
         assert!(total > 1.0, "causal weights should exceed 1.0: {total}");
-        assert!(total < 1.5, "causal weight excess should be bounded: {total}");
+        assert!(
+            total < 1.5,
+            "causal weight excess should be bounded: {total}"
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -574,22 +631,30 @@ mod tests {
 
     #[test]
     fn test_horizon_scale_clamped_at_extremes() {
-        use crate::cognitive_loop::thresholds::{PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE};
+        use crate::cognitive_loop::thresholds::{
+            PREDICTION_HORIZON_MAX_SCALE, PREDICTION_HORIZON_MIN_SCALE,
+        };
 
         // Very high PE → contract horizons, but not below floor
         let pe = 1.0f32;
         let pe_scale = 1.0 - (pe - 0.3) * 0.6; // = 0.58
         let tau = 0.3f32; // very slow substrate
-        let combined = (tau * pe_scale).clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE);
-        assert!(combined >= PREDICTION_HORIZON_MIN_SCALE,
-            "combined scale should not go below floor: {combined}");
+        let combined =
+            (tau * pe_scale).clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE);
+        assert!(
+            combined >= PREDICTION_HORIZON_MIN_SCALE,
+            "combined scale should not go below floor: {combined}"
+        );
 
         // Very low PE + fast substrate → expand, but not above ceiling
         let _pe = 0.0f32;
         let pe_scale = 1.0 + 0.05 * 6.0; // = 1.30
         let tau = 3.0f32; // extremely fast substrate
-        let combined = (tau * pe_scale).clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE);
-        assert!(combined <= PREDICTION_HORIZON_MAX_SCALE,
-            "combined scale should not exceed ceiling: {combined}");
+        let combined =
+            (tau * pe_scale).clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE);
+        assert!(
+            combined <= PREDICTION_HORIZON_MAX_SCALE,
+            "combined scale should not exceed ceiling: {combined}"
+        );
     }
 }

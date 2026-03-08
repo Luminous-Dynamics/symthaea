@@ -88,10 +88,7 @@ struct CovarianceState {
 impl IntegrationOracle {
     /// Create a new integration oracle with the given encoder and
     /// configuration.
-    pub fn new(
-        encoder: Box<dyn SystemEncoder>,
-        config: OracleConfig,
-    ) -> Result<Self, OracleError> {
+    pub fn new(encoder: Box<dyn SystemEncoder>, config: OracleConfig) -> Result<Self, OracleError> {
         config.validate()?;
 
         let num_vars = encoder.num_variables();
@@ -106,11 +103,8 @@ impl IntegrationOracle {
         };
         let mip_finder = SpectralMIPFinder::new(mip_config);
 
-        let obs_window = ObservationWindow::new(
-            num_vars,
-            config.window_size,
-            config.regularization,
-        );
+        let obs_window =
+            ObservationWindow::new(num_vars, config.window_size, config.regularization);
 
         // Use the encoder's HV dimension so the temporal prober neurons
         // match the encoded observation vectors.
@@ -143,9 +137,7 @@ impl IntegrationOracle {
     /// Requires `num_vars >= 2`.
     pub fn new_simple(num_vars: usize, mut config: OracleConfig) -> Result<Self, OracleError> {
         if num_vars < 2 {
-            return Err(OracleError::InvalidConfig(
-                "num_vars must be >= 2".into(),
-            ));
+            return Err(OracleError::InvalidConfig("num_vars must be >= 2".into()));
         }
         // SimpleEncoder doesn't support meaningful temporal probing
         config.temporal_probes = vec![];
@@ -234,18 +226,21 @@ impl IntegrationOracle {
             if self.obs_window.len() < 3 || self.obs_window.num_vars() < 2 {
                 return None;
             }
-            (self.obs_window.build_covariance(), self.obs_window.num_vars())
+            (
+                self.obs_window.build_covariance(),
+                self.obs_window.num_vars(),
+            )
         };
 
-        let window_used = self.covariance_mode
+        let window_used = self
+            .covariance_mode
             .as_ref()
             .map_or(self.obs_window.len(), |cs| cs.window_used);
-        let mip_result = self.mip_finder.compute_from_covariance(&cov, n, window_used)?;
+        let mip_result = self
+            .mip_finder
+            .compute_from_covariance(&cov, n, window_used)?;
 
-        let temporal_coherence = self
-            .temporal_prober
-            .as_ref()
-            .and_then(|p| p.compute());
+        let temporal_coherence = self.temporal_prober.as_ref().and_then(|p| p.compute());
 
         let normalized_index = if mip_result.total_mi > 1e-12 {
             (mip_result.phi / mip_result.total_mi).clamp(0.0, 1.0)
@@ -306,10 +301,14 @@ impl IntegrationOracle {
         let (cov, n) = if let Some(cov_state) = &self.covariance_mode {
             (cov_state.cov.clone(), cov_state.n)
         } else {
-            (self.obs_window.build_covariance(), self.obs_window.num_vars())
+            (
+                self.obs_window.build_covariance(),
+                self.obs_window.num_vars(),
+            )
         };
 
-        let window_used = self.covariance_mode
+        let window_used = self
+            .covariance_mode
             .as_ref()
             .map_or(self.obs_window.len(), |cs| cs.window_used);
 
@@ -330,7 +329,10 @@ impl IntegrationOracle {
                 }
             }
 
-            if let Some(result) = self.mip_finder.compute_from_covariance(&sub_cov, sub_n, window_used) {
+            if let Some(result) =
+                self.mip_finder
+                    .compute_from_covariance(&sub_cov, sub_n, window_used)
+            {
                 scales.push(sub_n);
                 phi_by_scale.push(result.phi);
             }

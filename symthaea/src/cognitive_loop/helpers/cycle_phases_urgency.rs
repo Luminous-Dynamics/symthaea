@@ -103,14 +103,18 @@ impl CognitiveLoopService {
         // High D2 → easier transitions (lower hysteresis), low D2 → perseveration.
         let flexibility = self.neuromod.bath.behavioral_flexibility();
         let flex_mod = 1.0 / flexibility; // 0.67–1.43 (inverted: high flex = lower threshold)
-        // Session 11 Item 2: Wire hysteresis_factor into urgency computation.
-        // Sustained stability relaxes hysteresis (factor decays from 1.0 toward 0.5),
-        // permitting smoother mode transitions after long stable runs.
-        // Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
+                                          // Session 11 Item 2: Wire hysteresis_factor into urgency computation.
+                                          // Sustained stability relaxes hysteresis (factor decays from 1.0 toward 0.5),
+                                          // permitting smoother mode transitions after long stable runs.
+                                          // Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
         let hysteresis_relax = self.carryover.quality.hysteresis_factor;
         let base_hysteresis = match self.carryover.urgency.urgency {
-            super::super::CycleUrgency::Cruise => effective_threshold * (1.0 + 0.2 * hysteresis_relax) * flex_mod,
-            super::super::CycleUrgency::Critical => effective_threshold * (1.0 - 0.2 * hysteresis_relax) * flex_mod,
+            super::super::CycleUrgency::Cruise => {
+                effective_threshold * (1.0 + 0.2 * hysteresis_relax) * flex_mod
+            }
+            super::super::CycleUrgency::Critical => {
+                effective_threshold * (1.0 - 0.2 * hysteresis_relax) * flex_mod
+            }
             _ => effective_threshold * flex_mod,
         };
 
@@ -177,8 +181,8 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
-        let hysteresis_threshold = base_hysteresis * pattern_mod * coherence_mod
-            * transition_cost_mod * consolidation_mod;
+        let hysteresis_threshold =
+            base_hysteresis * pattern_mod * coherence_mod * transition_cost_mod * consolidation_mod;
         let error_urgency = super::super::CycleUrgency::from_state(
             smoothed_urgency_error,
             hysteresis_threshold,
@@ -227,60 +231,61 @@ impl CognitiveLoopService {
         }
         error_history.push_back(prediction_error);
 
-        let (error_pattern, predicted_urgency, error_slope, oscillation_ratio) = if error_history.len() >= 4 {
-            let len = error_history.len();
-            // Direct index: newest = len-1, 4th-newest = len-4 (avoids Vec alloc)
-            let newest = error_history[len - 1];
-            let oldest_of_4 = error_history[len - 4];
-            // Compute linear trend (simple slope)
-            let slope = (newest - oldest_of_4) / 3.0; // newest - oldest, normalized
-                                                      // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
-            let mut sign_changes = 0u32;
-            let ref_val = oldest_of_4;
-            for i in 0..len.saturating_sub(1) {
-                let diff_cur = error_history[i + 1] - error_history[i];
-                let diff_ref = error_history[i] - ref_val;
-                if diff_cur.signum() != diff_ref.signum() {
-                    sign_changes += 1;
-                }
-            }
-            let oscillation_ratio = if len > 2 {
-                sign_changes as f32 / (len - 1) as f32
-            } else {
-                0.0
-            };
-            // Spike detection: current error > 2× running mean
-            let mean_err = error_history.iter().sum::<f32>() / len as f32;
-            let is_spike = prediction_error > mean_err * 2.0 && prediction_error > 0.1;
-
-            let pattern = if is_spike {
-                "Spike"
-            } else if oscillation_ratio > 0.6 {
-                "Oscillating"
-            } else if slope > 0.02 {
-                "Rising"
-            } else if slope < -0.02 {
-                "Falling"
-            } else {
-                "Stable"
-            };
-            // Predict urgency 5 cycles ahead from pattern
-            let predicted = match pattern {
-                "Rising" | "Spike" => "Critical",
-                "Oscillating" => "Normal",
-                "Falling" | "Stable" => {
-                    if self.carryover.urgency.consecutive_low_error > 15 {
-                        "Cruise"
-                    } else {
-                        "Normal"
+        let (error_pattern, predicted_urgency, error_slope, oscillation_ratio) =
+            if error_history.len() >= 4 {
+                let len = error_history.len();
+                // Direct index: newest = len-1, 4th-newest = len-4 (avoids Vec alloc)
+                let newest = error_history[len - 1];
+                let oldest_of_4 = error_history[len - 4];
+                // Compute linear trend (simple slope)
+                let slope = (newest - oldest_of_4) / 3.0; // newest - oldest, normalized
+                                                          // Count sign changes for oscillation detection (index pairs avoid collect→Vec)
+                let mut sign_changes = 0u32;
+                let ref_val = oldest_of_4;
+                for i in 0..len.saturating_sub(1) {
+                    let diff_cur = error_history[i + 1] - error_history[i];
+                    let diff_ref = error_history[i] - ref_val;
+                    if diff_cur.signum() != diff_ref.signum() {
+                        sign_changes += 1;
                     }
                 }
-                _ => "Normal",
+                let oscillation_ratio = if len > 2 {
+                    sign_changes as f32 / (len - 1) as f32
+                } else {
+                    0.0
+                };
+                // Spike detection: current error > 2× running mean
+                let mean_err = error_history.iter().sum::<f32>() / len as f32;
+                let is_spike = prediction_error > mean_err * 2.0 && prediction_error > 0.1;
+
+                let pattern = if is_spike {
+                    "Spike"
+                } else if oscillation_ratio > 0.6 {
+                    "Oscillating"
+                } else if slope > 0.02 {
+                    "Rising"
+                } else if slope < -0.02 {
+                    "Falling"
+                } else {
+                    "Stable"
+                };
+                // Predict urgency 5 cycles ahead from pattern
+                let predicted = match pattern {
+                    "Rising" | "Spike" => "Critical",
+                    "Oscillating" => "Normal",
+                    "Falling" | "Stable" => {
+                        if self.carryover.urgency.consecutive_low_error > 15 {
+                            "Cruise"
+                        } else {
+                            "Normal"
+                        }
+                    }
+                    _ => "Normal",
+                };
+                (pattern, predicted, slope, oscillation_ratio)
+            } else {
+                ("Warmup", "Normal", 0.0, 0.0)
             };
-            (pattern, predicted, slope, oscillation_ratio)
-        } else {
-            ("Warmup", "Normal", 0.0, 0.0)
-        };
 
         // #9: Error trend → DA baseline modulation (Schultz 2016)
         self.neuromod.bath.modulate_from_error_trend(error_pattern);
@@ -333,8 +338,7 @@ impl CognitiveLoopService {
         if self.carryover.urgency.mode_stability_counter == 1 {
             // Just settled into new mode — measure transition cost as current PE
             let cost = prediction_error.max(0.0);
-            self.stats.avg_transition_cost =
-                self.stats.avg_transition_cost * 0.8 + cost * 0.2;
+            self.stats.avg_transition_cost = self.stats.avg_transition_cost * 0.8 + cost * 0.2;
         }
 
         // Sustained Critical urgency → LR boost.
@@ -344,9 +348,8 @@ impl CognitiveLoopService {
         if matches!(urgency, super::super::CycleUrgency::Critical)
             && self.carryover.urgency.mode_stability_counter > 5
         {
-            let sustained_boost = ((self.carryover.urgency.mode_stability_counter - 5) as f32
-                * 0.01)
-                .min(0.1);
+            let sustained_boost =
+                ((self.carryover.urgency.mode_stability_counter - 5) as f32 * 0.01).min(0.1);
             self.scale_lr("sustained_critical", 1.0 + sustained_boost);
         }
 
@@ -368,7 +371,7 @@ impl CognitiveLoopService {
         // Science: Schultz (2016) — error trend direction predicts optimal plasticity level.
         {
             use super::super::thresholds::{
-                ERROR_PATTERN_RISING_LR, ERROR_PATTERN_FALLING_LR, ERROR_PATTERN_OSCILLATING_LR,
+                ERROR_PATTERN_FALLING_LR, ERROR_PATTERN_OSCILLATING_LR, ERROR_PATTERN_RISING_LR,
             };
             match error_pattern {
                 "Rising" | "Spike" => {
@@ -390,13 +393,13 @@ impl CognitiveLoopService {
         // Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
         {
             use super::super::thresholds::{
-                HYSTERESIS_RELAXATION_THRESHOLD, HYSTERESIS_RELAXATION_RATE,
-                HYSTERESIS_RELAXATION_FLOOR,
+                HYSTERESIS_RELAXATION_FLOOR, HYSTERESIS_RELAXATION_RATE,
+                HYSTERESIS_RELAXATION_THRESHOLD,
             };
             if self.carryover.urgency.mode_stability_counter > HYSTERESIS_RELAXATION_THRESHOLD {
-                self.carryover.quality.hysteresis_factor = (self.carryover.quality.hysteresis_factor
-                    * HYSTERESIS_RELAXATION_RATE)
-                    .max(HYSTERESIS_RELAXATION_FLOOR);
+                self.carryover.quality.hysteresis_factor =
+                    (self.carryover.quality.hysteresis_factor * HYSTERESIS_RELAXATION_RATE)
+                        .max(HYSTERESIS_RELAXATION_FLOOR);
             } else if self.carryover.urgency.mode_stability_counter == 0 {
                 // Mode just changed — reset hysteresis to full
                 self.carryover.quality.hysteresis_factor = 1.0;

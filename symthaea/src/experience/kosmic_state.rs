@@ -3,10 +3,10 @@
 //! Implements the unified identity structure from GIS v4.0 "Kosmic Song Synthesis":
 //!
 //! ```text
-//! KosmicSong = Φ + SevenHarmonies + GIS + MoralUncertainty
+//! KosmicSong = Φ + EightHarmonies + GIS + MoralUncertainty
 //! ```
 //!
-//! The Seven Harmonies act as **epistemic lenses** - different ways of knowing
+//! The Eight Harmonies act as **epistemic lenses** - different ways of knowing
 //! and evaluating that guide response generation.
 
 use serde::{Deserialize, Serialize};
@@ -23,8 +23,8 @@ pub struct KosmicSong {
     /// See `signals.rs` for actual control signals.
     pub phi: f32,
 
-    /// The Seven Harmonies as epistemic lenses
-    pub harmonies: SevenHarmonies,
+    /// The Eight Harmonies as epistemic lenses
+    pub harmonies: EightHarmonies,
 
     /// Graceful Ignorance System state
     pub gis_state: GisState,
@@ -43,7 +43,7 @@ impl Default for KosmicSong {
     fn default() -> Self {
         Self {
             phi: 0.5,
-            harmonies: SevenHarmonies::default(),
+            harmonies: EightHarmonies::default(),
             gis_state: GisState::default(),
             moral_uncertainty: MoralUncertainty::default(),
             dominant_mode: KosmicMode::Balanced,
@@ -92,6 +92,7 @@ impl KosmicSong {
             "COHERENCE" => KosmicMode::Integrating,
             "INTERCONNECT" => KosmicMode::Connecting,
             "RECIPROCITY" => KosmicMode::Giving,
+            "STILLNESS" => KosmicMode::Resting,
             _ => KosmicMode::Balanced,
         }
     }
@@ -144,12 +145,12 @@ pub struct ExperienceSignals {
     pub harmony_resonances: HashMap<String, f32>,
 }
 
-/// The Seven Harmonies as epistemic lenses
+/// The Eight Harmonies as epistemic lenses
 ///
 /// From GIS v4.0: Each harmony represents a different way of knowing
 /// and evaluating the world.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SevenHarmonies {
+pub struct EightHarmonies {
     /// COHERENCE: "Does this integrate?"
     /// Epistemic lens: systemic thinking, pattern recognition
     pub coherence: HarmonicState,
@@ -177,23 +178,29 @@ pub struct SevenHarmonies {
     /// EVOLUTION: "Does this grow?"
     /// Epistemic lens: developmental thinking, transformation
     pub evolution: HarmonicState,
+
+    /// STILLNESS: "Does this honor rest and release?"
+    /// Epistemic lens: apophatic knowing, contemplative silence
+    pub stillness: HarmonicState,
 }
 
-impl Default for SevenHarmonies {
+
+impl Default for EightHarmonies {
     fn default() -> Self {
         Self {
-            coherence: HarmonicState::new("COHERENCE", 0.2),
-            flourishing: HarmonicState::new("FLOURISHING", 0.15),
-            wisdom: HarmonicState::new("WISDOM", 0.2),
-            play: HarmonicState::new("PLAY", 0.1),
-            interconnect: HarmonicState::new("INTERCONNECT", 0.1),
-            reciprocity: HarmonicState::new("RECIPROCITY", 0.1),
-            evolution: HarmonicState::new("EVOLUTION", 0.15),
+            coherence: HarmonicState::new("COHERENCE", 0.17),
+            flourishing: HarmonicState::new("FLOURISHING", 0.17),
+            wisdom: HarmonicState::new("WISDOM", 0.13),
+            play: HarmonicState::new("PLAY", 0.09),
+            interconnect: HarmonicState::new("INTERCONNECT", 0.13),
+            reciprocity: HarmonicState::new("RECIPROCITY", 0.09),
+            evolution: HarmonicState::new("EVOLUTION", 0.09),
+            stillness: HarmonicState::new("STILLNESS", 0.13),
         }
     }
 }
 
-impl SevenHarmonies {
+impl EightHarmonies {
     /// Get all harmony activations as a vector
     pub fn activations(&self) -> Vec<f32> {
         vec![
@@ -204,6 +211,7 @@ impl SevenHarmonies {
             self.interconnect.activation,
             self.reciprocity.activation,
             self.evolution.activation,
+            self.stillness.activation,
         ]
     }
 
@@ -217,6 +225,7 @@ impl SevenHarmonies {
             (&self.interconnect, "INTERCONNECT"),
             (&self.reciprocity, "RECIPROCITY"),
             (&self.evolution, "EVOLUTION"),
+            (&self.stillness, "STILLNESS"),
         ];
 
         harmonies
@@ -263,6 +272,7 @@ impl SevenHarmonies {
                 "INTERCONNECT" => self.interconnect.update(*resonance, learning_rate),
                 "RECIPROCITY" => self.reciprocity.update(*resonance, learning_rate),
                 "EVOLUTION" => self.evolution.update(*resonance, learning_rate),
+                "STILLNESS" => self.stillness.update(*resonance, learning_rate),
                 _ => {}
             }
         }
@@ -288,6 +298,7 @@ impl SevenHarmonies {
         self.interconnect.activation = 0.5;
         self.reciprocity.activation = 0.5;
         self.evolution.activation = 0.5;
+        self.stillness.activation = 0.5;
     }
 }
 
@@ -536,6 +547,7 @@ pub enum KosmicMode {
     Integrating,   // Coherence-dominant
     Connecting,    // Interconnect-dominant
     Giving,        // Reciprocity-dominant
+    Resting,       // Stillness-dominant
 }
 
 #[cfg(test)]

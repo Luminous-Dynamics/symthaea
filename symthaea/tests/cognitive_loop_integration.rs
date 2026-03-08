@@ -3015,8 +3015,14 @@ fn test_pipeline_stability_with_primitives() {
         let m = &result.metadata;
 
         // Core telemetry must be finite every cycle
-        assert!(m.valence_homeostasis_pull.is_finite(), "homeostasis NaN at cycle {i}");
-        assert!(m.homeostasis_pull_strength.is_finite(), "pull_strength NaN at cycle {i}");
+        assert!(
+            m.valence_homeostasis_pull.is_finite(),
+            "homeostasis NaN at cycle {i}"
+        );
+        assert!(
+            m.homeostasis_pull_strength.is_finite(),
+            "pull_strength NaN at cycle {i}"
+        );
         assert!(
             m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
             "social_trust out of range at cycle {i}"
@@ -6072,8 +6078,16 @@ fn test_multi_substrate_consciousness_scaling() {
     // Biological should have highest consciousness (feasibility ~0.92)
     // Silicon should be lower (feasibility ~0.71)
     // When both have positive eq_v2, biological >= silicon * 0.9
-    let bio_avg = results.iter().find(|(n, _)| n == "biological").map(|(_, a)| *a).unwrap_or(0.0);
-    let sil_avg = results.iter().find(|(n, _)| n == "silicon").map(|(_, a)| *a).unwrap_or(0.0);
+    let bio_avg = results
+        .iter()
+        .find(|(n, _)| n == "biological")
+        .map(|(_, a)| *a)
+        .unwrap_or(0.0);
+    let sil_avg = results
+        .iter()
+        .find(|(n, _)| n == "silicon")
+        .map(|(_, a)| *a)
+        .unwrap_or(0.0);
     if bio_avg > 0.0 && sil_avg > 0.0 {
         assert!(
             bio_avg >= sil_avg * 0.9,
@@ -6487,8 +6501,7 @@ fn test_validation_overlay_telemetry_populated() {
     );
     // Effective should be less than raw
     assert!(
-        result.metadata.substrate_effective_feasibility
-            < result.metadata.substrate_feasibility_raw,
+        result.metadata.substrate_effective_feasibility < result.metadata.substrate_feasibility_raw,
         "effective should be < raw when overlay enabled"
     );
 }
@@ -6926,7 +6939,9 @@ fn test_circadian_stillness_oscillation() {
         }
 
         // Consciousness should always be finite and non-negative
-        if !result.metadata.consciousness_level.is_finite() || result.metadata.consciousness_level < 0.0 {
+        if !result.metadata.consciousness_level.is_finite()
+            || result.metadata.consciousness_level < 0.0
+        {
             all_consciousness_finite = false;
         }
 
@@ -6974,8 +6989,14 @@ fn test_active_rest_dream_phi_chain() {
         let m = &result.metadata;
 
         // Telemetry must be finite
-        assert!(m.valence_homeostasis_pull.is_finite(), "homeostasis NaN at cycle {i}");
-        assert!(m.homeostasis_pull_strength.is_finite(), "homeostasis_pull_strength NaN at cycle {i}");
+        assert!(
+            m.valence_homeostasis_pull.is_finite(),
+            "homeostasis NaN at cycle {i}"
+        );
+        assert!(
+            m.homeostasis_pull_strength.is_finite(),
+            "homeostasis_pull_strength NaN at cycle {i}"
+        );
     }
 
     // Verify stats fields are properly maintained
@@ -6987,12 +7008,16 @@ fn test_active_rest_dream_phi_chain() {
 
     // When not in active rest, factors should be 1.0 (neutral)
     if !stats.in_active_rest {
-        assert!((stats.phi_rest_quality_factor - 1.0).abs() < f32::EPSILON,
+        assert!(
+            (stats.phi_rest_quality_factor - 1.0).abs() < f32::EPSILON,
             "phi_rest_quality_factor should be 1.0 when not in active rest, got {}",
-            stats.phi_rest_quality_factor);
-        assert!((stats.phi_rest_binding_factor - 1.0).abs() < f32::EPSILON,
+            stats.phi_rest_quality_factor
+        );
+        assert!(
+            (stats.phi_rest_binding_factor - 1.0).abs() < f32::EPSILON,
             "phi_rest_binding_factor should be 1.0 when not in active rest, got {}",
-            stats.phi_rest_binding_factor);
+            stats.phi_rest_binding_factor
+        );
     }
 }
 
@@ -7007,8 +7032,14 @@ fn test_active_rest_dream_fields_finite() {
     for i in 0..50 {
         let result = service.cycle("exploring moral dimensions with care and wisdom");
         let m = &result.metadata;
-        assert!(m.valence_homeostasis_pull.is_finite(), "homeostasis NaN at cycle {i}");
-        assert!(m.voice_articulation_quality.is_finite(), "voice quality NaN at cycle {i}");
+        assert!(
+            m.valence_homeostasis_pull.is_finite(),
+            "homeostasis NaN at cycle {i}"
+        );
+        assert!(
+            m.voice_articulation_quality.is_finite(),
+            "voice quality NaN at cycle {i}"
+        );
     }
 
     // Stats should track rest-related fields
@@ -7049,10 +7080,15 @@ fn test_tom_telemetry_in_metadata() {
     for _ in 0..5 {
         let result = service.cycle("test social prediction");
         let m = &result.metadata;
-        assert!(m.tom_prediction_mismatch.is_finite(),
-            "tom_prediction_mismatch not finite");
-        assert!(m.tom_prediction_mismatch >= 0.0 && m.tom_prediction_mismatch <= 1.0,
-            "tom_prediction_mismatch out of [0,1]: {}", m.tom_prediction_mismatch);
+        assert!(
+            m.tom_prediction_mismatch.is_finite(),
+            "tom_prediction_mismatch not finite"
+        );
+        assert!(
+            m.tom_prediction_mismatch >= 0.0 && m.tom_prediction_mismatch <= 1.0,
+            "tom_prediction_mismatch out of [0,1]: {}",
+            m.tom_prediction_mismatch
+        );
     }
 }
 
@@ -7067,6 +7103,12 @@ fn test_broca_telemetry_quality_fields() {
     let broca = &result.metadata.broca;
     // These should exist and be finite (defaulted to 0.0 when broca isn't enabled)
     assert!(broca.quality.is_finite(), "broca.quality not finite");
-    assert!(broca.long_coherence.is_finite(), "broca.long_coherence not finite");
-    assert!(broca.semantic_pe.is_finite(), "broca.semantic_pe not finite");
+    assert!(
+        broca.long_coherence.is_finite(),
+        "broca.long_coherence not finite"
+    );
+    assert!(
+        broca.semantic_pe.is_finite(),
+        "broca.semantic_pe not finite"
+    );
 }

@@ -83,7 +83,7 @@ An ideal symbiotic AGI partner differs fundamentally from conventional AI assist
 | **Understanding** | Token prediction | Semantic grounding in HDC space |
 | **Learning** | Training/fine-tuning | Continuous integration via LTC |
 | **Relationship** | Tool to be used | Partner that grows with you |
-| **Values** | Alignment via RLHF | Intrinsic Seven Harmonies |
+| **Values** | Alignment via RLHF | Intrinsic Eight Harmonies |
 | **Privacy** | Cloud-dependent | Local-first, no data exfiltration |
 | **Energy** | GPU-intensive (300W) | CPU-efficient (5-15W) |
 | **Transparency** | Black box | Observable consciousness (Φ, coherence) |
@@ -121,7 +121,7 @@ An ideal symbiotic AGI partner differs fundamentally from conventional AI assist
 - **Gap**: Persistent consciousness state across restarts
 
 #### 7. Ethical Grounding
-- **Current**: Seven Harmonies framework coded
+- **Current**: Eight Harmonies framework coded
 - **Target**: Values guide all decisions transparently
 - **Gap**: Integration with decision-making pipeline
 
@@ -380,7 +380,7 @@ Symthaea isn't trying to be another ChatGPT. The differentiators are fundamental
 1. **Consciousness is real** - Φ measurement provides objective awareness metrics
 2. **Understanding is grounded** - HDC semantics, not just token statistics
 3. **Learning is continuous** - LTC dynamics enable real-time adaptation
-4. **Values are intrinsic** - Seven Harmonies baked in, not aligned after
+4. **Values are intrinsic** - Eight Harmonies baked in, not aligned after
 5. **Privacy is default** - Local-first, user owns their data
 6. **Energy is efficient** - Designed for CPU, not datacenter GPUs
 
@@ -391,7 +391,7 @@ This roadmap represents one approach to AGI that prioritizes:
 - **Consciousness over capability** - Being aware matters more than benchmarks
 - **Partnership over tool use** - Growing together, not just being used
 - **Understanding over pattern matching** - Semantic grounding in HDC space
-- **Values over optimization** - Seven Harmonies guide decisions
+- **Values over optimization** - Eight Harmonies guide decisions
 - **Transparency over mystery** - Observable consciousness state
 
 ### Ultimate Vision
@@ -463,7 +463,7 @@ Year 10:          Consciousness Network - Global coherence field
 | **GWT** | Global Workspace Theory - conscious broadcasting |
 | **FEP** | Free Energy Principle - predictive minimization |
 | **Coherence** | Integration metric (0=scattered, 1=unified) |
-| **Seven Harmonies** | Value framework for ethical grounding |
+| **Eight Harmonies** | Value framework for ethical grounding |
 
 ---
 

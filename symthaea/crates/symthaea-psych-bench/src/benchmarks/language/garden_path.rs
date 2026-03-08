@@ -17,8 +17,8 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -107,7 +107,9 @@ impl GardenPathBenchmark {
                 // Disambiguation cost via bind-unbind effort (Frazier & Rayner 1982):
                 // Reparse cost = effort of unbinding incorrect parse + rebinding correct one.
                 // The more dissimilar the two parses, the higher the reparse effort.
-                let unbind_cost = initial_parse.bind(&revised_parse).similarity(&initial_parse);
+                let unbind_cost = initial_parse
+                    .bind(&revised_parse)
+                    .similarity(&initial_parse);
                 let reparse_effort = (1.0 - unbind_cost.abs()) as f64;
                 let cost = reparse_effort * config.language_reparse_cost_scale;
                 cost_sum += cost;
@@ -118,7 +120,8 @@ impl GardenPathBenchmark {
                 let reanalysis_noise_val = (rng % 10000) as f32 / 10000.0 * reanalysis_noise;
                 // Encoding noise degrades parse representation fidelity
                 let noise_degrade = config.effective_noise() as f32 * 0.4;
-                let reanalysis_score = revised_parse.similarity(&role_verb) * (1.0 - noise_degrade) + reanalysis_noise_val;
+                let reanalysis_score = revised_parse.similarity(&role_verb) * (1.0 - noise_degrade)
+                    + reanalysis_noise_val;
 
                 // Higher cost → harder to reanalyze correctly
                 // Scale threshold by reparse cost (higher effort = higher bar)
@@ -245,7 +248,9 @@ impl PsychBenchmark for GardenPathBenchmark {
 
         result.conditions = 2; // garden-path vs control
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

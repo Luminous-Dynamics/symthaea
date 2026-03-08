@@ -258,11 +258,7 @@ mod tests {
     fn test_da_tolerance_develops() {
         let bench = ToleranceWithdrawalBenchmark;
         let result = bench.run(&config());
-        let detected = result
-            .metrics
-            .get("da_tolerance_detected")
-            .unwrap()
-            .mean;
+        let detected = result.metrics.get("da_tolerance_detected").unwrap().mean;
         assert!(
             (detected - 1.0).abs() < f64::EPSILON,
             "DA tolerance should develop under sustained injection"
@@ -273,11 +269,7 @@ mod tests {
     fn test_ne_tolerance_develops() {
         let bench = ToleranceWithdrawalBenchmark;
         let result = bench.run(&config());
-        let detected = result
-            .metrics
-            .get("ne_tolerance_detected")
-            .unwrap()
-            .mean;
+        let detected = result.metrics.get("ne_tolerance_detected").unwrap().mean;
         assert!(
             (detected - 1.0).abs() < f64::EPSILON,
             "NE tolerance should develop under sustained injection"
@@ -288,11 +280,7 @@ mod tests {
     fn test_sht_tolerance_develops() {
         let bench = ToleranceWithdrawalBenchmark;
         let result = bench.run(&config());
-        let detected = result
-            .metrics
-            .get("sht_tolerance_detected")
-            .unwrap()
-            .mean;
+        let detected = result.metrics.get("sht_tolerance_detected").unwrap().mean;
         assert!(
             (detected - 1.0).abs() < f64::EPSILON,
             "5-HT tolerance should develop under sustained injection"
@@ -303,11 +291,7 @@ mod tests {
     fn test_gaba_tolerance_develops() {
         let bench = ToleranceWithdrawalBenchmark;
         let result = bench.run(&config());
-        let detected = result
-            .metrics
-            .get("gaba_tolerance_detected")
-            .unwrap()
-            .mean;
+        let detected = result.metrics.get("gaba_tolerance_detected").unwrap().mean;
         assert!(
             (detected - 1.0).abs() < f64::EPSILON,
             "GABA tolerance should develop under sustained injection"

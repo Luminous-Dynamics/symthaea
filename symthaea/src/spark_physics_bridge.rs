@@ -8,8 +8,8 @@
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::physics::{
-    DesignPoint, DesignSpaceMapper, FusionReaction, MultiObjectiveDesign, ParetoFrontier,
-    ParetoOptimizer, ParametricSweep,
+    DesignPoint, DesignSpaceMapper, FusionReaction, MultiObjectiveDesign, ParametricSweep,
+    ParetoFrontier, ParetoOptimizer,
 };
 use symthaea_physics_bridge::{PhysicsBridge, PhysicsDomain};
 
@@ -431,11 +431,7 @@ impl GuidedDesignExplorer {
                     similarity: top.score,
                     insight: format!(
                         "Pareto point {:.1} kW (mass={:.0} kg, cost=${:.0}/kW) → {} ({:?})",
-                        design.power_kw,
-                        design.mass_kg,
-                        design.cost_per_kw,
-                        top.name,
-                        top.domain,
+                        design.power_kw, design.mass_kg, design.cost_per_kw, top.name, top.domain,
                     ),
                 });
             }
@@ -467,10 +463,7 @@ fn detect_plateaus(points: &[DesignPoint]) -> Vec<PlateauRegion> {
 
         if end - start + 1 >= MIN_PLATEAU_LEN {
             // Check metric variation
-            let metrics: Vec<f64> = points[start..=end]
-                .iter()
-                .map(|p| p.metric_value)
-                .collect();
+            let metrics: Vec<f64> = points[start..=end].iter().map(|p| p.metric_value).collect();
             let avg = metrics.iter().sum::<f64>() / metrics.len() as f64;
             let max_dev = metrics
                 .iter()
@@ -746,8 +739,12 @@ mod tests {
     fn test_guided_sweep_mass() {
         let g = genesis();
         let mut explorer = GuidedDesignExplorer::from_genesis(&g);
-        let result =
-            explorer.guided_sweep_with_kind(SweepKind::PowerVsMass, FusionReaction::DD, (1.0, 50.0), 10);
+        let result = explorer.guided_sweep_with_kind(
+            SweepKind::PowerVsMass,
+            FusionReaction::DD,
+            (1.0, 50.0),
+            10,
+        );
         assert!(!result.sweep.points.is_empty());
         // Mass sweep should produce param_values representing mass
         assert!(
@@ -760,8 +757,12 @@ mod tests {
     fn test_guided_sweep_cost() {
         let g = genesis();
         let mut explorer = GuidedDesignExplorer::from_genesis(&g);
-        let result =
-            explorer.guided_sweep_with_kind(SweepKind::PowerVsCost, FusionReaction::DD, (1.0, 50.0), 10);
+        let result = explorer.guided_sweep_with_kind(
+            SweepKind::PowerVsCost,
+            FusionReaction::DD,
+            (1.0, 50.0),
+            10,
+        );
         assert!(!result.sweep.points.is_empty());
         assert!(
             result.sweep.points.iter().any(|p| p.param_value > 0.0),

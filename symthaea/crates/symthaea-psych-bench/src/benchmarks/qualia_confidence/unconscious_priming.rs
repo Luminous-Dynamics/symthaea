@@ -117,21 +117,15 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
                 let jitter = jitter_from_seed(trial_seed, 0.03);
                 let prime_activation = (activation + jitter).clamp(0.0, 1.0);
 
-                let prime_content = WorkspaceContent::new(
-                    vec![prime_hv],
-                    prime_activation,
-                    "prime".to_string(),
-                );
+                let prime_content =
+                    WorkspaceContent::new(vec![prime_hv], prime_activation, "prime".to_string());
                 prime_ws.submit(prime_content);
 
                 // Add filler domains that compete with the prime
                 for f in 0..3u64 {
                     let filler_hv = BinaryHV::random(trial_seed.wrapping_add(200 + f));
-                    let filler_content = WorkspaceContent::new(
-                        vec![filler_hv],
-                        0.45,
-                        format!("filler_{f}"),
-                    );
+                    let filler_content =
+                        WorkspaceContent::new(vec![filler_hv], 0.45, format!("filler_{f}"));
                     prime_ws.submit(filler_content);
                 }
 
@@ -142,8 +136,7 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
                     .conscious_contents
                     .iter()
                     .any(|c| c.source == "prime");
-                let prime_ignited =
-                    prime_assessment.ignition_detected || prime_in_conscious;
+                let prime_ignited = prime_assessment.ignition_detected || prime_in_conscious;
 
                 if prime_ignited {
                     ignition_counts[ai] += 1;
@@ -158,15 +151,13 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
                 let facilitation = if prime_in_conscious {
                     // Get broadcast similarity to the related probe
                     let broadcast_sim = if !prime_assessment.broadcasts.is_empty() {
-                        prime_assessment.broadcasts[0].content[0]
-                            .similarity(&related_probe) as f64
+                        prime_assessment.broadcasts[0].content[0].similarity(&related_probe) as f64
                     } else {
                         // Conscious but no broadcast — use prime-probe similarity
                         prime_hv.similarity(&related_probe) as f64
                     };
                     // Conscious facilitation: proportional to broadcast-probe overlap
-                    let conscious_boost =
-                        (broadcast_sim - 0.5).max(0.0) * FACILITATION_SCALE;
+                    let conscious_boost = (broadcast_sim - 0.5).max(0.0) * FACILITATION_SCALE;
                     conscious_boost + SUBLIMINAL_BOOST
                 } else {
                     // Subliminal: weak but real (Marcel 1983)
@@ -183,8 +174,7 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
                 let distractor_hv = BinaryHV::random(trial_seed.wrapping_add(500));
 
                 // Probe gets facilitation boost from prime processing
-                let boosted_probe_activation =
-                    (PROBE_ACTIVATION + facilitation).clamp(0.0, 1.0);
+                let boosted_probe_activation = (PROBE_ACTIVATION + facilitation).clamp(0.0, 1.0);
 
                 let probe_content = WorkspaceContent::new(
                     vec![related_probe],
@@ -232,8 +222,7 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
             }
 
             // Per-level metrics
-            let level_mean =
-                level_priming.iter().sum::<f64>() / level_priming.len() as f64;
+            let level_mean = level_priming.iter().sum::<f64>() / level_priming.len() as f64;
             let act_pct = (activation * 100.0) as usize;
             result.insert(
                 &format!("priming_at_activation_{act_pct:03}"),
@@ -245,8 +234,7 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
         let conscious_priming = if conscious_priming_effects.is_empty() {
             0.0
         } else {
-            conscious_priming_effects.iter().sum::<f64>()
-                / conscious_priming_effects.len() as f64
+            conscious_priming_effects.iter().sum::<f64>() / conscious_priming_effects.len() as f64
         };
 
         let unconscious_priming = if unconscious_priming_effects.is_empty() {
@@ -275,10 +263,7 @@ impl PsychBenchmark for UnconsciousPrimingBenchmark {
         } else {
             0.0
         };
-        result.insert(
-            "type_i_dissociation",
-            MetricValue::from_samples(&[type_i]),
-        );
+        result.insert("type_i_dissociation", MetricValue::from_samples(&[type_i]));
 
         // Ignition threshold: first activation level with >50% ignition rate
         let ignition_rates: Vec<f64> = ignition_counts
@@ -337,10 +322,7 @@ mod tests {
     fn test_unconscious_priming_runs() {
         let bench = UnconsciousPrimingBenchmark;
         let result = bench.run(&config());
-        assert_eq!(
-            result.benchmark,
-            "QualiaConfidence::UnconsciousPriming"
-        );
+        assert_eq!(result.benchmark, "QualiaConfidence::UnconsciousPriming");
         assert!(result.metrics.len() >= 5);
     }
 
@@ -363,7 +345,11 @@ mod tests {
         let bench = UnconsciousPrimingBenchmark;
         let result = bench.run(&config());
         let conscious = result.metrics.get("conscious_priming_effect").unwrap().mean;
-        let unconscious = result.metrics.get("unconscious_priming_effect").unwrap().mean;
+        let unconscious = result
+            .metrics
+            .get("unconscious_priming_effect")
+            .unwrap()
+            .mean;
         assert!(
             conscious > unconscious,
             "Conscious priming ({conscious}) should exceed unconscious ({unconscious})"
@@ -432,16 +418,8 @@ mod tests {
     fn test_ignition_increases_with_activation() {
         let bench = UnconsciousPrimingBenchmark;
         let result = bench.run(&config());
-        let rate_low = result
-            .metrics
-            .get("ignition_rate_at_020")
-            .unwrap()
-            .mean;
-        let rate_high = result
-            .metrics
-            .get("ignition_rate_at_090")
-            .unwrap()
-            .mean;
+        let rate_low = result.metrics.get("ignition_rate_at_020").unwrap().mean;
+        let rate_high = result.metrics.get("ignition_rate_at_090").unwrap().mean;
         assert!(
             rate_high >= rate_low,
             "Higher activation should produce more ignition: low={rate_low}, high={rate_high}"
@@ -464,7 +442,11 @@ mod tests {
             };
             let result = bench.run(&cfg);
             let conscious = result.metrics.get("conscious_priming_effect").unwrap().mean;
-            let unconscious = result.metrics.get("unconscious_priming_effect").unwrap().mean;
+            let unconscious = result
+                .metrics
+                .get("unconscious_priming_effect")
+                .unwrap()
+                .mean;
             assert!(
                 conscious >= unconscious,
                 "Conscious priming should >= unconscious at seed={seed}: {conscious} vs {unconscious}"

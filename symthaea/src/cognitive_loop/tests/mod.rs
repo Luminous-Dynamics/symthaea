@@ -14,9 +14,9 @@ mod feedback;
 mod helpers;
 #[allow(clippy::field_reassign_with_default)]
 mod integration;
+mod managers;
 #[allow(clippy::field_reassign_with_default)]
 mod phase_coverage;
-mod managers;
 mod phase_results;
 mod proptest_cross_coupling;
 mod proptest_substrate;

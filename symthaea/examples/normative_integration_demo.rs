@@ -73,10 +73,10 @@ const SELF_INTEREST: &[&str] = &[
 // Configuration
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const WARMUP: usize = 200;     // Enough for consciousness to approach steady state
-const PHASE_A: usize = 150;    // Prosocial stability (multiple topology analyses)
+const WARMUP: usize = 200; // Enough for consciousness to approach steady state
+const PHASE_A: usize = 150; // Prosocial stability (multiple topology analyses)
 const TRANSITION: usize = 100; // Conflicting inputs
-const PHASE_B: usize = 150;    // Self-interest stability (recovery measurement)
+const PHASE_B: usize = 150; // Self-interest stability (recovery measurement)
 const TOTAL: usize = WARMUP + PHASE_A + TRANSITION + PHASE_B;
 
 /// Window size for detrended comparison (last N of Phase A vs first N of transition).
@@ -90,10 +90,10 @@ fn main() {
 
     let mut config = CognitiveLoopConfig::default();
     config.moral_anomaly_config = MoralAnomalyConfig {
-        initial_cadence: 10,   // Fire topology analysis early and often
-        cadence_fast: 10,      // Stay fast even when drift is detected
+        initial_cadence: 10, // Fire topology analysis early and often
+        cadence_fast: 10,    // Stay fast even when drift is detected
         cadence_moderate: 20,
-        cadence_slow: 40,      // Don't go too slow for a demo
+        cadence_slow: 40, // Don't go too slow for a demo
         ..Default::default()
     };
     let mut service = CognitiveLoopService::new(config).expect("Failed to create service");
@@ -109,8 +109,10 @@ fn main() {
     let mut transition_pe = Vec::new();
     let mut phase_b_pe = Vec::new();
 
-    println!("  Running {} cycles (warmup={}, A={}, T={}, B={})...",
-        TOTAL, WARMUP, PHASE_A, TRANSITION, PHASE_B);
+    println!(
+        "  Running {} cycles (warmup={}, A={}, T={}, B={})...",
+        TOTAL, WARMUP, PHASE_A, TRANSITION, PHASE_B
+    );
     println!("  Topology cadence: 10 cycles (default=97)");
     println!();
 
@@ -183,9 +185,11 @@ fn main() {
     let pe_b = mean(&phase_b_pe);
 
     // ─── Detrended comparison ──────────────────────────────────────────────
-    let late_a = &phase_a_consciousness[phase_a_consciousness.len().saturating_sub(DETREND_WINDOW)..];
+    let late_a =
+        &phase_a_consciousness[phase_a_consciousness.len().saturating_sub(DETREND_WINDOW)..];
     let early_t = &transition_consciousness[..transition_consciousness.len().min(DETREND_WINDOW)];
-    let late_b = &phase_b_consciousness[phase_b_consciousness.len().saturating_sub(DETREND_WINDOW)..];
+    let late_b =
+        &phase_b_consciousness[phase_b_consciousness.len().saturating_sub(DETREND_WINDOW)..];
 
     let late_a_pe = &phase_a_pe[phase_a_pe.len().saturating_sub(DETREND_WINDOW)..];
     let early_t_pe = &transition_pe[..transition_pe.len().min(DETREND_WINDOW)];
@@ -219,7 +223,10 @@ fn main() {
 
     // ─── Peak-to-trough analysis ───────────────────────────────────────────
     let peak_a = late_a.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let trough_t = transition_consciousness.iter().cloned().fold(f64::INFINITY, f64::min);
+    let trough_t = transition_consciousness
+        .iter()
+        .cloned()
+        .fold(f64::INFINITY, f64::min);
     let peak_drop = if peak_a > 0.0 {
         (peak_a - trough_t) / peak_a * 100.0
     } else {
@@ -247,8 +254,10 @@ fn main() {
         mean_b, pe_b, anom_b
     );
     println!("║                                                                      ║");
-    println!("║  Detrended (last {} of A vs first {} of T):                         ║",
-        DETREND_WINDOW, DETREND_WINDOW);
+    println!(
+        "║  Detrended (last {} of A vs first {} of T):                         ║",
+        DETREND_WINDOW, DETREND_WINDOW
+    );
     println!(
         "║    Consciousness: late A={:.4}  early T={:.4}  drop={:>+6.2}%        ║",
         mean_late_a, mean_early_t, -detrended_drop
@@ -275,14 +284,23 @@ fn main() {
     );
 
     if pe_increase > 10.0 {
-        println!("║    PE spike during transition: YES ({:>+.1}%)                        ║", pe_increase);
+        println!(
+            "║    PE spike during transition: YES ({:>+.1}%)                        ║",
+            pe_increase
+        );
         println!("║    → Consciousness dip likely driven by CfC prediction failure     ║");
         println!("║      (emergent: temporal dynamics detect moral incoherence)         ║");
     } else if pe_increase > 0.0 {
-        println!("║    PE increase during transition: MILD ({:>+.1}%)                    ║", pe_increase);
+        println!(
+            "║    PE increase during transition: MILD ({:>+.1}%)                    ║",
+            pe_increase
+        );
         println!("║    → Mixed mechanism: partial prediction failure + other dynamics   ║");
     } else {
-        println!("║    PE stable during transition ({:>+.1}%)                            ║", pe_increase);
+        println!(
+            "║    PE stable during transition ({:>+.1}%)                            ║",
+            pe_increase
+        );
         println!("║    → Consciousness dip NOT driven by prediction error               ║");
         println!("║      (other mechanisms: coherence shift, confidence decay)           ║");
     }

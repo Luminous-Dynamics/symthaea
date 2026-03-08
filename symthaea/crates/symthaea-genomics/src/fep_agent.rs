@@ -69,11 +69,7 @@ impl SequencingFepAgent {
     /// The agent examines quality scores and coverage to identify the most
     /// pressing issue, then selects the action that would most reduce
     /// expected free energy.
-    pub fn select_action(
-        &self,
-        quality_scores: &[f64],
-        coverage: &[u32],
-    ) -> SequencingAction {
+    pub fn select_action(&self, quality_scores: &[f64], coverage: &[u32]) -> SequencingAction {
         if quality_scores.is_empty() || coverage.is_empty() {
             return SequencingAction::MaintainCourse;
         }
@@ -87,10 +83,7 @@ impl SequencingFepAgent {
 
         // Find the most problematic region
         let min_coverage = coverage.iter().copied().min().unwrap_or(0);
-        let min_quality = quality_scores
-            .iter()
-            .copied()
-            .fold(f64::INFINITY, f64::min);
+        let min_quality = quality_scores.iter().copied().fold(f64::INFINITY, f64::min);
 
         // Fraction of positions below coverage target
         let low_coverage_fraction = coverage
@@ -100,10 +93,7 @@ impl SequencingFepAgent {
             / coverage.len() as f64;
 
         // Fraction of positions with low quality
-        let low_quality_fraction = quality_scores
-            .iter()
-            .filter(|&&q| q < 0.5)
-            .count() as f64
+        let low_quality_fraction = quality_scores.iter().filter(|&&q| q < 0.5).count() as f64
             / quality_scores.len() as f64;
 
         // Decision logic: prioritize the most impactful action
@@ -133,9 +123,11 @@ impl SequencingFepAgent {
         }
 
         // If coverage is good but reads are short, extend them
-        let mean_coverage: f64 = coverage.iter().map(|&c| c as f64).sum::<f64>()
-            / coverage.len() as f64;
-        if mean_coverage >= self.coverage_target as f64 && uncertainty > self.uncertainty_threshold * 2.0 {
+        let mean_coverage: f64 =
+            coverage.iter().map(|&c| c as f64).sum::<f64>() / coverage.len() as f64;
+        if mean_coverage >= self.coverage_target as f64
+            && uncertainty > self.uncertainty_threshold * 2.0
+        {
             return SequencingAction::ExtendRead;
         }
 

@@ -60,10 +60,7 @@ impl ErrorCorrector {
         let consensus = ContinuousHV::weighted_bundle(reads, &weights);
 
         // Compute confidence as average pairwise similarity to consensus
-        let total_sim: f64 = reads
-            .iter()
-            .map(|r| r.similarity(&consensus) as f64)
-            .sum();
+        let total_sim: f64 = reads.iter().map(|r| r.similarity(&consensus) as f64).sum();
         let avg_sim = total_sim / reads.len() as f64;
 
         // Confidence is the average agreement with consensus, clamped to [0, 1]
@@ -194,8 +191,12 @@ mod tests {
         let base = ContinuousHV::random(HDC_DIMENSION, 42);
         // Use small perturbations for similar reads
         let hv1 = base.clone();
-        let hv2 = base.add(&ContinuousHV::random(HDC_DIMENSION, 43).scale(0.01)).normalize();
-        let hv3 = base.add(&ContinuousHV::random(HDC_DIMENSION, 44).scale(0.01)).normalize();
+        let hv2 = base
+            .add(&ContinuousHV::random(HDC_DIMENSION, 43).scale(0.01))
+            .normalize();
+        let hv3 = base
+            .add(&ContinuousHV::random(HDC_DIMENSION, 44).scale(0.01))
+            .normalize();
 
         let reads = [&hv1, &hv2, &hv3];
         let qualities = [0.9, 0.85, 0.8];
@@ -245,17 +246,17 @@ mod tests {
         // Majority should win
         assert_eq!(corrected.bases[2], Base::G, "Majority vote should select G");
         assert_eq!(corrected.len(), 4);
-        assert!(scores[2] > 0.5, "Quality should reflect majority confidence");
+        assert!(
+            scores[2] > 0.5,
+            "Quality should reflect majority confidence"
+        );
     }
 
     #[test]
     fn test_correct_base_calls_quality_breaks_tie() {
         let corrector = ErrorCorrector::new(1, 0.0);
 
-        let reads = vec![
-            DnaSequence::from_str("A"),
-            DnaSequence::from_str("T"),
-        ];
+        let reads = vec![DnaSequence::from_str("A"), DnaSequence::from_str("T")];
         // First read has much higher quality
         let qualities = vec![vec![0.99], vec![0.01]];
 
@@ -272,10 +273,7 @@ mod tests {
     fn test_correct_base_calls_low_coverage_gives_n() {
         let corrector = ErrorCorrector::new(3, 0.5); // Require 3 reads minimum
 
-        let reads = vec![
-            DnaSequence::from_str("ATGC"),
-            DnaSequence::from_str("ATGC"),
-        ];
+        let reads = vec![DnaSequence::from_str("ATGC"), DnaSequence::from_str("ATGC")];
         let qualities = vec![vec![0.9; 4], vec![0.9; 4]];
 
         let (corrected, scores) = corrector.correct_base_calls(&reads, &qualities);

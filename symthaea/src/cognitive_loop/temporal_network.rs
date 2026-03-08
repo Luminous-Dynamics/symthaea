@@ -115,9 +115,7 @@ impl TemporalNetwork {
         match self {
             Self::CfC(cfc) => cfc.predict_forward(input, horizon),
             Self::HdcLtc(bridge) => bridge.predict_forward(input, horizon),
-            Self::HierarchicalCfC(hcfc) => {
-                Ok(hcfc.forward_hierarchical(input, horizon).combined)
-            }
+            Self::HierarchicalCfC(hcfc) => Ok(hcfc.forward_hierarchical(input, horizon).combined),
         }
     }
 
@@ -144,7 +142,9 @@ impl TemporalNetwork {
                 let norms: Vec<f32> = states
                     .iter()
                     .filter_map(|layer| {
-                        layer.last().map(|s| s.iter().map(|v| v * v).sum::<f32>().sqrt())
+                        layer
+                            .last()
+                            .map(|s| s.iter().map(|v| v * v).sum::<f32>().sqrt())
                     })
                     .collect();
                 if norms.len() < 2 {

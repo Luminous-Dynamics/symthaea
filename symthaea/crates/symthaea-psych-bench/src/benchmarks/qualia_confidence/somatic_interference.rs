@@ -194,10 +194,7 @@ fn classify_trial(
         // between correct and runner-up is ~0.055. Amplitude must exceed half
         // that margin (0.0275) to produce any flips. At 0.04 (~73% of margin),
         // occasional flips give realistic baseline accuracy of ~85-95%.
-        let baseline_noise = jitter_from_seed(
-            trial_seed.wrapping_add(i as u64 * 31 + 1111),
-            0.04,
-        );
+        let baseline_noise = jitter_from_seed(trial_seed.wrapping_add(i as u64 * 31 + 1111), 0.04);
 
         let final_sim = adjusted + ne_noise + ht_noise + ach_noise + baseline_noise;
 
@@ -262,10 +259,9 @@ impl PsychBenchmark for SomaticInterferenceBenchmark {
             // Generate stimulus near a random prototype
             // 45% bit flip gives similarity ~0.55, margin ~0.05 above random 0.50
             // This tight margin makes bath modulation consequential
-            let target_proto = (float_from_seed(trial_seed) * NUM_PROTOTYPES as f64) as usize
-                % NUM_PROTOTYPES;
-            let stimulus = prototypes[target_proto]
-                .add_noise(0.45, trial_seed.wrapping_add(7777));
+            let target_proto =
+                (float_from_seed(trial_seed) * NUM_PROTOTYPES as f64) as usize % NUM_PROTOTYPES;
+            let stimulus = prototypes[target_proto].add_noise(0.45, trial_seed.wrapping_add(7777));
 
             // Inject distress at trial 100
             if trial == INJECTION_TRIAL {
@@ -307,10 +303,9 @@ impl PsychBenchmark for SomaticInterferenceBenchmark {
                 .wrapping_add(trial as u64);
 
             // Same stimulus generation as dynamic condition
-            let target_proto = (float_from_seed(trial_seed) * NUM_PROTOTYPES as f64) as usize
-                % NUM_PROTOTYPES;
-            let stimulus = prototypes[target_proto]
-                .add_noise(0.45, trial_seed.wrapping_add(7777));
+            let target_proto =
+                (float_from_seed(trial_seed) * NUM_PROTOTYPES as f64) as usize % NUM_PROTOTYPES;
+            let stimulus = prototypes[target_proto].add_noise(0.45, trial_seed.wrapping_add(7777));
 
             if trial == INJECTION_TRIAL {
                 static_bath.inject_distress();
@@ -342,7 +337,12 @@ impl PsychBenchmark for SomaticInterferenceBenchmark {
         // ── Metrics ──
 
         // Per-window accuracies (dynamic)
-        let window_names = ["pre_baseline", "pre_injection", "acute_distress", "recovery"];
+        let window_names = [
+            "pre_baseline",
+            "pre_injection",
+            "acute_distress",
+            "recovery",
+        ];
         for (w, name) in window_names.iter().enumerate() {
             result.insert(
                 &format!("dynamic_{name}_accuracy"),
@@ -397,10 +397,7 @@ impl PsychBenchmark for SomaticInterferenceBenchmark {
         } else {
             1.0
         };
-        result.insert(
-            "cascade_ratio",
-            MetricValue::from_samples(&[cascade_ratio]),
-        );
+        result.insert("cascade_ratio", MetricValue::from_samples(&[cascade_ratio]));
 
         // Recovery completeness: how much accuracy recovered in window 4
         let recovery_completeness = if interference_magnitude > 0.001 {
@@ -435,10 +432,7 @@ mod tests {
     fn test_somatic_interference_runs() {
         let bench = SomaticInterferenceBenchmark;
         let result = bench.run(&config());
-        assert_eq!(
-            result.benchmark,
-            "QualiaConfidence::SomaticInterference"
-        );
+        assert_eq!(result.benchmark, "QualiaConfidence::SomaticInterference");
         assert!(result.metrics.len() >= 8);
     }
 

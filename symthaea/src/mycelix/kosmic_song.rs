@@ -4,7 +4,7 @@
 //! synthesizing:
 //!
 //! - **Phi (lambda2)**: Spectral connectivity proxy for consciousness level
-//! - **Seven Harmonies**: Value alignment and epistemic lenses
+//! - **Eight Harmonies**: Value alignment and epistemic lenses
 //! - **GIS**: Graceful Ignorance System (epistemic humility)
 //!
 //! ## The Kosmic Song Metaphor
@@ -72,7 +72,7 @@ use std::time::SystemTime;
 // Import real types from the crate's consciousness infrastructure
 // NOTE: Harmony is now the same type everywhere (symthaea_types::Harmony),
 // so no From bridge is needed.
-use crate::consciousness::seven_harmonies::{AlignmentResult, SevenHarmonies};
+use crate::consciousness::eight_harmonies::{AlignmentResult, EightHarmonies};
 use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea_core::hdc::{
     ConsciousnessTopology as HdcConsciousnessTopology, ContinuousHV, TopologyType, HDC_DIMENSION,
@@ -661,16 +661,16 @@ impl KosmicSong {
         )
     }
 
-    // === Semantic HDC Integration (seven_harmonies.rs bridge) ===
+    // === Semantic HDC Integration (eight_harmonies.rs bridge) ===
 
-    /// Evaluate an action using full semantic HDC encoding from seven_harmonies.rs
+    /// Evaluate an action using full semantic HDC encoding from eight_harmonies.rs
     ///
-    /// This method bridges the GIS system with the core SevenHarmonies HDC implementation,
+    /// This method bridges the GIS system with the core EightHarmonies HDC implementation,
     /// providing word-level semantic similarity matching for action evaluation.
     ///
     /// Returns an `AlignmentResult` with per-harmony scores and violation detection.
     pub fn evaluate_action_semantic(&mut self, action_description: &str) -> AlignmentResult {
-        let mut harmonies_system = SevenHarmonies::new();
+        let mut harmonies_system = EightHarmonies::new();
         let result = harmonies_system.evaluate_action(action_description);
 
         // Update harmonic profile based on alignment scores
@@ -700,14 +700,14 @@ impl KosmicSong {
 
     /// Check if an action would be vetoed by the semantic harmony evaluation
     pub fn would_veto_action(&self, action_description: &str) -> bool {
-        let mut harmonies_system = SevenHarmonies::new();
+        let mut harmonies_system = EightHarmonies::new();
         let result = harmonies_system.evaluate_action(action_description);
         result.should_veto()
     }
 
     /// Get the most aligned harmony for an action using semantic HDC
     pub fn most_aligned_harmony(&self, action_description: &str) -> Option<(Harmony, f32)> {
-        let mut harmonies_system = SevenHarmonies::new();
+        let mut harmonies_system = EightHarmonies::new();
         let result = harmonies_system.evaluate_action(action_description);
 
         result.best_alignment().map(|a| (a.harmony, a.alignment()))
@@ -715,10 +715,10 @@ impl KosmicSong {
 
     /// Get the HDC encoding of the current resonant harmony
     ///
-    /// This returns the BinaryHV semantic encoding from seven_harmonies.rs,
+    /// This returns the BinaryHV semantic encoding from eight_harmonies.rs,
     /// useful for similarity comparisons with other semantic vectors.
     pub fn resonant_harmony_encoding(&self) -> Option<crate::hdc::BinaryHV> {
-        let harmonies_system = SevenHarmonies::new();
+        let harmonies_system = EightHarmonies::new();
         harmonies_system
             .get(self.resonant_harmony)
             .map(|e| e.encoding)

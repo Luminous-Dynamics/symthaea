@@ -340,7 +340,10 @@ fn test_adaptive_thresholds_reduce_false_alerts() {
         adaptive_drift <= static_drift + 50 || adaptive_anom <= static_anom + 50,
         "Adaptive mode should not wildly inflate alert counts vs static mode. \
          adaptive: drift={}, anomalies={}; static: drift={}, anomalies={}",
-        adaptive_drift, adaptive_anom, static_drift, static_anom,
+        adaptive_drift,
+        adaptive_anom,
+        static_drift,
+        static_anom,
     );
 
     // Key: adaptive mode should complete cleanly with non-panic output.

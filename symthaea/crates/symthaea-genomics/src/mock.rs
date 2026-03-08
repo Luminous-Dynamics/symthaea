@@ -108,8 +108,7 @@ impl MockSequencer {
 
     /// Apply age-dependent DNA damage to a read.
     fn apply_damage(&self, bases: &mut [Base], age_years: f64, rng: &mut impl Rng) {
-        let deam_prob =
-            self.damage_model.expected_deamination_fraction(age_years);
+        let deam_prob = self.damage_model.expected_deamination_fraction(age_years);
 
         for base in bases.iter_mut() {
             // Deamination: C->T, G->A
@@ -135,7 +134,11 @@ impl MockSequencer {
             if rng.gen::<f64>() < self.error_rate {
                 // Replace with a random different base
                 let current = *base;
-                let alternatives: Vec<Base> = all_bases.iter().copied().filter(|&b| b != current).collect();
+                let alternatives: Vec<Base> = all_bases
+                    .iter()
+                    .copied()
+                    .filter(|&b| b != current)
+                    .collect();
                 if !alternatives.is_empty() {
                     *base = alternatives[rng.gen_range(0..alternatives.len())];
                 }
@@ -178,7 +181,12 @@ mod tests {
         let c_count = genome.count_base(Base::C);
 
         // Each base should be roughly 25% (+/- 5%)
-        for (name, count) in [("A", a_count), ("T", t_count), ("G", g_count), ("C", c_count)] {
+        for (name, count) in [
+            ("A", a_count),
+            ("T", t_count),
+            ("G", g_count),
+            ("C", c_count),
+        ] {
             let fraction = count as f64 / 10_000.0;
             assert!(
                 (fraction - 0.25).abs() < 0.05,
@@ -311,7 +319,7 @@ mod tests {
     fn test_no_damage_at_age_zero() {
         let model = DamageModel::new(15.0);
         let sequencer = MockSequencer::new(100, 0.0, 50, model); // No sequencing errors
-        // Use only C and G to make deamination detectable
+                                                                 // Use only C and G to make deamination detectable
         let genome = DnaSequence::from_str(&"CCCCGGGG".repeat(125)); // 1000 bases
         let mut rng = rand::thread_rng();
 

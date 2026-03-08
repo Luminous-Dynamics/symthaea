@@ -35,7 +35,10 @@ mod hub {
 
         // Non-zero L2 norm
         let norm: f32 = result.embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!(norm > 0.1, "Embedding should have non-trivial norm, got {norm}");
+        assert!(
+            norm > 0.1,
+            "Embedding should have non-trivial norm, got {norm}"
+        );
 
         // Non-trivial variance (not all same value)
         let mean: f32 = result.embedding.iter().sum::<f32>() / result.dimension as f32;
@@ -82,8 +85,8 @@ mod hub {
         let mut embedder_full = Qwen3Embedder::new(config_full).unwrap();
         assert!(embedder_full.is_model_loaded());
 
-        let config_half = Qwen3Config::from_hub("Qwen/Qwen3-Embedding-0.6B")
-            .with_matryoshka_dim(512);
+        let config_half =
+            Qwen3Config::from_hub("Qwen/Qwen3-Embedding-0.6B").with_matryoshka_dim(512);
         let mut embedder_half = Qwen3Embedder::new(config_half).unwrap();
         assert!(embedder_half.is_model_loaded());
 

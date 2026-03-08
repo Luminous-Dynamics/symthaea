@@ -9,10 +9,10 @@ use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
-use std::collections::BTreeMap;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
+use std::collections::BTreeMap;
 
 use symthaea_core::hdc::ContinuousHV;
 
@@ -56,7 +56,8 @@ impl BindingBenchmark {
         // Time pressure: 0.15/unit encoding noise models degraded feature integration under
         // speed emphasis (Treisman, 1996 FIT); rushed binding produces illusory conjunctions.
         let diff_model = difficulty_model_for("WorM::Binding");
-        let tp_noise_frac = (config.time_pressure as f32 * 0.15 + config.difficulty as f32 * 0.10) * diff_model.interference_multiplier(config.difficulty) as f32;
+        let tp_noise_frac = (config.time_pressure as f32 * 0.15 + config.difficulty as f32 * 0.10)
+            * diff_model.interference_multiplier(config.difficulty) as f32;
         for (pos, obj) in objects.iter().enumerate() {
             let hv = adapter.encode(obj, dim);
             let hv = if tp_noise_frac > 0.01 {
@@ -214,7 +215,9 @@ impl PsychBenchmark for BindingBenchmark {
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

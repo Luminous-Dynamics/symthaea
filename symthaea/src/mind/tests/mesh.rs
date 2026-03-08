@@ -3428,12 +3428,8 @@ fn test_process_mesh_dispatches_moral_topology() {
         scenario_count: 10,
         ..Default::default()
     };
-    let packet = WisdomPacket::from_moral_topology(
-        [10, 20, 30, 40, 50, 60, 70, 80],
-        1,
-        0.5,
-        &summary,
-    );
+    let packet =
+        WisdomPacket::from_moral_topology([10, 20, 30, 40, 50, 60, 70, 80], 1, 0.5, &summary);
 
     mind.mesh_inbox.push(packet);
     mind.tick();
@@ -3448,7 +3444,8 @@ fn test_process_mesh_dispatches_moral_topology() {
     assert_eq!(cached.beta_0, 5);
     assert!((cached.unity - 0.9).abs() < 1e-6);
     assert_eq!(
-        mind.mesh_stats().moral_topology_received, 1,
+        mind.mesh_stats().moral_topology_received,
+        1,
         "moral_topology_received counter should be 1"
     );
 }

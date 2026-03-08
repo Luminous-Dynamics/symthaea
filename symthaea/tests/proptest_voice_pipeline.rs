@@ -25,20 +25,20 @@ use symthaea_vocal_tract::pipeline::VocalTractPipeline;
 /// Random VoiceCognitiveState within documented channel ranges.
 fn voice_state_strategy() -> impl Strategy<Value = VoiceCognitiveState> {
     (
-        0.0f32..2.0,   // prediction_error
-        -1.0f32..1.0,  // emotional_valence
-        0.0f32..1.0,   // emotional_arousal
-        0.0f32..1.0,   // unified_quality
-        0.0f32..1.0,   // epistemic_confidence
-        -1.0f32..1.0,  // coherence_velocity
-        0.0f32..1.0,   // cross_agreement
-        0.0f32..1.0,   // consciousness_level
-        0.0f32..1.0,   // articulation_quality
-        0.0f32..1.0,   // rate_stability
+        0.0f32..2.0,                // prediction_error
+        -1.0f32..1.0,               // emotional_valence
+        0.0f32..1.0,                // emotional_arousal
+        0.0f32..1.0,                // unified_quality
+        0.0f32..1.0,                // epistemic_confidence
+        -1.0f32..1.0,               // coherence_velocity
+        0.0f32..1.0,                // cross_agreement
+        0.0f32..1.0,                // consciousness_level
+        0.0f32..1.0,                // articulation_quality
+        0.0f32..1.0,                // rate_stability
         (0.0f32..2.0, 0.0f32..5.0), // integrated_phi, expected_free_energy
     )
-        .prop_map(
-            |(pe, val, aro, uq, ec, cv, ca, cl, aq, rs, (phi, efe))| VoiceCognitiveState {
+        .prop_map(|(pe, val, aro, uq, ec, cv, ca, cl, aq, rs, (phi, efe))| {
+            VoiceCognitiveState {
                 prediction_error: pe,
                 emotional_valence: val,
                 emotional_arousal: aro,
@@ -51,8 +51,8 @@ fn voice_state_strategy() -> impl Strategy<Value = VoiceCognitiveState> {
                 rate_stability: rs,
                 integrated_phi: phi,
                 expected_free_energy: efe,
-            },
-        )
+            }
+        })
 }
 
 /// Random ARPABET phoneme name.
@@ -92,14 +92,16 @@ fn observation_strategy() -> impl Strategy<Value = VocalTractObservation> {
         0.0f64..1.0,
         0.0f64..1.0,
     )
-        .prop_map(|(art, form, pitch, coart, dur, energy)| VocalTractObservation {
-            articulation_score: art,
-            formant_accuracy: form,
-            pitch_stability: pitch,
-            coarticulation_smoothness: coart,
-            duration_accuracy: dur,
-            energy_consistency: energy,
-        })
+        .prop_map(
+            |(art, form, pitch, coart, dur, energy)| VocalTractObservation {
+                articulation_score: art,
+                formant_accuracy: form,
+                pitch_stability: pitch,
+                coarticulation_smoothness: coart,
+                duration_accuracy: dur,
+                energy_consistency: energy,
+            },
+        )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

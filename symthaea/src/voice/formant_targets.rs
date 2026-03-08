@@ -660,10 +660,7 @@ mod tests {
         assert!(ay.f1_offset > 0.0, "AY should have offset F1");
         // AY onset is near AA, offset is near IY
         assert!(ay.f1 > 600.0, "AY onset F1 should be high (AA-like)");
-        assert!(
-            ay.f1_offset < 350.0,
-            "AY offset F1 should be low (IY-like)"
-        );
+        assert!(ay.f1_offset < 350.0, "AY offset F1 should be low (IY-like)");
     }
 
     #[test]

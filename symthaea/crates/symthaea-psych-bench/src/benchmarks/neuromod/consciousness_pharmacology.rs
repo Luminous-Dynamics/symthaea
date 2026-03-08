@@ -62,6 +62,7 @@ impl ConditionTrace {
             .fold(f32::NEG_INFINITY, f32::max)
     }
 
+    #[allow(dead_code)]
     fn trough(&self) -> f32 {
         self.proxy_values
             .iter()
@@ -170,37 +171,100 @@ impl PsychBenchmark for ConsciousnessPharmacologyBenchmark {
         let mut result = BenchmarkResult::new(self.name(), None);
 
         // Psychedelic metrics
-        result.insert("psychedelic_proxy_peak", MetricValue::from_samples(&[psychedelic.peak() as f64]));
-        result.insert("psychedelic_proxy_mean", MetricValue::from_samples(&[psychedelic.mean() as f64]));
-        result.insert("psychedelic_time_to_peak", MetricValue::from_samples(&[psychedelic.time_to_peak() as f64]));
-        result.insert("psychedelic_duration_above_baseline", MetricValue::from_samples(&[psychedelic.duration_above_baseline() as f64]));
+        result.insert(
+            "psychedelic_proxy_peak",
+            MetricValue::from_samples(&[psychedelic.peak() as f64]),
+        );
+        result.insert(
+            "psychedelic_proxy_mean",
+            MetricValue::from_samples(&[psychedelic.mean() as f64]),
+        );
+        result.insert(
+            "psychedelic_time_to_peak",
+            MetricValue::from_samples(&[psychedelic.time_to_peak() as f64]),
+        );
+        result.insert(
+            "psychedelic_duration_above_baseline",
+            MetricValue::from_samples(&[psychedelic.duration_above_baseline() as f64]),
+        );
 
         // Anxiolytic metrics
-        result.insert("anxiolytic_proxy_peak", MetricValue::from_samples(&[anxiolytic.peak() as f64]));
-        result.insert("anxiolytic_proxy_mean", MetricValue::from_samples(&[anxiolytic.mean() as f64]));
-        result.insert("anxiolytic_time_to_peak", MetricValue::from_samples(&[anxiolytic.time_to_peak() as f64]));
-        result.insert("anxiolytic_duration_above_baseline", MetricValue::from_samples(&[anxiolytic.duration_above_baseline() as f64]));
+        result.insert(
+            "anxiolytic_proxy_peak",
+            MetricValue::from_samples(&[anxiolytic.peak() as f64]),
+        );
+        result.insert(
+            "anxiolytic_proxy_mean",
+            MetricValue::from_samples(&[anxiolytic.mean() as f64]),
+        );
+        result.insert(
+            "anxiolytic_time_to_peak",
+            MetricValue::from_samples(&[anxiolytic.time_to_peak() as f64]),
+        );
+        result.insert(
+            "anxiolytic_duration_above_baseline",
+            MetricValue::from_samples(&[anxiolytic.duration_above_baseline() as f64]),
+        );
 
         // Stimulant metrics
-        result.insert("stimulant_proxy_peak", MetricValue::from_samples(&[stimulant.peak() as f64]));
-        result.insert("stimulant_proxy_mean", MetricValue::from_samples(&[stimulant.mean() as f64]));
-        result.insert("stimulant_time_to_peak", MetricValue::from_samples(&[stimulant.time_to_peak() as f64]));
-        result.insert("stimulant_duration_above_baseline", MetricValue::from_samples(&[stimulant.duration_above_baseline() as f64]));
+        result.insert(
+            "stimulant_proxy_peak",
+            MetricValue::from_samples(&[stimulant.peak() as f64]),
+        );
+        result.insert(
+            "stimulant_proxy_mean",
+            MetricValue::from_samples(&[stimulant.mean() as f64]),
+        );
+        result.insert(
+            "stimulant_time_to_peak",
+            MetricValue::from_samples(&[stimulant.time_to_peak() as f64]),
+        );
+        result.insert(
+            "stimulant_duration_above_baseline",
+            MetricValue::from_samples(&[stimulant.duration_above_baseline() as f64]),
+        );
 
         // Sedative metrics
-        result.insert("sedative_proxy_peak", MetricValue::from_samples(&[sedative.peak() as f64]));
-        result.insert("sedative_proxy_mean", MetricValue::from_samples(&[sedative.mean() as f64]));
-        result.insert("sedative_time_to_peak", MetricValue::from_samples(&[sedative.time_to_peak() as f64]));
-        result.insert("sedative_duration_above_baseline", MetricValue::from_samples(&[sedative.duration_above_baseline() as f64]));
+        result.insert(
+            "sedative_proxy_peak",
+            MetricValue::from_samples(&[sedative.peak() as f64]),
+        );
+        result.insert(
+            "sedative_proxy_mean",
+            MetricValue::from_samples(&[sedative.mean() as f64]),
+        );
+        result.insert(
+            "sedative_time_to_peak",
+            MetricValue::from_samples(&[sedative.time_to_peak() as f64]),
+        );
+        result.insert(
+            "sedative_duration_above_baseline",
+            MetricValue::from_samples(&[sedative.duration_above_baseline() as f64]),
+        );
 
         // ECB buffer metrics
-        result.insert("ecb_proxy_peak", MetricValue::from_samples(&[ecb_buffer.peak() as f64]));
-        result.insert("ecb_proxy_mean", MetricValue::from_samples(&[ecb_buffer.mean() as f64]));
-        result.insert("ecb_time_to_peak", MetricValue::from_samples(&[ecb_buffer.time_to_peak() as f64]));
-        result.insert("ecb_duration_above_baseline", MetricValue::from_samples(&[ecb_buffer.duration_above_baseline() as f64]));
+        result.insert(
+            "ecb_proxy_peak",
+            MetricValue::from_samples(&[ecb_buffer.peak() as f64]),
+        );
+        result.insert(
+            "ecb_proxy_mean",
+            MetricValue::from_samples(&[ecb_buffer.mean() as f64]),
+        );
+        result.insert(
+            "ecb_time_to_peak",
+            MetricValue::from_samples(&[ecb_buffer.time_to_peak() as f64]),
+        );
+        result.insert(
+            "ecb_duration_above_baseline",
+            MetricValue::from_samples(&[ecb_buffer.duration_above_baseline() as f64]),
+        );
 
         // Cross-condition variance (stability metric)
-        result.insert("ecb_proxy_variance", MetricValue::from_samples(&[ecb_buffer.variance() as f64]));
+        result.insert(
+            "ecb_proxy_variance",
+            MetricValue::from_samples(&[ecb_buffer.variance() as f64]),
+        );
 
         if config.trial_trace {
             trace.push(TrialOutcome {
@@ -319,7 +383,10 @@ mod tests {
     fn test_stimulant_alters_consciousness() {
         let trace = run_condition("da", 0.4, 30);
         let deviation = (trace.mean() - trace.baseline_proxy).abs();
-        assert!(deviation.is_finite(), "Stimulant should produce finite deviation");
+        assert!(
+            deviation.is_finite(),
+            "Stimulant should produce finite deviation"
+        );
     }
 
     #[test]
@@ -343,7 +410,11 @@ mod tests {
         let bench = ConsciousnessPharmacologyBenchmark;
         let result = bench.run(&config());
         for (key, value) in &result.metrics {
-            assert!(value.mean.is_finite(), "Metric {key} should be finite: {}", value.mean);
+            assert!(
+                value.mean.is_finite(),
+                "Metric {key} should be finite: {}",
+                value.mean
+            );
         }
     }
 }

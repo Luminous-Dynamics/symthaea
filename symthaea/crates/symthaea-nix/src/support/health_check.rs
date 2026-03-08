@@ -287,7 +287,10 @@ impl HealthAssessor {
         } else {
             (
                 HealthStatus::Healthy,
-                format!("Load average OK ({:.2}, {} cores)", load, hardware.cpu_cores),
+                format!(
+                    "Load average OK ({:.2}, {} cores)",
+                    load, hardware.cpu_cores
+                ),
                 vec![],
             )
         };

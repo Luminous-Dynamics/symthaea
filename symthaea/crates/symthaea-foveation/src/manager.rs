@@ -285,8 +285,7 @@ impl FoveationManager {
         let da = da.clamp(0.0, 2.0);
 
         // NE scales surprise threshold: base * ne (higher NE → higher threshold)
-        self.effective_surprise_threshold =
-            self.config.min_surprise_threshold * ne.max(0.1);
+        self.effective_surprise_threshold = self.config.min_surprise_threshold * ne.max(0.1);
 
         // DA scales max concurrent: base * da, rounded, min 1
         let base = self.config.max_concurrent as f32;
@@ -312,7 +311,10 @@ impl FoveationManager {
         let dt_frames = result.processing_time_us as f32 / 20_000.0; // ~50fps
         let pred_row = result.grid_row as f32 + result.velocity[1] * dt_frames;
         let pred_col = result.grid_col as f32 + result.velocity[0] * dt_frames;
-        (pred_row.round().max(0.0) as usize, pred_col.round().max(0.0) as usize)
+        (
+            pred_row.round().max(0.0) as usize,
+            pred_col.round().max(0.0) as usize,
+        )
     }
 }
 
@@ -366,7 +368,11 @@ mod tests {
         ];
         mgr.on_saliency(&patches);
 
-        assert_eq!(mgr.pending_count(), 2, "Only patches above 0.5 should be enqueued");
+        assert_eq!(
+            mgr.pending_count(),
+            2,
+            "Only patches above 0.5 should be enqueued"
+        );
     }
 
     #[test]
@@ -471,7 +477,10 @@ mod tests {
 
         // Second tick at t=1_050_000us (50ms later, within cooldown)
         mgr.tick(1_050_000);
-        assert_eq!(mgr.total_dispatched, 1, "Should not dispatch within cooldown");
+        assert_eq!(
+            mgr.total_dispatched, 1,
+            "Should not dispatch within cooldown"
+        );
 
         // Third tick at t=1_200_000us (200ms later, past cooldown)
         mgr.tick(1_200_000);
@@ -513,7 +522,11 @@ mod tests {
     fn test_clear_pending() {
         let mut mgr = default_manager();
         mgr.on_frame(make_frame(64, 64, 128));
-        mgr.on_saliency(&[(0, 0, 0.6, [0.0, 0.0]), (1, 1, 0.8, [0.0, 0.0]), (2, 2, 0.9, [0.0, 0.0])]);
+        mgr.on_saliency(&[
+            (0, 0, 0.6, [0.0, 0.0]),
+            (1, 1, 0.8, [0.0, 0.0]),
+            (2, 2, 0.9, [0.0, 0.0]),
+        ]);
 
         assert_eq!(mgr.pending_count(), 3);
         mgr.clear_pending();
@@ -658,15 +671,15 @@ mod tests {
         // With high NE, raise threshold to 1.0 → no patches qualify
         mgr.modulate(2.0, 1.0); // threshold = 0.5 * 2.0 = 1.0
         mgr.on_saliency(&[(0, 0, 0.9, [0.0, 0.0])]); // 0.9 < 1.0 threshold
-        assert_eq!(mgr.pending_count(), 0, "High NE should filter out 0.9 surprise");
+        assert_eq!(
+            mgr.pending_count(),
+            0,
+            "High NE should filter out 0.9 surprise"
+        );
 
         // With low NE, lower threshold to 0.1 → all patches qualify
         mgr.modulate(0.2, 1.0); // threshold = 0.5 * 0.2 = 0.1
         mgr.on_saliency(&[(0, 0, 0.3, [0.0, 0.0])]);
-        assert_eq!(
-            mgr.pending_count(),
-            1,
-            "Low NE should accept 0.3 surprise"
-        );
+        assert_eq!(mgr.pending_count(), 1, "Low NE should accept 0.3 surprise");
     }
 }

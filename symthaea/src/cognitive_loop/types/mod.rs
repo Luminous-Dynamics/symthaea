@@ -4,13 +4,13 @@
 //! All public APIs are preserved via re-exports.
 
 mod carryover;
+mod output;
 mod scheduling;
 mod telemetry;
-mod output;
 
+pub use output::*;
 pub use scheduling::*;
 pub use telemetry::*;
-pub use output::*;
 
 // Re-export crate-visible types
 pub(crate) use carryover::{ConsciousnessCache, CycleCarryover, QualityMetrics};

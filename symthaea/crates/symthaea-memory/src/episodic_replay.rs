@@ -566,10 +566,7 @@ impl EpisodicMemory {
         if self.config.psi_weighted_sampling {
             // Phi-weighted sampling using softmax probabilities
             let temp = self.config.sampling_temperature.max(1e-10);
-            let scores: Vec<f64> = all_episodes
-                .iter()
-                .map(|pe| pe.score / temp)
-                .collect();
+            let scores: Vec<f64> = all_episodes.iter().map(|pe| pe.score / temp).collect();
 
             // Compute softmax
             let max_score = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -836,8 +833,7 @@ impl EpisodicMemory {
             };
         }
 
-        let batch =
-            self.sample_replay_batch_conditioned(self.config.batch_size, current_bath);
+        let batch = self.sample_replay_batch_conditioned(self.config.batch_size, current_bath);
         if batch.is_empty() {
             return ReplaySessionResult {
                 episodes_replayed: 0,
@@ -868,8 +864,7 @@ impl EpisodicMemory {
         let mut new_episodes = BinaryHeap::new();
         for mut pe in self.episodes.drain() {
             for be in &batch {
-                if (pe.episode.psi - be.psi).abs() < 0.001 && pe.episode.timestamp == be.timestamp
-                {
+                if (pe.episode.psi - be.psi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
                     pe.episode.replay_count += 1;
                     pe.episode.reconsolidate(current_psi);
                     break;
@@ -1497,7 +1492,10 @@ mod tests {
         let input = ndarray::Array1::zeros(128);
         let target = ndarray::Array1::ones(128);
         let loss = net.train_step(&input, &target, 0.02, 0.001).unwrap();
-        assert!((loss - 0.01).abs() < 1e-6, "Mock should return stable 0.01 loss");
+        assert!(
+            (loss - 0.01).abs() < 1e-6,
+            "Mock should return stable 0.01 loss"
+        );
         assert_eq!(net.train_calls, 1);
     }
 
@@ -1519,7 +1517,10 @@ mod tests {
         let target = ndarray::Array1::ones(64);
         let result = net.train_step(&input, &target, 0.02, 0.001);
         assert!(result.is_err(), "Failing mock should return Err");
-        assert_eq!(net.train_calls, 1, "Call count still incremented on failure");
+        assert_eq!(
+            net.train_calls, 1,
+            "Call count still incremented on failure"
+        );
     }
 
     #[test]
@@ -1528,7 +1529,10 @@ mod tests {
         let input = ndarray::Array1::zeros(64);
         let target = ndarray::Array1::ones(64);
         let loss = net.train_step(&input, &target, 0.02, 0.0).unwrap();
-        assert!((loss - 0.01).abs() < 1e-6, "Mock returns loss even with lr=0");
+        assert!(
+            (loss - 0.01).abs() < 1e-6,
+            "Mock returns loss even with lr=0"
+        );
         assert_eq!(net.last_lr, 0.0);
         assert_eq!(net.train_calls, 1);
     }
@@ -1557,7 +1561,10 @@ mod tests {
 
         let loss = memory.replay_training_step(&mut net, &ep, 0.01, 0.02);
         assert!(loss.is_finite(), "Loss should be finite");
-        assert_eq!(net.train_calls, 1, "Network train_step should be called once");
+        assert_eq!(
+            net.train_calls, 1,
+            "Network train_step should be called once"
+        );
         assert!(net.last_lr > 0.0, "LR should be positive");
     }
 
@@ -1602,7 +1609,10 @@ mod tests {
 
         let result = memory.replay_session(&mut net, 0.01);
         assert!(!result.skipped, "Session should not be skipped");
-        assert_eq!(result.episodes_replayed, 5, "Should replay batch_size episodes");
+        assert_eq!(
+            result.episodes_replayed, 5,
+            "Should replay batch_size episodes"
+        );
         assert_eq!(net.train_calls, 5, "Network should be trained 5 times");
         assert!(result.average_loss.is_finite());
         assert!(result.average_psi > 0.0);
@@ -1643,7 +1653,10 @@ mod tests {
         }
 
         let stats = memory.stats();
-        assert!(stats.total_stored == 20, "All 20 should be counted as stored");
+        assert!(
+            stats.total_stored == 20,
+            "All 20 should be counted as stored"
+        );
         assert!(
             stats.total_evicted > 0,
             "Some should have been evicted: {}",

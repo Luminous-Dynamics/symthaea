@@ -17,7 +17,6 @@ use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 
-
 /// Suite that evaluates all 14 Butlin consciousness indicators
 /// via static architectural analysis, optionally blended with runtime
 /// structural Phi measurements.
@@ -371,7 +370,9 @@ impl PsychBenchmark for ButlinIndicatorSuite {
 
         result.conditions = 14;
         result.trials_per_condition = 1;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -452,13 +453,20 @@ mod tests {
 
         // At least some indicators should differ
         let mut any_different = false;
-        for (s, r) in report_static.indicators.iter().zip(report_rt.indicators.iter()) {
+        for (s, r) in report_static
+            .indicators
+            .iter()
+            .zip(report_rt.indicators.iter())
+        {
             if (s.score.unwrap_or(0.0) - r.score.unwrap_or(0.0)).abs() > 0.001 {
                 any_different = true;
                 break;
             }
         }
-        assert!(any_different, "Runtime data should change at least some scores");
+        assert!(
+            any_different,
+            "Runtime data should change at least some scores"
+        );
     }
 
     #[test]
@@ -596,7 +604,10 @@ mod tests {
     #[test]
     fn test_normalize_phi_monotonic() {
         let values: Vec<f64> = (0..=100).map(|i| i as f64 * 0.1).collect();
-        let normalized: Vec<f64> = values.iter().map(|&v| ButlinIndicatorSuite::normalize_phi(v)).collect();
+        let normalized: Vec<f64> = values
+            .iter()
+            .map(|&v| ButlinIndicatorSuite::normalize_phi(v))
+            .collect();
         for i in 1..normalized.len() {
             assert!(
                 normalized[i] >= normalized[i - 1] - 1e-10,

@@ -47,12 +47,9 @@ impl AsyncTrainerHandle {
                     // Apply vision-surprise importance weighting to learning rate
                     let lr = sample.learning_rate * sample.importance;
                     let result = match sample.method {
-                        TrainingMethod::Spsa => network.train_step_spsa(
-                            &sample.input,
-                            &sample.target,
-                            sample.dt,
-                            lr,
-                        ),
+                        TrainingMethod::Spsa => {
+                            network.train_step_spsa(&sample.input, &sample.target, sample.dt, lr)
+                        }
                         TrainingMethod::Bptt => network.train_step_bptt(
                             &[sample.input],
                             &[sample.target],

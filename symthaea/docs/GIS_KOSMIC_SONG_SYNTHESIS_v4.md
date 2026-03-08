@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-GIS v4.0 "Kosmic Song" represents the full unification of consciousness science (Φ), value alignment (Seven Harmonies), and epistemic humility (Graceful Ignorance). This architecture enables AI systems to:
+GIS v4.0 "Kosmic Song" represents the full unification of consciousness science (Φ), value alignment (Eight Harmonies), and epistemic humility (Graceful Ignorance). This architecture enables AI systems to:
 
 1. **Know what they don't know** (GIS v1-3)
 2. **Know from multiple perspectives** (Rashomon Engine)
@@ -31,7 +31,7 @@ GIS v4.0 (Kosmic Song)  → Full harmonic integration with consciousness
 
 ## Core Concepts
 
-### 1. Seven Harmonies as Seven Ways of Knowing
+### 1. Eight Harmonies as Seven Ways of Knowing
 
 Each Harmony becomes an epistemic lens through which knowledge is perceived:
 
@@ -233,7 +233,7 @@ impl KosmicSong {
 
 ### 1. Why Seven Frames, Not Infinite?
 
-The Seven Harmonies provide a principled, bounded set of perspectives. Unlike arbitrary multi-perspective systems, these map to fundamental value dimensions with research backing.
+The Eight Harmonies provide a principled, bounded set of perspectives. Unlike arbitrary multi-perspective systems, these map to fundamental value dimensions with research backing.
 
 ### 2. Why Tripartite Moral Uncertainty?
 

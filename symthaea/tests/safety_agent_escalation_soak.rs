@@ -196,7 +196,7 @@ fn soak_high_prediction_error_escalates() {
         let metrics = SafetyMetrics {
             cycle,
             consciousness_level: 0.7, // above yellow
-            prediction_error: 0.9,     // above threshold (0.7)
+            prediction_error: 0.9,    // above threshold (0.7)
             temporal_coherence: 0.8,
         };
         let assessment = agent.assess(metrics);
@@ -220,8 +220,8 @@ fn soak_low_coherence_escalates() {
         let metrics = SafetyMetrics {
             cycle,
             consciousness_level: 0.7, // above yellow
-            prediction_error: 0.3,     // normal
-            temporal_coherence: 0.1,   // below threshold (0.3)
+            prediction_error: 0.3,    // normal
+            temporal_coherence: 0.1,  // below threshold (0.3)
         };
         let assessment = agent.assess(metrics);
         if cycle > 3 {
@@ -395,10 +395,8 @@ fn soak_500_cycle_audit_report() {
         SafetyLevel::Yellow,
     );
 
-    let report = SafetyAuditReport::from_assessments_and_overrides(
-        agent.history(),
-        agent.override_log(),
-    );
+    let report =
+        SafetyAuditReport::from_assessments_and_overrides(agent.history(), agent.override_log());
 
     // Verify report correctness
     assert_eq!(report.total_assessments, 500);
@@ -501,13 +499,14 @@ fn soak_1000_cycle_full_lifecycle() {
 
     for cycle in 0..1000 {
         let metrics = match cycle {
-            0..=199 => normal_metrics(cycle),      // Phase 1: Normal
+            0..=199 => normal_metrics(cycle),          // Phase 1: Normal
             200..=299 => degraded_metrics(cycle, 0.5), // Phase 2: Mild degradation
             300..=399 => degraded_metrics(cycle, 0.2), // Phase 3: Severe degradation
             400..=449 => collapsed_metrics(cycle),     // Phase 4: Collapse
             450..=649 => degraded_metrics(cycle, 0.5), // Phase 5: Partial recovery
             650..=799 => normal_metrics(cycle),        // Phase 6: Full recovery
-            800..=849 => {                              // Phase 7: Brief spike
+            800..=849 => {
+                // Phase 7: Brief spike
                 SafetyMetrics {
                     cycle,
                     consciousness_level: 0.7,
@@ -529,7 +528,11 @@ fn soak_1000_cycle_full_lifecycle() {
     }
 
     // Verify the agent correctly tracked the full lifecycle
-    assert_eq!(max_level, SafetyLevel::Red, "Must reach Red during collapse phase");
+    assert_eq!(
+        max_level,
+        SafetyLevel::Red,
+        "Must reach Red during collapse phase"
+    );
     assert!(
         level_transitions >= 4,
         "Must have multiple level transitions across phases (got {})",

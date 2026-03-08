@@ -408,7 +408,10 @@ impl PredictiveMonitor {
             .unwrap_or(0);
 
         // Only record the 1h horizon predictions (shortest, most verifiable)
-        for p in predictions.iter().filter(|p| (p.hours_ahead - 1.0).abs() < 0.01) {
+        for p in predictions
+            .iter()
+            .filter(|p| (p.hours_ahead - 1.0).abs() < 0.01)
+        {
             self.pending_predictions.push(PendingPrediction {
                 made_at: now_secs,
                 hours_ahead: p.hours_ahead,
@@ -599,7 +602,14 @@ impl PredictiveMonitor {
         let load_encoded = load_hv.scale((telemetry.load_average_1m as f32 / 16.0).min(1.0));
         let swap_encoded = swap_hv.scale(telemetry.swap_used_pct as f32 / 100.0);
 
-        ContinuousHV::bundle(&[&disk_encoded, &mem_encoded, &store_encoded, &fail_encoded, &load_encoded, &swap_encoded])
+        ContinuousHV::bundle(&[
+            &disk_encoded,
+            &mem_encoded,
+            &store_encoded,
+            &fail_encoded,
+            &load_encoded,
+            &swap_encoded,
+        ])
     }
 
     /// Compute per-hour trends from the history using simple linear regression.

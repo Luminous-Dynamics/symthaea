@@ -714,9 +714,13 @@ fn sweep_contiguous_cuts(cov: &[f64], n: usize) -> Vec<f64> {
         return vec![];
     }
 
-    // Left and right sweeps are independent — run in parallel.
+    // Left and right sweeps are independent — run in parallel when available.
+    #[cfg(feature = "parallel")]
     let ((left_ln_det, left_sum_ln_var), (right_ln_det, right_sum_ln_var)) =
         rayon::join(|| sweep_left(cov, n), || sweep_right(cov, n));
+    #[cfg(not(feature = "parallel"))]
+    let ((left_ln_det, left_sum_ln_var), (right_ln_det, right_sum_ln_var)) =
+        (sweep_left(cov, n), sweep_right(cov, n));
 
     // ─── Combine: for cut at k, left = [0..=k], right = [k+1..n-1] ───
     let mut cut_mis = Vec::with_capacity(n - 1);
@@ -1090,10 +1094,7 @@ impl SpectralMIPFinder {
                 cluster_phis.push(total_mi.max(0.0));
             } else {
                 let cut_mis = sweep_contiguous_cuts(&sub_cov, m);
-                let min_cut = cut_mis
-                    .iter()
-                    .copied()
-                    .fold(f64::MAX, f64::min);
+                let min_cut = cut_mis.iter().copied().fold(f64::MAX, f64::min);
                 cluster_phis.push((total_mi - min_cut).max(0.0));
             }
         }

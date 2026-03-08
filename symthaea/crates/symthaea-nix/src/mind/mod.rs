@@ -20,8 +20,8 @@ pub mod episodic_memory;
 pub mod goal_inference;
 pub mod hdc_world_model;
 pub mod journal_anomaly;
-pub mod predictive_hierarchy;
 pub mod ollama_bridge;
+pub mod predictive_hierarchy;
 pub mod working_memory;
 pub mod world_model;
 
@@ -31,7 +31,7 @@ pub use episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
 pub use goal_inference::{GoalInference, InferredGoal};
 pub use hdc_world_model::{DriftReport, HdcWorldModel, StateProjection};
 pub use journal_anomaly::JournalAnomalyDetector;
+pub use ollama_bridge::{OllamaBridge, OllamaBridgeConfig, OllamaResponse};
 pub use predictive_hierarchy::{PredictionLevel, PredictiveHierarchy};
 pub use working_memory::{MemoryItem, MemorySource, SavedWorkingMemory, WorkingMemory};
-pub use ollama_bridge::{OllamaBridge, OllamaBridgeConfig, OllamaResponse};
 pub use world_model::{ActionCategory, NixWorldModel};

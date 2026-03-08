@@ -166,7 +166,9 @@ mod tests {
         // Sum should be 2+3+4=9 for variable 0
         let cov = w.build_covariance();
         let mean_0 = (2.0 + 3.0 + 4.0) / 3.0;
-        let expected_var = ((2.0f64 - mean_0).powi(2) + (3.0f64 - mean_0).powi(2) + (4.0f64 - mean_0).powi(2)) / 3.0;
+        let expected_var =
+            ((2.0f64 - mean_0).powi(2) + (3.0f64 - mean_0).powi(2) + (4.0f64 - mean_0).powi(2))
+                / 3.0;
         assert!((cov[0] - expected_var).abs() < 1e-10, "variance mismatch");
     }
 
@@ -183,7 +185,10 @@ mod tests {
         let var_x0 = cov[0]; // Cov[0,0]
         let cov_01 = cov[1]; // Cov[0,1]
         assert!(var_x0 > 0.0, "variance should be positive");
-        assert!((cov_01 - 2.0 * var_x0).abs() < 1e-10, "cov(x,2x) should be 2*var(x)");
+        assert!(
+            (cov_01 - 2.0 * var_x0).abs() < 1e-10,
+            "cov(x,2x) should be 2*var(x)"
+        );
     }
 
     #[test]
@@ -238,6 +243,9 @@ mod tests {
         w.clear();
         assert_eq!(w.len(), 0);
         let cov = w.build_covariance();
-        assert!(cov.iter().all(|&v| v == 0.0), "cleared window should have zero covariance");
+        assert!(
+            cov.iter().all(|&v| v == 0.0),
+            "cleared window should have zero covariance"
+        );
     }
 }

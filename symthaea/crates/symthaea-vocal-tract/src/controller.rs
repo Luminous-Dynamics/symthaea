@@ -253,7 +253,11 @@ impl VocalTractController {
         Self::new_internal(genesis, config, 0.15)
     }
 
-    fn new_internal(genesis: &GenesisSeed, config: &VocalTractConfig, weight_init_scale: f32) -> Self {
+    fn new_internal(
+        genesis: &GenesisSeed,
+        config: &VocalTractConfig,
+        weight_init_scale: f32,
+    ) -> Self {
         let neuron_config = UnifiedConfig {
             tau_base: 0.005,
             backbone_tau: 0.1,
@@ -868,13 +872,11 @@ impl VocalTractController {
                         phoneme_lr *= ramp;
                     } else {
                         // Far-from-schwa: LR × [1.0, distance_lr_cap] ramp
-                        let ramp = 1.0
-                            + (params.distance_lr_cap - 1.0) * ((norm_dist - 0.3) / 0.7);
+                        let ramp = 1.0 + (params.distance_lr_cap - 1.0) * ((norm_dist - 0.3) / 0.7);
                         phoneme_lr *= ramp;
                         // Also boost F2 gradient (0.7× error scale = stronger F2 gradient)
-                        let mut custom_scale = [
-                            400.0, 600.0, 1500.0, 100.0, 150.0, 200.0, 100.0, 1.0, 1.0,
-                        ];
+                        let mut custom_scale =
+                            [400.0, 600.0, 1500.0, 100.0, 150.0, 200.0, 100.0, 1.0, 1.0];
                         custom_scale[1] *= 0.7; // 420.0 — stronger F2 gradient
                         error_scale_override = Some(custom_scale);
                     }
@@ -957,10 +959,18 @@ impl VocalTractController {
                 SourceType::Liquid => (0.6, 0.90),
                 SourceType::Nasal => (0.5, 0.95),
                 SourceType::Stop => {
-                    if target.is_voiced { (0.4, 0.7) } else { (0.2, 0.05) }
+                    if target.is_voiced {
+                        (0.4, 0.7)
+                    } else {
+                        (0.2, 0.05)
+                    }
                 }
                 SourceType::Fricative => {
-                    if target.is_voiced { (0.5, 0.6) } else { (0.4, 0.05) }
+                    if target.is_voiced {
+                        (0.5, 0.6)
+                    } else {
+                        (0.4, 0.05)
+                    }
                 }
                 SourceType::Affricate => (0.3, 0.1),
                 SourceType::Silent => (0.0, 0.0),
@@ -1011,7 +1021,10 @@ impl VocalTractController {
 
         for dim in 0..OUTPUT_DIM {
             // Construct RHS: y_i = target_raw[i] - bias[i] (what the weights need to produce)
-            let y: Vec<f32> = targets.iter().map(|t| t[dim] - self.output_bias[dim]).collect();
+            let y: Vec<f32> = targets
+                .iter()
+                .map(|t| t[dim] - self.output_bias[dim])
+                .collect();
 
             // Solve G * alpha = y using Gaussian elimination (n is small, ~44)
             let alpha = solve_linear_system(&gram, &y, n);
@@ -2526,10 +2539,17 @@ mod tests {
         let mut ctrl = VocalTractController::new(&genesis, &config);
         let hv = ContinuousHV::random(HDC_DIMENSION, 42);
         let target = FormantFrame {
-            f1: 500.0, f2: 1500.0, f3: 2500.0,
-            b1: 60.0, b2: 90.0, b3: 150.0,
-            f0: 120.0, energy: 0.5, voicing: 0.8,
-            time: 0.0, source_type: SourceType::Vowel,
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.5,
+            voicing: 0.8,
+            time: 0.0,
+            source_type: SourceType::Vowel,
             ..Default::default()
         };
         ctrl.forward(&hv, 0.005);
@@ -2544,16 +2564,22 @@ mod tests {
         let mut ctrl = VocalTractController::new(&genesis, &config);
         let hv = ContinuousHV::random(HDC_DIMENSION, 42);
         let target = FormantFrame {
-            f1: 500.0, f2: 1500.0, f3: 2500.0,
-            b1: 60.0, b2: 90.0, b3: 150.0,
-            f0: 120.0, energy: 0.5, voicing: 0.8,
-            time: 0.0, source_type: SourceType::Vowel,
+            f1: 500.0,
+            f2: 1500.0,
+            f3: 2500.0,
+            b1: 60.0,
+            b2: 90.0,
+            b3: 150.0,
+            f0: 120.0,
+            energy: 0.5,
+            voicing: 0.8,
+            time: 0.0,
+            source_type: SourceType::Vowel,
             ..Default::default()
         };
         ctrl.forward(&hv, 0.005);
-        let custom_scale: [f32; OUTPUT_DIM] = [
-            400.0, 420.0, 1500.0, 100.0, 150.0, 200.0, 100.0, 1.0, 1.0,
-        ];
+        let custom_scale: [f32; OUTPUT_DIM] =
+            [400.0, 420.0, 1500.0, 100.0, 150.0, 200.0, 100.0, 1.0, 1.0];
         ctrl.train_step_impl(&hv, &target, 0.005, 0.001, 0.0, Some(&custom_scale));
         // Should not panic
     }
@@ -2602,7 +2628,10 @@ mod tests {
     #[test]
     fn test_adaptive_lr_default_enabled() {
         let params = TrainingHyperparams::default();
-        assert!(params.attractor_adaptive_lr, "adaptive LR should be enabled by default");
+        assert!(
+            params.attractor_adaptive_lr,
+            "adaptive LR should be enabled by default"
+        );
     }
 
     #[test]

@@ -155,7 +155,10 @@ impl NeuralVocoderChannel {
                             match ort::session::Session::builder() {
                                 Ok(b) => b,
                                 Err(e2) => {
-                                    warn!("Fallback session builder failed: {}. Thread exiting.", e2);
+                                    warn!(
+                                        "Fallback session builder failed: {}. Thread exiting.",
+                                        e2
+                                    );
                                     return;
                                 }
                             }

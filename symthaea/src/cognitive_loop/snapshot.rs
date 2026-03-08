@@ -197,7 +197,7 @@ pub struct ConsciousnessSnapshot {
     /// Spectral MIP Phi — O(n³) Minimum Information Partition (None = not yet computed).
     pub spectral_mip_phi: Option<f64>,
 
-    /// Harmonies alignment score (0.0–1.0) from Seven Harmonies integrator.
+    /// Harmonies alignment score (0.0–1.0) from Eight Harmonies integrator.
     pub harmonies_alignment: f32,
 
     /// Empathic compassion level (0.0–1.0) from empathic unification.

@@ -33,6 +33,7 @@
 
 use super::binary_hv::BinaryHV;
 use super::lsh_simhash::{SimHashConfig, SimHashIndex};
+#[cfg(feature = "parallel")]
 use rayon::prelude::*; // Session 8: Parallel query processing
 
 /// Threshold for switching from naive to LSH search (dataset size)
@@ -278,33 +279,28 @@ pub fn adaptive_batch_find_most_similar(
     if targets.len() < LSH_THRESHOLD {
         // Level 1: Small dataset - always use naive (LSH overhead too high)
         if queries.len() < PARALLEL_THRESHOLD {
-            // Sequential for small query batches (parallel overhead too high)
             queries
-                .iter() // Sequential - parallel overhead > benefit
+                .iter()
                 .map(|q| naive_find_most_similar(q, targets))
                 .collect()
         } else {
-            // Parallel for large query batches
-            queries
-                .par_iter() // Parallel! 2-8x speedup on 50+ queries
-                .map(|q| naive_find_most_similar(q, targets))
-                .collect()
+            #[cfg(feature = "parallel")]
+            { queries.par_iter().map(|q| naive_find_most_similar(q, targets)).collect() }
+            #[cfg(not(feature = "parallel"))]
+            { queries.iter().map(|q| naive_find_most_similar(q, targets)).collect() }
         }
     } else if queries.len() < QUERY_COUNT_THRESHOLD {
         // Level 2: Large dataset, FEW queries - naive faster than LSH
-        // Production workload: 10 queries × 1000 vectors
         if queries.len() < PARALLEL_THRESHOLD {
-            // Sequential for <50 queries (4.3x faster than parallel!)
             queries
-                .iter() // Sequential - parallel overhead too high
+                .iter()
                 .map(|q| naive_find_most_similar(q, targets))
                 .collect()
         } else {
-            // Parallel for 50+ queries
-            queries
-                .par_iter() // Parallel! 2x+ speedup
-                .map(|q| naive_find_most_similar(q, targets))
-                .collect()
+            #[cfg(feature = "parallel")]
+            { queries.par_iter().map(|q| naive_find_most_similar(q, targets)).collect() }
+            #[cfg(not(feature = "parallel"))]
+            { queries.iter().map(|q| naive_find_most_similar(q, targets)).collect() }
         }
     } else {
         // Level 3-4: Large dataset, MANY queries (150+) - batch LSH wins!
@@ -335,25 +331,17 @@ fn batch_lsh_find_most_similar(
     index.insert_batch(targets);
 
     // Query for each input (cheap, index already built!)
-    // Session 8: Conditional parallelization based on query count
+    let query_fn = |q: &BinaryHV| {
+        let results = index.query_approximate(q, 1, targets);
+        results.into_iter().next()
+    };
     if queries.len() < PARALLEL_THRESHOLD {
-        // Sequential for <50 queries
-        queries
-            .iter()
-            .map(|q| {
-                let results = index.query_approximate(q, 1, targets);
-                results.into_iter().next()
-            })
-            .collect()
+        queries.iter().map(query_fn).collect()
     } else {
-        // Parallel for 50+ queries (2-8x speedup!)
-        queries
-            .par_iter()
-            .map(|q| {
-                let results = index.query_approximate(q, 1, targets);
-                results.into_iter().next()
-            })
-            .collect()
+        #[cfg(feature = "parallel")]
+        { queries.par_iter().map(query_fn).collect() }
+        #[cfg(not(feature = "parallel"))]
+        { queries.iter().map(query_fn).collect() }
     }
 }
 
@@ -375,28 +363,22 @@ pub fn adaptive_batch_find_top_k(
     if targets.len() < LSH_THRESHOLD {
         // Level 1: Small dataset - always use naive
         if queries.len() < PARALLEL_THRESHOLD {
-            queries
-                .iter() // Sequential for <50 queries
-                .map(|q| naive_find_top_k(q, targets, k))
-                .collect()
+            queries.iter().map(|q| naive_find_top_k(q, targets, k)).collect()
         } else {
-            queries
-                .par_iter() // Parallel for 50+ queries
-                .map(|q| naive_find_top_k(q, targets, k))
-                .collect()
+            #[cfg(feature = "parallel")]
+            { queries.par_iter().map(|q| naive_find_top_k(q, targets, k)).collect() }
+            #[cfg(not(feature = "parallel"))]
+            { queries.iter().map(|q| naive_find_top_k(q, targets, k)).collect() }
         }
     } else if queries.len() < QUERY_COUNT_THRESHOLD {
         // Level 2: Large dataset, FEW queries - naive is faster
         if queries.len() < PARALLEL_THRESHOLD {
-            queries
-                .iter() // Sequential for <50 queries
-                .map(|q| naive_find_top_k(q, targets, k))
-                .collect()
+            queries.iter().map(|q| naive_find_top_k(q, targets, k)).collect()
         } else {
-            queries
-                .par_iter() // Parallel for 50+ queries
-                .map(|q| naive_find_top_k(q, targets, k))
-                .collect()
+            #[cfg(feature = "parallel")]
+            { queries.par_iter().map(|q| naive_find_top_k(q, targets, k)).collect() }
+            #[cfg(not(feature = "parallel"))]
+            { queries.iter().map(|q| naive_find_top_k(q, targets, k)).collect() }
         }
     } else {
         // Level 3-4: Large dataset, MANY queries - batch LSH wins!
@@ -424,17 +406,13 @@ fn batch_lsh_find_top_k(
     index.insert_batch(targets);
 
     // Query for each input (reusing index!)
-    // Session 8: Conditional parallelization
     if queries.len() < PARALLEL_THRESHOLD {
-        queries
-            .iter() // Sequential for <50 queries
-            .map(|q| index.query_approximate(q, k, targets))
-            .collect()
+        queries.iter().map(|q| index.query_approximate(q, k, targets)).collect()
     } else {
-        queries
-            .par_iter() // Parallel for 50+ queries
-            .map(|q| index.query_approximate(q, k, targets))
-            .collect()
+        #[cfg(feature = "parallel")]
+        { queries.par_iter().map(|q| index.query_approximate(q, k, targets)).collect() }
+        #[cfg(not(feature = "parallel"))]
+        { queries.iter().map(|q| index.query_approximate(q, k, targets)).collect() }
     }
 }
 

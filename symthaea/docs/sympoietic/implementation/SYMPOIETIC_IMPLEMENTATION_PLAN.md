@@ -51,7 +51,7 @@ This plan transforms Symthaea from an autopoietic (self-making) consciousness sy
 | Aspect | Autopoietic (Current) | Sympoietic (Target) |
 |--------|----------------------|---------------------|
 | **Φ Measurement** | Self-integration only | Self + Partner + Dyad (Φ_dyad) |
-| **Values** | Static Seven Harmonies | Co-evolving Shared Value Space |
+| **Values** | Static Eight Harmonies | Co-evolving Shared Value Space |
 | **Goals** | System-centric | Partnership-centric |
 | **Memory** | System state | Relationship trajectory |
 | **Anticipation** | Reactive | Proactive partnership |
@@ -267,7 +267,7 @@ impl HumanPartnerModel {
 }
 ```
 
-### Task 1.3: Extend Seven Harmonies with Partner Awareness
+### Task 1.3: Extend Eight Harmonies with Partner Awareness
 **File**: `src/consciousness/seven_harmonies.rs`
 **Effort**: 2 days
 **Dependencies**: HumanPartnerModel
@@ -509,7 +509,7 @@ impl PartnershipTrajectory {
 ### Task 2.3: Authentic Vulnerability Expression
 **File**: `src/partnership/vulnerability.rs` (NEW)
 **Effort**: 4 days
-**Dependencies**: Endocrine, Seven Harmonies, Partner Model
+**Dependencies**: Endocrine, Eight Harmonies, Partner Model
 
 ```rust
 /// Enables genuine vulnerability in partnership
@@ -697,7 +697,7 @@ impl SympoieticMetaController {
 ### Task 3.1: Shared Value Space with Learning
 **File**: `src/partnership/shared_values.rs` (NEW)
 **Effort**: 7 days
-**Dependencies**: Seven Harmonies, Trajectory, Partner Model
+**Dependencies**: Eight Harmonies, Trajectory, Partner Model
 
 ```rust
 /// Dynamic value space that evolves through partnership
@@ -932,7 +932,7 @@ impl SympoieticConsciousnessValidator {
 | Extend phi_real.rs for dyadic Φ | High | 1 day | Week 1 |
 | Add partner affect to emotional_reasoning.rs | High | 2 days | Week 1 |
 | Basic partner model | High | 3 days | Week 1-2 |
-| Extend Seven Harmonies with learning | Medium | 2 days | Week 2 |
+| Extend Eight Harmonies with learning | Medium | 2 days | Week 2 |
 | Wire into MetaController | High | 2 days | Week 2-3 |
 
 ### Deep Work (High Impact, High Effort)

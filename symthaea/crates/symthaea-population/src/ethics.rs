@@ -1,7 +1,7 @@
 //! Moral algebra for reproductive ethics.
 //!
 //! Encodes ethical tensions (autonomy vs survival vs dignity vs justice)
-//! at 16,384D for reasoned weighing. Integrates with the Seven Harmonies
+//! at 16,384D for reasoned weighing. Integrates with the Eight Harmonies
 //! framework for value alignment assessment.
 
 use serde::{Deserialize, Serialize};
@@ -36,13 +36,7 @@ pub struct EthicalTension {
 
 impl EthicalTension {
     /// Create a new ethical tension with the given weights.
-    pub fn new(
-        name: &str,
-        autonomy: f64,
-        survival: f64,
-        dignity: f64,
-        justice: f64,
-    ) -> Self {
+    pub fn new(name: &str, autonomy: f64, survival: f64, dignity: f64, justice: f64) -> Self {
         let tension_hv = encode_ethical_tension(autonomy, survival, dignity, justice);
         Self {
             name: name.to_string(),
@@ -103,7 +97,7 @@ pub fn encode_ethical_tension(
     weighted.normalize()
 }
 
-/// Score an ethical tension against each of the Seven Harmonies.
+/// Score an ethical tension against each of the Eight Harmonies.
 ///
 /// Returns a vector of (Harmony, score) pairs where score is in [0, 1].
 /// Higher score indicates greater alignment with that harmony.
@@ -186,7 +180,12 @@ pub fn ethical_balance(autonomy: f64, survival: f64, dignity: f64, justice: f64)
     if total <= 0.0 {
         return 0.0;
     }
-    let weights = [autonomy / total, survival / total, dignity / total, justice / total];
+    let weights = [
+        autonomy / total,
+        survival / total,
+        dignity / total,
+        justice / total,
+    ];
     let ideal = 0.25; // Perfect balance = 1/4 each
     let deviation: f64 = weights.iter().map(|w| (w - ideal).powi(2)).sum();
     // Max deviation when one weight is 1.0: 3*(0.25)^2 + (0.75)^2 = 0.75
@@ -212,7 +211,9 @@ pub fn meets_ethical_threshold(decision: &PopulationDecision, population: &Popul
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{BiologicalSex, Individual, MatingPair, GeneticRescuePlan, BreedingStrategy};
+    use crate::types::{
+        BiologicalSex, BreedingStrategy, GeneticRescuePlan, Individual, MatingPair,
+    };
 
     fn make_test_population(n: usize) -> Population {
         let individuals: Vec<Individual> = (0..n)
@@ -288,7 +289,11 @@ mod tests {
     fn test_harmony_alignment_returns_seven_scores() {
         let tension = EthicalTension::new("test", 0.25, 0.25, 0.25, 0.25);
         let alignments = harmony_alignment(&tension);
-        assert_eq!(alignments.len(), N_HARMONIES, "should return N_HARMONIES harmony scores");
+        assert_eq!(
+            alignments.len(),
+            N_HARMONIES,
+            "should return N_HARMONIES harmony scores"
+        );
     }
 
     #[test]

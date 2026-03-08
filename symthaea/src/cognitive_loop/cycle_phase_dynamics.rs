@@ -33,61 +33,51 @@ use rayon::join as rayon_join;
 use std::borrow::Cow;
 use std::time::Instant;
 
-use super::phase_results::{
-    DynCore, DynFep, DynReasoning, DynAttention, DynResonator, DynHomeostasis, DynGuidance, DynNeuromod,
-    DynamicsPhaseResult, PerceptionPhaseResult,
-};
 use super::helpers;
+use super::phase_results::{
+    DynAttention, DynCore, DynFep, DynGuidance, DynHomeostasis, DynNeuromod, DynReasoning,
+    DynResonator, DynamicsPhaseResult, PerceptionPhaseResult,
+};
 use super::thresholds::{
-    ATTENTION_BUDGET_US, BINDING_CONFIDENCE_THRESHOLD, BINDING_LOW_THRESHOLD,
-    BINDING_STRONG_CONFIDENCE_SCALE, BINDING_STRONG_RELIEF_SCALE, BINDING_WEAK_CAUTION_SCALE,
-    BINDING_WEAK_CONFIDENCE_SCALE, COHERENCE_CONFIDENCE_BOOST, COHERENCE_HIGH_THRESHOLD,
-    COHERENCE_LOW_DAMPEN_SCALE, COHERENCE_LOW_THRESHOLD, COHERENCE_PREDICTION_EMA,
-    DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE, DOMINANCE_FLOW_SCALE,
-    MEMORY_RECALL_TOP_K, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD,
-    POLICY_TEMP_BASE, POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, QUANTUM_COHERENCE_BOOST_SCALE,
-    QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER, RESONANCE_TAU_SCALE,
-    RESONATOR_ERROR_CONFIDENCE_DAMPEN, RESONATOR_ERROR_EXPLORATION_SCALE,
+    ALEATORIC_UNCERTAINTY_DEFAULT, AROUSAL_RECOVERY_TAU_SCALE, AROUSAL_TAU_DEADZONE,
+    AROUSAL_TAU_SENSITIVITY, ATTENTION_BUDGET_US, BINDING_CONFIDENCE_THRESHOLD,
+    BINDING_LOW_THRESHOLD, BINDING_STRONG_CONFIDENCE_SCALE, BINDING_STRONG_RELIEF_SCALE,
+    BINDING_WEAK_CAUTION_SCALE, BINDING_WEAK_CONFIDENCE_SCALE, CODEBOOK_FAMILIAR_TAU_SCALE,
+    CODEBOOK_FAMILIAR_THRESHOLD, CODEBOOK_NOVEL_TAU_SCALE, CODEBOOK_NOVEL_THRESHOLD,
+    COHERENCE_CONFIDENCE_BOOST, COHERENCE_HIGH_THRESHOLD, COHERENCE_LOW_DAMPEN_SCALE,
+    COHERENCE_LOW_THRESHOLD, COHERENCE_PREDICTION_EMA, COHERENCE_VELOCITY_TAU_BOOST,
+    COHERENCE_VELOCITY_TAU_DAMPEN, COHERENCE_VELOCITY_TAU_THRESHOLD,
+    CONFIDENCE_CRASH_EXPLORATION_BOOST, CONFIDENCE_CRASH_FREEZE_CYCLES, CONFIDENCE_CRASH_THRESHOLD,
+    DOMINANCE_CONFIDENCE_THRESHOLD, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE,
+    DOMINANCE_FLOW_SCALE, EPISTEMIC_EXPLORE_SCALE, EPISTEMIC_EXPLORE_THRESHOLD,
+    EPISTEMIC_LOW_DAMPEN, EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER,
+    EPISTEMIC_OSCILLATION_THRESHOLD, EPISTEMIC_SEMANTIC_BOOST_SCALE,
+    EPISTEMIC_SEMANTIC_BOOST_THRESHOLD, EPISTEMIC_SEMANTIC_CAUTION_BASE,
+    EPISTEMIC_SEMANTIC_CAUTION_SCALE, EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD,
+    EPISTEMIC_UNCERTAINTY_DEFAULT, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
+    FEP_LEARNING_PLASTICITY_THRESHOLD, FEP_PRAGMATIC_EXPLOIT_THRESHOLD,
+    FEP_PRAGMATIC_EXPLORE_THRESHOLD, FEP_SURPRISE_TAU_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD,
+    HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA, HOMEOSTASIS_EFFICIENCY_HIGH,
+    HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_PULL_CRITICAL, HOMEOSTASIS_PULL_CRUISE,
+    HOMEOSTASIS_PULL_INCREASE, HOMEOSTASIS_PULL_NORMAL, HOMEOSTASIS_PULL_REDUCTION,
+    MCTS_CONSOLIDATE_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA,
+    MCTS_EFFECTIVENESS_EXPLORE_SCALE, MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW,
+    MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE, MCTS_PLAN_CONFIDENCE_THRESHOLD,
+    MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K, PE_VARIANCE_DAMPEN_SCALE, PE_VARIANCE_MAX_EFFECT,
+    PE_VARIANCE_THRESHOLD, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD,
+    POLICY_TEMP_BASE, POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, PREDICTIVE_BUDGET_GATING_RATIO,
+    QUANTUM_COHERENCE_BOOST_SCALE, QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER,
+    RESONANCE_TAU_SCALE, RESONATOR_ERROR_CONFIDENCE_DAMPEN, RESONATOR_ERROR_EXPLORATION_SCALE,
     RESONATOR_ERROR_EXPLORATION_THRESHOLD, RESONATOR_LOW_ERROR_CONFIDENCE_SCALE,
-    RESONATOR_LOW_ERROR_THRESHOLD, SELF_MODEL_ACCURACY_EMA, SELF_MODEL_HIGH_THRESHOLD,
-    SELF_MODEL_HIGH_TRUST_BOOST, SELF_MODEL_LOW_CONFIDENCE_SCALE, SELF_MODEL_LOW_THRESHOLD,
+    RESONATOR_LOW_ERROR_THRESHOLD, SELF_MODEL_ACCURACY_EMA, SELF_MODEL_CONFIDENCE_WEIGHT,
+    SELF_MODEL_HIGH_THRESHOLD, SELF_MODEL_HIGH_TRUST_BOOST, SELF_MODEL_LOW_CONFIDENCE_SCALE,
+    SELF_MODEL_LOW_THRESHOLD, SELF_MODEL_URGENCY_WEIGHT, SELF_MODEL_WEIGHT_BONUS,
+    SELF_MODEL_WEIGHT_HIGH_THRESHOLD, SELF_MODEL_WEIGHT_LOW_THRESHOLD, SELF_MODEL_WEIGHT_PENALTY,
     THALAMIC_DEEP_BUDGET_SCALE, THALAMIC_DEEP_LR_FACTOR, THALAMIC_DEEP_SALIENCE,
     THALAMIC_REFLEX_BUDGET_SCALE, THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE,
-    WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE,
-    TRAINING_BASE_IMPORTANCE, HOMEOSTASIS_PULL_CRUISE, HOMEOSTASIS_PULL_NORMAL,
-    HOMEOSTASIS_PULL_CRITICAL, HOMEOSTASIS_AROUSAL_TARGET, PREDICTIVE_BUDGET_GATING_RATIO,
-    WORLD_MODEL_STIFFNESS_THRESHOLD, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
-    FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_THRESHOLD,
-    FEP_TD_ERROR_DISCOVERY_THRESHOLD, FEP_LEARNING_PLASTICITY_THRESHOLD,
-    SELF_MODEL_CONFIDENCE_WEIGHT, SELF_MODEL_URGENCY_WEIGHT,
-    PE_VARIANCE_THRESHOLD, PE_VARIANCE_MAX_EFFECT, PE_VARIANCE_DAMPEN_SCALE,
-    AROUSAL_TAU_DEADZONE, AROUSAL_TAU_SENSITIVITY,
-    CODEBOOK_FAMILIAR_THRESHOLD, CODEBOOK_FAMILIAR_TAU_SCALE,
-    CODEBOOK_NOVEL_THRESHOLD, CODEBOOK_NOVEL_TAU_SCALE,
-    AROUSAL_RECOVERY_TAU_SCALE, FEP_SURPRISE_TAU_SCALE,
-    HOMEOSTASIS_EFFICIENCY_EMA, TRANSITION_COST_THRESHOLD,
-    TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE,
-    EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD, EPISTEMIC_SEMANTIC_BOOST_THRESHOLD,
-    EPISTEMIC_SEMANTIC_CAUTION_BASE, EPISTEMIC_SEMANTIC_CAUTION_SCALE,
-    EPISTEMIC_SEMANTIC_BOOST_SCALE,
-    EPISTEMIC_EXPLORE_THRESHOLD, EPISTEMIC_EXPLORE_SCALE,
-    EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_LOW_DAMPEN,
-    EPISTEMIC_OSCILLATION_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER,
-    MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW,
-    MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EXPLORE_SCALE,
-    MCTS_EFFECTIVENESS_EMA, MCTS_PLAN_CONFIDENCE_THRESHOLD,
-    MCTS_PLAN_WEIGHT_SCALE, MCTS_EXPLOIT_LR_SCALE,
-    MCTS_CONSOLIDATE_CONFIDENCE_SCALE, MCTS_EXPLORE_SCALE,
-    DOMINANCE_CONFIDENCE_THRESHOLD,
-    EPISTEMIC_UNCERTAINTY_DEFAULT, ALEATORIC_UNCERTAINTY_DEFAULT,
-    CONFIDENCE_CRASH_THRESHOLD, CONFIDENCE_CRASH_FREEZE_CYCLES,
-    CONFIDENCE_CRASH_EXPLORATION_BOOST,
-    SELF_MODEL_WEIGHT_HIGH_THRESHOLD, SELF_MODEL_WEIGHT_LOW_THRESHOLD,
-    SELF_MODEL_WEIGHT_BONUS, SELF_MODEL_WEIGHT_PENALTY,
-    COHERENCE_VELOCITY_TAU_BOOST, COHERENCE_VELOCITY_TAU_DAMPEN,
-    COHERENCE_VELOCITY_TAU_THRESHOLD,
-    HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW,
-    HOMEOSTASIS_PULL_REDUCTION, HOMEOSTASIS_PULL_INCREASE,
+    TRAINING_BASE_IMPORTANCE, TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE,
+    TRANSITION_COST_THRESHOLD, WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE,
+    WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -224,7 +214,10 @@ impl CognitiveLoopService {
         // Accurate self-model → boost self-model confidence proposals; inaccurate → dampen.
         // Science: Friston (2010) — interoceptive accuracy modulates self-model trust.
         if self_model_accuracy > SELF_MODEL_WEIGHT_HIGH_THRESHOLD {
-            self.scale_confidence("self_model_weight_hi", (1.0 + SELF_MODEL_WEIGHT_BONUS) as f32);
+            self.scale_confidence(
+                "self_model_weight_hi",
+                (1.0 + SELF_MODEL_WEIGHT_BONUS) as f32,
+            );
         } else if self_model_accuracy < SELF_MODEL_WEIGHT_LOW_THRESHOLD {
             self.scale_confidence("self_model_weight_lo", SELF_MODEL_WEIGHT_PENALTY as f32);
         }
@@ -313,10 +306,7 @@ impl CognitiveLoopService {
                 && fov_conf > FOVEATION_HIGH_CONFIDENCE_THRESHOLD
             {
                 // Familiar scene: dampen exploration, boost confidence
-                self.scale_exploration(
-                    "foveation_familiar",
-                    FOVEATION_FAMILIAR_EXPLORATION_DAMPEN,
-                );
+                self.scale_exploration("foveation_familiar", FOVEATION_FAMILIAR_EXPLORATION_DAMPEN);
                 self.scale_confidence("foveation_familiar", FOVEATION_CONFIDENCE_BOOST);
             } else if fov_count > 0 && fov_conf < FOVEATION_HIGH_CONFIDENCE_THRESHOLD {
                 // Novel objects: boost learning rate
@@ -342,7 +332,8 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 1a. Memory System Integration: Recall relevant episodic memories
         // ═══════════════════════════════════════════════════════════════════════
-        let memory_context_boost = self.recall_episodic_context(&perception.encoding.compressed_state);
+        let memory_context_boost =
+            self.recall_episodic_context(&perception.encoding.compressed_state);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1a.1 Resonator-enhanced recall: factorize bundled memories
@@ -430,7 +421,8 @@ impl CognitiveLoopService {
             if let Some(ref mut res_mem) = self.resonator_memory {
                 let res_start = Instant::now();
 
-                let res_dim_ok = perception.encoding.compressed_state.len() == res_mem.resonator.config.dim;
+                let res_dim_ok =
+                    perception.encoding.compressed_state.len() == res_mem.resonator.config.dim;
                 if res_dim_ok && !res_mem.is_empty() {
                     if let Ok(matches) =
                         res_mem.retrieve(&[("content", &perception.encoding.compressed_state)])
@@ -446,7 +438,9 @@ impl CognitiveLoopService {
 
                         let best_match_sim = top_matches
                             .iter()
-                            .map(|m| helpers::cosine_f32(&perception.encoding.compressed_state, &m.hv))
+                            .map(|m| {
+                                helpers::cosine_f32(&perception.encoding.compressed_state, &m.hv)
+                            })
                             .fold(0.0f32, f32::max);
                         let match_timestamps: Vec<u64> =
                             top_matches.iter().map(|m| m.timestamp).collect();
@@ -455,13 +449,15 @@ impl CognitiveLoopService {
                         if best_match_sim > 0.3 {
                             let best_ep = top_matches.iter().max_by(|a, b| {
                                 let sa: f32 = perception
-                                    .encoding.compressed_state
+                                    .encoding
+                                    .compressed_state
                                     .iter()
                                     .zip(a.hv.iter())
                                     .map(|(x, y)| x * y)
                                     .sum();
                                 let sb: f32 = perception
-                                    .encoding.compressed_state
+                                    .encoding
+                                    .compressed_state
                                     .iter()
                                     .zip(b.hv.iter())
                                     .map(|(x, y)| x * y)
@@ -642,24 +638,23 @@ impl CognitiveLoopService {
 
         // ── Phase 20: Epistemic gate → semantic memory LR bidirectionality ───
         let prev_epistemic = self.carryover.quality.last_epistemic_confidence;
-        let epistemic_semantic_lr_mod: f32 = if prev_epistemic < EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD
-            && prev_epistemic > 0.0
-        {
-            let caution =
-                EPISTEMIC_SEMANTIC_CAUTION_BASE + prev_epistemic * EPISTEMIC_SEMANTIC_CAUTION_SCALE;
-            semantic_lr_factor *= caution;
-            self.stats.epistemic_semantic_mod_count += 1;
-            caution - 1.0
-        } else if prev_epistemic > EPISTEMIC_SEMANTIC_BOOST_THRESHOLD {
-            let boost = 1.0_f32
-                + (prev_epistemic - EPISTEMIC_SEMANTIC_BOOST_THRESHOLD)
-                    * EPISTEMIC_SEMANTIC_BOOST_SCALE;
-            semantic_lr_factor *= boost;
-            self.stats.epistemic_semantic_mod_count += 1;
-            boost - 1.0
-        } else {
-            0.0
-        };
+        let epistemic_semantic_lr_mod: f32 =
+            if prev_epistemic < EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD && prev_epistemic > 0.0 {
+                let caution = EPISTEMIC_SEMANTIC_CAUTION_BASE
+                    + prev_epistemic * EPISTEMIC_SEMANTIC_CAUTION_SCALE;
+                semantic_lr_factor *= caution;
+                self.stats.epistemic_semantic_mod_count += 1;
+                caution - 1.0
+            } else if prev_epistemic > EPISTEMIC_SEMANTIC_BOOST_THRESHOLD {
+                let boost = 1.0_f32
+                    + (prev_epistemic - EPISTEMIC_SEMANTIC_BOOST_THRESHOLD)
+                        * EPISTEMIC_SEMANTIC_BOOST_SCALE;
+                semantic_lr_factor *= boost;
+                self.stats.epistemic_semantic_mod_count += 1;
+                boost - 1.0
+            } else {
+                0.0
+            };
 
         // 2b. Physics bridge: blend physics-informed HDC into compressed state
         #[allow(unused_mut)]
@@ -794,7 +789,11 @@ impl CognitiveLoopService {
             let mut mean_var = 0.0f32;
             for d in 0..dim {
                 let mean: f32 = raw_predictions.iter().map(|p| p[d]).sum::<f32>() / n;
-                let var: f32 = raw_predictions.iter().map(|p| (p[d] - mean).powi(2)).sum::<f32>() / n;
+                let var: f32 = raw_predictions
+                    .iter()
+                    .map(|p| (p[d] - mean).powi(2))
+                    .sum::<f32>()
+                    / n;
                 mean_var += var;
             }
             let aleatoric = (mean_var / dim as f32).sqrt().clamp(0.0, 1.0);
@@ -807,7 +806,11 @@ impl CognitiveLoopService {
         // Use smoothed epistemic for stability; raw for responsiveness on first cycle.
         // Depeweg et al. (2018): decomposing uncertainty for active learning.
         let smoothed_eu = self.carryover.quality.smoothed_epistemic_uncertainty;
-        let eu_for_exploration = if smoothed_eu > 0.0 { smoothed_eu } else { epistemic_uncertainty };
+        let eu_for_exploration = if smoothed_eu > 0.0 {
+            smoothed_eu
+        } else {
+            epistemic_uncertainty
+        };
         if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles % 7 == 0 {
             let mut epistemic_explore =
                 (eu_for_exploration - EPISTEMIC_EXPLORE_THRESHOLD) * EPISTEMIC_EXPLORE_SCALE;
@@ -817,8 +820,7 @@ impl CognitiveLoopService {
                 epistemic_explore *= EPISTEMIC_OSCILLATION_MULTIPLIER;
             }
             self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
-        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles % 7 == 0
-        {
+        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles % 7 == 0 {
             // Low epistemic uncertainty → dampen exploration (model is confident).
             self.adjust_exploration("epistemic_low", -EPISTEMIC_LOW_DAMPEN);
         }
@@ -835,7 +837,8 @@ impl CognitiveLoopService {
         // 6b. World Model
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        self.fep.world_model
+        self.fep
+            .world_model
             .update_sensory(&perception.encoding.compressed_state);
 
         // Incorporate causal structure into world model (every 41 cycles, co-prime).
@@ -883,7 +886,11 @@ impl CognitiveLoopService {
         let previous_state = self.last_state.clone();
 
         // 9. Create experience
-        self.create_experience(&perception.encoding.compressed_state, &prediction, prediction_error);
+        self.create_experience(
+            &perception.encoding.compressed_state,
+            &prediction,
+            prediction_error,
+        );
 
         // 10. Update coherence bridge
         let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
@@ -943,7 +950,8 @@ impl CognitiveLoopService {
         // 10d.5 Active Inference Bridge
         // ═══════════════════════════════════════════════════════════════════════
         let prediction_success = prediction_error < self.config.learning_threshold;
-        self.fep.active_inference_bridge
+        self.fep
+            .active_inference_bridge
             .observe_resolution(self.prediction_confidence, prediction_success);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1021,13 +1029,10 @@ impl CognitiveLoopService {
                 } else if effectiveness < MCTS_EFFECTIVENESS_LOW {
                     self.adjust_exploration(
                         "mcts_poor_plan",
-                        (MCTS_EFFECTIVENESS_LOW - effectiveness)
-                            * MCTS_EFFECTIVENESS_EXPLORE_SCALE,
+                        (MCTS_EFFECTIVENESS_LOW - effectiveness) * MCTS_EFFECTIVENESS_EXPLORE_SCALE,
                     );
                 }
-                self.stats.avg_mcts_plan_effectiveness = self
-                    .stats
-                    .avg_mcts_plan_effectiveness
+                self.stats.avg_mcts_plan_effectiveness = self.stats.avg_mcts_plan_effectiveness
                     * MCTS_EFFECTIVENESS_EMA
                     + effectiveness * (1.0 - MCTS_EFFECTIVENESS_EMA);
                 effectiveness
@@ -1064,7 +1069,8 @@ impl CognitiveLoopService {
 
         // ── FEP Free Energy Decomposition ──────────────
         let fep_vals = self
-            .fep.agent
+            .fep
+            .agent
             .last_fe_components
             .as_ref()
             .map(|fe| (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error));
@@ -1074,7 +1080,10 @@ impl CognitiveLoopService {
                     self.adjust_confidence("fep_accuracy_high", 0.01);
                 }
                 if comp > FEP_COMPLEXITY_THRESHOLD {
-                    self.scale_lr("fep_complexity", 1.0 - ((comp - FEP_COMPLEXITY_THRESHOLD).min(0.5) * 0.1) as f32);
+                    self.scale_lr(
+                        "fep_complexity",
+                        1.0 - ((comp - FEP_COMPLEXITY_THRESHOLD).min(0.5) * 0.1) as f32,
+                    );
                 }
                 if surp > reflection_thresholds.surprise as f64 {
                     let s_explore =
@@ -1092,8 +1101,10 @@ impl CognitiveLoopService {
                 "fep_pragmatic_exploit",
                 (1.0 - (fep_pragmatic_value - FEP_PRAGMATIC_EXPLOIT_THRESHOLD) * 0.3) as f32,
             );
-        } else if fep_pragmatic_value < FEP_PRAGMATIC_EXPLORE_THRESHOLD && fep_pragmatic_value > 0.0 {
-            let p_explore = ((FEP_PRAGMATIC_EXPLORE_THRESHOLD - fep_pragmatic_value) * 0.15).min(0.05) as f32;
+        } else if fep_pragmatic_value < FEP_PRAGMATIC_EXPLORE_THRESHOLD && fep_pragmatic_value > 0.0
+        {
+            let p_explore =
+                ((FEP_PRAGMATIC_EXPLORE_THRESHOLD - fep_pragmatic_value) * 0.15).min(0.05) as f32;
             self.adjust_exploration("fep_pragmatic_low", p_explore);
         }
 
@@ -1165,7 +1176,8 @@ impl CognitiveLoopService {
                 self.prediction_confidence,
                 effective_lr as f64,
             );
-            self.fep.agent
+            self.fep
+                .agent
                 .learn_from_outcome(fep_action_idx, &outcome_obs);
         }
 
@@ -1251,19 +1263,16 @@ impl CognitiveLoopService {
                     if intensity > 0.5 {
                         self.self_model_tier.self_reflection.force_reflection();
                         // Boost meta-awareness proportional to intensity
-                        self.adjust_confidence(
-                            "motor_reflection",
-                            (intensity - 0.5) * 0.05,
-                        );
+                        self.adjust_confidence("motor_reflection", (intensity - 0.5) * 0.05);
                     }
                 }
                 MotorCommandType::MemoryConsolidate => {
                     if enhanced_result.motor_command.intensity > 0.5 {
                         self.fep.episodic_memory.consolidate_recent();
                         // Also increase world model plasticity to lock in patterns
-                        self.fep.world_model.increase_plasticity(
-                            enhanced_result.motor_command.intensity as f32,
-                        );
+                        self.fep
+                            .world_model
+                            .increase_plasticity(enhanced_result.motor_command.intensity as f32);
                     }
                 }
                 MotorCommandType::ExpectationReset => {
@@ -1277,8 +1286,11 @@ impl CognitiveLoopService {
                 MotorCommandType::MotorOutput | MotorCommandType::NoOp => {}
             }
 
-            if self.fep.learning_signal > FEP_LEARNING_PLASTICITY_THRESHOLD && enhanced_result.should_learn {
-                self.fep.world_model
+            if self.fep.learning_signal > FEP_LEARNING_PLASTICITY_THRESHOLD
+                && enhanced_result.should_learn
+            {
+                self.fep
+                    .world_model
                     .increase_plasticity(self.fep.learning_signal);
             }
         }
@@ -1297,7 +1309,8 @@ impl CognitiveLoopService {
                 effective_lr as f64,
             );
             self.fep.agent.perceive(&urgent_obs);
-            self.fep.enhanced_bridge
+            self.fep
+                .enhanced_bridge
                 .cycle(coh_urgency as f64, 0.1, 0.1, effective_lr as f64);
         }
 
@@ -1348,7 +1361,9 @@ impl CognitiveLoopService {
         // Active Rest Mode: track Sacred Stillness dominance streak
         {
             let ss_coord = self.ethics_engine.last_harmony_coordinates()[7];
-            let dominant_idx = self.ethics_engine.last_harmony_coordinates()
+            let dominant_idx = self
+                .ethics_engine
+                .last_harmony_coordinates()
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
@@ -1372,7 +1387,10 @@ impl CognitiveLoopService {
                 if let Some(ref mut dream) = self.dream_engine {
                     if let Ok(result) = dream.dream() {
                         if result.insights > 0 {
-                            tracing::debug!(insights = result.insights, "Active rest dream consolidation");
+                            tracing::debug!(
+                                insights = result.insights,
+                                "Active rest dream consolidation"
+                            );
                         }
                     }
                 }
@@ -1389,10 +1407,16 @@ impl CognitiveLoopService {
         // reduce exploration rate by 20% — the system has settled on an ethical stance.
         // Only fires once per attractor entry to prevent exponential decay to floor.
         {
-            let attractor_now = self.ethics_engine.moral_topology().last_summary().attractor_detected;
+            let attractor_now = self
+                .ethics_engine
+                .moral_topology()
+                .last_summary()
+                .attractor_detected;
             if attractor_now && !self.stats.prev_moral_attractor {
                 let rate = self.fep.closed_learning_loop.exploration_rate();
-                self.fep.closed_learning_loop.set_exploration_rate(rate * 0.8);
+                self.fep
+                    .closed_learning_loop
+                    .set_exploration_rate(rate * 0.8);
             }
             self.stats.prev_moral_attractor = attractor_now;
         }
@@ -1463,121 +1487,123 @@ impl CognitiveLoopService {
         let substrate_degraded = self.substrate_manager.should_degrade_consciousness();
         #[cfg(feature = "reasoning_engine")]
         if !substrate_degraded {
-        if let Some(ref mut reasoning_engine) = self.reasoning_engine {
-            use crate::consciousness::epistemic_conflict::MultiTheoryMetrics as ECMetrics;
-            use crate::consciousness::reasoning_engine::ReasoningContext;
+            if let Some(ref mut reasoning_engine) = self.reasoning_engine {
+                use crate::consciousness::epistemic_conflict::MultiTheoryMetrics as ECMetrics;
+                use crate::consciousness::reasoning_engine::ReasoningContext;
 
-            let ec_metrics = ECMetrics {
-                phi: unified_psi,
-                gwt: coherence as f64,
-                ast: self.prediction_confidence,
-                pp: (1.0 - prediction_error as f64).clamp(0.0, 1.0),
-                rpt: pattern_confidence as f64,
-                embodiment: self.fep.learning_signal as f64,
-                unified: unified_psi,
-            };
+                let ec_metrics = ECMetrics {
+                    phi: unified_psi,
+                    gwt: coherence as f64,
+                    ast: self.prediction_confidence,
+                    pp: (1.0 - prediction_error as f64).clamp(0.0, 1.0),
+                    rpt: pattern_confidence as f64,
+                    embodiment: self.fep.learning_signal as f64,
+                    unified: unified_psi,
+                };
 
-            let elapsed_us = cycle_start.elapsed().as_micros() as u64;
-            let available_us = 20_000u64.saturating_sub(elapsed_us);
+                let elapsed_us = cycle_start.elapsed().as_micros() as u64;
+                let available_us = 20_000u64.saturating_sub(elapsed_us);
 
-            // Populate available actions for MCTS planning.
-            // When the code_generation feature is enabled, include code-specific
-            // actions so the reasoning engine can plan code tasks.
-            #[allow(unused_mut)]
-            let mut actions: Vec<crate::consciousness::temporal_planning::types::PlannedAction> = Vec::new();
+                // Populate available actions for MCTS planning.
+                // When the code_generation feature is enabled, include code-specific
+                // actions so the reasoning engine can plan code tasks.
+                #[allow(unused_mut)]
+                let mut actions: Vec<
+                    crate::consciousness::temporal_planning::types::PlannedAction,
+                > = Vec::new();
 
-            #[cfg(feature = "code_generation")]
-            {
-                use crate::consciousness::temporal_planning::types::PlannedAction;
-                actions.extend([
-                    PlannedAction {
-                        id: "code_generate".to_string(),
-                        description: "Generate code from specification".to_string(),
-                        embedding: vec![0.8, 0.2, 0.1, 0.9],
-                        prior: 0.3,
-                        is_epistemic: false,
-                    },
-                    PlannedAction {
-                        id: "code_verify".to_string(),
-                        description: "Verify generated code via compilation".to_string(),
-                        embedding: vec![0.6, 0.4, 0.3, 0.7],
-                        prior: 0.2,
-                        is_epistemic: true,
-                    },
-                    PlannedAction {
-                        id: "code_refactor".to_string(),
-                        description: "Refactor code for clarity or performance".to_string(),
-                        embedding: vec![0.5, 0.5, 0.6, 0.4],
-                        prior: 0.15,
-                        is_epistemic: false,
-                    },
-                    PlannedAction {
-                        id: "code_explain".to_string(),
-                        description: "Explain code structure and intent".to_string(),
-                        embedding: vec![0.3, 0.7, 0.8, 0.2],
-                        prior: 0.15,
-                        is_epistemic: true,
-                    },
-                    PlannedAction {
-                        id: "code_debug".to_string(),
-                        description: "Debug and diagnose code issues".to_string(),
-                        embedding: vec![0.4, 0.6, 0.5, 0.5],
-                        prior: 0.2,
-                        is_epistemic: true,
-                    },
-                ]);
-            }
-
-            let reasoning_ctx = ReasoningContext {
-                theory_metrics: ec_metrics,
-                phi: unified_psi,
-                available_budget_us: available_us,
-                available_actions: actions,
-                tool: None,
-                recent_utility: 0.5,
-                cycle_id: self.stats.total_cycles as u64,
-                neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
-            };
-
-            let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
-
-            reasoning_confidence = reasoning_result.phi_eff as f32;
-            reasoning_lr_factor = reasoning_result.reliability as f32;
-
-            if let Some(ref gate) = reasoning_result.gate {
-                if !gate.is_allowed() {
-                    reasoning_gate_blocked = true;
-                    reasoning_fallback = gate.fallback.as_ref().map(|f| format!("{:?}", f));
-                    reasoning_lr_factor = 0.0;
-                    tracing::info!(
-                        risk = ?gate.risk_level,
-                        required_phi = gate.required_phi,
-                        actual_phi = gate.actual_phi_eff,
-                        "Reasoning gate blocked action"
-                    );
+                #[cfg(feature = "code_generation")]
+                {
+                    use crate::consciousness::temporal_planning::types::PlannedAction;
+                    actions.extend([
+                        PlannedAction {
+                            id: "code_generate".to_string(),
+                            description: "Generate code from specification".to_string(),
+                            embedding: vec![0.8, 0.2, 0.1, 0.9],
+                            prior: 0.3,
+                            is_epistemic: false,
+                        },
+                        PlannedAction {
+                            id: "code_verify".to_string(),
+                            description: "Verify generated code via compilation".to_string(),
+                            embedding: vec![0.6, 0.4, 0.3, 0.7],
+                            prior: 0.2,
+                            is_epistemic: true,
+                        },
+                        PlannedAction {
+                            id: "code_refactor".to_string(),
+                            description: "Refactor code for clarity or performance".to_string(),
+                            embedding: vec![0.5, 0.5, 0.6, 0.4],
+                            prior: 0.15,
+                            is_epistemic: false,
+                        },
+                        PlannedAction {
+                            id: "code_explain".to_string(),
+                            description: "Explain code structure and intent".to_string(),
+                            embedding: vec![0.3, 0.7, 0.8, 0.2],
+                            prior: 0.15,
+                            is_epistemic: true,
+                        },
+                        PlannedAction {
+                            id: "code_debug".to_string(),
+                            description: "Debug and diagnose code issues".to_string(),
+                            embedding: vec![0.4, 0.6, 0.5, 0.5],
+                            prior: 0.2,
+                            is_epistemic: true,
+                        },
+                    ]);
                 }
-            }
 
-            if let Some(ref plan) = reasoning_result.plan {
-                if plan.did_plan {
-                    reasoning_plan_action = plan.best_action_idx;
-                    reasoning_plan_confidence = plan.confidence as f32;
+                let reasoning_ctx = ReasoningContext {
+                    theory_metrics: ec_metrics,
+                    phi: unified_psi,
+                    available_budget_us: available_us,
+                    available_actions: actions,
+                    tool: None,
+                    recent_utility: 0.5,
+                    cycle_id: self.stats.total_cycles as u64,
+                    neuromod_exploration_mod: self.neuromod.bath.mcts_exploration_modulation(),
+                };
+
+                let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
+
+                reasoning_confidence = reasoning_result.phi_eff as f32;
+                reasoning_lr_factor = reasoning_result.reliability as f32;
+
+                if let Some(ref gate) = reasoning_result.gate {
+                    if !gate.is_allowed() {
+                        reasoning_gate_blocked = true;
+                        reasoning_fallback = gate.fallback.as_ref().map(|f| format!("{:?}", f));
+                        reasoning_lr_factor = 0.0;
+                        tracing::info!(
+                            risk = ?gate.risk_level,
+                            required_phi = gate.required_phi,
+                            actual_phi = gate.actual_phi_eff,
+                            "Reasoning gate blocked action"
+                        );
+                    }
                 }
+
+                if let Some(ref plan) = reasoning_result.plan {
+                    if plan.did_plan {
+                        reasoning_plan_action = plan.best_action_idx;
+                        reasoning_plan_confidence = plan.confidence as f32;
+                    }
+                }
+
+                reasoning_narrative = reasoning_result.narrative.clone();
+
+                tracing::debug!(
+                    tier = ?reasoning_result.tier,
+                    phi_eff = reasoning_result.phi_eff,
+                    reliability = reasoning_result.reliability,
+                    gate_blocked = reasoning_gate_blocked,
+                    plan_confidence = reasoning_plan_confidence,
+                    wall_time_us = reasoning_result.wall_time_us,
+                    budget_exceeded = reasoning_result.budget_exceeded,
+                    "Reasoning engine cycle"
+                );
             }
-
-            reasoning_narrative = reasoning_result.narrative.clone();
-
-            tracing::debug!(
-                tier = ?reasoning_result.tier,
-                phi_eff = reasoning_result.phi_eff,
-                reliability = reasoning_result.reliability,
-                gate_blocked = reasoning_gate_blocked,
-                plan_confidence = reasoning_plan_confidence,
-                wall_time_us = reasoning_result.wall_time_us,
-                budget_exceeded = reasoning_result.budget_exceeded,
-                "Reasoning engine cycle"
-            );
-        }
         } // if !substrate_degraded (reasoning_engine)
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1695,24 +1721,35 @@ impl CognitiveLoopService {
             let (train_input, train_target, lr) = if let Some(prev) = previous_state {
                 (
                     Array1::from_vec(prev),
-                    perception.encoding.compressed_state.iter().copied().collect(),
+                    perception
+                        .encoding
+                        .compressed_state
+                        .iter()
+                        .copied()
+                        .collect(),
                     effective_lr,
                 )
             } else {
-                let train_input: Array1<f32> =
-                    perception.encoding.compressed_state.iter().copied().collect();
-                let train_target: Array1<f32> =
-                    perception.encoding.compressed_state.iter().copied().collect();
+                let train_input: Array1<f32> = perception
+                    .encoding
+                    .compressed_state
+                    .iter()
+                    .copied()
+                    .collect();
+                let train_target: Array1<f32> = perception
+                    .encoding
+                    .compressed_state
+                    .iter()
+                    .copied()
+                    .collect();
                 (train_input, train_target, effective_lr * 0.1)
             };
 
             // Compute vision-surprise importance weight for training
             #[cfg(feature = "vision-manifold")]
             let importance = (TRAINING_BASE_IMPORTANCE
-                + perception.cross_manifold_prediction_error
-                    * VISION_TRAINING_IMPORTANCE_SCALE
-                + perception.vision_mean_surprise
-                    * VISION_SURPRISE_TRAINING_IMPORTANCE_SCALE)
+                + perception.cross_manifold_prediction_error * VISION_TRAINING_IMPORTANCE_SCALE
+                + perception.vision_mean_surprise * VISION_SURPRISE_TRAINING_IMPORTANCE_SCALE)
                 .min(TRAINING_MAX_IMPORTANCE);
             #[cfg(not(feature = "vision-manifold"))]
             let importance = TRAINING_BASE_IMPORTANCE;
@@ -1792,7 +1829,8 @@ impl CognitiveLoopService {
 
         // #13: Report learning activity to glutamate channel
         {
-            let is_night = self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            let is_night =
+                self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             self.neuromod
                 .bath
                 .report_learning(effective_lr, prediction_error, is_night);
@@ -1846,7 +1884,8 @@ impl CognitiveLoopService {
         let causal_attention_boost = if self.stats.total_cycles % 41 == 0 {
             if let Some(ref mut cc) = self.causal_consciousness {
                 let vars: Vec<Vec<f64>> = perception
-                    .encoding.compressed_state
+                    .encoding
+                    .compressed_state
                     .chunks(8)
                     .map(|chunk: &[f32]| chunk.iter().map(|&v| v as f64).collect())
                     .collect();
@@ -1888,8 +1927,8 @@ impl CognitiveLoopService {
         #[cfg(feature = "ssm_language")]
         {
             let broca_psi = self.unification_engine.psi as f32;
-            let broca_novelty = prediction_error > self.config.learning_threshold
-                || surprise_triggered;
+            let broca_novelty =
+                prediction_error > self.config.learning_threshold || surprise_triggered;
             // Adaptive cadence: poor user model → generate more (probe to refine)
             let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
                 5 // more frequent when user model is inaccurate
@@ -1917,8 +1956,12 @@ impl CognitiveLoopService {
                         }
 
                         // ── Composite quality metric ──
+                        #[cfg(feature = "liquid-mamba")]
+                        let semantic_pe = result.semantic_pe;
+                        #[cfg(not(feature = "liquid-mamba"))]
+                        let semantic_pe = 0.0_f32;
                         let broca_quality = result.final_coherence * 0.4
-                            + (1.0 - result.semantic_pe.min(1.0)) * 0.4
+                            + (1.0 - semantic_pe.min(1.0)) * 0.4
                             + result.long_coherence * 0.2;
                         let broca_quality = broca_quality.clamp(0.0, 1.0);
 
@@ -1994,7 +2037,7 @@ impl CognitiveLoopService {
                         // Populate telemetry
                         broca.last_telemetry.quality = broca_quality;
                         broca.last_telemetry.long_coherence = result.long_coherence;
-                        broca.last_telemetry.semantic_pe = result.semantic_pe;
+                        broca.last_telemetry.semantic_pe = semantic_pe;
                     }
 
                     // Broca quality → attention budget: successful articulation
@@ -2186,8 +2229,14 @@ impl CognitiveLoopService {
             epistemic_uncertainty,
             aleatoric_uncertainty,
             fep_tau_factor,
-            causal_world_model_edges: if self.causal_enhancer.as_ref().map_or(false, |e| e.has_causal_structure()) {
-                self.causal_enhancer.as_ref().map_or(0, |e| e.current_graph().edges.len())
+            causal_world_model_edges: if self
+                .causal_enhancer
+                .as_ref()
+                .map_or(false, |e| e.has_causal_structure())
+            {
+                self.causal_enhancer
+                    .as_ref()
+                    .map_or(0, |e| e.current_graph().edges.len())
             } else {
                 0
             },

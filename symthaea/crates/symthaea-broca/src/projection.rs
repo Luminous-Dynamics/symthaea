@@ -776,9 +776,15 @@ impl HdcSsmProjection {
 
         // === Backprop through deep inner bottleneck (if enabled) ===
         let delta_fwd_act = if self.deep {
-            let inner_pre = inner_fwd_pre_act.as_ref().expect("deep mode guarantees Some intermediates");
-            let inner_act = inner_fwd_act.as_ref().expect("deep mode guarantees Some intermediates");
-            let expanded_pre = expanded_fwd_pre_act.as_ref().expect("deep mode guarantees Some intermediates");
+            let inner_pre = inner_fwd_pre_act
+                .as_ref()
+                .expect("deep mode guarantees Some intermediates");
+            let inner_act = inner_fwd_act
+                .as_ref()
+                .expect("deep mode guarantees Some intermediates");
+            let expanded_pre = expanded_fwd_pre_act
+                .as_ref()
+                .expect("deep mode guarantees Some intermediates");
 
             // delta_pre_deep flows into activation(expanded) + RESIDUAL_ALPHA * hidden_fwd_pre_deep
             // d/d(expanded) = delta_pre_deep * act'(expanded)
@@ -2450,7 +2456,11 @@ mod tests {
 
         let hv = ContinuousHV::random(hdc_dim, 42).normalize();
         let act = proj.bottleneck_activation(&hv);
-        assert_eq!(act.len(), bottleneck, "Bottleneck activation should have bottleneck dimensions");
+        assert_eq!(
+            act.len(),
+            bottleneck,
+            "Bottleneck activation should have bottleneck dimensions"
+        );
         assert!(
             act.iter().all(|v| v.is_finite()),
             "All bottleneck activations should be finite"

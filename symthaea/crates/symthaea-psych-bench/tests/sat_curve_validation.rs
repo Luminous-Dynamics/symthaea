@@ -7,9 +7,7 @@ use symthaea_psych_bench::benchmarks::{
     sustained_attention::{CptBenchmark, SartBenchmark},
     worm::NBackBenchmark,
 };
-use symthaea_psych_bench::harness::{
-    sat_curves::SatBattery, BenchmarkConfig, PsychBenchmark,
-};
+use symthaea_psych_bench::harness::{sat_curves::SatBattery, BenchmarkConfig, PsychBenchmark};
 
 fn sat_config() -> BenchmarkConfig {
     BenchmarkConfig {
@@ -32,8 +30,7 @@ fn sat_curve_basic_properties() {
         Box::new(SemanticPrimingBenchmark),
     ];
 
-    let bench_refs: Vec<&dyn PsychBenchmark> =
-        benchmarks.iter().map(|b| b.as_ref()).collect();
+    let bench_refs: Vec<&dyn PsychBenchmark> = benchmarks.iter().map(|b| b.as_ref()).collect();
     let config = sat_config();
     let pressures = [0.0, 0.25, 0.5, 0.75, 1.0];
 
@@ -80,25 +77,16 @@ fn sat_curve_basic_properties() {
 
         // Fit parameters should be finite
         if !curve.fit.asymptote.is_finite() {
-            failures.push(format!(
-                "{}: fit asymptote not finite",
-                curve.benchmark
-            ));
+            failures.push(format!("{}: fit asymptote not finite", curve.benchmark));
         }
         if !curve.fit.rate.is_finite() {
             failures.push(format!("{}: fit rate not finite", curve.benchmark));
         }
         if !curve.fit.intercept.is_finite() {
-            failures.push(format!(
-                "{}: fit intercept not finite",
-                curve.benchmark
-            ));
+            failures.push(format!("{}: fit intercept not finite", curve.benchmark));
         }
         if !curve.fit.r_squared.is_finite() {
-            failures.push(format!(
-                "{}: fit R² not finite",
-                curve.benchmark
-            ));
+            failures.push(format!("{}: fit R² not finite", curve.benchmark));
         }
         if curve.fit.r_squared < 0.0 || curve.fit.r_squared > 1.0 {
             failures.push(format!(
@@ -126,8 +114,7 @@ fn time_pressure_affects_accuracy() {
         Box::new(SartBenchmark),
     ];
 
-    let bench_refs: Vec<&dyn PsychBenchmark> =
-        benchmarks.iter().map(|b| b.as_ref()).collect();
+    let bench_refs: Vec<&dyn PsychBenchmark> = benchmarks.iter().map(|b| b.as_ref()).collect();
     let config = sat_config();
     let pressures = [0.0, 1.0];
 
@@ -151,13 +138,10 @@ fn time_pressure_affects_accuracy() {
 /// Verify SAT asymptote (lambda) is reasonable: between 0.1 and 1.0.
 #[test]
 fn sat_asymptote_in_range() {
-    let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
-        Box::new(StroopBenchmark),
-        Box::new(FlankerBenchmark),
-    ];
+    let benchmarks: Vec<Box<dyn PsychBenchmark>> =
+        vec![Box::new(StroopBenchmark), Box::new(FlankerBenchmark)];
 
-    let bench_refs: Vec<&dyn PsychBenchmark> =
-        benchmarks.iter().map(|b| b.as_ref()).collect();
+    let bench_refs: Vec<&dyn PsychBenchmark> = benchmarks.iter().map(|b| b.as_ref()).collect();
     let config = sat_config();
     let pressures = [0.0, 0.33, 0.67, 1.0];
 

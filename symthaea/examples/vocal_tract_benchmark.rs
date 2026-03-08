@@ -645,8 +645,7 @@ fn main() {
         }
 
         // Convert to audio
-        let mut vocoder =
-            symthaea::voice::FormantVocoder::new();
+        let mut vocoder = symthaea::voice::FormantVocoder::new();
         // Set time stamps
         for (i, f) in frames.iter_mut().enumerate() {
             f.time = i as f32 * dt;

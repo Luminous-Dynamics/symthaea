@@ -176,10 +176,7 @@ fn test_calibration_summary_contains_all_adjusted_transmitters() {
         summary.contains("NE") || summary.contains("NE-β"),
         "Summary missing NE: {summary}"
     );
-    assert!(
-        summary.contains("5-HT"),
-        "Summary missing 5-HT: {summary}"
-    );
+    assert!(summary.contains("5-HT"), "Summary missing 5-HT: {summary}");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -204,8 +201,8 @@ fn test_peer_calibration_blending() {
     let mut service_b = make_service();
     warmup(&mut service_b, 30);
     service_b.ingest_calibration(&[
-        ("Executive::Stroop", "stroop_effect", 2.0),  // sign-corrected: +2 = good = low interference
-        ("WorM::N-back", "nback_2::accuracy", -2.0),  // poor WM
+        ("Executive::Stroop", "stroop_effect", 2.0), // sign-corrected: +2 = good = low interference
+        ("WorM::N-back", "nback_2::accuracy", -2.0), // poor WM
     ]);
 
     // Record B's DA factor before merge
@@ -294,8 +291,7 @@ fn test_peer_calibration_shareable_roundtrip() {
 
     // JSON roundtrip
     let json = serde_json::to_string(&shareable).expect("serialize");
-    let deserialized: SharedCalibrationProfile =
-        serde_json::from_str(&json).expect("deserialize");
+    let deserialized: SharedCalibrationProfile = serde_json::from_str(&json).expect("deserialize");
 
     assert_eq!(deserialized.agent_id, shareable.agent_id);
     assert!((deserialized.coverage - shareable.coverage).abs() < 0.0001);
@@ -342,10 +338,16 @@ fn test_calibration_validator_telemetry_populated_after_calibration() {
     let mult = result.metadata.calibration_adjustment_multiplier;
 
     assert!(mult.is_finite(), "adjustment_multiplier should be finite");
-    assert!(mult > 0.0 && mult <= 1.0, "multiplier should be in (0, 1]: {mult}");
+    assert!(
+        mult > 0.0 && mult <= 1.0,
+        "multiplier should be in (0, 1]: {mult}"
+    );
     // Cooldown should be a reasonable value
     let cd = result.metadata.calibration_cooldown_duration;
-    assert!(cd >= 200 && cd <= 2000, "cooldown should be in [200, 2000]: {cd}");
+    assert!(
+        cd >= 200 && cd <= 2000,
+        "cooldown should be in [200, 2000]: {cd}"
+    );
 
     // The new adaptive dynamics telemetry should also be populated
     assert!(result.metadata.epistemic_uncertainty.is_finite());
@@ -365,18 +367,38 @@ fn test_adaptive_dynamics_telemetry_bounded() {
     let mut service = make_service();
 
     for i in 0..50 {
-        let input = if i % 3 == 0 { "novel surprising input" } else { "steady state" };
+        let input = if i % 3 == 0 {
+            "novel surprising input"
+        } else {
+            "steady state"
+        };
         let r = service.cycle(input);
 
-        assert!(r.metadata.epistemic_uncertainty >= 0.0 && r.metadata.epistemic_uncertainty <= 1.0,
-            "epistemic should be [0,1]: {}", r.metadata.epistemic_uncertainty);
-        assert!(r.metadata.aleatoric_uncertainty >= 0.0 && r.metadata.aleatoric_uncertainty <= 1.0,
-            "aleatoric should be [0,1]: {}", r.metadata.aleatoric_uncertainty);
-        assert!(r.metadata.theta_phase >= 0.0 && r.metadata.theta_phase < 7.0,
-            "theta should be [0, 2π): {}", r.metadata.theta_phase);
-        assert!(r.metadata.temporal_binding_strength >= 0.0 && r.metadata.temporal_binding_strength <= 1.0,
-            "binding should be [0,1]: {}", r.metadata.temporal_binding_strength);
-        assert!(r.metadata.prediction_horizon_scale > 0.0 && r.metadata.prediction_horizon_scale <= 1.5,
-            "horizon scale should be (0, 1.5]: {}", r.metadata.prediction_horizon_scale);
+        assert!(
+            r.metadata.epistemic_uncertainty >= 0.0 && r.metadata.epistemic_uncertainty <= 1.0,
+            "epistemic should be [0,1]: {}",
+            r.metadata.epistemic_uncertainty
+        );
+        assert!(
+            r.metadata.aleatoric_uncertainty >= 0.0 && r.metadata.aleatoric_uncertainty <= 1.0,
+            "aleatoric should be [0,1]: {}",
+            r.metadata.aleatoric_uncertainty
+        );
+        assert!(
+            r.metadata.theta_phase >= 0.0 && r.metadata.theta_phase < 7.0,
+            "theta should be [0, 2π): {}",
+            r.metadata.theta_phase
+        );
+        assert!(
+            r.metadata.temporal_binding_strength >= 0.0
+                && r.metadata.temporal_binding_strength <= 1.0,
+            "binding should be [0,1]: {}",
+            r.metadata.temporal_binding_strength
+        );
+        assert!(
+            r.metadata.prediction_horizon_scale > 0.0 && r.metadata.prediction_horizon_scale <= 1.5,
+            "horizon scale should be (0, 1.5]: {}",
+            r.metadata.prediction_horizon_scale
+        );
     }
 }

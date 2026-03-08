@@ -1,7 +1,7 @@
 //! Unified Value Evaluator - Consciousness-Guided Decision Making
 //!
 //! This module unifies:
-//! - **Seven Harmonies**: Semantic value alignment
+//! - **Eight Harmonies**: Semantic value alignment
 //! - **Affective Consciousness**: CARE system for authenticity
 //! - **Narrative Self**: Goal alignment and coherence
 //! - **Veto Mechanism**: Self-preservation and integrity
@@ -17,7 +17,7 @@
 //! │                    UNIFIED VALUE EVALUATOR                            │
 //! │                                                                       │
 //! │  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐         │
-//! │  │ Seven Harmonies │  │    Affective   │  │  Consciousness │         │
+//! │  │ Eight Harmonies │  │    Affective   │  │  Consciousness │         │
 //! │  │   (Semantic)    │  │   (CARE/PLAY)  │  │    (Φ level)   │         │
 //! │  └───────┬────────┘  └───────┬────────┘  └───────┬────────┘         │
 //! │          │                   │                    │                  │

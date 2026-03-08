@@ -793,8 +793,14 @@ mod tests {
         fn recipient_names() -> impl Strategy<Value = Vec<String>> {
             prop::collection::vec(
                 prop::sample::select(vec![
-                    "perception", "memory", "planning", "language", "action",
-                    "custom_a", "custom_b", "custom_c",
+                    "perception",
+                    "memory",
+                    "planning",
+                    "language",
+                    "action",
+                    "custom_a",
+                    "custom_b",
+                    "custom_c",
                 ]),
                 1..=5,
             )
@@ -805,8 +811,15 @@ mod tests {
         fn handler_keys() -> impl Strategy<Value = Vec<String>> {
             prop::collection::vec(
                 prop::sample::select(vec![
-                    "perception", "memory", "planning", "language", "action",
-                    "custom_a", "custom_b", "custom_c", "unrelated",
+                    "perception",
+                    "memory",
+                    "planning",
+                    "language",
+                    "action",
+                    "custom_a",
+                    "custom_b",
+                    "custom_c",
+                    "unrelated",
                 ]),
                 0..=4,
             )

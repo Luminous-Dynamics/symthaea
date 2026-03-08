@@ -1799,6 +1799,7 @@ mod lifecycle_e2e_tests {
                 scope: CommitteeScope::All,
                 min_phi: None,
                 signature_algorithm: None,
+                pq_required: false,
             })
             .await;
         let committee: SigningCommittee = decode_entry(&committee_record).unwrap();
@@ -1813,6 +1814,7 @@ mod lifecycle_e2e_tests {
                     participant_id: (i + 1) as u32,
                     member_did: did.clone(),
                     trust_score: 0.85,
+                    ml_kem_encapsulation_key: None,
                 },
             ).await;
         }
@@ -1826,6 +1828,7 @@ mod lifecycle_e2e_tests {
                 SubmitDkgDealInput {
                     committee_id: committee.id.clone(),
                     vss_commitment: commitments[i].clone(),
+                    encrypted_shares: None,
                 },
             ).await;
         }
@@ -2328,6 +2331,7 @@ mod execution_tests {
             scope: CommitteeScope::Treasury,
             min_phi: None,
             signature_algorithm: None,
+            pq_required: false,
         };
 
         let record: Record = conductor
@@ -2369,6 +2373,7 @@ mod execution_tests {
             scope: CommitteeScope::All,
             min_phi: None,
             signature_algorithm: None,
+            pq_required: false,
         };
         let committee_record: Record = conductor
             .call(&cell.zome("threshold_signing"), "create_committee", committee_input)
@@ -2381,6 +2386,7 @@ mod execution_tests {
             participant_id: 1,
             member_did: format!("did:mycelix:{}", app.agent()),
             trust_score: 0.85,
+            ml_kem_encapsulation_key: None,
         };
         let member_record: Record = conductor
             .call(&cell.zome("threshold_signing"), "register_member", member_input)
@@ -2540,6 +2546,7 @@ mod execution_tests {
                 scope: CommitteeScope::All,
                 min_phi: None,
                 signature_algorithm: None,
+                pq_required: false,
             };
             let _: Record = conductor
                 .call(&cell.zome("threshold_signing"), "create_committee", input)
@@ -2576,6 +2583,7 @@ mod execution_tests {
             scope: CommitteeScope::All,
             min_phi: None,
             signature_algorithm: None,
+            pq_required: false,
         };
         let committee_record: Record = conductor
             .call(&cell.zome("threshold_signing"), "create_committee", committee_input)
@@ -2590,6 +2598,7 @@ mod execution_tests {
             participant_id: 1,
             member_did: format!("did:mycelix:{}", app.agent()),
             trust_score: 0.9,
+            ml_kem_encapsulation_key: None,
         };
         let member_record: Record = conductor
             .call(&cell.zome("threshold_signing"), "register_member", member_input)
@@ -2697,6 +2706,7 @@ mod threshold_signing_dkg_tests {
                 scope: CommitteeScope::All,
                 min_phi: None,
                 signature_algorithm: None,
+                pq_required: false,
             })
             .await;
         let committee: SigningCommittee = decode_entry(&record).unwrap();
@@ -2711,6 +2721,7 @@ mod threshold_signing_dkg_tests {
                     participant_id: (i + 1) as u32,
                     member_did: format!("did:mycelix:{}", agent),
                     trust_score: 0.9,
+                    ml_kem_encapsulation_key: None,
                 },
             ).await;
         }
@@ -2724,6 +2735,7 @@ mod threshold_signing_dkg_tests {
                 SubmitDkgDealInput {
                     committee_id: committee.id.clone(),
                     vss_commitment: commitments[i].clone(),
+                    encrypted_shares: None,
                 },
             ).await;
         }
@@ -2769,6 +2781,7 @@ mod threshold_signing_dkg_tests {
             scope: CommitteeScope::Treasury,
             min_phi: None,
             signature_algorithm: None,
+            pq_required: false,
         };
         let committee_record: Record = conductor
             .call(&cell1.zome("threshold_signing"), "create_committee", committee_input)
@@ -2784,6 +2797,7 @@ mod threshold_signing_dkg_tests {
                 participant_id: (i + 1) as u32,
                 member_did: format!("did:mycelix:{}", app.agent()),
                 trust_score: 0.85,
+                ml_kem_encapsulation_key: None,
             };
             let member_record: Record = conductor
                 .call(&cell.zome("threshold_signing"), "register_member", member_input)
@@ -2806,6 +2820,7 @@ mod threshold_signing_dkg_tests {
             let deal_input = SubmitDkgDealInput {
                 committee_id: committee.id.clone(),
                 vss_commitment: commitment_bytes[i].clone(),
+                encrypted_shares: None,
             };
             let updated_member: Record = conductor
                 .call(&cell.zome("threshold_signing"), "submit_dkg_deal", deal_input)
@@ -2966,6 +2981,7 @@ mod threshold_signing_dkg_tests {
                 scope: CommitteeScope::All,
                 min_phi: None,
                 signature_algorithm: None,
+                pq_required: false,
             })
             .await;
         let committee: SigningCommittee = decode_entry(&record).unwrap();
@@ -2978,6 +2994,7 @@ mod threshold_signing_dkg_tests {
                 participant_id: 1,
                 member_did: format!("did:mycelix:{}", app.agent()),
                 trust_score: 0.9,
+                ml_kem_encapsulation_key: None,
             },
         ).await;
 
@@ -2989,6 +3006,7 @@ mod threshold_signing_dkg_tests {
             SubmitDkgDealInput {
                 committee_id: committee.id.clone(),
                 vss_commitment: garbage_vss,
+                encrypted_shares: None,
             },
         ).await;
         assert!(result.is_err(), "Garbage VSS commitment should be rejected");
@@ -3111,6 +3129,7 @@ mod threshold_signing_dkg_tests {
                 scope: CommitteeScope::Treasury,
                 min_phi: None,
                 signature_algorithm: Some(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65),
+                pq_required: true,
             })
             .await;
         let committee: SigningCommittee = decode_entry(&record).unwrap();
@@ -3288,6 +3307,7 @@ mod threshold_signing_dkg_tests {
                 scope: CommitteeScope::All,
                 min_phi: None,
                 signature_algorithm: Some(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65),
+                pq_required: true,
             })
             .await;
         let committee: SigningCommittee = decode_entry(&record).unwrap();
@@ -3539,6 +3559,7 @@ mod unit_tests {
             scope: CommitteeScope::All,
             min_phi: Some(0.4),
             signature_algorithm: None,
+            pq_required: false,
         };
 
         let json = serde_json::to_string(&input).expect("serialize");
@@ -4107,6 +4128,7 @@ mod governance_identity_tests {
             scope: CommitteeScope::Treasury,
             min_phi: Some(0.3),
             signature_algorithm: Some(ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65),
+            pq_required: true,
         };
 
         let record: Record = conductor
@@ -4146,6 +4168,7 @@ mod governance_identity_tests {
             scope: CommitteeScope::All,
             min_phi: None,
             signature_algorithm: None,
+            pq_required: false,
         };
 
         let committee_record: Record = conductor
@@ -4219,6 +4242,7 @@ mod governance_identity_tests {
             scope: CommitteeScope::All,
             min_phi: None,
             signature_algorithm: None,
+            pq_required: false,
         };
 
         let committee_record: Record = conductor
@@ -4260,6 +4284,7 @@ mod governance_identity_tests {
             scope: CommitteeScope::All,
             min_phi: None,
             signature_algorithm: None,
+            pq_required: false,
         };
 
         let committee2_record: Record = conductor
@@ -4279,6 +4304,7 @@ mod governance_identity_tests {
             participant_id: 1,
             member_did: "did:mycelix:penalized".to_string(),
             trust_score: 0.85,
+            ml_kem_encapsulation_key: None,
         };
 
         // This should fail — but since violations are per-committee and the new
@@ -4313,6 +4339,7 @@ mod governance_identity_tests {
             scope: CommitteeScope::All,
             min_phi: None,
             signature_algorithm: None,
+            pq_required: false,
         };
 
         let record: Record = conductor

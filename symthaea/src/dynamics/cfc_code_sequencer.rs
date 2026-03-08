@@ -63,7 +63,10 @@ impl AlgorithmPattern {
                 CodePlanStep {
                     action: PlanAction::SetReturnType,
                     name: None,
-                    context: vec!["algorithm:sorting".into(), "return:sorted-collection".into()],
+                    context: vec![
+                        "algorithm:sorting".into(),
+                        "return:sorted-collection".into(),
+                    ],
                     confidence: 0.85,
                 },
                 CodePlanStep {
@@ -97,7 +100,10 @@ impl AlgorithmPattern {
                 CodePlanStep {
                     action: PlanAction::SetReturnType,
                     name: None,
-                    context: vec!["algorithm:search".into(), "return:found-index-or-none".into()],
+                    context: vec![
+                        "algorithm:search".into(),
+                        "return:found-index-or-none".into(),
+                    ],
                     confidence: 0.85,
                 },
                 CodePlanStep {
@@ -184,7 +190,10 @@ impl AlgorithmPattern {
                 CodePlanStep {
                     action: PlanAction::AddParameter,
                     name: None,
-                    context: vec!["algorithm:accumulation".into(), "param:input-collection".into()],
+                    context: vec![
+                        "algorithm:accumulation".into(),
+                        "param:input-collection".into(),
+                    ],
                     confidence: 0.9,
                 },
                 CodePlanStep {
@@ -274,8 +283,18 @@ impl AlgorithmPatternDetector {
             sorting_prototype: Self::encode_prototype(
                 dim,
                 &[
-                    "sort", "order", "compare", "swap", "bubble", "merge", "quick", "insertion",
-                    "ascending", "descending", "partition", "pivot",
+                    "sort",
+                    "order",
+                    "compare",
+                    "swap",
+                    "bubble",
+                    "merge",
+                    "quick",
+                    "insertion",
+                    "ascending",
+                    "descending",
+                    "partition",
+                    "pivot",
                 ],
             ),
             search_prototype: Self::encode_prototype(
@@ -305,22 +324,52 @@ impl AlgorithmPatternDetector {
             graph_prototype: Self::encode_prototype(
                 dim,
                 &[
-                    "graph", "node", "edge", "vertex", "adjacent", "dijkstra", "shortest",
-                    "path", "traverse", "neighbor", "connected", "weight",
+                    "graph",
+                    "node",
+                    "edge",
+                    "vertex",
+                    "adjacent",
+                    "dijkstra",
+                    "shortest",
+                    "path",
+                    "traverse",
+                    "neighbor",
+                    "connected",
+                    "weight",
                 ],
             ),
             accumulation_prototype: Self::encode_prototype(
                 dim,
                 &[
-                    "sum", "count", "total", "accumulate", "fold", "reduce", "aggregate", "max",
-                    "min", "average", "filter", "collect",
+                    "sum",
+                    "count",
+                    "total",
+                    "accumulate",
+                    "fold",
+                    "reduce",
+                    "aggregate",
+                    "max",
+                    "min",
+                    "average",
+                    "filter",
+                    "collect",
                 ],
             ),
             string_prototype: Self::encode_prototype(
                 dim,
                 &[
-                    "string", "char", "parse", "format", "split", "join", "replace", "trim",
-                    "uppercase", "lowercase", "substring", "regex",
+                    "string",
+                    "char",
+                    "parse",
+                    "format",
+                    "split",
+                    "join",
+                    "replace",
+                    "trim",
+                    "uppercase",
+                    "lowercase",
+                    "substring",
+                    "regex",
                 ],
             ),
         }
@@ -381,12 +430,30 @@ impl AlgorithmPatternDetector {
     /// Returns `None` if no pattern exceeds the minimum similarity threshold.
     fn detect(&self, intent_hv: &ContinuousHV) -> Option<AlgorithmPattern> {
         let scores = [
-            (AlgorithmPattern::Sorting, intent_hv.similarity(&self.sorting_prototype)),
-            (AlgorithmPattern::Search, intent_hv.similarity(&self.search_prototype)),
-            (AlgorithmPattern::DynamicProgramming, intent_hv.similarity(&self.dp_prototype)),
-            (AlgorithmPattern::Graph, intent_hv.similarity(&self.graph_prototype)),
-            (AlgorithmPattern::Accumulation, intent_hv.similarity(&self.accumulation_prototype)),
-            (AlgorithmPattern::StringProcessing, intent_hv.similarity(&self.string_prototype)),
+            (
+                AlgorithmPattern::Sorting,
+                intent_hv.similarity(&self.sorting_prototype),
+            ),
+            (
+                AlgorithmPattern::Search,
+                intent_hv.similarity(&self.search_prototype),
+            ),
+            (
+                AlgorithmPattern::DynamicProgramming,
+                intent_hv.similarity(&self.dp_prototype),
+            ),
+            (
+                AlgorithmPattern::Graph,
+                intent_hv.similarity(&self.graph_prototype),
+            ),
+            (
+                AlgorithmPattern::Accumulation,
+                intent_hv.similarity(&self.accumulation_prototype),
+            ),
+            (
+                AlgorithmPattern::StringProcessing,
+                intent_hv.similarity(&self.string_prototype),
+            ),
         ];
 
         scores
@@ -399,12 +466,30 @@ impl AlgorithmPatternDetector {
     /// Detect with scores for all patterns (useful for debugging/testing)
     fn detect_with_scores(&self, intent_hv: &ContinuousHV) -> Vec<(AlgorithmPattern, f32)> {
         let mut scores = vec![
-            (AlgorithmPattern::Sorting, intent_hv.similarity(&self.sorting_prototype)),
-            (AlgorithmPattern::Search, intent_hv.similarity(&self.search_prototype)),
-            (AlgorithmPattern::DynamicProgramming, intent_hv.similarity(&self.dp_prototype)),
-            (AlgorithmPattern::Graph, intent_hv.similarity(&self.graph_prototype)),
-            (AlgorithmPattern::Accumulation, intent_hv.similarity(&self.accumulation_prototype)),
-            (AlgorithmPattern::StringProcessing, intent_hv.similarity(&self.string_prototype)),
+            (
+                AlgorithmPattern::Sorting,
+                intent_hv.similarity(&self.sorting_prototype),
+            ),
+            (
+                AlgorithmPattern::Search,
+                intent_hv.similarity(&self.search_prototype),
+            ),
+            (
+                AlgorithmPattern::DynamicProgramming,
+                intent_hv.similarity(&self.dp_prototype),
+            ),
+            (
+                AlgorithmPattern::Graph,
+                intent_hv.similarity(&self.graph_prototype),
+            ),
+            (
+                AlgorithmPattern::Accumulation,
+                intent_hv.similarity(&self.accumulation_prototype),
+            ),
+            (
+                AlgorithmPattern::StringProcessing,
+                intent_hv.similarity(&self.string_prototype),
+            ),
         ];
 
         scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
@@ -875,10 +960,7 @@ mod tests {
 
         let steps = AlgorithmPattern::Accumulation.to_plan_steps();
         assert!(steps.len() >= 3);
-        assert!(steps[0]
-            .context
-            .iter()
-            .any(|c| c.contains("accumulation")));
+        assert!(steps[0].context.iter().any(|c| c.contains("accumulation")));
     }
 
     #[test]
@@ -917,8 +999,7 @@ mod tests {
     fn test_string_processing_pattern_detected() {
         let dim = ALGORITHM_PATTERN_DIM;
         let detector = AlgorithmPatternDetector::new(dim);
-        let intent =
-            make_keyword_hv(dim, &["string", "char", "parse", "split", "uppercase"]);
+        let intent = make_keyword_hv(dim, &["string", "char", "parse", "split", "uppercase"]);
         let pattern = detector.detect(&intent);
         assert_eq!(pattern, Some(AlgorithmPattern::StringProcessing));
     }

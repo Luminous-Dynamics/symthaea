@@ -14,8 +14,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -58,7 +58,8 @@ impl StopSignalBenchmark {
         let go_threshold: f64 = (0.15 - pressure * 0.08) * sig_mult;
         let stop_effectiveness: f64 = (0.70 - pressure * 0.20) * sig_mult;
         // Softmax temperature: noisier decisions under pressure
-        let temperature: f64 = (0.30 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
+        let temperature: f64 =
+            (0.30 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
 
         let total_trials = 200;
         // 25% stop trials (Logan 1994, standard SST design)
@@ -133,7 +134,8 @@ impl StopSignalBenchmark {
                 let stop_noise = ContinuousHV::random(dim, rng);
                 let stop_stimulus =
                     ContinuousHV::weighted_bundle(&[&stop_proto, &stop_noise], &[0.80, 0.20]);
-                let stop_sim = (stop_stimulus.similarity(&stop_proto) * (1.0 - noise_degrade)) as f64;
+                let stop_sim =
+                    (stop_stimulus.similarity(&stop_proto) * (1.0 - noise_degrade)) as f64;
 
                 // NE phasic burst amplifies stop effectiveness (Aron 2007):
                 // Norepinephrine phasic signal strengthens the hyperdirect STN pathway.
@@ -273,7 +275,9 @@ impl PsychBenchmark for StopSignalBenchmark {
 
         result.conditions = 2; // go + stop
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

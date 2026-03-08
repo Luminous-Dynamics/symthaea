@@ -87,15 +87,17 @@ impl PhysicsSearchEngine {
         let symmetry_hv = self.sym_encoder.encode(&equation.symmetries);
         let dimensional_hv = self.dim_encoder.encode(&equation.dimensions);
 
-        self.search_multi_aspect(&full_hv, &skeleton_hv, &symmetry_hv, &dimensional_hv, max_results)
+        self.search_multi_aspect(
+            &full_hv,
+            &skeleton_hv,
+            &symmetry_hv,
+            &dimensional_hv,
+            max_results,
+        )
     }
 
     /// Search by skeleton only (best for cross-domain analogy discovery).
-    pub fn search_by_skeleton(
-        &self,
-        ast: &EquationNode,
-        max_results: usize,
-    ) -> Vec<SearchResult> {
+    pub fn search_by_skeleton(&self, ast: &EquationNode, max_results: usize) -> Vec<SearchResult> {
         let skeleton_hv = self.eq_encoder.encode_skeleton(ast);
         let mut results: Vec<SearchResult> = self
             .catalog
@@ -116,7 +118,11 @@ impl PhysicsSearchEngine {
                 }
             })
             .collect();
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(max_results);
         results
     }
@@ -147,7 +153,11 @@ impl PhysicsSearchEngine {
                 }
             })
             .collect();
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(max_results);
         results
     }
@@ -178,7 +188,11 @@ impl PhysicsSearchEngine {
                 }
             })
             .collect();
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(max_results);
         results
     }
@@ -186,11 +200,7 @@ impl PhysicsSearchEngine {
     /// Search by raw hypervector (for cognitive loop integration).
     ///
     /// Compares the query HV against each catalog entry's full encoding.
-    pub fn search_by_hv(
-        &self,
-        query_hv: &ContinuousHV,
-        max_results: usize,
-    ) -> Vec<SearchResult> {
+    pub fn search_by_hv(&self, query_hv: &ContinuousHV, max_results: usize) -> Vec<SearchResult> {
         let mut results: Vec<SearchResult> = self
             .catalog
             .entries()
@@ -210,7 +220,11 @@ impl PhysicsSearchEngine {
                 }
             })
             .collect();
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(max_results);
         results
     }
@@ -245,7 +259,11 @@ impl PhysicsSearchEngine {
                 })
             })
             .collect();
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(max_results);
         results
     }
@@ -300,7 +318,11 @@ impl PhysicsSearchEngine {
             })
             .collect();
 
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(max_results);
         results
     }
@@ -389,7 +411,10 @@ mod tests {
             .iter()
             .filter(|r| r.domain == PhysicsDomain::Electromagnetism)
             .count();
-        assert!(em_count >= 2, "Should find Maxwell equations with U(1) gauge");
+        assert!(
+            em_count >= 2,
+            "Should find Maxwell equations with U(1) gauge"
+        );
     }
 
     #[test]

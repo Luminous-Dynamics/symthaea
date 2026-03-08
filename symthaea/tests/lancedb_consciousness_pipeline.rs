@@ -151,7 +151,9 @@ async fn test_lancedb_retrieval_affects_context() {
             consolidation_strength: 0.0,
             retrieval_count: 0,
         };
-        db.store(record).await.expect("Should store familiar memory");
+        db.store(record)
+            .await
+            .expect("Should store familiar memory");
     }
 
     // Also store some "distant" memories with unrelated encodings.

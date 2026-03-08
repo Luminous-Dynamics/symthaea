@@ -16,10 +16,10 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
-use std::collections::BTreeMap;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::ssm_temporal::SsmTemporalBackend;
+use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Attentional Blink benchmark.
@@ -72,7 +72,8 @@ impl AttentionalBlinkBenchmark {
         // Time pressure: base 0.30 matches ~50% T2|T1 accuracy at lag-2 (Raymond et al., 1992 AB);
         // +0.15/unit degrades target discrimination, modeling attention-gate narrowing under SAT (Heitz, 2014).
         let diff_model = difficulty_model_for(self.name());
-        let temperature: f64 = (0.30 + config.time_pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
+        let temperature: f64 = (0.30 + config.time_pressure * 0.15)
+            * diff_model.temperature_multiplier(config.difficulty);
         let trials_per_lag = 25;
         let lags = [2, 3, 5, 8];
 
@@ -250,7 +251,11 @@ impl PsychBenchmark for AttentionalBlinkBenchmark {
                     trial_idx: trace.len(),
                     condition: "attentional_blink".to_string(),
                     correct: r.t1_accuracy > 0.5,
-                    rt_ticks: if r.t1_rt_ticks.is_empty() { 0.0 } else { r.t1_rt_ticks.iter().sum::<f64>() / r.t1_rt_ticks.len() as f64 },
+                    rt_ticks: if r.t1_rt_ticks.is_empty() {
+                        0.0
+                    } else {
+                        r.t1_rt_ticks.iter().sum::<f64>() / r.t1_rt_ticks.len() as f64
+                    },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,
@@ -269,7 +274,9 @@ impl PsychBenchmark for AttentionalBlinkBenchmark {
 
         result.conditions = 4; // 4 lag conditions
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

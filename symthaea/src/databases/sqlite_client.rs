@@ -1032,7 +1032,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                     .map_err(|e| DatabaseError::Other(format!("State serialization failed: {e}")))?;
                 let outcome_bytes = bincode::serialize(&link.outcome)
                     .map_err(|e| DatabaseError::Other(format!("Outcome serialization failed: {e}")))?;
-                
+
                 conn.execute(
                     "INSERT INTO causal_links (action_fingerprint, state_context, outcome, weight) VALUES (?1, ?2, ?3, ?4)",
                     params![link.action_fingerprint as i64, state_bytes, outcome_bytes, link.weight as f64],

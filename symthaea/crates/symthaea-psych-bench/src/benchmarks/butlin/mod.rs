@@ -14,4 +14,6 @@ pub mod indicators;
 pub mod report;
 
 pub use indicators::ButlinIndicatorSuite;
-pub use report::{ButlinIndicatorReport, IndicatorEvidence, IndicatorStatus, RuntimeConsciousnessData};
+pub use report::{
+    ButlinIndicatorReport, IndicatorEvidence, IndicatorStatus, RuntimeConsciousnessData,
+};

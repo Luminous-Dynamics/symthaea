@@ -147,7 +147,7 @@ impl CognitiveLoopService {
         module_timings.compositionality = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // UNIFIED VALUE EVALUATOR: Seven Harmonies alignment scoring
+        // UNIFIED VALUE EVALUATOR: Eight Harmonies alignment scoring
         // [extracted to compute_value_evaluator_phase]
         // ═══════════════════════════════════════════════════════════════════════
         let (value_evaluator_score, value_evaluator_decision, value_gate_factor) =
@@ -157,8 +157,11 @@ impl CognitiveLoopService {
         // CONSCIOUSNESS PROFILE: Multi-dimensional consciousness assessment
         // [extracted to compute_consciousness_profile_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let (consciousness_profile_composite, synergy_enhanced_composite, emergent_properties_count) =
-            self.compute_consciousness_profile_phase(hv16_cached, module_timings);
+        let (
+            consciousness_profile_composite,
+            synergy_enhanced_composite,
+            emergent_properties_count,
+        ) = self.compute_consciousness_profile_phase(hv16_cached, module_timings);
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONTEXT-AWARE EVOLUTION: Dynamic Φ/Harmonic/Epistemic weighting
@@ -241,7 +244,7 @@ impl CognitiveLoopService {
         module_timings.composition_rules = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
+        // FIDUCIARY HARMONICS: Eight Harmonies field coherence + interference
         // [extracted to compute_fiduciary_harmonics_phase]
         // ═══════════════════════════════════════════════════════════════════════
         let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) = self
@@ -373,8 +376,12 @@ impl CognitiveLoopService {
         // EPISTEMIC CONFLICT: Multi-theory conflict detection + Φ_eff reliability weighting
         // [extracted to compute_epistemic_conflict_phase]
         // ═══════════════════════════════════════════════════════════════════════
-        let (epistemic_phi_eff, epistemic_conflict_count) =
-            self.compute_epistemic_conflict_phase(unified_psi, coherence, prediction_error, module_timings);
+        let (epistemic_phi_eff, epistemic_conflict_count) = self.compute_epistemic_conflict_phase(
+            unified_psi,
+            coherence,
+            prediction_error,
+            module_timings,
+        );
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS EQUATION V2: Unified 7-theory formula
@@ -520,7 +527,9 @@ impl CognitiveLoopService {
                 // Track A: Build causal codebook entries by binding content BinaryHVs
                 let codebook_entries: Vec<(String, Vec<f32>)> = detected
                     .iter()
-                    .filter(|c| c.genuine_causation && c.causal_strength > CAUSAL_BINDING_THRESHOLD as f64)
+                    .filter(|c| {
+                        c.genuine_causation && c.causal_strength > CAUSAL_BINDING_THRESHOLD as f64
+                    })
                     .filter_map(|c| {
                         let contents: Vec<&crate::hdc::binary_hv::BinaryHV> = c
                             .intervals
@@ -562,9 +571,8 @@ impl CognitiveLoopService {
                     let analysis = analyzer.analyze_continuity();
                     self.carryover.quality.temporal_continuity = analysis.continuity_score;
                     // Track A: Detect continuity gaps that warrant demand replay
-                    let replay_needed =
-                        analysis.continuity_score < TEMPORAL_REPLAY_TRIGGER as f64
-                            || analysis.gap_count > 5;
+                    let replay_needed = analysis.continuity_score < TEMPORAL_REPLAY_TRIGGER as f64
+                        || analysis.gap_count > 5;
                     (analysis.continuity_score, replay_needed)
                 } else {
                     (self.carryover.quality.temporal_continuity, false)
@@ -787,7 +795,7 @@ impl CognitiveLoopService {
         (lattice_height, lattice_width, lattice_join_concept)
     }
 
-    /// Unified Value Evaluator: Seven Harmonies alignment scoring.
+    /// Unified Value Evaluator: Eight Harmonies alignment scoring.
     ///
     /// Evaluates cognitive action against fiduciary harmonics every 19 cycles.
     /// Applies feedback: Veto decision drastically reduces learning rate.
@@ -807,7 +815,7 @@ impl CognitiveLoopService {
         (score, String::new(), 1.0)
     }
 
-    /// Fiduciary Harmonics: Seven Harmonies field coherence + interference detection.
+    /// Fiduciary Harmonics: Eight Harmonies field coherence + interference detection.
     ///
     /// Drives harmonic levels from consciousness metrics every 11 cycles, detects
     /// and resolves value tensions. Applies feedback: high coherence boosts LR;
@@ -1013,15 +1021,13 @@ impl CognitiveLoopService {
                 self.carryover.quality.phi_validation_correlation = r;
                 // Adjust spectral weight based on validation quality
                 if r > PHI_VALIDATION_HIGH_THRESHOLD {
-                    self.carryover.quality.phi_spectral_weight =
-                        (SPECTRAL_WEIGHT_BASE
-                            + (r - PHI_VALIDATION_HIGH_THRESHOLD) as f32 * SPECTRAL_WEIGHT_SCALE)
-                            .clamp(0.4, 0.8);
+                    self.carryover.quality.phi_spectral_weight = (SPECTRAL_WEIGHT_BASE
+                        + (r - PHI_VALIDATION_HIGH_THRESHOLD) as f32 * SPECTRAL_WEIGHT_SCALE)
+                        .clamp(0.4, 0.8);
                 } else if r < PHI_VALIDATION_LOW_THRESHOLD && r > 0.0 {
-                    self.carryover.quality.phi_spectral_weight =
-                        (SPECTRAL_WEIGHT_BASE
-                            - (PHI_VALIDATION_LOW_THRESHOLD - r) as f32 * SPECTRAL_WEIGHT_SCALE)
-                            .clamp(0.4, 0.8);
+                    self.carryover.quality.phi_spectral_weight = (SPECTRAL_WEIGHT_BASE
+                        - (PHI_VALIDATION_LOW_THRESHOLD - r) as f32 * SPECTRAL_WEIGHT_SCALE)
+                        .clamp(0.4, 0.8);
                 }
                 r
             } else {

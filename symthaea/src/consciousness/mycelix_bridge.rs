@@ -3,7 +3,7 @@
 //! This module bridges Symthaea consciousness measurement to Mycelix governance,
 //! enabling:
 //! - **Consciousness-gated proposals**: Only submit when Φ > threshold
-//! - **Value-aligned voting**: Evaluate proposals against Seven Harmonies
+//! - **Value-aligned voting**: Evaluate proposals against Eight Harmonies
 //! - **Federated value learning**: Share value insights via Mycelix network
 //! - **Cross-hApp reputation**: Aggregate consciousness metrics across hApps
 //!
@@ -17,7 +17,7 @@
 //! │  │    Symthaea        │                │      Mycelix       │        │
 //! │  │                    │                │                    │        │
 //! │  │ • Consciousness Φ  │◄──────────────►│ • Agora (Proposals)│        │
-//! │  │ • Seven Harmonies  │   Bridge       │ • MATL (Trust)     │        │
+//! │  │ • Eight Harmonies  │   Bridge       │ • MATL (Trust)     │        │
 //! │  │ • Affective State  │   Protocol     │ • HyperFeel (FL)   │        │
 //! │  │ • Unified Evaluator│                │ • Epistemic Charter│        │
 //! │  └────────────────────┘                └────────────────────┘        │
@@ -62,7 +62,7 @@ const REP_VOTING: f64 = 0.6;
 const REP_CONSTITUTIONAL: f64 = 0.8;
 
 use super::affective_consciousness::CoreAffect;
-use super::seven_harmonies::Harmony;
+use super::eight_harmonies::Harmony;
 use super::unified_value_evaluator::{
     ActionType, AffectiveSystemsState, Decision, EvaluationContext, EvaluationResult,
     UnifiedValueEvaluator,

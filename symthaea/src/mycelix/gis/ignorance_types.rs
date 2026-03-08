@@ -1,7 +1,7 @@
 //! # Ignorance Type Taxonomy
 //!
 //! Implements the 5-type ignorance taxonomy from GIS v1.0, extended in v4.0 with
-//! Harmonic Ignorance for Seven Harmonies integration.
+//! Harmonic Ignorance for Eight Harmonies integration.
 //!
 //! | Symbol | Name | Description |
 //! |--------|------|-------------|
@@ -13,7 +13,7 @@
 //!
 //! ## GIS v4.0 Extension: Harmonic Ignorance
 //!
-//! Ignorance is not uniform across the Seven Harmonies. A gap in Care-Knowing
+//! Ignorance is not uniform across the Eight Harmonies. A gap in Care-Knowing
 //! (Pan-Sentient Flourishing) differs fundamentally from a gap in Truth-Knowing
 //! (Integral Wisdom).
 //!
@@ -262,7 +262,7 @@ pub enum ResolutionMethod {
 }
 
 // =============================================================================
-// GIS v4.0: Seven Harmonies Integration
+// GIS v4.0: Eight Harmonies Integration
 // =============================================================================
 
 // Canonical Harmony type from shared types crate

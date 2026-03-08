@@ -49,7 +49,10 @@ fn all_values_finite() {
 
     for &(domain, key, value, _, _) in &entries {
         if !value.is_finite() {
-            failures.push(format!("{}.{}: value is not finite ({})", domain, key, value));
+            failures.push(format!(
+                "{}.{}: value is not finite ({})",
+                domain, key, value
+            ));
         }
     }
 
@@ -273,7 +276,10 @@ fn normative_baselines_have_sd() {
     for &nk in &normative_keys {
         if let Some(&(domain, _, _, sd, _)) = entries.iter().find(|(_, key, _, _, _)| *key == nk) {
             if sd.is_none() {
-                missing_sd.push(format!("{}.{}: used for z-scores but has no SD", domain, nk));
+                missing_sd.push(format!(
+                    "{}.{}: used for z-scores but has no SD",
+                    domain, nk
+                ));
             }
         } else {
             missing_sd.push(format!("???.{}: key not found in any baseline domain", nk));

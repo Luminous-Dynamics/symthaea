@@ -195,8 +195,7 @@ impl Transmitter {
                 self.receptor_sensitivity *= self.tolerance_decay_rate;
             }
         } else {
-            if self.high_exposure_cycles > self.tolerance_onset_cycles
-                && self.level < self.baseline
+            if self.high_exposure_cycles > self.tolerance_onset_cycles && self.level < self.baseline
             {
                 self.withdrawal_cycles = self.withdrawal_duration;
             }
@@ -721,7 +720,11 @@ impl NeuromodulatorBath {
         // ── ENDOCANNABINOID: Retrograde inhibitor (Piomelli 2003) ───
         // Production from glutamate excess + stress buffer
         let ecb_production = self.glutamate.effective().max(0.3) * 0.03
-            + if self.allostatic_load > 0.3 { 0.02 } else { 0.0 };
+            + if self.allostatic_load > 0.3 {
+                0.02
+            } else {
+                0.0
+            };
         self.endocannabinoid.produce(ecb_production);
         self.endocannabinoid.reuptake();
         // CB1 dampening: high ECB reduces glutamate release (retrograde inhibition)
@@ -736,15 +739,13 @@ impl NeuromodulatorBath {
         // Adaptation: high serotonin → 1A down-regulates, 2A up-regulates
         let sht_eff = self.serotonin.effective();
         if sht_eff > 0.6 {
-            self.sht_subtypes.excitatory =
-                (self.sht_subtypes.excitatory * 0.999).max(0.5); // 1A tolerance
-            self.sht_subtypes.inhibitory =
-                (self.sht_subtypes.inhibitory * 1.001).min(2.0); // 2A sensitization
+            self.sht_subtypes.excitatory = (self.sht_subtypes.excitatory * 0.999).max(0.5); // 1A tolerance
+            self.sht_subtypes.inhibitory = (self.sht_subtypes.inhibitory * 1.001).min(2.0);
+        // 2A sensitization
         } else if sht_eff < 0.3 {
-            self.sht_subtypes.excitatory =
-                (self.sht_subtypes.excitatory * 1.001).min(2.0); // 1A up
-            self.sht_subtypes.inhibitory =
-                (self.sht_subtypes.inhibitory * 0.999).max(0.5); // 2A down
+            self.sht_subtypes.excitatory = (self.sht_subtypes.excitatory * 1.001).min(2.0); // 1A up
+            self.sht_subtypes.inhibitory = (self.sht_subtypes.inhibitory * 0.999).max(0.5);
+            // 2A down
         }
 
         // ── GABA RECEPTOR SUBTYPE DYNAMICS (Möhler 2006) ──────────────
@@ -752,15 +753,13 @@ impl NeuromodulatorBath {
         // GABA-B: slow metabotropic, more stable
         let gaba_eff = self.gaba.effective();
         if gaba_eff > 0.6 {
-            self.gaba_subtypes.excitatory =
-                (self.gaba_subtypes.excitatory * 0.998).max(0.5); // A desensitizes fast
-            self.gaba_subtypes.inhibitory =
-                (self.gaba_subtypes.inhibitory * 0.9995).max(0.5); // B slower tolerance
+            self.gaba_subtypes.excitatory = (self.gaba_subtypes.excitatory * 0.998).max(0.5); // A desensitizes fast
+            self.gaba_subtypes.inhibitory = (self.gaba_subtypes.inhibitory * 0.9995).max(0.5);
+        // B slower tolerance
         } else if gaba_eff < 0.3 {
-            self.gaba_subtypes.excitatory =
-                (self.gaba_subtypes.excitatory * 1.002).min(2.0); // A re-sensitizes
-            self.gaba_subtypes.inhibitory =
-                (self.gaba_subtypes.inhibitory * 1.0005).min(2.0); // B slower recovery
+            self.gaba_subtypes.excitatory = (self.gaba_subtypes.excitatory * 1.002).min(2.0); // A re-sensitizes
+            self.gaba_subtypes.inhibitory = (self.gaba_subtypes.inhibitory * 1.0005).min(2.0);
+            // B slower recovery
         }
 
         // ── E/I BALANCE HOMEOSTASIS (Bhatt 2009, Turrigiano 2012) ───
@@ -4749,10 +4748,7 @@ mod tests {
         let gaba_before = bath.gaba.level;
         bath.update(&inputs);
         // Under-inhibition block reduces GABA when E/I < 0.5
-        assert!(
-            bath.gaba.level <= gaba_before,
-            "Low E/I should reduce GABA"
-        );
+        assert!(bath.gaba.level <= gaba_before, "Low E/I should reduce GABA");
     }
 
     #[test]
@@ -4838,7 +4834,10 @@ mod tests {
         bath.glutamate.level = 0.0;
         bath.gaba.level = 0.0;
         let ratio = bath.ei_ratio();
-        assert!(ratio.is_finite(), "E/I ratio should be finite even at zero GABA (uses max(0.1))");
+        assert!(
+            ratio.is_finite(),
+            "E/I ratio should be finite even at zero GABA (uses max(0.1))"
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -4944,10 +4943,7 @@ mod tests {
             elapsed: 0,
         };
         let dose_0 = inj.current_dose();
-        let inj10 = ActiveInjection {
-            elapsed: 10,
-            ..inj
-        };
+        let inj10 = ActiveInjection { elapsed: 10, ..inj };
         let dose_10 = inj10.current_dose();
         // After one half-life, dose should be ~50%
         assert!(
@@ -5010,10 +5006,7 @@ mod tests {
         for i in 0..250 {
             tracker.record([i as f32 / 250.0; 9]);
         }
-        assert!(
-            tracker.history.len() <= 200,
-            "Window should cap at 200"
-        );
+        assert!(tracker.history.len() <= 200, "Window should cap at 200");
     }
 
     #[test]
@@ -5074,7 +5067,17 @@ mod tests {
         let mut tracker2 = BathPhaseTracker::default();
         for i in 0..60 {
             let v = (i as f32 / 60.0).clamp(0.0, 1.0);
-            tracker2.record([v, 1.0 - v, v * 0.5, 0.3 + v * 0.4, 0.7 - v * 0.3, v, 0.4, 0.6, 0.3]);
+            tracker2.record([
+                v,
+                1.0 - v,
+                v * 0.5,
+                0.3 + v * 0.4,
+                0.7 - v * 0.3,
+                v,
+                0.4,
+                0.6,
+                0.3,
+            ]);
         }
         assert!(
             tracker2.detect_attractor().is_none(),
@@ -5280,7 +5283,10 @@ mod tests {
         bath.gaba.level = 0.6;
         bath.gaba_subtypes.excitatory = 1.2;
         let sig = bath.gaba_a_signal();
-        assert!(sig > bath.gaba.effective(), "GABA-A should amplify with sensitized receptor");
+        assert!(
+            sig > bath.gaba.effective(),
+            "GABA-A should amplify with sensitized receptor"
+        );
     }
 
     #[test]
@@ -5353,13 +5359,11 @@ mod tests {
     fn test_per_transmitter_onset_differs() {
         let bath = NeuromodulatorBath::default();
         assert_ne!(
-            bath.dopamine.tolerance_onset_cycles,
-            bath.serotonin.tolerance_onset_cycles,
+            bath.dopamine.tolerance_onset_cycles, bath.serotonin.tolerance_onset_cycles,
             "DA and 5-HT should have different onset cycles"
         );
         assert_ne!(
-            bath.gaba.tolerance_onset_cycles,
-            bath.adenosine.tolerance_onset_cycles,
+            bath.gaba.tolerance_onset_cycles, bath.adenosine.tolerance_onset_cycles,
             "GABA and adenosine should have different onset cycles"
         );
     }
@@ -5399,8 +5403,7 @@ mod tests {
     fn test_withdrawal_duration_varies() {
         let bath = NeuromodulatorBath::default();
         assert_ne!(
-            bath.dopamine.withdrawal_duration,
-            bath.gaba.withdrawal_duration,
+            bath.dopamine.withdrawal_duration, bath.gaba.withdrawal_duration,
             "DA and GABA should have different withdrawal durations"
         );
         assert_eq!(bath.endocannabinoid.withdrawal_duration, 60);
@@ -5530,9 +5533,7 @@ mod tests {
     #[test]
     fn test_transmitter_by_index_accessor() {
         let bath = NeuromodulatorBath::default();
-        assert!(
-            (bath.transmitter_by_index(0).level - bath.dopamine.level).abs() < f32::EPSILON
-        );
+        assert!((bath.transmitter_by_index(0).level - bath.dopamine.level).abs() < f32::EPSILON);
         assert!(
             (bath.transmitter_by_index(8).level - bath.endocannabinoid.level).abs() < f32::EPSILON
         );
@@ -5661,9 +5662,13 @@ mod tests {
     #[test]
     fn test_phase_transition_stress_to_flow() {
         let mut detector = PhaseTransitionDetector::new(3);
-        for _ in 0..3 { detector.update("stressed"); }
+        for _ in 0..3 {
+            detector.update("stressed");
+        }
         assert_eq!(detector.current_phase(), "stressed");
-        for _ in 0..3 { detector.update("flow"); }
+        for _ in 0..3 {
+            detector.update("flow");
+        }
         assert_eq!(detector.current_phase(), "flow");
     }
 
@@ -5681,7 +5686,9 @@ mod tests {
     #[test]
     fn test_timeline_serde_round_trip() {
         let mut tracker = BathPhaseTracker::default();
-        for i in 0..10 { tracker.record([i as f32 / 10.0; 9]); }
+        for i in 0..10 {
+            tracker.record([i as f32 / 10.0; 9]);
+        }
         let timeline = tracker.to_timeline("balanced");
         let json = serde_json::to_string(&timeline).unwrap();
         let restored: BathTimeline = serde_json::from_str(&json).unwrap();
@@ -5692,7 +5699,9 @@ mod tests {
     fn test_timeline_entries_match_trajectory() {
         let mut tracker = BathPhaseTracker::default();
         let states: Vec<[f32; 9]> = (0..5).map(|i| [i as f32 * 0.1; 9]).collect();
-        for &s in &states { tracker.record(s); }
+        for &s in &states {
+            tracker.record(s);
+        }
         let timeline = tracker.to_timeline("flow");
         assert_eq!(timeline.entries.len(), 5);
     }
@@ -5718,7 +5727,9 @@ mod tests {
     #[test]
     fn test_tracker_total_recorded() {
         let mut tracker = BathPhaseTracker::default();
-        for i in 0..250 { tracker.record([i as f32 / 250.0; 9]); }
+        for i in 0..250 {
+            tracker.record([i as f32 / 250.0; 9]);
+        }
         assert_eq!(tracker.total_recorded, 250);
         assert!(tracker.history.len() <= 200);
     }
@@ -5801,7 +5812,10 @@ mod tests {
         .iter()
         .filter(|&&x| x)
         .count() as u8;
-        assert_eq!(snap.tolerant_count, tolerant_from_snapshot + bath.tolerant_count() - tolerant_from_snapshot);
+        assert_eq!(
+            snap.tolerant_count,
+            tolerant_from_snapshot + bath.tolerant_count() - tolerant_from_snapshot
+        );
         assert_eq!(snap.tolerant_count, bath.tolerant_count());
         // Withdrawal: per-transmitter should match aggregate
         let withdrawal_from_snapshot = [
@@ -5827,7 +5841,7 @@ mod tests {
         // Set load to 0.6 (below 0.75 release threshold)
         bath.allostatic_load = 0.6;
         bath.accumulate_allostatic_load(0.0, false); // cortisol=0 → no new accumulation
-        // Release should have bumped baselines by +0.002
+                                                     // Release should have bumped baselines by +0.002
         assert!(
             bath.dopamine.baseline_val() > 0.35,
             "DA baseline should increase when load drops below 0.75: got {}",
@@ -5895,7 +5909,7 @@ mod tests {
         let mut bath = NeuromodulatorBath::default();
         bath.dopamine.set_baseline(0.35);
         bath.allostatic_load = 0.1; // very low load
-        // 100 non-sleep cycles — release restores to 0.45 max, not 0.5
+                                    // 100 non-sleep cycles — release restores to 0.45 max, not 0.5
         for _ in 0..100 {
             bath.accumulate_allostatic_load(0.0, false);
         }
@@ -6164,8 +6178,14 @@ mod tests {
         // Baselines should be finite and within bounds (clamped by adjust_baseline)
         let sht = bath.serotonin.baseline_val();
         let da = bath.dopamine.baseline_val();
-        assert!(sht.is_finite() && sht >= 0.35 && sht <= 0.65, "5-HT baseline out of range: {sht}");
-        assert!(da.is_finite() && da >= 0.35 && da <= 0.65, "DA baseline out of range: {da}");
+        assert!(
+            sht.is_finite() && sht >= 0.35 && sht <= 0.65,
+            "5-HT baseline out of range: {sht}"
+        );
+        assert!(
+            da.is_finite() && da >= 0.35 && da <= 0.65,
+            "DA baseline out of range: {da}"
+        );
     }
 
     #[test]
@@ -6229,7 +6249,8 @@ mod tests {
         assert!(
             bath.oxytocin.level > bath_ctrl.oxytocin.level,
             "Positive moral should boost oxytocin: moral={}, ctrl={}",
-            bath.oxytocin.level, bath_ctrl.oxytocin.level
+            bath.oxytocin.level,
+            bath_ctrl.oxytocin.level
         );
     }
 
@@ -6259,7 +6280,8 @@ mod tests {
         assert!(
             bath.oxytocin.level < bath_ctrl.oxytocin.level,
             "Negative moral should suppress oxytocin: moral={}, ctrl={}",
-            bath.oxytocin.level, bath_ctrl.oxytocin.level
+            bath.oxytocin.level,
+            bath_ctrl.oxytocin.level
         );
     }
 
@@ -6289,7 +6311,8 @@ mod tests {
         assert!(
             (bath1.oxytocin.level - bath2.oxytocin.level).abs() < 0.001,
             "Moral=None vs moral=0.0 should be equivalent: {}, {}",
-            bath1.oxytocin.level, bath2.oxytocin.level
+            bath1.oxytocin.level,
+            bath2.oxytocin.level
         );
     }
 
@@ -6318,7 +6341,8 @@ mod tests {
         assert!(
             bath.dopamine.level >= bath_ctrl.dopamine.level,
             "Positive moral should boost DA: moral={}, ctrl={}",
-            bath.dopamine.level, bath_ctrl.dopamine.level
+            bath.dopamine.level,
+            bath_ctrl.dopamine.level
         );
     }
 
@@ -6340,8 +6364,14 @@ mod tests {
         for _ in 0..200 {
             bath.update(&inputs);
         }
-        assert!(bath.oxytocin.level.is_finite(), "Oxytocin should be finite after 200 cycles");
-        assert!(bath.dopamine.level.is_finite(), "DA should be finite after 200 cycles");
+        assert!(
+            bath.oxytocin.level.is_finite(),
+            "Oxytocin should be finite after 200 cycles"
+        );
+        assert!(
+            bath.dopamine.level.is_finite(),
+            "DA should be finite after 200 cycles"
+        );
         assert!(bath.oxytocin.level <= 1.0, "Oxytocin should not exceed 1.0");
         assert!(bath.dopamine.level <= 1.0, "DA should not exceed 1.0");
     }

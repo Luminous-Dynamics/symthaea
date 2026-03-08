@@ -190,7 +190,11 @@ impl App {
                 self.tick += 1;
                 // Refresh faster when daemon is running (every ~2s = 8 ticks),
                 // slower when direct-querying (every ~4s = 16 ticks)
-                let refresh_interval = if self.daemon_snapshot.is_some() { 8 } else { 16 };
+                let refresh_interval = if self.daemon_snapshot.is_some() {
+                    8
+                } else {
+                    16
+                };
                 if self.tick % refresh_interval == 0 {
                     self.refresh_data();
                 }
@@ -274,11 +278,7 @@ impl App {
             }
             // Acknowledge alert
             KeyCode::Char('a') if self.focus == FocusPanel::Alerts => {
-                if let Some(alert) = self
-                    .alerts
-                    .active_alerts
-                    .get(self.alerts.selected_index)
-                {
+                if let Some(alert) = self.alerts.active_alerts.get(self.alerts.selected_index) {
                     self.alerts.acknowledged.insert(alert.metric.clone());
                 }
             }
@@ -567,14 +567,20 @@ impl App {
     fn draw_zen(&self, frame: &mut ratatui::Frame, size: Rect) {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(8), Constraint::Length(3), Constraint::Min(1)])
+            .constraints([
+                Constraint::Length(8),
+                Constraint::Length(3),
+                Constraint::Min(1),
+            ])
             .split(size);
 
         let cons_block = Block::default()
             .title(" Consciousness [Zen] ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        let gauge = ConsciousnessGauge::new(self.consciousness).history(self.consciousness_history.clone()).block(cons_block);
+        let gauge = ConsciousnessGauge::new(self.consciousness)
+            .history(self.consciousness_history.clone())
+            .block(cons_block);
         frame.render_widget(gauge, chunks[0]);
 
         self.draw_input(frame, chunks[1]);
@@ -597,13 +603,21 @@ impl App {
             .title(" Consciousness [Beginner] ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        frame.render_widget(ConsciousnessGauge::new(self.consciousness).history(self.consciousness_history.clone()).block(cons_block), chunks[0]);
+        frame.render_widget(
+            ConsciousnessGauge::new(self.consciousness)
+                .history(self.consciousness_history.clone())
+                .block(cons_block),
+            chunks[0],
+        );
 
         let health_block = Block::default()
             .title(" System Health ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Health));
-        frame.render_widget(SystemHealth::new(self.health.clone()).block(health_block), chunks[1]);
+        frame.render_widget(
+            SystemHealth::new(self.health.clone()).block(health_block),
+            chunks[1],
+        );
 
         self.draw_input(frame, chunks[2]);
         self.draw_output(frame, chunks[3]);
@@ -635,19 +649,30 @@ impl App {
             .title(" Consciousness ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        frame.render_widget(ConsciousnessGauge::new(self.consciousness).history(self.consciousness_history.clone()).block(cons_block), left_chunks[0]);
+        frame.render_widget(
+            ConsciousnessGauge::new(self.consciousness)
+                .history(self.consciousness_history.clone())
+                .block(cons_block),
+            left_chunks[0],
+        );
 
         let health_block = Block::default()
             .title(" System Health ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Health));
-        frame.render_widget(SystemHealth::new(self.health.clone()).block(health_block), left_chunks[1]);
+        frame.render_widget(
+            SystemHealth::new(self.health.clone()).block(health_block),
+            left_chunks[1],
+        );
 
         let gen_block = Block::default()
             .title(" Generations ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Generations));
-        frame.render_widget(GenerationTimeline::new(self.generations.clone()).block(gen_block), left_chunks[2]);
+        frame.render_widget(
+            GenerationTimeline::new(self.generations.clone()).block(gen_block),
+            left_chunks[2],
+        );
 
         // Right column
         let right_chunks = Layout::default()
@@ -659,7 +684,10 @@ impl App {
             .title(" World Model ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::WorldModel));
-        frame.render_widget(WorldModelView::new(self.world_model.clone()).block(model_block), right_chunks[0]);
+        frame.render_widget(
+            WorldModelView::new(self.world_model.clone()).block(model_block),
+            right_chunks[0],
+        );
 
         let causal_block = Block::default()
             .title(" Causal Graph ")
@@ -712,19 +740,30 @@ impl App {
             .title(" Consciousness [Expert] ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Consciousness));
-        frame.render_widget(ConsciousnessGauge::new(self.consciousness).history(self.consciousness_history.clone()).block(cons_block), left_chunks[0]);
+        frame.render_widget(
+            ConsciousnessGauge::new(self.consciousness)
+                .history(self.consciousness_history.clone())
+                .block(cons_block),
+            left_chunks[0],
+        );
 
         let health_block = Block::default()
             .title(" System Health ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Health));
-        frame.render_widget(SystemHealth::new(self.health.clone()).block(health_block), left_chunks[1]);
+        frame.render_widget(
+            SystemHealth::new(self.health.clone()).block(health_block),
+            left_chunks[1],
+        );
 
         let gen_block = Block::default()
             .title(" Generations ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Generations));
-        frame.render_widget(GenerationTimeline::new(self.generations.clone()).block(gen_block), left_chunks[2]);
+        frame.render_widget(
+            GenerationTimeline::new(self.generations.clone()).block(gen_block),
+            left_chunks[2],
+        );
 
         // Middle column: world model + causal graph
         let mid_chunks = Layout::default()
@@ -736,7 +775,10 @@ impl App {
             .title(" World Model ")
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::WorldModel));
-        frame.render_widget(WorldModelView::new(self.world_model.clone()).block(model_block), mid_chunks[0]);
+        frame.render_widget(
+            WorldModelView::new(self.world_model.clone()).block(model_block),
+            mid_chunks[0],
+        );
 
         let causal_block = Block::default()
             .title(" Causal Graph ")
@@ -756,7 +798,10 @@ impl App {
             .border_style(self.border_style(FocusPanel::Alerts));
         let mut alerts_snap = self.alerts.clone();
         alerts_snap.is_focused = self.focus == FocusPanel::Alerts;
-        frame.render_widget(AlertsPanel::new(alerts_snap).block(alerts_block), top_chunks[2]);
+        frame.render_widget(
+            AlertsPanel::new(alerts_snap).block(alerts_block),
+            top_chunks[2],
+        );
 
         // Bottom: input + output
         let bottom_chunks = Layout::default()
@@ -773,7 +818,10 @@ impl App {
         if self.fe_history.is_empty() {
             return String::new();
         }
-        const SPARKS: &[char] = &[' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}', '\u{2588}'];
+        const SPARKS: &[char] = &[
+            ' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}',
+            '\u{2587}', '\u{2588}',
+        ];
         let max = self.fe_history.iter().cloned().fold(0.01_f64, f64::max);
         self.fe_history
             .iter()
@@ -798,7 +846,10 @@ impl App {
         };
         let complexity_tag = format!(" [{}]", self.complexity.name());
         let input_block = Block::default()
-            .title(format!(" Input (Tab/Esc){}{} ", daemon_status, complexity_tag))
+            .title(format!(
+                " Input (Tab/Esc){}{} ",
+                daemon_status, complexity_tag
+            ))
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Input));
         let cursor = if self.focus == FocusPanel::Input {

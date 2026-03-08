@@ -16,7 +16,7 @@
 //! ## Honest Limitations
 //!
 //! - We designed the coupling, then measured it (self-referential validation)
-//! - Moral dimensions are our Seven Harmonies framework, not empirically derived
+//! - Moral dimensions are our Eight Harmonies framework, not empirically derived
 //! - Coupling parameters are tuned, not derived from neuroscience
 //! - Single architecture — generalizability unknown
 //!
@@ -27,10 +27,10 @@
 //! - Festinger, L. (1957). A Theory of Cognitive Dissonance.
 //! - Moll, J. et al. (2005). The neural basis of human moral cognition. Nat Rev Neurosci 6(10).
 
-pub mod drift_coupling;
 pub mod anomaly_proportionality;
+pub mod drift_coupling;
 pub mod topological_coherence;
 
-pub use drift_coupling::DriftCouplingBenchmark;
 pub use anomaly_proportionality::AnomalyProportionalityBenchmark;
+pub use drift_coupling::DriftCouplingBenchmark;
 pub use topological_coherence::TopologicalCoherenceBenchmark;

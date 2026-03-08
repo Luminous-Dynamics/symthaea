@@ -208,10 +208,7 @@ mod tests {
     fn test_expected_heterozygosity_skewed() {
         let he = expected_heterozygosity(&[0.9, 0.1]);
         // He = 1 - (0.81 + 0.01) = 0.18
-        assert!(
-            (he - 0.18).abs() < 1e-10,
-            "skewed: He=0.18, got {he}"
-        );
+        assert!((he - 0.18).abs() < 1e-10, "skewed: He=0.18, got {he}");
     }
 
     #[test]
@@ -229,7 +226,10 @@ mod tests {
             },
         ];
         let ho = observed_heterozygosity(&genotypes);
-        assert!((ho - 1.0).abs() < 1e-10, "all heterozygous: Ho=1.0, got {ho}");
+        assert!(
+            (ho - 1.0).abs() < 1e-10,
+            "all heterozygous: Ho=1.0, got {ho}"
+        );
     }
 
     #[test]
@@ -309,12 +309,15 @@ mod tests {
     #[test]
     fn test_allelic_richness_basic() {
         let alleles = vec![
-            vec![1, 2, 3, 1, 2],  // 3 unique
-            vec![4, 4, 4, 4],     // 1 unique
-            vec![5, 6],           // 2 unique
+            vec![1, 2, 3, 1, 2], // 3 unique
+            vec![4, 4, 4, 4],    // 1 unique
+            vec![5, 6],          // 2 unique
         ];
         let ar = allelic_richness(&alleles);
-        assert!((ar - 2.0).abs() < 1e-10, "mean richness = 6/3 = 2.0, got {ar}");
+        assert!(
+            (ar - 2.0).abs() < 1e-10,
+            "mean richness = 6/3 = 2.0, got {ar}"
+        );
     }
 
     #[test]
@@ -364,7 +367,10 @@ mod tests {
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
         };
         let d = hdc_diversity(&pop);
-        assert!(d > 0.0, "diverse population should have positive diversity, got {d}");
+        assert!(
+            d > 0.0,
+            "diverse population should have positive diversity, got {d}"
+        );
     }
 
     #[test]
@@ -379,7 +385,11 @@ mod tests {
             founding_size: 3,
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
         };
-        assert_eq!(mt_lineage_count(&pop), 2, "2 founder females = 2 mt lineages");
+        assert_eq!(
+            mt_lineage_count(&pop),
+            2,
+            "2 founder females = 2 mt lineages"
+        );
     }
 
     #[test]

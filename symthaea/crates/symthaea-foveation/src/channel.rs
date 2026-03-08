@@ -172,7 +172,10 @@ mod tests {
         }
 
         // Should have sent at least the capacity
-        assert!(sent >= 2, "Should send at least capacity messages, sent {sent}");
+        assert!(
+            sent >= 2,
+            "Should send at least capacity messages, sent {sent}"
+        );
 
         // All sent requests should eventually complete
         for rx in receivers {

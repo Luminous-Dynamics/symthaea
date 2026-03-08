@@ -209,11 +209,7 @@ impl OllamaBridge {
     }
 
     /// Query with NixOS-specific context prepended.
-    pub fn query_nixos(
-        &mut self,
-        question: &str,
-        context: Option<&str>,
-    ) -> Option<OllamaResponse> {
+    pub fn query_nixos(&mut self, question: &str, context: Option<&str>) -> Option<OllamaResponse> {
         let prompt = if let Some(ctx) = context {
             format!(
                 "Context about the user's NixOS system:\n{}\n\nQuestion: {}",

@@ -61,9 +61,7 @@ pub fn determine_style(
 ///
 /// Uses softmax-like scoring based on how well the attachment system's
 /// statistics match each style's prototypical profile.
-pub fn style_probability_distribution(
-    system: &AttachmentSystem,
-) -> [(AttachmentStyle, f64); 4] {
+pub fn style_probability_distribution(system: &AttachmentSystem) -> [(AttachmentStyle, f64); 4] {
     let r = system.caregiver_reliability;
     let q = system.response_quality_ema;
     let w = system.internal_working_model.self_worthy; // warmth proxy
@@ -168,8 +166,16 @@ mod tests {
         }
 
         let dist = style_probability_distribution(&sys);
-        let secure_p = dist.iter().find(|(s, _)| *s == AttachmentStyle::Secure).unwrap().1;
-        let anxious_p = dist.iter().find(|(s, _)| *s == AttachmentStyle::Anxious).unwrap().1;
+        let secure_p = dist
+            .iter()
+            .find(|(s, _)| *s == AttachmentStyle::Secure)
+            .unwrap()
+            .1;
+        let anxious_p = dist
+            .iter()
+            .find(|(s, _)| *s == AttachmentStyle::Anxious)
+            .unwrap()
+            .1;
         assert!(
             secure_p > anxious_p,
             "Secure should dominate: secure={secure_p}, anxious={anxious_p}"
@@ -186,7 +192,10 @@ mod tests {
 
         let dist = style_probability_distribution(&sys);
         for (style, p) in &dist {
-            assert!(*p >= 0.0, "{style:?} probability should be non-negative: {p}");
+            assert!(
+                *p >= 0.0,
+                "{style:?} probability should be non-negative: {p}"
+            );
         }
     }
 

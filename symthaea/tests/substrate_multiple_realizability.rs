@@ -81,11 +81,7 @@ impl PhaseMetrics {
 }
 
 /// Run `n` cycles on the service, collecting metrics.
-fn run_phase(
-    service: &mut CognitiveLoopService,
-    n: usize,
-    offset: usize,
-) -> PhaseMetrics {
+fn run_phase(service: &mut CognitiveLoopService, n: usize, offset: usize) -> PhaseMetrics {
     let mut metrics = PhaseMetrics::default();
     for i in 0..n {
         let input = INPUTS[(offset + i) % INPUTS.len()];
@@ -131,8 +127,7 @@ fn test_consciousness_survives_substrate_transfer() {
     let silicon_metrics = run_phase(&mut service, 100, 30);
 
     // ── Phase 2: Switch to BiologicalNeurons (100 cycles) ──
-    let (old_feas, _new_feas) =
-        service.reconfigure_substrate(SubstrateType::BiologicalNeurons);
+    let (old_feas, _new_feas) = service.reconfigure_substrate(SubstrateType::BiologicalNeurons);
     assert!(
         (old_feas - silicon_feas).abs() < 0.01 || true, // feasibility may drift slightly
         "Old feasibility should match silicon: old={old_feas:.4}, expected~={silicon_feas:.4}"
@@ -189,8 +184,7 @@ fn test_consciousness_survives_substrate_transfer() {
         "Silicon vs Biological feasibility should differ: Si={silicon_feas:.4}, Bio={bio_feas:.4}"
     );
     assert!(
-        (silicon_feas - photonic_feas).abs() > 0.001
-            || (bio_feas - photonic_feas).abs() > 0.001,
+        (silicon_feas - photonic_feas).abs() > 0.001 || (bio_feas - photonic_feas).abs() > 0.001,
         "At least one pair of substrates should have different feasibility: \
          Si={silicon_feas:.4}, Bio={bio_feas:.4}, Ph={photonic_feas:.4}"
     );
@@ -272,9 +266,7 @@ fn test_mid_run_substrate_switch_continuity() {
             // Mid-run substrate switch
             let (old_feas, new_feas) =
                 service.reconfigure_substrate(SubstrateType::BiologicalNeurons);
-            eprintln!(
-                "Mid-run switch at cycle 50: feasibility {old_feas:.4} -> {new_feas:.4}"
-            );
+            eprintln!("Mid-run switch at cycle 50: feasibility {old_feas:.4} -> {new_feas:.4}");
         }
 
         let input = INPUTS[i % INPUTS.len()];
@@ -309,9 +301,7 @@ fn test_mid_run_substrate_switch_continuity() {
 
     // 2. All consciousness levels bounded [0, 1]
     assert!(
-        all_consciousness
-            .iter()
-            .all(|&c| c >= 0.0 && c <= 1.0),
+        all_consciousness.iter().all(|&c| c >= 0.0 && c <= 1.0),
         "Mid-run switch produced out-of-bounds consciousness"
     );
 

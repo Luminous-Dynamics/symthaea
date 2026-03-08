@@ -2,7 +2,7 @@
 //!
 //! This module provides consciousness-related capabilities including:
 //! - Consciousness unification and integration
-//! - Seven Harmonies value alignment framework
+//! - Eight Harmonies value alignment framework
 //! - Phi-based attention mechanisms
 //! - Empathic unification and emotional understanding
 //! - Evolution and recursive improvement
@@ -21,7 +21,7 @@
 //! | Layer | Module | Contents |
 //! |-------|--------|----------|
 //! | Primitives | [`primitives`] | HDC primitives, composition, evolution, lattice |
-//! | Values | [`values`] | Seven Harmonies, contextual weights, semantic embedding |
+//! | Values | [`values`] | Eight Harmonies, contextual weights, semantic embedding |
 //! | Temporal | [`temporal`] | Temporal binding, phenomenal binding, temporal primitives |
 //! | Embodiment | [`embodiment`] | Body schema, autopoiesis, interoception |
 //! | Integration | [`integration`] | Cross-modal, multi-modal, GWT, bridges |
@@ -39,7 +39,7 @@
 //! | Module | Gate | Notes |
 //! |--------|------|-------|
 //! | `primitives` (Layer 1) | always | HDC primitives, composition, evolution, lattice |
-//! | `values` (Layer 2) | always | Seven Harmonies, contextual weights, feedback |
+//! | `values` (Layer 2) | always | Eight Harmonies, contextual weights, feedback |
 //! | `temporal` (Layer 3) | always | Temporal/phenomenal binding |
 //! | `embodiment` (Layer 4) | always | Body schema, autopoiesis, interoception |
 //! | `integration` (Layer 5) | always | Cross-modal, GWT, hierarchical LTC |
@@ -96,13 +96,13 @@ pub use primitives::primitive_validation;
 pub use primitives::stability_regime;
 
 // ============================================================================
-// Layer 2: Values (Seven Harmonies, weights, embeddings, feedback)
+// Layer 2: Values (Eight Harmonies, weights, embeddings, feedback)
 // ============================================================================
 pub mod values;
 pub use values::contextual_weights;
 pub use values::harmonies_integration;
 pub use values::semantic_value_embedder;
-pub use values::seven_harmonies;
+pub use values::eight_harmonies;
 pub use values::value_feedback_loop;
 
 // ============================================================================
@@ -428,7 +428,7 @@ pub mod unified_living_mind;
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 pub mod recursive_improvement;
 
-/// Unified value evaluator — consciousness-guided decision making with Seven Harmonies
+/// Unified value evaluator — consciousness-guided decision making with Eight Harmonies
 pub mod unified_value_evaluator;
 
 /// Unified Emergent Intelligence — collective + context-aware + meta-cognitive
@@ -508,7 +508,9 @@ pub use primitive_reasoning::{
     TaskType, TierAwareConfig, TransformationType,
 };
 pub use primitive_reasoning::{PrimitiveReasoner, ReasoningResult};
-pub use seven_harmonies::{AlignmentResult, Harmony, HarmonyAlignment, SevenHarmonies};
+pub use eight_harmonies::{
+    AlignmentResult, EightHarmonies, Harmony, HarmonyAlignment,
+};
 pub use stability_regime::{
     CfCPrimitive, RegimeParams, StabilityRegimeConfig, StabilityRegimeProcessor,
     StabilityRegimeType,

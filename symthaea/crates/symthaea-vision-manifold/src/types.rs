@@ -77,10 +77,16 @@ impl VisionConfig {
             return Err(format!("hdc_dim must be >= 256, got {}", self.hdc_dim));
         }
         if self.patch_size == 0 || self.patch_size > 64 {
-            return Err(format!("patch_size must be in [1, 64], got {}", self.patch_size));
+            return Err(format!(
+                "patch_size must be in [1, 64], got {}",
+                self.patch_size
+            ));
         }
         if self.tau_base <= 0.001 || self.tau_base >= 100.0 {
-            return Err(format!("tau_base must be in (0.001, 100.0), got {}", self.tau_base));
+            return Err(format!(
+                "tau_base must be in (0.001, 100.0), got {}",
+                self.tau_base
+            ));
         }
         if self.surprise_threshold <= 0.0 || self.surprise_threshold > 1.0 {
             return Err(format!(
@@ -256,7 +262,13 @@ impl PatchGrid {
     pub fn new(frame_width: u32, frame_height: u32, patch_size: usize) -> Self {
         let cols = frame_width as usize / patch_size.max(1);
         let rows = frame_height as usize / patch_size.max(1);
-        Self { cols, rows, patch_size, frame_width, frame_height }
+        Self {
+            cols,
+            rows,
+            patch_size,
+            frame_width,
+            frame_height,
+        }
     }
 
     pub fn num_patches(&self) -> usize {
@@ -317,7 +329,10 @@ pub struct AttentionMap {
 impl AttentionMap {
     pub fn new(grid: PatchGrid) -> Self {
         let n = grid.num_patches();
-        Self { values: vec![0.0; n], grid }
+        Self {
+            values: vec![0.0; n],
+            grid,
+        }
     }
 
     /// Get surprise value at a specific grid position.

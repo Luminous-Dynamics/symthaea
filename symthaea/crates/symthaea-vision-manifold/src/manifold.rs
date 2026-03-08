@@ -93,7 +93,9 @@ impl VisionManifold {
         let trainer = ManifoldTrainer::new(&config.training, dim);
 
         let predictive = if config.enable_predictive_hierarchy {
-            Some(PredictiveCodingHierarchy::new(&config, max_width, max_height))
+            Some(PredictiveCodingHierarchy::new(
+                &config, max_width, max_height,
+            ))
         } else {
             None
         };
@@ -147,31 +149,30 @@ impl VisionManifold {
 
         // Compute motion field from luminance difference
         let grid = self.encoder.grid_for(width, height);
-        let (motion_hv_norm, motion_max) =
-            if !prev_lum.is_empty() && grid.num_patches() > 0 {
-                let current_lum = &self.encoder.prev_patch_lum;
-                let (motion_hv, vectors) = self.motion_field.compute(
-                    current_lum,
-                    &prev_lum,
-                    grid.rows,
-                    grid.cols,
-                    self.encoder.row_basis(),
-                    self.encoder.col_basis(),
-                );
-                let magnitudes: Vec<f32> = vectors
-                    .iter()
-                    .map(|v| (v[0] * v[0] + v[1] * v[1]).sqrt())
-                    .collect();
-                let max_mag = magnitudes.iter().copied().fold(0.0f32, f32::max);
-                let norm = motion_hv.norm();
-                self.motion_saliency = magnitudes;
-                self.last_motion_vectors = vectors;
-                (norm, max_mag)
-            } else {
-                self.motion_saliency.clear();
-                self.last_motion_vectors.clear();
-                (0.0, 0.0)
-            };
+        let (motion_hv_norm, motion_max) = if !prev_lum.is_empty() && grid.num_patches() > 0 {
+            let current_lum = &self.encoder.prev_patch_lum;
+            let (motion_hv, vectors) = self.motion_field.compute(
+                current_lum,
+                &prev_lum,
+                grid.rows,
+                grid.cols,
+                self.encoder.row_basis(),
+                self.encoder.col_basis(),
+            );
+            let magnitudes: Vec<f32> = vectors
+                .iter()
+                .map(|v| (v[0] * v[0] + v[1] * v[1]).sqrt())
+                .collect();
+            let max_mag = magnitudes.iter().copied().fold(0.0f32, f32::max);
+            let norm = motion_hv.norm();
+            self.motion_saliency = magnitudes;
+            self.last_motion_vectors = vectors;
+            (norm, max_mag)
+        } else {
+            self.motion_saliency.clear();
+            self.last_motion_vectors.clear();
+            (0.0, 0.0)
+        };
 
         // Optionally process through predictive coding hierarchy
         let cross_scale_prediction_error = if let Some(ref mut predictive) = self.predictive {
@@ -194,10 +195,7 @@ impl VisionManifold {
             prediction_error: self.prediction_error,
             manifold_coherence: self.coherence,
             attention_entropy: self.surprise.attention_map().entropy(),
-            num_salient_patches: self
-                .surprise
-                .salient_patches()
-                .len(),
+            num_salient_patches: self.surprise.salient_patches().len(),
             frame_sequence: self.frame_count,
             training_triggered,
             training_loss,
@@ -243,9 +241,7 @@ impl VisionManifold {
                     || (self.frame_count > 2 && self.prediction_error > spike_threshold));
             if should_train {
                 if let Some(last_input) = self.last_frame_hv.clone() {
-                    let result = self.train_step_inner(
-                        &last_input, &predicted, frame_hv, dt,
-                    );
+                    let result = self.train_step_inner(&last_input, &predicted, frame_hv, dt);
                     training_triggered = true;
                     training_loss = Some(result.loss);
                 }
@@ -760,7 +756,11 @@ impl SceneMemory {
     /// Store a scene landmark. Uses ring-buffer eviction when full.
     pub fn remember(&mut self, state: &ContinuousHV, frame: u64) {
         // Don't store near-duplicates
-        if self.landmarks.iter().any(|(hv, _)| state.similarity(hv) > 0.98) {
+        if self
+            .landmarks
+            .iter()
+            .any(|(hv, _)| state.similarity(hv) > 0.98)
+        {
             return;
         }
         if self.landmarks.len() >= self.capacity {
@@ -914,7 +914,10 @@ mod tests {
         let tel = m.observe_frame(&frame, 64, 64, 1, 0.033);
         assert_eq!(tel.frame_sequence, 1);
         // After a single CfC step from zero state, the manifold has begun evolving
-        assert!(m.state().norm() > 0.0, "State should be non-zero after observation");
+        assert!(
+            m.state().norm() > 0.0,
+            "State should be non-zero after observation"
+        );
     }
 
     #[test]
@@ -1131,7 +1134,10 @@ mod tests {
         assert_eq!(acc.errors.len(), 4);
         // All errors should be 1.0 (maximum)
         for &e in &acc.errors {
-            assert!((e - 1.0).abs() < 1e-6, "Pre-frame error should be 1.0, got {e}");
+            assert!(
+                (e - 1.0).abs() < 1e-6,
+                "Pre-frame error should be 1.0, got {e}"
+            );
         }
     }
 
@@ -1285,8 +1291,7 @@ mod tests {
 
         // Should be JSON-serializable
         let json = serde_json::to_string(&state).expect("Should serialize");
-        let deserialized: ManifoldState =
-            serde_json::from_str(&json).expect("Should deserialize");
+        let deserialized: ManifoldState = serde_json::from_str(&json).expect("Should deserialize");
         assert_eq!(deserialized.hdc_dim, state.hdc_dim);
         assert_eq!(deserialized.weight_hv.len(), state.weight_hv.len());
     }
@@ -1583,7 +1588,10 @@ mod tests {
         m.observe_frame(&frame, 64, 64, 1, 1000.0);
 
         let norm = m.state().norm();
-        assert!(norm.is_finite() && norm > 0.0, "Large dt should produce finite state");
+        assert!(
+            norm.is_finite() && norm > 0.0,
+            "Large dt should produce finite state"
+        );
         assert!(m.prediction_error().is_finite());
     }
 
@@ -1746,7 +1754,11 @@ mod tests {
             .map(|i| {
                 let x = i % 64;
                 let y = i / 64;
-                if (x / 4 + y / 4) % 2 == 0 { 200u8 } else { 50u8 }
+                if (x / 4 + y / 4) % 2 == 0 {
+                    200u8
+                } else {
+                    50u8
+                }
             })
             .collect();
 
@@ -1980,10 +1992,14 @@ mod tests {
         }
 
         // With training, the manifold's tau and weights have adapted
-        assert!(m_train.training_steps() > 0, "Training should have triggered");
+        assert!(
+            m_train.training_steps() > 0,
+            "Training should have triggered"
+        );
         // Without training (frozen), no training steps should occur
         assert_eq!(
-            m_notrain.training_steps(), 0,
+            m_notrain.training_steps(),
+            0,
             "Frozen manifold should have no training steps"
         );
 
@@ -2019,8 +2035,14 @@ mod tests {
 
         // High blend should track input more closely
         // Both should converge for a static scene, so check coherence is similar
-        assert!(coherence_high_blend > 0.5, "High blend coherence should be decent");
-        assert!(m_low.coherence() > 0.5, "Low blend coherence should also work");
+        assert!(
+            coherence_high_blend > 0.5,
+            "High blend coherence should be decent"
+        );
+        assert!(
+            m_low.coherence() > 0.5,
+            "Low blend coherence should also work"
+        );
     }
 
     // === Save/Load Extended Fields ===
@@ -2141,7 +2163,10 @@ mod tests {
         let tau_after = m.current_tau();
 
         // Weights and tau should not have changed while frozen
-        assert_eq!(weights_before, weights_after, "Weights should not change while frozen");
+        assert_eq!(
+            weights_before, weights_after,
+            "Weights should not change while frozen"
+        );
         assert!(
             (tau_before - tau_after).abs() < 1e-6,
             "Tau should not change while frozen"

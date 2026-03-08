@@ -157,7 +157,10 @@ mod tests {
         let a1 = encode_allele(42);
         let a2 = encode_allele(42);
         assert_eq!(a1.dim(), HDC_DIMENSION);
-        assert!((a1.similarity(&a2) - 1.0).abs() < 1e-6, "same seed => identical HV");
+        assert!(
+            (a1.similarity(&a2) - 1.0).abs() < 1e-6,
+            "same seed => identical HV"
+        );
     }
 
     #[test]
@@ -213,7 +216,10 @@ mod tests {
         let ind_a = make_individual(1, &loci, &[(10, 20), (30, 40), (50, 60)]);
         let ind_b = make_individual(2, &loci, &[(70, 80), (90, 100), (110, 120)]);
         let d = genetic_distance(&ind_a, &ind_b);
-        assert!(d > 0.5, "unrelated individuals should have large distance, got {d}");
+        assert!(
+            d > 0.5,
+            "unrelated individuals should have large distance, got {d}"
+        );
     }
 
     #[test]
@@ -222,7 +228,10 @@ mod tests {
         let ind_a = make_individual(1, &loci, &[(10, 20), (30, 40)]);
         let ind_b = make_individual(2, &loci, &[(10, 20), (30, 40)]);
         let d = genetic_distance(&ind_a, &ind_b);
-        assert!(d.abs() < 1e-5, "identical genomes should have distance ~0, got {d}");
+        assert!(
+            d.abs() < 1e-5,
+            "identical genomes should have distance ~0, got {d}"
+        );
     }
 
     #[test]
@@ -267,7 +276,11 @@ mod tests {
             individuals: (0..5)
                 .map(|i| {
                     let base = (i as u64) * 100;
-                    make_individual(i, &loci, &[(base, base + 1), (base + 2, base + 3), (base + 4, base + 5)])
+                    make_individual(
+                        i,
+                        &loci,
+                        &[(base, base + 1), (base + 2, base + 3), (base + 4, base + 5)],
+                    )
                 })
                 .collect(),
             generation: 0,

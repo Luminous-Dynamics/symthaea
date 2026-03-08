@@ -5,7 +5,7 @@
 //!
 //! ## Architecture
 //!
-//! Each of the Seven Harmonies provides an epistemic frame - a lens through
+//! Each of the Eight Harmonies provides an epistemic frame - a lens through
 //! which knowledge is perceived. The Rashomon Engine:
 //!
 //! 1. Generates perspectives from each relevant harmony

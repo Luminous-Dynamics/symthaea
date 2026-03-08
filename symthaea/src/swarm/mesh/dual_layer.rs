@@ -475,7 +475,10 @@ impl LoopbackTransport {
 
 impl MeshTransport for LoopbackTransport {
     fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
-        self.sent.lock().unwrap_or_else(|e| e.into_inner()).push(data.to_vec());
+        self.sent
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(data.to_vec());
         Ok(())
     }
 
@@ -543,12 +546,20 @@ impl BiLoopbackTransport {
 
 impl MeshTransport for BiLoopbackTransport {
     fn send_raw(&self, data: &[u8]) -> Result<(), MeshError> {
-        self.tx_buf.lock().unwrap_or_else(|e| e.into_inner()).push_back(data.to_vec());
+        self.tx_buf
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push_back(data.to_vec());
         Ok(())
     }
 
     fn recv_raw(&self, buf: &mut [u8]) -> Result<usize, MeshError> {
-        match self.rx_buf.lock().unwrap_or_else(|e| e.into_inner()).pop_front() {
+        match self
+            .rx_buf
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .pop_front()
+        {
             Some(data) => {
                 let len = data.len().min(buf.len());
                 buf[..len].copy_from_slice(&data[..len]);

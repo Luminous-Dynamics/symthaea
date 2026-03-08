@@ -834,20 +834,32 @@ mod tests {
 
         for i in 0..50 {
             let c = pipeline.advance(&input).unwrap();
-            assert!(c >= 0.0 && c <= 1.0, "consciousness out of range at step {i}: {c}");
+            assert!(
+                c >= 0.0 && c <= 1.0,
+                "consciousness out of range at step {i}: {c}"
+            );
             if c > 0.0 {
                 any_nonzero = true;
             }
             last_c = c;
         }
 
-        assert!(any_nonzero, "advance() should produce non-zero consciousness after warmup");
-        assert!(pipeline.step == 50, "step counter should track advance() calls");
+        assert!(
+            any_nonzero,
+            "advance() should produce non-zero consciousness after warmup"
+        );
+        assert!(
+            pipeline.step == 50,
+            "step counter should track advance() calls"
+        );
 
         println!("advance() after 50 steps: consciousness={last_c:.4}");
 
         // History should accumulate
-        assert!(!pipeline.history.is_empty(), "advance() should populate history");
+        assert!(
+            !pipeline.history.is_empty(),
+            "advance() should populate history"
+        );
     }
 
     #[test]

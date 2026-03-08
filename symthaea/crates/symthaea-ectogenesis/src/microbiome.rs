@@ -88,10 +88,7 @@ impl MicrobiomeSchedule {
     ///
     /// Returns the most recent stage whose start week is <= the given week.
     pub fn stage_for_week(&self, week: GestationalWeek) -> Option<&ColonizationStage> {
-        self.stages
-            .iter()
-            .rev()
-            .find(|s| s.week <= week)
+        self.stages.iter().rev().find(|s| s.week <= week)
     }
 
     /// Whether all stages have been reached.
@@ -186,7 +183,10 @@ mod tests {
     fn test_total_species_unique() {
         let schedule = MicrobiomeSchedule::standard();
         let total = schedule.total_species();
-        assert!(total >= 8, "Should have at least 8 unique species, got {total}");
+        assert!(
+            total >= 8,
+            "Should have at least 8 unique species, got {total}"
+        );
     }
 
     #[test]
@@ -194,7 +194,8 @@ mod tests {
         let schedule = MicrobiomeSchedule::standard();
         for i in 1..schedule.stages.len() {
             assert!(
-                schedule.stages[i].colony_forming_units > schedule.stages[i - 1].colony_forming_units,
+                schedule.stages[i].colony_forming_units
+                    > schedule.stages[i - 1].colony_forming_units,
                 "CFU should increase across stages"
             );
         }
@@ -206,6 +207,9 @@ mod tests {
         let json = serde_json::to_string(&schedule).unwrap();
         let deser: MicrobiomeSchedule = serde_json::from_str(&json).unwrap();
         assert_eq!(deser.stages.len(), schedule.stages.len());
-        assert_eq!(deser.stages[0].bacteria.len(), schedule.stages[0].bacteria.len());
+        assert_eq!(
+            deser.stages[0].bacteria.len(),
+            schedule.stages[0].bacteria.len()
+        );
     }
 }

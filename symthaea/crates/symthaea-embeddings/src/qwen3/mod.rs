@@ -40,16 +40,16 @@ use std::time::Instant;
 
 #[cfg(feature = "burn")]
 pub mod attention;
+#[cfg(feature = "burn-hub")]
+pub mod hub;
 #[cfg(feature = "burn")]
 pub mod mlp;
 #[cfg(feature = "burn")]
 pub mod model;
-#[cfg(feature = "burn")]
-pub mod safetensors_loader;
-#[cfg(feature = "burn-hub")]
-pub mod hub;
 #[cfg(feature = "ort-embed")]
 pub mod onnx;
+#[cfg(feature = "burn")]
+pub mod safetensors_loader;
 
 #[cfg(feature = "burn")]
 use burn::backend::NdArray;
@@ -104,8 +104,7 @@ fn forward_and_pool<B: burn::prelude::Backend>(
 ) -> Result<Vec<f32>> {
     use burn::prelude::*;
 
-    let input_tensor = Tensor::<B, 1, Int>::from_data(input_ids, device)
-        .unsqueeze_dim(0); // [1, seq_len]
+    let input_tensor = Tensor::<B, 1, Int>::from_data(input_ids, device).unsqueeze_dim(0); // [1, seq_len]
 
     let hidden = burn_model.forward(input_tensor, None);
     let [_batch, _seq, hidden_dim] = hidden.dims();
@@ -131,24 +130,23 @@ fn forward_and_pool<B: burn::prelude::Backend>(
                     .squeeze(1);
                 sum.div_scalar(token_count as f32)
             } else {
-                hidden
-                    .slice([0..1, 0..1, 0..out_dim])
-                    .reshape([1, out_dim])
+                hidden.slice([0..1, 0..1, 0..out_dim]).reshape([1, out_dim])
             }
         }
-        PoolingStrategy::ClsToken => {
-            hidden
-                .slice([0..1, 0..1, 0..out_dim])
-                .reshape([1, out_dim])
-        }
+        PoolingStrategy::ClsToken => hidden.slice([0..1, 0..1, 0..out_dim]).reshape([1, out_dim]),
         PoolingStrategy::MaxPooling => {
             // max_dim keeps rank → [1, 1, out_dim]; squeeze to [1, out_dim]
-            hidden.slice([0..1, 0..seq_len, 0..out_dim]).max_dim(1).squeeze(1)
+            hidden
+                .slice([0..1, 0..seq_len, 0..out_dim])
+                .max_dim(1)
+                .squeeze(1)
         }
     };
 
     let data = pooled.into_data();
-    let mut embedding: Vec<f32> = data.to_vec().map_err(|e| anyhow::anyhow!("tensor to_vec failed: {e}"))?;
+    let mut embedding: Vec<f32> = data
+        .to_vec()
+        .map_err(|e| anyhow::anyhow!("tensor to_vec failed: {e}"))?;
     embedding.truncate(out_dim);
 
     if normalize {
@@ -184,13 +182,24 @@ fn forward_and_pool_batch<B: burn::prelude::Backend>(
         return Ok(Vec::new());
     }
 
-    let min_len = batch_ids.iter().map(|ids| ids.len()).min().unwrap_or(1).max(1);
+    let min_len = batch_ids
+        .iter()
+        .map(|ids| ids.len())
+        .min()
+        .unwrap_or(1)
+        .max(1);
     let max_len = batch_ids.iter().map(|ids| ids.len()).max().unwrap_or(0);
 
     // For small/uniform batches, process directly
     if batch_ids.len() <= 4 || max_len <= min_len * 2 {
         return forward_and_pool_batch_direct(
-            burn_model, batch_ids, batch_masks, device, pooling, embedding_dim, normalize,
+            burn_model,
+            batch_ids,
+            batch_masks,
+            device,
+            pooling,
+            embedding_dim,
+            normalize,
         );
     }
 
@@ -201,11 +210,23 @@ fn forward_and_pool_batch<B: burn::prelude::Backend>(
     let mut indexed_results: Vec<(usize, Vec<f32>)> = Vec::with_capacity(batch_ids.len());
 
     for chunk_indices in &chunks {
-        let chunk_ids: Vec<Vec<i32>> = chunk_indices.iter().map(|&i| batch_ids[i].clone()).collect();
-        let chunk_masks: Vec<Vec<u32>> = chunk_indices.iter().map(|&i| batch_masks[i].clone()).collect();
+        let chunk_ids: Vec<Vec<i32>> = chunk_indices
+            .iter()
+            .map(|&i| batch_ids[i].clone())
+            .collect();
+        let chunk_masks: Vec<Vec<u32>> = chunk_indices
+            .iter()
+            .map(|&i| batch_masks[i].clone())
+            .collect();
 
         let chunk_embeddings = forward_and_pool_batch_direct(
-            burn_model, &chunk_ids, &chunk_masks, device, pooling, embedding_dim, normalize,
+            burn_model,
+            &chunk_ids,
+            &chunk_masks,
+            device,
+            pooling,
+            embedding_dim,
+            normalize,
         )?;
 
         for (local_idx, emb) in chunk_embeddings.into_iter().enumerate() {
@@ -287,8 +308,8 @@ fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
         }
     }
 
-    let input_tensor = Tensor::<B, 1, Int>::from_data(flat_ids.as_slice(), device)
-        .reshape([batch_size, max_len]);
+    let input_tensor =
+        Tensor::<B, 1, Int>::from_data(flat_ids.as_slice(), device).reshape([batch_size, max_len]);
 
     // Build additive attention mask: 0.0 for real tokens, -1e9 for padding
     let attn_mask_data: Vec<f32> = flat_masks
@@ -326,7 +347,9 @@ fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
             for i in 0..batch_size {
                 let seq_len = batch_ids[i].len();
                 let mask_slice = &flat_masks[i * max_len..i * max_len + seq_len];
-                let seq_hidden = hidden_sliced.clone().slice([i..i + 1, 0..max_len, 0..out_dim]);
+                let seq_hidden = hidden_sliced
+                    .clone()
+                    .slice([i..i + 1, 0..max_len, 0..out_dim]);
 
                 let row: Tensor<B, 2> = match pooling {
                     PoolingStrategy::LastTokenPooling => {
@@ -338,18 +361,16 @@ fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
                             .slice([0..1, last_idx..last_idx + 1, 0..out_dim])
                             .reshape([1, out_dim])
                     }
-                    PoolingStrategy::ClsToken => {
-                        seq_hidden
-                            .slice([0..1, 0..1, 0..out_dim])
-                            .reshape([1, out_dim])
+                    PoolingStrategy::ClsToken => seq_hidden
+                        .slice([0..1, 0..1, 0..out_dim])
+                        .reshape([1, out_dim]),
+                    PoolingStrategy::MaxPooling => seq_hidden
+                        .slice([0..1, 0..seq_len, 0..out_dim])
+                        .max_dim(1)
+                        .squeeze(1),
+                    PoolingStrategy::MeanPooling => {
+                        unreachable!("MeanPooling handled in vectorized batch path above")
                     }
-                    PoolingStrategy::MaxPooling => {
-                        seq_hidden
-                            .slice([0..1, 0..seq_len, 0..out_dim])
-                            .max_dim(1)
-                            .squeeze(1)
-                    }
-                    PoolingStrategy::MeanPooling => unreachable!("MeanPooling handled in vectorized batch path above"),
                 };
                 rows.push(row);
             }
@@ -359,7 +380,12 @@ fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
 
     // Vectorized normalization
     let pooled = if normalize {
-        let norms = pooled.clone().powf_scalar(2.0).sum_dim(1).sqrt().clamp_min(1e-6); // [B, 1]
+        let norms = pooled
+            .clone()
+            .powf_scalar(2.0)
+            .sum_dim(1)
+            .sqrt()
+            .clamp_min(1e-6); // [B, 1]
         pooled / norms
     } else {
         pooled
@@ -367,11 +393,10 @@ fn forward_and_pool_batch_direct<B: burn::prelude::Backend>(
 
     // Convert [B, D] tensor to Vec<Vec<f32>>
     let data = pooled.into_data();
-    let flat: Vec<f32> = data.to_vec().map_err(|e| anyhow::anyhow!("tensor to_vec failed: {e}"))?;
-    let results: Vec<Vec<f32>> = flat
-        .chunks(out_dim)
-        .map(|chunk| chunk.to_vec())
-        .collect();
+    let flat: Vec<f32> = data
+        .to_vec()
+        .map_err(|e| anyhow::anyhow!("tensor to_vec failed: {e}"))?;
+    let results: Vec<Vec<f32>> = flat.chunks(out_dim).map(|chunk| chunk.to_vec()).collect();
 
     Ok(results)
 }
@@ -387,13 +412,25 @@ impl BurnBackend {
         normalize: bool,
     ) -> Result<Vec<Vec<f32>>> {
         match self {
-            Self::NdArray { model, device } => {
-                forward_and_pool_batch(model, batch_ids, batch_masks, device, pooling, embedding_dim, normalize)
-            }
+            Self::NdArray { model, device } => forward_and_pool_batch(
+                model,
+                batch_ids,
+                batch_masks,
+                device,
+                pooling,
+                embedding_dim,
+                normalize,
+            ),
             #[cfg(feature = "burn-wgpu")]
-            Self::Wgpu { model, device } => {
-                forward_and_pool_batch(model, batch_ids, batch_masks, device, pooling, embedding_dim, normalize)
-            }
+            Self::Wgpu { model, device } => forward_and_pool_batch(
+                model,
+                batch_ids,
+                batch_masks,
+                device,
+                pooling,
+                embedding_dim,
+                normalize,
+            ),
         }
     }
 
@@ -407,13 +444,27 @@ impl BurnBackend {
         normalize: bool,
     ) -> Result<Vec<f32>> {
         match self {
-            Self::NdArray { model, device } => {
-                forward_and_pool(model, input_ids, mask, seq_len, device, pooling, embedding_dim, normalize)
-            }
+            Self::NdArray { model, device } => forward_and_pool(
+                model,
+                input_ids,
+                mask,
+                seq_len,
+                device,
+                pooling,
+                embedding_dim,
+                normalize,
+            ),
             #[cfg(feature = "burn-wgpu")]
-            Self::Wgpu { model, device } => {
-                forward_and_pool(model, input_ids, mask, seq_len, device, pooling, embedding_dim, normalize)
-            }
+            Self::Wgpu { model, device } => forward_and_pool(
+                model,
+                input_ids,
+                mask,
+                seq_len,
+                device,
+                pooling,
+                embedding_dim,
+                normalize,
+            ),
         }
     }
 }
@@ -694,7 +745,10 @@ impl Qwen3Embedder {
         let persistent_cache = if !config.use_simulated {
             let pc_config = crate::cache::PersistentCacheConfig {
                 path: None, // default: ~/.cache/symthaea/embeddings.redb
-                model_name: config.model_path.clone().unwrap_or_else(|| "unknown".into()),
+                model_name: config
+                    .model_path
+                    .clone()
+                    .unwrap_or_else(|| "unknown".into()),
                 dimension: config.embedding_dim,
                 use_f16_storage: false,
             };
@@ -731,7 +785,9 @@ impl Qwen3Embedder {
             #[cfg(not(feature = "burn"))]
             {
                 if embedder.config.model_path.is_some() {
-                    eprintln!("Note: Burn model support requires the `burn` feature, using simulation");
+                    eprintln!(
+                        "Note: Burn model support requires the `burn` feature, using simulation"
+                    );
                     embedder.config.use_simulated = true;
                 }
             }
@@ -771,19 +827,19 @@ impl Qwen3Embedder {
         }
 
         // Load tokenizer
-        let tokenizer_path = self
-            .config
-            .tokenizer_path
-            .clone()
-            .unwrap_or_else(|| {
-                let base = std::path::Path::new(&model_dir);
-                base.join("tokenizer.json").to_string_lossy().to_string()
-            });
+        let tokenizer_path = self.config.tokenizer_path.clone().unwrap_or_else(|| {
+            let base = std::path::Path::new(&model_dir);
+            base.join("tokenizer.json").to_string_lossy().to_string()
+        });
 
         match tokenizers::Tokenizer::from_file(&tokenizer_path) {
             Ok(tok) => self.tokenizer = Some(tok),
             Err(e) => {
-                tracing::warn!("Failed to load tokenizer from {}: {}, using simulation", tokenizer_path, e);
+                tracing::warn!(
+                    "Failed to load tokenizer from {}: {}, using simulation",
+                    tokenizer_path,
+                    e
+                );
                 self.config.use_simulated = true;
                 return Ok(());
             }
@@ -835,7 +891,10 @@ impl Qwen3Embedder {
     /// Load the Burn model with the appropriate backend.
     #[cfg(feature = "burn")]
     fn load_backend(&self, model_dir: &str) -> Result<Option<BurnBackend>> {
-        let wants_gpu = matches!(self.config.device, Device::Wgpu | Device::Cuda | Device::Metal);
+        let wants_gpu = matches!(
+            self.config.device,
+            Device::Wgpu | Device::Cuda | Device::Metal
+        );
 
         if wants_gpu {
             #[cfg(feature = "burn-wgpu")]
@@ -859,7 +918,11 @@ impl Qwen3Embedder {
         match self.load_ndarray_model(model_dir) {
             Ok(backend) => Ok(Some(backend)),
             Err(e) => {
-                tracing::warn!("Failed to load model from {}: {}, using simulation", model_dir, e);
+                tracing::warn!(
+                    "Failed to load model from {}: {}, using simulation",
+                    model_dir,
+                    e
+                );
                 Ok(None)
             }
         }
@@ -952,7 +1015,8 @@ impl Qwen3Embedder {
         } else {
             #[cfg(feature = "burn")]
             {
-                self.burn_embed(text).unwrap_or_else(|_| self.simulate_embedding(text))
+                self.burn_embed(text)
+                    .unwrap_or_else(|_| self.simulate_embedding(text))
             }
             #[cfg(not(feature = "burn"))]
             {
@@ -1036,10 +1100,8 @@ impl Qwen3Embedder {
             .ok_or_else(|| anyhow::anyhow!("Tokenizer not loaded"))?;
 
         // Apply instruction prefix if configured, then batch tokenize
-        let formatted: Vec<std::borrow::Cow<'_, str>> = texts
-            .iter()
-            .map(|t| self.format_text(t))
-            .collect();
+        let formatted: Vec<std::borrow::Cow<'_, str>> =
+            texts.iter().map(|t| self.format_text(t)).collect();
         let inputs: Vec<tokenizers::EncodeInput> = formatted
             .iter()
             .map(|t| tokenizers::EncodeInput::Single(t.as_ref().into()))
@@ -1360,7 +1422,9 @@ impl AsyncQwen3Embedder {
     pub async fn embed(&self, text: String) -> Result<EmbeddingResult> {
         let inner = self.inner.clone();
         tokio::task::spawn_blocking(move || {
-            let mut embedder = inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            let mut embedder = inner
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
             embedder.embed(&text)
         })
         .await
@@ -1371,7 +1435,9 @@ impl AsyncQwen3Embedder {
     pub async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<EmbeddingResult>> {
         let inner = self.inner.clone();
         tokio::task::spawn_blocking(move || {
-            let mut embedder = inner.lock().map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
+            let mut embedder = inner
+                .lock()
+                .map_err(|e| anyhow::anyhow!("Lock poisoned: {e}"))?;
             let refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
             embedder.embed_batch(&refs)
         })
@@ -1487,9 +1553,11 @@ mod tests {
 
     #[test]
     fn test_instruction_config() {
-        let config = Qwen3Config::simulated()
-            .with_instruction("Retrieve relevant passages");
-        assert_eq!(config.instruction.as_deref(), Some("Retrieve relevant passages"));
+        let config = Qwen3Config::simulated().with_instruction("Retrieve relevant passages");
+        assert_eq!(
+            config.instruction.as_deref(),
+            Some("Retrieve relevant passages")
+        );
     }
 
     #[test]
@@ -1497,28 +1565,32 @@ mod tests {
         let mut plain = Qwen3Embedder::new(Qwen3Config::simulated()).unwrap();
         let mut prefixed = Qwen3Embedder::new(
             Qwen3Config::simulated().with_instruction("Retrieve relevant passages"),
-        ).unwrap();
+        )
+        .unwrap();
 
         let text = "What is quantum computing?";
         let emb_plain = plain.embed(text).unwrap();
         let emb_prefixed = prefixed.embed(text).unwrap();
 
         // Instruction prefix should change the embedding
-        let dot: f32 = emb_plain.embedding.iter()
+        let dot: f32 = emb_plain
+            .embedding
+            .iter()
             .zip(emb_prefixed.embedding.iter())
             .map(|(a, b)| a * b)
             .sum();
-        assert!(dot < 0.999, "Instruction prefix should change embedding, cosine={dot}");
+        assert!(
+            dot < 0.999,
+            "Instruction prefix should change embedding, cosine={dot}"
+        );
     }
 
     #[test]
     fn test_instruction_deterministic() {
-        let mut emb1 = Qwen3Embedder::new(
-            Qwen3Config::simulated().with_instruction("Search"),
-        ).unwrap();
-        let mut emb2 = Qwen3Embedder::new(
-            Qwen3Config::simulated().with_instruction("Search"),
-        ).unwrap();
+        let mut emb1 =
+            Qwen3Embedder::new(Qwen3Config::simulated().with_instruction("Search")).unwrap();
+        let mut emb2 =
+            Qwen3Embedder::new(Qwen3Config::simulated().with_instruction("Search")).unwrap();
 
         let r1 = emb1.embed("test query").unwrap();
         let r2 = emb2.embed("test query").unwrap();
@@ -1716,7 +1788,11 @@ mod burn_tests {
         assert_eq!(result.len(), 64);
         // Normalized: should have unit norm
         let norm: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 0.01, "Expected unit norm, got {}", norm);
+        assert!(
+            (norm - 1.0).abs() < 0.01,
+            "Expected unit norm, got {}",
+            norm
+        );
     }
 
     #[test]
@@ -1738,31 +1814,52 @@ mod burn_tests {
 
         // Unpadded: single sequence via forward_and_pool
         let unpadded = super::forward_and_pool(
-            &model, &real_ids, &real_mask, 4, &device,
-            super::PoolingStrategy::LastTokenPooling, 64, true,
-        ).unwrap();
+            &model,
+            &real_ids,
+            &real_mask,
+            4,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            64,
+            true,
+        )
+        .unwrap();
 
         // Padded batch: same sequence twice — once exact, once with 8 pad tokens
-        let padded_ids = vec![
-            vec![1, 2, 3, 4],
-            vec![1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0],
-        ];
-        let padded_masks = vec![
-            vec![1u32; 4],
-            vec![1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-        ];
+        let padded_ids = vec![vec![1, 2, 3, 4], vec![1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0]];
+        let padded_masks = vec![vec![1u32; 4], vec![1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]];
         let batch = super::forward_and_pool_batch_direct(
-            &model, &padded_ids, &padded_masks, &device,
-            super::PoolingStrategy::LastTokenPooling, 64, true,
-        ).unwrap();
+            &model,
+            &padded_ids,
+            &padded_masks,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            64,
+            true,
+        )
+        .unwrap();
 
         // The first sequence (no padding) should match single-sequence result
-        let dot0: f32 = batch[0].iter().zip(unpadded.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot0 > 0.999, "Unpadded seq in batch should match single: cosine={dot0:.6}");
+        let dot0: f32 = batch[0]
+            .iter()
+            .zip(unpadded.iter())
+            .map(|(a, b)| a * b)
+            .sum();
+        assert!(
+            dot0 > 0.999,
+            "Unpadded seq in batch should match single: cosine={dot0:.6}"
+        );
 
         // The second sequence (with padding masked out) should also match
-        let dot1: f32 = batch[1].iter().zip(unpadded.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot1 > 0.999, "Padded seq should match unpadded: cosine={dot1:.6}");
+        let dot1: f32 = batch[1]
+            .iter()
+            .zip(unpadded.iter())
+            .map(|(a, b)| a * b)
+            .sum();
+        assert!(
+            dot1 > 0.999,
+            "Padded seq should match unpadded: cosine={dot1:.6}"
+        );
     }
 
     #[test]
@@ -1776,30 +1873,43 @@ mod burn_tests {
 
         // Single sequence mean pooling
         let single = super::forward_and_pool(
-            &model, &real_ids, &real_mask, 4, &device,
-            super::PoolingStrategy::MeanPooling, 64, true,
-        ).unwrap();
+            &model,
+            &real_ids,
+            &real_mask,
+            4,
+            &device,
+            super::PoolingStrategy::MeanPooling,
+            64,
+            true,
+        )
+        .unwrap();
 
         // Batch: same sequence with padding
-        let padded_ids = vec![
-            vec![1, 2, 3, 4],
-            vec![1, 2, 3, 4, 0, 0, 0, 0],
-        ];
-        let padded_masks = vec![
-            vec![1u32; 4],
-            vec![1, 1, 1, 1, 0, 0, 0, 0],
-        ];
+        let padded_ids = vec![vec![1, 2, 3, 4], vec![1, 2, 3, 4, 0, 0, 0, 0]];
+        let padded_masks = vec![vec![1u32; 4], vec![1, 1, 1, 1, 0, 0, 0, 0]];
         let batch = super::forward_and_pool_batch_direct(
-            &model, &padded_ids, &padded_masks, &device,
-            super::PoolingStrategy::MeanPooling, 64, true,
-        ).unwrap();
+            &model,
+            &padded_ids,
+            &padded_masks,
+            &device,
+            super::PoolingStrategy::MeanPooling,
+            64,
+            true,
+        )
+        .unwrap();
 
         // Both batch results should match the single-sequence result
         let dot0: f32 = batch[0].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot0 > 0.999, "Mean-pool unpadded batch should match single: cosine={dot0:.6}");
+        assert!(
+            dot0 > 0.999,
+            "Mean-pool unpadded batch should match single: cosine={dot0:.6}"
+        );
 
         let dot1: f32 = batch[1].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot1 > 0.999, "Mean-pool padded batch should match single: cosine={dot1:.6}");
+        assert!(
+            dot1 > 0.999,
+            "Mean-pool padded batch should match single: cosine={dot1:.6}"
+        );
     }
 
     #[test]
@@ -1809,25 +1919,79 @@ mod burn_tests {
         let model = cfg.init::<B>(&device);
 
         let ids_a: Vec<i32> = vec![1, 2, 3, 4];
-        let ids_b: Vec<i32> = vec![1, 2, 3, 5];     // slightly different
-        let ids_c: Vec<i32> = vec![10, 20, 30, 40];  // very different
+        let ids_b: Vec<i32> = vec![1, 2, 3, 5]; // slightly different
+        let ids_c: Vec<i32> = vec![10, 20, 30, 40]; // very different
         let mask = vec![1u32; 4];
 
         // Full dimension (64)
-        let full_a = super::forward_and_pool(&model, &ids_a, &mask, 4, &device,
-            super::PoolingStrategy::LastTokenPooling, 64, true).unwrap();
-        let full_b = super::forward_and_pool(&model, &ids_b, &mask, 4, &device,
-            super::PoolingStrategy::LastTokenPooling, 64, true).unwrap();
-        let full_c = super::forward_and_pool(&model, &ids_c, &mask, 4, &device,
-            super::PoolingStrategy::LastTokenPooling, 64, true).unwrap();
+        let full_a = super::forward_and_pool(
+            &model,
+            &ids_a,
+            &mask,
+            4,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            64,
+            true,
+        )
+        .unwrap();
+        let full_b = super::forward_and_pool(
+            &model,
+            &ids_b,
+            &mask,
+            4,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            64,
+            true,
+        )
+        .unwrap();
+        let full_c = super::forward_and_pool(
+            &model,
+            &ids_c,
+            &mask,
+            4,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            64,
+            true,
+        )
+        .unwrap();
 
         // Reduced dimension (32 = half) — Matryoshka truncation + renormalization
-        let half_a = super::forward_and_pool(&model, &ids_a, &mask, 4, &device,
-            super::PoolingStrategy::LastTokenPooling, 32, true).unwrap();
-        let half_b = super::forward_and_pool(&model, &ids_b, &mask, 4, &device,
-            super::PoolingStrategy::LastTokenPooling, 32, true).unwrap();
-        let half_c = super::forward_and_pool(&model, &ids_c, &mask, 4, &device,
-            super::PoolingStrategy::LastTokenPooling, 32, true).unwrap();
+        let half_a = super::forward_and_pool(
+            &model,
+            &ids_a,
+            &mask,
+            4,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            32,
+            true,
+        )
+        .unwrap();
+        let half_b = super::forward_and_pool(
+            &model,
+            &ids_b,
+            &mask,
+            4,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            32,
+            true,
+        )
+        .unwrap();
+        let half_c = super::forward_and_pool(
+            &model,
+            &ids_c,
+            &mask,
+            4,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            32,
+            true,
+        )
+        .unwrap();
 
         // Dimension should be correctly truncated
         assert_eq!(half_a.len(), 32);
@@ -1836,7 +2000,10 @@ mod burn_tests {
 
         // Reduced-dim embedding should be re-normalized to unit length
         let norm: f32 = half_a.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 0.01, "Reduced-dim embedding should be unit norm, got {norm}");
+        assert!(
+            (norm - 1.0).abs() < 0.01,
+            "Reduced-dim embedding should be unit norm, got {norm}"
+        );
 
         // Compute similarities at both dimensions for observability
         let full_ab: f32 = full_a.iter().zip(full_b.iter()).map(|(x, y)| x * y).sum();
@@ -1856,10 +2023,10 @@ mod burn_tests {
 
         // 4 sequences of very different lengths to trigger chunking
         let seqs: Vec<Vec<i32>> = vec![
-            vec![1, 2],                                     // len 2
-            vec![1, 2, 3],                                  // len 3
-            vec![1, 2, 3, 4, 5, 6],                         // len 6
-            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],   // len 12
+            vec![1, 2],                                  // len 2
+            vec![1, 2, 3],                               // len 3
+            vec![1, 2, 3, 4, 5, 6],                      // len 6
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], // len 12
         ];
         let masks: Vec<Vec<u32>> = seqs.iter().map(|s| vec![1u32; s.len()]).collect();
 
@@ -1867,17 +2034,30 @@ mod burn_tests {
         let mut sequential = Vec::new();
         for (ids, mask) in seqs.iter().zip(masks.iter()) {
             let emb = super::forward_and_pool(
-                &model, ids, mask, ids.len(), &device,
-                super::PoolingStrategy::LastTokenPooling, 64, true,
-            ).unwrap();
+                &model,
+                ids,
+                mask,
+                ids.len(),
+                &device,
+                super::PoolingStrategy::LastTokenPooling,
+                64,
+                true,
+            )
+            .unwrap();
             sequential.push(emb);
         }
 
         // Get batch results (exercises chunking for len ratio > 2)
         let batch = super::forward_and_pool_batch(
-            &model, &seqs, &masks, &device,
-            super::PoolingStrategy::LastTokenPooling, 64, true,
-        ).unwrap();
+            &model,
+            &seqs,
+            &masks,
+            &device,
+            super::PoolingStrategy::LastTokenPooling,
+            64,
+            true,
+        )
+        .unwrap();
 
         assert_eq!(batch.len(), sequential.len());
 
@@ -1903,30 +2083,43 @@ mod burn_tests {
 
         // Single sequence via forward_and_pool
         let single = super::forward_and_pool(
-            &model, &real_ids, &real_mask, 4, &device,
-            super::PoolingStrategy::ClsToken, 64, true,
-        ).unwrap();
+            &model,
+            &real_ids,
+            &real_mask,
+            4,
+            &device,
+            super::PoolingStrategy::ClsToken,
+            64,
+            true,
+        )
+        .unwrap();
 
         // Batch: unpadded + padded
-        let batch_ids = vec![
-            vec![1, 2, 3, 4],
-            vec![1, 2, 3, 4, 0, 0, 0, 0],
-        ];
-        let batch_masks = vec![
-            vec![1u32; 4],
-            vec![1, 1, 1, 1, 0, 0, 0, 0],
-        ];
+        let batch_ids = vec![vec![1, 2, 3, 4], vec![1, 2, 3, 4, 0, 0, 0, 0]];
+        let batch_masks = vec![vec![1u32; 4], vec![1, 1, 1, 1, 0, 0, 0, 0]];
         let batch = super::forward_and_pool_batch_direct(
-            &model, &batch_ids, &batch_masks, &device,
-            super::PoolingStrategy::ClsToken, 64, true,
-        ).unwrap();
+            &model,
+            &batch_ids,
+            &batch_masks,
+            &device,
+            super::PoolingStrategy::ClsToken,
+            64,
+            true,
+        )
+        .unwrap();
 
         // CLS reads position 0 — padding should not affect it
         let dot0: f32 = batch[0].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot0 > 0.999, "CLS unpadded batch should match single: cosine={dot0:.6}");
+        assert!(
+            dot0 > 0.999,
+            "CLS unpadded batch should match single: cosine={dot0:.6}"
+        );
 
         let dot1: f32 = batch[1].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot1 > 0.999, "CLS padded batch should match single: cosine={dot1:.6}");
+        assert!(
+            dot1 > 0.999,
+            "CLS padded batch should match single: cosine={dot1:.6}"
+        );
     }
 
     #[test]
@@ -1940,31 +2133,44 @@ mod burn_tests {
 
         // Single sequence via forward_and_pool
         let single = super::forward_and_pool(
-            &model, &real_ids, &real_mask, 4, &device,
-            super::PoolingStrategy::MaxPooling, 64, true,
-        ).unwrap();
+            &model,
+            &real_ids,
+            &real_mask,
+            4,
+            &device,
+            super::PoolingStrategy::MaxPooling,
+            64,
+            true,
+        )
+        .unwrap();
 
         // Batch: unpadded + padded
-        let batch_ids = vec![
-            vec![1, 2, 3, 4],
-            vec![1, 2, 3, 4, 0, 0, 0, 0],
-        ];
-        let batch_masks = vec![
-            vec![1u32; 4],
-            vec![1, 1, 1, 1, 0, 0, 0, 0],
-        ];
+        let batch_ids = vec![vec![1, 2, 3, 4], vec![1, 2, 3, 4, 0, 0, 0, 0]];
+        let batch_masks = vec![vec![1u32; 4], vec![1, 1, 1, 1, 0, 0, 0, 0]];
         let batch = super::forward_and_pool_batch_direct(
-            &model, &batch_ids, &batch_masks, &device,
-            super::PoolingStrategy::MaxPooling, 64, true,
-        ).unwrap();
+            &model,
+            &batch_ids,
+            &batch_masks,
+            &device,
+            super::PoolingStrategy::MaxPooling,
+            64,
+            true,
+        )
+        .unwrap();
 
         // Unpadded should match closely
         let dot0: f32 = batch[0].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot0 > 0.999, "Max-pool unpadded batch should match single: cosine={dot0:.6}");
+        assert!(
+            dot0 > 0.999,
+            "Max-pool unpadded batch should match single: cosine={dot0:.6}"
+        );
 
         // Padded: max over padding-influenced hidden states may vary more
         // (additive mask zeroes attention but residual stream still differs)
         let dot1: f32 = batch[1].iter().zip(single.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot1 > 0.95, "Max-pool padded batch should be close to single: cosine={dot1:.6}");
+        assert!(
+            dot1 > 0.95,
+            "Max-pool padded batch should be close to single: cosine={dot1:.6}"
+        );
     }
 }

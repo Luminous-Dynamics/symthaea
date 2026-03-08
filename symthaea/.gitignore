@@ -58,6 +58,7 @@ archive/
 **/data/**
 !**/data/
 !crates/symthaea-broca/data/broca-vocab-*.json
+!src/voice/data/cmudict.dict
 models/
 results/
 zenodo-dataset/

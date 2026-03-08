@@ -373,8 +373,7 @@ impl CognitiveLoopService {
                         .sum::<f32>()
                         / similar.len().max(1) as f32;
                     if avg_pe < self.stats.avg_prediction_error * 0.5 {
-                        self.prediction_confidence =
-                            (self.prediction_confidence + 0.02).min(1.0);
+                        self.prediction_confidence = (self.prediction_confidence + 0.02).min(1.0);
                     }
                 }
             }
@@ -394,13 +393,14 @@ impl CognitiveLoopService {
                 };
                 // DA-tagged sleep consolidation: Night phase → bigger replay batches
                 // Science: Walker & Stickgold (2006) — DA-tagged memories consolidate during sleep
-                let sleep_boost =
-                    if self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night {
-                        let factor = self.neuromod.bath.sleep_consolidation_boost();
-                        (base_batch as f32 * (factor - 1.0)).round() as usize
-                    } else {
-                        0
-                    };
+                let sleep_boost = if self.biorhythm_mgr.rhythm.phase
+                    == crate::chronobiology::CircadianPhase::Night
+                {
+                    let factor = self.neuromod.bath.sleep_consolidation_boost();
+                    (base_batch as f32 * (factor - 1.0)).round() as usize
+                } else {
+                    0
+                };
                 // #2: Phasic DA burst → replay amplification (Lisman & Grace 2005)
                 let phasic_da_boost = {
                     let da_ph = self.neuromod.bath.da_phasic();

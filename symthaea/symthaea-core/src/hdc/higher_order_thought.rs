@@ -100,8 +100,9 @@ impl MentalState {
             RepresentationOrder::ZeroOrder => RepresentationOrder::FirstOrder,
             RepresentationOrder::FirstOrder => RepresentationOrder::SecondOrder,
             RepresentationOrder::SecondOrder => RepresentationOrder::ThirdOrder,
-            RepresentationOrder::ThirdOrder | RepresentationOrder::HigherOrder =>
-                RepresentationOrder::HigherOrder,
+            RepresentationOrder::ThirdOrder | RepresentationOrder::HigherOrder => {
+                RepresentationOrder::HigherOrder
+            }
         };
 
         Self {
@@ -133,7 +134,7 @@ impl MentalState {
             // Compare representation content to actual target
             // Simplified: check if very different
             let similarity = self.similarity(&self.content, &target.content);
-            similarity < 0.7  // Threshold for misrepresentation
+            similarity < 0.7 // Threshold for misrepresentation
         } else {
             false
         }
@@ -173,10 +174,10 @@ impl Default for HOTConfig {
     fn default() -> Self {
         Self {
             auto_generate_hots: true,
-            max_depth: 3,             // Up to third-order
-            hot_threshold: 0.5,       // Moderate threshold
+            max_depth: 3,       // Up to third-order
+            hot_threshold: 0.5, // Moderate threshold
             detect_misrepresentation: true,
-            require_explicit_hots: false,  // Allow tacit HOTs
+            require_explicit_hots: false, // Allow tacit HOTs
         }
     }
 }
@@ -279,11 +280,7 @@ impl HigherOrderThoughtSystem {
         let target = self.first_order[target_idx].clone();
 
         // Create HOT
-        let mut hot = MentalState::higher_order(
-            target,
-            hot_content,
-            "introspection".to_string()
-        );
+        let mut hot = MentalState::higher_order(target, hot_content, "introspection".to_string());
         hot.timestamp = self.timestep;
 
         // Target is now conscious (has HOT about it)
@@ -320,14 +317,13 @@ impl HigherOrderThoughtSystem {
 
         for (idx, state) in self.first_order.iter().enumerate() {
             // Check if already has HOT
-            let has_hot = self.second_order.iter()
-                .any(|hot| {
-                    if let Some(target) = &hot.represents {
-                        self.states_equal(&target.content, &state.content)
-                    } else {
-                        false
-                    }
-                });
+            let has_hot = self.second_order.iter().any(|hot| {
+                if let Some(target) = &hot.represents {
+                    self.states_equal(&target.content, &state.content)
+                } else {
+                    false
+                }
+            });
 
             if !has_hot && state.confidence > self.config.hot_threshold {
                 // Generate HOT (simplified: copy content with marker)
@@ -346,9 +342,10 @@ impl HigherOrderThoughtSystem {
     fn create_hot_representation(&self, first_order: &[BinaryHV]) -> Vec<BinaryHV> {
         // Simplified: Bind with "awareness" marker
         // In full implementation: More sophisticated meta-representation
-        let awareness_marker = BinaryHV::random(999);  // Fixed marker for "I am aware of"
+        let awareness_marker = BinaryHV::random(999); // Fixed marker for "I am aware of"
 
-        first_order.iter()
+        first_order
+            .iter()
             .map(|&hv| hv.bind(&awareness_marker))
             .collect()
     }
@@ -364,7 +361,8 @@ impl HigherOrderThoughtSystem {
 
     /// Assess higher-order consciousness state
     fn assess(&mut self) -> HOTAssessment {
-        let total_states = self.first_order.len() + self.second_order.len() + self.higher_order.len();
+        let total_states =
+            self.first_order.len() + self.second_order.len() + self.higher_order.len();
 
         let first_order_count = self.first_order.len();
         let second_order_count = self.second_order.len();
@@ -380,7 +378,9 @@ impl HigherOrderThoughtSystem {
         let self_awareness = !self.higher_order.is_empty();
 
         // Count misrepresentations
-        let misrepresentations = self.second_order.iter()
+        let misrepresentations = self
+            .second_order
+            .iter()
             .chain(self.higher_order.iter())
             .filter(|hot| hot.is_misrepresented())
             .count();
@@ -395,11 +395,8 @@ impl HigherOrderThoughtSystem {
             0.0
         };
 
-        let explanation = self.generate_explanation(
-            consciousness_ratio,
-            self_awareness,
-            misrepresentations,
-        );
+        let explanation =
+            self.generate_explanation(consciousness_ratio, self_awareness, misrepresentations);
 
         HOTAssessment {
             total_states,
@@ -456,7 +453,8 @@ impl HigherOrderThoughtSystem {
 
     /// Get all conscious states (with HOTs)
     pub fn get_conscious_states(&self) -> Vec<&MentalState> {
-        self.second_order.iter()
+        self.second_order
+            .iter()
             .chain(self.higher_order.iter())
             .collect()
     }
@@ -486,21 +484,15 @@ mod tests {
 
     #[test]
     fn test_first_order_state() {
-        let state = MentalState::first_order(
-            vec![BinaryHV::ones(); 10],
-            "perception".to_string(),
-        );
+        let state = MentalState::first_order(vec![BinaryHV::ones(); 10], "perception".to_string());
         assert_eq!(state.order, RepresentationOrder::FirstOrder);
-        assert!(!state.is_conscious());  // First-order alone not conscious
+        assert!(!state.is_conscious()); // First-order alone not conscious
         assert_eq!(state.depth(), 1);
     }
 
     #[test]
     fn test_higher_order_state() {
-        let first = MentalState::first_order(
-            vec![BinaryHV::ones(); 10],
-            "perception".to_string(),
-        );
+        let first = MentalState::first_order(vec![BinaryHV::ones(); 10], "perception".to_string());
         let second = MentalState::higher_order(
             first,
             vec![BinaryHV::zero(); 10],
@@ -508,16 +500,13 @@ mod tests {
         );
 
         assert_eq!(second.order, RepresentationOrder::SecondOrder);
-        assert!(second.is_conscious());  // Second-order IS conscious
+        assert!(second.is_conscious()); // Second-order IS conscious
         assert_eq!(second.depth(), 2);
     }
 
     #[test]
     fn test_third_order_meta_consciousness() {
-        let first = MentalState::first_order(
-            vec![BinaryHV::ones(); 10],
-            "perception".to_string(),
-        );
+        let first = MentalState::first_order(vec![BinaryHV::ones(); 10], "perception".to_string());
         let second = MentalState::higher_order(
             first,
             vec![BinaryHV::zero(); 10],
@@ -547,7 +536,7 @@ mod tests {
         system.perceive(vec![BinaryHV::ones(); 10], "vision".to_string());
 
         assert_eq!(system.first_order.len(), 1);
-        assert_eq!(system.second_order.len(), 0);  // No HOT yet
+        assert_eq!(system.second_order.len(), 0); // No HOT yet
     }
 
     #[test]
@@ -574,17 +563,14 @@ mod tests {
         });
 
         // Add high-confidence first-order state
-        let mut state = MentalState::first_order(
-            vec![BinaryHV::ones(); 10],
-            "vision".to_string(),
-        );
-        state.confidence = 0.9;  // Above threshold
+        let mut state = MentalState::first_order(vec![BinaryHV::ones(); 10], "vision".to_string());
+        state.confidence = 0.9; // Above threshold
         system.first_order.push(state);
 
         // Process should auto-generate HOT
         let assessment = system.process();
 
-        assert!(assessment.second_order_count > 0);  // HOT generated
+        assert!(assessment.second_order_count > 0); // HOT generated
         assert!(assessment.consciousness_ratio > 0.0);
     }
 
@@ -633,15 +619,12 @@ mod tests {
 
     #[test]
     fn test_misrepresentation_detection() {
-        let first = MentalState::first_order(
-            vec![BinaryHV::ones(); 10],
-            "perception".to_string(),
-        );
+        let first = MentalState::first_order(vec![BinaryHV::ones(); 10], "perception".to_string());
 
         // HOT misrepresents (very different content)
         let mut hot = MentalState::higher_order(
             first,
-            vec![BinaryHV::zero(); 10],  // Completely different
+            vec![BinaryHV::zero(); 10], // Completely different
             "introspection".to_string(),
         );
 

@@ -175,7 +175,11 @@ fn maxwell_gauss_law() -> PhysicsEquation {
         ),
         symmetries: SymmetryDescriptor::new(
             vec![LieGroup::U(1)],
-            vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T],
+            vec![
+                DiscreteSymmetry::C,
+                DiscreteSymmetry::P,
+                DiscreteSymmetry::T,
+            ],
             true,
         ),
         dimensions: DimensionalSignature::ELECTRIC_FIELD,
@@ -198,7 +202,11 @@ fn maxwell_gauss_magnetism() -> PhysicsEquation {
         ),
         symmetries: SymmetryDescriptor::new(
             vec![LieGroup::U(1)],
-            vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T],
+            vec![
+                DiscreteSymmetry::C,
+                DiscreteSymmetry::P,
+                DiscreteSymmetry::T,
+            ],
             true,
         ),
         dimensions: DimensionalSignature::MAGNETIC_FIELD,
@@ -224,7 +232,11 @@ fn maxwell_faraday() -> PhysicsEquation {
         ),
         symmetries: SymmetryDescriptor::new(
             vec![LieGroup::U(1)],
-            vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T],
+            vec![
+                DiscreteSymmetry::C,
+                DiscreteSymmetry::P,
+                DiscreteSymmetry::T,
+            ],
             true,
         ),
         dimensions: DimensionalSignature::ELECTRIC_FIELD,
@@ -260,7 +272,11 @@ fn maxwell_ampere() -> PhysicsEquation {
         ),
         symmetries: SymmetryDescriptor::new(
             vec![LieGroup::U(1)],
-            vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T],
+            vec![
+                DiscreteSymmetry::C,
+                DiscreteSymmetry::P,
+                DiscreteSymmetry::T,
+            ],
             true,
         ),
         dimensions: DimensionalSignature::MAGNETIC_FIELD,
@@ -423,15 +439,9 @@ fn kerr_metric() -> PhysicsEquation {
                         ]))),
                         make_const("dt²"),
                     ]),
-                    make_product(vec![
-                        make_const("Σ/Δ"),
-                        make_const("dr²"),
-                    ]),
+                    make_product(vec![make_const("Σ/Δ"), make_const("dr²")]),
                     make_product(vec![make_const("Σ"), make_const("dθ²")]),
-                    make_product(vec![
-                        make_const("cross_term"),
-                        make_const("dtdφ"),
-                    ]),
+                    make_product(vec![make_const("cross_term"), make_const("dtdφ")]),
                 ]),
             ]),
         ),
@@ -510,12 +520,10 @@ fn reissner_nordstrom_metric() -> PhysicsEquation {
                     make_product(vec![
                         EquationNode::Negate(Box::new(make_sum(vec![
                             EquationNode::Scalar(1.0),
-                            EquationNode::Negate(Box::new(make_product(vec![
-                                make_const("2GM/c²r"),
-                            ]))),
-                            make_product(vec![
-                                make_const("GQ²/(4πε₀c⁴r²)"),
-                            ]),
+                            EquationNode::Negate(Box::new(make_product(vec![make_const(
+                                "2GM/c²r",
+                            )]))),
+                            make_product(vec![make_const("GQ²/(4πε₀c⁴r²)")]),
                         ]))),
                         make_const("dt²"),
                     ]),
@@ -559,9 +567,7 @@ fn de_sitter_metric() -> PhysicsEquation {
                     make_product(vec![
                         EquationNode::Negate(Box::new(make_sum(vec![
                             EquationNode::Scalar(1.0),
-                            EquationNode::Negate(Box::new(make_product(vec![
-                                make_const("Λr²/3"),
-                            ]))),
+                            EquationNode::Negate(Box::new(make_product(vec![make_const("Λr²/3")]))),
                         ]))),
                         make_const("dt²"),
                     ]),
@@ -635,11 +641,7 @@ fn schrodinger_equation() -> PhysicsEquation {
                 make_field("ψ", TensorDescriptor::scalar(euc3)),
             ]),
         ),
-        symmetries: SymmetryDescriptor::new(
-            vec![LieGroup::U(1)],
-            vec![DiscreteSymmetry::T],
-            true,
-        ),
+        symmetries: SymmetryDescriptor::new(vec![LieGroup::U(1)], vec![DiscreteSymmetry::T], true),
         dimensions: DimensionalSignature::ENERGY,
         tensor: Some(TensorDescriptor::scalar(euc3)),
     }
@@ -653,26 +655,28 @@ fn dirac_equation() -> PhysicsEquation {
         name: "Dirac Equation".to_string(),
         domain: PhysicsDomain::QuantumFieldTheory,
         ast: make_equals(
-            make_product(vec![
-                make_sum(vec![
-                    make_product(vec![
-                        make_const("iγ^μ"),
-                        make_diffop(
-                            DiffOperator::Partial,
-                            make_field("ψ", TensorDescriptor::vector(lor4)),
-                        ),
-                    ]),
-                    EquationNode::Negate(Box::new(make_product(vec![
-                        make_const("m"),
+            make_product(vec![make_sum(vec![
+                make_product(vec![
+                    make_const("iγ^μ"),
+                    make_diffop(
+                        DiffOperator::Partial,
                         make_field("ψ", TensorDescriptor::vector(lor4)),
-                    ]))),
+                    ),
                 ]),
-            ]),
+                EquationNode::Negate(Box::new(make_product(vec![
+                    make_const("m"),
+                    make_field("ψ", TensorDescriptor::vector(lor4)),
+                ]))),
+            ])]),
             EquationNode::Scalar(0.0),
         ),
         symmetries: SymmetryDescriptor::new(
             vec![LieGroup::Poincare, LieGroup::U(1)],
-            vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T],
+            vec![
+                DiscreteSymmetry::C,
+                DiscreteSymmetry::P,
+                DiscreteSymmetry::T,
+            ],
             true,
         ),
         dimensions: DimensionalSignature::ENERGY,
@@ -704,7 +708,11 @@ fn klein_gordon_equation() -> PhysicsEquation {
         ),
         symmetries: SymmetryDescriptor::new(
             vec![LieGroup::Poincare],
-            vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T],
+            vec![
+                DiscreteSymmetry::C,
+                DiscreteSymmetry::P,
+                DiscreteSymmetry::T,
+            ],
             false,
         ),
         dimensions: DimensionalSignature::ENERGY,
@@ -902,10 +910,7 @@ fn friedmann_first() -> PhysicsEquation {
         ast: make_equals(
             EquationNode::Power {
                 base: Box::new(make_product(vec![
-                    make_diffop(
-                        DiffOperator::TimeDerivative,
-                        make_const("a"),
-                    ),
+                    make_diffop(DiffOperator::TimeDerivative, make_const("a")),
                     EquationNode::Power {
                         base: Box::new(make_const("a")),
                         exponent: Box::new(EquationNode::Scalar(-1.0)),
@@ -958,10 +963,10 @@ fn friedmann_second() -> PhysicsEquation {
             make_sum(vec![
                 EquationNode::Negate(Box::new(make_product(vec![
                     make_const("4πG/3"),
-                    make_sum(vec![make_const("ρ"), make_product(vec![
-                        EquationNode::Scalar(3.0),
-                        make_const("p"),
-                    ])]),
+                    make_sum(vec![
+                        make_const("ρ"),
+                        make_product(vec![EquationNode::Scalar(3.0), make_const("p")]),
+                    ]),
                 ]))),
                 make_product(vec![make_const("Λ/3")]),
             ]),
@@ -994,10 +999,7 @@ fn gamow_peak_integral() -> PhysicsEquation {
                 EquationNode::Sqrt(Box::new(make_product(vec![
                     EquationNode::Scalar(8.0),
                     EquationNode::Power {
-                        base: Box::new(make_product(vec![
-                            make_const("π"),
-                            make_const("μ"),
-                        ])),
+                        base: Box::new(make_product(vec![make_const("π"), make_const("μ")])),
                         exponent: Box::new(EquationNode::Scalar(-1.0)),
                     },
                 ]))),
@@ -1071,10 +1073,7 @@ fn coulomb_screening() -> PhysicsEquation {
                             exponent: Box::new(EquationNode::Scalar(-0.5)),
                         },
                         EquationNode::Negate(Box::new(EquationNode::Power {
-                            base: Box::new(make_sum(vec![
-                                make_const("E"),
-                                make_const("Ue"),
-                            ])),
+                            base: Box::new(make_sum(vec![make_const("E"), make_const("Ue")])),
                             exponent: Box::new(EquationNode::Scalar(-0.5)),
                         })),
                     ]),
@@ -1156,7 +1155,11 @@ mod tests {
     #[test]
     fn catalog_builds_successfully() {
         let catalog = PhysicsCatalog::new();
-        assert!(catalog.len() >= 27, "Expected >= 27 entries, got {}", catalog.len());
+        assert!(
+            catalog.len() >= 27,
+            "Expected >= 27 entries, got {}",
+            catalog.len()
+        );
     }
 
     #[test]
@@ -1234,7 +1237,9 @@ mod tests {
     fn nuclear_physics_equations_cluster() {
         let catalog = PhysicsCatalog::new();
         let gamow = catalog.find_by_name("Gamow Peak Integral").unwrap();
-        let screening = catalog.find_by_name("Coulomb Screening Enhancement").unwrap();
+        let screening = catalog
+            .find_by_name("Coulomb Screening Enhancement")
+            .unwrap();
         let wave = catalog.find_by_name("Wave Equation").unwrap();
 
         let nuclear_sim = gamow.full_hv.similarity(&screening.full_hv);
@@ -1250,7 +1255,9 @@ mod tests {
     fn spark_engine_equations_present() {
         let catalog = PhysicsCatalog::new();
         assert!(catalog.find_by_name("Gamow Peak Integral").is_some());
-        assert!(catalog.find_by_name("Coulomb Screening Enhancement").is_some());
+        assert!(catalog
+            .find_by_name("Coulomb Screening Enhancement")
+            .is_some());
         assert!(catalog.find_by_name("D-D Branching Ratio").is_some());
         assert!(catalog.find_by_name("Thermal-Gamow Coupling").is_some());
     }

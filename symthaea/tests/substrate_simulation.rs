@@ -177,7 +177,10 @@ fn speed_modulation_varies_tau_factor() {
     // Different substrates should produce different tau factors
     // (at least some should differ)
     let unique_count = {
-        let mut vals: Vec<u32> = tau_factors.iter().map(|(_, t)| (*t * 1000.0) as u32).collect();
+        let mut vals: Vec<u32> = tau_factors
+            .iter()
+            .map(|(_, t)| (*t * 1000.0) as u32)
+            .collect();
         vals.sort();
         vals.dedup();
         vals.len()
@@ -225,7 +228,12 @@ fn per_region_substrate_assignment() {
     );
 
     // All should be in [0, 1]
-    for (label, f) in [("PFC", pfc_f), ("Memory", mem_f), ("Sensory", sens_f), ("Motor", motor_f)] {
+    for (label, f) in [
+        ("PFC", pfc_f),
+        ("Memory", mem_f),
+        ("Sensory", sens_f),
+        ("Motor", motor_f),
+    ] {
         assert!(
             f >= 0.0 && f <= 1.0,
             "{label} feasibility out of range: {f}"

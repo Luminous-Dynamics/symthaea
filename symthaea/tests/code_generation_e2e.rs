@@ -9,11 +9,11 @@
 // Run: cargo test --test code_generation_e2e --features code_generation
 // ==================================================================================
 
+use symthaea::hdc::code_encoder::CodeHDEncoder;
 use symthaea::language::code_generator::{CodeContext, CodeGenerator};
 use symthaea::language::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use symthaea::language::code_parser::{CodeParser, EntityKind};
 use symthaea::language::code_verifier::CodeVerifier;
-use symthaea::hdc::code_encoder::CodeHDEncoder;
 use symthaea::mind::structured_thought::{
     CodeContext as ThoughtCodeContext, EpistemicStatus, StructuredThought,
 };
@@ -42,8 +42,16 @@ fn e2e_add_function_native_complete() {
     assert_eq!(result.language, "rust");
 
     // Body is real, not a placeholder
-    assert!(result.source.contains("a + b"), "Expected real body: {}", result.source);
-    assert!(!result.source.contains("todo!"), "Should not contain todo: {}", result.source);
+    assert!(
+        result.source.contains("a + b"),
+        "Expected real body: {}",
+        result.source
+    );
+    assert!(
+        !result.source.contains("todo!"),
+        "Should not contain todo: {}",
+        result.source
+    );
 
     // Tests are real assertions
     assert!(result.source.contains("assert_eq!(add(1, 2), 3)"));
@@ -82,7 +90,11 @@ fn e2e_factorial_native_complete() {
 
     let result = gen.generate(&intent, &CodeContext::default());
 
-    assert!(result.source.contains(".product()"), "Expected factorial body: {}", result.source);
+    assert!(
+        result.source.contains(".product()"),
+        "Expected factorial body: {}",
+        result.source
+    );
     assert!(!result.source.contains("todo!"));
 }
 
@@ -92,7 +104,11 @@ fn e2e_struct_with_constructor() {
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("Point", EntityKind::Struct).with_language("rust"),
-        spec: CodeSpec::new("rust", "Point", "A 2D point with x: f64 and y: f64 coordinates"),
+        spec: CodeSpec::new(
+            "rust",
+            "Point",
+            "A 2D point with x: f64 and y: f64 coordinates",
+        ),
     };
 
     let result = gen.generate(&intent, &CodeContext::default());
@@ -137,8 +153,8 @@ fn e2e_complex_intent_triggers_llm_completion() {
     );
 
     // Build the thought code context — needs_llm_completion should be true
-    let needs_llm = result.source.contains("todo!(")
-        || result.source.contains("NotImplementedError");
+    let needs_llm =
+        result.source.contains("todo!(") || result.source.contains("NotImplementedError");
     assert!(needs_llm, "Should need LLM completion");
 
     // Verify the prompt serialization includes the completion signal
@@ -146,10 +162,16 @@ fn e2e_complex_intent_triggers_llm_completion() {
     thought.code_context = Some(ThoughtCodeContext {
         language: "rust".to_string(),
         spec_purpose: Some("Dijkstra's shortest path".to_string()),
-        spec_signature: Some("fn dijkstra(graph: &[Vec<(usize, u32)>], start: usize) -> Vec<u32>".to_string()),
+        spec_signature: Some(
+            "fn dijkstra(graph: &[Vec<(usize, u32)>], start: usize) -> Vec<u32>".to_string(),
+        ),
         spec_constraints: vec![],
         spec_examples: vec![],
-        plan_steps: result.plan_steps.iter().map(|s| format!("{:?}", s.action)).collect(),
+        plan_steps: result
+            .plan_steps
+            .iter()
+            .map(|s| format!("{:?}", s.action))
+            .collect(),
         generated_code: Some(result.source.clone()),
         phi_score: Some(result.phi_score),
         intent_similarity: Some(result.intent_similarity),
@@ -176,9 +198,13 @@ fn e2e_simple_intent_no_llm_needed() {
 
     let result = gen.generate(&intent, &CodeContext::default());
 
-    let needs_llm = result.source.contains("todo!(")
-        || result.source.contains("NotImplementedError");
-    assert!(!needs_llm, "Simple pattern should NOT need LLM: {}", result.source);
+    let needs_llm =
+        result.source.contains("todo!(") || result.source.contains("NotImplementedError");
+    assert!(
+        !needs_llm,
+        "Simple pattern should NOT need LLM: {}",
+        result.source
+    );
 }
 
 // ==================================================================================
@@ -191,14 +217,17 @@ fn e2e_python_add_native() {
 
     let intent = CodeIntent::Create {
         target: CodeTarget::new("add", EntityKind::Function).with_language("python"),
-        spec: CodeSpec::new("python", "add", "Add two numbers")
-            .with_example("add(1, 2)", "3"),
+        spec: CodeSpec::new("python", "add", "Add two numbers").with_example("add(1, 2)", "3"),
     };
 
     let result = gen.generate(&intent, &CodeContext::default());
 
     assert_eq!(result.language, "python");
-    assert!(result.source.contains("return a + b"), "Expected Python body: {}", result.source);
+    assert!(
+        result.source.contains("return a + b"),
+        "Expected Python body: {}",
+        result.source
+    );
     assert!(result.source.contains("assert add(1, 2) == 3"));
 }
 
@@ -209,7 +238,11 @@ fn e2e_python_complex_triggers_llm() {
     // Use a purpose that won't match any Python emitter keyword pattern
     let intent = CodeIntent::Create {
         target: CodeTarget::new("solve_knapsack", EntityKind::Function).with_language("python"),
-        spec: CodeSpec::new("python", "solve_knapsack", "Implement dynamic programming knapsack solver"),
+        spec: CodeSpec::new(
+            "python",
+            "solve_knapsack",
+            "Implement dynamic programming knapsack solver",
+        ),
     };
 
     let result = gen.generate(&intent, &CodeContext::default());
@@ -239,7 +272,9 @@ fn e2e_verify_generated_rust_syntax() {
 
     // Verify with tree-sitter + HDC round-trip
     let mut parser = symthaea::language::rust_parser::RustParser::new();
-    let parsed = parser.parse(&result.source).expect("Should parse valid Rust");
+    let parsed = parser
+        .parse(&result.source)
+        .expect("Should parse valid Rust");
 
     // Should have entities (function definition)
     assert!(
@@ -302,17 +337,53 @@ fn e2e_batch_native_coverage() {
 
     let cases = vec![
         ("add", "Add two numbers", "fn add(a: i32, b: i32) -> i32"),
-        ("subtract", "Subtract two numbers", "fn subtract(a: i32, b: i32) -> i32"),
-        ("multiply", "Multiply two numbers", "fn multiply(a: f64, b: f64) -> f64"),
-        ("divide", "Divide two numbers", "fn divide(a: f64, b: f64) -> f64"),
-        ("reverse", "Reverse a string", "fn reverse(s: &str) -> String"),
+        (
+            "subtract",
+            "Subtract two numbers",
+            "fn subtract(a: i32, b: i32) -> i32",
+        ),
+        (
+            "multiply",
+            "Multiply two numbers",
+            "fn multiply(a: f64, b: f64) -> f64",
+        ),
+        (
+            "divide",
+            "Divide two numbers",
+            "fn divide(a: f64, b: f64) -> f64",
+        ),
+        (
+            "reverse",
+            "Reverse a string",
+            "fn reverse(s: &str) -> String",
+        ),
         ("length", "Get string length", "fn length(s: &str) -> usize"),
-        ("is_even", "Check if number is even", "fn is_even(n: i32) -> bool"),
-        ("is_odd", "Check if number is odd", "fn is_odd(n: i32) -> bool"),
-        ("factorial", "Compute factorial", "fn factorial(n: u64) -> u64"),
-        ("uppercase", "Convert to uppercase", "fn uppercase(s: &str) -> String"),
+        (
+            "is_even",
+            "Check if number is even",
+            "fn is_even(n: i32) -> bool",
+        ),
+        (
+            "is_odd",
+            "Check if number is odd",
+            "fn is_odd(n: i32) -> bool",
+        ),
+        (
+            "factorial",
+            "Compute factorial",
+            "fn factorial(n: u64) -> u64",
+        ),
+        (
+            "uppercase",
+            "Convert to uppercase",
+            "fn uppercase(s: &str) -> String",
+        ),
         ("abs", "Absolute value", "fn abs(n: i32) -> i32"),
-        ("sort", "Sort a vector", "fn sort(items: Vec<i32>) -> Vec<i32>"),
+        (
+            "sort",
+            "Sort a vector",
+            "fn sort(items: Vec<i32>) -> Vec<i32>",
+        ),
     ];
 
     let mut native_count = 0;

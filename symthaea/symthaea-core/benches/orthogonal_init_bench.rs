@@ -20,9 +20,8 @@ fn bench_generation_speed(c: &mut Criterion) {
     for &dim in &[512, 1024, 4096, 16384] {
         group.bench_with_input(BenchmarkId::new("random_5", dim), &dim, |b, &dim| {
             b.iter(|| {
-                let hvs: Vec<ContinuousHV> = (0..5)
-                    .map(|i| ContinuousHV::random(dim, 42 + i))
-                    .collect();
+                let hvs: Vec<ContinuousHV> =
+                    (0..5).map(|i| ContinuousHV::random(dim, 42 + i)).collect();
                 black_box(hvs)
             })
         });
@@ -47,9 +46,8 @@ fn bench_init_quality(c: &mut Criterion) {
             BenchmarkId::new("random_similarity", dim),
             &dim,
             |b, &dim| {
-                let hvs: Vec<ContinuousHV> = (0..5)
-                    .map(|i| ContinuousHV::random(dim, 42 + i))
-                    .collect();
+                let hvs: Vec<ContinuousHV> =
+                    (0..5).map(|i| ContinuousHV::random(dim, 42 + i)).collect();
                 b.iter(|| {
                     let mut sum = 0.0f64;
                     let mut count = 0;

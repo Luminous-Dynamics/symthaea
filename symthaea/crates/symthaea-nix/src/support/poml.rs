@@ -182,7 +182,9 @@ fn parse_xml(input: &str) -> Result<XmlNode, String> {
     };
 
     let mut parser = XmlParser::new(input);
-    parser.parse_element().ok_or_else(|| "Failed to parse XML".to_string())
+    parser
+        .parse_element()
+        .ok_or_else(|| "Failed to parse XML".to_string())
 }
 
 struct XmlParser<'a> {
@@ -200,9 +202,7 @@ impl<'a> XmlParser<'a> {
     }
 
     fn skip_whitespace(&mut self) {
-        while self.pos < self.input.len()
-            && self.input.as_bytes()[self.pos].is_ascii_whitespace()
-        {
+        while self.pos < self.input.len() && self.input.as_bytes()[self.pos].is_ascii_whitespace() {
             self.pos += 1;
         }
     }
@@ -397,8 +397,8 @@ impl PomlProcessor {
             }
         }
 
-        let content =
-            std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", name, e))?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| format!("Failed to read {}: {}", name, e))?;
         let root = parse_xml(&content)?;
         self.template_cache.insert(name.to_string(), root);
         Ok(&self.template_cache[name])
@@ -521,7 +521,8 @@ impl PomlProcessor {
                     let resolved = substitute_variables(raw, &vars);
 
                     // Handle default syntax: {{ var | default: "value" }}
-                    let value = if resolved.contains("| default:") || resolved.contains("|default:") {
+                    let value = if resolved.contains("| default:") || resolved.contains("|default:")
+                    {
                         // Variable wasn't resolved — use the default
                         if let Some(default_start) = resolved.find("default:") {
                             let default_val = resolved[default_start + 8..].trim();
@@ -1024,7 +1025,9 @@ mod tests {
         assert!(result.prompt.contains("[s1]"));
         assert!(result.prompt.contains("[s2]"));
         assert!(result.prompt.contains("Input: install firefox"));
-        assert!(result.prompt.contains("Output: {\"intent\": \"install_package\"}"));
+        assert!(result
+            .prompt
+            .contains("Output: {\"intent\": \"install_package\"}"));
         assert!(result.prompt.contains("Output Format:"));
         assert!(result.prompt.contains("Hint: Be precise"));
     }
@@ -1041,7 +1044,10 @@ mod tests {
         assert_eq!(result.metadata.model_hints.temperature, Some(0.3));
         assert_eq!(result.metadata.model_hints.max_tokens, Some(500));
         assert_eq!(result.metadata.model_hints.preferred_models.len(), 2);
-        assert_eq!(result.metadata.model_hints.preferred_models[0], "mistral-7b");
+        assert_eq!(
+            result.metadata.model_hints.preferred_models[0],
+            "mistral-7b"
+        );
     }
 
     #[test]
@@ -1194,7 +1200,9 @@ mod tests {
 
         let ctx = PomlContext::default();
         let result = proc.process("err", &ctx).unwrap();
-        assert!(result.prompt.contains("On ambiguous: Return multiple intents"));
+        assert!(result
+            .prompt
+            .contains("On ambiguous: Return multiple intents"));
         assert!(result.prompt.contains("On unknown: Return unknown intent"));
     }
 

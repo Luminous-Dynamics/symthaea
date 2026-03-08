@@ -359,7 +359,10 @@ mod tests {
         assert_eq!(config.embedding_dim, 1024);
         assert_eq!(config.max_seq_length, 8192);
         assert_eq!(config.num_threads, 4);
-        assert_eq!(config.pooling, super::super::PoolingStrategy::LastTokenPooling);
+        assert_eq!(
+            config.pooling,
+            super::super::PoolingStrategy::LastTokenPooling
+        );
     }
 
     #[test]
@@ -384,7 +387,10 @@ mod tests {
     #[test]
     fn test_onnx_default_is_last_token() {
         let config = OnnxEmbedderConfig::default();
-        assert_eq!(config.pooling, super::super::PoolingStrategy::LastTokenPooling);
+        assert_eq!(
+            config.pooling,
+            super::super::PoolingStrategy::LastTokenPooling
+        );
     }
 
     #[test]

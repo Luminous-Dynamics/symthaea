@@ -33,11 +33,7 @@ impl SurpriseMap {
     /// Accumulated with exponential decay. Bounded to the theoretical
     /// steady-state maximum of `1.0 / (1.0 - decay)` to prevent runaway
     /// accumulation from pathological inputs while preserving normal dynamics.
-    pub fn update(
-        &mut self,
-        current_patches: &[ContinuousHV],
-        previous_patches: &[ContinuousHV],
-    ) {
+    pub fn update(&mut self, current_patches: &[ContinuousHV], previous_patches: &[ContinuousHV]) {
         // Decay existing surprise
         for s in &mut self.surprise {
             *s *= self.decay;

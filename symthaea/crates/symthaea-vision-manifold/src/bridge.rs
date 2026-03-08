@@ -75,7 +75,8 @@ impl VisionBridge {
         channels: usize,
         dt: f32,
     ) -> ContinuousHV {
-        self.manifold.observe_frame(pixels, width, height, channels, dt);
+        self.manifold
+            .observe_frame(pixels, width, height, channels, dt);
         self.apply_attention_boost()
     }
 
@@ -89,7 +90,9 @@ impl VisionBridge {
         dt: f32,
     ) -> (ContinuousHV, VisionTelemetry) {
         let t0 = Instant::now();
-        let mut telemetry = self.manifold.observe_frame(pixels, width, height, channels, dt);
+        let mut telemetry = self
+            .manifold
+            .observe_frame(pixels, width, height, channels, dt);
 
         let boosted_hv = self.apply_attention_boost();
 
@@ -111,10 +114,7 @@ impl VisionBridge {
         let surprise_map = self.manifold.surprise_map();
         let motion_saliency = self.manifold.motion_saliency();
         let max_surprise = surprise_map.max_surprise();
-        let max_motion = motion_saliency
-            .iter()
-            .copied()
-            .fold(0.0f32, f32::max);
+        let max_motion = motion_saliency.iter().copied().fold(0.0f32, f32::max);
         let max_signal = max_surprise.max(max_motion);
 
         if max_signal < 1e-6 || self.attention_boost < 1e-6 {
@@ -250,8 +250,7 @@ impl CrossManifoldPredictor {
     /// actual cognitive HV, weakening dimensions that produced error.
     pub fn observe_cognitive(&mut self, actual_cognitive: &ContinuousHV) {
         if let Some(ref predicted) = self.last_prediction {
-            self.prediction_error =
-                1.0 - actual_cognitive.similarity(predicted).clamp(-1.0, 1.0);
+            self.prediction_error = 1.0 - actual_cognitive.similarity(predicted).clamp(-1.0, 1.0);
 
             // Hebbian update: W += lr * (actual - predicted) ⊗ sign(predicted)
             let dim = self.dim;
@@ -404,9 +403,7 @@ mod tests {
         let cfg = VisionConfig::default();
         let mut bridge = VisionBridge::new(cfg.clone(), 64, 64);
 
-        let rgb_frame: Vec<u8> = (0..64 * 64)
-            .flat_map(|_| vec![128u8, 64, 192])
-            .collect();
+        let rgb_frame: Vec<u8> = (0..64 * 64).flat_map(|_| vec![128u8, 64, 192]).collect();
         let hv = bridge.process_frame(&rgb_frame, 64, 64, 3, 0.033);
         assert_eq!(hv.dim(), cfg.hdc_dim);
         assert!(hv.norm() > 0.0);
@@ -512,10 +509,14 @@ mod tests {
         let mut all_hvs = Vec::with_capacity(100);
         for i in 0..100 {
             let frame = match i {
-                0..=30 => &frame_a,     // Static scene
-                31..=50 => &frame_b,    // Scene change
+                0..=30 => &frame_a,  // Static scene
+                31..=50 => &frame_b, // Scene change
                 _ => {
-                    if i % 2 == 0 { &frame_a } else { &frame_b }
+                    if i % 2 == 0 {
+                        &frame_a
+                    } else {
+                        &frame_b
+                    }
                 }
             };
 
@@ -557,7 +558,10 @@ mod tests {
 
         // Verify health is OK
         let health = bridge.manifold().compute_health();
-        assert!(health.is_healthy, "Manifold should be healthy after 100 frames");
+        assert!(
+            health.is_healthy,
+            "Manifold should be healthy after 100 frames"
+        );
         assert_eq!(health.total_frames, 100);
     }
 
@@ -588,7 +592,7 @@ mod tests {
         assert_eq!(bridge.frame_count(), 30);
 
         // Different color states should be distinguishable
-        let red_hv = &hvs[8];  // Late red
+        let red_hv = &hvs[8]; // Late red
         let blue_hv = &hvs[28]; // Late blue
         let sim = red_hv.similarity(blue_hv);
         assert!(
@@ -611,7 +615,10 @@ mod tests {
             bridge.process_frame(&frame, 64, 64, 1, 0.033);
         }
         let conf = bridge.prediction_confidence();
-        assert!(conf >= 0.0 && conf <= 1.0, "Confidence should be in [0, 1]: {conf}");
+        assert!(
+            conf >= 0.0 && conf <= 1.0,
+            "Confidence should be in [0, 1]: {conf}"
+        );
     }
 
     #[test]

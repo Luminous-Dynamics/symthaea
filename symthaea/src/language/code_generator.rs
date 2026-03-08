@@ -206,7 +206,9 @@ impl CodeGenerator {
 
             // From auto-generation
             let auto = super::emitters::generate_auto_tests_pub(
-                &parsed.name, &spec.purpose, Some(&parsed),
+                &parsed.name,
+                &spec.purpose,
+                Some(&parsed),
             );
             for (i, assertion) in auto.iter().enumerate() {
                 tests.push(format!("    #[test]"));
@@ -292,13 +294,18 @@ impl CodeGenerator {
         primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
         let mut notes = Vec::new();
-        let lang = target.language.clone().unwrap_or_else(|| "rust".to_string());
+        let lang = target
+            .language
+            .clone()
+            .unwrap_or_else(|| "rust".to_string());
 
         // Try to find existing source code in context
-        let existing_source = context.source_files.iter()
+        let existing_source = context
+            .source_files
+            .iter()
             .find(|(path, _)| {
-                path.contains(&target.name) ||
-                target.path.as_ref().map_or(false, |p| path.contains(p))
+                path.contains(&target.name)
+                    || target.path.as_ref().map_or(false, |p| path.contains(p))
             })
             .map(|(_, src)| src.as_str());
 
@@ -391,13 +398,10 @@ impl CodeGenerator {
                     let fn_pattern = format!("fn {}(", func_name);
                     if let Some(pos) = result.find(&fn_pattern) {
                         // Find start of line
-                        let line_start = result[..pos].rfind('\n')
-                            .map(|p| p + 1)
-                            .unwrap_or(0);
+                        let line_start = result[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
                         let indent = &result[line_start..pos];
-                        let whitespace: String = indent.chars()
-                            .take_while(|c| c.is_whitespace())
-                            .collect();
+                        let whitespace: String =
+                            indent.chars().take_while(|c| c.is_whitespace()).collect();
                         result.insert_str(line_start, &format!("{}/// {}\n", whitespace, content));
                     }
                 }
@@ -432,9 +436,8 @@ impl CodeGenerator {
                         let after = &result[pos + fn_pattern.len()..];
                         if let Some(close_paren) = after.find(')') {
                             let params = &after[..close_paren];
-                            let new_params: Vec<&str> = params.split(',')
-                                .filter(|p| !p.contains(name))
-                                .collect();
+                            let new_params: Vec<&str> =
+                                params.split(',').filter(|p| !p.contains(name)).collect();
                             let insert_pos = pos + fn_pattern.len();
                             result = format!(
                                 "{}{}{}",
@@ -456,11 +459,7 @@ impl CodeGenerator {
     }
 
     /// Generate a modification spec when no existing source is available.
-    fn generate_modification_spec(
-        func_name: &str,
-        changes: &[CodeChange],
-        _lang: &str,
-    ) -> String {
+    fn generate_modification_spec(func_name: &str, changes: &[CodeChange], _lang: &str) -> String {
         let mut lines = Vec::new();
         lines.push(format!("// Modification plan for `{}`:", func_name));
 

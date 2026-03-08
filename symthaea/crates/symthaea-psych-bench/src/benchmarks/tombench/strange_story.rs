@@ -13,8 +13,8 @@ use crate::harness::config::BenchmarkConfig;
 #[cfg(not(feature = "symthaea-backend"))]
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 #[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
@@ -226,7 +226,9 @@ impl StrangeStoryBenchmark {
         // Difficulty-gated noise (breaks ceiling at higher difficulty).
         // Scales with (1 + difficulty) so noise amplitude grows with task difficulty.
         let noise = if config.difficulty > 0.0 {
-            let mut rng_state = (config.seed ^ ((trial_idx as u64).wrapping_mul(0x9E3779B97F4A7C15))).wrapping_add(1);
+            let mut rng_state = (config.seed
+                ^ ((trial_idx as u64).wrapping_mul(0x9E3779B97F4A7C15)))
+            .wrapping_add(1);
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
@@ -250,7 +252,8 @@ impl StrangeStoryBenchmark {
         // Difficulty-gated processing error: stochastic response flip models
         // impaired narrative integration at higher cognitive load (Happé, 1994).
         if config.difficulty > 0.0 {
-            let mut rng2 = (config.seed ^ ((trial_idx as u64).wrapping_mul(0xA0761D6478BD642F))).wrapping_add(1);
+            let mut rng2 = (config.seed ^ ((trial_idx as u64).wrapping_mul(0xA0761D6478BD642F)))
+                .wrapping_add(1);
             rng2 ^= rng2 << 13;
             rng2 ^= rng2 >> 7;
             rng2 ^= rng2 << 17;
@@ -411,7 +414,9 @@ impl PsychBenchmark for StrangeStoryBenchmark {
 
         result.conditions = type_accs.len();
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

@@ -379,9 +379,15 @@ mod tests {
     #[test]
     fn test_neuromod_separation_pattern() {
         let sep = AttachmentNeuromodulation::separation();
-        assert!(sep.noradrenaline_separation > 0.0, "NE should rise on separation");
+        assert!(
+            sep.noradrenaline_separation > 0.0,
+            "NE should rise on separation"
+        );
         assert!(sep.serotonin_despair < 0.0, "5-HT should dip on separation");
-        assert!(sep.oxytocin_burst < 0.01, "No oxytocin burst during separation");
+        assert!(
+            sep.oxytocin_burst < 0.01,
+            "No oxytocin burst during separation"
+        );
     }
 
     #[test]
@@ -389,14 +395,23 @@ mod tests {
         let reu = AttachmentNeuromodulation::reunion();
         assert!(reu.oxytocin_burst > 0.0, "Oxytocin burst on reunion");
         assert!(reu.dopamine_reunion > 0.0, "DA reward on reunion");
-        assert!(reu.noradrenaline_separation < 0.0, "NE should decrease on reunion");
+        assert!(
+            reu.noradrenaline_separation < 0.0,
+            "NE should decrease on reunion"
+        );
     }
 
     #[test]
     fn test_neuromod_despair_pattern() {
         let desp = AttachmentNeuromodulation::despair();
-        assert!(desp.serotonin_despair < -0.2, "Major 5-HT depletion in despair");
-        assert!(desp.adenosine_stress > 0.3, "Adenosine stress load in despair");
+        assert!(
+            desp.serotonin_despair < -0.2,
+            "Major 5-HT depletion in despair"
+        );
+        assert!(
+            desp.adenosine_stress > 0.3,
+            "Adenosine stress load in despair"
+        );
     }
 
     #[test]
@@ -413,7 +428,10 @@ mod tests {
         let initial_oxy = bath.oxytocin.level;
         let reunion = AttachmentNeuromodulation::reunion();
         reunion.apply_to_bath(&mut bath);
-        assert!(bath.oxytocin.level > initial_oxy, "Oxytocin should increase on reunion");
+        assert!(
+            bath.oxytocin.level > initial_oxy,
+            "Oxytocin should increase on reunion"
+        );
         assert!(bath.dopamine.level > 0.5, "DA should increase on reunion");
     }
 
@@ -510,13 +528,22 @@ mod tests {
 
         // Reunion: oxytocin burst, DA up, NE down
         AttachmentNeuromodulation::reunion().apply_to_bath(&mut bath);
-        assert!(bath.oxytocin.level > baseline_oxy, "Oxytocin should surge on reunion");
-        assert!(bath.noradrenaline.level < post_sep_ne, "NE should drop on reunion");
+        assert!(
+            bath.oxytocin.level > baseline_oxy,
+            "Oxytocin should surge on reunion"
+        );
+        assert!(
+            bath.noradrenaline.level < post_sep_ne,
+            "NE should drop on reunion"
+        );
         assert!(bath.dopamine.level > 0.5, "DA reward burst on reunion");
 
         // Co-regulation: further calming
         AttachmentNeuromodulation::coregulation(0.9).apply_to_bath(&mut bath);
-        assert!(bath.oxytocin.level > baseline_oxy, "Oxytocin should remain elevated after co-regulation");
+        assert!(
+            bath.oxytocin.level > baseline_oxy,
+            "Oxytocin should remain elevated after co-regulation"
+        );
     }
 
     #[test]
@@ -527,7 +554,10 @@ mod tests {
         // Separation adds stress
         AttachmentNeuromodulation::separation().apply_to_bath(&mut bath);
         let post_sep = bath.adenosine.level;
-        assert!(post_sep > initial_ade, "Adenosine should increase on separation");
+        assert!(
+            post_sep > initial_ade,
+            "Adenosine should increase on separation"
+        );
 
         // Despair adds more stress
         AttachmentNeuromodulation::despair().apply_to_bath(&mut bath);

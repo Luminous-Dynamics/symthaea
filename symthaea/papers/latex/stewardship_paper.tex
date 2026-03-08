@@ -275,7 +275,7 @@ FEP agents drive every continuous control surface in the \genesis{} pipeline.
 \item \textbf{CfC evolve}: $\hv(t) \rightarrow \hv(t + \Delta t)$ via Eq.~\ref{eq:cfc}
 \item \textbf{Predict}: multi-scale prediction at 6 horizons
 \item \textbf{Learn}: prediction error → weight updates via HD-STDP
-\item \textbf{Moral algebra}: check actions against Seven Harmonies value system
+\item \textbf{Moral algebra}: check actions against Eight Harmonies value system
 \item \textbf{Act}: FEP motor command selection
 \end{enumerate}
 Post-processing (consciousness metrics, metadata, telemetry) runs in parallel
@@ -777,7 +777,7 @@ by purely functional or behaviorist architectures.
 \subsection{Moral Algebra: Integrated Value Reasoning}
 
 \symthaea{}'s moral algebra operates in $\dimHDC$-dimensional space over the
-Seven Harmonies value system. For any action $a$, the moral score is:
+Eight Harmonies value system. For any action $a$, the moral score is:
 \begin{equation}
 M(a) = \sum_{i=1}^{7} w_i \cdot \similar\!\left(\hv_a, \hv_{H_i}\right)
 \label{eq:moral}
@@ -1155,9 +1155,9 @@ consequence.
 \section{Ethical Framework}
 \label{sec:ethics}
 
-\subsection{The Seven Harmonies}
+\subsection{The Eight Harmonies}
 
-\symthaea{}'s value system is organized around seven harmonies, each representing
+\symthaea{}'s value system is organized around eight harmonies, each representing
 both a value dimension and an epistemic lens:
 
 \begin{enumerate}[nosep,leftmargin=2em]
@@ -1174,7 +1174,7 @@ Care-related harmonies (Resonant Coherence, Pan-Sentient Flourishing) receive
 highest weight---a deliberate design choice reflecting the primacy of care
 in stewardship contexts.
 
-% ── Figure 6: Seven Harmonies Radar ──────────────────────────────────────
+% ── Figure 6: Eight Harmonies Radar ──────────────────────────────────────
 \begin{figure}[htbp]
 \centering
 \begin{tikzpicture}[scale=1.0]
@@ -1247,11 +1247,11 @@ in stewardship contexts.
   \draw[red!60!black, thick, dashed] (-2.5,-4.3) -- (-1.8,-4.3)
     node[right, font=\small, black] {Non-Optimization};
 \end{tikzpicture}
-\caption{\textbf{Seven Harmonies radar chart.} Two decision profiles overlaid:
+\caption{\textbf{Eight Harmonies radar chart.} Two decision profiles overlaid:
 the Stewardship Decision profile (solid blue) emphasizes Growth, Stewardship,
 and Emergence while maintaining moderate Balance and Resonance. The
 Non-Optimization profile (dashed red) shows balanced consideration across
-all seven harmonies, reflecting the principle that the AI must \emph{maintain}
+all eight harmonies, reflecting the principle that the AI must \emph{maintain}
 diversity rather than optimize toward any target (Eq.~\ref{eq:nonopt}).}
 \label{fig:harmonies_radar}
 \end{figure}
@@ -1409,7 +1409,7 @@ extrapolating to novel moral situations like consent proxy escalation during
 ectogenesis.
 
 \paragraph{Constitutional AI.} Rule-based constraints encode human values as
-explicit principles \cite{bostrom2014superintelligence}. Our Seven Harmonies
+explicit principles \cite{bostrom2014superintelligence}. Our Eight Harmonies
 serve a similar role, but with a crucial difference: they operate as
 $\dimHDC$-dimensional value vectors that participate in holographic reasoning,
 not as logical rules checked by a separate system. This means value conflicts
@@ -1586,7 +1586,7 @@ sub-crates are available under the \texttt{genesis} feature flag.
 
 \medskip
 \noindent\textbf{Acknowledgments.} This work was developed as part of the
-Luminous Dynamics project. The Seven Harmonies framework was developed through
+Luminous Dynamics project. The Eight Harmonies framework was developed through
 collaborative philosophical inquiry guided by the principles of Evolving
 Resonant Co-Creationism.
 

@@ -429,16 +429,28 @@ impl SeriousIncidentReport {
         md.push_str("# Serious Incident Report — EU AI Act Article 73\n\n");
         md.push_str(&format!("**Incident ID**: {}\n\n", self.incident_id));
         md.push_str(&format!("**Generated**: {}\n\n", self.generated_at));
-        md.push_str(&format!("**System Version**: Symthaea v{}\n\n", self.system_version));
+        md.push_str(&format!(
+            "**System Version**: Symthaea v{}\n\n",
+            self.system_version
+        ));
         md.push_str("---\n\n");
 
         md.push_str("## Incident Summary\n\n");
         md.push_str(&format!("| Field | Value |\n|-------|-------|\n"));
         md.push_str(&format!("| Severity | {} |\n", self.severity));
-        md.push_str(&format!("| Peak Safety Level | {} |\n", self.peak_safety_level.label()));
+        md.push_str(&format!(
+            "| Peak Safety Level | {} |\n",
+            self.peak_safety_level.label()
+        ));
         md.push_str(&format!("| Red Cycles | {} |\n", self.red_cycle_count));
-        md.push_str(&format!("| Min Consciousness | {:.3} |\n", self.min_consciousness));
-        md.push_str(&format!("| Total Assessments | {} |\n", self.total_assessments));
+        md.push_str(&format!(
+            "| Min Consciousness | {:.3} |\n",
+            self.min_consciousness
+        ));
+        md.push_str(&format!(
+            "| Total Assessments | {} |\n",
+            self.total_assessments
+        ));
         md.push_str(&format!("| Human Overrides | {} |\n", self.overrides.len()));
 
         md.push_str("\n## Description\n\n");
@@ -458,8 +470,10 @@ impl SeriousIncidentReport {
             for entry in &self.overrides {
                 md.push_str(&format!(
                     "| {} | {} | {} | {} | {} |\n",
-                    entry.cycle, entry.operator,
-                    entry.original_level.label(), entry.override_level.label(),
+                    entry.cycle,
+                    entry.operator,
+                    entry.original_level.label(),
+                    entry.override_level.label(),
                     entry.reason,
                 ));
             }
@@ -999,10 +1013,7 @@ mod tests {
         agent.assess(metrics(0.1, 0.9, 0.1)); // Red
         agent.assess(metrics(0.5, 0.3, 0.6)); // Yellow
 
-        let report = agent.serious_incident_report(
-            "SIR-2026-TEST",
-            "Test incident for validation",
-        );
+        let report = agent.serious_incident_report("SIR-2026-TEST", "Test incident for validation");
 
         assert_eq!(report.incident_id, "SIR-2026-TEST");
         assert_eq!(report.peak_safety_level, SafetyLevel::Red);
@@ -1059,6 +1070,10 @@ mod tests {
         // Green metrics, but trend-escalated to Yellow
         let a = agent.assess(metrics(0.8, 0.1, 0.7));
         assert_eq!(a.raw_level, SafetyLevel::Green, "Raw level should be Green");
-        assert_eq!(a.level, SafetyLevel::Yellow, "Final level should be trend-escalated Yellow");
+        assert_eq!(
+            a.level,
+            SafetyLevel::Yellow,
+            "Final level should be trend-escalated Yellow"
+        );
     }
 }

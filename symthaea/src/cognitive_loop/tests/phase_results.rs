@@ -336,6 +336,7 @@ fn dynamics_phase_result_field_count() {
         fep_tau_factor: _,
         causal_world_model_edges: _,
         epistemic_budget_scale: _,
+        ..
     } = d;
 }
 

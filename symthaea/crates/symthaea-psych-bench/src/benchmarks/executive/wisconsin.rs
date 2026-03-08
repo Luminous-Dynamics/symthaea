@@ -16,7 +16,6 @@ use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 
-
 /// Card features.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Color {
@@ -107,7 +106,7 @@ impl WisconsinCardSortingBenchmark {
 
         // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
         let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
-        // Encoding noise and time pressure degrade learning rates (impaired feedback)
+                                                      // Encoding noise and time pressure degrade learning rates (impaired feedback)
         let noise = config.effective_noise();
         let lr_scale = 1.0 - noise * 0.6;
         let lr_correct = 0.2 * lr_scale; // Moderate reinforcement (lower cap = less needed)
@@ -270,14 +269,15 @@ impl WisconsinCardSortingBenchmark {
                     Rule::Shape => "shape",
                     Rule::Number => "number",
                 };
-                let is_perseverative = !is_correct && prev_rule.is_some_and(|pr| {
-                    let old_rule_idx = match pr {
-                        Rule::Color => 0,
-                        Rule::Shape => 1,
-                        Rule::Number => 2,
-                    };
-                    chosen_rule_idx == old_rule_idx
-                });
+                let is_perseverative = !is_correct
+                    && prev_rule.is_some_and(|pr| {
+                        let old_rule_idx = match pr {
+                            Rule::Color => 0,
+                            Rule::Shape => 1,
+                            Rule::Number => 2,
+                        };
+                        chosen_rule_idx == old_rule_idx
+                    });
                 card_trace.push(TrialOutcome {
                     trial_idx: global_card_idx,
                     condition: format!("rule_{}", current_rule_name),

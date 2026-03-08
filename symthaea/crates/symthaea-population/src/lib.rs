@@ -18,28 +18,28 @@
 //! - **Simulation**: Multi-generation forward simulation with selection
 //! - **Temporal Evolution**: O(1) trajectory prediction via CfC closed-form
 //! - **Governance**: Mycelix-compatible tiered decision making
-//! - **Ethics**: Moral algebra for reproductive ethics with Seven Harmonies alignment
+//! - **Ethics**: Moral algebra for reproductive ethics with Eight Harmonies alignment
 
-pub mod types;
-pub mod hdc_genetics;
-pub mod effective_population;
-pub mod diversity;
-pub mod inbreeding;
 pub mod breeding_strategy;
+pub mod diversity;
+pub mod effective_population;
+pub mod ethics;
 pub mod genetic_load;
+pub mod governance;
+pub mod hdc_genetics;
+pub mod inbreeding;
 pub mod simulation;
 pub mod temporal_evolution;
-pub mod governance;
-pub mod ethics;
+pub mod types;
 
-pub use types::*;
-pub use hdc_genetics::*;
-pub use effective_population::*;
-pub use diversity::*;
-pub use inbreeding::*;
 pub use breeding_strategy::*;
+pub use diversity::*;
+pub use effective_population::*;
+pub use ethics::*;
 pub use genetic_load::*;
+pub use governance::*;
+pub use hdc_genetics::*;
+pub use inbreeding::*;
 pub use simulation::*;
 pub use temporal_evolution::*;
-pub use governance::*;
-pub use ethics::*;
+pub use types::*;

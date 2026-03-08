@@ -66,15 +66,14 @@ impl BioBag {
 
         // Fluid gradually approaches target (simple exponential smoothing)
         let alpha = 0.3;
-        self.fluid.temperature_celsius += alpha
-            * (self.target_fluid.temperature_celsius - self.fluid.temperature_celsius);
+        self.fluid.temperature_celsius +=
+            alpha * (self.target_fluid.temperature_celsius - self.fluid.temperature_celsius);
         self.fluid.ph += alpha * (self.target_fluid.ph - self.fluid.ph);
-        self.fluid.volume_ml +=
-            alpha * (self.target_fluid.volume_ml - self.fluid.volume_ml);
-        self.fluid.electrolyte_balance += alpha
-            * (self.target_fluid.electrolyte_balance - self.fluid.electrolyte_balance);
-        self.fluid.protein_concentration += alpha
-            * (self.target_fluid.protein_concentration - self.fluid.protein_concentration);
+        self.fluid.volume_ml += alpha * (self.target_fluid.volume_ml - self.fluid.volume_ml);
+        self.fluid.electrolyte_balance +=
+            alpha * (self.target_fluid.electrolyte_balance - self.fluid.electrolyte_balance);
+        self.fluid.protein_concentration +=
+            alpha * (self.target_fluid.protein_concentration - self.fluid.protein_concentration);
     }
 
     /// Compute a quality score (0-1) for the current fluid state.
@@ -85,8 +84,7 @@ impl BioBag {
             (self.fluid.temperature_celsius - self.target_fluid.temperature_celsius).abs() / 2.0;
         let ph_err = (self.fluid.ph - self.target_fluid.ph).abs() / 0.5;
         let vol_err = if self.target_fluid.volume_ml > 0.0 {
-            (self.fluid.volume_ml - self.target_fluid.volume_ml).abs()
-                / self.target_fluid.volume_ml
+            (self.fluid.volume_ml - self.target_fluid.volume_ml).abs() / self.target_fluid.volume_ml
         } else {
             0.0
         };
@@ -118,7 +116,10 @@ mod tests {
 
         assert!(v10 < v20, "Volume should rise: v10={v10}, v20={v20}");
         assert!(v20 < v32, "Volume should rise: v20={v20}, v32={v32}");
-        assert!(v40 < v32, "Volume should decline after peak: v40={v40}, v32={v32}");
+        assert!(
+            v40 < v32,
+            "Volume should decline after peak: v40={v40}, v32={v32}"
+        );
     }
 
     #[test]
@@ -136,7 +137,10 @@ mod tests {
         let mut bag = BioBag::new(GestationalWeek::new(20));
         bag.fluid.temperature_celsius = 39.0; // Fever-level
         let score = bag.quality_score();
-        assert!(score < 0.8, "Temperature deviation should lower quality, got {score}");
+        assert!(
+            score < 0.8,
+            "Temperature deviation should lower quality, got {score}"
+        );
     }
 
     #[test]

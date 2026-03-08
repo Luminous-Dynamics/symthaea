@@ -3,7 +3,7 @@
 //! This module bridges the philosophical foundations of Evolving Resonant Co-creationism
 //! to Symthaea's computational architecture. It provides:
 //!
-//! - **Harmonics**: The Seven Harmonies as operational reasoning modes
+//! - **Harmonics**: The Eight Harmonies as operational reasoning modes
 //! - **Autopoiesis**: Self-maintenance monitoring for cognitive closure
 //! - **Meta-cognition**: Recursive self-modeling capabilities
 //!
@@ -22,7 +22,7 @@
 //! Each philosophical concept is given *operational* meaning - not as decoration
 //! but as computation that actually influences reasoning and generation.
 //!
-//! The Seven Harmonies aren't just tracked values; they are reasoning modes
+//! The Eight Harmonies aren't just tracked values; they are reasoning modes
 //! that bias thought in specific directions.
 
 #![deny(unsafe_code)]

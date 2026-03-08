@@ -195,13 +195,19 @@ impl Widget for WorldModelView<'_> {
                     Color::Green
                 };
                 spans.push(Span::raw("MAE: "));
-                spans.push(Span::styled(format!("{:.1}", mae), Style::default().fg(mae_color)));
+                spans.push(Span::styled(
+                    format!("{:.1}", mae),
+                    Style::default().fg(mae_color),
+                ));
             }
             if self.snapshot.maintenance_plan_count > 0 {
                 if !spans.is_empty() {
                     spans.push(Span::raw("  "));
                 }
-                spans.push(Span::raw(format!("Plans: {}", self.snapshot.maintenance_plan_count)));
+                spans.push(Span::raw(format!(
+                    "Plans: {}",
+                    self.snapshot.maintenance_plan_count
+                )));
             }
             if !spans.is_empty() {
                 buf.set_line(x, y, &Line::from(spans), inner.width.saturating_sub(1));

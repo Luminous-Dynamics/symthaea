@@ -1073,7 +1073,7 @@ pub fn klein_bottle(rows: usize, cols: usize, dim: usize, seed: u64) -> Consciou
 
 The consciousness module includes a sophisticated ethical framework.
 
-### 9.1 Seven Harmonies (`seven_harmonies.rs`)
+### 9.1 Eight Harmonies (`seven_harmonies.rs`)
 
 Core value system inspired by the Luminous Dynamics philosophy:
 
@@ -1101,7 +1101,7 @@ pub struct UnifiedValueEvaluator {
 
 impl UnifiedValueEvaluator {
     pub fn evaluate(&self, action: &Action) -> ValueAssessment {
-        // Considers all seven harmonies
+        // Considers all eight harmonies
         // Weights by current context
         // Requires minimum consciousness level
     }

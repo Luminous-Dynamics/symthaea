@@ -36,9 +36,9 @@ pub mod types;
 
 pub use attention::SurpriseMap;
 pub use bridge::{CrossManifoldPredictor, VisionBridge};
-pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 #[cfg(feature = "camera")]
 pub use camera::CameraSource;
+pub use camera::{CameraManifold, CapturedFrame, MockCameraSource};
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder};
 pub use manifold::{HorizonAccuracy, SceneMemory, VisionManifold};
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};

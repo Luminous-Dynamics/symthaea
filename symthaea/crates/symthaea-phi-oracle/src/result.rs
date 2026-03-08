@@ -45,7 +45,11 @@ impl fmt::Display for IntegrationReport {
         writeln!(f, "--- Integration Report ---")?;
         writeln!(f, "Integration index:        {:.6}", self.integration_index)?;
         writeln!(f, "Normalized index:         {:.6}", self.normalized_index)?;
-        writeln!(f, "Total mutual information:  {:.6}", self.total_mutual_information)?;
+        writeln!(
+            f,
+            "Total mutual information:  {:.6}",
+            self.total_mutual_information
+        )?;
         writeln!(f, "Observations used:         {}", self.num_observations)?;
         writeln!(f)?;
 
@@ -139,7 +143,11 @@ impl fmt::Display for TemporalCoherence {
             writeln!(f, "  tau={tau:>8.4}  CV={cv:.4}  {bar}")?;
         }
         writeln!(f, "  Dominant timescale: {:.4}s", self.dominant_timescale)?;
-        writeln!(f, "  Temporal depth:     {:.4} (log-ratio)", self.temporal_depth)?;
+        writeln!(
+            f,
+            "  Temporal depth:     {:.4} (log-ratio)",
+            self.temporal_depth
+        )?;
         Ok(())
     }
 }

@@ -130,10 +130,7 @@ impl Widget for AlertsPanel<'_> {
 
                 let acc_line = Line::from(vec![
                     Span::raw("Pred MAE: "),
-                    Span::styled(
-                        format!("{:.1}", mae),
-                        Style::default().fg(acc_color),
-                    ),
+                    Span::styled(format!("{:.1}", mae), Style::default().fg(acc_color)),
                     Span::styled(
                         format!(" {}", trend_arrow),
                         Style::default().fg(trend_color),
@@ -171,10 +168,7 @@ impl Widget for AlertsPanel<'_> {
                 } else {
                     "No active alerts".to_string()
                 };
-                let line = Line::from(Span::styled(
-                    msg,
-                    Style::default().fg(Color::DarkGray),
-                ));
+                let line = Line::from(Span::styled(msg, Style::default().fg(Color::DarkGray)));
                 buf.set_line(x, y, &line, w);
             }
             return;
@@ -235,7 +229,9 @@ impl Widget for AlertsPanel<'_> {
             // Selection cursor
             let cursor = if is_selected { "> " } else { "  " };
             let cursor_style = if is_selected {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default()
             };
@@ -306,7 +302,7 @@ impl Widget for AlertsPanel<'_> {
             let metrics = [
                 ("disk", 0, 100.0, Color::Magenta),
                 ("mem", 1, 100.0, Color::Blue),
-                ("store", 2, 200.0, Color::Yellow),  // in thousands
+                ("store", 2, 200.0, Color::Yellow), // in thousands
                 ("fail", 3, 10.0, Color::Red),
             ];
 
@@ -353,8 +349,7 @@ fn mae_trend(history: &[f64]) -> (&'static str, Color) {
         return ("=", Color::DarkGray);
     }
 
-    let recent_avg: f64 =
-        history[recent_start..].iter().sum::<f64>() / (n - recent_start) as f64;
+    let recent_avg: f64 = history[recent_start..].iter().sum::<f64>() / (n - recent_start) as f64;
     let prev_avg: f64 =
         history[prev_start..prev_end].iter().sum::<f64>() / (prev_end - prev_start) as f64;
 

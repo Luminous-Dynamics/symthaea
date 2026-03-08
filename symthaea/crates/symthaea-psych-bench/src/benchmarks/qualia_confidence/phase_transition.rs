@@ -124,11 +124,8 @@ impl PsychBenchmark for PhaseTransitionBenchmark {
                         domain_prototypes[di].add_noise(noise as f32, noise_seed)
                     };
 
-                    let content = WorkspaceContent::new(
-                        vec![noisy_hv],
-                        activation,
-                        name.to_string(),
-                    );
+                    let content =
+                        WorkspaceContent::new(vec![noisy_hv], activation, name.to_string());
                     ws.submit(content);
                 }
 
@@ -160,7 +157,8 @@ impl PsychBenchmark for PhaseTransitionBenchmark {
 
                     // Compute discrimination margin: best match vs second-best
                     let mut sorted_sims = similarities.clone();
-                    sorted_sims.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+                    sorted_sims
+                        .sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
                     let margin = if sorted_sims.len() >= 2 {
                         sorted_sims[0] - sorted_sims[1]
                     } else {
@@ -204,25 +202,17 @@ impl PsychBenchmark for PhaseTransitionBenchmark {
         }
 
         // Fit sigmoid and linear to RECOGNITION curve (nonlinear prediction)
-        let (sig_l, sig_k, sig_x0, sig_r2) =
-            sigmoid_fit(&noise_levels, &recognition_rates);
-        let (_lin_slope, _lin_intercept, lin_r2) =
-            linear_fit(&noise_levels, &recognition_rates);
+        let (sig_l, sig_k, sig_x0, sig_r2) = sigmoid_fit(&noise_levels, &recognition_rates);
+        let (_lin_slope, _lin_intercept, lin_r2) = linear_fit(&noise_levels, &recognition_rates);
 
         result.insert("sigmoid_r_squared", MetricValue::from_samples(&[sig_r2]));
         result.insert("linear_r_squared", MetricValue::from_samples(&[lin_r2]));
-        result.insert(
-            "critical_noise_level",
-            MetricValue::from_samples(&[sig_x0]),
-        );
+        result.insert("critical_noise_level", MetricValue::from_samples(&[sig_x0]));
         result.insert(
             "phase_transition_sharpness",
             MetricValue::from_samples(&[sig_k.abs()]),
         );
-        result.insert(
-            "sigmoid_amplitude",
-            MetricValue::from_samples(&[sig_l]),
-        );
+        result.insert("sigmoid_amplitude", MetricValue::from_samples(&[sig_l]));
 
         // Also fit raw similarity curve (should be ~linear as control)
         let (_, _, raw_lin_r2) = linear_fit(&noise_levels, &raw_similarity_means);
@@ -252,8 +242,7 @@ impl PsychBenchmark for PhaseTransitionBenchmark {
         );
 
         // Recognition range
-        let recognition_range = recognition_rates[0]
-            - *recognition_rates.last().unwrap_or(&0.0);
+        let recognition_range = recognition_rates[0] - *recognition_rates.last().unwrap_or(&0.0);
         result.insert(
             "recognition_range",
             MetricValue::from_samples(&[recognition_range]),

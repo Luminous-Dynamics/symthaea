@@ -69,9 +69,7 @@ impl MiniRecurrentNet {
         // Slight variation per dim prevents trivial symmetry.
         let mut self_weights = [0.0f64; 4];
         for i in 0..4 {
-            let w_seed = seed
-                .wrapping_mul(0x100000001b3)
-                .wrapping_add(i as u64 * 10);
+            let w_seed = seed.wrapping_mul(0x100000001b3).wrapping_add(i as u64 * 10);
             let variation = float_from_seed(w_seed) * 0.06 - 0.03; // ±0.03
             self_weights[i] = 0.85 + variation;
         }
@@ -104,10 +102,7 @@ impl MiniRecurrentNet {
 /// Run PCI measurement for one condition.
 ///
 /// Returns (mean_complexity, trajectory_for_last_rep).
-fn run_pci_condition(
-    config: &BenchmarkConfig,
-    broadcasting_enabled: bool,
-) -> (f64, Vec<[f64; 4]>) {
+fn run_pci_condition(config: &BenchmarkConfig, broadcasting_enabled: bool) -> (f64, Vec<[f64; 4]>) {
     let mut complexities = Vec::with_capacity(NUM_REPETITIONS);
     let mut last_trajectory = Vec::new();
 
@@ -142,8 +137,7 @@ fn run_pci_condition(
             // Activation always above entry threshold — network always has state to report
             let abs_mean = net.state.iter().map(|s| s.abs()).sum::<f64>() / 4.0;
             let activation = (0.5 + abs_mean * 0.5).clamp(0.0, 1.0);
-            let content =
-                WorkspaceContent::new(vec![state_hv], activation, "network".to_string());
+            let content = WorkspaceContent::new(vec![state_hv], activation, "network".to_string());
             ws.submit(content);
             let assessment = ws.process();
 
@@ -185,8 +179,7 @@ fn run_pci_condition(
             // Activation always above entry threshold — network always has state to report
             let abs_mean = net.state.iter().map(|s| s.abs()).sum::<f64>() / 4.0;
             let activation = (0.5 + abs_mean * 0.5).clamp(0.0, 1.0);
-            let content =
-                WorkspaceContent::new(vec![state_hv], activation, "network".to_string());
+            let content = WorkspaceContent::new(vec![state_hv], activation, "network".to_string());
             ws.submit(content);
             let assessment = ws.process();
 
@@ -275,18 +268,12 @@ impl PsychBenchmark for PerturbationalComplexityBenchmark {
             1.0
         };
 
-        result.insert(
-            "pci_conscious",
-            MetricValue::from_samples(&[pci_conscious]),
-        );
+        result.insert("pci_conscious", MetricValue::from_samples(&[pci_conscious]));
         result.insert(
             "pci_unconscious",
             MetricValue::from_samples(&[pci_unconscious]),
         );
-        result.insert(
-            "pci_ratio",
-            MetricValue::from_samples(&[pci_ratio]),
-        );
+        result.insert("pci_ratio", MetricValue::from_samples(&[pci_ratio]));
 
         // Baseline complexity (pre-perturbation, conscious condition)
         if conscious_traj.len() >= BASELINE_CYCLES {
@@ -416,8 +403,16 @@ mod tests {
     fn test_perturbation_propagates_further_with_broadcasting() {
         let bench = PerturbationalComplexityBenchmark;
         let result = bench.run(&config());
-        let depth_c = result.metrics.get("perturbation_propagation_depth").unwrap().mean;
-        let depth_u = result.metrics.get("unconscious_propagation_depth").unwrap().mean;
+        let depth_c = result
+            .metrics
+            .get("perturbation_propagation_depth")
+            .unwrap()
+            .mean;
+        let depth_u = result
+            .metrics
+            .get("unconscious_propagation_depth")
+            .unwrap()
+            .mean;
         assert!(
             depth_c > depth_u,
             "Conscious propagation depth ({depth_c}) should exceed unconscious ({depth_u})"

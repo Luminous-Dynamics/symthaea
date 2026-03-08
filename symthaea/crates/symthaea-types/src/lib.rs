@@ -23,7 +23,7 @@ pub const N_HARMONIES: usize = 8;
 ///
 /// # Value Alignment
 ///
-/// Used by [`SevenHarmonies`](crate) evaluators to assess whether actions
+/// Used by [`EightHarmonies`](crate) evaluators to assess whether actions
 /// align with deep ethical and consciousness principles.
 ///
 /// # Epistemic Lens (GIS v4.0)
@@ -81,7 +81,7 @@ impl Harmony {
     }
 
     // ========================================================================
-    // Value alignment methods (from seven_harmonies)
+    // Value alignment methods (from eight_harmonies)
     // ========================================================================
 
     /// Get the human-readable name of this harmony
@@ -138,7 +138,9 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "Does this honor our fundamental connection?",
             Harmony::SacredReciprocity => "Does this participate in the generous flow of giving?",
             Harmony::EvolutionaryProgression => "Does this contribute to wise evolution?",
-            Harmony::SacredStillness => "Does this honor the need for rest, release, and not-knowing?",
+            Harmony::SacredStillness => {
+                "Does this honor the need for rest, release, and not-knowing?"
+            }
         }
     }
 

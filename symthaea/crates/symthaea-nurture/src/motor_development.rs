@@ -201,7 +201,10 @@ pub fn motor_milestones_expected_by(age: &DevelopmentalAge) -> Vec<String> {
     let months = age.months;
     let mut expected = Vec::new();
 
-    for m in gross_motor_milestones().iter().chain(fine_motor_milestones().iter()) {
+    for m in gross_motor_milestones()
+        .iter()
+        .chain(fine_motor_milestones().iter())
+    {
         if months >= m.age_months {
             expected.push(m.name.clone());
         }
@@ -239,13 +242,19 @@ mod tests {
     #[test]
     fn test_gross_motor_count() {
         let milestones = gross_motor_milestones();
-        assert!(milestones.len() >= 10, "Should have 10+ gross motor milestones");
+        assert!(
+            milestones.len() >= 10,
+            "Should have 10+ gross motor milestones"
+        );
     }
 
     #[test]
     fn test_fine_motor_count() {
         let milestones = fine_motor_milestones();
-        assert!(milestones.len() >= 8, "Should have 8+ fine motor milestones");
+        assert!(
+            milestones.len() >= 8,
+            "Should have 8+ fine motor milestones"
+        );
     }
 
     #[test]

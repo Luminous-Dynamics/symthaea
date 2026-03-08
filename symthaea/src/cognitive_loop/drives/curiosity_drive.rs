@@ -111,7 +111,8 @@ impl CuriosityDrive {
         // Novelty bonus: higher when exploring after boredom
         // Reads current exploration_urge (set by feedback system in previous cycle)
         if self.exploration_urge > 0.3 {
-            self.novelty_bonus = 1.0 + (Self::MAX_NOVELTY_BONUS - 1.0) * self.exploration_urge as f32;
+            self.novelty_bonus =
+                1.0 + (Self::MAX_NOVELTY_BONUS - 1.0) * self.exploration_urge as f32;
         } else if prediction_error > 0.5 {
             // High error = novel situation, boost learning
             self.novelty_bonus = 1.0 + 0.3 * (prediction_error - 0.5);
@@ -258,8 +259,8 @@ mod tests {
     fn curiosity_high_error_gives_novelty_bonus() {
         let mut cd = CuriosityDrive::default();
         let _upd = cd.update(0.8); // High error = novel situation
-        // Check novelty_bonus right after update (before apply_exploration_update
-        // resets it based on exploration_urge which is still 0.0 at this point).
+                                   // Check novelty_bonus right after update (before apply_exploration_update
+                                   // resets it based on exploration_urge which is still 0.0 at this point).
         assert!(
             cd.novelty_bonus > 1.0,
             "high error should boost novelty: {}",

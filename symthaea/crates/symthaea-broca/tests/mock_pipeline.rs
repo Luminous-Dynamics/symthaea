@@ -245,7 +245,9 @@ fn test_contrastive_pretrain_then_generate() {
         .collect();
 
     // Contrastive pretrain
-    let (avg_dist, avg_recon) = gen.projection_mut().contrastive_pretrain(&thought_hvs, 5, 0.01);
+    let (avg_dist, avg_recon) = gen
+        .projection_mut()
+        .contrastive_pretrain(&thought_hvs, 5, 0.01);
     assert!(
         avg_dist.is_finite(),
         "avg_dist should be finite: {avg_dist}"
@@ -391,10 +393,7 @@ fn test_eval_only_workflow() {
     // 6. Assert: format_liquid_mamba_eval_report() produces non-empty string
     let report = format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
     assert!(!report.is_empty(), "Report should be non-empty");
-    assert!(
-        report.contains("Liquid-Mamba"),
-        "Report should have header"
-    );
+    assert!(report.contains("Liquid-Mamba"), "Report should have header");
 
     let _ = std::fs::remove_file(&path);
 }
@@ -466,7 +465,10 @@ fn test_diagnostics_restore_from_checkpoint() {
         .projection_diagnostics()
         .expect("diagnostics should be enabled");
     let original_steps = diag.total_steps;
-    assert!(original_steps >= 5, "Should have recorded steps: {original_steps}");
+    assert!(
+        original_steps >= 5,
+        "Should have recorded steps: {original_steps}"
+    );
 
     // Take snapshot and save checkpoint
     let snap = diag.snapshot();
@@ -661,7 +663,9 @@ fn test_full_training_pipeline_smoke() {
     // 3. Run 2 epochs over the dataset
     for _epoch in 0..2 {
         for pair in &dataset.pairs {
-            let ch = ThoughtChannels { channels: pair.channels };
+            let ch = ThoughtChannels {
+                channels: pair.channels,
+            };
             let result = gen.generate(&ch);
             gen.distill_step(&ch, &result);
         }
@@ -669,7 +673,10 @@ fn test_full_training_pipeline_smoke() {
 
     // 4. Compute effective rank
     let rank = gen.last_cached_rank();
-    assert!(rank.is_finite(), "Rank should be finite after training: {rank}");
+    assert!(
+        rank.is_finite(),
+        "Rank should be finite after training: {rank}"
+    );
 
     // 5. Save checkpoint with diagnostics snapshot
     let weights = gen.projection().flatten_weights();
@@ -840,7 +847,10 @@ fn test_temporal_generation_pipeline() {
     // PE stats should be finite
     let (mean, std_dev, trend) = gen.pe_stats();
     assert!(mean.is_finite(), "PE mean should be finite: {mean}");
-    assert!(std_dev.is_finite(), "PE std_dev should be finite: {std_dev}");
+    assert!(
+        std_dev.is_finite(),
+        "PE std_dev should be finite: {std_dev}"
+    );
     assert!(trend.is_finite(), "PE trend should be finite: {trend}");
 }
 

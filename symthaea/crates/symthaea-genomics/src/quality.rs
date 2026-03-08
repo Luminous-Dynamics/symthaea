@@ -289,11 +289,19 @@ mod tests {
     fn test_phred_score_math() {
         // P=0.1 -> Q=10
         let q = QualityAssessor::phred_score(0.1);
-        assert!((q - 10.0).abs() < 0.01, "Phred(0.1) should be 10, got {}", q);
+        assert!(
+            (q - 10.0).abs() < 0.01,
+            "Phred(0.1) should be 10, got {}",
+            q
+        );
 
         // P=0.01 -> Q=20
         let q = QualityAssessor::phred_score(0.01);
-        assert!((q - 20.0).abs() < 0.01, "Phred(0.01) should be 20, got {}", q);
+        assert!(
+            (q - 20.0).abs() < 0.01,
+            "Phred(0.01) should be 20, got {}",
+            q
+        );
 
         // P=0.001 -> Q=30
         let q = QualityAssessor::phred_score(0.001);

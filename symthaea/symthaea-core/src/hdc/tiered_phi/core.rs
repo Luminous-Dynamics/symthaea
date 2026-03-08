@@ -12,6 +12,7 @@
 //! For comprehensive documentation, see the parent [`super`] module.
 
 use crate::hdc::binary_hv::BinaryHV;
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -1067,6 +1068,7 @@ impl TieredPhi {
         }
 
         // Build similarity matrix - PARALLEL for large n
+        #[cfg(feature = "parallel")]
         let similarity_matrix = if n > 16 {
             // Revolutionary #89: Parallel similarity computation
             self.build_similarity_matrix_parallel(components)
@@ -1074,19 +1076,32 @@ impl TieredPhi {
             // Sequential for small n (avoid Rayon overhead)
             self.build_similarity_matrix_sequential(components)
         };
+        #[cfg(not(feature = "parallel"))]
+        let similarity_matrix = self.build_similarity_matrix_sequential(components);
 
         // Compute Laplacian: L = D - A (where D is degree matrix)
-        // Parallel reduction for degree calculation
-        let degrees: Vec<f64> = if n > 16 {
-            similarity_matrix
-                .par_iter()
-                .map(|row| row.iter().sum::<f64>() - 1.0)
-                .collect()
-        } else {
-            similarity_matrix
-                .iter()
-                .map(|row| row.iter().sum::<f64>() - 1.0)
-                .collect()
+        let degrees: Vec<f64> = {
+            #[cfg(feature = "parallel")]
+            {
+                if n > 16 {
+                    similarity_matrix
+                        .par_iter()
+                        .map(|row| row.iter().sum::<f64>() - 1.0)
+                        .collect()
+                } else {
+                    similarity_matrix
+                        .iter()
+                        .map(|row| row.iter().sum::<f64>() - 1.0)
+                        .collect()
+                }
+            }
+            #[cfg(not(feature = "parallel"))]
+            {
+                similarity_matrix
+                    .iter()
+                    .map(|row| row.iter().sum::<f64>() - 1.0)
+                    .collect()
+            }
         };
 
         // For small matrices, use power iteration to find second smallest eigenvalue
@@ -1102,6 +1117,7 @@ impl TieredPhi {
 
     /// Build similarity matrix in parallel using Rayon
     /// Revolutionary #89: O(n²) similarity with ~linear parallelization
+    #[cfg(feature = "parallel")]
     pub fn build_similarity_matrix_parallel(&self, components: &[BinaryHV]) -> Vec<Vec<f64>> {
         let n = components.len();
 

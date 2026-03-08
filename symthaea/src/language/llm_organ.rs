@@ -841,7 +841,7 @@ impl LLMOrgan {
             (
                 QueryType::Code,
                 super::consciousness_prompts::CODE_GENERATION_SYSTEM_PROMPT.to_string(),
-                0.2_f32,   // Low temperature for deterministic code
+                0.2_f32,    // Low temperature for deterministic code
                 2048_usize, // Code needs more tokens
             )
         } else {

@@ -903,7 +903,10 @@ impl BatchDiscovery {
         }
 
         // Finalize
-        let result = pipeline.lock().unwrap_or_else(|e| e.into_inner()).finalize();
+        let result = pipeline
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .finalize();
 
         let mut final_stats = stats.lock().unwrap_or_else(|e| e.into_inner()).clone();
         final_stats.total_time_sec = start_time.elapsed().as_secs_f32();

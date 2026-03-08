@@ -56,18 +56,22 @@ mod real_camera {
         /// Open camera at the given device path (e.g., `/dev/video0`).
         pub fn new(device_index: u32, width: u32, height: u32) -> Result<Self, String> {
             let path = format!("/dev/video{device_index}");
-            let dev = Device::with_path(&path)
-                .map_err(|e| format!("Failed to open {path}: {e}"))?;
+            let dev =
+                Device::with_path(&path).map_err(|e| format!("Failed to open {path}: {e}"))?;
 
             // Request YUYV format (widely supported), we'll convert to grayscale
-            let mut fmt = dev.format().map_err(|e| format!("Failed to get format: {e}"))?;
+            let mut fmt = dev
+                .format()
+                .map_err(|e| format!("Failed to get format: {e}"))?;
             fmt.width = width;
             fmt.height = height;
             fmt.fourcc = FourCC::new(b"YUYV");
             dev.set_format(&fmt)
                 .map_err(|e| format!("Failed to set format: {e}"))?;
 
-            let actual = dev.format().map_err(|e| format!("Failed to read format: {e}"))?;
+            let actual = dev
+                .format()
+                .map_err(|e| format!("Failed to read format: {e}"))?;
 
             let stream = Stream::with_buffers(&dev, Type::VideoCapture, 4)
                 .map_err(|e| format!("Failed to create stream: {e}"))?;
@@ -82,7 +86,9 @@ mod real_camera {
 
         /// Capture the next frame as grayscale pixels (Y channel from YUYV).
         pub fn next_frame(&mut self) -> Result<CapturedFrame, String> {
-            let (buf, _meta) = self.stream.next()
+            let (buf, _meta) = self
+                .stream
+                .next()
                 .map_err(|e| format!("Failed to capture frame: {e}"))?;
 
             // YUYV: every 2 bytes = [Y, U/V], extract Y channel for grayscale
@@ -121,7 +127,9 @@ mod real_camera {
         /// B = Y + 1.772 * (Cb - 128)
         /// ```
         pub fn next_frame_rgb(&mut self) -> Result<CapturedFrame, String> {
-            let (buf, _meta) = self.stream.next()
+            let (buf, _meta) = self
+                .stream
+                .next()
                 .map_err(|e| format!("Failed to capture frame: {e}"))?;
 
             let num_pixels = (self.width * self.height) as usize;

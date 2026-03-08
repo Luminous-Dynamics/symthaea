@@ -4,7 +4,7 @@
 //! into a single coherent module.
 
 use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig};
-use crate::dynamics::temporal_signatures::{TemporalSignatureEncoder, SignatureConfig};
+use crate::dynamics::temporal_signatures::{SignatureConfig, TemporalSignatureEncoder};
 use crate::voice::voice_feedback::{VoiceFeedbackBridge, VoiceFeedbackConfig};
 
 /// Consolidated voice-coherence bridge manager.

@@ -44,7 +44,13 @@ impl<'a> Default for ReportOptions<'a> {
 ///
 /// If `include_llm` is true, includes LLM baseline comparison columns.
 pub fn generate_report(report: &BenchmarkReport, include_llm: bool) -> String {
-    generate_full_report(report, &ReportOptions { include_llm, ..Default::default() })
+    generate_full_report(
+        report,
+        &ReportOptions {
+            include_llm,
+            ..Default::default()
+        },
+    )
 }
 
 /// Generate a full HTML report with optional SAT curves and reliability sections.
@@ -627,8 +633,7 @@ pub fn write_sat_curves(html: &mut String, curves: &[SatCurve]) {
             let tp = si as f64 / 20.0;
             let t = 1.0 - tp;
             let predicted = if t > curve.fit.intercept {
-                curve.fit.asymptote
-                    * (1.0 - (-curve.fit.rate * (t - curve.fit.intercept)).exp())
+                curve.fit.asymptote * (1.0 - (-curve.fit.rate * (t - curve.fit.intercept)).exp())
             } else {
                 0.0
             };
@@ -675,10 +680,7 @@ pub fn write_reliability_section(html: &mut String, battery: &ReliabilityBattery
         return;
     }
 
-    let _ = write!(
-        html,
-        "<h2>Test-Retest Reliability</h2>\n"
-    );
+    let _ = write!(html, "<h2>Test-Retest Reliability</h2>\n");
 
     // Summary stats
     let mean_icc: f64 =
@@ -712,10 +714,7 @@ pub fn write_reliability_section(html: &mut String, battery: &ReliabilityBattery
             ReliabilityClass::Moderate => "yellow",
             ReliabilityClass::Poor => "red",
         };
-        let practice_str = format!(
-            "{:+.1}%",
-            r.practice.change_pct,
-        );
+        let practice_str = format!("{:+.1}%", r.practice.change_pct,);
         let _ = write!(
             html,
             "<tr><td>{}</td><td>{}</td><td class=\"{}\">{:.3}</td><td>{:.3}</td><td>{:.3}</td><td>{}</td><td>{}</td></tr>\n",
@@ -740,7 +739,10 @@ fn write_psychometric_summary(html: &mut String, report: &BenchmarkReport) {
 
     let pr = PsychometricReport::from_report(report);
 
-    let _ = write!(html, "<h2>Psychometric Summary</h2>\n<div class=\"summary\">\n");
+    let _ = write!(
+        html,
+        "<h2>Psychometric Summary</h2>\n<div class=\"summary\">\n"
+    );
     let _ = write!(
         html,
         "<strong>Overall score:</strong> {:.1}% | ",
@@ -1135,9 +1137,7 @@ mod tests {
 
     #[test]
     fn test_html_reliability_empty() {
-        let battery = ReliabilityBattery {
-            results: vec![],
-        };
+        let battery = ReliabilityBattery { results: vec![] };
         let mut html = String::new();
         write_reliability_section(&mut html, &battery);
         assert!(html.is_empty(), "empty battery should produce no output");

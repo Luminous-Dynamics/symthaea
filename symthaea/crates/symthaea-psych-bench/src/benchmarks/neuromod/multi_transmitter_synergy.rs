@@ -84,11 +84,7 @@ fn run_condition(
 
 /// Compute interaction index: I = mean(HH) + mean(LL) - mean(HL) - mean(LH).
 /// Positive = synergistic, negative = antagonistic.
-fn interaction_index(
-    t1: &str,
-    t2: &str,
-    metric_fn: fn(&NeuromodulatorBath) -> f32,
-) -> f64 {
+fn interaction_index(t1: &str, t2: &str, metric_fn: fn(&NeuromodulatorBath) -> f32) -> f64 {
     let hh = run_condition(t1, HIGH, t2, HIGH, metric_fn);
     let hl = run_condition(t1, HIGH, t2, LOW, metric_fn);
     let lh = run_condition(t1, LOW, t2, HIGH, metric_fn);

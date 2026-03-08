@@ -200,12 +200,8 @@ fn adaptive_behavior_default_neutral() {
 #[test]
 fn adaptive_behavior_from_focused_pattern() {
     use crate::dynamics::temporal_signatures::ConsciousnessPattern;
-    let ab = AdaptiveBehavior::from_consciousness_state(
-        ConsciousnessPattern::Focused,
-        0.8,
-        0.7,
-        0.6,
-    );
+    let ab =
+        AdaptiveBehavior::from_consciousness_state(ConsciousnessPattern::Focused, 0.8, 0.7, 0.6);
     assert!(ab.learning_rate_multiplier > 1.0, "focused should boost LR");
     assert!(
         ab.speech_rate_multiplier > 1.0,
@@ -217,12 +213,8 @@ fn adaptive_behavior_from_focused_pattern() {
 #[test]
 fn adaptive_behavior_from_uncertain_pattern() {
     use crate::dynamics::temporal_signatures::ConsciousnessPattern;
-    let ab = AdaptiveBehavior::from_consciousness_state(
-        ConsciousnessPattern::Uncertain,
-        0.3,
-        0.3,
-        0.2,
-    );
+    let ab =
+        AdaptiveBehavior::from_consciousness_state(ConsciousnessPattern::Uncertain, 0.3, 0.3, 0.2);
     assert!(
         ab.learning_rate_multiplier < 1.0,
         "uncertain should reduce LR"

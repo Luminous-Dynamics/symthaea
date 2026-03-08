@@ -348,6 +348,7 @@ mod math_integration_tests;
 pub mod native_similarity; // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod number_theory;
 pub mod numeric_tower; // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
+#[cfg(feature = "parallel")]
 pub mod parallel_hv; // Rayon parallel batch operations (7x faster on 8 cores)
 #[cfg(test)]
 mod phi_feedback_integration_tests;

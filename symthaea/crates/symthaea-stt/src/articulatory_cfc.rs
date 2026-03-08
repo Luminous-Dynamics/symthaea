@@ -706,10 +706,19 @@ mod tests {
         let probs_high_temp = LearnedArticulatoryDetector::softmax_temperature(&logits, 10.0);
 
         // High temperature should make distribution more uniform
-        let max_normal = probs_normal.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let max_normal = probs_normal
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
         let min_normal = probs_normal.iter().cloned().fold(f32::INFINITY, f32::min);
-        let max_temp = probs_high_temp.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        let min_temp = probs_high_temp.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max_temp = probs_high_temp
+            .iter()
+            .cloned()
+            .fold(f32::NEG_INFINITY, f32::max);
+        let min_temp = probs_high_temp
+            .iter()
+            .cloned()
+            .fold(f32::INFINITY, f32::min);
 
         let range_normal = max_normal - min_normal;
         let range_temp = max_temp - min_temp;

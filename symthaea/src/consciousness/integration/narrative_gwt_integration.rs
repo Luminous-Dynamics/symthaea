@@ -92,7 +92,7 @@ use crate::consciousness::temporal_consciousness::{
     TemporalConsciousnessAnalyzer, TemporalConsciousnessConfig,
 };
 // **REVOLUTIONARY IMPROVEMENT #76**: Unified Value Evaluator Integration
-// Uses Seven Harmonies + Affective Consciousness for semantic value checking
+// Uses Eight Harmonies + Affective Consciousness for semantic value checking
 use crate::consciousness::affective_consciousness::CoreAffect;
 use crate::consciousness::unified_value_evaluator::{
     ActionType, AffectiveSystemsState, ConfidenceLevel, Decision as ValueDecision,
@@ -404,7 +404,7 @@ pub struct NarrativeGWTIntegration {
     pub temporal_analyzer: Option<TemporalConsciousnessAnalyzer>,
 
     // **REVOLUTIONARY IMPROVEMENT #76**: Unified Value Evaluator
-    /// Semantic value checking using Seven Harmonies + Affective Consciousness
+    /// Semantic value checking using Eight Harmonies + Affective Consciousness
     pub value_evaluator: UnifiedValueEvaluator,
 
     /// Configuration
@@ -592,7 +592,7 @@ impl NarrativeGWTIntegration {
     /// Check if action is consistent with core values using semantic evaluation
     ///
     /// Uses the Unified Value Evaluator which combines:
-    /// - Seven Harmonies (semantic value alignment)
+    /// - Eight Harmonies (semantic value alignment)
     /// - Affective Consciousness (emotional grounding)
     /// - Authenticity Detection (CARE system + semantic alignment)
     /// - Consciousness-gated thresholds

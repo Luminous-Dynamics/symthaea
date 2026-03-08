@@ -5,9 +5,9 @@
 //! structural properties (sections present, valid HTML, no panics).
 
 use symthaea_psych_bench::benchmarks::executive::*;
-use symthaea_psych_bench::benchmarks::worm::*;
 use symthaea_psych_bench::benchmarks::inhibition::*;
 use symthaea_psych_bench::benchmarks::sustained_attention::*;
+use symthaea_psych_bench::benchmarks::worm::*;
 use symthaea_psych_bench::harness::html;
 use symthaea_psych_bench::harness::report::BenchmarkReport;
 use symthaea_psych_bench::harness::{BenchmarkConfig, PsychBenchmark};
@@ -99,10 +99,8 @@ fn test_html_reliability_section_integration() {
         ..Default::default()
     };
 
-    let benchmarks: Vec<Box<dyn PsychBenchmark>> = vec![
-        Box::new(StroopBenchmark),
-        Box::new(FlankerBenchmark),
-    ];
+    let benchmarks: Vec<Box<dyn PsychBenchmark>> =
+        vec![Box::new(StroopBenchmark), Box::new(FlankerBenchmark)];
     let bench_refs: Vec<&dyn PsychBenchmark> = benchmarks.iter().map(|b| b.as_ref()).collect();
 
     let battery = ReliabilityBattery::run(&bench_refs, &config, 3, 10);

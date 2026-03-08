@@ -57,8 +57,7 @@ impl CognitiveLoopService {
             // Conway (2005) — self-relevant and context-rich memories encode preferentially.
             #[cfg(feature = "vision-manifold")]
             let phi_weighted_surprise = if state.scene_recognized {
-                phi_weighted_surprise
-                    * super::super::thresholds::SCENE_RECOGNITION_DREAM_BOOST
+                phi_weighted_surprise * super::super::thresholds::SCENE_RECOGNITION_DREAM_BOOST
             } else {
                 phi_weighted_surprise
             };
@@ -96,12 +95,7 @@ impl CognitiveLoopService {
                 (dynamic_normal_interval as f32 * stillness_depth_factor) as usize;
             let dynamic_normal_interval = dynamic_normal_interval.max(3); // never faster than every 3 cycles
             if matches!(urgency, super::super::CycleUrgency::Cruise)
-                || urgency.should_run(
-                    self.stats.total_cycles,
-                    10,
-                    dynamic_normal_interval,
-                    5,
-                )
+                || urgency.should_run(self.stats.total_cycles, 10, dynamic_normal_interval, 5)
             {
                 match dream.dream() {
                     Ok(result) => {

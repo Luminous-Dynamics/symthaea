@@ -2,7 +2,7 @@
 
 use super::super::affective_consciousness::CoreAffect;
 use super::super::contextual_weights::ActionDomain;
-use super::super::seven_harmonies::AlignmentResult;
+use super::super::eight_harmonies::AlignmentResult;
 use serde::{Deserialize, Serialize};
 
 /// Minimum consciousness level for different action types

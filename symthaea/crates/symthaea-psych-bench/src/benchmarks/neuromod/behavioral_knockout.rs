@@ -47,6 +47,7 @@ struct BehavioralSample {
     consciousness_mod: f32,
     ei_ratio: f32,
     behavioral_flexibility: f32,
+    #[allow(dead_code)]
     sleep_pressure: f32,
 }
 
@@ -139,9 +140,7 @@ fn run_condition(knockout: Option<&str>) -> ConditionStats {
             Some("ne") => bath.clamp_all_levels(None, Some(0.0), None, None, None, None, None),
             Some("sht") => bath.clamp_all_levels(None, None, Some(0.0), None, None, None, None),
             Some("ach") => bath.clamp_all_levels(None, None, None, Some(0.0), None, None, None),
-            Some("gaba") => {
-                bath.clamp_all_levels(None, None, None, None, Some(0.0), None, None)
-            }
+            Some("gaba") => bath.clamp_all_levels(None, None, None, None, Some(0.0), None, None),
             Some("all") => bath.clamp_all_levels(
                 Some(0.0),
                 Some(0.0),
@@ -196,8 +195,7 @@ impl PsychBenchmark for BehavioralKnockoutBenchmark {
         let gaba_ko_inhibition_d = cohens_d(&baseline, &gaba_ko, |s| s.global_inhibition);
         let gaba_ko_ei_d = cohens_d(&baseline, &gaba_ko, |s| s.ei_ratio);
         let all_ko_lr_collapse_d = cohens_d(&baseline, &all_ko, |s| s.learning_rate);
-        let all_ko_consciousness_collapse_d =
-            cohens_d(&baseline, &all_ko, |s| s.consciousness_mod);
+        let all_ko_consciousness_collapse_d = cohens_d(&baseline, &all_ko, |s| s.consciousness_mod);
 
         // Baseline means
         let baseline_lr_mean = baseline.mean(|s| s.learning_rate);
@@ -211,25 +209,73 @@ impl PsychBenchmark for BehavioralKnockoutBenchmark {
 
         // Cohen's d effect sizes
         result.insert("da_ko_lr_d", MetricValue::from_samples(&[da_ko_lr_d]));
-        result.insert("da_ko_gradient_d", MetricValue::from_samples(&[da_ko_gradient_d]));
-        result.insert("ne_ko_exploration_d", MetricValue::from_samples(&[ne_ko_exploration_d]));
-        result.insert("ne_ko_flexibility_d", MetricValue::from_samples(&[ne_ko_flexibility_d]));
-        result.insert("sht_ko_confidence_d", MetricValue::from_samples(&[sht_ko_confidence_d]));
-        result.insert("sht_ko_consciousness_d", MetricValue::from_samples(&[sht_ko_consciousness_d]));
-        result.insert("ach_ko_attention_d", MetricValue::from_samples(&[ach_ko_attention_d]));
-        result.insert("ach_ko_threshold_d", MetricValue::from_samples(&[ach_ko_threshold_d]));
-        result.insert("gaba_ko_inhibition_d", MetricValue::from_samples(&[gaba_ko_inhibition_d]));
+        result.insert(
+            "da_ko_gradient_d",
+            MetricValue::from_samples(&[da_ko_gradient_d]),
+        );
+        result.insert(
+            "ne_ko_exploration_d",
+            MetricValue::from_samples(&[ne_ko_exploration_d]),
+        );
+        result.insert(
+            "ne_ko_flexibility_d",
+            MetricValue::from_samples(&[ne_ko_flexibility_d]),
+        );
+        result.insert(
+            "sht_ko_confidence_d",
+            MetricValue::from_samples(&[sht_ko_confidence_d]),
+        );
+        result.insert(
+            "sht_ko_consciousness_d",
+            MetricValue::from_samples(&[sht_ko_consciousness_d]),
+        );
+        result.insert(
+            "ach_ko_attention_d",
+            MetricValue::from_samples(&[ach_ko_attention_d]),
+        );
+        result.insert(
+            "ach_ko_threshold_d",
+            MetricValue::from_samples(&[ach_ko_threshold_d]),
+        );
+        result.insert(
+            "gaba_ko_inhibition_d",
+            MetricValue::from_samples(&[gaba_ko_inhibition_d]),
+        );
         result.insert("gaba_ko_ei_d", MetricValue::from_samples(&[gaba_ko_ei_d]));
-        result.insert("all_ko_lr_collapse_d", MetricValue::from_samples(&[all_ko_lr_collapse_d]));
-        result.insert("all_ko_consciousness_collapse_d", MetricValue::from_samples(&[all_ko_consciousness_collapse_d]));
+        result.insert(
+            "all_ko_lr_collapse_d",
+            MetricValue::from_samples(&[all_ko_lr_collapse_d]),
+        );
+        result.insert(
+            "all_ko_consciousness_collapse_d",
+            MetricValue::from_samples(&[all_ko_consciousness_collapse_d]),
+        );
 
         // Baseline means
-        result.insert("baseline_lr_mean", MetricValue::from_samples(&[baseline_lr_mean]));
-        result.insert("baseline_exploration_mean", MetricValue::from_samples(&[baseline_exploration_mean]));
-        result.insert("baseline_confidence_mean", MetricValue::from_samples(&[baseline_confidence_mean]));
-        result.insert("baseline_attention_mean", MetricValue::from_samples(&[baseline_attention_mean]));
-        result.insert("baseline_inhibition_mean", MetricValue::from_samples(&[baseline_inhibition_mean]));
-        result.insert("baseline_consciousness_mean", MetricValue::from_samples(&[baseline_consciousness_mean]));
+        result.insert(
+            "baseline_lr_mean",
+            MetricValue::from_samples(&[baseline_lr_mean]),
+        );
+        result.insert(
+            "baseline_exploration_mean",
+            MetricValue::from_samples(&[baseline_exploration_mean]),
+        );
+        result.insert(
+            "baseline_confidence_mean",
+            MetricValue::from_samples(&[baseline_confidence_mean]),
+        );
+        result.insert(
+            "baseline_attention_mean",
+            MetricValue::from_samples(&[baseline_attention_mean]),
+        );
+        result.insert(
+            "baseline_inhibition_mean",
+            MetricValue::from_samples(&[baseline_inhibition_mean]),
+        );
+        result.insert(
+            "baseline_consciousness_mean",
+            MetricValue::from_samples(&[baseline_consciousness_mean]),
+        );
 
         if config.trial_trace {
             let baseline_flex = baseline.mean(|s| s.behavioral_flexibility);
@@ -357,7 +403,11 @@ mod tests {
     fn test_da_knockout_positive_d() {
         let bench = BehavioralKnockoutBenchmark;
         let result = bench.run(&config());
-        let d = result.metrics.get("da_ko_lr_d").expect("missing da_ko_lr_d").mean;
+        let d = result
+            .metrics
+            .get("da_ko_lr_d")
+            .expect("missing da_ko_lr_d")
+            .mean;
         assert!(
             d.abs() > 0.1,
             "DA knockout should produce measurable LR effect: d={d}"
@@ -368,7 +418,11 @@ mod tests {
     fn test_ne_knockout_positive_d() {
         let bench = BehavioralKnockoutBenchmark;
         let result = bench.run(&config());
-        let d = result.metrics.get("ne_ko_exploration_d").expect("missing ne_ko_exploration_d").mean;
+        let d = result
+            .metrics
+            .get("ne_ko_exploration_d")
+            .expect("missing ne_ko_exploration_d")
+            .mean;
         assert!(
             d.abs() > 0.1,
             "NE knockout should produce measurable exploration effect: d={d}"
@@ -379,7 +433,11 @@ mod tests {
     fn test_sht_knockout_positive_d() {
         let bench = BehavioralKnockoutBenchmark;
         let result = bench.run(&config());
-        let d = result.metrics.get("sht_ko_confidence_d").expect("missing sht_ko_confidence_d").mean;
+        let d = result
+            .metrics
+            .get("sht_ko_confidence_d")
+            .expect("missing sht_ko_confidence_d")
+            .mean;
         assert!(
             d.abs() > 0.1,
             "5-HT knockout should produce measurable confidence effect: d={d}"
@@ -390,7 +448,11 @@ mod tests {
     fn test_ach_knockout_positive_d() {
         let bench = BehavioralKnockoutBenchmark;
         let result = bench.run(&config());
-        let d = result.metrics.get("ach_ko_attention_d").expect("missing ach_ko_attention_d").mean;
+        let d = result
+            .metrics
+            .get("ach_ko_attention_d")
+            .expect("missing ach_ko_attention_d")
+            .mean;
         assert!(
             d.abs() > 0.1,
             "ACh knockout should produce measurable attention effect: d={d}"
@@ -401,7 +463,11 @@ mod tests {
     fn test_gaba_knockout_positive_d() {
         let bench = BehavioralKnockoutBenchmark;
         let result = bench.run(&config());
-        let d = result.metrics.get("gaba_ko_inhibition_d").expect("missing gaba_ko_inhibition_d").mean;
+        let d = result
+            .metrics
+            .get("gaba_ko_inhibition_d")
+            .expect("missing gaba_ko_inhibition_d")
+            .mean;
         assert!(
             d.abs() > 0.1,
             "GABA knockout should produce measurable inhibition effect: d={d}"
@@ -412,8 +478,16 @@ mod tests {
     fn test_all_knockout_collapse() {
         let bench = BehavioralKnockoutBenchmark;
         let result = bench.run(&config());
-        let lr_d = result.metrics.get("all_ko_lr_collapse_d").expect("missing all_ko_lr_collapse_d").mean;
-        let cons_d = result.metrics.get("all_ko_consciousness_collapse_d").expect("missing all_ko_consciousness_collapse_d").mean;
+        let lr_d = result
+            .metrics
+            .get("all_ko_lr_collapse_d")
+            .expect("missing all_ko_lr_collapse_d")
+            .mean;
+        let cons_d = result
+            .metrics
+            .get("all_ko_consciousness_collapse_d")
+            .expect("missing all_ko_consciousness_collapse_d")
+            .mean;
         assert!(
             lr_d.abs() > 0.1 || cons_d.abs() > 0.1,
             "All-knockout should collapse at least one output: lr_d={lr_d}, cons_d={cons_d}"

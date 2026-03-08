@@ -13,8 +13,8 @@
 //! cargo run --example butlin_validation --release
 //! ```
 
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use symthaea::cognitive_loop::config::TemporalBackend;
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
 const WARMUP_CYCLES: usize = 50;
 const MEASUREMENT_CYCLES: usize = 100;
@@ -37,8 +37,8 @@ fn collect_runtime(backend: TemporalBackend) -> RuntimeData {
     let mut config = CognitiveLoopConfig::with_cfc();
     config.temporal_backend = backend;
     config.enable_attention_schema = true;
-    let mut service = CognitiveLoopService::new(config)
-        .expect("Failed to create CognitiveLoopService");
+    let mut service =
+        CognitiveLoopService::new(config).expect("Failed to create CognitiveLoopService");
 
     let stimuli = [
         "The morning light reveals new patterns in the data",
@@ -58,10 +58,17 @@ fn collect_runtime(backend: TemporalBackend) -> RuntimeData {
     }
 
     let mut vals = RuntimeData {
-        micro_phi: 0.0, meso_phi: 0.0, macro_phi: 0.0,
-        bottleneck: 0.0, emergence: 0.0, num_clusters: 0.0,
-        consciousness_level: 0.0, pipeline_phi: 0.0, coherence: 0.0,
-        attention_fatigue: 0.0, attention_pred_accuracy: 0.0,
+        micro_phi: 0.0,
+        meso_phi: 0.0,
+        macro_phi: 0.0,
+        bottleneck: 0.0,
+        emergence: 0.0,
+        num_clusters: 0.0,
+        consciousness_level: 0.0,
+        pipeline_phi: 0.0,
+        coherence: 0.0,
+        attention_fatigue: 0.0,
+        attention_pred_accuracy: 0.0,
     };
 
     for i in 0..MEASUREMENT_CYCLES {
@@ -143,55 +150,84 @@ fn indicators() -> Vec<Indicator> {
 }
 
 fn evaluate(inds: &[Indicator], rt: Option<&RuntimeData>) -> Vec<(f64, &'static str)> {
-    inds.iter().map(|ind| {
-        let score = match rt {
-            Some(rt) => {
-                let micro_n = normalize_phi(rt.micro_phi);
-                let meso_n = normalize_phi(rt.meso_phi);
-                let macro_n = normalize_phi(rt.macro_phi);
-                let runtime_boost = match ind.id {
-                    "RPT-1" => Some(micro_n),
-                    "RPT-2" => Some(micro_n * 0.8),
-                    "GWT-3" => Some(meso_n),
-                    "HOT-2" => Some((rt.bottleneck.min(1.0) * 2.0).clamp(0.0, 1.0)),
-                    "IIT-1" | "IIT-2" | "IIT-3" => Some(macro_n),
-                    _ => None,
-                };
-                match runtime_boost {
-                    Some(rt_val) => 0.6 * ind.static_score + 0.4 * rt_val.clamp(0.0, 1.0),
-                    None => ind.static_score,
+    inds.iter()
+        .map(|ind| {
+            let score = match rt {
+                Some(rt) => {
+                    let micro_n = normalize_phi(rt.micro_phi);
+                    let meso_n = normalize_phi(rt.meso_phi);
+                    let macro_n = normalize_phi(rt.macro_phi);
+                    let runtime_boost = match ind.id {
+                        "RPT-1" => Some(micro_n),
+                        "RPT-2" => Some(micro_n * 0.8),
+                        "GWT-3" => Some(meso_n),
+                        "HOT-2" => Some((rt.bottleneck.min(1.0) * 2.0).clamp(0.0, 1.0)),
+                        "IIT-1" | "IIT-2" | "IIT-3" => Some(macro_n),
+                        _ => None,
+                    };
+                    match runtime_boost {
+                        Some(rt_val) => 0.6 * ind.static_score + 0.4 * rt_val.clamp(0.0, 1.0),
+                        None => ind.static_score,
+                    }
                 }
-            }
-            None => ind.static_score,
-        };
-        let status = if score >= 0.6 { "PRESENT" } else if score >= 0.3 { "PARTIAL" } else { "ABSENT" };
-        (score, status)
-    }).collect()
+                None => ind.static_score,
+            };
+            let status = if score >= 0.6 {
+                "PRESENT"
+            } else if score >= 0.3 {
+                "PARTIAL"
+            } else {
+                "ABSENT"
+            };
+            (score, status)
+        })
+        .collect()
 }
 
 fn main() {
     println!();
     println!("================================================================");
     println!("  BUTLIN CONSCIOUSNESS INDICATOR VALIDATION");
-    println!("  {} warmup + {} measurement cycles per backend", WARMUP_CYCLES, MEASUREMENT_CYCLES);
+    println!(
+        "  {} warmup + {} measurement cycles per backend",
+        WARMUP_CYCLES, MEASUREMENT_CYCLES
+    );
     println!("================================================================");
     println!();
 
     // ── CfC ──
     println!("[1/2] Collecting runtime data (CfC)...");
     let cfc = collect_runtime(TemporalBackend::CfC);
-    println!("  Structural: micro={:.4} meso={:.4} macro={:.4}", cfc.micro_phi, cfc.meso_phi, cfc.macro_phi);
-    println!("  Consciousness: {:.4}, Pipeline Phi: {:.4}, Coherence: {:.4}", cfc.consciousness_level, cfc.pipeline_phi, cfc.coherence);
-    println!("  AST: fatigue={:.4} pred_acc={:.4}", cfc.attention_fatigue, cfc.attention_pred_accuracy);
+    println!(
+        "  Structural: micro={:.4} meso={:.4} macro={:.4}",
+        cfc.micro_phi, cfc.meso_phi, cfc.macro_phi
+    );
+    println!(
+        "  Consciousness: {:.4}, Pipeline Phi: {:.4}, Coherence: {:.4}",
+        cfc.consciousness_level, cfc.pipeline_phi, cfc.coherence
+    );
+    println!(
+        "  AST: fatigue={:.4} pred_acc={:.4}",
+        cfc.attention_fatigue, cfc.attention_pred_accuracy
+    );
 
     println!();
 
     // ── HierarchicalCfC ──
     println!("[2/2] Collecting runtime data (HierarchicalCfC)...");
     let hcfc = collect_runtime(TemporalBackend::HierarchicalCfC);
-    println!("  Structural: micro={:.4} meso={:.4} macro={:.4}", hcfc.micro_phi, hcfc.meso_phi, hcfc.macro_phi);
-    println!("  Consciousness: {:.4}, Pipeline Phi: {:.4}, Coherence: {:.4}", hcfc.consciousness_level, hcfc.pipeline_phi, hcfc.coherence);
-    println!("  AST: fatigue={:.4} pred_acc={:.4}", hcfc.attention_fatigue, hcfc.attention_pred_accuracy);
+    println!(
+        "  Structural: micro={:.4} meso={:.4} macro={:.4}",
+        hcfc.micro_phi, hcfc.meso_phi, hcfc.macro_phi
+    );
+    println!(
+        "  Consciousness: {:.4}, Pipeline Phi: {:.4}, Coherence: {:.4}",
+        hcfc.consciousness_level, hcfc.pipeline_phi, hcfc.coherence
+    );
+    println!(
+        "  AST: fatigue={:.4} pred_acc={:.4}",
+        hcfc.attention_fatigue, hcfc.attention_pred_accuracy
+    );
 
     println!();
 
@@ -205,8 +241,14 @@ fn main() {
     println!("  BUTLIN INDICATOR REPORT (14 indicators, 6 theories)");
     println!("================================================================");
     println!();
-    println!("  {:6} {:12} {:44} {:8} {:>8} {:>8} {:>8}", "ID", "Theory", "Description", "Status", "Static", "CfC", "HCfC");
-    println!("  {:-<6} {:-<12} {:-<44} {:-<8} {:-<8} {:-<8} {:-<8}", "", "", "", "", "", "", "");
+    println!(
+        "  {:6} {:12} {:44} {:8} {:>8} {:>8} {:>8}",
+        "ID", "Theory", "Description", "Status", "Static", "CfC", "HCfC"
+    );
+    println!(
+        "  {:-<6} {:-<12} {:-<44} {:-<8} {:-<8} {:-<8} {:-<8}",
+        "", "", "", "", "", "", ""
+    );
 
     let mut static_present = 0;
     let mut cfc_present = 0;
@@ -215,12 +257,20 @@ fn main() {
         let (stat_s, stat_status) = static_scores[i];
         let (cfc_s, _) = cfc_scores[i];
         let (hcfc_s, _) = hcfc_scores[i];
-        if stat_status == "PRESENT" { static_present += 1; }
-        if cfc_scores[i].1 == "PRESENT" { cfc_present += 1; }
-        if hcfc_scores[i].1 == "PRESENT" { hcfc_present += 1; }
+        if stat_status == "PRESENT" {
+            static_present += 1;
+        }
+        if cfc_scores[i].1 == "PRESENT" {
+            cfc_present += 1;
+        }
+        if hcfc_scores[i].1 == "PRESENT" {
+            hcfc_present += 1;
+        }
         let theory_short = &ind.theory[..ind.theory.len().min(12)];
-        println!("  {:6} {:12} {:44} {:8} {:8.3} {:8.3} {:8.3}",
-            ind.id, theory_short, ind.description, stat_status, stat_s, cfc_s, hcfc_s);
+        println!(
+            "  {:6} {:12} {:44} {:8} {:8.3} {:8.3} {:8.3}",
+            ind.id, theory_short, ind.description, stat_status, stat_s, cfc_s, hcfc_s
+        );
     }
     // Use evidence in detailed output
     println!();
@@ -242,8 +292,10 @@ fn main() {
     println!();
     println!("  Key implementations:");
     println!("    PP-2: HierarchicalCfC (4 temporal scales, bidirectional)");
-    println!("    AST-1: AttentionSchema (fatigue={:.4}, pred_acc={:.4}, causal loop active)",
-        hcfc.attention_fatigue, hcfc.attention_pred_accuracy);
+    println!(
+        "    AST-1: AttentionSchema (fatigue={:.4}, pred_acc={:.4}, causal loop active)",
+        hcfc.attention_fatigue, hcfc.attention_pred_accuracy
+    );
 
     println!();
 
@@ -252,8 +304,10 @@ fn main() {
     if all_pass {
         println!("  RESULT: PASS (14/14 across all evaluation modes)");
     } else {
-        println!("  RESULT: FAIL (expected 14/14, got static={}/14 cfc={}/14 hcfc={}/14)",
-            static_present, cfc_present, hcfc_present);
+        println!(
+            "  RESULT: FAIL (expected 14/14, got static={}/14 cfc={}/14 hcfc={}/14)",
+            static_present, cfc_present, hcfc_present
+        );
     }
     println!("================================================================");
 

@@ -365,9 +365,17 @@ fn output_feedback_divergence_trace() {
     let result = service.cycle("test");
 
     // With trace_feedback enabled, at least one trace vector should be non-empty
-    let has_traces = !result.metadata.feedback.feedback_trace_confidence.is_empty()
+    let has_traces = !result
+        .metadata
+        .feedback
+        .feedback_trace_confidence
+        .is_empty()
         || !result.metadata.feedback.feedback_trace_lr.is_empty()
-        || !result.metadata.feedback.feedback_trace_exploration.is_empty()
+        || !result
+            .metadata
+            .feedback
+            .feedback_trace_exploration
+            .is_empty()
         || !result.metadata.feedback.feedback_trace_threshold.is_empty();
     assert!(has_traces, "trace_feedback=true should produce trace data");
 }
@@ -487,7 +495,8 @@ fn phi_zero_relational_no_oxy() {
 #[test]
 fn phi_trust_grows_with_coherence() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    service.social_mgr.partner_model = Some(crate::partnership::HumanPartnerModel::new("test_partner"));
+    service.social_mgr.partner_model =
+        Some(crate::partnership::HumanPartnerModel::new("test_partner"));
     let initial_trust = service.social_mgr.partner_model.as_ref().unwrap().trust;
 
     // Simulate coherence=0.8 → signal = (0.8 - 0.5) * 0.01 = 0.003

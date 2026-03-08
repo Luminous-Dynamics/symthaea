@@ -97,6 +97,8 @@ impl CognitiveLoopService {
             metadata,
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::BinaryHV([0u8; 2048]),
+            #[cfg(feature = "ssm_language")]
+            language_output: None,
             #[cfg(feature = "identity")]
             signed_output: None,
             #[cfg(feature = "identity")]

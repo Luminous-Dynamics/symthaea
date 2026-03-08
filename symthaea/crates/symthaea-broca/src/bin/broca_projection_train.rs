@@ -49,7 +49,11 @@ fn main() {
     if let Some(boost) = opts.hedging_boost {
         gating_config.unknown_hedging_boost = boost;
         gating_config.uncertain_hedging_boost = boost * 0.5; // proportional
-        tracing::info!(unknown_boost = boost, uncertain_boost = boost * 0.5, "Hedging boost override");
+        tracing::info!(
+            unknown_boost = boost,
+            uncertain_boost = boost * 0.5,
+            "Hedging boost override"
+        );
     }
 
     let lm_config = LiquidMambaConfig {
@@ -110,7 +114,9 @@ fn main() {
                 gen.projection_mut().load_weights(&ckpt.projection_weights);
                 // Load temporal weights if present
                 if ckpt.temporal {
-                    if let (Some(ref tw), Some(tp)) = (&ckpt.temporal_weights, gen.temporal_proj_mut()) {
+                    if let (Some(ref tw), Some(tp)) =
+                        (&ckpt.temporal_weights, gen.temporal_proj_mut())
+                    {
                         tp.load_weights(tw);
                         tracing::info!(
                             chunk_dim = ckpt.chunk_dim,
@@ -922,7 +928,9 @@ fn print_usage() {
     eprintln!(
         "  --genesis PHRASE            Genesis seed phrase (default: broca-projection-default)"
     );
-    eprintln!("  --deep-projection           Use deep double-bottleneck projection (256->128->256)");
+    eprintln!(
+        "  --deep-projection           Use deep double-bottleneck projection (256->128->256)"
+    );
     eprintln!("  --temporal                  Use temporal projection (64×256D chunks → continuous latent prompting)");
     eprintln!("  --learned-pos-enc           Use learned (trainable) positional encoding (requires --temporal)");
     eprintln!("  --stride N                  Chunk stride for temporal overlap (default: chunk_size=256, no overlap)");
@@ -931,7 +939,9 @@ fn print_usage() {
     eprintln!("  --rank-reg W                Rank regularization weight for W_up decorrelation (default: 0, try 0.001-0.01)");
     eprintln!("  --learned-attention          Enable learned chunk attention weighting (requires --temporal)");
     eprintln!("  --pos-enc-unfreeze N        Epoch to unfreeze learned pos_enc (0 = always learned, requires --learned-pos-enc)");
-    eprintln!("  --max-gen-tokens N          Max tokens per generation during training (default: 16)");
+    eprintln!(
+        "  --max-gen-tokens N          Max tokens per generation during training (default: 16)"
+    );
     eprintln!();
     eprintln!("Architecture improvements (A-F):");
     eprintln!("  --chunk-size N              Override chunk dimension for temporal projection (default: bottleneck_dim=256)");
@@ -953,7 +963,9 @@ fn print_usage() {
     eprintln!();
     eprintln!("Evaluation options:");
     eprintln!("  --eval PATH            Held-out JSONL for post-training evaluation");
-    eprintln!("  --eval-only            Skip training, run evaluation only (requires --resume + --eval)");
+    eprintln!(
+        "  --eval-only            Skip training, run evaluation only (requires --resume + --eval)"
+    );
     eprintln!();
     eprintln!("Diagnostics:");
     eprintln!("  --diagnostics          Enable gradient diagnostics and periodic health logging");

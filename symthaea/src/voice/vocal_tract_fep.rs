@@ -81,7 +81,9 @@ pub struct StreamingVocalTract {
     mel_buffer_target: usize,
     /// Double-buffered pending neural audio responses.
     #[cfg(feature = "neural-vocoder")]
-    pending_neural_audio: std::collections::VecDeque<std::sync::mpsc::Receiver<super::neural_vocoder::VocoderResponse>>,
+    pending_neural_audio: std::collections::VecDeque<
+        std::sync::mpsc::Receiver<super::neural_vocoder::VocoderResponse>,
+    >,
     /// Cache of neural audio samples ready to be returned.
     #[cfg(feature = "neural-vocoder")]
     neural_audio_cache: std::collections::VecDeque<f32>,
@@ -271,10 +273,8 @@ impl StreamingVocalTract {
         }
 
         // Apply derivative-based voice quality modulation
-        let quality = super::vocoder::cognitive_state_to_voice_quality_extended(
-            cognitive_state,
-            &derivs,
-        );
+        let quality =
+            super::vocoder::cognitive_state_to_voice_quality_extended(cognitive_state, &derivs);
         self.vocoder
             .synthesize_frame_with_quality(&frame, &quality, self.samples_per_frame)
     }
@@ -304,10 +304,8 @@ impl StreamingVocalTract {
             return self.tick_neural(&frame, cognitive_state);
         }
 
-        let quality = super::vocoder::cognitive_state_to_voice_quality_extended(
-            cognitive_state,
-            &derivs,
-        );
+        let quality =
+            super::vocoder::cognitive_state_to_voice_quality_extended(cognitive_state, &derivs);
         self.vocoder
             .synthesize_frame_with_quality(&frame, &quality, self.samples_per_frame)
     }
@@ -370,7 +368,8 @@ impl StreamingVocalTract {
                             self.crossfade_remaining = self.crossfade_length;
                             // Adaptive: grow buffer target after first successful inference
                             if self.mel_buffer_target < self.mel_buffer_max {
-                                self.mel_buffer_target = (self.mel_buffer_target + 4).min(self.mel_buffer_max);
+                                self.mel_buffer_target =
+                                    (self.mel_buffer_target + 4).min(self.mel_buffer_max);
                             }
                         }
                         self.neural_audio_cache.extend(response.audio.iter());
@@ -401,12 +400,17 @@ impl StreamingVocalTract {
 
             // Apply crossfade from DSP→neural if we're in the transition window
             if self.crossfade_remaining > 0 {
-                let dsp_samples = self.vocoder.synthesize_frame_with_quality(frame, &dsp_quality, self.samples_per_frame);
+                let dsp_samples = self.vocoder.synthesize_frame_with_quality(
+                    frame,
+                    &dsp_quality,
+                    self.samples_per_frame,
+                );
                 let mut blended = Vec::with_capacity(self.samples_per_frame);
 
                 for (&neural, &dsp) in neural_samples.iter().zip(dsp_samples.iter()) {
                     if self.crossfade_remaining > 0 {
-                        let t = 1.0 - (self.crossfade_remaining as f32 / self.crossfade_length as f32);
+                        let t =
+                            1.0 - (self.crossfade_remaining as f32 / self.crossfade_length as f32);
                         let neural_weight = 0.5 * (1.0 - (std::f32::consts::PI * t).cos());
                         blended.push(dsp * (1.0 - neural_weight) + neural * neural_weight);
                         self.crossfade_remaining -= 1;
@@ -417,7 +421,11 @@ impl StreamingVocalTract {
                 blended
             } else if neural_preference < 0.95 {
                 // Continuous consciousness-modulated blend
-                let dsp_samples = self.vocoder.synthesize_frame_with_quality(frame, &dsp_quality, self.samples_per_frame);
+                let dsp_samples = self.vocoder.synthesize_frame_with_quality(
+                    frame,
+                    &dsp_quality,
+                    self.samples_per_frame,
+                );
                 neural_samples
                     .iter()
                     .zip(dsp_samples.iter())
@@ -859,10 +867,7 @@ mod stress_tests {
             all_samples.iter().all(|s| s.is_finite()),
             "All samples must be finite under burst switching"
         );
-        let max_abs: f32 = all_samples
-            .iter()
-            .map(|s| s.abs())
-            .fold(0.0f32, f32::max);
+        let max_abs: f32 = all_samples.iter().map(|s| s.abs()).fold(0.0f32, f32::max);
         assert!(
             max_abs < 2.0,
             "Max abs too high under burst switching: {max_abs:.3}"

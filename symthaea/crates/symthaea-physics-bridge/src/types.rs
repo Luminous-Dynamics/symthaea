@@ -529,9 +529,9 @@ impl LieGroup {
                 let n = *n as u32;
                 n * n
             }
-            LieGroup::Lorentz => 6,  // SO(3,1) — 3 boosts + 3 rotations
-            LieGroup::Poincare => 10, // 6 Lorentz + 4 translations
-            LieGroup::Conformal => 15, // SO(4,2)
+            LieGroup::Lorentz => 6,        // SO(3,1) — 3 boosts + 3 rotations
+            LieGroup::Poincare => 10,      // 6 Lorentz + 4 translations
+            LieGroup::Conformal => 15,     // SO(4,2)
             LieGroup::StandardModel => 12, // 8 + 3 + 1
             LieGroup::E(6) => 78,
             LieGroup::E(7) => 133,
@@ -595,11 +595,7 @@ impl SymmetryDescriptor {
     }
 
     /// Create with both Lie and discrete symmetries.
-    pub fn new(
-        lie_groups: Vec<LieGroup>,
-        discrete: Vec<DiscreteSymmetry>,
-        is_gauge: bool,
-    ) -> Self {
+    pub fn new(lie_groups: Vec<LieGroup>, discrete: Vec<DiscreteSymmetry>, is_gauge: bool) -> Self {
         let algebra_dimension = lie_groups.iter().map(|g| g.algebra_dimension()).sum();
         Self {
             lie_groups,

@@ -158,9 +158,9 @@ mod tests {
         let mut pixels = Vec::with_capacity((w * h * 3) as usize);
         for y in 0..h {
             for x in 0..w {
-                pixels.push(((x * 3) % 256) as u8);     // R
-                pixels.push(((y * 5) % 256) as u8);     // G
-                pixels.push(((x + y) % 256) as u8);     // B
+                pixels.push(((x * 3) % 256) as u8); // R
+                pixels.push(((y * 5) % 256) as u8); // G
+                pixels.push(((x + y) % 256) as u8); // B
             }
         }
         FrameBuffer {

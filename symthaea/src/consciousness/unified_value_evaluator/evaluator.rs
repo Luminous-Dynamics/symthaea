@@ -4,7 +4,7 @@ use super::super::contextual_weights::{
     ActionDomain, ContextualWeights, DomainClassifier, HarmonyWeightProfile,
 };
 use super::super::semantic_value_embedder::{EmbedderConfig, SemanticValueEmbedder};
-use super::super::seven_harmonies::{AlignmentResult, Harmony, SevenHarmonies};
+use super::super::eight_harmonies::{AlignmentResult, Harmony, EightHarmonies};
 use super::super::value_feedback_loop::{
     FeedbackLoopConfig, FeedbackLoopSummary, ValueFeedbackLoop,
 };
@@ -21,8 +21,8 @@ use std::collections::HashMap;
 
 /// The Unified Value Evaluator
 pub struct UnifiedValueEvaluator {
-    /// Seven Harmonies for semantic alignment
-    harmonies: SevenHarmonies,
+    /// Eight Harmonies for semantic alignment
+    harmonies: EightHarmonies,
     /// Semantic encoder (reserved for future HDC-based encoding)
     _encoder: SemanticEncoder,
     /// Configuration
@@ -58,7 +58,7 @@ impl UnifiedValueEvaluator {
     /// Create a new unified evaluator
     pub fn new() -> Self {
         Self {
-            harmonies: SevenHarmonies::new(),
+            harmonies: EightHarmonies::new(),
             _encoder: SemanticEncoder::new(),
             config: EvaluatorConfig::default(),
             history: Vec::new(),
@@ -76,7 +76,7 @@ impl UnifiedValueEvaluator {
     /// Create with custom configuration
     pub fn with_config(config: EvaluatorConfig) -> Self {
         Self {
-            harmonies: SevenHarmonies::new(),
+            harmonies: EightHarmonies::new(),
             _encoder: SemanticEncoder::new(),
             config,
             history: Vec::new(),
@@ -97,7 +97,7 @@ impl UnifiedValueEvaluator {
         feedback_config: FeedbackLoopConfig,
     ) -> Self {
         Self {
-            harmonies: SevenHarmonies::new(),
+            harmonies: EightHarmonies::new(),
             _encoder: SemanticEncoder::new(),
             config,
             history: Vec::new(),
@@ -1063,7 +1063,7 @@ impl Default for UnifiedValueEvaluator {
 mod tests {
     use super::super::super::affective_consciousness::CoreAffect;
     use super::super::super::contextual_weights::ActionDomain;
-    use super::super::super::seven_harmonies::{AlignmentResult, Harmony, HarmonyAlignment};
+    use super::super::super::eight_harmonies::{AlignmentResult, Harmony, HarmonyAlignment};
     use super::super::types::{
         ActionType, AffectiveSystemsState, Decision, EvaluationBreakdown, EvaluationContext,
         EvaluationResult, VetoReason,

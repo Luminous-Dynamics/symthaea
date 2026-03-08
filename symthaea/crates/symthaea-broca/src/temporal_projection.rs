@@ -57,7 +57,10 @@ impl EmbeddingStats {
     /// `flat` should be `[count * dim]` values in row-major order (row = one embedding).
     pub fn compute(flat: &[f32], dim: usize) -> Self {
         assert!(dim > 0, "dim must be positive");
-        assert!(flat.len() % dim == 0, "flat length must be divisible by dim");
+        assert!(
+            flat.len() % dim == 0,
+            "flat length must be divisible by dim"
+        );
         let count = flat.len() / dim;
         assert!(count > 0, "must have at least one embedding");
 
@@ -155,7 +158,12 @@ impl EmbeddingStats {
             variance[j] = f32::from_le_bytes(buf4);
         }
 
-        Ok(Self { dim, count, mean, variance })
+        Ok(Self {
+            dim,
+            count,
+            mean,
+            variance,
+        })
     }
 }
 
@@ -460,17 +468,17 @@ impl std::fmt::Debug for AdapterMlp {
 /// an adapter MLP, and adds sinusoidal positional encoding. The result is a sequence
 /// of continuous embeddings ready for Mamba's `forward_embeds()`.
 pub struct TemporalProjection {
-    chunk_size: usize,  // per-chunk dimension (e.g. 256)
-    num_chunks: usize,  // number of chunks (e.g. 64 non-overlapping, or more with overlap)
-    stride: usize,      // step between chunk starts (chunk_size = no overlap, < chunk_size = overlap)
+    chunk_size: usize, // per-chunk dimension (e.g. 256)
+    num_chunks: usize, // number of chunks (e.g. 64 non-overlapping, or more with overlap)
+    stride: usize, // step between chunk starts (chunk_size = no overlap, < chunk_size = overlap)
     // Per-group up/down projections (Improvement C)
     group_w_up: Vec<Vec<f32>>,   // [num_groups][ssm_dim * chunk_size]
     group_w_down: Vec<Vec<f32>>, // [num_groups][chunk_size * ssm_dim]
     num_groups: usize,           // default 1 (single shared matrix, legacy behavior)
-    ln_gamma: Vec<f32>,     // [chunk_size] LayerNorm scale
-    ln_beta: Vec<f32>,      // [chunk_size] LayerNorm bias
-    pos_enc: Vec<f32>,      // [num_chunks * ssm_dim] positional encoding
-    learned_pos_enc: bool,  // if true, pos_enc is trainable; if false, fixed sinusoidal
+    ln_gamma: Vec<f32>,          // [chunk_size] LayerNorm scale
+    ln_beta: Vec<f32>,           // [chunk_size] LayerNorm bias
+    pos_enc: Vec<f32>,           // [num_chunks * ssm_dim] positional encoding
+    learned_pos_enc: bool,       // if true, pos_enc is trainable; if false, fixed sinusoidal
     // Per-group gradient accumulators
     grad_group_up: Vec<Vec<f32>>,   // [num_groups][ssm_dim * chunk_size]
     grad_group_down: Vec<Vec<f32>>, // [num_groups][chunk_size * ssm_dim]
@@ -478,14 +486,14 @@ pub struct TemporalProjection {
     grad_ln_beta: Vec<f32>,
     grad_pos_enc: Vec<f32>, // [num_chunks * ssm_dim] gradient for learned pos_enc
     // Chunk attention (learned importance per chunk)
-    chunk_attention: Vec<f32>,      // [num_chunks] logits (sigmoid-gated during forward)
+    chunk_attention: Vec<f32>, // [num_chunks] logits (sigmoid-gated during forward)
     grad_chunk_attention: Vec<f32>, // [num_chunks] gradient accumulator
-    learned_attention: bool,        // if true, chunk_attention is trainable
+    learned_attention: bool,   // if true, chunk_attention is trainable
     // Adapter MLP (Improvement E)
     adapter: Option<AdapterMlp>,
     // Dimensions
-    hdc_dim: usize,  // 16384
-    ssm_dim: usize,  // 768
+    hdc_dim: usize, // 16384
+    ssm_dim: usize, // 768
 }
 
 impl TemporalProjection {
@@ -509,7 +517,14 @@ impl TemporalProjection {
         ssm_dim: usize,
         learned_pos_enc: bool,
     ) -> Self {
-        Self::new_full(genesis, hdc_dim, chunk_dim, ssm_dim, learned_pos_enc, chunk_dim)
+        Self::new_full(
+            genesis,
+            hdc_dim,
+            chunk_dim,
+            ssm_dim,
+            learned_pos_enc,
+            chunk_dim,
+        )
     }
 
     /// Create a new temporal projection with all options.
@@ -527,7 +542,10 @@ impl TemporalProjection {
         stride: usize,
     ) -> Self {
         assert!(stride > 0, "stride must be positive");
-        assert!(chunk_dim <= hdc_dim, "chunk_dim ({chunk_dim}) must be <= hdc_dim ({hdc_dim})");
+        assert!(
+            chunk_dim <= hdc_dim,
+            "chunk_dim ({chunk_dim}) must be <= hdc_dim ({hdc_dim})"
+        );
 
         // For non-overlapping (stride == chunk_dim), require divisibility
         if stride == chunk_dim {
@@ -1081,7 +1099,11 @@ impl TemporalProjection {
                 continue;
             }
 
-            let dot: f32 = ssm_vec.iter().zip(target_ssm.iter()).map(|(a, b)| a * b).sum();
+            let dot: f32 = ssm_vec
+                .iter()
+                .zip(target_ssm.iter())
+                .map(|(a, b)| a * b)
+                .sum();
             let cos_sim = dot / (a_norm * b_norm);
 
             let inv_ab = 1.0 / (a_norm * b_norm);
@@ -1094,7 +1116,8 @@ impl TemporalProjection {
             // Backprop to w_chunk_up
             for j in 0..self.ssm_dim {
                 for k in 0..self.chunk_size {
-                    self.grad_group_up[g][j * self.chunk_size + k] += scale * ssm_grad[j] * normed[k];
+                    self.grad_group_up[g][j * self.chunk_size + k] +=
+                        scale * ssm_grad[j] * normed[k];
                 }
             }
 
@@ -1312,7 +1335,11 @@ impl TemporalProjection {
     ///
     /// `ssm_gradients`: gradient of loss w.r.t. the SSM embedding at each chunk position.
     /// Only non-None entries contribute gradients (sparse gradient from rotating position).
-    pub fn compute_e2e_gradients(&mut self, thought: &ContinuousHV, ssm_gradients: &[Option<Vec<f32>>]) {
+    pub fn compute_e2e_gradients(
+        &mut self,
+        thought: &ContinuousHV,
+        ssm_gradients: &[Option<Vec<f32>>],
+    ) {
         let scale = 1.0 / self.num_chunks as f32;
         for chunk_idx in 0..self.num_chunks {
             let grad = match &ssm_gradients[chunk_idx] {
@@ -1379,15 +1406,31 @@ impl TemporalProjection {
             max_norm_down = max_norm_down.max(nd);
             total_sq += nu.powi(2) + nd.powi(2);
         }
-        let norm_ln = (l2_norm(&self.grad_ln_gamma).powi(2) + l2_norm(&self.grad_ln_beta).powi(2)).sqrt();
-        let norm_pos = if self.learned_pos_enc { l2_norm(&self.grad_pos_enc) } else { 0.0 };
-        let norm_attn = if self.learned_attention { l2_norm(&self.grad_chunk_attention) } else { 0.0 };
+        let norm_ln =
+            (l2_norm(&self.grad_ln_gamma).powi(2) + l2_norm(&self.grad_ln_beta).powi(2)).sqrt();
+        let norm_pos = if self.learned_pos_enc {
+            l2_norm(&self.grad_pos_enc)
+        } else {
+            0.0
+        };
+        let norm_attn = if self.learned_attention {
+            l2_norm(&self.grad_chunk_attention)
+        } else {
+            0.0
+        };
         let adapter_norm = self.adapter.as_ref().map_or(0.0f32, |a| {
-            (l2_norm(&a.grad_w1).powi(2) + l2_norm(&a.grad_b1).powi(2)
-                + l2_norm(&a.grad_w2).powi(2) + l2_norm(&a.grad_b2).powi(2)).sqrt()
+            (l2_norm(&a.grad_w1).powi(2)
+                + l2_norm(&a.grad_b1).powi(2)
+                + l2_norm(&a.grad_w2).powi(2)
+                + l2_norm(&a.grad_b2).powi(2))
+            .sqrt()
         });
-        let combined_norm = (total_sq + norm_ln.powi(2) + norm_pos.powi(2)
-            + norm_attn.powi(2) + adapter_norm.powi(2)).sqrt();
+        let combined_norm = (total_sq
+            + norm_ln.powi(2)
+            + norm_pos.powi(2)
+            + norm_attn.powi(2)
+            + adapter_norm.powi(2))
+        .sqrt();
 
         let was_clipped = combined_norm > grad_clip;
         let clip_scale = if was_clipped {
@@ -1400,10 +1443,16 @@ impl TemporalProjection {
 
         // Apply to per-group weights
         for g in 0..self.num_groups {
-            for (w, grad) in self.group_w_up[g].iter_mut().zip(self.grad_group_up[g].iter()) {
+            for (w, grad) in self.group_w_up[g]
+                .iter_mut()
+                .zip(self.grad_group_up[g].iter())
+            {
                 *w -= effective_lr * grad;
             }
-            for (w, grad) in self.group_w_down[g].iter_mut().zip(self.grad_group_down[g].iter()) {
+            for (w, grad) in self.group_w_down[g]
+                .iter_mut()
+                .zip(self.grad_group_down[g].iter())
+            {
                 *w -= effective_lr * grad;
             }
         }
@@ -1422,7 +1471,11 @@ impl TemporalProjection {
         }
         // Apply to learned chunk attention
         if self.learned_attention {
-            for (w, grad) in self.chunk_attention.iter_mut().zip(self.grad_chunk_attention.iter()) {
+            for (w, grad) in self
+                .chunk_attention
+                .iter_mut()
+                .zip(self.grad_chunk_attention.iter())
+            {
                 *w -= effective_lr * grad;
             }
         }
@@ -1610,8 +1663,7 @@ impl TemporalProjection {
             vec![0, step, 2 * step, 3 * step]
         };
 
-        let mut ssm_vecs: Vec<Vec<f32>> =
-            Vec::with_capacity(thoughts.len() * sample_chunks.len());
+        let mut ssm_vecs: Vec<Vec<f32>> = Vec::with_capacity(thoughts.len() * sample_chunks.len());
         for thought in thoughts {
             for &ci in &sample_chunks {
                 let start = ci * self.stride;
@@ -1679,7 +1731,8 @@ impl TemporalProjection {
             for ci in 0..self.num_chunks {
                 let start = ci * self.stride;
                 if start + self.chunk_size <= thought.values.len() {
-                    normed_chunks.push(self.layer_norm(&thought.values[start..start + self.chunk_size]));
+                    normed_chunks
+                        .push(self.layer_norm(&thought.values[start..start + self.chunk_size]));
                 }
             }
         }
@@ -1762,14 +1815,25 @@ impl TemporalProjection {
     ///
     /// Layout: `[g0_up|g1_up|...|g0_down|g1_down|...|ln_gamma|ln_beta|pos_enc?|attn?|adapter?]`
     pub fn flatten_weights(&self) -> Vec<f32> {
-        let pos_size = if self.learned_pos_enc { self.pos_enc.len() } else { 0 };
-        let attn_size = if self.learned_attention { self.chunk_attention.len() } else { 0 };
+        let pos_size = if self.learned_pos_enc {
+            self.pos_enc.len()
+        } else {
+            0
+        };
+        let attn_size = if self.learned_attention {
+            self.chunk_attention.len()
+        } else {
+            0
+        };
         let adapter_size = self.adapter.as_ref().map_or(0, |a| a.num_params());
         let per_group_up = self.ssm_dim * self.chunk_size;
         let per_group_down = self.chunk_size * self.ssm_dim;
         let total_size = self.num_groups * (per_group_up + per_group_down)
-            + self.ln_gamma.len() + self.ln_beta.len()
-            + pos_size + attn_size + adapter_size;
+            + self.ln_gamma.len()
+            + self.ln_beta.len()
+            + pos_size
+            + attn_size
+            + adapter_size;
 
         let mut weights = Vec::with_capacity(total_size);
         // All up matrices
@@ -1804,15 +1868,16 @@ impl TemporalProjection {
         let beta_size = self.ln_beta.len();
 
         // Detect format: try multi-group first, fall back to legacy single-group
-        let multi_group_base = self.num_groups * (per_group_up + per_group_down)
-            + gamma_size + beta_size;
+        let multi_group_base =
+            self.num_groups * (per_group_up + per_group_down) + gamma_size + beta_size;
         let legacy_base = per_group_up + per_group_down + gamma_size + beta_size;
 
-        let (is_multi_group, base_size) = if weights.len() >= multi_group_base && self.num_groups > 1 {
-            (true, multi_group_base)
-        } else {
-            (false, legacy_base)
-        };
+        let (is_multi_group, base_size) =
+            if weights.len() >= multi_group_base && self.num_groups > 1 {
+                (true, multi_group_base)
+            } else {
+                (false, legacy_base)
+            };
 
         let pos_size = self.pos_enc.len();
         let attn_size = self.chunk_attention.len();
@@ -1848,14 +1913,17 @@ impl TemporalProjection {
             }
         }
 
-        self.ln_gamma.copy_from_slice(&weights[offset..offset + gamma_size]);
+        self.ln_gamma
+            .copy_from_slice(&weights[offset..offset + gamma_size]);
         offset += gamma_size;
-        self.ln_beta.copy_from_slice(&weights[offset..offset + beta_size]);
+        self.ln_beta
+            .copy_from_slice(&weights[offset..offset + beta_size]);
         offset += beta_size;
 
         // Load learned pos_enc if present
         if offset + pos_size <= weights.len() && weights.len() > base_size {
-            self.pos_enc.copy_from_slice(&weights[offset..offset + pos_size]);
+            self.pos_enc
+                .copy_from_slice(&weights[offset..offset + pos_size]);
             self.learned_pos_enc = true;
             offset += pos_size;
         }
@@ -1866,7 +1934,8 @@ impl TemporalProjection {
             let remaining = weights.len() - offset;
             let adapter_size = self.adapter.as_ref().map_or(0, |a| a.num_params());
             if remaining == attn_size || remaining == attn_size + adapter_size {
-                self.chunk_attention.copy_from_slice(&weights[offset..offset + attn_size]);
+                self.chunk_attention
+                    .copy_from_slice(&weights[offset..offset + attn_size]);
                 self.learned_attention = true;
                 offset += attn_size;
             }
@@ -1886,10 +1955,17 @@ impl TemporalProjection {
         let per_group_up = self.ssm_dim * self.chunk_size;
         let per_group_down = self.chunk_size * self.ssm_dim;
         let mut total = self.num_groups * (per_group_up + per_group_down)
-            + self.ln_gamma.len() + self.ln_beta.len();
-        if self.learned_pos_enc { total += self.pos_enc.len(); }
-        if self.learned_attention { total += self.chunk_attention.len(); }
-        if let Some(ref adapter) = self.adapter { total += adapter.num_params(); }
+            + self.ln_gamma.len()
+            + self.ln_beta.len();
+        if self.learned_pos_enc {
+            total += self.pos_enc.len();
+        }
+        if self.learned_attention {
+            total += self.chunk_attention.len();
+        }
+        if let Some(ref adapter) = self.adapter {
+            total += adapter.num_params();
+        }
         total
     }
 
@@ -2190,7 +2266,8 @@ mod tests {
         let tp = TemporalProjection::new(&test_genesis(), 16384, 256, 768);
         let weights = tp.flatten_weights();
 
-        let mut tp2 = TemporalProjection::new(&GenesisSeed::from_phrase("different"), 16384, 256, 768);
+        let mut tp2 =
+            TemporalProjection::new(&GenesisSeed::from_phrase("different"), 16384, 256, 768);
         tp2.load_weights(&weights);
 
         let thought = ContinuousHV::random_default(42);
@@ -2198,7 +2275,10 @@ mod tests {
         let seq2 = tp2.project_to_ssm_sequence(&thought);
         for (a, b) in seq1.iter().zip(seq2.iter()) {
             for (va, vb) in a.iter().zip(b.iter()) {
-                assert!((va - vb).abs() < 1e-6, "Weights should produce identical output");
+                assert!(
+                    (va - vb).abs() < 1e-6,
+                    "Weights should produce identical output"
+                );
             }
         }
     }
@@ -2233,7 +2313,10 @@ mod tests {
             tp.apply_gradients(0.01, 100.0);
         }
 
-        let changed = tp.pos_enc.iter().zip(initial_pos.iter())
+        let changed = tp
+            .pos_enc
+            .iter()
+            .zip(initial_pos.iter())
             .any(|(a, b)| (a - b).abs() > 1e-10);
         assert!(changed, "Learned pos_enc should change during training");
     }
@@ -2246,7 +2329,11 @@ mod tests {
         assert_eq!(weights.len(), 393_728 + 49_152);
 
         let mut tp2 = TemporalProjection::new_with_options(
-            &GenesisSeed::from_phrase("different"), 16384, 256, 768, false,
+            &GenesisSeed::from_phrase("different"),
+            16384,
+            256,
+            768,
+            false,
         );
         tp2.load_weights(&weights);
         assert!(tp2.learned_pos_enc());
@@ -2436,7 +2523,10 @@ mod tests {
         }
 
         let final_pe = tp.roundtrip_pe(&thought);
-        assert!(final_pe.is_finite(), "PE should be finite after directional training");
+        assert!(
+            final_pe.is_finite(),
+            "PE should be finite after directional training"
+        );
         assert!(
             (final_pe - initial_pe).abs() > 1e-6,
             "Directional loss should modify the projection"
@@ -2499,10 +2589,15 @@ mod tests {
         assert!(output.iter().all(|x| x.is_finite()));
 
         // With near-zero init weights, adapter should be near-identity
-        let max_diff: f32 = output.iter().zip(input.iter())
+        let max_diff: f32 = output
+            .iter()
+            .zip(input.iter())
             .map(|(o, i)| (o - i).abs())
             .fold(0.0f32, f32::max);
-        assert!(max_diff < 1.0, "Small-init adapter should be near-identity, max_diff={max_diff}");
+        assert!(
+            max_diff < 1.0,
+            "Small-init adapter should be near-identity, max_diff={max_diff}"
+        );
     }
 
     #[test]
@@ -2547,7 +2642,7 @@ mod tests {
         let thought = ContinuousHV::random_default(42).normalize();
 
         tp.compute_anticollapse_gradients(&thought, 0.1, 0.0); // threshold=0 → all pairs counted
-        // Check that some gradients are non-zero
+                                                               // Check that some gradients are non-zero
         let grad_norm = l2_norm(&tp.grad_group_up[0]);
         assert!(grad_norm > 0.0, "Anti-collapse should produce gradients");
     }
@@ -2608,12 +2703,7 @@ mod tests {
     #[test]
     fn test_embedding_stats_compute() {
         // 4 embeddings, dim=3
-        let flat = vec![
-            1.0, 2.0, 3.0,
-            3.0, 4.0, 5.0,
-            5.0, 6.0, 7.0,
-            7.0, 8.0, 9.0,
-        ];
+        let flat = vec![1.0, 2.0, 3.0, 3.0, 4.0, 5.0, 5.0, 6.0, 7.0, 7.0, 8.0, 9.0];
         let stats = EmbeddingStats::compute(&flat, 3);
         assert_eq!(stats.dim, 3);
         assert_eq!(stats.count, 4);
@@ -2670,8 +2760,12 @@ mod tests {
         let output = adapter.forward(&stats.mean);
         for i in 0..dim {
             // Output should be approximately 2*mean (residual + b2)
-            assert!((output[i] - 2.0 * stats.mean[i]).abs() < 1.0,
-                "dim {i}: expected ~{}, got {}", 2.0 * stats.mean[i], output[i]);
+            assert!(
+                (output[i] - 2.0 * stats.mean[i]).abs() < 1.0,
+                "dim {i}: expected ~{}, got {}",
+                2.0 * stats.mean[i],
+                output[i]
+            );
         }
     }
 
@@ -2689,16 +2783,28 @@ mod tests {
         let default_adapter = AdapterMlp::new(&genesis, dim);
 
         // w1 should differ significantly (diagonal whitening vs small random)
-        let w1_diff: f32 = stats_adapter.w1.iter().zip(default_adapter.w1.iter())
+        let w1_diff: f32 = stats_adapter
+            .w1
+            .iter()
+            .zip(default_adapter.w1.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
-        assert!(w1_diff > 1.0, "w1 should differ between stats and default init");
+        assert!(
+            w1_diff > 1.0,
+            "w1 should differ between stats and default init"
+        );
 
         // b1 should differ (centering vs zeros)
-        let b1_diff: f32 = stats_adapter.b1.iter().zip(default_adapter.b1.iter())
+        let b1_diff: f32 = stats_adapter
+            .b1
+            .iter()
+            .zip(default_adapter.b1.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
-        assert!(b1_diff > 0.1, "b1 should differ between stats and default init");
+        assert!(
+            b1_diff > 0.1,
+            "b1 should differ between stats and default init"
+        );
     }
 
     #[test]

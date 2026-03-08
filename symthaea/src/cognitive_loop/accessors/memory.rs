@@ -128,7 +128,8 @@ impl CognitiveLoopService {
 
     /// Add a goal to the system
     pub fn add_goal(&mut self, id: &str, description: &str, priority: f32) {
-        self.fep.goal_system
+        self.fep
+            .goal_system
             .add_goal(CognitiveGoal::new(id, description, priority));
     }
 }

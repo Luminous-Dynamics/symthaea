@@ -123,10 +123,7 @@ pub fn is_inbreeding_safe(kinship: f64, threshold: f64) -> bool {
 /// Mean kinship of an individual with the rest of the population.
 ///
 /// Used by minimum kinship breeding strategy (Ballou & Lacy 1995).
-pub fn mean_kinship(
-    individual_idx: usize,
-    kinship_mat: &[Vec<f64>],
-) -> f64 {
+pub fn mean_kinship(individual_idx: usize, kinship_mat: &[Vec<f64>]) -> f64 {
     let n = kinship_mat.len();
     if n <= 1 {
         return 0.0;
@@ -176,13 +173,48 @@ mod tests {
         // Gen 1: 5 = 1x2, 6 = 3x4
         // Gen 2: 7 = 5x6 (common grandparents: none -> kinship=0)
         let mut ped = Pedigree::new();
-        ped.add_entry(PedigreeEntry { individual_id: 1, parent_a_id: None, parent_b_id: None, generation: 0 });
-        ped.add_entry(PedigreeEntry { individual_id: 2, parent_a_id: None, parent_b_id: None, generation: 0 });
-        ped.add_entry(PedigreeEntry { individual_id: 3, parent_a_id: None, parent_b_id: None, generation: 0 });
-        ped.add_entry(PedigreeEntry { individual_id: 4, parent_a_id: None, parent_b_id: None, generation: 0 });
-        ped.add_entry(PedigreeEntry { individual_id: 5, parent_a_id: Some(1), parent_b_id: Some(2), generation: 1 });
-        ped.add_entry(PedigreeEntry { individual_id: 6, parent_a_id: Some(3), parent_b_id: Some(4), generation: 1 });
-        ped.add_entry(PedigreeEntry { individual_id: 7, parent_a_id: Some(5), parent_b_id: Some(6), generation: 2 });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 1,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 2,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 3,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 4,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 5,
+            parent_a_id: Some(1),
+            parent_b_id: Some(2),
+            generation: 1,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 6,
+            parent_a_id: Some(3),
+            parent_b_id: Some(4),
+            generation: 1,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 7,
+            parent_a_id: Some(5),
+            parent_b_id: Some(6),
+            generation: 2,
+        });
         ped
     }
 
@@ -191,11 +223,36 @@ mod tests {
         // Gen 1: 3 = 1x2, 4 = 1x2 (full siblings)
         // Gen 2: 5 = 3x4 (offspring of siblings)
         let mut ped = Pedigree::new();
-        ped.add_entry(PedigreeEntry { individual_id: 1, parent_a_id: None, parent_b_id: None, generation: 0 });
-        ped.add_entry(PedigreeEntry { individual_id: 2, parent_a_id: None, parent_b_id: None, generation: 0 });
-        ped.add_entry(PedigreeEntry { individual_id: 3, parent_a_id: Some(1), parent_b_id: Some(2), generation: 1 });
-        ped.add_entry(PedigreeEntry { individual_id: 4, parent_a_id: Some(1), parent_b_id: Some(2), generation: 1 });
-        ped.add_entry(PedigreeEntry { individual_id: 5, parent_a_id: Some(3), parent_b_id: Some(4), generation: 2 });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 1,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 2,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 3,
+            parent_a_id: Some(1),
+            parent_b_id: Some(2),
+            generation: 1,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 4,
+            parent_a_id: Some(1),
+            parent_b_id: Some(2),
+            generation: 1,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 5,
+            parent_a_id: Some(3),
+            parent_b_id: Some(4),
+            generation: 2,
+        });
         ped
     }
 
@@ -259,10 +316,7 @@ mod tests {
     fn test_unrelated_kinship() {
         let ped = make_simple_pedigree();
         let k = kinship_from_pedigree(&ped, 1, 3);
-        assert!(
-            k.abs() < 1e-10,
-            "unrelated founders kinship = 0, got {k}"
-        );
+        assert!(k.abs() < 1e-10, "unrelated founders kinship = 0, got {k}");
     }
 
     #[test]
@@ -347,10 +401,7 @@ mod tests {
         let a = make_test_individual(1, BiologicalSex::Female, 42);
         let b = make_test_individual(2, BiologicalSex::Male, 99999);
         let k = hdc_kinship_estimate(&a, &b);
-        assert!(
-            k < 0.2,
-            "unrelated HDC kinship should be low, got {k}"
-        );
+        assert!(k < 0.2, "unrelated HDC kinship should be low, got {k}");
     }
 
     #[test]
@@ -369,7 +420,10 @@ mod tests {
         ];
         let mk = mean_kinship(0, &km);
         // (0.1 + 0.2) / 2 = 0.15
-        assert!((mk - 0.15).abs() < 1e-10, "mean kinship of 0 = 0.15, got {mk}");
+        assert!(
+            (mk - 0.15).abs() < 1e-10,
+            "mean kinship of 0 = 0.15, got {mk}"
+        );
     }
 
     #[test]
@@ -381,7 +435,10 @@ mod tests {
         ];
         let pmk = population_mean_kinship(&km);
         // (0.1 + 0.2 + 0.15) / 3 = 0.15
-        assert!((pmk - 0.15).abs() < 1e-10, "pop mean kinship = 0.15, got {pmk}");
+        assert!(
+            (pmk - 0.15).abs() < 1e-10,
+            "pop mean kinship = 0.15, got {pmk}"
+        );
     }
 
     #[test]

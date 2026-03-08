@@ -544,7 +544,7 @@ mod tests {
     fn test_core_values() {
         let soul = Soul::default();
 
-        // Should have Seven Harmonies by default
+        // Should have Eight Harmonies by default
         assert!(soul.get_value("resonance").is_some());
         assert!(soul.get_value("flourishing").is_some());
     }

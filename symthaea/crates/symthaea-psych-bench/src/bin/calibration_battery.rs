@@ -9,7 +9,9 @@
 //! Output (stdout):
 //!   [{"benchmark":"Executive::Stroop","metric":"stroop_effect","z_score":-0.42}, ...]
 
-use symthaea_psych_bench::benchmarks::executive::{DualTaskBenchmark, FlankerBenchmark, StroopBenchmark};
+use symthaea_psych_bench::benchmarks::executive::{
+    DualTaskBenchmark, FlankerBenchmark, StroopBenchmark,
+};
 use symthaea_psych_bench::benchmarks::inhibition::{GoNoGoBenchmark, StopSignalBenchmark};
 use symthaea_psych_bench::benchmarks::social::{RmeBenchmark, UltimatumGameBenchmark};
 use symthaea_psych_bench::benchmarks::sustained_attention::{CptBenchmark, PvtBenchmark};

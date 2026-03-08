@@ -656,7 +656,9 @@ impl StructuredThought {
             }
             if ctx.needs_llm_completion {
                 prompt.push_str("NEEDS_COMPLETION: true\n");
-                prompt.push_str("The GENERATED_CODE contains todo!() or NotImplementedError placeholders.\n");
+                prompt.push_str(
+                    "The GENERATED_CODE contains todo!() or NotImplementedError placeholders.\n",
+                );
                 prompt.push_str("Replace ONLY the placeholder bodies with real implementations.\n");
                 prompt.push_str("Keep the function signatures, struct definitions, and test assertions exactly as-is.\n");
             }
@@ -895,9 +897,12 @@ mod tests {
             spec_constraints: vec![],
             spec_examples: vec![],
             plan_steps: vec!["DefineFunction".to_string()],
-            generated_code: Some(r#"pub fn solve(input: &str) -> Vec<i32> {
+            generated_code: Some(
+                r#"pub fn solve(input: &str) -> Vec<i32> {
     todo!("Implement: Complex algorithm → Vec<i32>")
-}"#.to_string()),
+}"#
+                .to_string(),
+            ),
             phi_score: Some(0.5),
             intent_similarity: Some(0.6),
             syntactically_valid: None,

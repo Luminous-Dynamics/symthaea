@@ -18,8 +18,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -102,7 +102,8 @@ impl SocialNormBenchmark {
             // Compare stimulus to norm prototype
             // Encoding noise degrades norm representation fidelity
             let noise_degrade = config.effective_noise() as f32 * 0.4;
-            let norm_sim = stimulus.similarity(&norms[scenario_idx]) * (1.0 - noise_degrade) + social_boost;
+            let norm_sim =
+                stimulus.similarity(&norms[scenario_idx]) * (1.0 - noise_degrade) + social_boost;
             xor_shift(&mut rng);
             let noise = (rng % 10000) as f32 / 10000.0 * noise_level;
 
@@ -257,7 +258,9 @@ impl PsychBenchmark for SocialNormBenchmark {
 
         result.conditions = 2; // congruent vs violation
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

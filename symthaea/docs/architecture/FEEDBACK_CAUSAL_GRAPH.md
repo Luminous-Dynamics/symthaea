@@ -51,7 +51,7 @@ cycle. Two variables (`prediction_confidence`, `fep_lr_boost`) use the
 | `moral_harm_detect` | Scale | Harm violation | ×0.85 | Greene (2013) |
 | `moral_benefit` | Scale | Positive moral alignment | ×MORAL_BENEFIT_CONFIDENCE_BOOST | — |
 | `neuromod_serotonin` | Add | Serotonin bath | +5-HT.confidence_delta() | — |
-| `harmonies_low_align` | Add | Harmony misalignment | −0.02 | Seven Harmonies |
+| `harmonies_low_align` | Add | Harmony misalignment | −0.02 | Eight Harmonies |
 | `reasoning_chain` | Add | Chain conf > 0.7, depth ≥ 3 | +(conf−0.7)×0.05 | — |
 | `limit_binding` | Add | Binding is limiting component | +0.01 | — |
 | `love_resonance` | Add | Harmonic love > 0.6 | +(res−0.6)×0.04 | — |
@@ -71,7 +71,7 @@ cycle. Two variables (`prediction_confidence`, `fep_lr_boost`) use the
 
 | Label | Method | Condition | Effect | Citation |
 |-------|--------|-----------|--------|----------|
-| `harmonies_low_align` | Add | Harmony misaligned, not approved | −0.02 | Seven Harmonies |
+| `harmonies_low_align` | Add | Harmony misaligned, not approved | −0.02 | Eight Harmonies |
 | `reasoning_chain` | Add | Strong chain (conf > 0.7) | +(conf−0.7)×0.03 | — |
 | `temporal_continuity` | Add | Continuity > 0.7 | +(cont−0.7)×0.05 | — |
 | `causal_chain_detect` | Add | Causal chains > 2 | +(chains.min(10)−2)×0.005 | — |

@@ -12,8 +12,8 @@
 //! cargo run --example hierarchical_comparison --release
 //! ```
 
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use symthaea::cognitive_loop::config::TemporalBackend;
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
 const N_CYCLES: usize = 200;
 
@@ -64,17 +64,23 @@ struct MetricsAccumulator {
 
 impl MetricsAccumulator {
     fn mean(v: &[f64]) -> f64 {
-        if v.is_empty() { return 0.0; }
+        if v.is_empty() {
+            return 0.0;
+        }
         v.iter().sum::<f64>() / v.len() as f64
     }
 
     fn mean_f32(v: &[f32]) -> f32 {
-        if v.is_empty() { return 0.0; }
+        if v.is_empty() {
+            return 0.0;
+        }
         v.iter().sum::<f32>() / v.len() as f32
     }
 
     fn std_f64(v: &[f64]) -> f64 {
-        if v.len() < 2 { return 0.0; }
+        if v.len() < 2 {
+            return 0.0;
+        }
         let m = Self::mean(v);
         let var = v.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (v.len() - 1) as f64;
         var.sqrt()
@@ -82,12 +88,32 @@ impl MetricsAccumulator {
 
     fn print_summary(&self, label: &str) {
         println!("  {label}:");
-        println!("    Phi (unified_psi):      {:.4} +/- {:.4}", Self::mean(&self.phi), Self::std_f64(&self.phi));
-        println!("    Coherence:              {:.4}", Self::mean_f32(&self.coherence));
-        println!("    Consciousness level:    {:.4} +/- {:.4}", Self::mean(&self.consciousness_level), Self::std_f64(&self.consciousness_level));
-        println!("    Prediction error:       {:.4}", Self::mean_f32(&self.prediction_error));
-        println!("    Attention fatigue:      {:.4}", Self::mean_f32(&self.attention_fatigue));
-        println!("    Attention pred acc:     {:.4}", Self::mean_f32(&self.attention_pred_accuracy));
+        println!(
+            "    Phi (unified_psi):      {:.4} +/- {:.4}",
+            Self::mean(&self.phi),
+            Self::std_f64(&self.phi)
+        );
+        println!(
+            "    Coherence:              {:.4}",
+            Self::mean_f32(&self.coherence)
+        );
+        println!(
+            "    Consciousness level:    {:.4} +/- {:.4}",
+            Self::mean(&self.consciousness_level),
+            Self::std_f64(&self.consciousness_level)
+        );
+        println!(
+            "    Prediction error:       {:.4}",
+            Self::mean_f32(&self.prediction_error)
+        );
+        println!(
+            "    Attention fatigue:      {:.4}",
+            Self::mean_f32(&self.attention_fatigue)
+        );
+        println!(
+            "    Attention pred acc:     {:.4}",
+            Self::mean_f32(&self.attention_pred_accuracy)
+        );
     }
 }
 
@@ -95,8 +121,8 @@ fn run_backend(backend: TemporalBackend, inputs: &[&str]) -> MetricsAccumulator 
     let mut config = CognitiveLoopConfig::with_cfc();
     config.temporal_backend = backend;
     config.enable_attention_schema = true;
-    let mut service = CognitiveLoopService::new(config)
-        .expect("Failed to create CognitiveLoopService");
+    let mut service =
+        CognitiveLoopService::new(config).expect("Failed to create CognitiveLoopService");
 
     let mut acc = MetricsAccumulator::default();
 
@@ -109,11 +135,18 @@ fn run_backend(backend: TemporalBackend, inputs: &[&str]) -> MetricsAccumulator 
         acc.consciousness_level.push(md.consciousness_level);
         acc.prediction_error.push(result.prediction_error);
         acc.attention_fatigue.push(md.attention.attention_fatigue);
-        acc.attention_pred_accuracy.push(md.attention.attention_prediction_accuracy);
+        acc.attention_pred_accuracy
+            .push(md.attention.attention_prediction_accuracy);
 
         if (i + 1) % 50 == 0 {
-            println!("    cycle {}: phi={:.4} coherence={:.3} consciousness={:.4} PE={:.3}",
-                i + 1, md.pipeline_consciousness, md.prediction_coherence, md.consciousness_level, result.prediction_error);
+            println!(
+                "    cycle {}: phi={:.4} coherence={:.3} consciousness={:.4} PE={:.3}",
+                i + 1,
+                md.pipeline_consciousness,
+                md.prediction_coherence,
+                md.consciousness_level,
+                result.prediction_error
+            );
         }
     }
 
@@ -152,9 +185,12 @@ fn main() {
 
     println!();
     println!("  Delta (Hierarchical - Single):");
-    let phi_delta = MetricsAccumulator::mean(&hcfc_metrics.phi) - MetricsAccumulator::mean(&cfc_metrics.phi);
-    let cons_delta = MetricsAccumulator::mean(&hcfc_metrics.consciousness_level) - MetricsAccumulator::mean(&cfc_metrics.consciousness_level);
-    let pe_delta = MetricsAccumulator::mean_f32(&hcfc_metrics.prediction_error) - MetricsAccumulator::mean_f32(&cfc_metrics.prediction_error);
+    let phi_delta =
+        MetricsAccumulator::mean(&hcfc_metrics.phi) - MetricsAccumulator::mean(&cfc_metrics.phi);
+    let cons_delta = MetricsAccumulator::mean(&hcfc_metrics.consciousness_level)
+        - MetricsAccumulator::mean(&cfc_metrics.consciousness_level);
+    let pe_delta = MetricsAccumulator::mean_f32(&hcfc_metrics.prediction_error)
+        - MetricsAccumulator::mean_f32(&cfc_metrics.prediction_error);
     println!("    Phi:                    {:+.4}", phi_delta);
     println!("    Consciousness level:    {:+.4}", cons_delta);
     println!("    Prediction error:       {:+.4}", pe_delta);
@@ -169,10 +205,22 @@ fn main() {
     println!("  Butlin AST-1 validation: Attention schema self-model");
     println!("  causally modulates perception via encode_for_thought_vector()");
     println!("  injection into compressed_state (weight=0.05).");
-    println!("    CfC attention fatigue:   {:.4}", MetricsAccumulator::mean_f32(&cfc_metrics.attention_fatigue));
-    println!("    HCfC attention fatigue:  {:.4}", MetricsAccumulator::mean_f32(&hcfc_metrics.attention_fatigue));
-    println!("    CfC pred accuracy:       {:.4}", MetricsAccumulator::mean_f32(&cfc_metrics.attention_pred_accuracy));
-    println!("    HCfC pred accuracy:      {:.4}", MetricsAccumulator::mean_f32(&hcfc_metrics.attention_pred_accuracy));
+    println!(
+        "    CfC attention fatigue:   {:.4}",
+        MetricsAccumulator::mean_f32(&cfc_metrics.attention_fatigue)
+    );
+    println!(
+        "    HCfC attention fatigue:  {:.4}",
+        MetricsAccumulator::mean_f32(&hcfc_metrics.attention_fatigue)
+    );
+    println!(
+        "    CfC pred accuracy:       {:.4}",
+        MetricsAccumulator::mean_f32(&cfc_metrics.attention_pred_accuracy)
+    );
+    println!(
+        "    HCfC pred accuracy:      {:.4}",
+        MetricsAccumulator::mean_f32(&hcfc_metrics.attention_pred_accuracy)
+    );
 
     println!();
     println!("================================================================");

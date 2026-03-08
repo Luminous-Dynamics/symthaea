@@ -72,7 +72,11 @@ pub fn evaluate_compatibility(
             remote.features.iter().map(|s| s.as_str()).collect();
         let intersection = local_set.intersection(&remote_set).count() as f64;
         let union = local_set.union(&remote_set).count() as f64;
-        if union > 0.0 { intersection / union } else { 1.0 }
+        if union > 0.0 {
+            intersection / union
+        } else {
+            1.0
+        }
     };
 
     // Phi compatibility: 1.0 when equal, decays with distance
@@ -116,7 +120,11 @@ mod tests {
     fn test_identical_configs_high_compat() {
         let card = make_card(vec!["a".into(), "b".into()], 0.8);
         let result = evaluate_compatibility(&card, &card, &HandshakeConfig::default());
-        assert!(result.total_score > 0.9, "Identical cards should have high compat: {}", result.total_score);
+        assert!(
+            result.total_score > 0.9,
+            "Identical cards should have high compat: {}",
+            result.total_score
+        );
         assert!(result.approved);
     }
 
@@ -125,7 +133,10 @@ mod tests {
         let a = make_card(vec!["a".into()], 0.8);
         let b = make_card(vec!["b".into()], 0.3);
         let result = evaluate_compatibility(&a, &b, &HandshakeConfig::default());
-        assert!(result.total_score > 0.0, "Different configs should still be positive");
+        assert!(
+            result.total_score > 0.0,
+            "Different configs should still be positive"
+        );
     }
 
     #[test]
@@ -152,6 +163,10 @@ mod tests {
         let a = make_card(vec![], 0.80);
         let b = make_card(vec![], 0.82);
         let result = evaluate_compatibility(&a, &b, &HandshakeConfig::default());
-        assert!(result.phi_compat > 0.9, "Close phi should have high compat: {}", result.phi_compat);
+        assert!(
+            result.phi_compat > 0.9,
+            "Close phi should have high compat: {}",
+            result.phi_compat
+        );
     }
 }

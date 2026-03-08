@@ -142,7 +142,11 @@ impl CognitiveLoopService {
             temporal_max_chain_length: feedback.consciousness.temporal_max_chain_length,
             lattice_height: feedback.consciousness.lattice_height,
             lattice_width: feedback.consciousness.lattice_width,
-            lattice_join_concept: feedback.consciousness.lattice_join_concept.clone().unwrap_or_default(),
+            lattice_join_concept: feedback
+                .consciousness
+                .lattice_join_concept
+                .clone()
+                .unwrap_or_default(),
             causal_codebook_entries: feedback.consciousness.causal_codebook_entries_len,
             compositionality_total: feedback.consciousness.compositionality_total,
             composition_rule_applied: feedback.ethics.composition_rule_applied.clone(),
@@ -224,6 +228,8 @@ impl CognitiveLoopService {
                     && moral_anomaly_report.drift_alert,
                 moral_fragmentation_increase: self.ethics_engine.last_topology_fresh()
                     && moral_anomaly_report.fragmentation_increase,
+                moral_trajectory_convergence: moral_anomaly_report.trajectory_convergence,
+                moral_convergence_severity: moral_anomaly_report.convergence_severity,
                 moral_anomaly_response_applied: self.config.enable_moral_anomaly_response
                     && self.ethics_engine.last_topology_fresh()
                     && moral_anomaly_report.anomaly_score > 0.0,
@@ -260,8 +266,13 @@ impl CognitiveLoopService {
             epistemic_conflict_count: feedback.reasoning.epistemic_conflict_count,
             holographic_unity: feedback.consciousness.holographic_unity,
             holographic_binding: feedback.consciousness.holographic_binding,
-            consciousness_gradient_magnitude: feedback.consciousness.consciousness_gradient_magnitude,
-            consciousness_limiting_component: feedback.consciousness.consciousness_limiting_component.clone(),
+            consciousness_gradient_magnitude: feedback
+                .consciousness
+                .consciousness_gradient_magnitude,
+            consciousness_limiting_component: feedback
+                .consciousness
+                .consciousness_limiting_component
+                .clone(),
             eq_v2_limiting_component: feedback.consciousness.eq_v2_limiting_component.clone(),
             affect_consciousness_valence: feedback.consciousness.affect_cons_valence,
             affect_consciousness_arousal: feedback.consciousness.affect_cons_arousal,
@@ -391,16 +402,19 @@ impl CognitiveLoopService {
             // Adaptive dynamics telemetry
             epistemic_uncertainty: dynamics.epistemic_uncertainty,
             aleatoric_uncertainty: dynamics.aleatoric_uncertainty,
-            theta_phase: ((self.stats.total_cycles as f64
-                * super::thresholds::THETA_PHASE_ADVANCE)
+            theta_phase: ((self.stats.total_cycles as f64 * super::thresholds::THETA_PHASE_ADVANCE)
                 % (2.0 * std::f64::consts::PI)) as f32,
             temporal_binding_strength: perception.encoding.temporal_binding_strength,
             prediction_horizon_scale: {
                 // Match prediction.rs: PE-adaptive × substrate tau × trend, clamped.
                 let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
-                let pe_scale = if pe > 0.3 { 1.0 - (pe - 0.3) * 0.6 }
-                    else if pe < 0.05 { 1.0 + (0.05 - pe) * 6.0 }
-                    else { 1.0 };
+                let pe_scale = if pe > 0.3 {
+                    1.0 - (pe - 0.3) * 0.6
+                } else if pe < 0.05 {
+                    1.0 + (0.05 - pe) * 6.0
+                } else {
+                    1.0
+                };
                 // Error slope → horizon adjustment: rising errors shorten horizons
                 // (focus near-term), falling errors lengthen them (exploit stability).
                 // Clark (2013): predictive brain adjusts temporal scope to match uncertainty.
@@ -412,9 +426,10 @@ impl CognitiveLoopService {
                 } else {
                     1.0
                 };
-                (self.substrate_manager.tau_factor * pe_scale * slope_scale)
-                    .clamp(super::thresholds::PREDICTION_HORIZON_MIN_SCALE,
-                           super::thresholds::PREDICTION_HORIZON_MAX_SCALE)
+                (self.substrate_manager.tau_factor * pe_scale * slope_scale).clamp(
+                    super::thresholds::PREDICTION_HORIZON_MIN_SCALE,
+                    super::thresholds::PREDICTION_HORIZON_MAX_SCALE,
+                )
             },
             fep_tau_factor: dynamics.fep_tau_factor,
             causal_world_model_edges: dynamics.causal_world_model_edges,
@@ -426,7 +441,10 @@ impl CognitiveLoopService {
             calibration_validations_total: self.neuromod.calibration_validator.total_validations(),
             calibration_improvements: self.neuromod.calibration_validator.improvements,
             calibration_regressions: self.neuromod.calibration_validator.regressions,
-            calibration_adjustment_multiplier: self.neuromod.calibration_validator.adjustment_multiplier(),
+            calibration_adjustment_multiplier: self
+                .neuromod
+                .calibration_validator
+                .adjustment_multiplier(),
             calibration_cooldown_duration: self.neuromod.self_assessment.cooldown_duration(),
             feedback_signals_high_water: self.feedback_state.feedback_signals_high_water,
             feedback_dampened_count: self.feedback_state.feedback_dampened_count,
@@ -462,8 +480,8 @@ impl CognitiveLoopService {
         metadata.social_models_count = self.social_mgr.social.social_models_count;
         metadata.social_mean_trust = self.social_mgr.social.social_mean_trust;
         metadata.tom_prediction_mismatch = self.stats.tom_prediction_mismatch_ema;
-        metadata.tom_exploration_triggered = self.stats.tom_prediction_mismatch_ema > 0.4
-            && self.stats.total_cycles > 10;
+        metadata.tom_exploration_triggered =
+            self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10;
 
         // ── MCE factor telemetry (from consciousness carryover cache) ──
         metadata.mce_bottleneck = self.carryover.consciousness.mce_bottleneck_name.clone();
@@ -482,8 +500,7 @@ impl CognitiveLoopService {
         metadata.compound_instability = feedback.quality.cross_module_agreement < 0.5
             && perception.urgency.error_slope > 0.02
             && self.stats.total_cycles > 30;
-        metadata.flow_feedback_relaxed = self.flow_state.in_flow
-            && self.flow_state.intensity > 0.5;
+        metadata.flow_feedback_relaxed = self.flow_state.in_flow && self.flow_state.intensity > 0.5;
         metadata.homeostasis_efficiency = self.carryover.quality.homeostasis_efficiency;
         // Session 10 telemetry (Session 11: lr_frozen from dynamics phase)
         metadata.confidence_crash_detected = dynamics.confidence_crash_detected;
@@ -508,11 +525,13 @@ impl CognitiveLoopService {
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
-            .gwt_mgr.memory_flag
+            .gwt_mgr
+            .memory_flag
             .swap(false, std::sync::atomic::Ordering::Relaxed);
-        metadata.gwt_perception_broadcasts = self
-            .gwt_mgr.perception_count
-            .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
+        metadata.gwt_perception_broadcasts =
+            self.gwt_mgr
+                .perception_count
+                .swap(0, std::sync::atomic::Ordering::Relaxed) as u32;
 
         // ── GWT-triggered memory consolidation (Dehaene & Changeux 2011) ──
         // When global workspace broadcasts, record current state for episodic
@@ -520,7 +539,8 @@ impl CognitiveLoopService {
         if metadata.gwt_memory_consolidation_requested {
             if let Some(ref mut dream) = self.dream_engine {
                 let action: Vec<f32> = perception
-                    .encoding.encoding_result
+                    .encoding
+                    .encoding_result
                     .hdv
                     .values
                     .iter()
@@ -541,7 +561,8 @@ impl CognitiveLoopService {
         if perception.urgency.error_slope > 0.03 && !metadata.gwt_memory_consolidation_requested {
             if let Some(ref mut dream) = self.dream_engine {
                 let action: Vec<f32> = perception
-                    .encoding.encoding_result
+                    .encoding
+                    .encoding_result
                     .hdv
                     .values
                     .iter()
@@ -559,7 +580,8 @@ impl CognitiveLoopService {
         // ── Voice telemetry ──
         {
             let voice_summary = self.voice_coherence.voice.summary();
-            metadata.voice_articulation_quality = self.voice_coherence.voice.smoothed_articulation();
+            metadata.voice_articulation_quality =
+                self.voice_coherence.voice.smoothed_articulation();
             metadata.voice_rate_stability = self.voice_coherence.voice.rate_stability();
             metadata.voice_confidence = voice_summary.voice_confidence;
             metadata.voice_phi_adjustment = self.voice_coherence.voice.compute_phi_adjustment();
@@ -571,7 +593,8 @@ impl CognitiveLoopService {
         metadata.substrate_transition = metadata.substrate.substrate_transition.clone();
         metadata.substrate_feasibility_raw = metadata.substrate.substrate_feasibility_raw;
         metadata.substrate_honest_confidence = metadata.substrate.substrate_honest_confidence;
-        metadata.substrate_effective_feasibility = metadata.substrate.substrate_effective_feasibility;
+        metadata.substrate_effective_feasibility =
+            metadata.substrate.substrate_effective_feasibility;
         metadata.substrate_tau_factor = metadata.substrate.substrate_tau_factor;
         metadata.substrate_scale_pressure = metadata.substrate.substrate_scale_pressure;
         metadata.substrate_feasibility = metadata.substrate.substrate_effective_feasibility;
@@ -625,23 +648,22 @@ impl CognitiveLoopService {
             if let Some(ref fov_mutex) = self.foveation_manager {
                 if let Ok(fov) = fov_mutex.lock() {
                     let ft = fov.telemetry();
-                    metadata.foveation =
-                        Some(super::FoveationBridgeTelemetry {
-                            pending_count: ft.pending_count,
-                            in_flight_count: ft.in_flight_count,
-                            ready_count: ft.ready_count,
-                            total_dispatched: ft.total_dispatched,
-                            total_completed: ft.total_completed,
-                            avg_processing_time_us: ft.avg_processing_time_us as u64,
-                            last_confidence: ft.last_confidence,
-                            effective_surprise_threshold: fov.effective_surprise_threshold(),
-                            effective_max_concurrent: fov.effective_max_concurrent(),
-                            recognition_count: perception.foveation_recognition_count,
-                            top_recognition_confidence: perception.foveation_top_confidence,
-                            hv_binding_applied: perception.foveation_recognition_count > 0,
-                            dynamics_coupling_triggered: perception.foveation_recognition_count >= 2
-                                && perception.foveation_top_confidence > 0.6,
-                        });
+                    metadata.foveation = Some(super::FoveationBridgeTelemetry {
+                        pending_count: ft.pending_count,
+                        in_flight_count: ft.in_flight_count,
+                        ready_count: ft.ready_count,
+                        total_dispatched: ft.total_dispatched,
+                        total_completed: ft.total_completed,
+                        avg_processing_time_us: ft.avg_processing_time_us as u64,
+                        last_confidence: ft.last_confidence,
+                        effective_surprise_threshold: fov.effective_surprise_threshold(),
+                        effective_max_concurrent: fov.effective_max_concurrent(),
+                        recognition_count: perception.foveation_recognition_count,
+                        top_recognition_confidence: perception.foveation_top_confidence,
+                        hv_binding_applied: perception.foveation_recognition_count > 0,
+                        dynamics_coupling_triggered: perception.foveation_recognition_count >= 2
+                            && perception.foveation_top_confidence > 0.6,
+                    });
                 }
             }
         }
@@ -721,7 +743,8 @@ impl CognitiveLoopService {
             );
             let chunk_size = (perception.encoding.encoding_result.hdv.values.len() / 32).max(1);
             perception
-                .encoding.encoding_result
+                .encoding
+                .encoding_result
                 .hdv
                 .values
                 .chunks(chunk_size)
@@ -768,10 +791,22 @@ impl CognitiveLoopService {
         let dominant_concentration = self.feedback_state.dominant_source_concentration();
         if dominant_concentration > 0.6 && self.feedback_state.total_proposals() > 4 {
             // Apply a mild Scale(0.97) to all channels from "anti_monopoly" source
-            self.feedback_state.confidence.propose("anti_monopoly", super::feedback_state::FeedbackProposal::Scale(0.97));
-            self.feedback_state.learning_rate.propose("anti_monopoly", super::feedback_state::FeedbackProposal::Scale(0.97));
-            self.feedback_state.exploration.propose("anti_monopoly", super::feedback_state::FeedbackProposal::Scale(0.97));
-            self.feedback_state.threshold.propose("anti_monopoly", super::feedback_state::FeedbackProposal::Scale(0.97));
+            self.feedback_state.confidence.propose(
+                "anti_monopoly",
+                super::feedback_state::FeedbackProposal::Scale(0.97),
+            );
+            self.feedback_state.learning_rate.propose(
+                "anti_monopoly",
+                super::feedback_state::FeedbackProposal::Scale(0.97),
+            );
+            self.feedback_state.exploration.propose(
+                "anti_monopoly",
+                super::feedback_state::FeedbackProposal::Scale(0.97),
+            );
+            self.feedback_state.threshold.propose(
+                "anti_monopoly",
+                super::feedback_state::FeedbackProposal::Scale(0.97),
+            );
         }
 
         // Session 9 telemetry (part 2 — after dominant_concentration computed)
@@ -782,8 +817,8 @@ impl CognitiveLoopService {
         // Science: Dehaene (2014) — GWT requires multi-source consensus for ignition.
         {
             use super::thresholds::{
-                PROPOSAL_DIVERSITY_MIN_SOURCES, PROPOSAL_DIVERSITY_WARMUP,
-                PROPOSAL_DIVERSITY_EXPLORATION_BOOST,
+                PROPOSAL_DIVERSITY_EXPLORATION_BOOST, PROPOSAL_DIVERSITY_MIN_SOURCES,
+                PROPOSAL_DIVERSITY_WARMUP,
             };
             let source_count = self.feedback_state.distinct_source_count();
             metadata.proposal_source_count = source_count as u32;
@@ -876,7 +911,11 @@ impl CognitiveLoopService {
             output: dynamics.core.output.clone(),
             prediction_error: dynamics.core.prediction_error,
             peak_attention: perception.encoding.encoding_result.peak_attention,
-            detected_primitives: perception.encoding.encoding_result.detected_primitives.clone(),
+            detected_primitives: perception
+                .encoding
+                .encoding_result
+                .detected_primitives
+                .clone(),
             learning_occurred: dynamics.core.learning_occurred,
             training_loss: dynamics.core.training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),

@@ -48,10 +48,8 @@ pub fn ensure_model(repo_id: &str) -> Result<String> {
                 .and_then(|v| v.as_object())
                 .ok_or_else(|| anyhow::anyhow!("Index file missing weight_map object"))?;
 
-            let shard_files: HashSet<&str> = weight_map
-                .values()
-                .filter_map(|v| v.as_str())
-                .collect();
+            let shard_files: HashSet<&str> =
+                weight_map.values().filter_map(|v| v.as_str()).collect();
 
             // Download each unique shard file
             for shard in &shard_files {
@@ -113,10 +111,7 @@ mod tests {
 
         let index: serde_json::Value = serde_json::from_str(index_json).unwrap();
         let weight_map = index.get("weight_map").unwrap().as_object().unwrap();
-        let shard_files: HashSet<&str> = weight_map
-            .values()
-            .filter_map(|v| v.as_str())
-            .collect();
+        let shard_files: HashSet<&str> = weight_map.values().filter_map(|v| v.as_str()).collect();
 
         assert_eq!(shard_files.len(), 2);
         assert!(shard_files.contains("model-00001-of-00002.safetensors"));
@@ -127,6 +122,9 @@ mod tests {
     fn test_parse_shard_index_missing_weight_map() {
         let bad_json = r#"{"metadata": {}}"#;
         let index: serde_json::Value = serde_json::from_str(bad_json).unwrap();
-        assert!(index.get("weight_map").and_then(|v| v.as_object()).is_none());
+        assert!(index
+            .get("weight_map")
+            .and_then(|v| v.as_object())
+            .is_none());
     }
 }

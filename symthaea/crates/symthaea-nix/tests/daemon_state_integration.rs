@@ -287,7 +287,10 @@ fn test_knowledge_dynamic_ranking() {
     let mut kb = KnowledgeBase::new(&mut codebook);
 
     // Add 3 articles with different symptoms
-    for (i, symptom) in ["disk full", "memory OOM", "nginx crash"].iter().enumerate() {
+    for (i, symptom) in ["disk full", "memory OOM", "nginx crash"]
+        .iter()
+        .enumerate()
+    {
         kb.add_learned_article(
             DynamicKnowledgeArticle {
                 id: format!("learned_{i}"),
@@ -343,7 +346,15 @@ fn test_semantic_search_rank_validity() {
 
     // All similarities should be finite and non-negative
     for r in &results {
-        assert!(r.similarity.is_finite(), "Similarity must be finite for {}", r.path);
-        assert!(r.similarity >= 0.0, "Similarity must be non-negative for {}", r.path);
+        assert!(
+            r.similarity.is_finite(),
+            "Similarity must be finite for {}",
+            r.path
+        );
+        assert!(
+            r.similarity >= 0.0,
+            "Similarity must be non-negative for {}",
+            r.path
+        );
     }
 }

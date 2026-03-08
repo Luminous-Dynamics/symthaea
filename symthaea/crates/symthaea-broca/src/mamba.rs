@@ -15,10 +15,10 @@
 //! operations used by [`crate::liquid_mamba::LiquidMambaGenerator`]. This
 //! enables deterministic testing without network access or model downloads.
 
+use crate::mamba_model::{Config, Model, State};
 use anyhow::{Context, Result};
 use candle_core::{DType, Device, IndexOp, Tensor};
 use candle_nn::VarBuilder;
-use crate::mamba_model::{Config, Model, State};
 
 /// Select the best available compute device.
 ///
@@ -444,30 +444,26 @@ impl MambaWrapper {
 
         // 1. Inject [0..pos) as context (no autograd)
         for i in 0..pos {
-            let embed = Tensor::from_vec(
-                sequence[i].clone(),
-                (1, d_model),
-                &self.device,
-            )?;
+            let embed = Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?;
             self.model.forward_embeds_no_head(&embed, &mut self.state)?;
         }
 
         // 2. Make sequence[pos] a Var for gradient tracking
-        let var_embed = candle_core::Var::from_tensor(
-            &Tensor::from_vec(sequence[pos].clone(), (1, d_model), &self.device)?,
-        )?;
-        let _logits = self.model.forward_embeds(&var_embed.as_tensor(), &mut self.state)?;
+        let var_embed = candle_core::Var::from_tensor(&Tensor::from_vec(
+            sequence[pos].clone(),
+            (1, d_model),
+            &self.device,
+        )?)?;
+        let _logits = self
+            .model
+            .forward_embeds(&var_embed.as_tensor(), &mut self.state)?;
 
         // 3. Detach state to prevent gradient flow through warmup
         self.state.detach()?;
 
         // 4. Inject [pos+1..N) as context (no autograd needed for these)
         for i in (pos + 1)..n {
-            let embed = Tensor::from_vec(
-                sequence[i].clone(),
-                (1, d_model),
-                &self.device,
-            )?;
+            let embed = Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?;
             self.model.forward_embeds_no_head(&embed, &mut self.state)?;
         }
 
@@ -541,11 +537,7 @@ impl MambaWrapper {
 
         // 1. Inject [0..first_var_pos) as context (no autograd)
         for i in 0..first_var_pos.min(n) {
-            let embed = Tensor::from_vec(
-                sequence[i].clone(),
-                (1, d_model),
-                &self.device,
-            )?;
+            let embed = Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?;
             self.model.forward_embeds_no_head(&embed, &mut self.state)?;
         }
 
@@ -558,17 +550,16 @@ impl MambaWrapper {
 
         for i in first_var_pos..n {
             if pos_set.contains(&i) {
-                let var_embed = candle_core::Var::from_tensor(
-                    &Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?,
-                )?;
-                self.model.forward_embeds_no_head(var_embed.as_tensor(), &mut self.state)?;
-                vars.push((i, var_embed));
-            } else {
-                let embed = Tensor::from_vec(
+                let var_embed = candle_core::Var::from_tensor(&Tensor::from_vec(
                     sequence[i].clone(),
                     (1, d_model),
                     &self.device,
-                )?;
+                )?)?;
+                self.model
+                    .forward_embeds_no_head(var_embed.as_tensor(), &mut self.state)?;
+                vars.push((i, var_embed));
+            } else {
+                let embed = Tensor::from_vec(sequence[i].clone(), (1, d_model), &self.device)?;
                 self.model.forward_embeds_no_head(&embed, &mut self.state)?;
             }
         }
@@ -582,7 +573,10 @@ impl MambaWrapper {
         let target_idx = tokens.get(1).copied().unwrap_or(teacher_token) as usize;
         let vocab = logits.dim(0)?;
         if target_idx >= vocab {
-            return Ok(vars.iter().map(|(pos, _)| (*pos, vec![0.0f32; d_model])).collect());
+            return Ok(vars
+                .iter()
+                .map(|(pos, _)| (*pos, vec![0.0f32; d_model]))
+                .collect());
         }
 
         let log_softmax = candle_nn::ops::log_softmax(&logits, 0)?;
@@ -601,7 +595,10 @@ impl MambaWrapper {
             .iter()
             .map(|(pos, var)| {
                 let grad = match grads.get(var.as_tensor()) {
-                    Some(g) => g.flatten_all().and_then(|t| t.to_vec1::<f32>()).unwrap_or_else(|_| vec![0.0f32; d_model]),
+                    Some(g) => g
+                        .flatten_all()
+                        .and_then(|t| t.to_vec1::<f32>())
+                        .unwrap_or_else(|_| vec![0.0f32; d_model]),
                     None => vec![0.0f32; d_model],
                 };
                 (*pos, grad)
@@ -917,11 +914,14 @@ pub(crate) mod tests {
         ) -> Result<Vec<(usize, Vec<f32>)>> {
             // Mock: return small deterministic gradient at each requested position
             let d = self.d_model();
-            Ok(positions.iter().map(|&pos| {
-                // Vary gradient slightly by position for testing
-                let grad_val = 0.001 * (1.0 + pos as f32 * 0.01);
-                (pos, vec![grad_val; d])
-            }).collect())
+            Ok(positions
+                .iter()
+                .map(|&pos| {
+                    // Vary gradient slightly by position for testing
+                    let grad_val = 0.001 * (1.0 + pos as f32 * 0.01);
+                    (pos, vec![grad_val; d])
+                })
+                .collect())
         }
 
         fn enable_lora(&mut self, _rank: usize, _alpha: f32, _lr: f32) {

@@ -1,9 +1,9 @@
-//! # Seven Harmonies: Value Alignment Framework
+//! # Eight Harmonies: Value Alignment Framework
 //!
-//! The Seven Primary Harmonies of Infinite Love represent a complete framework
+//! The Eight Primary Harmonies of Infinite Love represent a complete framework
 //! for evaluating actions against deep ethical and consciousness principles.
 //!
-//! ## The Seven Harmonies
+//! ## The Eight Harmonies
 //!
 //! 1. **Resonant Coherence** - Harmonious integration, luminous order
 //! 2. **Pan-Sentient Flourishing** - Unconditional care, intrinsic value
@@ -12,13 +12,14 @@
 //! 5. **Universal Interconnectedness** - Fundamental unity, empathic resonance
 //! 6. **Sacred Reciprocity** - Generous flow, mutual upliftment
 //! 7. **Evolutionary Progression** - Wise becoming, continuous evolution
+//! 8. **Sacred Stillness** - Rest, silence, release, the void from which all arises
 //!
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use symthaea_harmonies::{SevenHarmonies, Harmony};
+//! use symthaea_harmonies::{EightHarmonies, Harmony};
 //!
-//! let mut harmonies = SevenHarmonies::new();
+//! let mut harmonies = EightHarmonies::new();
 //! let result = harmonies.evaluate("install firefox");
 //!
 //! if result.is_aligned() {
@@ -146,11 +147,11 @@ impl AlignmentResult {
         let summary = if overall_score > 0.5 {
             "Action strongly aligns with the Kosmic Song".to_string()
         } else if overall_score > 0.0 {
-            "Action generally aligns with the Seven Harmonies".to_string()
+            "Action generally aligns with the Eight Harmonies".to_string()
         } else if overall_score > -0.5 {
             "Action may conflict with some harmonies - review recommended".to_string()
         } else {
-            "Action conflicts with the Seven Harmonies - reconsider".to_string()
+            "Action conflicts with the Eight Harmonies - reconsider".to_string()
         };
 
         Self {
@@ -216,10 +217,10 @@ impl AlignmentResult {
     }
 }
 
-/// The Seven Harmonies evaluator
+/// The Eight Harmonies evaluator
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // Fields reserved for harmony evaluation
-pub struct SevenHarmonies {
+pub struct EightHarmonies {
     /// Weights for each harmony (all equal by default)
     weights: HashMap<Harmony, f64>,
 
@@ -227,12 +228,12 @@ pub struct SevenHarmonies {
     min_confidence: f64,
 
     /// Statistics
-    stats: SevenHarmoniesStats,
+    stats: EightHarmoniesStats,
 }
 
 /// Statistics for the evaluator
 #[derive(Debug, Clone, Default)]
-pub struct SevenHarmoniesStats {
+pub struct EightHarmoniesStats {
     /// Total evaluations
     pub total_evaluations: u64,
 
@@ -246,7 +247,7 @@ pub struct SevenHarmoniesStats {
     pub avg_score: f64,
 }
 
-impl SevenHarmonies {
+impl EightHarmonies {
     /// Create a new evaluator with equal weights
     pub fn new() -> Self {
         let mut weights = HashMap::new();
@@ -257,7 +258,7 @@ impl SevenHarmonies {
         Self {
             weights,
             min_confidence: 0.3,
-            stats: SevenHarmoniesStats::default(),
+            stats: EightHarmoniesStats::default(),
         }
     }
 
@@ -379,7 +380,7 @@ impl SevenHarmonies {
     }
 
     /// Get statistics
-    pub fn stats(&self) -> &SevenHarmoniesStats {
+    pub fn stats(&self) -> &EightHarmoniesStats {
         &self.stats
     }
 
@@ -409,7 +410,7 @@ pub struct HarmonyEncoding {
     pub encoding: symthaea_core::hdc::binary_hv::BinaryHV,
 }
 
-impl Default for SevenHarmonies {
+impl Default for EightHarmonies {
     fn default() -> Self {
         Self::new()
     }
@@ -433,8 +434,8 @@ mod tests {
     }
 
     #[test]
-    fn test_seven_harmonies_evaluate() {
-        let mut harmonies = SevenHarmonies::new();
+    fn test_eight_harmonies_evaluate() {
+        let mut harmonies = EightHarmonies::new();
 
         let result = harmonies.evaluate("help me install this package");
         assert!(result.overall_score > -1.0);
@@ -456,7 +457,7 @@ mod tests {
 
     #[test]
     fn test_kosmic_song() {
-        let song = SevenHarmonies::kosmic_song();
+        let song = EightHarmonies::kosmic_song();
         assert!(song.contains("Infinite Love"));
     }
 
@@ -622,12 +623,12 @@ mod tests {
     }
 
     // =========================================================================
-    // SevenHarmonies extended tests
+    // EightHarmonies extended tests
     // =========================================================================
 
     #[test]
     fn test_set_weight_affects_evaluator() {
-        let mut harmonies = SevenHarmonies::new();
+        let mut harmonies = EightHarmonies::new();
         harmonies.set_weight(Harmony::ResonantCoherence, 10.0);
         // The weight should be stored
         assert_eq!(
@@ -638,14 +639,14 @@ mod tests {
 
     #[test]
     fn test_set_weight_clamps_negative() {
-        let mut harmonies = SevenHarmonies::new();
+        let mut harmonies = EightHarmonies::new();
         harmonies.set_weight(Harmony::InfinitePlay, -5.0);
         assert_eq!(*harmonies.weights.get(&Harmony::InfinitePlay).unwrap(), 0.0);
     }
 
     #[test]
     fn test_evaluate_action_is_alias() {
-        let mut harmonies = SevenHarmonies::new();
+        let mut harmonies = EightHarmonies::new();
         let result = harmonies.evaluate_action("help the community grow and share");
         assert!(result.overall_score.is_finite());
         assert!(result.overall_confidence > 0.0);
@@ -653,7 +654,7 @@ mod tests {
 
     #[test]
     fn test_stats_accumulate() {
-        let mut harmonies = SevenHarmonies::new();
+        let mut harmonies = EightHarmonies::new();
         assert_eq!(harmonies.stats().total_evaluations, 0);
 
         harmonies.evaluate("help");
@@ -666,7 +667,7 @@ mod tests {
 
     #[test]
     fn test_stats_avg_score() {
-        let mut harmonies = SevenHarmonies::new();
+        let mut harmonies = EightHarmonies::new();
         harmonies.evaluate("help the community");
         harmonies.evaluate("share knowledge and grow");
         let avg = harmonies.stats().avg_score;
@@ -675,7 +676,7 @@ mod tests {
 
     #[test]
     fn test_neutral_text_low_confidence() {
-        let mut harmonies = SevenHarmonies::new();
+        let mut harmonies = EightHarmonies::new();
         let result = harmonies.evaluate("install firefox");
         // Neutral text should have low confidence (0.3 default)
         assert!(
@@ -686,14 +687,14 @@ mod tests {
 
     #[test]
     fn test_get_returns_none() {
-        let harmonies = SevenHarmonies::new();
+        let harmonies = EightHarmonies::new();
         // get() always returns None (placeholder for HDC encoding)
         assert!(harmonies.get(Harmony::ResonantCoherence).is_none());
     }
 
     #[test]
     fn test_evaluate_positive_text() {
-        let mut harmonies = SevenHarmonies::new();
+        let mut harmonies = EightHarmonies::new();
         let result = harmonies.evaluate("help the community grow and share knowledge together");
         assert!(
             result.overall_score > 0.0,
@@ -705,7 +706,7 @@ mod tests {
 
     #[test]
     fn test_evaluate_negative_text() {
-        let mut harmonies = SevenHarmonies::new();
+        let mut harmonies = EightHarmonies::new();
         let result = harmonies.evaluate("destroy harm exploit and isolate");
         assert!(
             result.overall_score < 0.0,

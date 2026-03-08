@@ -291,14 +291,23 @@ impl CognitiveLoopBenchmarkRunner {
             trials.iter().map(|t| t.bath_entropy as f64).sum::<f64>() / n.max(1.0);
         let mean_allostatic_load =
             trials.iter().map(|t| t.allostatic_load as f64).sum::<f64>() / n.max(1.0);
-        let mean_consciousness_mod =
-            trials.iter().map(|t| t.consciousness_mod as f64).sum::<f64>() / n.max(1.0);
-        let mean_social_coherence =
-            trials.iter().map(|t| t.social_coherence as f64).sum::<f64>() / n.max(1.0);
+        let mean_consciousness_mod = trials
+            .iter()
+            .map(|t| t.consciousness_mod as f64)
+            .sum::<f64>()
+            / n.max(1.0);
+        let mean_social_coherence = trials
+            .iter()
+            .map(|t| t.social_coherence as f64)
+            .sum::<f64>()
+            / n.max(1.0);
         let mean_structural_micro_phi =
             trials.iter().map(|t| t.structural_micro_phi).sum::<f64>() / n.max(1.0);
-        let mean_structural_emergence_ratio =
-            trials.iter().map(|t| t.structural_emergence_ratio).sum::<f64>() / n.max(1.0);
+        let mean_structural_emergence_ratio = trials
+            .iter()
+            .map(|t| t.structural_emergence_ratio)
+            .sum::<f64>()
+            / n.max(1.0);
 
         LoopBenchmarkResult {
             benchmark: bench.loop_name().to_string(),
@@ -721,7 +730,9 @@ mod impls {
                         alternatives: alternatives.clone(),
                         correct_idx,
                         condition: format!("offer_{:.0}pct", offer * 100.0),
-                        trial_idx: offer_levels.iter().position(|&o| o == offer).unwrap_or(0) * trials_per + rep,
+                        trial_idx: offer_levels.iter().position(|&o| o == offer).unwrap_or(0)
+                            * trials_per
+                            + rep,
                     });
                 }
             }
@@ -773,10 +784,7 @@ mod impls {
                 } else {
                     xor_shift(&mut rng);
                     let noise = ContinuousHV::random(dim, rng);
-                    ContinuousHV::weighted_bundle(
-                        &[&colors[ink_idx], &noise],
-                        &[0.85, 0.15],
-                    )
+                    ContinuousHV::weighted_bundle(&[&colors[ink_idx], &noise], &[0.85, 0.15])
                 };
 
                 stimuli.push(LoopStimulus {

@@ -151,9 +151,7 @@ fn baseline_for_benchmark<'a>(
         // Language
         name if name.contains("LexicalDecision") => Some(("lexicality_effect", &bl.language)),
         name if name.contains("SemanticPriming") => Some(("priming_effect", &bl.language)),
-        name if name.contains("SemanticCoherence") => {
-            Some(("coherence_mean", &bl.language))
-        }
+        name if name.contains("SemanticCoherence") => Some(("coherence_mean", &bl.language)),
         name if name.contains("GardenPath") => Some(("disambiguation_cost", &bl.language)),
 
         // Social
@@ -209,9 +207,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("Butlin") => Some(("present_count", &bl.butlin)),
 
         // Neuromod
-        name if name.contains("RewardLearning") => {
-            Some(("trials_to_criterion", &bl.neuromod))
-        }
+        name if name.contains("RewardLearning") => Some(("trials_to_criterion", &bl.neuromod)),
         name if name.contains("YerkesDodson") => Some(("peak_ne_level", &bl.neuromod)),
         name if name.contains("AttentionNetwork") => Some(("conflict_effect", &bl.neuromod)),
         name if name.contains("MoodInduction") => Some(("mood_congruent_bias", &bl.neuromod)),
@@ -230,9 +226,7 @@ fn baseline_for_benchmark<'a>(
         name if name.contains("AllostaticStress") => {
             Some(("chronic_da_baseline_final", &bl.neuromod))
         }
-        name if name.contains("BehavioralKnockout") => {
-            Some(("da_ko_lr_d", &bl.neuromod))
-        }
+        name if name.contains("BehavioralKnockout") => Some(("da_ko_lr_d", &bl.neuromod)),
         name if name.contains("ConsciousnessPharmacology") => {
             Some(("psychedelic_proxy_peak", &bl.neuromod))
         }

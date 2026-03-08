@@ -218,7 +218,10 @@ mod tests {
     #[test]
     fn test_percentile_from_z() {
         let p0 = DevelopmentalProfile::percentile_from_z(0.0);
-        assert!((p0 - 50.0).abs() < 5.0, "z=0 should be ~50th percentile, got {p0}");
+        assert!(
+            (p0 - 50.0).abs() < 5.0,
+            "z=0 should be ~50th percentile, got {p0}"
+        );
 
         let p_pos = DevelopmentalProfile::percentile_from_z(2.0);
         assert!(p_pos > 90.0, "z=2 should be >90th percentile, got {p_pos}");
@@ -233,7 +236,10 @@ mod tests {
         for z in -30..=30 {
             let z_f = z as f64 / 10.0;
             let p = DevelopmentalProfile::percentile_from_z(z_f);
-            assert!(p >= prev, "Percentile should be monotonic: z={z_f}, prev={prev}, p={p}");
+            assert!(
+                p >= prev,
+                "Percentile should be monotonic: z={z_f}, prev={prev}, p={p}"
+            );
             prev = p;
         }
     }
@@ -261,7 +267,10 @@ mod tests {
         let age = DevelopmentalAge::new(24.0);
         let profile = DevelopmentalProfile::assess(&age, &[]);
         let delayed = profile.delayed_domains();
-        assert!(!delayed.is_empty(), "Should have delayed domains with no milestones");
+        assert!(
+            !delayed.is_empty(),
+            "Should have delayed domains with no milestones"
+        );
     }
 
     #[test]
@@ -300,7 +309,11 @@ mod tests {
         for months in [0, 6, 12, 24, 36, 48, 60] {
             let age = DevelopmentalAge::new(months as f64);
             let all = DevelopmentalMilestoneDb::milestones_for_age(&age);
-            let half: Vec<String> = all.iter().take(all.len() / 2).map(|m| m.name.clone()).collect();
+            let half: Vec<String> = all
+                .iter()
+                .take(all.len() / 2)
+                .map(|m| m.name.clone())
+                .collect();
             let profile = DevelopmentalProfile::assess(&age, &half);
             assert!(
                 profile.overall_developmental_quotient >= 0.0
@@ -320,9 +333,14 @@ mod tests {
 
         let json = serde_json::to_string(&profile).unwrap();
         let deserialized: DevelopmentalProfile = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.domain_scores.len(), profile.domain_scores.len());
+        assert_eq!(
+            deserialized.domain_scores.len(),
+            profile.domain_scores.len()
+        );
         assert!(
-            (deserialized.overall_developmental_quotient - profile.overall_developmental_quotient).abs() < 1e-10
+            (deserialized.overall_developmental_quotient - profile.overall_developmental_quotient)
+                .abs()
+                < 1e-10
         );
     }
 }

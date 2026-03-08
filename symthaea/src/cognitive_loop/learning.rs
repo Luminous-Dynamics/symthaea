@@ -315,7 +315,10 @@ mod tests {
     #[test]
     fn test_default_values() {
         let cll = ClosedLearningLoop::default();
-        assert_eq!(cll.q_values, [Q_VALUE_INITIAL; 5], "default Q-values should be Q_VALUE_INITIAL");
+        assert_eq!(
+            cll.q_values, [Q_VALUE_INITIAL; 5],
+            "default Q-values should be Q_VALUE_INITIAL"
+        );
         assert!(
             (cll.exploration_rate() - EXPLORATION_RATE_INITIAL).abs() < f32::EPSILON,
             "default exploration_rate should be EXPLORATION_RATE_INITIAL"
@@ -498,7 +501,10 @@ mod tests {
         // Reset
         cll.reset();
 
-        assert_eq!(cll.q_values, [Q_VALUE_INITIAL; 5], "q_values should reset to Q_VALUE_INITIAL");
+        assert_eq!(
+            cll.q_values, [Q_VALUE_INITIAL; 5],
+            "q_values should reset to Q_VALUE_INITIAL"
+        );
         assert!(
             (cll.exploration_rate() - EXPLORATION_RATE_INITIAL).abs() < f32::EPSILON,
             "exploration_rate should reset to EXPLORATION_RATE_INITIAL"
@@ -585,8 +591,14 @@ mod tests {
         let q_low = cll_low.q_values()[4];
         let q_neutral = cll_neutral.q_values()[4];
 
-        assert!(q_high > q_neutral, "high plasticity should learn faster: {q_high} > {q_neutral}");
-        assert!(q_neutral > q_low, "low plasticity should learn slower: {q_neutral} > {q_low}");
+        assert!(
+            q_high > q_neutral,
+            "high plasticity should learn faster: {q_high} > {q_neutral}"
+        );
+        assert!(
+            q_neutral > q_low,
+            "low plasticity should learn slower: {q_neutral} > {q_low}"
+        );
     }
 
     #[test]

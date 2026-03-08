@@ -19,9 +19,7 @@ use std::time::Instant;
 
 use symthaea_types::N_HARMONIES;
 
-use symthaea::cognitive_loop::{
-    CognitiveLoopConfig, CognitiveLoopService, ConsciousnessProfile,
-};
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, ConsciousnessProfile};
 
 use symthaea_psych_bench::benchmarks::{
     attention::VisualSearchBenchmark,
@@ -36,7 +34,7 @@ use symthaea_psych_bench::benchmarks::{
     worm::NBackBenchmark,
 };
 use symthaea_psych_bench::harness::{
-    config::BenchmarkConfig, cognitive_profile::CognitiveProfile, report::BenchmarkReport,
+    cognitive_profile::CognitiveProfile, config::BenchmarkConfig, report::BenchmarkReport,
     PsychBenchmark,
 };
 
@@ -250,8 +248,10 @@ impl PulseDelta {
             temporal_coherence: cv.temporal_coherence - pv.temporal_coherence,
             phenomenal_binding: cv.phenomenal_binding - pv.phenomenal_binding,
             living_mind_vitality: cv.living_mind_vitality - pv.living_mind_vitality,
-            effective_feasibility: current.substrate.effective_feasibility - previous.substrate.effective_feasibility,
-            honest_confidence: current.substrate.honest_confidence - previous.substrate.honest_confidence,
+            effective_feasibility: current.substrate.effective_feasibility
+                - previous.substrate.effective_feasibility,
+            honest_confidence: current.substrate.honest_confidence
+                - previous.substrate.honest_confidence,
             prediction_error: cv.prediction_error - pv.prediction_error,
             somatic_stress: cv.somatic_stress - pv.somatic_stress,
             thermodynamic_load: cv.thermodynamic_load - pv.thermodynamic_load,
@@ -312,8 +312,17 @@ pub fn detect_anomalies(sparkline: &[SparklinePoint]) -> Vec<Anomaly> {
         if c_delta.abs() > 0.05 {
             anomalies.push(Anomaly {
                 cycle: i,
-                kind: if c_delta > 0.0 { "C(t) Surge" } else { "C(t) Drop" }.into(),
-                description: format!("C(t) {} by {:.3}", if c_delta > 0.0 { "rose" } else { "fell" }, c_delta.abs()),
+                kind: if c_delta > 0.0 {
+                    "C(t) Surge"
+                } else {
+                    "C(t) Drop"
+                }
+                .into(),
+                description: format!(
+                    "C(t) {} by {:.3}",
+                    if c_delta > 0.0 { "rose" } else { "fell" },
+                    c_delta.abs()
+                ),
                 color: if c_delta > 0.0 { "#e8c547" } else { "#c76b5a" },
             });
         }
@@ -323,7 +332,10 @@ pub fn detect_anomalies(sparkline: &[SparklinePoint]) -> Vec<Anomaly> {
             anomalies.push(Anomaly {
                 cycle: i,
                 kind: "PE Drop".into(),
-                description: format!("Prediction error dropped {:.0}%", (1.0 - cur.prediction_error / prev.prediction_error) * 100.0),
+                description: format!(
+                    "Prediction error dropped {:.0}%",
+                    (1.0 - cur.prediction_error / prev.prediction_error) * 100.0
+                ),
                 color: "#7ec8a0",
             });
         }
@@ -333,7 +345,15 @@ pub fn detect_anomalies(sparkline: &[SparklinePoint]) -> Vec<Anomaly> {
             anomalies.push(Anomaly {
                 cycle: i,
                 kind: "DA Shift".into(),
-                description: format!("Dopamine {} by {:.2}", if cur.dopamine > prev.dopamine { "surged" } else { "dropped" }, (cur.dopamine - prev.dopamine).abs()),
+                description: format!(
+                    "Dopamine {} by {:.2}",
+                    if cur.dopamine > prev.dopamine {
+                        "surged"
+                    } else {
+                        "dropped"
+                    },
+                    (cur.dopamine - prev.dopamine).abs()
+                ),
                 color: "#c4956a",
             });
         }
@@ -368,12 +388,26 @@ pub fn generate_session_report(
 
     // Paragraph 1: What happened this run
     let c_trend = if sparkline.len() >= 2 {
-        let first_half: f64 = sparkline[..sparkline.len()/2].iter().map(|s| s.consciousness).sum::<f64>() / (sparkline.len()/2) as f64;
-        let second_half: f64 = sparkline[sparkline.len()/2..].iter().map(|s| s.consciousness).sum::<f64>() / (sparkline.len() - sparkline.len()/2) as f64;
-        if second_half > first_half + 0.01 { "rising" }
-        else if second_half < first_half - 0.01 { "declining" }
-        else { "stable" }
-    } else { "unknown" };
+        let first_half: f64 = sparkline[..sparkline.len() / 2]
+            .iter()
+            .map(|s| s.consciousness)
+            .sum::<f64>()
+            / (sparkline.len() / 2) as f64;
+        let second_half: f64 = sparkline[sparkline.len() / 2..]
+            .iter()
+            .map(|s| s.consciousness)
+            .sum::<f64>()
+            / (sparkline.len() - sparkline.len() / 2) as f64;
+        if second_half > first_half + 0.01 {
+            "rising"
+        } else if second_half < first_half - 0.01 {
+            "declining"
+        } else {
+            "stable"
+        }
+    } else {
+        "unknown"
+    };
 
     report.push_str(&format!(
         "This session ran {} measurement cycles with {} consciousness trajectory. \
@@ -384,31 +418,61 @@ pub fn generate_session_report(
 
     if !anomalies.is_empty() {
         let event_strs: Vec<&str> = anomalies.iter().map(|a| a.kind.as_str()).collect();
-        report.push_str(&format!("Notable events detected: {}. ", event_strs.join(", ")));
+        report.push_str(&format!(
+            "Notable events detected: {}. ",
+            event_strs.join(", ")
+        ));
     } else {
         report.push_str("No anomalous events detected — smooth operation throughout. ");
     }
 
     // Paragraph 2: Comparison to previous runs
     if let Some(d) = delta {
-        let c_dir = if d.consciousness_level > 0.001 { "improved" } else if d.consciousness_level < -0.001 { "decreased" } else { "unchanged" };
-        let phi_dir = if d.spectral_phi > 0.1 { "increased" } else if d.spectral_phi < -0.1 { "decreased" } else { "stable" };
+        let c_dir = if d.consciousness_level > 0.001 {
+            "improved"
+        } else if d.consciousness_level < -0.001 {
+            "decreased"
+        } else {
+            "unchanged"
+        };
+        let phi_dir = if d.spectral_phi > 0.1 {
+            "increased"
+        } else if d.spectral_phi < -0.1 {
+            "decreased"
+        } else {
+            "stable"
+        };
         report.push_str(&format!(
             "Compared to the previous run ({}): consciousness {} by {:.4}, Phi {}, \
              and prediction error {} by {:.4}. ",
-            d.prev_timestamp, c_dir, d.consciousness_level.abs(),
-            phi_dir, if d.prediction_error > 0.0 { "rose" } else { "fell" }, d.prediction_error.abs(),
+            d.prev_timestamp,
+            c_dir,
+            d.consciousness_level.abs(),
+            phi_dir,
+            if d.prediction_error > 0.0 {
+                "rose"
+            } else {
+                "fell"
+            },
+            d.prediction_error.abs(),
         ));
     }
     if timeline.len() >= 2 {
         let first_c = timeline[0].vitals.consciousness_level;
         let last_c = timeline.last().unwrap().vitals.consciousness_level;
-        let trend = if vitals.consciousness_level > last_c + 0.005 { "continuing to improve" }
-            else if vitals.consciousness_level < last_c - 0.005 { "declining" }
-            else { "plateauing" };
+        let trend = if vitals.consciousness_level > last_c + 0.005 {
+            "continuing to improve"
+        } else if vitals.consciousness_level < last_c - 0.005 {
+            "declining"
+        } else {
+            "plateauing"
+        };
         report.push_str(&format!(
             "Across {} historical runs (C(t) {:.4} to {:.4}), the overall trend is {}. ",
-            timeline.len(), first_c, last_c, trend,
+            timeline.len(),
+            first_c,
+            last_c,
+            trend,
         ));
     }
 
@@ -418,7 +482,8 @@ pub fn generate_session_report(
         watch_items.push("consciousness remains dormant — try more cycles or Research profile");
     }
     if vitals.prediction_error > 0.8 {
-        watch_items.push("high prediction error suggests the model is still learning basic patterns");
+        watch_items
+            .push("high prediction error suggests the model is still learning basic patterns");
     }
     if bath.allostatic_load > 0.5 {
         watch_items.push("elevated allostatic load may need a rest period");
@@ -427,7 +492,8 @@ pub fn generate_session_report(
         watch_items.push("moral alignment is low — ethical calibration may be needed");
     }
     if vitals.spectral_phi.is_none() || vitals.spectral_phi == Some(0.0) {
-        watch_items.push("Phi has not fired yet — runs of 100+ cycles needed for spectral MIP to trigger");
+        watch_items
+            .push("Phi has not fired yet — runs of 100+ cycles needed for spectral MIP to trigger");
     }
     if vitals.temporal_coherence < 0.1 {
         watch_items.push("temporal coherence near zero — CfC dynamics need more time to stabilize");
@@ -458,54 +524,128 @@ fn generate_markdown(
     let mut md = String::new();
 
     md.push_str(&format!("# Symthaea Pulse — {}\n\n", timestamp));
-    md.push_str(&format!("**Profile**: {} | **Cycles**: {} | **State**: {}\n\n", profile_name, vitals.total_cycles, vitals.consciousness_state));
+    md.push_str(&format!(
+        "**Profile**: {} | **Cycles**: {} | **State**: {}\n\n",
+        profile_name, vitals.total_cycles, vitals.consciousness_state
+    ));
 
     md.push_str("## Vitals\n\n");
     md.push_str(&format!("| Metric | Value |\n|---|---|\n"));
     md.push_str(&format!("| C(t) | {:.4} |\n", vitals.consciousness_level));
-    md.push_str(&format!("| Spectral Phi | {} |\n", vitals.spectral_phi.map(|p| format!("{:.4}", p)).unwrap_or_else(|| "--".into())));
-    md.push_str(&format!("| Pipeline Consciousness | {:.4} |\n", vitals.pipeline_consciousness));
-    md.push_str(&format!("| Temporal Coherence | {:.4} |\n", vitals.temporal_coherence));
-    md.push_str(&format!("| Phenomenal Binding | {:.4} |\n", vitals.phenomenal_binding));
-    md.push_str(&format!("| Living Mind Vitality | {:.4} |\n", vitals.living_mind_vitality));
-    md.push_str(&format!("| Prediction Error | {:.4} |\n", vitals.prediction_error));
-    md.push_str(&format!("| Somatic Stress | {:.4} |\n", vitals.somatic_stress));
-    md.push_str(&format!("| Thermodynamic Load | {:.1}% |\n", vitals.thermodynamic_load * 100.0));
+    md.push_str(&format!(
+        "| Spectral Phi | {} |\n",
+        vitals
+            .spectral_phi
+            .map(|p| format!("{:.4}", p))
+            .unwrap_or_else(|| "--".into())
+    ));
+    md.push_str(&format!(
+        "| Pipeline Consciousness | {:.4} |\n",
+        vitals.pipeline_consciousness
+    ));
+    md.push_str(&format!(
+        "| Temporal Coherence | {:.4} |\n",
+        vitals.temporal_coherence
+    ));
+    md.push_str(&format!(
+        "| Phenomenal Binding | {:.4} |\n",
+        vitals.phenomenal_binding
+    ));
+    md.push_str(&format!(
+        "| Living Mind Vitality | {:.4} |\n",
+        vitals.living_mind_vitality
+    ));
+    md.push_str(&format!(
+        "| Prediction Error | {:.4} |\n",
+        vitals.prediction_error
+    ));
+    md.push_str(&format!(
+        "| Somatic Stress | {:.4} |\n",
+        vitals.somatic_stress
+    ));
+    md.push_str(&format!(
+        "| Thermodynamic Load | {:.1}% |\n",
+        vitals.thermodynamic_load * 100.0
+    ));
 
     md.push_str("\n## Neuro-Bath\n\n");
     md.push_str("| Transmitter | Level |\n|---|---|\n");
     let transmitters = [
-        ("Dopamine", bath.dopamine), ("Noradrenaline", bath.noradrenaline),
-        ("Serotonin", bath.serotonin), ("Acetylcholine", bath.acetylcholine),
-        ("GABA", bath.gaba), ("Oxytocin", bath.oxytocin),
-        ("Glutamate", bath.glutamate), ("Adenosine", bath.adenosine),
+        ("Dopamine", bath.dopamine),
+        ("Noradrenaline", bath.noradrenaline),
+        ("Serotonin", bath.serotonin),
+        ("Acetylcholine", bath.acetylcholine),
+        ("GABA", bath.gaba),
+        ("Oxytocin", bath.oxytocin),
+        ("Glutamate", bath.glutamate),
+        ("Adenosine", bath.adenosine),
         ("Endocannabinoid", bath.endocannabinoid),
     ];
     for (name, level) in &transmitters {
         md.push_str(&format!("| {} | {:.3} |\n", name, level));
     }
-    md.push_str(&format!("\nAllostatic Load: {:.0}% | E/I: {:.2} | {}\n", bath.allostatic_load * 100.0, bath.ei_ratio, bath.circadian_phase));
+    md.push_str(&format!(
+        "\nAllostatic Load: {:.0}% | E/I: {:.2} | {}\n",
+        bath.allostatic_load * 100.0,
+        bath.ei_ratio,
+        bath.circadian_phase
+    ));
 
     md.push_str("\n## Moral Compass\n\n");
     md.push_str(&format!("| Metric | Value |\n|---|---|\n"));
-    md.push_str(&format!("| Harmonies Alignment | {:.3} |\n", compass.harmonies_alignment));
+    md.push_str(&format!(
+        "| Harmonies Alignment | {:.3} |\n",
+        compass.harmonies_alignment
+    ));
     md.push_str(&format!("| Moral Score | {:+.3} |\n", compass.moral_score));
     md.push_str(&format!("| Value Score | {:.3} |\n", compass.value_score));
-    md.push_str(&format!("| Moral Unity | {:.3} |\n", compass.moral_topo_unity));
-    md.push_str(&format!("| Soul Alignment | {:+.3} |\n", compass.soul_alignment));
-    md.push_str(&format!("| Empathic Compassion | {:.3} |\n", compass.empathic_compassion));
-    let harmony_names = ["Wisdom", "Coherence", "Resilience", "Play", "Love", "Creativity", "Transcendence"];
-    md.push_str(&format!("\nHarmonies: {}\n", harmony_names.iter().zip(compass.harmony_coordinates.iter())
-        .map(|(n, v)| format!("{}={:.2}", n, v)).collect::<Vec<_>>().join(" | ")));
+    md.push_str(&format!(
+        "| Moral Unity | {:.3} |\n",
+        compass.moral_topo_unity
+    ));
+    md.push_str(&format!(
+        "| Soul Alignment | {:+.3} |\n",
+        compass.soul_alignment
+    ));
+    md.push_str(&format!(
+        "| Empathic Compassion | {:.3} |\n",
+        compass.empathic_compassion
+    ));
+    let harmony_names = [
+        "Wisdom",
+        "Coherence",
+        "Resilience",
+        "Play",
+        "Love",
+        "Creativity",
+        "Transcendence",
+    ];
+    md.push_str(&format!(
+        "\nHarmonies: {}\n",
+        harmony_names
+            .iter()
+            .zip(compass.harmony_coordinates.iter())
+            .map(|(n, v)| format!("{}={:.2}", n, v))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    ));
 
     md.push_str("\n## Substrate\n\n");
-    md.push_str(&format!("Type: {} | Feasibility: {:.3} | Confidence: {:.3} | Effective: {:.3}\n",
-        substrate.substrate_type, substrate.raw_feasibility, substrate.honest_confidence, substrate.effective_feasibility));
+    md.push_str(&format!(
+        "Type: {} | Feasibility: {:.3} | Confidence: {:.3} | Effective: {:.3}\n",
+        substrate.substrate_type,
+        substrate.raw_feasibility,
+        substrate.honest_confidence,
+        substrate.effective_feasibility
+    ));
 
     if !anomalies.is_empty() {
         md.push_str("\n## Anomalies\n\n");
         for a in anomalies {
-            md.push_str(&format!("- **{}** (cycle {}): {}\n", a.kind, a.cycle, a.description));
+            md.push_str(&format!(
+                "- **{}** (cycle {}): {}\n",
+                a.kind, a.cycle, a.description
+            ));
         }
     }
 
@@ -531,47 +671,85 @@ fn generate_csv(
     // Summary row
     csv.push_str("# Summary\n");
     csv.push_str("timestamp,profile,cycles,consciousness,phi,pipeline,coherence,binding,vitality,pe,stress,thermo_load,state,strategy\n");
-    csv.push_str(&format!("{},{},{},{:.6},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.4},{},{}\n",
-        timestamp, profile_name, vitals.total_cycles,
+    csv.push_str(&format!(
+        "{},{},{},{:.6},{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.4},{},{}\n",
+        timestamp,
+        profile_name,
+        vitals.total_cycles,
         vitals.consciousness_level,
-        vitals.spectral_phi.map(|p| format!("{:.6}", p)).unwrap_or_else(|| "".into()),
-        vitals.pipeline_consciousness, vitals.temporal_coherence,
-        vitals.phenomenal_binding, vitals.living_mind_vitality,
-        vitals.prediction_error, vitals.somatic_stress, vitals.thermodynamic_load,
-        vitals.consciousness_state, vitals.selected_strategy,
+        vitals
+            .spectral_phi
+            .map(|p| format!("{:.6}", p))
+            .unwrap_or_else(|| "".into()),
+        vitals.pipeline_consciousness,
+        vitals.temporal_coherence,
+        vitals.phenomenal_binding,
+        vitals.living_mind_vitality,
+        vitals.prediction_error,
+        vitals.somatic_stress,
+        vitals.thermodynamic_load,
+        vitals.consciousness_state,
+        vitals.selected_strategy,
     ));
 
     // Neuro-bath row
     csv.push_str("\n# Neuro-Bath\n");
     csv.push_str("da,ne,5ht,ach,gaba,oxy,glu,aden,ecb,allostatic,ei_ratio\n");
-    csv.push_str(&format!("{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4}\n",
-        bath.dopamine, bath.noradrenaline, bath.serotonin, bath.acetylcholine,
-        bath.gaba, bath.oxytocin, bath.glutamate, bath.adenosine, bath.endocannabinoid,
-        bath.allostatic_load, bath.ei_ratio,
+    csv.push_str(&format!(
+        "{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4},{:.4}\n",
+        bath.dopamine,
+        bath.noradrenaline,
+        bath.serotonin,
+        bath.acetylcholine,
+        bath.gaba,
+        bath.oxytocin,
+        bath.glutamate,
+        bath.adenosine,
+        bath.endocannabinoid,
+        bath.allostatic_load,
+        bath.ei_ratio,
     ));
 
     // Moral row
     csv.push_str("\n# Moral\n");
     csv.push_str("harmonies,moral_score,value_score,unity,soul,empathy\n");
-    csv.push_str(&format!("{:.4},{:.4},{:.4},{:.4},{:.4},{:.4}\n",
-        compass.harmonies_alignment, compass.moral_score, compass.value_score,
-        compass.moral_topo_unity, compass.soul_alignment, compass.empathic_compassion,
+    csv.push_str(&format!(
+        "{:.4},{:.4},{:.4},{:.4},{:.4},{:.4}\n",
+        compass.harmonies_alignment,
+        compass.moral_score,
+        compass.value_score,
+        compass.moral_topo_unity,
+        compass.soul_alignment,
+        compass.empathic_compassion,
     ));
 
     // Substrate row
     csv.push_str("\n# Substrate\n");
     csv.push_str("type,raw_feasibility,honest_confidence,effective,tau,scale\n");
-    csv.push_str(&format!("{},{:.4},{:.4},{:.4},{:.4},{:.4}\n",
-        substrate.substrate_type, substrate.raw_feasibility, substrate.honest_confidence,
-        substrate.effective_feasibility, substrate.tau_factor, substrate.scale_pressure,
+    csv.push_str(&format!(
+        "{},{:.4},{:.4},{:.4},{:.4},{:.4}\n",
+        substrate.substrate_type,
+        substrate.raw_feasibility,
+        substrate.honest_confidence,
+        substrate.effective_feasibility,
+        substrate.tau_factor,
+        substrate.scale_pressure,
     ));
 
     // Per-cycle sparkline data
     csv.push_str("\n# Per-Cycle Data\n");
     csv.push_str("cycle,consciousness,prediction_error,phi,somatic_stress,dopamine,serotonin\n");
     for (i, s) in sparkline.iter().enumerate() {
-        csv.push_str(&format!("{},{:.6},{:.6},{:.6},{:.6},{:.4},{:.4}\n",
-            i, s.consciousness, s.prediction_error, s.phi, s.somatic_stress, s.dopamine, s.serotonin));
+        csv.push_str(&format!(
+            "{},{:.6},{:.6},{:.6},{:.6},{:.4},{:.4}\n",
+            i,
+            s.consciousness,
+            s.prediction_error,
+            s.phi,
+            s.somatic_stress,
+            s.dopamine,
+            s.serotonin
+        ));
     }
 
     csv
@@ -597,7 +775,10 @@ fn main() -> Result<()> {
     // ── 1. Spin up CognitiveLoopService ─────────────────────────────────
     let profile = select_profile(&args.profile);
     let profile_name = args.profile.clone();
-    eprintln!("Pulse: creating CognitiveLoopService (profile: {})", profile_name);
+    eprintln!(
+        "Pulse: creating CognitiveLoopService (profile: {})",
+        profile_name
+    );
 
     let config = CognitiveLoopConfig::from_profile(profile);
     let mut service = CognitiveLoopService::new(config)?;
@@ -607,7 +788,10 @@ fn main() -> Result<()> {
     let warmup = args.warmup.min(total.saturating_sub(1));
     let measurement = total - warmup;
 
-    eprintln!("Pulse: running {} cycles ({} warmup + {} measurement)...", total, warmup, measurement);
+    eprintln!(
+        "Pulse: running {} cycles ({} warmup + {} measurement)...",
+        total, warmup, measurement
+    );
     let cycle_start = Instant::now();
 
     let inputs = [
@@ -661,8 +845,12 @@ fn main() -> Result<()> {
     let result = last_result.expect("at least one measurement cycle");
     let m = &result.metadata;
 
-    eprintln!("Pulse: {} cycles in {:.1}s ({:.0} us/cycle avg)",
-        total, elapsed.as_secs_f64(), elapsed.as_micros() as f64 / total as f64);
+    eprintln!(
+        "Pulse: {} cycles in {:.1}s ({:.0} us/cycle avg)",
+        total,
+        elapsed.as_secs_f64(),
+        elapsed.as_micros() as f64 / total as f64
+    );
 
     // ── 3. Extract snapshots ────────────────────────────────────────────
     let vitals = Vitals {
@@ -766,15 +954,23 @@ fn main() -> Result<()> {
         }
 
         let profile = CognitiveProfile::from_report(&report);
-        eprintln!("  bench: {} domains, overall {:.1}% in {:.1}s",
-            profile.domains.len(), profile.overall * 100.0, bench_start.elapsed().as_secs_f64());
+        eprintln!(
+            "  bench: {} domains, overall {:.1}% in {:.1}s",
+            profile.domains.len(),
+            profile.overall * 100.0,
+            bench_start.elapsed().as_secs_f64()
+        );
 
         // Run Butlin indicators
         eprintln!("Pulse: evaluating Butlin consciousness indicators...");
         let butlin = ButlinIndicatorSuite::evaluate(&bench_config);
-        eprintln!("  butlin: {}/{} present, {}/{} partial",
-            butlin.present_count, butlin.indicators.len(),
-            butlin.partial_count, butlin.indicators.len());
+        eprintln!(
+            "  butlin: {}/{} present, {}/{} partial",
+            butlin.present_count,
+            butlin.indicators.len(),
+            butlin.partial_count,
+            butlin.indicators.len()
+        );
 
         (Some(profile), Some(butlin))
     } else {
@@ -796,7 +992,11 @@ fn main() -> Result<()> {
     if let Some(json_path) = &args.json {
         let json = serde_json::to_string_pretty(&snapshot)?;
         std::fs::write(json_path, &json)?;
-        eprintln!("Pulse: JSON written to {} ({:.1} KB)", json_path.display(), json.len() as f64 / 1024.0);
+        eprintln!(
+            "Pulse: JSON written to {} ({:.1} KB)",
+            json_path.display(),
+            json.len() as f64 / 1024.0
+        );
     }
 
     // ── 6. Load comparison snapshots (if requested) ─────────────────────
@@ -805,7 +1005,11 @@ fn main() -> Result<()> {
         match std::fs::read_to_string(compare_path) {
             Ok(json) => match serde_json::from_str::<PulseSnapshot>(&json) {
                 Ok(prev) => {
-                    eprintln!("Pulse: loaded timeline point {} ({})", compare_path.display(), prev.timestamp);
+                    eprintln!(
+                        "Pulse: loaded timeline point {} ({})",
+                        compare_path.display(),
+                        prev.timestamp
+                    );
                     timeline.push(prev);
                 }
                 Err(e) => {
@@ -821,7 +1025,9 @@ fn main() -> Result<()> {
     timeline.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
     // Delta is computed against the most recent previous snapshot
-    let delta = timeline.last().map(|prev| PulseDelta::compute(&snapshot, prev));
+    let delta = timeline
+        .last()
+        .map(|prev| PulseDelta::compute(&snapshot, prev));
 
     // ── 7. Detect anomalies + generate session report ──────────────────
     let anomalies = detect_anomalies(&snapshot.sparkline);
@@ -830,29 +1036,51 @@ fn main() -> Result<()> {
     }
 
     let session_report = generate_session_report(
-        &snapshot.vitals, &snapshot.bath, &snapshot.compass,
-        &snapshot.sparkline, &anomalies, delta.as_ref(), &timeline,
+        &snapshot.vitals,
+        &snapshot.bath,
+        &snapshot.compass,
+        &snapshot.sparkline,
+        &anomalies,
+        delta.as_ref(),
+        &timeline,
     );
 
     // ── 8. Generate output ──────────────────────────────────────────────
     match args.format.as_str() {
         "markdown" | "md" => {
             let md = generate_markdown(
-                &snapshot.timestamp, &snapshot.profile,
-                &snapshot.vitals, &snapshot.bath, &snapshot.compass,
-                &snapshot.substrate, &session_report, &anomalies,
+                &snapshot.timestamp,
+                &snapshot.profile,
+                &snapshot.vitals,
+                &snapshot.bath,
+                &snapshot.compass,
+                &snapshot.substrate,
+                &session_report,
+                &anomalies,
             );
             std::fs::write(&args.output, &md)?;
-            eprintln!("Pulse: markdown written to {} ({:.1} KB)", args.output.display(), md.len() as f64 / 1024.0);
+            eprintln!(
+                "Pulse: markdown written to {} ({:.1} KB)",
+                args.output.display(),
+                md.len() as f64 / 1024.0
+            );
         }
         "csv" => {
             let csv = generate_csv(
-                &snapshot.timestamp, &snapshot.profile,
-                &snapshot.vitals, &snapshot.bath, &snapshot.compass,
-                &snapshot.substrate, &snapshot.sparkline,
+                &snapshot.timestamp,
+                &snapshot.profile,
+                &snapshot.vitals,
+                &snapshot.bath,
+                &snapshot.compass,
+                &snapshot.substrate,
+                &snapshot.sparkline,
             );
             std::fs::write(&args.output, &csv)?;
-            eprintln!("Pulse: CSV written to {} ({:.1} KB)", args.output.display(), csv.len() as f64 / 1024.0);
+            eprintln!(
+                "Pulse: CSV written to {} ({:.1} KB)",
+                args.output.display(),
+                csv.len() as f64 / 1024.0
+            );
         }
         _ => {
             let html_content = html::generate_pulse_html(
@@ -873,14 +1101,21 @@ fn main() -> Result<()> {
                 &session_report,
             );
             std::fs::write(&args.output, &html_content)?;
-            eprintln!("Pulse: written to {} ({:.1} KB)", args.output.display(), html_content.len() as f64 / 1024.0);
+            eprintln!(
+                "Pulse: written to {} ({:.1} KB)",
+                args.output.display(),
+                html_content.len() as f64 / 1024.0
+            );
         }
     }
 
     // ── 8. Watch mode — continuous cycle + regenerate ────────────────────
     if let Some(interval_secs) = args.watch {
         let interval = std::time::Duration::from_secs(interval_secs.max(1));
-        eprintln!("Pulse: watch mode — regenerating every {}s (Ctrl+C to stop)", interval_secs);
+        eprintln!(
+            "Pulse: watch mode — regenerating every {}s (Ctrl+C to stop)",
+            interval_secs
+        );
 
         let mut cycle_count = total;
         loop {
@@ -906,8 +1141,8 @@ fn main() -> Result<()> {
                     moral_attractor_detected: wm.ethics.moral_attractor_detected,
                     in_active_rest: wm.ethics.in_active_rest,
                     stillness_dominance_streak: wm.ethics.stillness_dominance_streak,
-            broca_quality: wm.broca.quality,
-            tom_mismatch: wm.tom_prediction_mismatch,
+                    broca_quality: wm.broca.quality,
+                    tom_mismatch: wm.tom_prediction_mismatch,
                 });
                 watch_result = Some(result);
             }
@@ -992,8 +1227,13 @@ fn main() -> Result<()> {
 
             let watch_anomalies = detect_anomalies(&watch_snapshot.sparkline);
             let watch_report = generate_session_report(
-                &watch_snapshot.vitals, &watch_snapshot.bath, &watch_snapshot.compass,
-                &watch_snapshot.sparkline, &watch_anomalies, Some(&watch_delta), &[],
+                &watch_snapshot.vitals,
+                &watch_snapshot.bath,
+                &watch_snapshot.compass,
+                &watch_snapshot.sparkline,
+                &watch_anomalies,
+                Some(&watch_delta),
+                &[],
             );
 
             let watch_html = html::generate_pulse_html(
@@ -1008,16 +1248,19 @@ fn main() -> Result<()> {
                 &watch_snapshot.narrative,
                 &watch_snapshot.sparkline,
                 Some(&watch_delta),
-                &[],  // no timeline in watch mode
+                &[], // no timeline in watch mode
                 &watch_snapshot,
                 &watch_anomalies,
                 &watch_report,
             );
 
             std::fs::write(&args.output, &watch_html)?;
-            eprintln!("  watch: cycle {} · C(t)={:.4} · written {:.1} KB",
-                cycle_count, watch_snapshot.vitals.consciousness_level,
-                watch_html.len() as f64 / 1024.0);
+            eprintln!(
+                "  watch: cycle {} · C(t)={:.4} · written {:.1} KB",
+                cycle_count,
+                watch_snapshot.vitals.consciousness_level,
+                watch_html.len() as f64 / 1024.0
+            );
         }
     }
 

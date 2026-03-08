@@ -27,13 +27,7 @@ pub struct Milestone {
 }
 
 impl Milestone {
-    fn new(
-        category: MilestoneCategory,
-        name: &str,
-        expected: f64,
-        low: f64,
-        high: f64,
-    ) -> Self {
+    fn new(category: MilestoneCategory, name: &str, expected: f64, low: f64, high: f64) -> Self {
         Self {
             category,
             name: name.to_string(),
@@ -54,42 +48,162 @@ impl DevelopmentalMilestoneDb {
             // === Gross Motor ===
             Milestone::new(MilestoneCategory::GrossMotor, "Head lift", 2.0, 1.0, 3.0),
             Milestone::new(MilestoneCategory::GrossMotor, "Roll over", 4.0, 3.0, 6.0),
-            Milestone::new(MilestoneCategory::GrossMotor, "Sitting unsupported", 6.0, 5.0, 8.0),
+            Milestone::new(
+                MilestoneCategory::GrossMotor,
+                "Sitting unsupported",
+                6.0,
+                5.0,
+                8.0,
+            ),
             Milestone::new(MilestoneCategory::GrossMotor, "Crawling", 9.0, 6.0, 11.0),
-            Milestone::new(MilestoneCategory::GrossMotor, "Pull to stand", 10.0, 8.0, 12.0),
-            Milestone::new(MilestoneCategory::GrossMotor, "First steps", 12.0, 9.0, 16.0),
-            Milestone::new(MilestoneCategory::GrossMotor, "Walking well", 15.0, 12.0, 18.0),
+            Milestone::new(
+                MilestoneCategory::GrossMotor,
+                "Pull to stand",
+                10.0,
+                8.0,
+                12.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::GrossMotor,
+                "First steps",
+                12.0,
+                9.0,
+                16.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::GrossMotor,
+                "Walking well",
+                15.0,
+                12.0,
+                18.0,
+            ),
             Milestone::new(MilestoneCategory::GrossMotor, "Running", 24.0, 18.0, 30.0),
             // === Fine Motor ===
             Milestone::new(MilestoneCategory::FineMotor, "Reaching", 4.0, 3.0, 5.0),
             Milestone::new(MilestoneCategory::FineMotor, "Palmar grasp", 5.0, 4.0, 6.0),
-            Milestone::new(MilestoneCategory::FineMotor, "Transfer objects", 7.0, 5.0, 9.0),
+            Milestone::new(
+                MilestoneCategory::FineMotor,
+                "Transfer objects",
+                7.0,
+                5.0,
+                9.0,
+            ),
             Milestone::new(MilestoneCategory::FineMotor, "Pincer grasp", 9.0, 7.0, 12.0),
-            Milestone::new(MilestoneCategory::FineMotor, "Stacking blocks", 15.0, 12.0, 18.0),
+            Milestone::new(
+                MilestoneCategory::FineMotor,
+                "Stacking blocks",
+                15.0,
+                12.0,
+                18.0,
+            ),
             Milestone::new(MilestoneCategory::FineMotor, "Scribbling", 18.0, 14.0, 22.0),
-            Milestone::new(MilestoneCategory::FineMotor, "Drawing circle", 36.0, 30.0, 42.0),
+            Milestone::new(
+                MilestoneCategory::FineMotor,
+                "Drawing circle",
+                36.0,
+                30.0,
+                42.0,
+            ),
             // === Language ===
             Milestone::new(MilestoneCategory::Language, "Cooing", 2.0, 1.0, 4.0),
             Milestone::new(MilestoneCategory::Language, "Babbling", 6.0, 4.0, 8.0),
             Milestone::new(MilestoneCategory::Language, "First words", 10.0, 8.0, 14.0),
-            Milestone::new(MilestoneCategory::Language, "Two-word phrases", 18.0, 14.0, 24.0),
+            Milestone::new(
+                MilestoneCategory::Language,
+                "Two-word phrases",
+                18.0,
+                14.0,
+                24.0,
+            ),
             Milestone::new(MilestoneCategory::Language, "50+ words", 24.0, 18.0, 30.0),
-            Milestone::new(MilestoneCategory::Language, "Simple sentences", 36.0, 30.0, 42.0),
-            Milestone::new(MilestoneCategory::Language, "Complex sentences", 48.0, 36.0, 60.0),
+            Milestone::new(
+                MilestoneCategory::Language,
+                "Simple sentences",
+                36.0,
+                30.0,
+                42.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::Language,
+                "Complex sentences",
+                48.0,
+                36.0,
+                60.0,
+            ),
             // === Social ===
             Milestone::new(MilestoneCategory::Social, "Social smile", 2.0, 1.0, 3.0),
-            Milestone::new(MilestoneCategory::Social, "Stranger anxiety", 8.0, 6.0, 10.0),
-            Milestone::new(MilestoneCategory::Social, "Separation anxiety", 9.0, 6.0, 12.0),
+            Milestone::new(
+                MilestoneCategory::Social,
+                "Stranger anxiety",
+                8.0,
+                6.0,
+                10.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::Social,
+                "Separation anxiety",
+                9.0,
+                6.0,
+                12.0,
+            ),
             Milestone::new(MilestoneCategory::Social, "Parallel play", 24.0, 18.0, 30.0),
-            Milestone::new(MilestoneCategory::Social, "Cooperative play", 36.0, 30.0, 48.0),
-            Milestone::new(MilestoneCategory::Social, "Theory of mind", 48.0, 36.0, 60.0),
+            Milestone::new(
+                MilestoneCategory::Social,
+                "Cooperative play",
+                36.0,
+                30.0,
+                48.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::Social,
+                "Theory of mind",
+                48.0,
+                36.0,
+                60.0,
+            ),
             // === Cognitive ===
-            Milestone::new(MilestoneCategory::Cognitive, "Object permanence", 8.0, 6.0, 10.0),
-            Milestone::new(MilestoneCategory::Cognitive, "Means-end reasoning", 10.0, 8.0, 12.0),
-            Milestone::new(MilestoneCategory::Cognitive, "Symbolic play", 18.0, 14.0, 24.0),
-            Milestone::new(MilestoneCategory::Cognitive, "Sorting by category", 24.0, 20.0, 30.0),
-            Milestone::new(MilestoneCategory::Cognitive, "Counting to 10", 36.0, 30.0, 48.0),
-            Milestone::new(MilestoneCategory::Cognitive, "Conservation", 60.0, 48.0, 72.0),
+            Milestone::new(
+                MilestoneCategory::Cognitive,
+                "Object permanence",
+                8.0,
+                6.0,
+                10.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::Cognitive,
+                "Means-end reasoning",
+                10.0,
+                8.0,
+                12.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::Cognitive,
+                "Symbolic play",
+                18.0,
+                14.0,
+                24.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::Cognitive,
+                "Sorting by category",
+                24.0,
+                20.0,
+                30.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::Cognitive,
+                "Counting to 10",
+                36.0,
+                30.0,
+                48.0,
+            ),
+            Milestone::new(
+                MilestoneCategory::Cognitive,
+                "Conservation",
+                60.0,
+                48.0,
+                72.0,
+            ),
         ]
     }
 
@@ -143,7 +257,11 @@ mod tests {
     #[test]
     fn test_all_milestones_count() {
         let all = DevelopmentalMilestoneDb::all_milestones();
-        assert!(all.len() >= 30, "Should have 30+ milestones, got {}", all.len());
+        assert!(
+            all.len() >= 30,
+            "Should have 30+ milestones, got {}",
+            all.len()
+        );
     }
 
     #[test]
@@ -159,7 +277,12 @@ mod tests {
 
         for cat in categories {
             let count = all.iter().filter(|m| m.category == cat).count();
-            assert!(count >= 5, "{:?} should have 5+ milestones, got {}", cat, count);
+            assert!(
+                count >= 5,
+                "{:?} should have 5+ milestones, got {}",
+                cat,
+                count
+            );
         }
     }
 
@@ -169,12 +292,16 @@ mod tests {
             assert!(
                 m.range_low_months <= m.expected_months,
                 "{}: low ({}) should be <= expected ({})",
-                m.name, m.range_low_months, m.expected_months
+                m.name,
+                m.range_low_months,
+                m.expected_months
             );
             assert!(
                 m.expected_months <= m.range_high_months,
                 "{}: expected ({}) should be <= high ({})",
-                m.name, m.expected_months, m.range_high_months
+                m.name,
+                m.expected_months,
+                m.range_high_months
             );
         }
     }
@@ -214,7 +341,8 @@ mod tests {
 
     #[test]
     fn test_milestones_for_category() {
-        let gross = DevelopmentalMilestoneDb::milestones_for_category(MilestoneCategory::GrossMotor);
+        let gross =
+            DevelopmentalMilestoneDb::milestones_for_category(MilestoneCategory::GrossMotor);
         assert!(gross.len() >= 6);
         for m in &gross {
             assert_eq!(m.category, MilestoneCategory::GrossMotor);
@@ -226,8 +354,12 @@ mod tests {
         let range = DevelopmentalMilestoneDb::milestones_in_range(6.0, 12.0);
         assert!(!range.is_empty());
         for m in &range {
-            assert!(m.expected_months >= 6.0 && m.expected_months <= 12.0,
-                "{} at {}mo is outside 6-12mo range", m.name, m.expected_months);
+            assert!(
+                m.expected_months >= 6.0 && m.expected_months <= 12.0,
+                "{} at {}mo is outside 6-12mo range",
+                m.name,
+                m.expected_months
+            );
         }
     }
 
@@ -240,17 +372,34 @@ mod tests {
     fn test_social_milestones_progression() {
         let social = DevelopmentalMilestoneDb::milestones_for_category(MilestoneCategory::Social);
         // Social smile should come before theory of mind
-        let smile_age = social.iter().find(|m| m.name == "Social smile").unwrap().expected_months;
-        let tom_age = social.iter().find(|m| m.name == "Theory of mind").unwrap().expected_months;
+        let smile_age = social
+            .iter()
+            .find(|m| m.name == "Social smile")
+            .unwrap()
+            .expected_months;
+        let tom_age = social
+            .iter()
+            .find(|m| m.name == "Theory of mind")
+            .unwrap()
+            .expected_months;
         assert!(smile_age < tom_age);
     }
 
     #[test]
     fn test_cognitive_milestones_progression() {
-        let cognitive = DevelopmentalMilestoneDb::milestones_for_category(MilestoneCategory::Cognitive);
+        let cognitive =
+            DevelopmentalMilestoneDb::milestones_for_category(MilestoneCategory::Cognitive);
         // Object permanence before conservation
-        let op_age = cognitive.iter().find(|m| m.name == "Object permanence").unwrap().expected_months;
-        let cons_age = cognitive.iter().find(|m| m.name == "Conservation").unwrap().expected_months;
+        let op_age = cognitive
+            .iter()
+            .find(|m| m.name == "Object permanence")
+            .unwrap()
+            .expected_months;
+        let cons_age = cognitive
+            .iter()
+            .find(|m| m.name == "Conservation")
+            .unwrap()
+            .expected_months;
         assert!(op_age < cons_age);
     }
 }

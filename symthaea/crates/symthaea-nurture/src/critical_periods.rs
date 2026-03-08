@@ -101,18 +101,15 @@ impl CriticalPeriodModel {
     /// Currently uses the analytical curve. The CfC neuron can be trained
     /// to match these curves for integration with the broader cognitive loop,
     /// where the neuron state encodes the developmental trajectory.
-    pub fn plasticity_at(
-        &mut self,
-        domain: CriticalPeriodDomain,
-        age: &DevelopmentalAge,
-    ) -> f64 {
+    pub fn plasticity_at(&mut self, domain: CriticalPeriodDomain, age: &DevelopmentalAge) -> f64 {
         // Use analytical as ground truth; CfC evolves state for integration
         let plasticity = Self::analytical_plasticity(domain, age.months);
 
         // Evolve CfC state with age as temporal input (for downstream integration)
         let age_hv = ContinuousHV::random(HDC_DIMENSION, 5000 + domain as u64)
             .scale(age.months as f32 / 60.0);
-        self.neuron.evolve_closed_form(age.months as f32 / 60.0, &age_hv);
+        self.neuron
+            .evolve_closed_form(age.months as f32 / 60.0, &age_hv);
 
         plasticity
     }
@@ -123,11 +120,7 @@ impl CriticalPeriodModel {
     }
 
     /// Check if a critical period is still open (plasticity > threshold).
-    pub fn is_window_open(
-        domain: CriticalPeriodDomain,
-        age_months: f64,
-        threshold: f64,
-    ) -> bool {
+    pub fn is_window_open(domain: CriticalPeriodDomain, age_months: f64, threshold: f64) -> bool {
         Self::analytical_plasticity(domain, age_months) > threshold
     }
 
@@ -144,8 +137,8 @@ impl CriticalPeriodModel {
     pub fn closing_age(domain: CriticalPeriodDomain) -> f64 {
         match domain {
             CriticalPeriodDomain::Attachment => 24.0,
-            CriticalPeriodDomain::Language => 48.0,  // Midpoint of decline
-            CriticalPeriodDomain::Vision => 24.0,    // Midpoint of decline
+            CriticalPeriodDomain::Language => 48.0, // Midpoint of decline
+            CriticalPeriodDomain::Vision => 24.0,   // Midpoint of decline
         }
     }
 }
@@ -163,23 +156,38 @@ mod tests {
     #[test]
     fn test_attachment_plasticity_high_at_birth() {
         let p = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 0.0);
-        assert!((p - 1.0).abs() < 1e-10, "Plasticity should be 1.0 at birth, got {p}");
+        assert!(
+            (p - 1.0).abs() < 1e-10,
+            "Plasticity should be 1.0 at birth, got {p}"
+        );
     }
 
     #[test]
     fn test_attachment_plasticity_high_at_6_months() {
         let p = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 6.0);
-        assert!((p - 1.0).abs() < 1e-10, "Plasticity should be 1.0 at 6mo, got {p}");
+        assert!(
+            (p - 1.0).abs() < 1e-10,
+            "Plasticity should be 1.0 at 6mo, got {p}"
+        );
     }
 
     #[test]
     fn test_attachment_plasticity_declines_after_12() {
-        let p12 = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 12.0);
-        let p18 = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 18.0);
-        let p24 = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 24.0);
+        let p12 =
+            CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 12.0);
+        let p18 =
+            CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 18.0);
+        let p24 =
+            CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 24.0);
 
-        assert!(p12 > p18, "Plasticity should decline: 12mo={p12} > 18mo={p18}");
-        assert!(p18 > p24, "Plasticity should decline: 18mo={p18} > 24mo={p24}");
+        assert!(
+            p12 > p18,
+            "Plasticity should decline: 12mo={p12} > 18mo={p18}"
+        );
+        assert!(
+            p18 > p24,
+            "Plasticity should decline: 18mo={p18} > 24mo={p24}"
+        );
     }
 
     #[test]
@@ -191,7 +199,10 @@ mod tests {
     #[test]
     fn test_attachment_residual_never_zero() {
         let p = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 120.0);
-        assert!(p >= 0.05, "Should have minimum residual plasticity, got {p}");
+        assert!(
+            p >= 0.05,
+            "Should have minimum residual plasticity, got {p}"
+        );
     }
 
     #[test]
@@ -203,7 +214,10 @@ mod tests {
     #[test]
     fn test_language_plasticity_high_at_30_months() {
         let p = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Language, 30.0);
-        assert!((p - 1.0).abs() < 1e-10, "Language plasticity should be 1.0 at 30mo, got {p}");
+        assert!(
+            (p - 1.0).abs() < 1e-10,
+            "Language plasticity should be 1.0 at 30mo, got {p}"
+        );
     }
 
     #[test]
@@ -212,17 +226,27 @@ mod tests {
         let p48 = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Language, 48.0);
         let p60 = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Language, 60.0);
 
-        assert!(p36 > p48, "Language plasticity should decline: 36mo={p36} > 48mo={p48}");
-        assert!(p48 > p60, "Language plasticity should decline: 48mo={p48} > 60mo={p60}");
+        assert!(
+            p36 > p48,
+            "Language plasticity should decline: 36mo={p36} > 48mo={p48}"
+        );
+        assert!(
+            p48 > p60,
+            "Language plasticity should decline: 48mo={p48} > 60mo={p60}"
+        );
     }
 
     #[test]
     fn test_language_window_longer_than_attachment() {
-        let attachment_30 = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 30.0);
-        let language_30 = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Language, 30.0);
+        let attachment_30 =
+            CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 30.0);
+        let language_30 =
+            CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Language, 30.0);
 
-        assert!(language_30 > attachment_30,
-            "Language window should be open longer: lang={language_30}, attach={attachment_30}");
+        assert!(
+            language_30 > attachment_30,
+            "Language window should be open longer: lang={language_30}, attach={attachment_30}"
+        );
     }
 
     #[test]
@@ -244,12 +268,19 @@ mod tests {
     #[test]
     fn test_vision_window_closed_by_48() {
         let p = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Vision, 48.0);
-        assert!(p < 0.2, "Vision plasticity should be very low at 48mo, got {p}");
+        assert!(
+            p < 0.2,
+            "Vision plasticity should be very low at 48mo, got {p}"
+        );
     }
 
     #[test]
     fn test_all_domains_monotonic_decrease() {
-        for domain in [CriticalPeriodDomain::Attachment, CriticalPeriodDomain::Language, CriticalPeriodDomain::Vision] {
+        for domain in [
+            CriticalPeriodDomain::Attachment,
+            CriticalPeriodDomain::Language,
+            CriticalPeriodDomain::Vision,
+        ] {
             let mut prev = 1.0;
             // Sample at peak + declining region
             for month in (0..=120).step_by(6) {
@@ -268,8 +299,12 @@ mod tests {
         let p = model.plasticity_at(CriticalPeriodDomain::Attachment, &age);
 
         // Should match analytical
-        let analytical = CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 12.0);
-        assert!((p - analytical).abs() < 1e-10, "plasticity_at should match analytical: {p} vs {analytical}");
+        let analytical =
+            CriticalPeriodModel::analytical_plasticity(CriticalPeriodDomain::Attachment, 12.0);
+        assert!(
+            (p - analytical).abs() < 1e-10,
+            "plasticity_at should match analytical: {p} vs {analytical}"
+        );
 
         // Neuron state should have evolved (not zero)
         let state_norm = model.neuron_state().norm();
@@ -278,10 +313,26 @@ mod tests {
 
     #[test]
     fn test_is_window_open() {
-        assert!(CriticalPeriodModel::is_window_open(CriticalPeriodDomain::Attachment, 6.0, 0.5));
-        assert!(!CriticalPeriodModel::is_window_open(CriticalPeriodDomain::Attachment, 60.0, 0.5));
-        assert!(CriticalPeriodModel::is_window_open(CriticalPeriodDomain::Language, 30.0, 0.5));
-        assert!(!CriticalPeriodModel::is_window_open(CriticalPeriodDomain::Vision, 60.0, 0.5));
+        assert!(CriticalPeriodModel::is_window_open(
+            CriticalPeriodDomain::Attachment,
+            6.0,
+            0.5
+        ));
+        assert!(!CriticalPeriodModel::is_window_open(
+            CriticalPeriodDomain::Attachment,
+            60.0,
+            0.5
+        ));
+        assert!(CriticalPeriodModel::is_window_open(
+            CriticalPeriodDomain::Language,
+            30.0,
+            0.5
+        ));
+        assert!(!CriticalPeriodModel::is_window_open(
+            CriticalPeriodDomain::Vision,
+            60.0,
+            0.5
+        ));
     }
 
     #[test]
@@ -298,9 +349,16 @@ mod tests {
     #[test]
     fn test_residual_plasticity_all_domains() {
         // All domains should have non-zero residual at extreme age
-        for domain in [CriticalPeriodDomain::Attachment, CriticalPeriodDomain::Language, CriticalPeriodDomain::Vision] {
+        for domain in [
+            CriticalPeriodDomain::Attachment,
+            CriticalPeriodDomain::Language,
+            CriticalPeriodDomain::Vision,
+        ] {
             let p = CriticalPeriodModel::analytical_plasticity(domain, 240.0); // 20 years
-            assert!(p > 0.0, "{domain:?} should have non-zero residual at 20 years, got {p}");
+            assert!(
+                p > 0.0,
+                "{domain:?} should have non-zero residual at 20 years, got {p}"
+            );
         }
     }
 }

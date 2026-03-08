@@ -65,7 +65,10 @@ fn comprehensive_difficulty_gradient() {
         // Interference models
         ("Executive::Stroop", Box::new(StroopBenchmark)),
         ("Executive::Flanker", Box::new(FlankerBenchmark)),
-        ("Affect::EmotionalStroop", Box::new(EmotionalStroopBenchmark)),
+        (
+            "Affect::EmotionalStroop",
+            Box::new(EmotionalStroopBenchmark),
+        ),
         ("Motor::Bimanual", Box::new(BimanualBenchmark)),
         (
             "MemoryAgent::ConflictResolution",
@@ -73,10 +76,7 @@ fn comprehensive_difficulty_gradient() {
         ),
         ("MemoryAgent::LongRange", Box::new(LongRangeBenchmark)),
         ("WorM::Binding", Box::new(BindingBenchmark)),
-        (
-            "WorM::ChangeDetection",
-            Box::new(ChangeDetectionBenchmark),
-        ),
+        ("WorM::ChangeDetection", Box::new(ChangeDetectionBenchmark)),
         ("WorM::DigitSpan", Box::new(DigitSpanBenchmark)),
         ("WorM::N-back", Box::new(NBackBenchmark)),
         ("WorM::SerialRecall", Box::new(SerialRecallBenchmark)),
@@ -86,10 +86,7 @@ fn comprehensive_difficulty_gradient() {
             "Attention::AttentionalBlink",
             Box::new(AttentionalBlinkBenchmark),
         ),
-        (
-            "Attention::VisualSearch",
-            Box::new(VisualSearchBenchmark),
-        ),
+        ("Attention::VisualSearch", Box::new(VisualSearchBenchmark)),
         ("Executive::WCST", Box::new(WisconsinCardSortingBenchmark)),
         ("Inhibition::StopSignal", Box::new(StopSignalBenchmark)),
         (
@@ -141,17 +138,17 @@ fn comprehensive_difficulty_gradient() {
     // The difficulty model DOES modulate internal variables (threshold, noise,
     // temperature) but the observable key metric doesn't shift enough to detect.
     let exempt_from_effect_check = [
-        "Executive::WCST",             // categories_completed always 6 at low dim
-        "Language::SemanticPriming",    // priming_effect too small at dim=128
-        "Social::SocialNorm",          // d' at ceiling with 128-dim HVs
-        "Social::UltimatumGame",       // fairness_sensitivity deterministic at low trials
-        "Motor::Bimanual",             // coordination_cost stays 0 at low dim
-        "WorM::ChangeDetection",       // set_size_4::accuracy insensitive to noise_frac delta
-        "WorM::DigitSpan",             // forward_span is discrete integer (7→7)
-        "WorM::N-back",                // nback_2::accuracy ceiling at dim=128
-        "WorM::SpatialUpdating",       // overall_accuracy at ceiling (1.0)
-        "SustainedAttention::CPT",     // d' at ceiling with dim=128 HVs
-        "ToMBench::Hinting",           // keyword-dominant scoring, sigmoid too flat
+        "Executive::WCST",           // categories_completed always 6 at low dim
+        "Language::SemanticPriming", // priming_effect too small at dim=128
+        "Social::SocialNorm",        // d' at ceiling with 128-dim HVs
+        "Social::UltimatumGame",     // fairness_sensitivity deterministic at low trials
+        "Motor::Bimanual",           // coordination_cost stays 0 at low dim
+        "WorM::ChangeDetection",     // set_size_4::accuracy insensitive to noise_frac delta
+        "WorM::DigitSpan",           // forward_span is discrete integer (7→7)
+        "WorM::N-back",              // nback_2::accuracy ceiling at dim=128
+        "WorM::SpatialUpdating",     // overall_accuracy at ceiling (1.0)
+        "SustainedAttention::CPT",   // d' at ceiling with dim=128 HVs
+        "ToMBench::Hinting",         // keyword-dominant scoring, sigmoid too flat
     ];
 
     let mut failures = Vec::new();

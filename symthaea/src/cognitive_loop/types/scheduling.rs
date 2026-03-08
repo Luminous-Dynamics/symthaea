@@ -118,4 +118,3 @@ pub(crate) struct CycleState<'a> {
     #[cfg(feature = "vision-manifold")]
     pub scene_recognized: bool,
 }
-

@@ -290,6 +290,9 @@ mod tests {
             Box::new(RmeBenchmark),
             Box::new(UltimatumGameBenchmark),
             Box::new(SocialNormBenchmark),
+            Box::new(PrisonersDilemmaBenchmark),
+            Box::new(PublicGoodsBenchmark),
+            Box::new(DictatorGameBenchmark),
         ];
 
         let mut missing = Vec::new();

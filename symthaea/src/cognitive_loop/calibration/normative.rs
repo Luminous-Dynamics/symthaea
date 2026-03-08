@@ -396,7 +396,10 @@ impl NeuromodCalibration {
             let mut ecb_z_sources: Vec<(f64, f64)> = Vec::new(); // (z, weight)
 
             // Self-assessment allostatic proxy (highest weight — most specific)
-            if let Some((_, z)) = z_scores.iter().find(|(name, _)| *name == "Allostatic::Endocannabinoid") {
+            if let Some((_, z)) = z_scores
+                .iter()
+                .find(|(name, _)| *name == "Allostatic::Endocannabinoid")
+            {
                 ecb_z_sources.push((*z, 2.0));
             }
 
@@ -406,19 +409,25 @@ impl NeuromodCalibration {
             }
 
             // CPT sustained attention as chronic stress signal (weight 1.0)
-            if let Some((_, z)) = z_scores.iter().find(|(name, _)| *name == "SustainedAttention::CPT") {
+            if let Some((_, z)) = z_scores
+                .iter()
+                .find(|(name, _)| *name == "SustainedAttention::CPT")
+            {
                 ecb_z_sources.push((*z, 1.0));
             }
 
             if !ecb_z_sources.is_empty() {
                 let total_weight: f64 = ecb_z_sources.iter().map(|(_, w)| w).sum();
-                let weighted_z: f64 = ecb_z_sources.iter().map(|(z, w)| z * w).sum::<f64>() / total_weight;
+                let weighted_z: f64 =
+                    ecb_z_sources.iter().map(|(z, w)| z * w).sum::<f64>() / total_weight;
                 valid_count += 1;
                 // Composite is lower-is-better: high composite = allostatic depletion → invert
                 let factor = z_to_sensitivity_factor(weighted_z, true);
                 let source_names: Vec<String> = {
                     let mut names = Vec::new();
-                    if !ecb_z_sources.is_empty() { names.push("composite".to_string()); }
+                    if !ecb_z_sources.is_empty() {
+                        names.push("composite".to_string());
+                    }
                     names
                 };
                 adjustments.push(TransmitterCalibration {
@@ -461,10 +470,12 @@ impl NeuromodCalibration {
         // Low vigilance decrement (negative adenosine z) + good inhibitory tone (negative GABA z)
         // = high stillness quality. Both inverted: negative z = healthier rest capacity.
         let stillness_quality = {
-            let gaba_z_opt = adjustments.iter()
+            let gaba_z_opt = adjustments
+                .iter()
                 .find(|a| a.transmitter == "GABA")
                 .map(|a| a.z_score);
-            let aden_z_opt = adjustments.iter()
+            let aden_z_opt = adjustments
+                .iter()
                 .find(|a| a.transmitter == "Adenosine")
                 .map(|a| a.z_score);
             match (gaba_z_opt, aden_z_opt) {
@@ -473,9 +484,7 @@ impl NeuromodCalibration {
                     let composite = -(g * 0.5 + a * 0.5); // negate: negative z = good
                     (0.5 + composite * 0.25).clamp(0.0, 1.0) as f32
                 }
-                (Some(z), None) | (None, Some(z)) => {
-                    (0.5 - z * 0.25).clamp(0.0, 1.0) as f32
-                }
+                (Some(z), None) | (None, Some(z)) => (0.5 - z * 0.25).clamp(0.0, 1.0) as f32,
                 (None, None) => 0.5, // no data → neutral
             }
         };
@@ -600,7 +609,11 @@ impl NeuromodCalibration {
                 }
             };
             // Tolerance-aware gating for global transmitter adjustments
-            let factor = match tolerance_adjusted_factor(transmitter, adj.sensitivity_factor, adj.transmitter) {
+            let factor = match tolerance_adjusted_factor(
+                transmitter,
+                adj.sensitivity_factor,
+                adj.transmitter,
+            ) {
                 Some(f) => f,
                 None => continue, // in withdrawal — skip
             };
@@ -708,13 +721,11 @@ impl NeuromodCalibration {
                 None => adj.transmitter,
             };
             if let Some(&peer_factor) = peer.sensitivity_factors.get(key) {
-                adj.sensitivity_factor =
-                    adj.sensitivity_factor * (1.0 - w) + peer_factor * w;
+                adj.sensitivity_factor = adj.sensitivity_factor * (1.0 - w) + peer_factor * w;
             }
         }
         // Blend confidence delta
-        self.confidence_delta =
-            self.confidence_delta * (1.0 - w) + peer.confidence_delta * w;
+        self.confidence_delta = self.confidence_delta * (1.0 - w) + peer.confidence_delta * w;
     }
 
     /// Scale calibration adjustments by sleep quality (0.0–1.0).

@@ -37,8 +37,7 @@ fn main() {
     let mut state = vec![0.0f64; num_nodes]; // frequency deviations from 60Hz
 
     // Oracle setup
-    let encoder =
-        TimeSeriesEncoder::new(num_nodes, 256, 42).with_name("power-grid-6node");
+    let encoder = TimeSeriesEncoder::new(num_nodes, 256, 42).with_name("power-grid-6node");
 
     let config = OracleConfig {
         window_size: 50,
@@ -69,8 +68,7 @@ fn main() {
             forces[i] -= 0.1 * state[i];
             // Generator drive (small periodic perturbation)
             if i == 0 || i == 3 {
-                forces[i] +=
-                    0.5 * (step as f64 * dt * 2.0 * std::f64::consts::PI * 0.1).sin();
+                forces[i] += 0.5 * (step as f64 * dt * 2.0 * std::f64::consts::PI * 0.1).sin();
             }
         }
 

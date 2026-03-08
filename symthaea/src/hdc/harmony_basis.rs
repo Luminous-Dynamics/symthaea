@@ -517,7 +517,10 @@ mod tests {
             matrix.observe(&coords, 0.05);
         }
         // Should develop synergy between 0 and 1
-        assert!(matrix.weights[0][1] > 0.5, "Co-activated harmonies should develop synergy");
+        assert!(
+            matrix.weights[0][1] > 0.5,
+            "Co-activated harmonies should develop synergy"
+        );
     }
 
     #[test]
@@ -527,7 +530,10 @@ mod tests {
         let coords = [0.9, -0.5, 0.3, 0.0, 0.7, -0.2, 0.1, 0.4];
         let result = matrix.apply(&coords, 0.3);
         for c in &result {
-            assert!(*c >= -1.0 && *c <= 1.0, "Applied coords should be in [-1, 1]");
+            assert!(
+                *c >= -1.0 && *c <= 1.0,
+                "Applied coords should be in [-1, 1]"
+            );
         }
     }
 }

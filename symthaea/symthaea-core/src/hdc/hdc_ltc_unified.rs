@@ -118,8 +118,8 @@ impl Default for UnifiedConfig {
             learning_rate: 0.01,
             momentum: 0.9,
             weight_decay: 0.0001,
-            gating_steepness: 1.0, // Standard sigmoid
-            interp_bias: 0.0,      // Neutral interpolation
+            gating_steepness: 1.0,           // Standard sigmoid
+            interp_bias: 0.0,                // Neutral interpolation
             fourier_frequencies: Vec::new(), // Disabled by default
             fourier_amplitude: 0.1,
         }
@@ -2369,7 +2369,11 @@ mod tests {
             neuron.evolve_closed_form(0.02, &input);
         }
         let norm = neuron.state().norm();
-        assert!(norm > 0.0 && norm.is_finite(), "State should evolve, got norm={}", norm);
+        assert!(
+            norm > 0.0 && norm.is_finite(),
+            "State should evolve, got norm={}",
+            norm
+        );
     }
 
     #[test]

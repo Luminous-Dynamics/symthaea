@@ -118,10 +118,8 @@ impl MoralOxytocinBenchmark {
             .map(|t| t.social_coherence as f64)
             .collect();
 
-        let mean_high_sc =
-            high_moral_sc.iter().sum::<f64>() / high_moral_sc.len().max(1) as f64;
-        let mean_low_sc =
-            low_moral_sc.iter().sum::<f64>() / low_moral_sc.len().max(1) as f64;
+        let mean_high_sc = high_moral_sc.iter().sum::<f64>() / high_moral_sc.len().max(1) as f64;
+        let mean_low_sc = low_moral_sc.iter().sum::<f64>() / low_moral_sc.len().max(1) as f64;
 
         // All finite check
         let all_finite = traces.iter().all(|t| {
