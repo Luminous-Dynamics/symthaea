@@ -485,12 +485,26 @@ impl CognitiveLoopService {
         metadata.flow_feedback_relaxed = self.flow_state.in_flow
             && self.flow_state.intensity > 0.5;
         metadata.homeostasis_efficiency = self.carryover.quality.homeostasis_efficiency;
-        // Session 10 telemetry
-        metadata.confidence_crash_detected = self.carryover.quality.crash_freeze_remaining
-            == super::thresholds::CONFIDENCE_CRASH_FREEZE_CYCLES.saturating_sub(1);
+        // Session 10 telemetry (Session 11: lr_frozen from dynamics phase)
+        metadata.confidence_crash_detected = dynamics.confidence_crash_detected;
         metadata.crash_freeze_remaining = self.carryover.quality.crash_freeze_remaining;
+        metadata.lr_frozen = dynamics.lr_frozen;
         metadata.hysteresis_factor = self.carryover.quality.hysteresis_factor;
         metadata.agreement_confidence_coupling = feedback.quality.agreement_confidence_coupling;
+
+        // Session 11 Item 8: Proposal conflict ratio → epistemic exploration boost.
+        // High conflict = subsystems disagree about direction → boost exploration.
+        {
+            let conflict = self.feedback_state.avg_conflict_ratio();
+            metadata.proposal_conflict_ratio = conflict;
+            if conflict > 0.3 && self.stats.total_cycles > 15 {
+                self.feedback_state.exploration.propose(
+                    "high_conflict",
+                    super::feedback_state::FeedbackProposal::Add(0.02),
+                );
+                metadata.conflict_exploration_boost = true;
+            }
+        }
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self

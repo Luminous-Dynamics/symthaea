@@ -1547,6 +1547,8 @@ impl Symthaea {
         // Phi measurement, then inject into the structured thought so the LLM
         // translation phase receives a fully-planned code context.
         #[cfg(feature = "code_generation")]
+        let mut pregenerated_tests: Option<String> = None;
+        #[cfg(feature = "code_generation")]
         if detected_domain == "programming" {
             use crate::language::code_intent::{
                 CodeIntentCategory, CodeIntentClassifier, CodeSpec, CodeTarget,
@@ -1587,6 +1589,27 @@ impl Symthaea {
                             spec = spec.with_constraint("MULTI_ENTITY: generate struct + impl block + methods");
                         }
                     }
+                    // Item 3 (Phase 3h): Detect algorithm patterns and inject as
+                    // constraints so the emitter produces scaffolding, not todo!()
+                    let intent_hv = self.text_to_hv(content);
+                    if let Some(pattern) = crate::dynamics::cfc_code_sequencer::CfCCodeSequencer::detect_algorithm_pattern(&intent_hv) {
+                        let constraint = match pattern {
+                            crate::dynamics::cfc_code_sequencer::AlgorithmPattern::Sorting =>
+                                "ALGORITHM:sorting — use compare-swap or divide-recurse-merge pattern",
+                            crate::dynamics::cfc_code_sequencer::AlgorithmPattern::Search =>
+                                "ALGORITHM:search — use binary search, BFS/DFS, or linear scan pattern",
+                            crate::dynamics::cfc_code_sequencer::AlgorithmPattern::DynamicProgramming =>
+                                "ALGORITHM:dp — use memoization table or bottom-up tabulation pattern",
+                            crate::dynamics::cfc_code_sequencer::AlgorithmPattern::Graph =>
+                                "ALGORITHM:graph — use adjacency list with BFS/DFS/Dijkstra pattern",
+                            crate::dynamics::cfc_code_sequencer::AlgorithmPattern::Accumulation =>
+                                "ALGORITHM:accumulation — use fold/reduce/iterator chain pattern",
+                            crate::dynamics::cfc_code_sequencer::AlgorithmPattern::StringProcessing =>
+                                "ALGORITHM:string — use char iteration/regex/split-join pattern",
+                        };
+                        spec = spec.with_constraint(constraint);
+                    }
+
                     crate::language::code_intent::CodeIntent::Create { target, spec }
                 }
                 _ => {
@@ -1626,6 +1649,18 @@ impl Symthaea {
                 past_examples: relevant_examples,
                 ..Default::default()
             };
+
+            // Item 1 (Phase 3h): Test-first generation — produce tests BEFORE
+            // implementation so they serve as independent behavioral oracle
+            pregenerated_tests = if let crate::language::code_intent::CodeIntent::Create {
+                ref spec, ..
+            } = intent
+            {
+                self.code_generator.generate_tests_only(spec)
+            } else {
+                None
+            };
+
             let generated = self.code_generator.generate(&intent, &gen_ctx);
 
             // Extract spec fields for the structured thought
@@ -1649,6 +1684,40 @@ impl Symthaea {
             let mut notes = generated.notes;
             for (error_pat, fix_hint) in &self.error_pattern_memory {
                 notes.push(format!("AVOID_ERROR: {} — {}", error_pat, fix_hint));
+            }
+
+            // Item 5 (Phase 3h): Inject top-1 cached example as few-shot hint
+            // for LLM prompts when the native emitter can't handle it
+            if needs_llm {
+                // Clone cache to avoid borrow conflict with text_to_hv(&mut self)
+                let cache_snapshot = self.code_generation_cache.clone();
+                let query_hv = self.text_to_hv(content);
+                let best_match: Option<(String, String)> = {
+                    let mut best: Option<(f32, usize)> = None;
+                    for (i, (p, _)) in cache_snapshot.iter().enumerate() {
+                        let p_hv = self.text_to_hv(p);
+                        let sim = query_hv.similarity(&p_hv);
+                        if sim > 0.2 && best.map_or(true, |(s, _)| sim > s) {
+                            best = Some((sim, i));
+                        }
+                    }
+                    best.map(|(_, i)| cache_snapshot[i].clone())
+                };
+                if let Some((purpose, code)) = best_match {
+                    notes.push(format!(
+                        "SIMILAR_EXAMPLE: For \"{}\", this worked:\n{}",
+                        purpose,
+                        &code[..code.len().min(500)]
+                    ));
+                }
+
+                // Also inject test-first tests as behavioral spec for LLM
+                if let Some(ref tests) = pregenerated_tests {
+                    notes.push(format!(
+                        "EXPECTED_TESTS: The generated code must pass these tests:\n{}",
+                        tests
+                    ));
+                }
             }
 
             thought.code_context = Some(crate::mind::structured_thought::CodeContext {
@@ -1884,6 +1953,14 @@ impl Symthaea {
                     "rust" if has_inline_tests => {
                         executor.execute_rust_with_inline_tests(&current_code)
                     }
+                    // Item 1 (Phase 3h): Use pregenerated tests as verification
+                    // oracle when code has no inline tests
+                    "rust" if pregenerated_tests.is_some() => {
+                        executor.execute_rust(
+                            &current_code,
+                            pregenerated_tests.as_deref(),
+                        )
+                    }
                     "rust" => executor.execute_rust(&current_code, None),
                     "python" => executor.execute_python(&current_code),
                     "nix" => executor.evaluate_nix(&current_code),
@@ -1999,6 +2076,40 @@ impl Symthaea {
                         }
                     }
                 }
+
+                // Item 6 (Phase 3h): Compilation feedback → FEP surprise signal
+                // Compilation failure = high surprise → should boost learning rate
+                // Compilation success after retries = moderate surprise → reward
+                let code_surprise = if compile_ok {
+                    if attempt > 1 {
+                        // Success after retries: moderate positive signal
+                        0.3 / (attempt as f32)
+                    } else {
+                        // First-try success: low surprise (expected)
+                        0.05
+                    }
+                } else {
+                    // Failure: high surprise
+                    0.8
+                };
+                // Store code surprise in the thought metadata so the cognitive
+                // loop can pick it up as an FEP prediction error signal
+                if let Some(ref mut ctx) = thought.code_context {
+                    // Encode surprise as a note the cognitive loop can parse
+                    ctx.notes.push(format!("CODE_SURPRISE:{:.3}", code_surprise));
+                    // Update intent_similarity inversely with surprise
+                    // (high surprise = low achieved similarity)
+                    ctx.intent_similarity = Some(
+                        ctx.intent_similarity.unwrap_or(0.5) * (1.0 - code_surprise * 0.5)
+                    );
+                }
+                tracing::debug!(
+                    target: "symthaea::code",
+                    code_surprise,
+                    compile_ok,
+                    attempts = attempt,
+                    "Phase 3h: Compilation feedback → surprise signal"
+                );
             }
 
             // Store successful generation in episodic memory + cache

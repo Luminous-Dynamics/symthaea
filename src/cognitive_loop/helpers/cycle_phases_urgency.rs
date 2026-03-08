@@ -103,9 +103,14 @@ impl CognitiveLoopService {
         // High D2 → easier transitions (lower hysteresis), low D2 → perseveration.
         let flexibility = self.neuromod.bath.behavioral_flexibility();
         let flex_mod = 1.0 / flexibility; // 0.67–1.43 (inverted: high flex = lower threshold)
+        // Session 11 Item 2: Wire hysteresis_factor into urgency computation.
+        // Sustained stability relaxes hysteresis (factor decays from 1.0 toward 0.5),
+        // permitting smoother mode transitions after long stable runs.
+        // Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
+        let hysteresis_relax = self.carryover.quality.hysteresis_factor;
         let base_hysteresis = match self.carryover.urgency.urgency {
-            super::super::CycleUrgency::Cruise => effective_threshold * 1.2 * flex_mod,
-            super::super::CycleUrgency::Critical => effective_threshold * 0.8 * flex_mod,
+            super::super::CycleUrgency::Cruise => effective_threshold * (1.0 + 0.2 * hysteresis_relax) * flex_mod,
+            super::super::CycleUrgency::Critical => effective_threshold * (1.0 - 0.2 * hysteresis_relax) * flex_mod,
             _ => effective_threshold * flex_mod,
         };
 
@@ -351,6 +356,10 @@ impl CognitiveLoopService {
         if oscillation_ratio > 0.5 {
             let osc_dampen = 1.0 - (oscillation_ratio - 0.5) * 0.2; // 0.9–1.0
             self.scale_lr("error_oscillation", osc_dampen.max(0.9));
+            // Session 11 Item 6: Oscillation → confidence dampening.
+            // Oscillating errors = meta-uncertainty about target → confidence should drop too.
+            // Science: Doya (2002) — meta-uncertainty degrades both learning and confidence.
+            self.scale_confidence("error_oscillation", osc_dampen.max(0.9));
         }
 
         // Session 10 Item 5: Error pattern → predictive learning rate.

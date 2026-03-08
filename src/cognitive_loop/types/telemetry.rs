@@ -956,6 +956,18 @@ pub struct CycleMetadata {
     /// Whether agreement-confidence velocity coupling fired this cycle.
     #[serde(default)]
     pub agreement_confidence_coupling: bool,
+
+    // ── Session 11: Fixes + Adaptive Intelligence ────────────────────────
+    /// Whether LR was frozen this cycle by crash freeze (Set proposal pinning).
+    #[serde(default)]
+    pub lr_frozen: bool,
+    /// Proposal conflict ratio (0.0 = unanimous, 0.5 = maximally conflicted).
+    /// Science: Dayan & Daw (2008) — model disagreement signals meta-uncertainty.
+    #[serde(default)]
+    pub proposal_conflict_ratio: f32,
+    /// Whether high conflict triggered epistemic exploration boost.
+    #[serde(default)]
+    pub conflict_exploration_boost: bool,
 }
 
 fn default_response_profile() -> String {
@@ -1087,6 +1099,12 @@ pub struct BrocaGenerationTelemetry {
     /// Semantic prediction error (reconstruction accuracy).
     #[serde(default)]
     pub semantic_pe: f32,
+    /// Type-token ratio: unique_tokens / total_tokens (0.0–1.0, higher = more diverse).
+    #[serde(default)]
+    pub type_token_ratio: f32,
+    /// Maximum consecutive repetitions of a single token (lower = better).
+    #[serde(default)]
+    pub max_repetition: usize,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

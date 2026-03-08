@@ -69,7 +69,11 @@ impl NarrativeCoherence {
             episodes: VecDeque::with_capacity(100),
             future_scenarios: Vec::new(),
             max_episodes: 100,
-            smoothing: 0.1,
+            // EMA smoothing for autobiographical integration updates.
+            // 0.1 → 23 episodes to 90% convergence (~115 cycles at 1 ep/5 cycles).
+            // 0.2 → 11 episodes to 90% convergence (~55 cycles). Faster pickup
+            // of narrative structure without over-weighting single episodes.
+            smoothing: 0.2,
         }
     }
 
@@ -132,17 +136,19 @@ impl NarrativeCoherence {
         self.update_simulation_depth();
     }
 
-    /// Compute how well a new episode integrates with existing narrative
+    /// Compute how well a new episode integrates with existing narrative.
+    ///
+    /// Three signals: episode density (do we have enough material),
+    /// causal linkage (are episodes causally connected), and valence
+    /// diversity (a rich narrative has emotional range, not flat affect).
     fn compute_episode_integration(&self, _content: &str) -> f64 {
         if self.episodes.is_empty() {
             return 0.5; // Neutral for first episode
         }
 
-        // Heuristic: integration based on temporal proximity and narrative continuity
-        let recent_count = self.episodes.iter().rev().take(10).count();
-
-        // More recent episodes = better integration potential
-        let recency_factor = recent_count as f64 / 10.0;
+        // Episode density: saturates at 20 episodes (not 10) for more
+        // discriminative warmup period.
+        let density = (self.episodes.len() as f64 / 20.0).min(1.0);
 
         // Causal density (episodes with links)
         let linked_count = self
@@ -152,7 +158,26 @@ impl NarrativeCoherence {
             .count();
         let causal_density = linked_count as f64 / self.episodes.len().max(1) as f64;
 
-        recency_factor * 0.5 + causal_density * 0.5
+        // Valence diversity: std dev of recent valences. A coherent
+        // narrative integrates varied experiences — flat affect (all
+        // same valence) is less integrated than emotional range.
+        // Science: McAdams (2001) — redemption/contamination sequences
+        // in life narratives require valence shifts.
+        let valence_diversity = if self.episodes.len() >= 5 {
+            let recent: Vec<f64> = self.episodes.iter().rev().take(20)
+                .map(|ep| ep.valence).collect();
+            let mean = recent.iter().sum::<f64>() / recent.len() as f64;
+            let variance = recent.iter()
+                .map(|v| (v - mean).powi(2))
+                .sum::<f64>() / recent.len() as f64;
+            // Map std dev [0, 0.5] → [0.3, 1.0]. Some baseline even with
+            // zero variance (repeated same input still builds narrative).
+            (0.3 + variance.sqrt() * 1.4).min(1.0)
+        } else {
+            0.5
+        };
+
+        density * 0.3 + causal_density * 0.3 + valence_diversity * 0.4
     }
 
     /// Update overall autobiographical integration score

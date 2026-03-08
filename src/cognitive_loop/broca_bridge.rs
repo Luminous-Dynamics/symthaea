@@ -136,6 +136,29 @@ impl BrocaManager {
         let result = self.generator.generate(&channels);
 
         let elapsed = start.elapsed();
+
+        // Compute quality metrics from token IDs
+        let (type_token_ratio, max_repetition) = if result.token_ids.is_empty() {
+            (0.0, 0)
+        } else {
+            let unique: std::collections::HashSet<u32> = result.token_ids.iter().copied().collect();
+            let ttr = unique.len() as f32 / result.token_ids.len() as f32;
+            let max_rep = {
+                let mut max = 1usize;
+                let mut run = 1usize;
+                for w in result.token_ids.windows(2) {
+                    if w[0] == w[1] {
+                        run += 1;
+                        max = max.max(run);
+                    } else {
+                        run = 1;
+                    }
+                }
+                max
+            };
+            (ttr, max_rep)
+        };
+
         self.last_telemetry = BrocaGenerationTelemetry {
             generated: true,
             token_count: result.num_tokens,
@@ -143,6 +166,8 @@ impl BrocaManager {
             veto_triggered: result.veto_triggered,
             generation_time_us: elapsed.as_micros() as u64,
             consciousness_gated: false,
+            type_token_ratio,
+            max_repetition,
             ..Default::default()
         };
 

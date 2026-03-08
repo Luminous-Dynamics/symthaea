@@ -152,6 +152,44 @@ fn infer_rust_body(purpose: &str, params: &[(String, String)], return_type: Opti
     // Pattern-match common operations from the purpose
     let ret = return_type.unwrap_or("");
 
+    // ── Specific multi-word patterns (must be checked BEFORE generic single-word) ──
+
+    // two_sum (before generic "sum")
+    if purpose_lower.contains("two_sum") || purpose_lower.contains("two sum") {
+        if params.len() == 2 && params[0].1.contains("Vec") {
+            return format!(
+                "for i in 0..{0}.len() {{\n        for j in (i + 1)..{0}.len() {{\n            if {0}[i] + {0}[j] == {1} {{\n                return Some((i, j));\n            }}\n        }}\n    }}\n    None",
+                params[0].0, params[1].0
+            );
+        }
+    }
+    // dot_product (before generic "product")
+    if purpose_lower.contains("dot_product") || purpose_lower.contains("dot product") {
+        if params.len() == 2 && params[0].1.contains("Vec") {
+            return format!("{}.iter().zip({}.iter()).map(|(a, b)| a * b).sum()", params[0].0, params[1].0);
+        }
+    }
+    // count_words (before generic "count")
+    if purpose_lower.contains("count_words") || purpose_lower.contains("count words") || purpose_lower.contains("word count") {
+        if params.len() == 1 {
+            return format!("{}.split_whitespace().count()", params[0].0);
+        }
+    }
+    // ok_or (before generic Result/Option patterns)
+    if purpose_lower.contains("ok_or") {
+        if params.len() >= 1 && params[0].1.contains("Option") {
+            return format!("{}.ok_or(\"value was None\".to_string())", params[0].0);
+        }
+    }
+    // characters / to_chars (before generic "char at")
+    if purpose_lower.contains("characters") || purpose_lower.contains("to_chars") || purpose_lower.contains("get chars") {
+        if params.len() == 1 && (params[0].1.contains("str") || params[0].1.contains("String")) {
+            return format!("{}.chars().collect()", params[0].0);
+        }
+    }
+
+    // ── Generic single-word patterns ──
+
     // Arithmetic operations
     if purpose_lower.contains("add") || purpose_lower.contains("sum") {
         if params.len() == 2 {
@@ -444,6 +482,137 @@ fn infer_rust_body(purpose: &str, params: &[(String, String)], return_type: Opti
             if params.len() >= 1 {
                 return format!("{}.iter().find(|x| /* condition */).cloned()", params[0].0);
             }
+        }
+    }
+
+    // --- Iterator adapters ---
+    // windows
+    if purpose_lower.contains("windows") || purpose_lower.contains("sliding window") {
+        if params.len() == 2 && params[0].1.contains("Vec") {
+            return format!("{}.windows({}).map(|w| w.to_vec()).collect()", params[0].0, params[1].0);
+        }
+    }
+    // chain / concatenate lists
+    if (purpose_lower.contains("chain") || purpose_lower.contains("concatenate lists")) && params.len() == 2 && params[0].1.contains("Vec") {
+        return format!("[{}.as_slice(), {}.as_slice()].concat()", params[0].0, params[1].0);
+    }
+    // flat_map
+    if purpose_lower.contains("flat_map") || purpose_lower.contains("flat map") {
+        if params.len() == 1 && params[0].1.contains("Vec") {
+            return format!("{}.iter().flat_map(|x| x.iter().cloned()).collect()", params[0].0);
+        }
+    }
+    // partition / split into
+    if purpose_lower.contains("partition") || purpose_lower.contains("split into") {
+        if params.len() == 1 && params[0].1.contains("Vec") {
+            return format!("{}.iter().partition(|x| /* condition */)", params[0].0);
+        }
+    }
+    // any / any element
+    if purpose_lower.contains("any element") || (purpose_lower.contains("any") && !purpose_lower.contains("many") && params.len() == 1 && params[0].1.contains("Vec")) {
+        return format!("{}.iter().any(|x| /* condition */)", params[0].0);
+    }
+    // all / every element
+    if purpose_lower.contains("all elements") || purpose_lower.contains("every element") {
+        if params.len() == 1 && params[0].1.contains("Vec") {
+            return format!("{}.iter().all(|x| /* condition */)", params[0].0);
+        }
+    }
+
+    // --- Option/Result combinators ---
+    // unwrap_or / default value
+    if purpose_lower.contains("unwrap_or") || (purpose_lower.contains("default") && params.len() == 2 && params[0].1.contains("Option")) {
+        return format!("{}.unwrap_or({})", params[0].0, params[1].0);
+    }
+    // map_or
+    if purpose_lower.contains("map_or") {
+        if params.len() >= 1 && params[0].1.contains("Option") {
+            return format!("{}.map_or(Default::default(), |x| x)", params[0].0);
+        }
+    }
+    // and_then / then (Option)
+    if params.len() >= 1 && params[0].1.contains("Option") && (purpose_lower.contains("and_then") || purpose_lower.contains("then")) {
+        return format!("{}.and_then(|x| Some(x))", params[0].0);
+    }
+
+    // --- Common algorithms ---
+    // palindrome
+    if purpose_lower.contains("palindrome") {
+        if params.len() == 1 {
+            return format!("let s: String = {}.chars().collect();\n    let r: String = s.chars().rev().collect();\n    s == r", params[0].0);
+        }
+    }
+    // (two_sum moved to specific multi-word section above)
+    // matrix_transpose
+    if purpose_lower.contains("matrix_transpose") || purpose_lower.contains("matrix transpose") || purpose_lower.contains("transpose") {
+        if params.len() == 1 && params[0].1.contains("Vec") {
+            return format!(
+                "if {0}.is_empty() || {0}[0].is_empty() {{ return vec![]; }}\n    let rows = {0}.len();\n    let cols = {0}[0].len();\n    (0..cols).map(|c| (0..rows).map(|r| {0}[r][c]).collect()).collect()",
+                params[0].0
+            );
+        }
+    }
+    // (dot_product and count_words moved to specific multi-word section above)
+    // median
+    if purpose_lower.contains("median") {
+        if params.len() == 1 && params[0].1.contains("Vec") {
+            return format!(
+                "let mut sorted = {0}.to_vec();\n    sorted.sort();\n    let mid = sorted.len() / 2;\n    if sorted.len() % 2 == 0 {{\n        (sorted[mid - 1] + sorted[mid]) / 2\n    }} else {{\n        sorted[mid]\n    }}",
+                params[0].0
+            );
+        }
+    }
+    // mode
+    if purpose_lower.contains("mode") {
+        if params.len() == 1 && params[0].1.contains("Vec") {
+            return format!(
+                "let mut counts = std::collections::HashMap::new();\n    for v in {0}.iter() {{\n        *counts.entry(v).or_insert(0usize) += 1;\n    }}\n    counts.into_iter().max_by_key(|&(_, c)| c).map(|(v, _)| *v).unwrap()",
+                params[0].0
+            );
+        }
+    }
+    // lcm (least common multiple)
+    if purpose_lower.contains("lcm") || purpose_lower.contains("least common multiple") {
+        if params.len() == 2 {
+            return format!(
+                "let (mut a, mut b) = ({0}, {1});\n    let product = a * b;\n    while b != 0 {{\n        let t = b;\n        b = a % b;\n        a = t;\n    }}\n    product / a",
+                params[0].0, params[1].0
+            );
+        }
+    }
+
+    // --- Type conversion ---
+    // to_string / stringify
+    if purpose_lower.contains("to_string") || purpose_lower.contains("stringify") {
+        if params.len() == 1 {
+            return format!("{}.to_string()", params[0].0);
+        }
+    }
+    // parse / from_string
+    if purpose_lower.contains("parse") || purpose_lower.contains("from_string") || purpose_lower.contains("from string") {
+        if params.len() == 1 && (params[0].1.contains("str") || params[0].1.contains("String")) {
+            return format!("{}.parse().unwrap_or_default()", params[0].0);
+        }
+    }
+    // to_vec / to_vector
+    if purpose_lower.contains("to_vec") || purpose_lower.contains("to_vector") || purpose_lower.contains("to vector") {
+        if params.len() == 1 {
+            return format!("{}.to_vec()", params[0].0);
+        }
+    }
+    // (characters/to_char moved to specific multi-word section above)
+
+    // --- Misc ---
+    // swap
+    if purpose_lower.contains("swap") {
+        if params.len() == 2 {
+            return format!("({1}, {0})", params[0].0, params[1].0);
+        }
+    }
+    // modulo / remainder
+    if purpose_lower.contains("modulo") || purpose_lower.contains("remainder") {
+        if params.len() == 2 {
+            return format!("{} % {}", params[0].0, params[1].0);
         }
     }
 
@@ -1816,5 +1985,262 @@ mod tests {
         assert!(result.contains("impl Point"), "Should have impl block: {}", result);
         assert!(result.contains("fn new("), "Should have constructor: {}", result);
         assert!(result.contains("fn distance("), "Should have distance method: {}", result);
+    }
+
+    // ========================================================================
+    // New pattern arm tests: iterator adapters, combinators, algorithms, etc.
+    // ========================================================================
+
+    fn make_plan() -> Vec<CodePlanStep> {
+        vec![CodePlanStep { action: PlanAction::DefineFunction, name: None, context: vec![], confidence: 0.9 }]
+    }
+
+    #[test]
+    fn test_emit_windows() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "sliding", "Get sliding windows of size n")
+            .with_signature("fn sliding(items: Vec<i32>, n: usize) -> Vec<Vec<i32>>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".windows("), "Should use windows: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_chain() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "merge", "Chain two lists together")
+            .with_signature("fn merge(a: Vec<i32>, b: Vec<i32>) -> Vec<i32>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".concat()"), "Should use concat: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_flat_map() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "flatten_map", "Apply flat_map to nested list")
+            .with_signature("fn flatten_map(items: Vec<Vec<i32>>) -> Vec<i32>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("flat_map"), "Should use flat_map: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_partition() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "split", "Partition a list into two groups")
+            .with_signature("fn split(items: Vec<i32>) -> (Vec<i32>, Vec<i32>)");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".partition("), "Should use partition: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_any() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "has_match", "Check if any element matches condition")
+            .with_signature("fn has_match(items: Vec<i32>) -> bool");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".any("), "Should use any: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_all() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "all_valid", "Check if every element satisfies condition")
+            .with_signature("fn all_valid(items: Vec<i32>) -> bool");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".all("), "Should use all: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_unwrap_or() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "get_or", "Return value or unwrap_or with default")
+            .with_signature("fn get_or(val: Option<i32>, fallback: i32) -> i32");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".unwrap_or("), "Should use unwrap_or: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_map_or() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "transform_opt", "Apply map_or to option")
+            .with_signature("fn transform_opt(val: Option<i32>) -> i32");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".map_or("), "Should use map_or: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_ok_or() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "require", "Convert option to result using ok_or")
+            .with_signature("fn require(val: Option<i32>) -> Result<i32, String>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".ok_or("), "Should use ok_or: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_and_then() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "chain_opt", "Apply and_then to option")
+            .with_signature("fn chain_opt(val: Option<i32>) -> Option<i32>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".and_then("), "Should use and_then: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_palindrome() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "is_palindrome", "Check if string is a palindrome")
+            .with_signature("fn is_palindrome(s: &str) -> bool");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".chars().rev()"), "Should reverse chars: {}", result);
+        assert!(result.contains("s == r"), "Should compare: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_two_sum() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "two_sum", "Find two_sum indices that add to target")
+            .with_signature("fn two_sum(nums: Vec<i32>, target: i32) -> Option<(usize, usize)>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("nums[i] + nums[j]"), "Should have nested loop: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_matrix_transpose() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "transpose", "Transpose a matrix")
+            .with_signature("fn transpose(matrix: Vec<Vec<i32>>) -> Vec<Vec<i32>>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("cols"), "Should reference cols: {}", result);
+        assert!(result.contains("rows"), "Should reference rows: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_dot_product() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "dot", "Compute dot product of two vectors")
+            .with_signature("fn dot(a: Vec<f64>, b: Vec<f64>) -> f64");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".zip("), "Should zip: {}", result);
+        assert!(result.contains("a * b"), "Should multiply: {}", result);
+        assert!(result.contains(".sum()"), "Should sum: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_count_words() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "count_words", "Count words in a string")
+            .with_signature("fn count_words(s: &str) -> usize");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("split_whitespace"), "Should split whitespace: {}", result);
+        assert!(result.contains(".count()"), "Should count: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_median() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "median", "Compute the median of a list")
+            .with_signature("fn median(nums: Vec<i32>) -> i32");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("sorted.sort()"), "Should sort: {}", result);
+        assert!(result.contains("mid"), "Should find middle: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_mode() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "mode", "Find the mode of a list")
+            .with_signature("fn mode(nums: Vec<i32>) -> i32");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("HashMap"), "Should use HashMap: {}", result);
+        assert!(result.contains("max_by_key"), "Should find max frequency: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_lcm() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "lcm", "Compute least common multiple")
+            .with_signature("fn lcm(a: i32, b: i32) -> i32");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("product"), "Should compute product: {}", result);
+        assert!(result.contains("% b"), "Should use mod for gcd: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_to_string() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "stringify", "Convert to_string representation")
+            .with_signature("fn stringify(n: i32) -> String");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".to_string()"), "Should use to_string: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_parse() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "parse_int", "Parse a string to integer")
+            .with_signature("fn parse_int(s: &str) -> i32");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".parse()"), "Should use parse: {}", result);
+        assert!(result.contains("unwrap_or_default"), "Should have default: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_to_vec() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "to_vec", "Convert slice to_vec")
+            .with_signature("fn to_vec(items: &[i32]) -> Vec<i32>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".to_vec()"), "Should use to_vec: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_chars() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "characters", "Get characters from string")
+            .with_signature("fn characters(s: &str) -> Vec<char>");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains(".chars().collect"), "Should collect chars: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_swap() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "swap", "Swap two values")
+            .with_signature("fn swap(a: i32, b: i32) -> (i32, i32)");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("(b, a)"), "Should swap: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+    }
+
+    #[test]
+    fn test_emit_modulo() {
+        let emitter = RustEmitter;
+        let spec = CodeSpec::new("rust", "modulo", "Compute modulo of two numbers")
+            .with_signature("fn modulo(a: i32, b: i32) -> i32");
+        let result = emitter.emit_from_spec(&spec, &make_plan());
+        assert!(result.contains("a % b"), "Should use modulo: {}", result);
+        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
     }
 }

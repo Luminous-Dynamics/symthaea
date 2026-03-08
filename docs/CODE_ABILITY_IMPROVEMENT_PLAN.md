@@ -8,9 +8,9 @@ Based on comprehensive review of all subsystems (March 6, 2026).
 | Layer | Score | What Works | What's Missing |
 |-------|-------|-----------|----------------|
 | Code Perception | 7/10 | Tree-sitter (Rust/Python/Nix), CodeHDEncoder (16,384D), CodebaseMemory, NL intent extraction + signature inference | No dataflow/CFG, types are string labels |
-| Code Planning | 6/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine with 5 code actions, multi-entity detection (struct+impl) | No deep code reasoning yet |
-| Code Generation | 7/10 | ~55+ Rust + ~25 Python native patterns; LLM fallback; composition inference; auto-generated tests; multi-entity struct+impl+methods; 50-case benchmark 100% | Complex algorithms still need LLM; no SSM distillation |
-| Code Verification | 7/10 | CodeVerifier, tree-sitter, CodeExecutor (compile+test), 3-attempt retry with error+test feedback, LLM roundtrip verified, 50-case benchmark | No property-based test generation |
+| Code Planning | 7/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine with 5 code actions, multi-entity detection, algorithm pattern templates (6 patterns, HDC-based) | No deep code reasoning yet |
+| Code Generation | 7/10 | ~55+ Rust + ~25 Python native patterns; LLM fallback; composition inference; auto-generated tests; multi-entity struct+impl+methods; import inference; real code modification (6 transform types); 59-case benchmark 100% | Complex algorithms still need LLM; no SSM distillation |
+| Code Verification | 7/10 | CodeVerifier, tree-sitter, CodeExecutor (compile+test), 3-attempt retry with semantic auto-fix + error feedback, test-first generation, LLM roundtrip verified, 59-case benchmark | No property-based test generation |
 | Language Output | 7/10 | LLM Organ translates StructuredThought; CodeContext populated in Phase 3.6; LLM completion verified via Ollama roundtrip | — |
 | Learning | 8/10 | FEP surprise → LR boost, School lookahead, episodic code cache (32 entries), HDC-similarity top-3 retrieval, error pattern memory (64-entry) | No SSM distillation yet |
 
@@ -571,6 +571,62 @@ Separate `#[test]` per category for easy diagnosis. Asserts ≥70% native pass r
 - `test_llm_detection_accuracy` — 10 cases, 100% detection accuracy
 - `test_prompt_construction` — verifies CodeContext → prompt serialization
 - `test_prompt_includes_notes` — verifies PAST_EXAMPLE notes propagate
+
+## Phase 3g: Auto-Fix + Test-First + Import Inference + Code Modification + Algorithm Templates — DONE (2026-03-08)
+
+**Status**: COMPLETE. 6 improvements pushing code quality beyond 7/10; 59-case benchmark at 100%.
+
+### 3g.1 Semantic Error Auto-Fix
+
+**File**: `src/language/code_executor.rs` — `try_auto_fix()`
+
+Before burning an LLM retry on compilation errors, apply mechanical fixes:
+- "cannot borrow as mutable" → add `mut` to binding
+- "unused variable" → prefix with `_`
+- Missing stdlib types → prepend `use` statements
+Wired into `src/symthaea.rs` retry loop: auto-fix → re-verify → skip LLM retry if fixed.
+
+### 3g.2 Test-First Generation
+
+**File**: `src/language/code_generator.rs` — `generate_tests_only()`
+
+Generates ONLY test assertions from a CodeSpec (independent of implementation). Uses `parse_rust_signature_pub()` and `generate_auto_tests_pub()` wrappers in `emitters.rs`. Tests serve as behavioral oracle, not mirror of implementation.
+
+### 3g.3 Import Inference
+
+**File**: `src/language/emitters.rs` — `infer_rust_imports()`
+
+Scans generated Rust code for 23 stdlib types (HashMap, HashSet, File, Duration, Arc, Mutex, etc.). Detects usage patterns (`Type<`, `Type::`, `: Type`) and auto-prepends `use` statements. Wired into Rust emitter's `emit_from_spec()` output to catch missing imports at generation time.
+
+### 3g.4 Real Code Modification
+
+**File**: `src/language/code_generator.rs` — `generate_modify()` rewritten
+
+Replaces TODO-only stubs with real structural transformations via `apply_modifications()`:
+- `AddParameter`: finds function signature, inserts new param
+- `ChangeReturnType`: finds `-> OldType`, replaces
+- `Rename`: all-occurrence replacement
+- `AddDocumentation`: inserts `///` comment before function
+- `AddErrorHandling`: wraps return type in `Result<T, Box<dyn Error>>`
+- `RemoveParameter`: finds and removes param from signature
+
+### 3g.5 Algorithm Plan Templates
+
+**File**: `src/dynamics/cfc_code_sequencer.rs` — `AlgorithmPatternDetector`
+
+HDC-based algorithm pattern detection using ContinuousHV cosine similarity:
+- 6 prototype patterns: Sorting, Search, DynamicProgramming, Graph, Accumulation, StringProcessing
+- Each pattern has keyword-encoded prototype HV (512D)
+- `detect()` returns best match above 0.15 similarity threshold
+- `template_steps()` on `AlgorithmPattern` returns pre-built CodePlanStep sequences
+
+### 3g.6 Harder Benchmark Cases
+
+**File**: `tests/code_generation_benchmark.rs` — 2 new test functions
+
+- `benchmark_advanced_rust`: 9 advanced Rust patterns (Option/Result handling, closures, iterators, generics)
+- `benchmark_regression_summary`: Aggregate pass rate across all categories, asserts ≥80% overall
+- Total benchmark: 59 cases across 8 categories
 
 ---
 
