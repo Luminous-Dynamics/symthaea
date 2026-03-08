@@ -456,13 +456,14 @@ impl UnifiedConsciousnessPipeline {
         // 4. Update consciousness state from measurements
         self.update_consciousness_state();
 
-        // 5. Compute consciousness (lightweight — no binding update)
+        // 5. Compute consciousness
         let result = self.equation.compute(&self.current_state);
+        let consciousness = self.compute_consciousness_direct();
 
         // 6. Update history
         let moment = ConsciousMoment {
             step: self.step,
-            consciousness: result.consciousness,
+            consciousness,
             binding: self.binding_network.binding_coherence(),
             workspace: self.ltc.workspace_access() as f64,
             phi: self.ltc.estimate_phi() as f64,
@@ -475,7 +476,7 @@ impl UnifiedConsciousnessPipeline {
         }
 
         // 7. Update causal accumulator
-        self.causal_accumulator += result.consciousness * 0.1;
+        self.causal_accumulator += consciousness * 0.1;
         self.step += 1;
 
         Ok(result.consciousness)
@@ -515,11 +516,12 @@ impl UnifiedConsciousnessPipeline {
 
         // 6. Compute consciousness level
         let result = self.equation.compute(&self.current_state);
+        let consciousness = self.compute_consciousness_direct();
 
         // 7. Create conscious moment
         let moment = ConsciousMoment {
             step: self.step,
-            consciousness: result.consciousness,
+            consciousness,
             binding: self.binding_network.binding_coherence(),
             workspace: self.ltc.workspace_access() as f64,
             phi: self.ltc.estimate_phi() as f64,
@@ -534,7 +536,7 @@ impl UnifiedConsciousnessPipeline {
         }
 
         // 9. Update causal accumulator (consciousness affects future processing)
-        self.causal_accumulator += result.consciousness * 0.1;
+        self.causal_accumulator += consciousness * 0.1;
 
         self.step += 1;
 
@@ -591,6 +593,36 @@ impl UnifiedConsciousnessPipeline {
 
         // Higher variance = more focused attention
         (variance.sqrt() as f64 * 2.0).clamp(0.0, 1.0)
+    }
+
+    /// Compute pipeline consciousness directly from measured signals.
+    ///
+    /// The internal ConsciousnessEquationV2 uses a harsh soft_min(7 components)
+    /// × sigmoid(theta=0.5) that produces near-zero output when any single
+    /// component (Recursion, Efficacy, etc.) is low — a cold-start bottleneck.
+    ///
+    /// This direct measure uses the pipeline's three genuine signals:
+    /// - **Phi** (integration): LTC inter-circuit information flow
+    /// - **Binding** (coherence): oscillatory phase locking
+    /// - **Workspace** (access): global-to-local activity ratio
+    ///
+    /// Formula: normalized_phi × (0.5 + 0.25 × binding + 0.25 × workspace)
+    /// Maps to [0, 1] via sigmoid, with warm-up ramp for the first 20 steps.
+    fn compute_consciousness_direct(&self) -> f64 {
+        let phi = self.ltc.estimate_phi() as f64;
+        let binding = self.binding_network.binding_coherence();
+        let workspace = self.ltc.workspace_access() as f64;
+
+        // Normalize phi to [0, 1] via shifted sigmoid (same as consciousness engine)
+        let phi_norm = 2.0 / (1.0 + (-phi).exp()) - 1.0;
+
+        // Combine: phi as primary driver, binding + workspace as modulators
+        let raw = phi_norm * (0.5 + 0.25 * binding + 0.25 * workspace.clamp(0.0, 1.0));
+
+        // Warm-up ramp: smoothly increase over first 20 steps to avoid cold-start spikes
+        let warmup = (self.step as f64 / 20.0).clamp(0.0, 1.0);
+
+        (raw * warmup).clamp(0.0, 1.0)
     }
 
     /// Compute recursion depth (self-referential processing)
