@@ -1,0 +1,296 @@
+# Mycelix Governance Cluster CI
+# Zomes: Proposals, Voting, Threshold-Signing (DKG), Councils, Constitution, Execution, Bridge
+# PQ-hardened (ML-DSA-65, ML-KEM), commit-reveal voting, consciousness-gated
+
+name: Governance CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mycelix-governance/**'
+      - '.github/workflows/governance-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mycelix-governance/**'
+      - '.github/workflows/governance-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: governance-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: 'stable'
+
+jobs:
+  # ============================================================================
+  # Formatting
+  # ============================================================================
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-governance
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt
+
+      - run: cargo fmt --all --check
+
+  # ============================================================================
+  # Linting
+  # ============================================================================
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-governance
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: mycelix-governance
+
+      - run: cargo clippy --all -- -D warnings
+
+  # ============================================================================
+  # Unit Tests
+  # ============================================================================
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-governance
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: mycelix-governance
+
+      - run: cargo test --workspace
+
+  # ============================================================================
+  # WASM Build
+  # ============================================================================
+  build-wasm:
+    name: Build WASM
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-governance/target/
+          key: ${{ runner.os }}-cargo-governance-wasm-${{ hashFiles('mycelix-governance/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-governance-wasm-
+
+      - name: Build WASM zomes
+        run: |
+          nix develop ./mycelix-governance --command bash -c '
+            cd mycelix-governance
+            cargo build --release --workspace --target wasm32-unknown-unknown
+
+            echo "=== WASM Zome Sizes ==="
+            for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
+              if [ -f "$wasm" ]; then
+                name=$(basename "$wasm" .wasm)
+                size=$(stat -c %s "$wasm" 2>/dev/null || stat -f %z "$wasm" 2>/dev/null)
+                printf "  %-35s %s bytes\n" "$name" "$size"
+              fi
+            done
+          '
+
+  # ============================================================================
+  # Integration Tests (sweettest, conductor-dependent)
+  # ============================================================================
+  sweettest:
+    name: Sweettest
+    runs-on: ubuntu-latest
+    needs: [build-wasm, test]
+    continue-on-error: true
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-governance/target/
+            mycelix-governance/tests/target/
+          key: ${{ runner.os }}-cargo-governance-sweettest-${{ hashFiles('mycelix-governance/tests/Cargo.lock', 'mycelix-governance/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-governance-wasm-
+
+      - name: Build WASM and package DNA
+        run: |
+          nix develop ./mycelix-governance --command bash -c '
+            cd mycelix-governance
+            cargo build --release --workspace --target wasm32-unknown-unknown
+            hc dna pack dna/
+          '
+
+      - name: Run sweettest
+        continue-on-error: true
+        run: |
+          nix develop ./mycelix-governance --command bash -c '
+            cd mycelix-governance/tests
+            cargo test --release -- --ignored --test-threads=1 --nocapture
+          '
+
+  # ============================================================================
+  # Package DNA
+  # ============================================================================
+  package-dna:
+    name: Package DNA
+    runs-on: ubuntu-latest
+    needs: [build-wasm, test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Build and package
+        run: |
+          nix develop ./mycelix-governance --command bash -c '
+            cd mycelix-governance
+            cargo build --release --workspace --target wasm32-unknown-unknown
+            mkdir -p dist
+            hc dna pack dna/ -o dist/mycelix_governance.dna
+            echo "=== DNA packaged ==="
+            ls -lh dist/mycelix_governance.dna
+          '
+
+      - name: Upload DNA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: governance-dna
+          path: mycelix-governance/dist/mycelix_governance.dna
+          if-no-files-found: error
+
+  # ============================================================================
+  # Summary
+  # ============================================================================
+  summary:
+    name: Summary
+    if: always()
+    needs: [fmt, clippy, test, build-wasm, sweettest, package-dna]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Governance Cluster CI" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "PQ-hardened democratic governance: proposals, voting, DKG, councils" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          for job in fmt clippy test build-wasm sweettest package-dna; do
+            case "$job" in
+              fmt) result="${{ needs.fmt.result }}" ;;
+              clippy) result="${{ needs.clippy.result }}" ;;
+              test) result="${{ needs.test.result }}" ;;
+              build-wasm) result="${{ needs.build-wasm.result }}" ;;
+              sweettest) result="${{ needs.sweettest.result }}" ;;
+              package-dna) result="${{ needs.package-dna.result }}" ;;
+            esac
+            case "$result" in
+              success) status="pass" ;;
+              failure) status="**FAILED**" ;;
+              *) status="$result" ;;
+            esac
+            echo "| $job | $status |" >> $GITHUB_STEP_SUMMARY
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Zomes (7)" >> $GITHUB_STEP_SUMMARY
+          echo "| Zome | Role |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| proposals | Proposal creation, lifecycle, discussion |" >> $GITHUB_STEP_SUMMARY
+          echo "| voting | Cast/tally votes, delegation, commit-reveal |" >> $GITHUB_STEP_SUMMARY
+          echo "| threshold-signing | DKG committees, ML-DSA-65 verification |" >> $GITHUB_STEP_SUMMARY
+          echo "| councils | Council hierarchy, membership, domains |" >> $GITHUB_STEP_SUMMARY
+          echo "| constitution | Charter, amendments, governance parameters |" >> $GITHUB_STEP_SUMMARY
+          echo "| execution | Timelock queue, proposal execution |" >> $GITHUB_STEP_SUMMARY
+          echo "| bridge | Cross-cluster governance dispatch |" >> $GITHUB_STEP_SUMMARY

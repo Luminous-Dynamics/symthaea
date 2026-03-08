@@ -1,6 +1,6 @@
 # Mycelix Ecosystem Status
 
-**Last verified**: 2026-02-16
+**Last verified**: 2026-03-08
 **Holochain**: 0.6.0 | **HDK**: 0.6.0 | **HDI**: 0.7.0
 
 ## hApp Bundle Status
@@ -89,16 +89,17 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 
 | hApp | Zomes | Tests | Notes |
 |------|-------|-------|-------|
-| **Identity** | 9 (did_registry, trust_credential, mfa, verifiable_credential, credential_schema, education, revocation, recovery, bridge) | 23 unit + 100+ sweettests | W3C DID Core, MFA (5 factor types), ZK-based trust attestations, consciousness credential issuance. 36,820 LOC. |
-| **Governance** | 7 (proposals, voting, threshold-signing, councils, constitution, execution, bridge) | 44 unit + 130+ sweettests | 5 proposal types, Phi-weighted voting, Feldman VSS DKG (off-chain ceremony, on-chain commitments), constitutional amendments. 28,364 LOC. |
+| **Identity** | 9 (did_registry, trust_credential, mfa, verifiable_credential, credential_schema, education, revocation, recovery, bridge) | 23 unit + 100+ sweettests + 20 consciousness gating sweettests | W3C DID Core, MFA (5 factor types), ZK-based trust attestations, consciousness credential issuance. 36,820 LOC. |
+| **Governance** | 7 (proposals, voting, threshold-signing, councils, constitution, execution, bridge) | 44 unit + 156+ sweettests | 5 proposal types, Phi-weighted voting, Feldman VSS DKG (off-chain ceremony, on-chain commitments), constitutional amendments. 28,364 LOC. |
 
 ### Additional Clusters
 
 | Cluster | Zomes | LOC | Tests | Notes |
 |---------|-------|-----|-------|-------|
 | **Hearth** (FAMILY tier) | 11 + bridge | 30,403 | 1,023 (workspace) | Kinship, gratitude, care, autonomy, decisions, stories, milestones, rhythms, emergency, resources. Consciousness-gated. |
-| **Personal** (Sovereign tier) | 3 + bridge | 4,447 | 20 | Identity vault, health vault, credential wallet. Lightweight scaffold. |
-| **Attribution** (OPEN tier) | 3 zomes | 6,849 | 17 | Dependency registry, usage receipts, reciprocity pledges. |
+| **Finance** (ECONOMY tier) | 7+ zomes (tend, treasury, staking, payments, recognition, bridge, currency-mint) | 11 consciousness gating sweettests + unit tests | 22,273 LOC. Currency-mint modularized (7 modules), 5 cross-cluster bridge handlers. 8th role in unified hApp. |
+| **Personal** (Sovereign tier) | 3 + bridge | 4,447 | 30 sweettests + is_finite() hardened | Identity vault, health vault, credential wallet. is_finite() guards on credential-wallet. |
+| **Attribution** (OPEN tier) | 3 zomes | 6,849 | 17 unit + 1 sweettest | Dependency registry, usage receipts, reciprocity pledges. |
 
 ### Cluster Domains (active in commons/civic clusters)
 
@@ -122,9 +123,8 @@ These domains are fully implemented as zomes within the Commons or Civic cluster
 | hApp | Status | Notes |
 |------|--------|-------|
 | **Knowledge** | Types + structure | 23 subdirectories. Large scope. |
-| **Finance** | Types + structure | 22,273 LOC. Needs promotion to beta. |
 | **Energy** | Types + structure | 10,118 LOC. |
-| **Health** | MVP (7 zomes) | Reduced from 37 to 7 core zomes. 22 archived to `_archive-2026-02-15/`. |
+| **Health** | MVP (7 zomes) | Reduced from 37 to 7 core zomes. 22 archived to `_archive-2026-02-15/`. health-ci.yml CI workflow added. 8 sweettests at workspace level. |
 | **Space** | Types + structure | 12 subdirectories. |
 
 ### Stub / Early Stage
@@ -147,14 +147,14 @@ These domains are fully implemented as zomes within the Commons or Civic cluster
 
 ## SDKs
 
-| SDK | Version | Claimed Tests | Verified (2026-02-04) | Notes |
+| SDK | Version | Claimed Tests | Verified (2026-03-08) | Notes |
 |-----|---------|---------------|----------------------|-------|
-| **Rust** (`mycelix-sdk`) | 0.6.0 | 866 | **996 pass** (1002 w/ parallel feature) | All tests pass. Agentic module tests fixed. |
+| **Rust** (`mycelix-sdk`) | 0.6.0 | 866 | **1,036+ pass** (lib verified) | All tests pass. New finance module (finance.rs, FinanceBridgeClient, 12 tests). E0609 bug fixed (.phi → .coherence field rename). |
 | **TypeScript** (`@mycelix/sdk`) | 0.6.0 | 5,828 | **6,316 pass / 15 skip** | All tests pass. libsodium ESM compat fixed. |
 | **Python** (`mycelix`) | 0.1.0 | 45 | **45 pass**, 87% coverage | MATL, epistemic, FL, bridge modules. Verified 2026-02-04. |
 
 ### SDK Rust Modules
-agentic, bridge, credentials, crypto, dkg, economics, epistemic, error, fl, hyperfeel, identity, intentions, matl, pagination, pog, storage, temporal, wasm, zkproof
+agentic, bridge, credentials, crypto, dkg, economics, epistemic, error, finance, fl, hyperfeel, identity, intentions, matl, pagination, pog, storage, temporal, wasm, zkproof
 
 ### SDK TypeScript Integration Modules (37 — re-audited 2026-03-06)
 
@@ -218,7 +218,7 @@ All 37 integration modules have real implementations (types + classes + methods)
 | Component | Status | Notes |
 |-----------|--------|-------|
 | **Justfile** | Exists | Comprehensive task runner at `mycelix-workspace/justfile` |
-| **CI** | Exists | `.github/workflows/mycelix-ci.yml` + `mycelix-release.yml` |
+| **CI** | Exists | `.github/workflows/mycelix-ci.yml` + `mycelix-release.yml` + `finance-ci.yml` + `health-ci.yml` |
 | **Observatory** | Live + Demo | `mycelix-workspace/observatory/` - SvelteKit, 3-tier fallback (live→sim→static) |
 | **SMS Gateway** | Exists | `mycelix-workspace/services/sms-gateway/` |
 | **Civic hApp** | Exists | `mycelix-workspace/services/civic-happ/` |
@@ -228,14 +228,14 @@ All 37 integration modules have real implementations (types + classes + methods)
 
 ## Known Gaps
 
-1. ~~**Rust SDK 5 test failures**~~: Fixed 2026-02-04. All 996 tests pass (1002 with parallel feature).
+1. ~~**Rust SDK 5 test failures**~~: Fixed 2026-02-04. All 1,036+ lib tests pass. Finance module added 2026-03-08.
 2. ~~**TS SDK libsodium errors**~~: Fixed. All 6,316 tests pass.
 3. ~~**Core REST API**~~: Implemented 2026-02-04. 4 endpoints: /health, /status, /trust/{id}, /pogq/validate.
 4. ~~**Observatory mock-only**~~: Live conductor connection fully implemented, awaiting conductor.
 5. ~~**hApp scaffolding incomplete**~~: Fixed 2026-02-08. All 10 ready-to-build hApps have v0 manifest format.
 6. **Scope sprawl**: 24 hApps total, 12 with bundles, 10 scaffolded (ready to build), 2 REST APIs.
 7. ~~**SDK-TS bundle size**~~: Re-audited 2026-03-06. All 37 integration modules have real implementations (0 stubs). 22 are zome-connected (callZome), 15 are local-only (in-memory Map + LocalBridge). Total ~37,500 LOC.
-8. **Cross-hApp bridges**: Claimed in architecture docs, not tested in integration.
+8. ~~**Cross-hApp bridges**~~: Unified hApp now has 8 roles (personal, identity, hearth, commons_land, commons_care, civic, attribution, finance). 6 new E2E tests for full 8-role mesh.
 9. **WASM builds pending**: 6 hApps (climate, mutualaid, consensus, music, food, transport) need `nix develop` + WASM compilation.
 10. ~~**FL consciousness integration**~~: `ConsciousnessAwareByzantinePlugin` added 2026-02-15. Uses Phi scores for weight adjustment (boost/dampen/veto). 110 tests pass.
 11. ~~**Emergency domain status**~~: Promoted from "stub" to "complete". 6 zomes, ~12,700 LOC, cross-domain bridges validated.

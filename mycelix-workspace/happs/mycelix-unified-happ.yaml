@@ -1,6 +1,6 @@
 ---
 # Mycelix Unified hApp Bundle
-# Combines Personal + Identity + Hearth + Commons + Civic DNAs for cross-cluster communication.
+# Combines Personal + Identity + Hearth + Commons + Civic + Attribution + Finance + Governance DNAs for cross-cluster communication.
 #
 # When all DNAs are installed as separate roles within the same hApp,
 # zomes can call between clusters using:
@@ -26,6 +26,7 @@ description: |
   - Commons Care (ALL): Care, mutualaid, transport, support, space (social/care)
   - Attribution (OPEN): Dependency registry, usage receipts, reciprocity pledges
   - Finance (ECONOMY): Payments (SAP/TEND/MYCEL), treasury, staking, recognition, currency-mint
+  - Governance (DEMOCRACY): Proposals, voting, DKG, councils, constitution, execution
   Enables cross-cluster calls between all tiers via OtherRole dispatch.
   Commons split into two sub-cluster DNAs to fit under Holochain's 16MB limit.
   Note: "HEARTH" in the finance hApp refers to commons pool governance;
@@ -115,6 +116,17 @@ roles:
       deferred: false
     dna:
       path: ./finance/dna/mycelix_finance.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: governance
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./governance/dna/mycelix_governance.dna
       modifiers:
         network_seed: ~
         properties: ~

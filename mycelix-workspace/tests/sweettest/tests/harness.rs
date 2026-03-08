@@ -116,6 +116,7 @@ impl DnaPaths {
             ("civic", Self::civic()),
             ("attribution", Self::attribution()),
             ("finance", Self::finance()),
+            ("governance", Self::governance()),
         ]
     }
 }

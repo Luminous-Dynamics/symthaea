@@ -189,6 +189,64 @@ jobs:
           '
 
   # ============================================================================
+  # Sweettest Integration (workspace-level, conductor-dependent)
+  # ============================================================================
+  sweettest:
+    name: Sweettest Integration
+    runs-on: ubuntu-latest
+    needs: [build-zomes, test-zomes]
+    continue-on-error: true
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-health/target/
+          key: ${{ runner.os }}-cargo-health-sweettest-${{ hashFiles('mycelix-health/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-health-build-
+
+      - name: Build WASM and package DNA
+        run: |
+          nix develop ./mycelix-health --command bash -c '
+            cd mycelix-health
+            cargo build --release --workspace --target wasm32-unknown-unknown
+            hc dna pack dna/
+          '
+
+      - name: Run health sweettest
+        continue-on-error: true
+        run: |
+          nix develop ./mycelix-health --command bash -c '
+            cd mycelix-workspace/tests/sweettest
+            cargo test --release --test health_sweettest -- --ignored --test-threads=1 --nocapture
+          '
+
+  # ============================================================================
   # Package DNA
   # ============================================================================
   package-dna:
