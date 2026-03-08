@@ -267,6 +267,9 @@ pub struct DaemonConfig {
     /// Enable dynamic knowledge learning from resolved incidents.
     #[serde(default = "default_enable_knowledge_learning")]
     pub enable_knowledge_learning: bool,
+    /// Port for the Prometheus metrics endpoint (observability feature).
+    #[serde(default = "default_metrics_port")]
+    pub metrics_port: u16,
 }
 
 fn default_snapshot_version() -> u32 {
@@ -303,6 +306,9 @@ fn default_ollama_timeout() -> u64 {
 fn default_enable_knowledge_learning() -> bool {
     true
 }
+fn default_metrics_port() -> u16 {
+    9090
+}
 
 impl Default for DaemonConfig {
     fn default() -> Self {
@@ -317,6 +323,7 @@ impl Default for DaemonConfig {
             ollama_model: default_ollama_model(),
             ollama_timeout: default_ollama_timeout(),
             enable_knowledge_learning: default_enable_knowledge_learning(),
+            metrics_port: default_metrics_port(),
         }
     }
 }
