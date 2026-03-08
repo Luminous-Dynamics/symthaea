@@ -110,6 +110,12 @@ audio_output/
 
 # Video output from MuJoCo demos
 video_output/
+
+# Runtime logs
+MUJOCO_LOG.TXT
+
+# Generated HTML visualizations
+pulse.html
 benchmarks/external/**/helm-repo/
 benchmarks/external/**/.git/
 symthaea/
