@@ -525,33 +525,20 @@ impl CognitiveLoopService {
         // Attention, Recurrence, Embodiment, Knowledge, Synchrony.
         // Urgency-adaptive: Critical=every 5th, Normal=every 10th, Cruise=every 20th
         let consciousness_level = if ctx.urgency.should_run(self.stats.total_cycles, 5, 10, 20) {
-            // Wire embodiment factor with blended prediction error signals.
-            // Pure self-prediction (predicted==actual) gives no error signal,
-            // but full divergence (confidence vs outcome) over-penalizes during
-            // bootstrap when confidence is poorly calibrated.
-            // Blend: 60% high-accuracy signal (keeps M growing) + 40% genuine
-            // prediction error (adds real embodied learning signal).
-            // Science: Friston (2010) — embodied cognition from prediction accuracy.
-            {
-                let outcome = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
-                let confidence = self.prediction_confidence.clamp(0.0, 1.0);
-                // Blended prediction: 60% outcome (near-perfect) + 40% confidence
-                let blended_predicted = outcome * 0.6 + confidence * 0.4;
-                self.master_equation
-                    .embodiment_factor
-                    .record_prediction(blended_predicted, outcome);
-            }
-            // Interoceptive coherence from allostatic regulation.
-            // Science: Barrett (2017) — interoceptive accuracy tracks allostatic regulation.
-            // Small genuine error (~3%) from body arousal deviation so the EMA
-            // has signal to track rather than converging to perfect self-prediction.
+            // Wire embodiment factor from cognitive loop signals.
+            // Science: Friston (2010) — low PE = good embodied prediction (sensorimotor accuracy)
+            // Science: Barrett (2017) — interoceptive coherence from allostatic regulation
+            self.master_equation.embodiment_factor.record_prediction(
+                1.0 - ctx.prediction_error as f64,
+                1.0 - ctx.prediction_error as f64,
+            );
+            // Use allostatic load as direct interoceptive coherence signal.
+            // Low allostatic load = high body coherence (expected ≈ actual).
             {
                 let allostatic = self.neuromod.bath.allostatic_load;
-                let body_coherence = (1.0 - allostatic as f64).clamp(0.0, 1.0);
-                let arousal_delta = (late.body_arousal as f64 - 0.3).abs().min(0.3) * 0.1;
+                let coherence = 1.0 - allostatic as f64;
                 self.master_equation.embodiment_factor.update_interoceptive(
-                    body_coherence,
-                    (body_coherence - arousal_delta).max(0.0),
+                    coherence, coherence,
                 );
             }
 
