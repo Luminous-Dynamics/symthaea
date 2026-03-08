@@ -1012,6 +1012,10 @@ jobs:
         run: cargo test --all
         working-directory: mycelix-governance
 
+      - name: Run PQ crypto tests (ML-DSA-65 + ML-KEM-768)
+        run: cargo test -p threshold_signing_coordinator -p threshold_signing_integrity --target x86_64-unknown-linux-gnu
+        working-directory: mycelix-governance
+
       - name: Clippy
         run: cargo clippy --all -- -D warnings
         working-directory: mycelix-governance

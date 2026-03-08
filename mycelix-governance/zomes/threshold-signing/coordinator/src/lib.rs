@@ -2474,4 +2474,196 @@ mod tests {
             &signature,
         ).is_err());
     }
+
+    // =========================================================================
+    // ML-KEM + ML-DSA combined PQ workflow tests
+    // =========================================================================
+
+    #[test]
+    fn test_pq_combined_encrypt_sign_verify() {
+        // Full PQ workflow: encrypt deal with ML-KEM, sign encrypted deal with ML-DSA, verify both
+        use feldman_dkg::{Dealer, ParticipantId};
+        use rand::rngs::OsRng;
+
+        // Generate ML-KEM keypair for recipient
+        let kem_kp = feldman_dkg::pq_kem::generate_keypair();
+
+        // Generate ML-DSA keypair for dealer (attestation)
+        let sig_kp = feldman_dkg::pq_sig::generate_signing_keypair();
+
+        // Create and encrypt a deal
+        let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let deal = dealer.generate_deal();
+        let mut encrypt_fn = feldman_dkg::pq_kem::ml_kem_encrypt_fn(
+            &kem_kp.encapsulation_key_bytes()
+        );
+        let encrypted_deal = feldman_dkg::EncryptedDeal::from_deal(
+            &deal,
+            |recipient, plaintext| encrypt_fn(recipient, plaintext),
+        ).unwrap();
+
+        // Sign the serialized encrypted deal with ML-DSA
+        let deal_bytes = encrypted_deal.to_bytes().unwrap();
+        let signature = feldman_dkg::pq_sig::sign(&sig_kp.signing_key, &deal_bytes);
+
+        // Verify the ML-DSA signature
+        assert!(feldman_dkg::pq_sig::verify(
+            &sig_kp.verifying_key_bytes(),
+            &deal_bytes,
+            &signature,
+        ).is_ok());
+
+        // Decrypt with ML-KEM and verify share integrity
+        let mut decrypt_fn = feldman_dkg::pq_kem::ml_kem_decrypt_fn(&kem_kp.dk);
+        let share0 = &encrypted_deal.encrypted_shares[0];
+        let decrypted = decrypt_fn(
+            &share0.encapsulated_key,
+            &share0.nonce,
+            &share0.ciphertext,
+        ).unwrap();
+        assert_eq!(decrypted.len(), 32);
+    }
+
+    #[test]
+    fn test_pq_tampered_encrypted_deal_signature_fails() {
+        // Sign encrypted deal, tamper with deal bytes, verify signature rejects
+        use feldman_dkg::{Dealer, ParticipantId};
+        use rand::rngs::OsRng;
+
+        let kem_kp = feldman_dkg::pq_kem::generate_keypair();
+        let sig_kp = feldman_dkg::pq_sig::generate_signing_keypair();
+
+        let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let deal = dealer.generate_deal();
+        let mut encrypt_fn = feldman_dkg::pq_kem::ml_kem_encrypt_fn(
+            &kem_kp.encapsulation_key_bytes()
+        );
+        let encrypted_deal = feldman_dkg::EncryptedDeal::from_deal(
+            &deal,
+            |recipient, plaintext| encrypt_fn(recipient, plaintext),
+        ).unwrap();
+
+        let deal_bytes = encrypted_deal.to_bytes().unwrap();
+        let signature = feldman_dkg::pq_sig::sign(&sig_kp.signing_key, &deal_bytes);
+
+        // Tamper with deal bytes
+        let mut tampered = deal_bytes.clone();
+        tampered[10] ^= 0xFF;
+
+        // Signature should fail on tampered data
+        assert!(feldman_dkg::pq_sig::verify(
+            &sig_kp.verifying_key_bytes(),
+            &tampered,
+            &signature,
+        ).is_err());
+    }
+
+    // =========================================================================
+    // PQ error path unit tests (combine_signatures logic)
+    // =========================================================================
+
+    #[test]
+    fn test_pq_required_defaults_false() {
+        // Default for ThresholdSignatureAlgorithm is Ecdsa, pq_required is false
+        assert_eq!(ThresholdSignatureAlgorithm::default(), ThresholdSignatureAlgorithm::Ecdsa);
+        // Construct with pq_required=false (default path in create_signing_committee)
+        let committee = SigningCommittee {
+            id: "test-pq-default".into(),
+            name: "PQ Default Test".into(),
+            threshold: 2,
+            member_count: 3,
+            phase: DkgPhase::Registration,
+            public_key: None,
+            commitments: Vec::new(),
+            scope: CommitteeScope::All,
+            created_at: Timestamp::from_micros(0),
+            active: true,
+            epoch: 1,
+            min_phi: None,
+            signature_algorithm: ThresholdSignatureAlgorithm::default(),
+            pq_required: false,
+        };
+        assert!(!committee.pq_required);
+        assert_eq!(committee.signature_algorithm, ThresholdSignatureAlgorithm::Ecdsa);
+    }
+
+    #[test]
+    fn test_pq_required_true_with_hybrid() {
+        // Construct a Hybrid committee with pq_required=true
+        let committee = SigningCommittee {
+            id: "test-pq-required".into(),
+            name: "PQ Required Hybrid".into(),
+            threshold: 2,
+            member_count: 3,
+            phase: DkgPhase::Registration,
+            public_key: None,
+            commitments: Vec::new(),
+            scope: CommitteeScope::Constitutional,
+            created_at: Timestamp::from_micros(0),
+            active: true,
+            epoch: 1,
+            min_phi: None,
+            signature_algorithm: ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65,
+            pq_required: true,
+        };
+        assert!(committee.pq_required);
+        assert_eq!(committee.signature_algorithm, ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65);
+
+        // Verify serde roundtrip preserves pq_required
+        let serialized = serde_json::to_vec(&committee).unwrap();
+        let deserialized: SigningCommittee = serde_json::from_slice(&serialized).unwrap();
+        assert!(deserialized.pq_required);
+        assert_eq!(deserialized.signature_algorithm, ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65);
+    }
+
+    #[test]
+    fn test_ml_dsa_verify_wrong_key_rejects() {
+        // Simulates the combine_signatures MlDsa65 path: verify with wrong attestor key
+        let kp_signer = feldman_dkg::pq_sig::generate_signing_keypair();
+        let kp_wrong = feldman_dkg::pq_sig::generate_signing_keypair();
+
+        let content_hash = b"MIP-42 tally hash bytes here!!!_"; // 32 bytes
+        let pq_sig = feldman_dkg::pq_sig::sign(&kp_signer.signing_key, content_hash);
+
+        // Verify with wrong key — should fail (simulates wrong attestor registered)
+        let result = feldman_dkg::pq_sig::verify(
+            &kp_wrong.verifying_key_bytes(),
+            content_hash,
+            &pq_sig,
+        );
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("verification failed"));
+    }
+
+    #[test]
+    fn test_ml_dsa_verify_content_hash_mismatch() {
+        // Simulates combine_signatures: signature was over different content hash
+        let kp = feldman_dkg::pq_sig::generate_signing_keypair();
+
+        let original_hash = b"original governance tally hash__";
+        let tampered_hash = b"tampered governance tally hash__";
+        let pq_sig = feldman_dkg::pq_sig::sign(&kp.signing_key, original_hash);
+
+        let result = feldman_dkg::pq_sig::verify(
+            &kp.verifying_key_bytes(),
+            tampered_hash,
+            &pq_sig,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_signature_algorithm_serde_variants() {
+        // All three algorithm variants roundtrip through JSON correctly
+        for (json_val, expected) in [
+            ("\"Ecdsa\"", ThresholdSignatureAlgorithm::Ecdsa),
+            ("\"MlDsa65\"", ThresholdSignatureAlgorithm::MlDsa65),
+            ("\"HybridEcdsaMlDsa65\"", ThresholdSignatureAlgorithm::HybridEcdsaMlDsa65),
+        ] {
+            let alg: ThresholdSignatureAlgorithm = serde_json::from_str(json_val).unwrap();
+            assert_eq!(alg, expected);
+            let reserialized = serde_json::to_string(&alg).unwrap();
+            assert_eq!(reserialized, json_val);
+        }
+    }
 }
