@@ -246,5 +246,18 @@ fn main() {
         hcfc.attention_fatigue, hcfc.attention_pred_accuracy);
 
     println!();
+
+    // CI gate: all three evaluation modes must achieve 14/14 PRESENT
+    let all_pass = static_present == 14 && cfc_present == 14 && hcfc_present == 14;
+    if all_pass {
+        println!("  RESULT: PASS (14/14 across all evaluation modes)");
+    } else {
+        println!("  RESULT: FAIL (expected 14/14, got static={}/14 cfc={}/14 hcfc={}/14)",
+            static_present, cfc_present, hcfc_present);
+    }
     println!("================================================================");
+
+    if !all_pass {
+        std::process::exit(1);
+    }
 }

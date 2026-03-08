@@ -824,6 +824,33 @@ mod tests {
     }
 
     #[test]
+    fn test_advance_accumulates_consciousness() {
+        let mut pipeline = UnifiedConsciousnessPipeline::default_pipeline().unwrap();
+
+        // advance() is the lightweight per-cycle path (HDC encode + LTC step, no binding)
+        let input = vec![0.5; 64];
+        let mut last_c = 0.0;
+        let mut any_nonzero = false;
+
+        for i in 0..50 {
+            let c = pipeline.advance(&input).unwrap();
+            assert!(c >= 0.0 && c <= 1.0, "consciousness out of range at step {i}: {c}");
+            if c > 0.0 {
+                any_nonzero = true;
+            }
+            last_c = c;
+        }
+
+        assert!(any_nonzero, "advance() should produce non-zero consciousness after warmup");
+        assert!(pipeline.step == 50, "step counter should track advance() calls");
+
+        println!("advance() after 50 steps: consciousness={last_c:.4}");
+
+        // History should accumulate
+        assert!(!pipeline.history.is_empty(), "advance() should populate history");
+    }
+
+    #[test]
     fn test_run_minimal_demo() {
         let steps = 10;
         let moments = UnifiedConsciousnessPipeline::run_minimal_demo(steps).unwrap();
