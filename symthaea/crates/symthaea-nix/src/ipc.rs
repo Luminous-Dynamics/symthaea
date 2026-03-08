@@ -108,6 +108,12 @@ pub struct AnomalyEntry {
     pub reason: String,
     /// Originating systemd unit.
     pub unit: String,
+    /// Diagnosed error type (e.g., "configuration_error", "dependency_failure").
+    #[serde(default)]
+    pub error_type: Option<String>,
+    /// Suggested remediation from domain plugin diagnosis.
+    #[serde(default)]
+    pub suggestion: Option<String>,
 }
 
 /// Severity level for predictive alerts.
@@ -188,6 +194,40 @@ impl DaemonSnapshot {
     /// Check if the daemon process is still alive (via /proc on Linux).
     pub fn daemon_alive(&self) -> bool {
         Path::new(&format!("/proc/{}", self.daemon_pid)).exists()
+    }
+
+    /// A fully-populated snapshot with sensible defaults for use in tests.
+    ///
+    /// Override specific fields with struct update syntax:
+    /// `DaemonSnapshot { anomaly_count: 99, ..DaemonSnapshot::test_default() }`
+    pub fn test_default() -> Self {
+        Self {
+            version: SNAPSHOT_VERSION,
+            timestamp: 1700000000,
+            observation_count: 42,
+            anomaly_count: 3,
+            hierarchy_errors: [0.1, 0.2, 0.15, 0.05],
+            free_energy: 0.35,
+            is_surprised: false,
+            drift_similarity: 0.95,
+            causal_edge_count: 210,
+            episodic_count: 5,
+            concerns: vec![],
+            recent_anomalies: vec![],
+            daemon_running: true,
+            daemon_pid: 12345,
+            support_status: Some("Healthy".into()),
+            recommendation_count: 0,
+            alerts: vec![],
+            top_causal_edges: vec![],
+            memory_used_percent: Some(55.0),
+            watchdog_status: None,
+            degraded: false,
+            prediction_accuracy: Some(3.0),
+            maintenance_plan_count: 0,
+            load_average_1m: Some(0.5),
+            swap_used_percent: Some(10.0),
+        }
     }
 }
 
@@ -353,16 +393,6 @@ mod tests {
 
     fn sample_snapshot() -> DaemonSnapshot {
         DaemonSnapshot {
-            version: SNAPSHOT_VERSION,
-            timestamp: 1700000000,
-            observation_count: 42,
-            anomaly_count: 3,
-            hierarchy_errors: [0.1, 0.2, 0.15, 0.05],
-            free_energy: 0.35,
-            is_surprised: false,
-            drift_similarity: 0.95,
-            causal_edge_count: 210,
-            episodic_count: 5,
             concerns: vec![ConcernEntry {
                 label: "high memory usage".into(),
                 activation: 0.8,
@@ -372,20 +402,15 @@ mod tests {
                 score: 0.7,
                 reason: "OOM killer invoked".into(),
                 unit: "kernel".into(),
+                error_type: None,
+                suggestion: None,
             }],
-            daemon_running: true,
-            daemon_pid: 12345,
             support_status: None,
-            recommendation_count: 0,
-            alerts: vec![],
-            top_causal_edges: vec![],
             memory_used_percent: None,
-            watchdog_status: None,
-            degraded: false,
             prediction_accuracy: None,
-            maintenance_plan_count: 0,
             load_average_1m: None,
             swap_used_percent: None,
+            ..DaemonSnapshot::test_default()
         }
     }
 

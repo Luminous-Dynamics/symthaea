@@ -22,6 +22,12 @@ pub struct SystemTelemetry {
     pub memory_used_pct: f64,
     pub store_path_count: u64,
     pub failed_unit_count: u32,
+    /// CPU load average (1-minute).
+    #[serde(default)]
+    pub load_average_1m: f64,
+    /// Swap usage percentage (0-100).
+    #[serde(default)]
+    pub swap_used_pct: f64,
 }
 
 /// A single telemetry sample with its timestamp for persistence.
@@ -46,6 +52,12 @@ pub struct AlertThresholds {
     pub memory_warn_pct: f64,
     pub memory_crit_pct: f64,
     pub store_warn_paths: u64,
+    /// CPU load average warning threshold (per-core normalized).
+    pub load_warn: f64,
+    /// Swap usage warning percentage.
+    pub swap_warn_pct: f64,
+    /// Swap usage critical percentage.
+    pub swap_crit_pct: f64,
 }
 
 impl Default for AlertThresholds {
@@ -56,6 +68,9 @@ impl Default for AlertThresholds {
             memory_warn_pct: 85.0,
             memory_crit_pct: 95.0,
             store_warn_paths: 100_000,
+            load_warn: 4.0,
+            swap_warn_pct: 50.0,
+            swap_crit_pct: 80.0,
         }
     }
 }
@@ -184,15 +199,19 @@ impl PredictiveMonitor {
         let mem_role = self.codebook.get_or_create("memory_usage").clone();
         let store_role = self.codebook.get_or_create("store_paths").clone();
         let fail_role = self.codebook.get_or_create("failed_units").clone();
+        let load_role = self.codebook.get_or_create("load_average").clone();
+        let swap_role = self.codebook.get_or_create("swap_usage").clone();
 
         // Similarity gives the approximate scaled value, attenuated by bundling.
-        // With 4 components bundled, each similarity is ~1/4 of the true value,
+        // With 6 components bundled, each similarity is ~1/6 of the true value,
         // so we compensate with NUM_COMPONENTS.
-        const NUM_COMPONENTS: f64 = 4.0;
+        const NUM_COMPONENTS: f64 = 6.0;
         let disk_sim = hv.similarity(&disk_role).max(0.0) as f64 * NUM_COMPONENTS;
         let mem_sim = hv.similarity(&mem_role).max(0.0) as f64 * NUM_COMPONENTS;
         let store_sim = hv.similarity(&store_role).max(0.0) as f64 * NUM_COMPONENTS;
         let fail_sim = hv.similarity(&fail_role).max(0.0) as f64 * NUM_COMPONENTS;
+        let load_sim = hv.similarity(&load_role).max(0.0) as f64 * NUM_COMPONENTS;
+        let swap_sim = hv.similarity(&swap_role).max(0.0) as f64 * NUM_COMPONENTS;
 
         // Denormalize back to metric ranges
         SystemTelemetry {
@@ -200,6 +219,8 @@ impl PredictiveMonitor {
             memory_used_pct: (mem_sim * 100.0).clamp(0.0, 100.0),
             store_path_count: (store_sim * 200_000.0).max(0.0) as u64,
             failed_unit_count: (fail_sim * 10.0).max(0.0) as u32,
+            load_average_1m: (load_sim * 16.0).max(0.0),
+            swap_used_pct: (swap_sim * 100.0).clamp(0.0, 100.0),
         }
     }
 
@@ -336,6 +357,46 @@ impl PredictiveMonitor {
             confidence,
         });
 
+        // Load average prediction — trend extrapolation
+        let trend_load = current.load_average_1m + trend.load_average_per_hour * hours_ahead;
+        let load_pred = trend_load.max(0.0);
+        let load_threshold = self.thresholds.load_warn;
+        predictions.push(Prediction {
+            metric: "load_average_1m",
+            current_value: current.load_average_1m,
+            predicted_value: load_pred,
+            hours_ahead,
+            crosses_threshold: load_pred >= load_threshold
+                && current.load_average_1m < load_threshold,
+            threshold: load_threshold,
+            recommended_action: if load_pred >= load_threshold {
+                Some("Investigate CPU load: top -b -n1 | head -20".to_string())
+            } else {
+                None
+            },
+            confidence,
+        });
+
+        // Swap usage prediction — trend extrapolation
+        let trend_swap = current.swap_used_pct + trend.swap_used_pct * hours_ahead;
+        let swap_pred = trend_swap.clamp(0.0, 100.0);
+        let swap_threshold = self.thresholds.swap_crit_pct;
+        predictions.push(Prediction {
+            metric: "swap_used_pct",
+            current_value: current.swap_used_pct,
+            predicted_value: swap_pred,
+            hours_ahead,
+            crosses_threshold: swap_pred >= swap_threshold
+                && current.swap_used_pct < swap_threshold,
+            threshold: swap_threshold,
+            recommended_action: if swap_pred >= self.thresholds.swap_warn_pct {
+                Some("Investigate swap pressure: swapon --show && free -h".to_string())
+            } else {
+                None
+            },
+            confidence,
+        });
+
         predictions
     }
 
@@ -377,6 +438,8 @@ impl PredictiveMonitor {
                     "memory_used_pct" => actual.memory_used_pct,
                     "store_path_count" => actual.store_path_count as f64,
                     "failed_unit_count" => actual.failed_unit_count as f64,
+                    "load_average_1m" => actual.load_average_1m,
+                    "swap_used_pct" => actual.swap_used_pct,
                     _ => continue,
                 };
                 let abs_error = (pred.predicted_value - actual_value).abs();
@@ -524,6 +587,8 @@ impl PredictiveMonitor {
         let mem_hv = self.codebook.get_or_create("memory_usage").clone();
         let store_hv = self.codebook.get_or_create("store_paths").clone();
         let fail_hv = self.codebook.get_or_create("failed_units").clone();
+        let load_hv = self.codebook.get_or_create("load_average").clone();
+        let swap_hv = self.codebook.get_or_create("swap_usage").clone();
 
         // Scale role vectors by normalized metric values
         let disk_encoded = disk_hv.scale(telemetry.disk_used_pct as f32 / 100.0);
@@ -531,8 +596,10 @@ impl PredictiveMonitor {
         let store_encoded =
             store_hv.scale((telemetry.store_path_count as f32 / 200_000.0).min(1.0));
         let fail_encoded = fail_hv.scale((telemetry.failed_unit_count as f32 / 10.0).min(1.0));
+        let load_encoded = load_hv.scale((telemetry.load_average_1m as f32 / 16.0).min(1.0));
+        let swap_encoded = swap_hv.scale(telemetry.swap_used_pct as f32 / 100.0);
 
-        ContinuousHV::bundle(&[&disk_encoded, &mem_encoded, &store_encoded, &fail_encoded])
+        ContinuousHV::bundle(&[&disk_encoded, &mem_encoded, &store_encoded, &fail_encoded, &load_encoded, &swap_encoded])
     }
 
     /// Compute per-hour trends from the history using simple linear regression.
@@ -558,6 +625,8 @@ impl PredictiveMonitor {
                 / hours,
             failed_units_per_hour: (last.failed_unit_count as f64 - first.failed_unit_count as f64)
                 / hours,
+            load_average_per_hour: (last.load_average_1m - first.load_average_1m) / hours,
+            swap_used_pct: (last.swap_used_pct - first.swap_used_pct) / hours,
         }
     }
 
@@ -581,6 +650,8 @@ struct TelemetryTrend {
     memory_used_pct: f64,
     store_paths_per_hour: f64,
     failed_units_per_hour: f64,
+    load_average_per_hour: f64,
+    swap_used_pct: f64,
 }
 
 #[cfg(test)]
@@ -593,6 +664,8 @@ mod tests {
             memory_used_pct: mem,
             store_path_count: store,
             failed_unit_count: failed,
+            load_average_1m: 0.5,
+            swap_used_pct: 5.0,
         }
     }
 
@@ -648,8 +721,8 @@ mod tests {
         }
 
         let predictions = monitor.predict_all_horizons();
-        // 4 metrics × 4 horizons = 16 predictions
-        assert_eq!(predictions.len(), 16);
+        // 6 metrics × 4 horizons = 24 predictions
+        assert_eq!(predictions.len(), 24);
     }
 
     #[test]

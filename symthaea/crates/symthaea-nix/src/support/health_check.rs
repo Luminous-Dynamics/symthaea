@@ -37,6 +37,8 @@ pub enum IssueCategory {
     Services,
     Store,
     Flake,
+    Load,
+    Swap,
 }
 
 impl std::fmt::Display for IssueCategory {
@@ -47,6 +49,8 @@ impl std::fmt::Display for IssueCategory {
             Self::Services => write!(f, "services"),
             Self::Store => write!(f, "store"),
             Self::Flake => write!(f, "flake"),
+            Self::Load => write!(f, "load"),
+            Self::Swap => write!(f, "swap"),
         }
     }
 }
@@ -76,6 +80,14 @@ pub struct HealthAssessor {
     pub flake_warn_age_days: u32,
     /// Days before flake.lock age triggers a critical alert.
     pub flake_crit_age_days: u32,
+    /// Load average (1-min) warning threshold.
+    pub load_warn: f64,
+    /// Load average (1-min) critical threshold.
+    pub load_crit: f64,
+    /// Swap usage percentage warning threshold.
+    pub swap_warn_pct: f32,
+    /// Swap usage percentage critical threshold.
+    pub swap_crit_pct: f32,
 }
 
 impl Default for HealthAssessor {
@@ -90,6 +102,10 @@ impl Default for HealthAssessor {
             flake_search_paths: vec!["/etc/nixos".to_string()],
             flake_warn_age_days: 30,
             flake_crit_age_days: 90,
+            load_warn: 4.0,
+            load_crit: 8.0,
+            swap_warn_pct: 50.0,
+            swap_crit_pct: 80.0,
         }
     }
 }
@@ -106,6 +122,8 @@ impl HealthAssessor {
         if let Some(hw) = hardware {
             checks.push(self.check_disk(hw));
             checks.push(self.check_memory(hw));
+            checks.push(self.check_load(hw));
+            checks.push(self.check_swap(hw));
         }
         checks.push(self.check_services(snapshot));
         checks.push(self.check_store(snapshot));
@@ -233,6 +251,110 @@ impl HealthAssessor {
             status,
             message,
             category: IssueCategory::Memory,
+            recommendations: recs,
+        }
+    }
+
+    /// Check load average.
+    pub fn check_load(&self, hardware: &HardwareInfo) -> HealthCheck {
+        let load = hardware.load_average[0];
+        let cores = hardware.cpu_cores.max(1) as f64;
+
+        let (status, message, recs) = if load >= self.load_crit {
+            (
+                HealthStatus::Critical,
+                format!(
+                    "Load average {:.2} ({:.1}x cores) — system overloaded",
+                    load,
+                    load / cores
+                ),
+                vec![
+                    "Identify heavy processes: top -bn1 | head -20".to_string(),
+                    "Check for runaway builds: ps aux | grep nix-build".to_string(),
+                    "Consider limiting parallel builds: nix.settings.max-jobs".to_string(),
+                ],
+            )
+        } else if load >= self.load_warn {
+            (
+                HealthStatus::Warning,
+                format!(
+                    "Load average {:.2} ({:.1}x cores) — elevated",
+                    load,
+                    load / cores
+                ),
+                vec!["Monitor with: uptime or systemd-cgtop".to_string()],
+            )
+        } else {
+            (
+                HealthStatus::Healthy,
+                format!("Load average OK ({:.2}, {} cores)", load, hardware.cpu_cores),
+                vec![],
+            )
+        };
+
+        HealthCheck {
+            name: "load_average",
+            status,
+            message,
+            category: IssueCategory::Load,
+            recommendations: recs,
+        }
+    }
+
+    /// Check swap usage.
+    pub fn check_swap(&self, hardware: &HardwareInfo) -> HealthCheck {
+        if hardware.swap_total_mb == 0 {
+            return HealthCheck {
+                name: "swap",
+                status: HealthStatus::Healthy,
+                message: "No swap configured".to_string(),
+                category: IssueCategory::Swap,
+                recommendations: vec![],
+            };
+        }
+
+        let used_pct =
+            (hardware.swap_used_mb as f64 / hardware.swap_total_mb as f64 * 100.0) as f32;
+
+        let (status, message, recs) = if used_pct >= self.swap_crit_pct {
+            (
+                HealthStatus::Critical,
+                format!(
+                    "Swap {:.1}% used ({} MiB / {} MiB) — heavy swapping",
+                    used_pct, hardware.swap_used_mb, hardware.swap_total_mb
+                ),
+                vec![
+                    "Identify swap-heavy processes: smem -rs swap".to_string(),
+                    "Consider adding RAM or increasing swap".to_string(),
+                    "Restart memory-leaking services".to_string(),
+                ],
+            )
+        } else if used_pct >= self.swap_warn_pct {
+            (
+                HealthStatus::Warning,
+                format!(
+                    "Swap {:.1}% used ({} MiB / {} MiB)",
+                    used_pct, hardware.swap_used_mb, hardware.swap_total_mb
+                ),
+                vec!["Monitor with: free -h or swapon --show".to_string()],
+            )
+        } else {
+            (
+                HealthStatus::Healthy,
+                format!(
+                    "Swap OK ({:.1}% used, {} MiB free)",
+                    used_pct,
+                    hardware.swap_total_mb.saturating_sub(hardware.swap_used_mb)
+                ),
+                vec![],
+            )
+        };
+
+        HealthCheck {
+            name: "swap",
+            status,
+            message,
+            category: IssueCategory::Swap,
             recommendations: recs,
         }
     }
@@ -582,9 +704,76 @@ mod tests {
         let snapshot = make_snapshot(vec![], Some(1000));
         let (overall, checks) = assessor.assess_all(&snapshot, None);
 
-        // Should still produce service, store, and flake checks
+        // Should still produce service, store, and flake checks (no hw = no disk/memory/load/swap)
         assert_eq!(overall, HealthStatus::Healthy);
-        assert_eq!(checks.len(), 3); // services + store + flake
+        assert_eq!(checks.len(), 3); // services + store + flake (load/swap/disk/memory need hw)
+    }
+
+    #[test]
+    fn test_load_healthy() {
+        let assessor = HealthAssessor::default();
+        let hw = make_hardware(50.0, 40.0); // load_average defaults to [0.5, 0.4, 0.3]
+        let check = assessor.check_load(&hw);
+        assert_eq!(check.status, HealthStatus::Healthy);
+        assert_eq!(check.category, IssueCategory::Load);
+    }
+
+    #[test]
+    fn test_load_warning() {
+        let assessor = HealthAssessor::default();
+        let mut hw = make_hardware(50.0, 40.0);
+        hw.load_average = [5.0, 4.0, 3.0];
+        let check = assessor.check_load(&hw);
+        assert_eq!(check.status, HealthStatus::Warning);
+        assert!(check.message.contains("5.00"));
+    }
+
+    #[test]
+    fn test_load_critical() {
+        let assessor = HealthAssessor::default();
+        let mut hw = make_hardware(50.0, 40.0);
+        hw.load_average = [10.0, 8.0, 6.0];
+        let check = assessor.check_load(&hw);
+        assert_eq!(check.status, HealthStatus::Critical);
+        assert!(check.message.contains("overloaded"));
+    }
+
+    #[test]
+    fn test_swap_healthy() {
+        let assessor = HealthAssessor::default();
+        let hw = make_hardware(50.0, 40.0); // swap_used_mb defaults to 0
+        let check = assessor.check_swap(&hw);
+        assert_eq!(check.status, HealthStatus::Healthy);
+        assert_eq!(check.category, IssueCategory::Swap);
+    }
+
+    #[test]
+    fn test_swap_warning() {
+        let assessor = HealthAssessor::default();
+        let mut hw = make_hardware(50.0, 40.0);
+        hw.swap_used_mb = 5000; // 5000/8192 = ~61%
+        let check = assessor.check_swap(&hw);
+        assert_eq!(check.status, HealthStatus::Warning);
+    }
+
+    #[test]
+    fn test_swap_critical() {
+        let assessor = HealthAssessor::default();
+        let mut hw = make_hardware(50.0, 40.0);
+        hw.swap_used_mb = 7000; // 7000/8192 = ~85%
+        let check = assessor.check_swap(&hw);
+        assert_eq!(check.status, HealthStatus::Critical);
+        assert!(check.message.contains("swapping"));
+    }
+
+    #[test]
+    fn test_swap_no_swap_configured() {
+        let assessor = HealthAssessor::default();
+        let mut hw = make_hardware(50.0, 40.0);
+        hw.swap_total_mb = 0;
+        let check = assessor.check_swap(&hw);
+        assert_eq!(check.status, HealthStatus::Healthy);
+        assert!(check.message.contains("No swap"));
     }
 
     #[test]

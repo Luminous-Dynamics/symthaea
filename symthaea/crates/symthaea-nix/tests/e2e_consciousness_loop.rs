@@ -392,17 +392,19 @@ fn test_daemon_ipc_snapshot_roundtrip() {
             score: 0.91,
             reason: "OOM killer invoked".into(),
             unit: "kernel".into(),
+            error_type: None,
+            suggestion: None,
         },
         AnomalyEntry {
             score: 0.55,
             reason: "segfault in libfoo".into(),
             unit: "app.service".into(),
+            error_type: Some("runtime_error".into()),
+            suggestion: Some("Check coredump: coredumpctl list".into()),
         },
     ];
 
     let snapshot = DaemonSnapshot {
-        version: symthaea_nix::ipc::SNAPSHOT_VERSION,
-        timestamp: 1700000000,
         observation_count: 142,
         anomaly_count: 7,
         hierarchy_errors: [0.12, 0.24, 0.08, 0.03],
@@ -413,19 +415,13 @@ fn test_daemon_ipc_snapshot_roundtrip() {
         episodic_count: 12,
         concerns,
         recent_anomalies: anomalies,
-        daemon_running: true,
         daemon_pid: 99999,
         support_status: None,
-        recommendation_count: 0,
-        alerts: vec![],
-        top_causal_edges: vec![],
         memory_used_percent: None,
-        watchdog_status: None,
-        degraded: false,
         prediction_accuracy: None,
-        maintenance_plan_count: 0,
         load_average_1m: None,
         swap_used_percent: None,
+        ..DaemonSnapshot::test_default()
     };
 
     // Write atomically
@@ -571,31 +567,22 @@ fn test_cognitive_to_ipc_pipeline() {
         .as_secs();
 
     let ipc_snapshot = DaemonSnapshot {
-        version: symthaea_nix::ipc::SNAPSHOT_VERSION,
         timestamp: now,
         observation_count: 1,
         anomaly_count: 0,
         hierarchy_errors,
         free_energy,
         is_surprised: free_energy > 0.3,
-        drift_similarity: 0.95,
         causal_edge_count: 200,
         episodic_count: episodic.len(),
         concerns,
-        recent_anomalies: vec![],
-        daemon_running: true,
         daemon_pid: std::process::id(),
         support_status: None,
-        recommendation_count: 0,
-        alerts: vec![],
-        top_causal_edges: vec![],
         memory_used_percent: None,
-        watchdog_status: None,
-        degraded: false,
         prediction_accuracy: None,
-        maintenance_plan_count: 0,
         load_average_1m: None,
         swap_used_percent: None,
+        ..DaemonSnapshot::test_default()
     };
 
     // 6. Write to disk and read back
@@ -633,31 +620,18 @@ fn test_cognitive_to_ipc_pipeline() {
 #[test]
 fn test_stale_snapshot_detection() {
     let snapshot = DaemonSnapshot {
-        version: symthaea_nix::ipc::SNAPSHOT_VERSION,
         timestamp: 1000, // ancient
         observation_count: 0,
         anomaly_count: 0,
         hierarchy_errors: [0.0; 4],
         free_energy: 0.0,
-        is_surprised: false,
-        drift_similarity: 1.0,
-        causal_edge_count: 0,
-        episodic_count: 0,
-        concerns: vec![],
-        recent_anomalies: vec![],
-        daemon_running: true,
         daemon_pid: 1, // PID 1 (init) is always alive
         support_status: None,
-        recommendation_count: 0,
-        alerts: vec![],
-        top_causal_edges: vec![],
         memory_used_percent: None,
-        watchdog_status: None,
-        degraded: false,
         prediction_accuracy: None,
-        maintenance_plan_count: 0,
         load_average_1m: None,
         swap_used_percent: None,
+        ..DaemonSnapshot::test_default()
     };
 
     assert!(

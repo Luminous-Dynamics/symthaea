@@ -24,6 +24,10 @@ pub struct HealthSnapshot {
     pub memory_used_percent: Option<f64>,
     /// Memory usage history for sparkline (last 30 samples, 0-100).
     pub memory_history: Vec<f64>,
+    /// CPU load average (1-minute).
+    pub load_average_1m: Option<f64>,
+    /// Swap usage percentage.
+    pub swap_used_percent: Option<f64>,
 }
 
 /// System health dashboard widget.
@@ -172,6 +176,44 @@ impl Widget for SystemHealth<'_> {
                 Span::styled(spark, Style::default().fg(Color::Cyan)),
             ]);
             buf.set_line(x, y, &spark_line, inner.width.saturating_sub(1));
+            y += 1;
+        }
+
+        // Load average (optional)
+        if y < inner.y + inner.height {
+            if let Some(load) = self.snapshot.load_average_1m {
+                let load_color = if load > 8.0 {
+                    Color::Red
+                } else if load > 4.0 {
+                    Color::Yellow
+                } else {
+                    Color::Green
+                };
+                let load_line = Line::from(vec![
+                    Span::raw("Load:     "),
+                    Span::styled(format!("{:.2}", load), Style::default().fg(load_color)),
+                ]);
+                buf.set_line(x, y, &load_line, inner.width.saturating_sub(1));
+                y += 1;
+            }
+        }
+
+        // Swap usage (optional)
+        if y < inner.y + inner.height {
+            if let Some(swap) = self.snapshot.swap_used_percent {
+                let swap_color = if swap > 80.0 {
+                    Color::Red
+                } else if swap > 50.0 {
+                    Color::Yellow
+                } else {
+                    Color::Green
+                };
+                let swap_line = Line::from(vec![
+                    Span::raw("Swap:     "),
+                    Span::styled(format!("{:.0}%", swap), Style::default().fg(swap_color)),
+                ]);
+                buf.set_line(x, y, &swap_line, inner.width.saturating_sub(1));
+            }
         }
     }
 }
@@ -191,6 +233,7 @@ mod tests {
             current_generation: Some(45),
             total_generations: 10,
             memory_used_percent: Some(55.0),
+            ..Default::default()
         };
         let widget =
             SystemHealth::new(snap).block(Block::default().title("Health").borders(Borders::ALL));
@@ -219,6 +262,8 @@ mod tests {
             total_generations: 10,
             memory_used_percent: Some(55.0),
             memory_history: vec![40.0, 45.0, 50.0, 55.0, 60.0, 55.0, 50.0, 48.0],
+            load_average_1m: Some(1.2),
+            swap_used_percent: Some(15.0),
         };
         let widget =
             SystemHealth::new(snap).block(Block::default().title("Health").borders(Borders::ALL));

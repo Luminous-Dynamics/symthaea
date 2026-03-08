@@ -126,6 +126,8 @@ pub struct App {
     consciousness_history: Vec<ConsciousnessState>,
     /// Memory usage history for sparkline (last 30 samples).
     memory_history: Vec<f64>,
+    /// Prediction MAE history for trend tracking (last 20 samples).
+    mae_history: Vec<f64>,
 }
 
 impl App {
@@ -155,6 +157,7 @@ impl App {
             anomaly_history: Vec::with_capacity(60),
             consciousness_history: Vec::with_capacity(20),
             memory_history: Vec::with_capacity(30),
+            mae_history: Vec::with_capacity(20),
         }
     }
 
@@ -421,6 +424,8 @@ impl App {
                 .collect(),
             drift_similarity: snap.drift_similarity,
             episodic_count: snap.episodic_count,
+            prediction_accuracy: snap.prediction_accuracy,
+            maintenance_plan_count: snap.maintenance_plan_count,
             ..Default::default()
         };
 
@@ -434,6 +439,7 @@ impl App {
                     to: e.to.clone(),
                     confidence: e.confidence,
                     relationship: "causal".to_string(),
+                    suggestion: None,
                 })
                 .collect();
             // Append anomalies as secondary entries
@@ -443,6 +449,7 @@ impl App {
                     to: a.reason.clone(),
                     confidence: a.score,
                     relationship: "anomaly".to_string(),
+                    suggestion: a.suggestion.clone(),
                 });
             }
         } else {
@@ -454,6 +461,7 @@ impl App {
                     to: a.reason.clone(),
                     confidence: a.score,
                     relationship: "anomaly".to_string(),
+                    suggestion: a.suggestion.clone(),
                 })
                 .collect();
         }
@@ -462,6 +470,8 @@ impl App {
         self.health.services_failed = snap.anomaly_count as usize;
         self.health.memory_used_percent = snap.memory_used_percent;
         self.health.memory_history = self.memory_history.clone();
+        self.health.load_average_1m = snap.load_average_1m;
+        self.health.swap_used_percent = snap.swap_used_percent;
 
         // Alerts: prefer real predictive alerts from daemon, fall back to anomaly-derived
         if !snap.alerts.is_empty() {
@@ -497,6 +507,15 @@ impl App {
         self.alerts.recommendation_count = snap.recommendation_count;
         self.alerts.watchdog_status = snap.watchdog_status.clone();
         self.alerts.prediction_accuracy = snap.prediction_accuracy;
+
+        // Track MAE history for trend display (BF)
+        if let Some(mae) = snap.prediction_accuracy {
+            self.mae_history.push(mae);
+            if self.mae_history.len() > 20 {
+                self.mae_history.remove(0);
+            }
+        }
+        self.alerts.prediction_mae_history = self.mae_history.clone();
 
         self.refresh_generations();
     }
@@ -978,6 +997,8 @@ mod tests {
                 score: 0.8,
                 reason: "OOM killer".into(),
                 unit: "kernel".into(),
+                error_type: None,
+                suggestion: None,
             }],
             daemon_running: true,
             daemon_pid: 1,

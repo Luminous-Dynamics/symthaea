@@ -125,6 +125,8 @@ impl SupportAssessor {
                         "memory_used_pct" => "memory",
                         "store_path_count" => "store",
                         "failed_unit_count" => "services",
+                        "load_average_1m" => "cpu",
+                        "swap_used_pct" => "swap",
                         _ => "unknown",
                     };
 
@@ -279,6 +281,8 @@ mod tests {
                 memory_used_pct: 40.0,
                 store_path_count: 50_000,
                 failed_unit_count: 0,
+                load_average_1m: 0.5,
+                swap_used_pct: 5.0,
             });
         }
 

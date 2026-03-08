@@ -31,6 +31,8 @@ pub struct AlertsSnapshot {
     pub acknowledged: std::collections::HashSet<String>,
     /// Overall prediction mean absolute error (lower is better).
     pub prediction_accuracy: Option<f64>,
+    /// MAE history for trend tracking (last N samples).
+    pub prediction_mae_history: Vec<f64>,
 }
 
 /// Alerts dashboard widget.
@@ -112,7 +114,7 @@ impl Widget for AlertsPanel<'_> {
             }
         }
 
-        // Prediction accuracy (MAE)
+        // Prediction accuracy (MAE) with trend arrow (BF)
         if y < inner.y + inner.height {
             if let Some(mae) = self.snapshot.prediction_accuracy {
                 let acc_color = if mae < 3.0 {
@@ -122,11 +124,19 @@ impl Widget for AlertsPanel<'_> {
                 } else {
                     Color::Red
                 };
+
+                // Compute trend from MAE history
+                let (trend_arrow, trend_color) = mae_trend(&self.snapshot.prediction_mae_history);
+
                 let acc_line = Line::from(vec![
                     Span::raw("Pred MAE: "),
                     Span::styled(
                         format!("{:.1}", mae),
                         Style::default().fg(acc_color),
+                    ),
+                    Span::styled(
+                        format!(" {}", trend_arrow),
+                        Style::default().fg(trend_color),
                     ),
                     Span::styled(
                         if mae < 3.0 {
@@ -325,6 +335,39 @@ impl Widget for AlertsPanel<'_> {
     }
 }
 
+/// Compute MAE trend arrow from history.
+///
+/// Returns (arrow_str, color): rising MAE (worse) = red "^", falling (better) = green "v",
+/// stable = gray "=".
+fn mae_trend(history: &[f64]) -> (&'static str, Color) {
+    if history.len() < 3 {
+        return ("=", Color::DarkGray);
+    }
+    // Compare average of last 3 vs previous 3 (or all earlier)
+    let n = history.len();
+    let recent_start = n.saturating_sub(3);
+    let prev_end = recent_start;
+    let prev_start = prev_end.saturating_sub(3);
+
+    if prev_start >= prev_end {
+        return ("=", Color::DarkGray);
+    }
+
+    let recent_avg: f64 =
+        history[recent_start..].iter().sum::<f64>() / (n - recent_start) as f64;
+    let prev_avg: f64 =
+        history[prev_start..prev_end].iter().sum::<f64>() / (prev_end - prev_start) as f64;
+
+    let delta = recent_avg - prev_avg;
+    if delta > 0.5 {
+        ("^", Color::Red) // MAE rising = getting worse
+    } else if delta < -0.5 {
+        ("v", Color::Green) // MAE falling = improving
+    } else {
+        ("=", Color::DarkGray) // stable
+    }
+}
+
 /// Render a sparkline string from a series of values using Unicode block chars.
 fn render_sparkline(values: &[f64], max_val: f64) -> String {
     const BLOCKS: &[char] = &['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -378,6 +421,51 @@ mod tests {
             recommendation_count: 2,
             watchdog_status: Some("monitoring".into()),
             matched_knowledge_ids: vec!["disk-001".into()],
+            ..AlertsSnapshot::default()
+        };
+        let widget =
+            AlertsPanel::new(snap).block(Block::default().title("Alerts").borders(Borders::ALL));
+        let area = Rect::new(0, 0, 60, 12);
+        let mut buf = Buffer::empty(area);
+        widget.render(area, &mut buf);
+    }
+
+    #[test]
+    fn test_mae_trend_improving() {
+        // MAE going down = improving
+        let history = vec![8.0, 7.5, 7.0, 4.0, 3.5, 3.0];
+        let (arrow, color) = super::mae_trend(&history);
+        assert_eq!(arrow, "v");
+        assert_eq!(color, Color::Green);
+    }
+
+    #[test]
+    fn test_mae_trend_worsening() {
+        // MAE going up = worsening
+        let history = vec![2.0, 2.5, 3.0, 5.0, 6.0, 7.0];
+        let (arrow, color) = super::mae_trend(&history);
+        assert_eq!(arrow, "^");
+        assert_eq!(color, Color::Red);
+    }
+
+    #[test]
+    fn test_mae_trend_stable() {
+        let history = vec![3.0, 3.1, 3.0, 3.1, 3.0, 3.1];
+        let (arrow, _) = super::mae_trend(&history);
+        assert_eq!(arrow, "=");
+    }
+
+    #[test]
+    fn test_mae_trend_insufficient_data() {
+        let (arrow, _) = super::mae_trend(&[1.0, 2.0]);
+        assert_eq!(arrow, "=");
+    }
+
+    #[test]
+    fn test_render_with_mae_history() {
+        let snap = AlertsSnapshot {
+            prediction_accuracy: Some(4.5),
+            prediction_mae_history: vec![6.0, 5.5, 5.0, 4.5, 4.5, 4.5],
             ..AlertsSnapshot::default()
         };
         let widget =

@@ -56,6 +56,13 @@ ratatui = { version = "0.30", optional = true }
 zbus = { version = "4.0", optional = true }
 libsystemd = { version = "0.7", optional = true }
 
+# Observability (optional)
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"], optional = true }
+prometheus = { version = "0.13", optional = true }
+hyper = { version = "1.0", features = ["server", "http1"], optional = true }
+hyper-util = { version = "0.1", features = ["tokio"], optional = true }
+http-body-util = { version = "0.1", optional = true }
+
 [dev-dependencies]
 tempfile = "3.10"
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -71,4 +78,5 @@ cli = ["clap", "clap_complete"]
 tui = ["crossterm", "ratatui", "cli"]
 daemon = ["tokio/full"]
 systemd = ["zbus", "libsystemd"]
+observability = ["tracing-subscriber", "prometheus", "hyper", "hyper-util", "http-body-util", "daemon"]
 full = ["cli", "tui", "daemon", "systemd"]
