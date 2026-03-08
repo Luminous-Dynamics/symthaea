@@ -16,11 +16,9 @@
 use symthaea::language::code_generator::{CodeContext, CodeGenerator};
 use symthaea::language::code_intent::{CodeIntent, CodeSpec, CodeTarget};
 use symthaea::language::code_parser::EntityKind;
-use symthaea::language::llm_backend::{GenerationParams, LLMBackend, OllamaBackend};
 use symthaea::language::consciousness_prompts::CODE_GENERATION_SYSTEM_PROMPT;
-use symthaea::mind::structured_thought::{
-    CodeContext as ThoughtCodeContext, StructuredThought,
-};
+use symthaea::language::llm_backend::{GenerationParams, LLMBackend, OllamaBackend};
+use symthaea::mind::structured_thought::{CodeContext as ThoughtCodeContext, StructuredThought};
 
 // ==================================================================================
 // Helpers
@@ -104,8 +102,7 @@ async fn test_llm_completion_roundtrip() {
     assert!(prompt.contains("SPEC_SIGNATURE"));
 
     // Step 4: Call Ollama with the code generation system prompt
-    let model =
-        std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "gemma3:1b".to_string());
+    let model = std::env::var("SYMTHAEA_LLM_MODEL").unwrap_or_else(|_| "gemma3:1b".to_string());
     let backend = OllamaBackend::with_timeouts(
         "http://localhost:11434",
         &model,
@@ -180,11 +177,7 @@ fn test_native_emitter_no_llm_needed() {
             "Compute factorial",
             "fn factorial(n: u64) -> u64",
         ),
-        (
-            "abs",
-            "Absolute value",
-            "fn abs(n: i32) -> i32",
-        ),
+        ("abs", "Absolute value", "fn abs(n: i32) -> i32"),
     ];
 
     for (name, purpose, sig) in &simple_cases {
@@ -334,7 +327,10 @@ fn test_prompt_construction() {
             "Must be stable sort".to_string(),
             "In-place is preferred".to_string(),
         ],
-        spec_examples: vec![("merge_sort(&mut [3,1,2])".to_string(), "[1,2,3]".to_string())],
+        spec_examples: vec![(
+            "merge_sort(&mut [3,1,2])".to_string(),
+            "[1,2,3]".to_string(),
+        )],
         plan_steps: generated
             .plan_steps
             .iter()
@@ -439,7 +435,10 @@ fn test_prompt_includes_notes() {
 
     let prompt = thought.to_translation_prompt();
 
-    assert!(prompt.contains("CODE_NOTES:"), "Prompt must have CODE_NOTES section");
+    assert!(
+        prompt.contains("CODE_NOTES:"),
+        "Prompt must have CODE_NOTES section"
+    );
     assert!(
         prompt.contains("Low confidence in body implementation"),
         "Prompt must include first note"

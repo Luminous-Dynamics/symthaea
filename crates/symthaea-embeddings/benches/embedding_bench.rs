@@ -18,7 +18,9 @@ fn simulation_single_embed(c: &mut Criterion) {
     c.bench_function("simulation_single_embed", |b| {
         b.iter(|| {
             embedder.clear_cache();
-            embedder.embed(black_box("The quick brown fox jumps over the lazy dog")).unwrap()
+            embedder
+                .embed(black_box("The quick brown fox jumps over the lazy dog"))
+                .unwrap()
         })
     });
 }
@@ -27,11 +29,15 @@ fn simulation_cached_embed(c: &mut Criterion) {
     let config = Qwen3Config::simulated();
     let mut embedder = Qwen3Embedder::new(config).unwrap();
     // Prime the cache
-    embedder.embed("The quick brown fox jumps over the lazy dog").unwrap();
+    embedder
+        .embed("The quick brown fox jumps over the lazy dog")
+        .unwrap();
 
     c.bench_function("simulation_cached_embed", |b| {
         b.iter(|| {
-            embedder.embed(black_box("The quick brown fox jumps over the lazy dog")).unwrap()
+            embedder
+                .embed(black_box("The quick brown fox jumps over the lazy dog"))
+                .unwrap()
         })
     });
 }
@@ -78,7 +84,11 @@ fn bridge_project_batch(c: &mut Criterion) {
 
     for &size in &[4, 16, 64] {
         let embeddings: Vec<Vec<f32>> = (0..size)
-            .map(|i| (0..1024).map(|j| ((i * 1000 + j) as f32 * 0.001).sin()).collect())
+            .map(|i| {
+                (0..1024)
+                    .map(|j| ((i * 1000 + j) as f32 * 0.001).sin())
+                    .collect()
+            })
             .collect();
 
         group.bench_function(format!("{size}"), |b| {
@@ -100,7 +110,9 @@ fn simulation_dimensions(c: &mut Criterion) {
         group.bench_function(format!("{dim}D"), |b| {
             b.iter(|| {
                 embedder.clear_cache();
-                embedder.embed(black_box("Matryoshka dimension reduction benchmark")).unwrap()
+                embedder
+                    .embed(black_box("Matryoshka dimension reduction benchmark"))
+                    .unwrap()
             })
         });
     }

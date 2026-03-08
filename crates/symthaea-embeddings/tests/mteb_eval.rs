@@ -132,11 +132,26 @@ fn classification_dataset() -> ClassificationData {
     ];
 
     let labels = vec![
-        "science", "science", "science", "science",
-        "sports", "sports", "sports", "sports",
-        "technology", "technology", "technology", "technology",
-        "nature", "nature", "nature", "nature",
-        "music", "music", "music", "music",
+        "science",
+        "science",
+        "science",
+        "science",
+        "sports",
+        "sports",
+        "sports",
+        "sports",
+        "technology",
+        "technology",
+        "technology",
+        "technology",
+        "nature",
+        "nature",
+        "nature",
+        "nature",
+        "music",
+        "music",
+        "music",
+        "music",
     ];
 
     ClassificationData { texts, labels }
@@ -259,8 +274,14 @@ fn test_retrieval_pipeline_simulated() {
     // Pipeline correctness: metrics should be finite and in valid range
     assert!(avg_mrr.is_finite(), "MRR@10 should be finite");
     assert!(avg_recall.is_finite(), "Recall@5 should be finite");
-    assert!(avg_mrr >= 0.0 && avg_mrr <= 1.0, "MRR@10 out of range: {avg_mrr}");
-    assert!(avg_recall >= 0.0 && avg_recall <= 1.0, "Recall@5 out of range: {avg_recall}");
+    assert!(
+        avg_mrr >= 0.0 && avg_mrr <= 1.0,
+        "MRR@10 out of range: {avg_mrr}"
+    );
+    assert!(
+        avg_recall >= 0.0 && avg_recall <= 1.0,
+        "Recall@5 out of range: {avg_recall}"
+    );
 }
 
 #[test]
@@ -310,7 +331,10 @@ fn test_classification_pipeline_simulated() {
 
     // Pipeline correctness: accuracy should be finite and in valid range
     assert!(accuracy.is_finite(), "Accuracy should be finite");
-    assert!(accuracy >= 0.0 && accuracy <= 1.0, "Accuracy out of range: {accuracy}");
+    assert!(
+        accuracy >= 0.0 && accuracy <= 1.0,
+        "Accuracy out of range: {accuracy}"
+    );
 }
 
 #[cfg(feature = "burn-hub")]
@@ -321,7 +345,10 @@ fn test_retrieval_real_model() {
 
     let config = Qwen3Config::from_hub("Qwen/Qwen3-Embedding-0.6B");
     let mut embedder = Qwen3Embedder::new(config).unwrap();
-    assert!(embedder.is_model_loaded(), "Model should be loaded from hub");
+    assert!(
+        embedder.is_model_loaded(),
+        "Model should be loaded from hub"
+    );
 
     let corpus = retrieval_corpus();
     let queries = retrieval_queries();
@@ -370,7 +397,10 @@ fn test_classification_real_model() {
 
     let config = Qwen3Config::from_hub("Qwen/Qwen3-Embedding-0.6B");
     let mut embedder = Qwen3Embedder::new(config).unwrap();
-    assert!(embedder.is_model_loaded(), "Model should be loaded from hub");
+    assert!(
+        embedder.is_model_loaded(),
+        "Model should be loaded from hub"
+    );
 
     let dataset = classification_dataset();
 

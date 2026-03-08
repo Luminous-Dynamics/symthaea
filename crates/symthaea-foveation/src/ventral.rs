@@ -479,7 +479,10 @@ mod tests {
         let req = make_request(30, vec![128; 64]);
         let result = pipeline.process(&req);
 
-        assert!(result.processing_time_us < 1_000_000, "Should complete quickly");
+        assert!(
+            result.processing_time_us < 1_000_000,
+            "Should complete quickly"
+        );
     }
 
     #[test]
@@ -538,14 +541,20 @@ mod tests {
     #[test]
     fn test_pixel_contrast_zero_for_uniform() {
         let c = pixel_contrast(&vec![128; 100]);
-        assert!(c < 0.01, "Uniform pixels should have zero contrast, got {c}");
+        assert!(
+            c < 0.01,
+            "Uniform pixels should have zero contrast, got {c}"
+        );
     }
 
     #[test]
     fn test_pixel_contrast_high_for_alternating() {
         let pixels: Vec<u8> = (0..100).map(|i| if i % 2 == 0 { 0 } else { 255 }).collect();
         let c = pixel_contrast(&pixels);
-        assert!(c > 100.0, "Alternating 0/255 should have high contrast, got {c}");
+        assert!(
+            c > 100.0,
+            "Alternating 0/255 should have high contrast, got {c}"
+        );
     }
 
     #[test]

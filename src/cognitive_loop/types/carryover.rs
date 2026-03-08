@@ -353,4 +353,3 @@ pub(crate) struct CycleCarryover {
     /// GWT winning coalition size from previous cycle (0 if no broadcast)
     pub(crate) gwt_coalition_size: u32,
 }
-

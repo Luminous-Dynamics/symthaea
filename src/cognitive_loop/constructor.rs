@@ -115,8 +115,7 @@ impl CognitiveLoopService {
                 // Ensure dimensions match CfC config for compatibility
                 hcfc_config.input_dim = config.cfc_config.input_dim;
                 hcfc_config.output_dim = config.cfc_config.num_neurons;
-                let hcfc =
-                    crate::dynamics::hierarchical_cfc::HierarchicalCfC::new(hcfc_config);
+                let hcfc = crate::dynamics::hierarchical_cfc::HierarchicalCfC::new(hcfc_config);
                 TemporalNetwork::HierarchicalCfC(hcfc)
             }
         };
@@ -126,7 +125,8 @@ impl CognitiveLoopService {
             base_learning_rate: config.cfc_config.learning_rate,
             ..Default::default()
         };
-        let voice_coherence = super::voice_coherence_bridge::VoiceCoherenceBridge::new(coherence_config);
+        let voice_coherence =
+            super::voice_coherence_bridge::VoiceCoherenceBridge::new(coherence_config);
 
         // Initialize adaptive behavior with defaults
         let adaptive_behavior = AdaptiveBehavior::default();
@@ -216,8 +216,7 @@ impl CognitiveLoopService {
 
         // Register GWT handlers for memory and perception broadcast consumption.
         let gwt_memory_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let gwt_perception_count =
-            std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let gwt_perception_count = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
 
         if let Some(ref mut workspace) = gwt {
             let mf = gwt_memory_flag.clone();
@@ -433,8 +432,7 @@ impl CognitiveLoopService {
                     })
                     .unwrap_or(7_000_042);
                 Some(symthaea_vision_manifold::CrossManifoldPredictor::new(
-                    16_384,
-                    cmp_seed,
+                    16_384, cmp_seed,
                 ))
             } else {
                 None
@@ -687,7 +685,11 @@ impl CognitiveLoopService {
             carryover: CycleCarryover::default(),
             prefrontal,
             self_model_tier,
-            gwt_mgr: super::gwt_manager::GwtManager::new(gwt, gwt_memory_flag, gwt_perception_count),
+            gwt_mgr: super::gwt_manager::GwtManager::new(
+                gwt,
+                gwt_memory_flag,
+                gwt_perception_count,
+            ),
             consciousness_monitors: super::consciousness_monitor_tier::ConsciousnessMonitorTier {
                 resonance: consciousness_resonance,
                 quantum_coherence,

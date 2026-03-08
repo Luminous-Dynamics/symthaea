@@ -98,7 +98,13 @@ mod tests {
         let mut bridge = ReputationBridge::new(3, 0.5);
         let card = make_card(0.9);
         let result = bridge.process_card(&card);
-        assert!(matches!(result, VouchDecision::Accepted { interactions: 1, needed: 3 }));
+        assert!(matches!(
+            result,
+            VouchDecision::Accepted {
+                interactions: 1,
+                needed: 3
+            }
+        ));
     }
 
     #[test]

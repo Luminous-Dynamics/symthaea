@@ -737,9 +737,9 @@ impl AttentionSchema {
         } else {
             0.0
         };
-        sc.clarity =
-            ((sc.clarity * 0.8) + (self.current_state.intensity * 0.2) - fatigue_clarity_penalty)
-                .clamp(0.1, 1.0);
+        sc.clarity = ((sc.clarity * 0.8) + (self.current_state.intensity * 0.2)
+            - fatigue_clarity_penalty)
+            .clamp(0.1, 1.0);
 
         // Update resource allocation
         let ra = &mut self.self_model.resource_allocation;
@@ -810,8 +810,7 @@ impl AttentionSchema {
         });
 
         // Consequence 4: Capacity-based prediction (what we're missing)
-        let unattended_channels =
-            8usize.saturating_sub(self.current_state.active_channels.len());
+        let unattended_channels = 8usize.saturating_sub(self.current_state.active_channels.len());
         if unattended_channels > 4 {
             consequences.push(AttentionConsequence {
                 outcome: format!(
@@ -1099,8 +1098,7 @@ impl AttentionSchema {
             AttentionMode::Reflexive => 0.9,
             AttentionMode::Inhibited => 0.1,
         };
-        let fatigue_norm =
-            (self.stats.focus_duration_cycles as f32 / 60.0).min(1.0);
+        let fatigue_norm = (self.stats.focus_duration_cycles as f32 / 60.0).min(1.0);
         let pred_acc = self.stats.prediction_accuracy as f32;
 
         [

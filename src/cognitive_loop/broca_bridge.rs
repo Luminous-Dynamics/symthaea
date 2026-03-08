@@ -50,11 +50,7 @@ impl BrocaManager {
     /// If `checkpoint_path` is `Some`, loads weights from that file.
     /// If `None`, tries the default checkpoint at `crates/symthaea-broca/data/broca-cfc-v2.bin`.
     /// If neither path exists, creates a fresh (untrained) generator.
-    pub fn new(
-        genesis: &GenesisSeed,
-        config: BrocaConfig,
-        checkpoint_path: Option<&str>,
-    ) -> Self {
+    pub fn new(genesis: &GenesisSeed, config: BrocaConfig, checkpoint_path: Option<&str>) -> Self {
         let generator = Self::try_load_checkpoint(checkpoint_path, genesis)
             .unwrap_or_else(|| BrocaGenerator::new(genesis, config));
 
@@ -103,10 +99,7 @@ impl BrocaManager {
     /// Returns `None` if consciousness is too low (below threshold).
     /// Populates `ThoughtChannels` from the provided signals and delegates
     /// to `BrocaGenerator::generate()`.
-    pub fn generate(
-        &mut self,
-        signals: BrocaConsciousnessSignals,
-    ) -> Option<GenerationResult> {
+    pub fn generate(&mut self, signals: BrocaConsciousnessSignals) -> Option<GenerationResult> {
         // Gate: don't generate if consciousness too low
         if signals.consciousness_level < self.consciousness_threshold {
             self.last_telemetry = BrocaGenerationTelemetry {

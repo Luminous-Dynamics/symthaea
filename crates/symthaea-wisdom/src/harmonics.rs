@@ -1,10 +1,10 @@
-//! # Harmonics - The Seven Harmonies as Operational Reasoning Modes
+//! # Harmonics - The Eight Harmonies as Operational Reasoning Modes
 //!
 //! Each harmony is not just a value but a *mode of reasoning* that biases
 //! cognitive operations in specific directions. This implements the
 //! "Seven Primary Harmonies of Infinite Love" from ERC philosophy.
 //!
-//! ## The Seven Harmonies
+//! ## The Eight Harmonies
 //!
 //! 1. **Resonant Coherence** - Love as Harmonious Integration
 //!    - Question: "Does this hang together?"
@@ -36,7 +36,7 @@
 
 use std::fmt;
 
-/// The seven harmonies as an enumeration
+/// The eight harmonies as an enumeration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActiveHarmonic {
     Coherence,    // Resonant Coherence

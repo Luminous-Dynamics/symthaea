@@ -138,8 +138,11 @@ impl SymmetryEncoder {
 
         // Lie groups
         if !desc.lie_groups.is_empty() {
-            let lie_hvs: Vec<ContinuousHV> =
-                desc.lie_groups.iter().map(|g| self.encode_lie_group(g)).collect();
+            let lie_hvs: Vec<ContinuousHV> = desc
+                .lie_groups
+                .iter()
+                .map(|g| self.encode_lie_group(g))
+                .collect();
             let refs: Vec<&ContinuousHV> = lie_hvs.iter().collect();
             let lie_bundle = ContinuousHV::bundle(&refs);
             components.push(self.role_lie.bind(&lie_bundle));
@@ -147,8 +150,11 @@ impl SymmetryEncoder {
 
         // Discrete symmetries
         if !desc.discrete.is_empty() {
-            let disc_hvs: Vec<ContinuousHV> =
-                desc.discrete.iter().map(|d| self.encode_discrete(d)).collect();
+            let disc_hvs: Vec<ContinuousHV> = desc
+                .discrete
+                .iter()
+                .map(|d| self.encode_discrete(d))
+                .collect();
             let refs: Vec<&ContinuousHV> = disc_hvs.iter().collect();
             let disc_bundle = ContinuousHV::bundle(&refs);
             components.push(self.role_discrete.bind(&disc_bundle));
@@ -251,7 +257,11 @@ mod tests {
         let enc = SymmetryEncoder::new();
         let cpt = SymmetryDescriptor::new(
             vec![LieGroup::Poincare],
-            vec![DiscreteSymmetry::C, DiscreteSymmetry::P, DiscreteSymmetry::T],
+            vec![
+                DiscreteSymmetry::C,
+                DiscreteSymmetry::P,
+                DiscreteSymmetry::T,
+            ],
             false,
         );
         let hv = enc.encode(&cpt);

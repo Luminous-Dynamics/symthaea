@@ -125,11 +125,11 @@ mod identity_integration;
 
 // ── Impl-block submodules (split from this file) ────────────────────────────
 mod accessors;
+pub(crate) mod biorhythm_manager;
 pub(crate) mod consciousness_engine;
 pub(crate) mod consciousness_monitor_tier;
 mod constructor;
 mod cycle;
-mod phase_results;
 mod cycle_consciousness;
 mod cycle_late_consciousness;
 mod cycle_neuromod_phase;
@@ -142,23 +142,23 @@ mod cycle_strategy;
 mod cycle_subsystems;
 pub(crate) mod ethics_engine;
 pub(crate) mod feedback_state;
+pub(crate) mod fep_module;
+pub(crate) mod gwt_manager;
 mod helpers;
 pub(crate) mod managers;
 mod moral;
 pub(crate) mod neuromod_manager;
 pub(crate) mod neuromodulators;
+mod phase_results;
 mod prediction;
 pub(crate) mod primitive_tier;
 pub(crate) mod self_model_tier;
+pub(crate) mod social_manager;
+pub(crate) mod substrate_manager;
 pub(crate) mod subsystem_trait;
 pub(crate) mod thresholds;
 pub(crate) mod virtual_body;
-pub(crate) mod substrate_manager;
-pub(crate) mod fep_module;
 pub(crate) mod voice_coherence_bridge;
-pub(crate) mod social_manager;
-pub(crate) mod gwt_manager;
-pub(crate) mod biorhythm_manager;
 
 #[cfg(feature = "ssm_language")]
 pub(crate) mod broca_bridge;
@@ -386,8 +386,9 @@ pub struct CognitiveLoopService {
     /// Swapped each cycle: previous cycle's rx is consumed, new rx installed.
     /// Wrapped in Mutex to satisfy Sync bound (MetricsProvider).
     #[cfg(feature = "semantic-encoder")]
-    pending_semantic_rx:
-        std::sync::Mutex<Option<std::sync::mpsc::Receiver<symthaea_embeddings::channel::EmbedResponse>>>,
+    pending_semantic_rx: std::sync::Mutex<
+        Option<std::sync::mpsc::Receiver<symthaea_embeddings::channel::EmbedResponse>>,
+    >,
 
     /// Background training thread handle (when `config.async_training` is true
     /// and the backend is CfC).  `None` for synchronous training or HdcLtc backend.
@@ -447,7 +448,6 @@ pub struct CognitiveLoopService {
     prev_primitive_state: Option<PrimitiveConsciousnessState>,
 
     // NOTE: surprise_bridge moved into fep_module::FepModule
-
     /// Prefrontal cortex for executive control and working memory.
     /// When enabled, maintains a working memory of recent inputs and
     /// gates learning/exploration when memory utilization is high.
@@ -541,7 +541,7 @@ pub struct CognitiveLoopService {
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
     carryover: CycleCarryover,
 
-    /// Soul: Seven Harmonies value alignment for moral evaluation.
+    /// Soul: Eight Harmonies value alignment for moral evaluation.
     /// When present, evaluates action alignment against core values
     /// and integrates experiences for long-term value learning.
     soul: Option<crate::soul::Soul>,
@@ -642,7 +642,7 @@ pub struct CognitiveLoopService {
     metrics_collector: Option<crate::infrastructure::MetricsCollector>,
 
     /// Experience integration bus for principled signal tracking and harmonic reasoning.
-    /// Bridges cognitive loop signals to Seven Harmonies wisdom system.
+    /// Bridges cognitive loop signals to Eight Harmonies wisdom system.
     experience_bus: Option<crate::experience::ExperienceBus>,
 
     /// School bridge for curriculum-aware learning recommendations.

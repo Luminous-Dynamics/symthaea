@@ -205,8 +205,12 @@ fn main() {
         let stats = &mut phase_stats[pi];
         stats.consciousness_levels.push(m.consciousness_level);
         stats.prediction_errors.push(result.prediction_error as f64);
-        stats.moral_anomaly_scores.push(m.ethics.moral_anomaly_score);
-        stats.exploration_urges.push(m.neuromod.neuromod_mcts_exploration_mod as f64);
+        stats
+            .moral_anomaly_scores
+            .push(m.ethics.moral_anomaly_score);
+        stats
+            .exploration_urges
+            .push(m.neuromod.neuromod_mcts_exploration_mod as f64);
         if m.attention.gwt_broadcast {
             stats.gwt_broadcast_count += 1;
         }
@@ -282,7 +286,12 @@ fn main() {
     eprintln!();
 
     // ── Summary statistics ────────────────────────────────────────────────
-    let phases = [Phase::Baseline, Phase::Challenge, Phase::Recovery, Phase::Stress];
+    let phases = [
+        Phase::Baseline,
+        Phase::Challenge,
+        Phase::Recovery,
+        Phase::Stress,
+    ];
 
     println!("=== Longitudinal Stability Study: Summary ===");
     println!();
@@ -340,7 +349,10 @@ fn main() {
     println!("  Recovery ratio:          {:.1}%", recovery_pct);
     println!(
         "  Total GWT broadcasts:    {}",
-        phase_stats.iter().map(|s| s.gwt_broadcast_count).sum::<usize>()
+        phase_stats
+            .iter()
+            .map(|s| s.gwt_broadcast_count)
+            .sum::<usize>()
     );
     println!();
 }

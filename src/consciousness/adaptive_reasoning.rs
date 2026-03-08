@@ -293,7 +293,10 @@ impl QLearningAgent {
     ) -> (Primitive, TransformationType) {
         use rand::Rng;
         if available_actions.is_empty() {
-            return (get_standard_primitives().remove(0), TransformationType::Bind);
+            return (
+                get_standard_primitives().remove(0),
+                TransformationType::Bind,
+            );
         }
 
         let mut rng = rand::thread_rng();

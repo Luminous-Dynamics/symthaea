@@ -705,7 +705,11 @@ impl FormantVocoder {
             nasal_antires,
             nasal_pole,
             subglottal: [sg1, sg2, sg3],
-            cascade_res: [AllPoleResonator::new(), AllPoleResonator::new(), AllPoleResonator::new()],
+            cascade_res: [
+                AllPoleResonator::new(),
+                AllPoleResonator::new(),
+                AllPoleResonator::new(),
+            ],
             ou_jitter,
             ou_shimmer,
             radiation_prev: 0.0,
@@ -2231,7 +2235,10 @@ mod tests {
     #[test]
     fn test_cascade_default_parallel() {
         let config = VocoderConfig::default();
-        assert!(!config.cascade, "Cascade should be off by default (parallel mode)");
+        assert!(
+            !config.cascade,
+            "Cascade should be off by default (parallel mode)"
+        );
     }
 
     #[test]

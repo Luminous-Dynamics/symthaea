@@ -72,10 +72,7 @@ fn clamp_transmitter(bath: &mut NeuromodulatorBath, target: &str, level: f32) {
 /// Run a dose sweep for a given transmitter, measuring a behavioral metric.
 ///
 /// Uses direct level clamping each cycle to isolate dose→behavior from PK/tolerance.
-fn dose_sweep(
-    target: &str,
-    metric_fn: fn(&NeuromodulatorBath) -> f32,
-) -> Vec<f64> {
+fn dose_sweep(target: &str, metric_fn: fn(&NeuromodulatorBath) -> f32) -> Vec<f64> {
     let inputs = neutral_inputs();
     let mut means = Vec::with_capacity(DOSES.len());
 
@@ -158,7 +155,10 @@ impl PsychBenchmark for DoseResponseBenchmark {
         result.insert("ne_monotonicity", MetricValue::from_samples(&[ne_score]));
         result.insert("sht_monotonicity", MetricValue::from_samples(&[sht_score]));
         result.insert("ach_monotonicity", MetricValue::from_samples(&[ach_score]));
-        result.insert("gaba_monotonicity", MetricValue::from_samples(&[gaba_score]));
+        result.insert(
+            "gaba_monotonicity",
+            MetricValue::from_samples(&[gaba_score]),
+        );
         result.insert(
             "extreme_saturation_finite",
             MetricValue::from_samples(&[if extreme_finite { 1.0 } else { 0.0 }]),

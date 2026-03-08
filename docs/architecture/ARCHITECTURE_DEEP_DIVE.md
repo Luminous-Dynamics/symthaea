@@ -169,7 +169,7 @@ pub struct ConversationTurn {
 
 ## 5. Consciousness Implementation
 
-### Seven Harmonies Framework
+### Eight Harmonies Framework
 
 ```rust
 pub enum Harmony {
@@ -272,7 +272,7 @@ pub struct CausalConcept {
 
 | Component | Status | Location |
 |-----------|--------|----------|
-| Seven Harmonies (values) | ✅ Production | `seven_harmonies.rs` |
+| Eight Harmonies (values) | ✅ Production | `seven_harmonies.rs` |
 | Emotional reasoning | ✅ Production | `emotional_reasoning.rs` |
 | Social coherence | ✅ Beta | `social_coherence.rs` |
 | Endocrine system | ✅ Production | `endocrine.rs` |
@@ -336,7 +336,7 @@ if phi >= 0.6 { execute() } else { request_confirmation() }
 
 ### Leverage Points
 
-1. **Seven Harmonies** → Value co-evolution (add learning)
+1. **Eight Harmonies** → Value co-evolution (add learning)
 2. **Emotional reasoning** → Partner emotional modeling (extend)
 3. **Social coherence** → Relational Φ (generalize)
 4. **Active inference** → Proactive anticipation (extend)
@@ -357,7 +357,7 @@ if phi >= 0.6 { execute() } else { request_confirmation() }
 **Phase 1**: Extend existing modules
 - Add partner modeling to emotional reasoning
 - Add relational Φ to phi calculator
-- Add learning to Seven Harmonies
+- Add learning to Eight Harmonies
 
 **Phase 2**: New partnership module
 - Create `src/partnership/` structure

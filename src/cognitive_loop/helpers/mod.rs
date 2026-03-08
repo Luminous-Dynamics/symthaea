@@ -252,6 +252,8 @@ impl CognitiveLoopService {
             metadata: super::CycleMetadata::default(),
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(&hdv),
+            #[cfg(feature = "ssm_language")]
+            language_output: None,
             #[cfg(feature = "identity")]
             signed_output,
             #[cfg(feature = "identity")]
@@ -338,8 +340,8 @@ impl CognitiveLoopService {
         let coherence = self.voice_coherence.bridge.smoothed_coherence();
 
         // Effective threshold matches cycle() behavior (adaptive scaling)
-        let effective_threshold =
-            self.config.learning_threshold * self.carryover.learning.adaptive_threshold_scale as f32;
+        let effective_threshold = self.config.learning_threshold
+            * self.carryover.learning.adaptive_threshold_scale as f32;
 
         // 9. Learn if error is significant
         let (learning_occurred, training_loss) = if prediction_error > effective_threshold {
@@ -414,6 +416,8 @@ impl CognitiveLoopService {
             },
             thought_vector: vec![0.0; 32],
             wisdom_hv: symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16(hdv),
+            #[cfg(feature = "ssm_language")]
+            language_output: None,
             #[cfg(feature = "identity")]
             signed_output: None,
             #[cfg(feature = "identity")]
@@ -662,7 +666,8 @@ impl CognitiveLoopService {
         // fep_action_outcome_coupling is updated during cycle processing by enhanced FEP bridge
 
         // Closed Learning Loop statistics
-        self.stats.current_strategy = format!("{:?}", self.fep.closed_learning_loop.current_strategy);
+        self.stats.current_strategy =
+            format!("{:?}", self.fep.closed_learning_loop.current_strategy);
         self.stats.best_strategy = format!("{:?}", self.fep.closed_learning_loop.best_strategy());
         self.stats.average_reward = self.fep.closed_learning_loop.average_reward();
         self.stats.exploration_rate = self.fep.closed_learning_loop.exploration_rate();
@@ -739,9 +744,10 @@ impl CognitiveLoopService {
                 } else {
                     0.5 // No items yet — neutral
                 };
-                // Blend: 40% utilization (active use) + 40% graduation quality
-                // + 20% floor (WM exists and is available, even if idle).
-                (utilization * 0.4 + graduation_quality * 0.4 + 0.2).clamp(0.0, 1.0)
+                // Blend: 30% utilization (active use) + 30% graduation quality
+                // + 40% floor (WM capacity exists and is available even when
+                // idle — an unused but available workspace is not a deficit).
+                (utilization * 0.3 + graduation_quality * 0.3 + 0.4).clamp(0.0, 1.0)
             })
             .unwrap_or(0.5)
     }

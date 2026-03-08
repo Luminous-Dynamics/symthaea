@@ -949,22 +949,14 @@ mod tests {
         let window = AudioFrontend::hann_window(50);
         // Endpoints should be near zero
         assert!(window[0].abs() < 0.01, "start = {}", window[0]);
-        assert!(
-            window[49].abs() < 0.01,
-            "end = {}",
-            window[49]
-        );
+        assert!(window[49].abs() < 0.01, "end = {}", window[49]);
     }
 
     #[test]
     fn test_hann_window_peak() {
         let window = AudioFrontend::hann_window(101);
         // Center should be near 1.0
-        assert!(
-            (window[50] - 1.0).abs() < 0.01,
-            "center = {}",
-            window[50]
-        );
+        assert!((window[50] - 1.0).abs() < 0.01, "center = {}", window[50]);
     }
 
     #[test]
@@ -977,10 +969,7 @@ mod tests {
         // Each filter should have non-negative values
         for (i, filter) in filters.iter().enumerate() {
             for &val in filter {
-                assert!(
-                    val >= 0.0,
-                    "filter {i} has negative value: {val}"
-                );
+                assert!(val >= 0.0, "filter {i} has negative value: {val}");
             }
         }
 
@@ -1003,10 +992,7 @@ mod tests {
         // Each filter peak should be <= 1.0 (triangular)
         for (i, filter) in filters.iter().enumerate() {
             let max: f32 = filter.iter().cloned().fold(0.0f32, f32::max);
-            assert!(
-                max <= 1.0 + 1e-6,
-                "filter {i} peak exceeds 1.0: {max}"
-            );
+            assert!(max <= 1.0 + 1e-6, "filter {i} peak exceeds 1.0: {max}");
         }
     }
 
@@ -1027,9 +1013,7 @@ mod tests {
     #[test]
     fn test_compute_deltas_linear_ramp() {
         // Linear ramp: feature[t] = t
-        let features: Vec<Vec<f32>> = (0..10)
-            .map(|t| vec![t as f32])
-            .collect();
+        let features: Vec<Vec<f32>> = (0..10).map(|t| vec![t as f32]).collect();
         let deltas = AudioFrontend::compute_deltas(&features, 2);
 
         assert_eq!(deltas.len(), 10);

@@ -112,7 +112,9 @@ const HOT_THRESHOLD_CONSERVATIVE: f64 = 0.70;
 const SWEEP_FILLER1_LEVELS: [f64; 5] = [0.52, 0.57, 0.62, 0.67, 0.72];
 
 /// ROC curve: HOT thresholds to sweep for receiver operating characteristic.
-const ROC_THRESHOLDS: [f64; 11] = [0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80];
+const ROC_THRESHOLDS: [f64; 11] = [
+    0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80,
+];
 
 /// Number of equal-width bins for confidence calibration analysis.
 const CALIBRATION_BINS: usize = 10;
@@ -186,13 +188,11 @@ fn run_condition(
 
             // Fillers
             let filler1_hv = BinaryHV::random(trial_seed.wrapping_add(100));
-            let filler1_jitter =
-                jitter_from_seed(trial_seed.wrapping_add(101), JITTER_AMPLITUDE);
+            let filler1_jitter = jitter_from_seed(trial_seed.wrapping_add(101), JITTER_AMPLITUDE);
             let filler1_activation = (filler1_base + filler1_jitter).clamp(0.05, 0.95);
 
             let filler2_hv = BinaryHV::random(trial_seed.wrapping_add(200));
-            let filler2_jitter =
-                jitter_from_seed(trial_seed.wrapping_add(201), JITTER_AMPLITUDE);
+            let filler2_jitter = jitter_from_seed(trial_seed.wrapping_add(201), JITTER_AMPLITUDE);
             let filler2_activation = (filler2_base + filler2_jitter).clamp(0.05, 0.95);
 
             // --- GWT ---
@@ -224,10 +224,8 @@ fn run_condition(
 
             // --- HOT (with optional observation noise) ---
             let hot_observed_activation = if hot_observation_noise > 0.0 {
-                let noise = gaussian_noise_from_seed(
-                    trial_seed.wrapping_add(500),
-                    hot_observation_noise,
-                );
+                let noise =
+                    gaussian_noise_from_seed(trial_seed.wrapping_add(500), hot_observation_noise);
                 (effective_activation + noise).clamp(0.05, 0.95)
             } else {
                 effective_activation
@@ -361,7 +359,10 @@ fn compute_roc(trials: &[(f64, bool)], thresholds: &[f64]) -> (f64, f64, f64, us
 
     for &t in thresholds {
         let hits = trials.iter().filter(|&&(act, gwt)| gwt && act >= t).count();
-        let fas = trials.iter().filter(|&&(act, gwt)| !gwt && act >= t).count();
+        let fas = trials
+            .iter()
+            .filter(|&&(act, gwt)| !gwt && act >= t)
+            .count();
 
         let hit_rate = hits as f64 / n_signal as f64;
         let fa_rate = fas as f64 / n_noise as f64;
@@ -402,7 +403,12 @@ fn compute_roc(trials: &[(f64, bool)], thresholds: &[f64]) -> (f64, f64, f64, us
         auc += dx * avg_y;
     }
 
-    (auc.clamp(0.0, 1.0), best_threshold, best_j.max(0.0), deduped.len())
+    (
+        auc.clamp(0.0, 1.0),
+        best_threshold,
+        best_j.max(0.0),
+        deduped.len(),
+    )
 }
 
 /// Compute confidence calibration metrics from trial-level data.
@@ -429,9 +435,7 @@ fn compute_calibration(trials: &[(f64, bool)], num_bins: usize) -> (f64, f64, f6
 
         let in_bin: Vec<_> = trials
             .iter()
-            .filter(|&&(act, _)| {
-                act >= lo && (act < hi || (b == num_bins - 1 && act <= hi))
-            })
+            .filter(|&&(act, _)| act >= lo && (act < hi || (b == num_bins - 1 && act <= hi)))
             .collect();
 
         if in_bin.is_empty() {
@@ -493,16 +497,19 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
         let base_seed = config.seed;
-        let levels: Vec<f64> = (0..NUM_LEVELS)
-            .map(|i| 0.10 + i as f64 * 0.05)
-            .collect();
+        let levels: Vec<f64> = (0..NUM_LEVELS).map(|i| 0.10 + i as f64 * 0.05).collect();
 
         // =====================================================================
         // 1. Primary condition: liberal HOT (threshold 0.50)
         // =====================================================================
         let primary = run_condition(
-            base_seed, &levels, FILLER_1_BASE, FILLER_2_BASE,
-            HOT_THRESHOLD_LIBERAL, 0, 0.0,
+            base_seed,
+            &levels,
+            FILLER_1_BASE,
+            FILLER_2_BASE,
+            HOT_THRESHOLD_LIBERAL,
+            0,
+            0.0,
         );
         let pm = compute_metrics(&primary, &levels);
 
@@ -525,8 +532,13 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         // 2. Conservative HOT condition (threshold 0.70)
         // =====================================================================
         let conservative = run_condition(
-            base_seed, &levels, FILLER_1_BASE, FILLER_2_BASE,
-            HOT_THRESHOLD_CONSERVATIVE, 1_000_000, 0.0,
+            base_seed,
+            &levels,
+            FILLER_1_BASE,
+            FILLER_2_BASE,
+            HOT_THRESHOLD_CONSERVATIVE,
+            1_000_000,
+            0.0,
         );
         let cm = compute_metrics(&conservative, &levels);
 
@@ -549,8 +561,13 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         for (i, &f1) in SWEEP_FILLER1_LEVELS.iter().enumerate() {
             let f2 = f1 + 0.10;
             let cond = run_condition(
-                base_seed, &levels, f1, f2,
-                HOT_THRESHOLD_LIBERAL, (i as u64 + 2) * 1_000_000, 0.0,
+                base_seed,
+                &levels,
+                f1,
+                f2,
+                HOT_THRESHOLD_LIBERAL,
+                (i as u64 + 2) * 1_000_000,
+                0.0,
             );
             let sm = compute_metrics(&cond, &levels);
             sweep_accuracies.push(sm.classification_accuracy);
@@ -575,7 +592,11 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
                     * (pressure_levels[i + 1] - pressure_levels[i]);
             }
             let span = pressure_levels.last().unwrap() - pressure_levels.first().unwrap();
-            if span > 0.0 { area / span } else { 0.0 }
+            if span > 0.0 {
+                area / span
+            } else {
+                0.0
+            }
         } else {
             0.0
         };
@@ -601,8 +622,13 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
 
         for (i, &sigma) in NOISE_SIGMA_LEVELS.iter().enumerate() {
             let noisy_cond = run_condition(
-                base_seed, &levels, FILLER_1_BASE, FILLER_2_BASE,
-                HOT_THRESHOLD_LIBERAL, (i as u64 + 10) * 1_000_000, sigma,
+                base_seed,
+                &levels,
+                FILLER_1_BASE,
+                FILLER_2_BASE,
+                HOT_THRESHOLD_LIBERAL,
+                (i as u64 + 10) * 1_000_000,
+                sigma,
             );
             let nm = compute_metrics(&noisy_cond, &levels);
             noise_accuracies.push(nm.classification_accuracy);
@@ -640,10 +666,7 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         // 7. Cross-condition ROC (competition sweep discriminability)
         // =====================================================================
         let (sweep_roc_auc_slope, _, _) = linear_fit(&pressure_levels, &sweep_roc_aucs);
-        let sweep_roc_min_auc = sweep_roc_aucs
-            .iter()
-            .copied()
-            .fold(f64::INFINITY, f64::min);
+        let sweep_roc_min_auc = sweep_roc_aucs.iter().copied().fold(f64::INFINITY, f64::min);
 
         // =====================================================================
         // Build result
@@ -652,67 +675,174 @@ impl PsychBenchmark for MetacognitiveIgnitionBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         // Primary condition metrics
-        result.insert("boundary_alignment", MetricValue::from_samples(&[pm.boundary_alignment]));
-        result.insert("classification_accuracy", MetricValue::from_samples(&[pm.classification_accuracy]));
-        result.insert("hot_ignition_correlation", MetricValue::from_samples(&[pm.hot_ignition_correlation]));
-        result.insert("spontaneous_tracking_score", MetricValue::from_samples(&[spontaneous_tracking_score]));
-        result.insert("gwt_sigmoid_r_squared", MetricValue::from_samples(&[pm.gwt_r2]));
-        result.insert("hot_sigmoid_r_squared", MetricValue::from_samples(&[pm.hot_r2]));
-        result.insert("gwt_effective_threshold", MetricValue::from_samples(&[pm.gwt_x0]));
-        result.insert("hot_effective_threshold", MetricValue::from_samples(&[pm.hot_x0]));
-        result.insert("sigmoid_quality", MetricValue::from_samples(&[pm.sigmoid_quality]));
+        result.insert(
+            "boundary_alignment",
+            MetricValue::from_samples(&[pm.boundary_alignment]),
+        );
+        result.insert(
+            "classification_accuracy",
+            MetricValue::from_samples(&[pm.classification_accuracy]),
+        );
+        result.insert(
+            "hot_ignition_correlation",
+            MetricValue::from_samples(&[pm.hot_ignition_correlation]),
+        );
+        result.insert(
+            "spontaneous_tracking_score",
+            MetricValue::from_samples(&[spontaneous_tracking_score]),
+        );
+        result.insert(
+            "gwt_sigmoid_r_squared",
+            MetricValue::from_samples(&[pm.gwt_r2]),
+        );
+        result.insert(
+            "hot_sigmoid_r_squared",
+            MetricValue::from_samples(&[pm.hot_r2]),
+        );
+        result.insert(
+            "gwt_effective_threshold",
+            MetricValue::from_samples(&[pm.gwt_x0]),
+        );
+        result.insert(
+            "hot_effective_threshold",
+            MetricValue::from_samples(&[pm.hot_x0]),
+        );
+        result.insert(
+            "sigmoid_quality",
+            MetricValue::from_samples(&[pm.sigmoid_quality]),
+        );
 
         // SDT — liberal condition
         result.insert("sdt_hit_rate", MetricValue::from_samples(&[pm.hit_rate]));
-        result.insert("sdt_false_alarm_rate", MetricValue::from_samples(&[pm.false_alarm_rate]));
+        result.insert(
+            "sdt_false_alarm_rate",
+            MetricValue::from_samples(&[pm.false_alarm_rate]),
+        );
         result.insert("sdt_d_prime", MetricValue::from_samples(&[pm.d_prime]));
-        result.insert("sdt_criterion_c", MetricValue::from_samples(&[pm.criterion_c]));
+        result.insert(
+            "sdt_criterion_c",
+            MetricValue::from_samples(&[pm.criterion_c]),
+        );
 
         // SDT — conservative condition
-        result.insert("conservative_hit_rate", MetricValue::from_samples(&[cm.hit_rate]));
-        result.insert("conservative_false_alarm_rate", MetricValue::from_samples(&[cm.false_alarm_rate]));
-        result.insert("conservative_d_prime", MetricValue::from_samples(&[cm.d_prime]));
-        result.insert("conservative_criterion_c", MetricValue::from_samples(&[cm.criterion_c]));
+        result.insert(
+            "conservative_hit_rate",
+            MetricValue::from_samples(&[cm.hit_rate]),
+        );
+        result.insert(
+            "conservative_false_alarm_rate",
+            MetricValue::from_samples(&[cm.false_alarm_rate]),
+        );
+        result.insert(
+            "conservative_d_prime",
+            MetricValue::from_samples(&[cm.d_prime]),
+        );
+        result.insert(
+            "conservative_criterion_c",
+            MetricValue::from_samples(&[cm.criterion_c]),
+        );
 
         // Bidirectional comparison
-        result.insert("criterion_shift", MetricValue::from_samples(&[criterion_shift]));
+        result.insert(
+            "criterion_shift",
+            MetricValue::from_samples(&[criterion_shift]),
+        );
         result.insert("d_prime_ratio", MetricValue::from_samples(&[d_prime_ratio]));
 
         // Competition sweep
-        result.insert("sweep_alignment_slope", MetricValue::from_samples(&[alignment_slope]));
-        result.insert("sweep_accuracy_slope", MetricValue::from_samples(&[accuracy_slope]));
-        result.insert("sweep_alignment_auc", MetricValue::from_samples(&[sweep_alignment_auc]));
-        result.insert("sweep_min_accuracy", MetricValue::from_samples(
-            &[sweep_accuracies.iter().copied().fold(f64::INFINITY, f64::min)],
-        ));
-        result.insert("sweep_max_accuracy", MetricValue::from_samples(
-            &[sweep_accuracies.iter().copied().fold(f64::NEG_INFINITY, f64::max)],
-        ));
+        result.insert(
+            "sweep_alignment_slope",
+            MetricValue::from_samples(&[alignment_slope]),
+        );
+        result.insert(
+            "sweep_accuracy_slope",
+            MetricValue::from_samples(&[accuracy_slope]),
+        );
+        result.insert(
+            "sweep_alignment_auc",
+            MetricValue::from_samples(&[sweep_alignment_auc]),
+        );
+        result.insert(
+            "sweep_min_accuracy",
+            MetricValue::from_samples(&[sweep_accuracies
+                .iter()
+                .copied()
+                .fold(f64::INFINITY, f64::min)]),
+        );
+        result.insert(
+            "sweep_max_accuracy",
+            MetricValue::from_samples(&[sweep_accuracies
+                .iter()
+                .copied()
+                .fold(f64::NEG_INFINITY, f64::max)]),
+        );
 
         // ROC analysis
         result.insert("roc_auc", MetricValue::from_samples(&[roc_auc]));
-        result.insert("roc_optimal_threshold", MetricValue::from_samples(&[roc_optimal_threshold]));
+        result.insert(
+            "roc_optimal_threshold",
+            MetricValue::from_samples(&[roc_optimal_threshold]),
+        );
         result.insert("roc_optimal_j", MetricValue::from_samples(&[roc_optimal_j]));
-        result.insert("roc_num_points", MetricValue::from_samples(&[roc_num_points as f64]));
+        result.insert(
+            "roc_num_points",
+            MetricValue::from_samples(&[roc_num_points as f64]),
+        );
 
         // Confidence calibration
-        result.insert("calibration_ece", MetricValue::from_samples(&[calibration_ece]));
-        result.insert("calibration_slope", MetricValue::from_samples(&[calibration_slope]));
-        result.insert("calibration_max_bin_error", MetricValue::from_samples(&[calibration_max_bin_error]));
+        result.insert(
+            "calibration_ece",
+            MetricValue::from_samples(&[calibration_ece]),
+        );
+        result.insert(
+            "calibration_slope",
+            MetricValue::from_samples(&[calibration_slope]),
+        );
+        result.insert(
+            "calibration_max_bin_error",
+            MetricValue::from_samples(&[calibration_max_bin_error]),
+        );
 
         // Observation noise sweep
-        result.insert("noise_accuracy_slope", MetricValue::from_samples(&[noise_accuracy_slope]));
-        result.insert("noise_roc_auc_at_010", MetricValue::from_samples(&[noise_roc_auc_at_010]));
-        result.insert("noise_roc_auc_slope", MetricValue::from_samples(&[noise_roc_auc_slope]));
-        result.insert("noise_d_prime_retention", MetricValue::from_samples(&[noise_d_prime_retention]));
-        result.insert("noise_tolerance", MetricValue::from_samples(&[noise_tolerance]));
+        result.insert(
+            "noise_accuracy_slope",
+            MetricValue::from_samples(&[noise_accuracy_slope]),
+        );
+        result.insert(
+            "noise_roc_auc_at_010",
+            MetricValue::from_samples(&[noise_roc_auc_at_010]),
+        );
+        result.insert(
+            "noise_roc_auc_slope",
+            MetricValue::from_samples(&[noise_roc_auc_slope]),
+        );
+        result.insert(
+            "noise_d_prime_retention",
+            MetricValue::from_samples(&[noise_d_prime_retention]),
+        );
+        result.insert(
+            "noise_tolerance",
+            MetricValue::from_samples(&[noise_tolerance]),
+        );
 
         // Cross-condition ROC (competition sweep)
-        result.insert("sweep_roc_auc_slope", MetricValue::from_samples(&[sweep_roc_auc_slope]));
-        result.insert("sweep_roc_min_auc", MetricValue::from_samples(&[sweep_roc_min_auc]));
+        result.insert(
+            "sweep_roc_auc_slope",
+            MetricValue::from_samples(&[sweep_roc_auc_slope]),
+        );
+        result.insert(
+            "sweep_roc_min_auc",
+            MetricValue::from_samples(&[sweep_roc_min_auc]),
+        );
 
-        result.insert("is_degenerate", MetricValue::from_samples(&[if is_degenerate { 1.0 } else { 0.0 }]));
-        result.insert("elapsed_ms", MetricValue::from_samples(&[elapsed.as_millis() as f64]));
+        result.insert(
+            "is_degenerate",
+            MetricValue::from_samples(&[if is_degenerate { 1.0 } else { 0.0 }]),
+        );
+        result.insert(
+            "elapsed_ms",
+            MetricValue::from_samples(&[elapsed.as_millis() as f64]),
+        );
 
         result
     }
@@ -752,7 +882,8 @@ mod tests {
             assert!(
                 metric.mean.is_finite(),
                 "Metric '{}' is not finite: {}",
-                key, metric.mean
+                key,
+                metric.mean
             );
         }
     }
@@ -781,18 +912,30 @@ mod tests {
     fn test_hot_ignition_correlation_positive() {
         let result = run_benchmark(42);
         let corr = result.metrics["hot_ignition_correlation"].mean;
-        assert!(corr > 0.0, "HOT-ignition correlation should be positive: {corr}");
+        assert!(
+            corr > 0.0,
+            "HOT-ignition correlation should be positive: {corr}"
+        );
     }
 
     #[test]
     fn test_gwt_ignition_increases() {
         let base_seed = 42u64;
         let levels: Vec<f64> = (0..NUM_LEVELS).map(|i| 0.10 + i as f64 * 0.05).collect();
-        let cr = run_condition(base_seed, &levels, FILLER_1_BASE, FILLER_2_BASE, HOT_THRESHOLD_LIBERAL, 0, 0.0);
+        let cr = run_condition(
+            base_seed,
+            &levels,
+            FILLER_1_BASE,
+            FILLER_2_BASE,
+            HOT_THRESHOLD_LIBERAL,
+            0,
+            0.0,
+        );
         assert!(
             cr.gwt_rates[NUM_LEVELS - 1] > cr.gwt_rates[0],
             "GWT rate should increase: low={}, high={}",
-            cr.gwt_rates[0], cr.gwt_rates[NUM_LEVELS - 1]
+            cr.gwt_rates[0],
+            cr.gwt_rates[NUM_LEVELS - 1]
         );
     }
 
@@ -800,18 +943,30 @@ mod tests {
     fn test_hot_ratio_increases() {
         let base_seed = 42u64;
         let levels: Vec<f64> = (0..NUM_LEVELS).map(|i| 0.10 + i as f64 * 0.05).collect();
-        let cr = run_condition(base_seed, &levels, FILLER_1_BASE, FILLER_2_BASE, HOT_THRESHOLD_LIBERAL, 0, 0.0);
+        let cr = run_condition(
+            base_seed,
+            &levels,
+            FILLER_1_BASE,
+            FILLER_2_BASE,
+            HOT_THRESHOLD_LIBERAL,
+            0,
+            0.0,
+        );
         assert!(
             cr.hot_rates[NUM_LEVELS - 1] > cr.hot_rates[0],
             "HOT rate should increase: low={}, high={}",
-            cr.hot_rates[0], cr.hot_rates[NUM_LEVELS - 1]
+            cr.hot_rates[0],
+            cr.hot_rates[NUM_LEVELS - 1]
         );
     }
 
     #[test]
     fn test_not_degenerate() {
         let result = run_benchmark(42);
-        assert!(result.metrics["is_degenerate"].mean < 0.5, "Should not be degenerate");
+        assert!(
+            result.metrics["is_degenerate"].mean < 0.5,
+            "Should not be degenerate"
+        );
     }
 
     #[test]
@@ -830,7 +985,10 @@ mod tests {
         let r2 = run_benchmark(42);
         let s1 = r1.metrics["spontaneous_tracking_score"].mean;
         let s2 = r2.metrics["spontaneous_tracking_score"].mean;
-        assert!((s1 - s2).abs() < 1e-10, "Same seed should match: {s1} vs {s2}");
+        assert!(
+            (s1 - s2).abs() < 1e-10,
+            "Same seed should match: {s1} vs {s2}"
+        );
     }
 
     #[test]
@@ -961,7 +1119,10 @@ mod tests {
     fn test_sdt_false_alarm_rate_moderate() {
         let result = run_benchmark(42);
         let far = result.metrics["sdt_false_alarm_rate"].mean;
-        assert!(far > 0.05 && far < 0.90, "FA rate should be moderate: {far}");
+        assert!(
+            far > 0.05 && far < 0.90,
+            "FA rate should be moderate: {far}"
+        );
     }
 
     // =================================================================
@@ -1061,10 +1222,7 @@ mod tests {
     fn test_roc_auc_above_chance() {
         let result = run_benchmark(42);
         let auc = result.metrics["roc_auc"].mean;
-        assert!(
-            auc > 0.50,
-            "ROC AUC should beat chance (0.50): {auc}"
-        );
+        assert!(auc > 0.50, "ROC AUC should beat chance (0.50): {auc}");
     }
 
     #[test]

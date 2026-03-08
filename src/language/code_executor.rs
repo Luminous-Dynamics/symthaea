@@ -99,10 +99,8 @@ impl CodeExecutor {
         let sandbox = Sandbox::new()
             .with_timeout(Duration::from_secs(30))
             .simulation_only();
-        let work_dir = std::env::temp_dir().join(format!(
-            "symthaea-code-exec-{}",
-            std::process::id()
-        ));
+        let work_dir =
+            std::env::temp_dir().join(format!("symthaea-code-exec-{}", std::process::id()));
         Self { sandbox, work_dir }
     }
 
@@ -119,10 +117,8 @@ impl CodeExecutor {
         sandbox.allow_command("nix-instantiate");
         Self {
             sandbox,
-            work_dir: std::env::temp_dir().join(format!(
-                "symthaea-code-exec-{}",
-                std::process::id()
-            )),
+            work_dir: std::env::temp_dir()
+                .join(format!("symthaea-code-exec-{}", std::process::id())),
         }
     }
 
@@ -131,11 +127,7 @@ impl CodeExecutor {
     /// Writes source to a temp file, invokes `rustc --edition 2021`,
     /// and captures errors. If `test_source` is provided, appends it
     /// and runs with `--test`.
-    pub fn execute_rust(
-        &mut self,
-        source: &str,
-        test_source: Option<&str>,
-    ) -> ExecutionResult {
+    pub fn execute_rust(&mut self, source: &str, test_source: Option<&str>) -> ExecutionResult {
         let start = std::time::Instant::now();
 
         // Ensure work directory exists
@@ -177,19 +169,27 @@ impl CodeExecutor {
         let output_path = self.work_dir.join("generated");
         let compile_args = if test_source.is_some() {
             vec![
-                "--edition", "2021", "--test",
+                "--edition",
+                "2021",
+                "--test",
                 source_path.to_str().unwrap_or("generated.rs"),
-                "-o", output_path.to_str().unwrap_or("generated"),
+                "-o",
+                output_path.to_str().unwrap_or("generated"),
             ]
         } else {
             vec![
-                "--edition", "2021",
+                "--edition",
+                "2021",
                 source_path.to_str().unwrap_or("generated.rs"),
-                "-o", output_path.to_str().unwrap_or("generated"),
+                "-o",
+                output_path.to_str().unwrap_or("generated"),
             ]
         };
 
-        match self.sandbox.run("rustc", &compile_args.iter().map(|s| *s).collect::<Vec<_>>()) {
+        match self.sandbox.run(
+            "rustc",
+            &compile_args.iter().map(|s| *s).collect::<Vec<_>>(),
+        ) {
             Ok(result) => {
                 if !result.success() {
                     let errors = parse_compile_errors(&result.stderr);
@@ -211,10 +211,10 @@ impl CodeExecutor {
 
                 // If tests, run the compiled test binary
                 if test_source.is_some() {
-                    match self.sandbox.run(
-                        output_path.to_str().unwrap_or("./generated"),
-                        &[],
-                    ) {
+                    match self
+                        .sandbox
+                        .run(output_path.to_str().unwrap_or("./generated"), &[])
+                    {
                         Ok(test_result) => {
                             let (passed, failed) = parse_test_output(&test_result.stdout);
                             ExecutionResult {
@@ -310,9 +310,12 @@ impl CodeExecutor {
 
         let output_path = self.work_dir.join("generated_test");
         let compile_args: Vec<&str> = vec![
-            "--edition", "2021", "--test",
+            "--edition",
+            "2021",
+            "--test",
             source_path.to_str().unwrap_or("generated_test.rs"),
-            "-o", output_path.to_str().unwrap_or("generated_test"),
+            "-o",
+            output_path.to_str().unwrap_or("generated_test"),
         ];
 
         match self.sandbox.run("rustc", &compile_args) {
@@ -336,10 +339,10 @@ impl CodeExecutor {
                 }
 
                 // Run the test binary
-                match self.sandbox.run(
-                    output_path.to_str().unwrap_or("./generated_test"),
-                    &[],
-                ) {
+                match self
+                    .sandbox
+                    .run(output_path.to_str().unwrap_or("./generated_test"), &[])
+                {
                     Ok(test_result) => {
                         let (passed, failed) = parse_test_output(&test_result.stdout);
                         ExecutionResult {
@@ -570,7 +573,10 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
         }
 
         // Type mismatch: expected String, found &str
-        if err_lower.contains("expected") && err_lower.contains("string") && err_lower.contains("&str") {
+        if err_lower.contains("expected")
+            && err_lower.contains("string")
+            && err_lower.contains("&str")
+        {
             // This is tricky to fix in place without line numbers, skip for now
             // but add a note to the source
         }
@@ -630,7 +636,11 @@ pub fn try_auto_fix(source: &str, errors: &[String]) -> Option<String> {
         }
     }
 
-    if any_fix { Some(fixed) } else { None }
+    if any_fix {
+        Some(fixed)
+    } else {
+        None
+    }
 }
 
 /// Extract text between two delimiter strings (first occurrence).
@@ -681,7 +691,10 @@ mod tests {
             simulated: false,
         };
         let surprise = result.to_surprise();
-        assert!(surprise > 0.8, "Compile failure should have high surprise: {surprise}");
+        assert!(
+            surprise > 0.8,
+            "Compile failure should have high surprise: {surprise}"
+        );
         assert!(surprise <= 1.0);
     }
 
@@ -698,7 +711,10 @@ mod tests {
             simulated: false,
         };
         let surprise = result.to_surprise();
-        assert!(surprise > 0.3 && surprise < 0.8, "Test failure moderate surprise: {surprise}");
+        assert!(
+            surprise > 0.3 && surprise < 0.8,
+            "Test failure moderate surprise: {surprise}"
+        );
     }
 
     #[test]

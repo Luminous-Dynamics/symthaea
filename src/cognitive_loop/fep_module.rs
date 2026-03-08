@@ -6,9 +6,9 @@
 use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
 use crate::exploration::SurpriseExplorationBridge;
 
+use super::goal_world::{GoalSystemBridge, WorldModelBridge};
 use super::learning::ClosedLearningLoop;
 use super::memory_bridge::EpisodicMemoryBridge;
-use super::goal_world::{GoalSystemBridge, WorldModelBridge};
 use super::routing::ActiveInferenceBridge;
 
 /// Consolidated Free Energy Principle module.

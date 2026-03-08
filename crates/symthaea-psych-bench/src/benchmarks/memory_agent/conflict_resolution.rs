@@ -9,10 +9,10 @@ use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
-use std::collections::BTreeMap;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
+use std::collections::BTreeMap;
 
 /// Conflict resolution benchmark.
 pub struct ConflictResolutionBenchmark;
@@ -88,7 +88,8 @@ impl ConflictResolutionBenchmark {
         // Time pressure: base 0.25 yields ~65% recency preference (Oberauer, 2002 WM updating);
         // +0.15/unit adds retrieval noise, modeling noisier competition under SAT (Heitz, 2014).
         let diff_model = difficulty_model_for("MemoryAgent::ConflictResolution");
-        let temperature = (0.25 + config.time_pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
+        let temperature = (0.25 + config.time_pressure * 0.15)
+            * diff_model.temperature_multiplier(config.difficulty);
         let max_sim = a_sim.max(b_sim);
         let a_weight = ((a_sim - max_sim) / temperature).exp();
         let b_weight = ((b_sim - max_sim) / temperature).exp();
@@ -167,7 +168,9 @@ impl PsychBenchmark for ConflictResolutionBenchmark {
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

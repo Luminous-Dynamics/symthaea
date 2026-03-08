@@ -22,7 +22,7 @@ impl TemporalPlanner {
     /// Create a new temporal planner with default neuron configuration.
     pub fn new() -> Self {
         let config = UnifiedConfig {
-            tau_base: 10.0,           // Slower dynamics for gestational timescale
+            tau_base: 10.0, // Slower dynamics for gestational timescale
             backbone_tau: 0.3,
             dimension: HDC_DIMENSION,
             ..UnifiedConfig::default()

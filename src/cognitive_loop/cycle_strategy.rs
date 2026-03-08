@@ -190,7 +190,7 @@ impl CognitiveLoopService {
     /// Covers:
     /// - HDC encode with attention from previous prediction
     /// - BinaryHV cache (real_hv_to_hv16)
-    /// - Soul alignment evaluation (Seven Harmonies)
+    /// - Soul alignment evaluation (Eight Harmonies)
     /// - Phi-guided attention gating
     /// - Surprise-driven exploration
     /// - Codebook diversity → memoization threshold adaptation

@@ -13,9 +13,7 @@ use symthaea_nix::mind::causal_graph::NixCausalGraph;
 use symthaea_nix::mind::episodic_memory::EpisodeOutcome;
 use symthaea_nix::mind::world_model::ActionCategory;
 use symthaea_nix::mind::NixWorldModel;
-use symthaea_nix::plugin::pipeline_integration::{
-    NixConsciousnessQuadrant, NixPipelineProcessor,
-};
+use symthaea_nix::plugin::pipeline_integration::{NixConsciousnessQuadrant, NixPipelineProcessor};
 
 /// Helper: build a mock system snapshot with configurable services.
 fn mock_snapshot(services: &[(&str, ServiceState)]) -> SystemStateSnapshot {
@@ -70,8 +68,14 @@ fn test_observe_to_encode_state_flow() {
     };
 
     // Verify the encoded vector is valid
-    assert!(state_hv.dim() > 0, "Encoded vector should have positive dimension");
-    assert!(state_hv.norm() > 0.0, "Encoded vector should have non-zero norm");
+    assert!(
+        state_hv.dim() > 0,
+        "Encoded vector should have positive dimension"
+    );
+    assert!(
+        state_hv.norm() > 0.0,
+        "Encoded vector should have non-zero norm"
+    );
 
     // Verify that different system states produce different encodings
     let degraded = degraded_snapshot();
@@ -116,8 +120,14 @@ fn test_full_pipeline_no_panic() {
 
     // Stage 4: Plan actions from user input
     let plan = engine.process_input("install nginx");
-    assert!(!plan.needs_clarification, "Clear goal should not need clarification");
-    assert!(!plan.actions.is_empty(), "Plan should have at least one action");
+    assert!(
+        !plan.needs_clarification,
+        "Clear goal should not need clarification"
+    );
+    assert!(
+        !plan.actions.is_empty(),
+        "Plan should have at least one action"
+    );
 
     // Verify EFE ordering
     for window in plan.actions.windows(2) {
@@ -181,7 +191,10 @@ fn test_gate_veto_skips_execute() {
     // High Phi + high confidence = Confident → should allow
     let result4 = proc.process("install vim", 0.7, 0.8);
     assert_eq!(result4.quadrant, NixConsciousnessQuadrant::Confident);
-    assert!(result4.phi_allowed, "Confident with high Phi should allow execution");
+    assert!(
+        result4.phi_allowed,
+        "Confident with high Phi should allow execution"
+    );
 }
 
 // ─── Test 4: Learn phase updates state ─────────────────────────────────────
@@ -225,7 +238,10 @@ fn test_learn_phase_updates_state() {
     // Verify that predictions change after learning
     let predicted = engine.world_model().predict_state(&ActionCategory::Install);
     assert!(predicted.dim() > 0);
-    assert!(predicted.norm() > 0.0, "Predicted state should be non-zero after learning");
+    assert!(
+        predicted.norm() > 0.0,
+        "Predicted state should be non-zero after learning"
+    );
 
     // Learn from a failure — episodic memory should contain both successes and failures
     let fail_before = ContinuousHV::random(dim, 999);
@@ -336,7 +352,8 @@ fn test_causal_graph_accumulates_through_pipeline() {
 
             if !changed.is_empty() {
                 let refs: Vec<&str> = changed.iter().map(|s| s.as_str()).collect();
-                let all_keys: Vec<&str> = snapshot.services.iter().map(|(n, _)| n.as_str()).collect();
+                let all_keys: Vec<&str> =
+                    snapshot.services.iter().map(|(n, _)| n.as_str()).collect();
                 causal_graph.observe_outcome(&changed[0], &refs, &all_keys);
             }
         }
@@ -378,7 +395,14 @@ fn test_multiple_cycles_free_energy_finite() {
     for i in 0..20 {
         let snapshot = mock_snapshot(&[
             ("nginx.service", ServiceState::Running),
-            ("sshd.service", if i % 5 == 0 { ServiceState::Failed } else { ServiceState::Running }),
+            (
+                "sshd.service",
+                if i % 5 == 0 {
+                    ServiceState::Failed
+                } else {
+                    ServiceState::Running
+                },
+            ),
         ]);
         let state_hv = {
             let mut encoder = SystemStateEncoder::new(&mut codebook);
@@ -386,6 +410,10 @@ fn test_multiple_cycles_free_energy_finite() {
         };
         world_model.observe(state_hv);
         let fe = world_model.free_energy();
-        assert!(fe.is_finite(), "Free energy should remain finite at cycle {}", i);
+        assert!(
+            fe.is_finite(),
+            "Free energy should remain finite at cycle {}",
+            i
+        );
     }
 }

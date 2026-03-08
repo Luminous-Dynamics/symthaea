@@ -65,7 +65,8 @@ impl CptBenchmark {
 
         // Time pressure noise
         let diff_model = difficulty_model_for(self.name());
-        let noise_level: f32 = (0.15 + config.time_pressure as f32 * 0.15) / diff_model.signal_multiplier(config.difficulty) as f32;
+        let noise_level: f32 = (0.15 + config.time_pressure as f32 * 0.15)
+            / diff_model.signal_multiplier(config.difficulty) as f32;
 
         // Vigilance decrement: threshold rises per block
         let threshold_increment: f32 = 0.005;
@@ -122,7 +123,9 @@ impl CptBenchmark {
 
                 // Threshold rises with vigilance decrement
                 let base_threshold: f32 = 0.50;
-                let threshold = base_threshold + threshold_increment * block as f32 + config.difficulty as f32 * 0.15;
+                let threshold = base_threshold
+                    + threshold_increment * block as f32
+                    + config.difficulty as f32 * 0.15;
 
                 let responded = (similarity + noise) > threshold;
 

@@ -409,7 +409,7 @@ impl ContinuousHV {
             // Modified Gram-Schmidt: project out all previous vectors
             for prev in &result {
                 let proj_coeff = v.dot(prev); // prev is unit norm, so proj = dot * prev
-                // v = v - proj_coeff * prev
+                                              // v = v - proj_coeff * prev
                 for (vi, pi) in v.values.iter_mut().zip(prev.values.iter()) {
                     *vi -= proj_coeff * pi;
                 }

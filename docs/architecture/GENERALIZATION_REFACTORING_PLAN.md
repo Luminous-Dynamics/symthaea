@@ -6047,7 +6047,7 @@ Based on comprehensive review of brain and mind models (see `BRAIN_AND_MIND_MODE
 | **Consciousness Equation** | 3 | ✅ None | Mathematical, universal |
 | **LTC Hierarchy** | 4 | ✅ None | Neural dynamics unchanged |
 | **Autopoiesis** | 3 | ✅ None | Self-reference universal |
-| **Value Systems** | 5 | ✅ None | Seven Harmonies universal |
+| **Value Systems** | 5 | ✅ None | Eight Harmonies universal |
 | **Theories (GWT, HOT, FEP)** | 15+ | ✅ None | Theory implementations stable |
 | **Binding/Resonance** | 10+ | ✅ None | Oscillatory binding unchanged |
 | **Phenomenal** | 20+ | ✅ None | Qualia models universal |

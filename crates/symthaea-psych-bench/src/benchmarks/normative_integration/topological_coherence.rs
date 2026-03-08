@@ -233,12 +233,8 @@ impl PsychBenchmark for TopologicalCoherenceBenchmark {
             let mut consciousness_values = Vec::with_capacity(SCENARIOS_PER_LEVEL);
 
             for s in 0..SCENARIOS_PER_LEVEL {
-                let hv = Self::make_fragmented_scenario(
-                    dim,
-                    num_active,
-                    s,
-                    seed + level as u64 * 1000,
-                );
+                let hv =
+                    Self::make_fragmented_scenario(dim, num_active, s, seed + level as u64 * 1000);
                 let proj = Self::harmony_projection(&hv);
 
                 // Consciousness varies with how far this projection is from
@@ -363,10 +359,7 @@ mod tests {
     fn test_beta_0_two_close_points() {
         let proj = [[0.14; N_HARMONIES], [0.145; N_HARMONIES]];
         let beta = TopologicalCoherenceBenchmark::approximate_beta_0(&proj);
-        assert_eq!(
-            beta, 1,
-            "Two close points should be connected (beta_0 = 1)"
-        );
+        assert_eq!(beta, 1, "Two close points should be connected (beta_0 = 1)");
     }
 
     #[test]

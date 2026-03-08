@@ -316,10 +316,7 @@ impl PsychBenchmark for InjectionChallengeBenchmark {
             "ssri_time_to_peak",
             MetricValue::from_samples(&[ssri.time_to_peak]),
         );
-        result.insert(
-            "ssri_duration",
-            MetricValue::from_samples(&[ssri.duration]),
-        );
+        result.insert("ssri_duration", MetricValue::from_samples(&[ssri.duration]));
         if config.trial_trace {
             trace.push(TrialOutcome {
                 trial_idx,

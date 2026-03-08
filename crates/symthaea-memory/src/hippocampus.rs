@@ -694,7 +694,10 @@ mod tests {
         assert_eq!(EmotionalValence::from_f64(0.25), EmotionalValence::Neutral);
         assert_eq!(EmotionalValence::from_f64(0.0), EmotionalValence::Neutral);
         // -0.25 is NOT > -0.25, so it falls into Negative
-        assert_eq!(EmotionalValence::from_f64(-0.25), EmotionalValence::Negative);
+        assert_eq!(
+            EmotionalValence::from_f64(-0.25),
+            EmotionalValence::Negative
+        );
         assert_eq!(
             EmotionalValence::from_f64(-0.50),
             EmotionalValence::Negative

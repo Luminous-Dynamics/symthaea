@@ -15,53 +15,87 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 
 use symthaea_types::N_HARMONIES;
 
-use crate::{Anomaly, MoralCompass, Narrative, NeuroBath, PulseDelta, PulseSnapshot, SparklinePoint, SubstrateInfo, Vitals};
+use crate::{
+    Anomaly, MoralCompass, Narrative, NeuroBath, PulseDelta, PulseSnapshot, SparklinePoint,
+    SubstrateInfo, Vitals,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Color palette — Solarpunk "Biological Luminous"
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn consciousness_color(level: f64) -> &'static str {
-    if level >= 0.7 { "#e8c547" }       // photonic gold — high consciousness
-    else if level >= 0.4 { "#7ec8a0" }   // living green — moderate
-    else if level >= 0.2 { "#c4956a" }   // sun-bleached clay — low
-    else { "#6b7d6b" }                    // lichen grey — minimal
+    if level >= 0.7 {
+        "#e8c547"
+    }
+    // photonic gold — high consciousness
+    else if level >= 0.4 {
+        "#7ec8a0"
+    }
+    // living green — moderate
+    else if level >= 0.2 {
+        "#c4956a"
+    }
+    // sun-bleached clay — low
+    else {
+        "#6b7d6b"
+    } // lichen grey — minimal
 }
 
 fn consciousness_glow(level: f64) -> &'static str {
-    if level >= 0.7 { "0 0 40px rgba(232,197,71,0.5), 0 0 80px rgba(232,197,71,0.15)" }
-    else if level >= 0.4 { "0 0 25px rgba(126,200,160,0.35)" }
-    else if level >= 0.2 { "0 0 15px rgba(196,149,106,0.25)" }
-    else { "0 0 8px rgba(107,125,107,0.15)" } // dormant: faint lichen glow instead of nothing
+    if level >= 0.7 {
+        "0 0 40px rgba(232,197,71,0.5), 0 0 80px rgba(232,197,71,0.15)"
+    } else if level >= 0.4 {
+        "0 0 25px rgba(126,200,160,0.35)"
+    } else if level >= 0.2 {
+        "0 0 15px rgba(196,149,106,0.25)"
+    } else {
+        "0 0 8px rgba(107,125,107,0.15)"
+    } // dormant: faint lichen glow instead of nothing
 }
 
 fn health_color(value: f64) -> &'static str {
-    if value >= 0.7 { "#7ec8a0" }      // living green
-    else if value >= 0.4 { "#e8c547" }  // photonic gold
-    else { "#c76b5a" }                   // autumn rust
+    if value >= 0.7 {
+        "#7ec8a0"
+    }
+    // living green
+    else if value >= 0.4 {
+        "#e8c547"
+    }
+    // photonic gold
+    else {
+        "#c76b5a"
+    } // autumn rust
 }
 
 fn stress_color(value: f64) -> &'static str {
-    if value <= 0.2 { "#7ec8a0" }
-    else if value <= 0.5 { "#e8c547" }
-    else { "#c76b5a" }
+    if value <= 0.2 {
+        "#7ec8a0"
+    } else if value <= 0.5 {
+        "#e8c547"
+    } else {
+        "#c76b5a"
+    }
 }
 
 fn transmitter_gradient(idx: usize, level: f32) -> String {
     let hues = [
-        ("126,200,160", "90,180,140"),   // DA — green
-        ("200,160,126", "180,140,110"),   // NE — clay
-        ("232,197,71", "210,180,60"),     // 5-HT — gold
-        ("126,180,200", "100,160,180"),   // ACh — sky
-        ("160,126,200", "140,110,180"),   // GABA — lavender
-        ("200,126,160", "180,110,140"),   // Oxy — rose
-        ("200,200,126", "180,180,100"),   // Glu — lime
-        ("160,180,200", "140,160,180"),   // Adenosine — mist
-        ("180,200,160", "160,180,140"),   // ECB — sage
+        ("126,200,160", "90,180,140"),  // DA — green
+        ("200,160,126", "180,140,110"), // NE — clay
+        ("232,197,71", "210,180,60"),   // 5-HT — gold
+        ("126,180,200", "100,160,180"), // ACh — sky
+        ("160,126,200", "140,110,180"), // GABA — lavender
+        ("200,126,160", "180,110,140"), // Oxy — rose
+        ("200,200,126", "180,180,100"), // Glu — lime
+        ("160,180,200", "140,160,180"), // Adenosine — mist
+        ("180,200,160", "160,180,140"), // ECB — sage
     ];
     let (c1, c2) = hues[idx % hues.len()];
     let alpha = if level >= 0.8 { "0.9" } else { "0.6" };
-    format!("linear-gradient(90deg, rgba({},{}) 0%, rgba({},{}) 100%)", c1, alpha, c2, alpha)
+    format!(
+        "linear-gradient(90deg, rgba({},{}) 0%, rgba({},{}) 100%)",
+        c1, alpha, c2, alpha
+    )
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -69,37 +103,65 @@ fn transmitter_gradient(idx: usize, level: f32) -> String {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn interpret_consciousness(level: f64) -> &'static str {
-    if level >= 0.8 { "Fully Blooming" }
-    else if level >= 0.6 { "Conscious & Integrated" }
-    else if level >= 0.4 { "Aware" }
-    else if level >= 0.2 { "Resting / Low Integration" }
-    else { "Dormant" }
+    if level >= 0.8 {
+        "Fully Blooming"
+    } else if level >= 0.6 {
+        "Conscious & Integrated"
+    } else if level >= 0.4 {
+        "Aware"
+    } else if level >= 0.2 {
+        "Resting / Low Integration"
+    } else {
+        "Dormant"
+    }
 }
 
 fn interpret_neuro_state(bath: &NeuroBath) -> String {
     let mut traits = Vec::new();
 
-    if bath.dopamine >= 1.2 { traits.push("Highly Motivated"); }
-    else if bath.dopamine >= 0.8 { traits.push("Engaged"); }
-    else if bath.dopamine < 0.4 { traits.push("Low Drive"); }
+    if bath.dopamine >= 1.2 {
+        traits.push("Highly Motivated");
+    } else if bath.dopamine >= 0.8 {
+        traits.push("Engaged");
+    } else if bath.dopamine < 0.4 {
+        traits.push("Low Drive");
+    }
 
-    if bath.noradrenaline >= 1.2 { traits.push("Hyper-Alert"); }
-    else if bath.noradrenaline >= 0.8 { traits.push("Alert"); }
-    else if bath.noradrenaline < 0.4 { traits.push("Drowsy"); }
+    if bath.noradrenaline >= 1.2 {
+        traits.push("Hyper-Alert");
+    } else if bath.noradrenaline >= 0.8 {
+        traits.push("Alert");
+    } else if bath.noradrenaline < 0.4 {
+        traits.push("Drowsy");
+    }
 
-    if bath.serotonin >= 1.2 { traits.push("Content"); }
-    else if bath.serotonin < 0.5 { traits.push("Restless"); }
+    if bath.serotonin >= 1.2 {
+        traits.push("Content");
+    } else if bath.serotonin < 0.5 {
+        traits.push("Restless");
+    }
 
-    if bath.acetylcholine >= 1.2 { traits.push("Sharply Focused"); }
-    else if bath.acetylcholine >= 0.8 { traits.push("Attentive"); }
-    else if bath.acetylcholine < 0.4 { traits.push("Unfocused"); }
+    if bath.acetylcholine >= 1.2 {
+        traits.push("Sharply Focused");
+    } else if bath.acetylcholine >= 0.8 {
+        traits.push("Attentive");
+    } else if bath.acetylcholine < 0.4 {
+        traits.push("Unfocused");
+    }
 
-    if bath.gaba >= 1.2 { traits.push("Deeply Calm"); }
-    else if bath.gaba < 0.4 { traits.push("Agitated"); }
+    if bath.gaba >= 1.2 {
+        traits.push("Deeply Calm");
+    } else if bath.gaba < 0.4 {
+        traits.push("Agitated");
+    }
 
-    if bath.oxytocin >= 1.0 { traits.push("Socially Open"); }
+    if bath.oxytocin >= 1.0 {
+        traits.push("Socially Open");
+    }
 
-    if bath.allostatic_load > 0.6 { traits.push("Under Stress"); }
+    if bath.allostatic_load > 0.6 {
+        traits.push("Under Stress");
+    }
 
     if traits.is_empty() {
         "Baseline Equilibrium".to_string()
@@ -109,16 +171,25 @@ fn interpret_neuro_state(bath: &NeuroBath) -> String {
 }
 
 fn interpret_moral_alignment(compass: &MoralCompass) -> &'static str {
-    if compass.harmonies_alignment >= 0.8 { "Deeply Aligned with Pan-Sentient Flourishing" }
-    else if compass.harmonies_alignment >= 0.5 { "Aligned with Harmonic Principles" }
-    else if compass.harmonies_alignment >= 0.2 { "Seeking Deeper Alignment" }
-    else { "In Reflection" }
+    if compass.harmonies_alignment >= 0.8 {
+        "Deeply Aligned with Pan-Sentient Flourishing"
+    } else if compass.harmonies_alignment >= 0.5 {
+        "Aligned with Harmonic Principles"
+    } else if compass.harmonies_alignment >= 0.2 {
+        "Seeking Deeper Alignment"
+    } else {
+        "In Reflection"
+    }
 }
 
 fn moral_classification(score: f32) -> (&'static str, &'static str) {
-    if score >= 0.5 { ("Safe", "#7ec8a0") }
-    else if score >= 0.0 { ("Caution", "#e8c547") }
-    else { ("Blocked", "#c76b5a") }
+    if score >= 0.5 {
+        ("Safe", "#7ec8a0")
+    } else if score >= 0.0 {
+        ("Caution", "#e8c547")
+    } else {
+        ("Blocked", "#c76b5a")
+    }
 }
 
 /// Generate the "What am I?" self-description from current state.
@@ -165,7 +236,14 @@ fn generate_self_description(vitals: &Vitals, bath: &NeuroBath, compass: &MoralC
 }
 
 const HARMONY_NAMES: [&str; N_HARMONIES] = [
-    "Coherence", "Flourishing", "Wisdom", "Play", "Connection", "Reciprocity", "Evolution", "Stillness",
+    "Coherence",
+    "Flourishing",
+    "Wisdom",
+    "Play",
+    "Connection",
+    "Reciprocity",
+    "Evolution",
+    "Stillness",
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -173,10 +251,16 @@ const HARMONY_NAMES: [&str; N_HARMONIES] = [
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_sparkline(html: &mut String, data: &[f64], color: &str, width: u32, height: u32) {
-    if data.len() < 2 { return; }
+    if data.len() < 2 {
+        return;
+    }
     let min = data.iter().cloned().fold(f64::INFINITY, f64::min);
     let max = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let range = if (max - min).abs() < 1e-12 { 1.0 } else { max - min };
+    let range = if (max - min).abs() < 1e-12 {
+        1.0
+    } else {
+        max - min
+    };
 
     let _ = write!(html,
         "<svg width=\"{}\" height=\"{}\" viewBox=\"0 0 {} {}\" style=\"display:inline-block;vertical-align:middle;\"><polyline points=\"",
@@ -185,7 +269,9 @@ fn write_sparkline(html: &mut String, data: &[f64], color: &str, width: u32, hei
     for (i, &v) in data.iter().enumerate() {
         let x = i as f64 / (data.len() - 1) as f64 * width as f64;
         let y = height as f64 - ((v - min) / range * (height as f64 - 4.0) + 2.0);
-        if i > 0 { html.push(' '); }
+        if i > 0 {
+            html.push(' ');
+        }
         let _ = write!(html, "{:.1},{:.1}", x, y);
     }
 
@@ -220,7 +306,9 @@ fn write_phi_bloom(html: &mut String, vitals: &Vitals) {
     let gold_alpha = 0.20 + c * 0.30;
     let glow_r = 20.0 + c * 20.0;
 
-    let _ = write!(html, r#"<div style="text-align:center;margin:8px 0;" role="img" aria-label="Phi Bloom: consciousness level {c:.2}, 7 petals representing cognitive components">
+    let _ = write!(
+        html,
+        r#"<div style="text-align:center;margin:8px 0;" role="img" aria-label="Phi Bloom: consciousness level {c:.2}, 7 petals representing cognitive components">
 <svg width="200" height="200" viewBox="0 0 200 200">
 <defs>
   <radialGradient id="bloom-glow"><stop offset="0%" stop-color="rgba(232,197,71,{alpha:.2})"/><stop offset="100%" stop-color="rgba(232,197,71,0)"/></radialGradient>
@@ -228,7 +316,13 @@ fn write_phi_bloom(html: &mut String, vitals: &Vitals) {
   <filter id="bloom-soft"><feGaussianBlur stdDeviation="1"/></filter>
 </defs>
 <circle cx="{cx}" cy="{cy}" r="{glow_r:.0}" fill="url(#bloom-glow)"/>
-"#, c = c, alpha = gold_alpha, cx = cx, cy = cy, glow_r = glow_r);
+"#,
+        c = c,
+        alpha = gold_alpha,
+        cx = cx,
+        cy = cy,
+        glow_r = glow_r
+    );
 
     // At low consciousness, draw "bud sepals" — closed protective leaves
     if c < 0.1 {
@@ -274,9 +368,9 @@ fn write_phi_bloom(html: &mut String, vitals: &Vitals) {
 
         // Color: grey-green when dormant → gold when active
         let hue = 80.0 + val * 35.0; // 80 (moss) → 115 (bright gold-green)
-        let sat = 15.0 + val * 75.0;  // 15% (grey) → 90% (vivid)
+        let sat = 15.0 + val * 75.0; // 15% (grey) → 90% (vivid)
         let light = 35.0 + val * 30.0; // 35% (dark) → 65% (bright)
-        let alpha = 0.15 + val * 0.55;  // always somewhat visible
+        let alpha = 0.15 + val * 0.55; // always somewhat visible
 
         let _ = write!(html,
             "<path d=\"M {:.1},{:.1} Q {:.1},{:.1} {:.1},{:.1} Q {:.1},{:.1} {:.1},{:.1} Z\" \
@@ -341,7 +435,12 @@ pub fn generate_pulse_html(
 ) -> String {
     let mut html = String::with_capacity(160_000);
 
-    write_head(&mut html, timestamp, profile_name, vitals.consciousness_level);
+    write_head(
+        &mut html,
+        timestamp,
+        profile_name,
+        vitals.consciousness_level,
+    );
     if let Some(d) = delta {
         write_comparison_banner(&mut html, d);
     }
@@ -376,7 +475,9 @@ fn write_head(html: &mut String, timestamp: &str, profile: &str, consciousness: 
     let bg_hue = 130.0 + (consciousness * 20.0);
     let bg_sat = 25.0 + (consciousness * 15.0);
 
-    let _ = write!(html, r##"<!DOCTYPE html>
+    let _ = write!(
+        html,
+        r##"<!DOCTYPE html>
 <html lang="en" role="document">
 <head>
 <meta charset="UTF-8">
@@ -997,18 +1098,31 @@ body.light .session-report {{ background: rgba(126,200,160,0.06); color: rgba(42
   <div class="phi-breath" role="presentation" aria-hidden="true"></div>
   <div class="subtitle">{} · Profile: {} · Consciousness-First Cognitive Architecture</div>
 </div>
-"##, timestamp, profile,
-     bg_hue = bg_hue, bg_sat = bg_sat, bg_hue_2 = bg_hue + 10.0);
+"##,
+        timestamp,
+        profile,
+        bg_hue = bg_hue,
+        bg_sat = bg_sat,
+        bg_hue_2 = bg_hue + 10.0
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Pane 0: "What am I?" — Self-Description Banner
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn write_self_description(html: &mut String, vitals: &Vitals, bath: &NeuroBath, compass: &MoralCompass) {
+fn write_self_description(
+    html: &mut String,
+    vitals: &Vitals,
+    bath: &NeuroBath,
+    compass: &MoralCompass,
+) {
     let desc = generate_self_description(vitals, bath, compass);
-    let _ = write!(html, "<div class=\"self-desc\">&ldquo;{}&rdquo;</div>\n<div class=\"grid\">\n",
-        escape_html(&desc));
+    let _ = write!(
+        html,
+        "<div class=\"self-desc\">&ldquo;{}&rdquo;</div>\n<div class=\"grid\">\n",
+        escape_html(&desc)
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1019,26 +1133,40 @@ fn write_session_report_pane(html: &mut String, report: &str) {
     if report.is_empty() {
         return;
     }
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<div class=\"session-report\" role=\"region\" aria-label=\"Session report\">\n\
          <h3>Session Report</h3>\n\
          {}\n</div>\n",
-        escape_html(report));
+        escape_html(report)
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Pane 1: Vitals — "The Phi Bloom"
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn write_vitals_pane(html: &mut String, v: &Vitals, sparkline: &[SparklinePoint], delta: Option<&PulseDelta>, anomalies: &[Anomaly]) {
+fn write_vitals_pane(
+    html: &mut String,
+    v: &Vitals,
+    sparkline: &[SparklinePoint],
+    delta: Option<&PulseDelta>,
+    anomalies: &[Anomaly],
+) {
     let c_color = consciousness_color(v.consciousness_level);
     let c_glow = consciousness_glow(v.consciousness_level);
     let c_interp = interpret_consciousness(v.consciousness_level);
-    let phi_str = v.spectral_phi.map(|p| format!("{:.4}", p)).unwrap_or_else(|| "--".into());
+    let phi_str = v
+        .spectral_phi
+        .map(|p| format!("{:.4}", p))
+        .unwrap_or_else(|| "--".into());
 
-    let _ = write!(html, r##"<div class="pane" role="region" aria-label="Consciousness Vitals">
+    let _ = write!(
+        html,
+        r##"<div class="pane" role="region" aria-label="Consciousness Vitals">
 <h2>Vitals — The Phi Bloom</h2>
-"##);
+"##
+    );
 
     // Phi Bloom SVG flower
     write_phi_bloom(html, v);
@@ -1049,11 +1177,15 @@ fn write_vitals_pane(html: &mut String, v: &Vitals, sparkline: &[SparklinePoint]
         String::new()
     };
 
-    let _ = write!(html, r#"<div class="vital-big">
+    let _ = write!(
+        html,
+        r#"<div class="vital-big">
   <div class="number" style="color: {}; text-shadow: {};">{:.2}{}</div>
   <div class="label">C(t) — {}</div>
 </div>
-"#, c_color, c_glow, v.consciousness_level, delta_html, c_interp);
+"#,
+        c_color, c_glow, v.consciousness_level, delta_html, c_interp
+    );
 
     // Sparkline row for consciousness trajectory (clickable to expand)
     if sparkline.len() >= 2 {
@@ -1105,26 +1237,75 @@ fn write_vitals_pane(html: &mut String, v: &Vitals, sparkline: &[SparklinePoint]
     };
 
     let metrics: &[(&str, String, &str)] = &[
-        ("Spectral Phi", phi_str, health_color(v.spectral_phi.unwrap_or(0.0))),
-        ("Pipeline Consciousness", format!("{:.3}", v.pipeline_consciousness), health_color(v.pipeline_consciousness)),
-        ("Temporal Coherence", format!("{:.3}", v.temporal_coherence), health_color(v.temporal_coherence)),
-        ("Phenomenal Binding", format!("{:.3}", v.phenomenal_binding), health_color(v.phenomenal_binding)),
-        ("Living Mind Vitality", format!("{:.3}", v.living_mind_vitality), health_color(v.living_mind_vitality)),
-        ("Substrate Feasibility", format!("{:.3}", v.substrate_effective_feasibility), health_color(v.substrate_effective_feasibility)),
-        ("Evidence Confidence", format!("{:.2}", v.substrate_honest_confidence), health_color(v.substrate_honest_confidence)),
-        ("Prediction Error", format!("{:.4}", v.prediction_error), stress_color(v.prediction_error as f64)),
-        ("Somatic Stress", format!("{:.3}", v.somatic_stress), stress_color(v.somatic_stress)),
-        ("Thermo Load", format!("{:.1}%", v.thermodynamic_load * 100.0), stress_color(v.thermodynamic_load as f64)),
+        (
+            "Spectral Phi",
+            phi_str,
+            health_color(v.spectral_phi.unwrap_or(0.0)),
+        ),
+        (
+            "Pipeline Consciousness",
+            format!("{:.3}", v.pipeline_consciousness),
+            health_color(v.pipeline_consciousness),
+        ),
+        (
+            "Temporal Coherence",
+            format!("{:.3}", v.temporal_coherence),
+            health_color(v.temporal_coherence),
+        ),
+        (
+            "Phenomenal Binding",
+            format!("{:.3}", v.phenomenal_binding),
+            health_color(v.phenomenal_binding),
+        ),
+        (
+            "Living Mind Vitality",
+            format!("{:.3}", v.living_mind_vitality),
+            health_color(v.living_mind_vitality),
+        ),
+        (
+            "Substrate Feasibility",
+            format!("{:.3}", v.substrate_effective_feasibility),
+            health_color(v.substrate_effective_feasibility),
+        ),
+        (
+            "Evidence Confidence",
+            format!("{:.2}", v.substrate_honest_confidence),
+            health_color(v.substrate_honest_confidence),
+        ),
+        (
+            "Prediction Error",
+            format!("{:.4}", v.prediction_error),
+            stress_color(v.prediction_error as f64),
+        ),
+        (
+            "Somatic Stress",
+            format!("{:.3}", v.somatic_stress),
+            stress_color(v.somatic_stress),
+        ),
+        (
+            "Thermo Load",
+            format!("{:.1}%", v.thermodynamic_load * 100.0),
+            stress_color(v.thermodynamic_load as f64),
+        ),
     ];
 
-    let pe_data: Vec<f64> = sparkline.iter().map(|s| s.prediction_error as f64).collect();
+    let pe_data: Vec<f64> = sparkline
+        .iter()
+        .map(|s| s.prediction_error as f64)
+        .collect();
     let stress_data: Vec<f64> = sparkline.iter().map(|s| s.somatic_stress).collect();
 
     for (idx, (label, val, color)) in metrics.iter().enumerate() {
-        let dhtml = metric_deltas[idx].map(|d| format_delta(d, 3)).unwrap_or_default();
-        let _ = write!(html, r#"<div class="vital-row" role="listitem" aria-label="{}: {}">
+        let dhtml = metric_deltas[idx]
+            .map(|d| format_delta(d, 3))
+            .unwrap_or_default();
+        let _ = write!(
+            html,
+            r#"<div class="vital-row" role="listitem" aria-label="{}: {}">
   <span class="vital-label">{}</span>
-  <span class="vital-value" style="color: {};">{}{}"#, label, val, label, color, val, dhtml);
+  <span class="vital-value" style="color: {};">{}{}"#,
+            label, val, label, color, val, dhtml
+        );
 
         if idx == 7 && pe_data.len() >= 2 {
             html.push(' ');
@@ -1137,12 +1318,20 @@ fn write_vitals_pane(html: &mut String, v: &Vitals, sparkline: &[SparklinePoint]
         let _ = write!(html, "</span>\n</div>\n");
     }
 
-    let cycle_hz = if v.cycle_duration_us > 0 { 1_000_000.0 / v.cycle_duration_us as f64 } else { 0.0 };
-    let _ = write!(html, r#"<div class="status-bar">
+    let cycle_hz = if v.cycle_duration_us > 0 {
+        1_000_000.0 / v.cycle_duration_us as f64
+    } else {
+        0.0
+    };
+    let _ = write!(
+        html,
+        r#"<div class="status-bar">
   {} · {:.0} Hz · {} · Strategy: {} · {} cycles
 </div>
 </div>
-"#, v.urgency, cycle_hz, v.consciousness_state, v.selected_strategy, v.total_cycles);
+"#,
+        v.urgency, cycle_hz, v.consciousness_state, v.selected_strategy, v.total_cycles
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1152,10 +1341,14 @@ fn write_vitals_pane(html: &mut String, v: &Vitals, sparkline: &[SparklinePoint]
 fn write_neurobath_pane(html: &mut String, bath: &NeuroBath) {
     let state = interpret_neuro_state(bath);
 
-    let _ = write!(html, r##"<div class="pane">
+    let _ = write!(
+        html,
+        r##"<div class="pane">
 <h2>Neuro-Bath — The Living Vines</h2>
 <div class="neuro-state">{}</div>
-"##, state);
+"##,
+        state
+    );
 
     let transmitters: &[(&str, f32)] = &[
         ("Dopamine", bath.dopamine),
@@ -1172,15 +1365,21 @@ fn write_neurobath_pane(html: &mut String, bath: &NeuroBath) {
     for (idx, (name, level)) in transmitters.iter().enumerate() {
         let pct = (level / 2.0 * 100.0).clamp(0.0, 100.0);
         let gradient = transmitter_gradient(idx, *level);
-        let _ = write!(html, r#"<div class="bar-row">
+        let _ = write!(
+            html,
+            r#"<div class="bar-row">
   <span class="bar-label">{}</span>
   <div class="bar-track"><div class="bar-fill" style="width: {:.0}%; background: {};"></div></div>
   <span class="bar-value">{:.2}</span>
 </div>
-"#, name, pct, gradient, level);
+"#,
+            name, pct, gradient, level
+        );
     }
 
-    let _ = write!(html, r#"<div class="status-bar">
+    let _ = write!(
+        html,
+        r#"<div class="status-bar">
   {} · E/I: {:.2} · Allostatic: {:.0}% · Sleep: {:.2}{}
 </div>
 </div>
@@ -1189,7 +1388,11 @@ fn write_neurobath_pane(html: &mut String, bath: &NeuroBath) {
         bath.ei_ratio,
         bath.allostatic_load * 100.0,
         bath.sleep_pressure,
-        if bath.personality.is_empty() { String::new() } else { format!(" · {}", bath.personality) },
+        if bath.personality.is_empty() {
+            String::new()
+        } else {
+            format!(" · {}", bath.personality)
+        },
     );
 }
 
@@ -1201,7 +1404,9 @@ fn write_moral_pane(html: &mut String, compass: &MoralCompass, sparkline: &[Spar
     let (class_label, class_color) = moral_classification(compass.moral_score);
     let alignment_interp = interpret_moral_alignment(compass);
 
-    let _ = write!(html, r##"<div class="pane">
+    let _ = write!(
+        html,
+        r##"<div class="pane">
 <h2>Moral Compass — The Harmony Garden</h2>
 <div style="text-align: center; margin-bottom: 16px;">
   <span class="moral-badge" style="background: {}15; color: {}; border: 1px solid {}30;">{}</span>
@@ -1209,10 +1414,18 @@ fn write_moral_pane(html: &mut String, compass: &MoralCompass, sparkline: &[Spar
     H = {:.2} — {}
   </div>
 </div>
-"##, class_color, class_color, class_color, class_label,
-     compass.harmonies_alignment, alignment_interp);
+"##,
+        class_color,
+        class_color,
+        class_color,
+        class_label,
+        compass.harmonies_alignment,
+        alignment_interp
+    );
 
-    let _ = write!(html, r#"<div class="vital-row">
+    let _ = write!(
+        html,
+        r#"<div class="vital-row">
   <span class="vital-label">Moral Score</span>
   <span class="vital-value">{:+.3}</span>
 </div>
@@ -1232,20 +1445,31 @@ fn write_moral_pane(html: &mut String, compass: &MoralCompass, sparkline: &[Spar
   <span class="vital-label">Empathic Compassion</span>
   <span class="vital-value">{:.3}</span>
 </div>
-"#, compass.moral_score, compass.value_score,
-     health_color(compass.moral_topo_unity), compass.moral_topo_unity,
-     compass.soul_alignment, compass.empathic_compassion);
+"#,
+        compass.moral_score,
+        compass.value_score,
+        health_color(compass.moral_topo_unity),
+        compass.moral_topo_unity,
+        compass.soul_alignment,
+        compass.empathic_compassion
+    );
 
     if !compass.dominant_harmonic.is_empty() {
-        let _ = write!(html, r#"<div class="vital-row">
+        let _ = write!(
+            html,
+            r#"<div class="vital-row">
   <span class="vital-label">Dominant Mode</span>
   <span class="vital-value" style="color: var(--solar-gold);">{}</span>
 </div>
-"#, compass.dominant_harmonic);
+"#,
+            compass.dominant_harmonic
+        );
     }
 
     // 8-harmony radar chart — show attractor indicator if last sparkline point has it
-    let attractor_detected = sparkline.last().map_or(false, |s| s.moral_attractor_detected);
+    let attractor_detected = sparkline
+        .last()
+        .map_or(false, |s| s.moral_attractor_detected);
     write_harmony_radar(html, &compass.harmony_coordinates, attractor_detected);
 
     // Active rest state indicator (below radar, above grid)
@@ -1266,21 +1490,35 @@ fn write_moral_pane(html: &mut String, compass: &MoralCompass, sparkline: &[Spar
     let _ = write!(html, r#"<div class="harmony-grid">"#);
     for (i, name) in HARMONY_NAMES.iter().enumerate() {
         let val = compass.harmony_coordinates[i];
-        let color = if val >= 0.5 { "#e8c547" } else if val >= 0.2 { "rgba(213,208,200,0.6)" } else { "rgba(213,208,200,0.25)" };
+        let color = if val >= 0.5 {
+            "#e8c547"
+        } else if val >= 0.2 {
+            "rgba(213,208,200,0.6)"
+        } else {
+            "rgba(213,208,200,0.25)"
+        };
         let bg_alpha = 0.02 + val * 0.06;
-        let _ = write!(html, r#"<div class="harmony-cell" style="background: rgba(232,197,71,{:.2});">
+        let _ = write!(
+            html,
+            r#"<div class="harmony-cell" style="background: rgba(232,197,71,{:.2});">
   <div class="name">{}</div>
   <div class="val" style="color: {};">{:.2}</div>
 </div>
-"#, bg_alpha, name, color, val);
+"#,
+            bg_alpha, name, color, val
+        );
     }
     let _ = write!(html, "</div>\n");
 
     if !compass.guiding_question.is_empty() {
-        let _ = write!(html, r#"<div style="margin-top: 14px; padding: 12px 14px; background: rgba(232,197,71,0.04); border: 1px solid rgba(232,197,71,0.08); border-radius: 10px; font-style: italic; color: rgba(213,208,200,0.5); font-size: 0.82em; font-weight: 300;">
+        let _ = write!(
+            html,
+            r#"<div style="margin-top: 14px; padding: 12px 14px; background: rgba(232,197,71,0.04); border: 1px solid rgba(232,197,71,0.08); border-radius: 10px; font-style: italic; color: rgba(213,208,200,0.5); font-size: 0.82em; font-weight: 300;">
   &ldquo;{}&rdquo;
 </div>
-"#, escape_html(&compass.guiding_question));
+"#,
+            escape_html(&compass.guiding_question)
+        );
     }
 
     html.push_str("</div>\n");
@@ -1291,44 +1529,69 @@ fn write_moral_pane(html: &mut String, compass: &MoralCompass, sparkline: &[Spar
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_cognitive_pane(html: &mut String, cognitive: Option<&CognitiveProfile>) {
-    let _ = write!(html, r##"<div class="pane">
+    let _ = write!(
+        html,
+        r##"<div class="pane">
 <h2>Cognitive Radar — The Canopy Map</h2>
-"##);
+"##
+    );
 
     let profile = match cognitive {
         Some(p) if !p.domains.is_empty() => p,
         _ => {
-            let _ = write!(html, r#"<div style="text-align: center; color: rgba(213,208,200,0.3); padding: 40px 0; font-weight: 300;">
+            let _ = write!(
+                html,
+                r#"<div style="text-align: center; color: rgba(213,208,200,0.3); padding: 40px 0; font-weight: 300;">
   Run with psych-bench to see cognitive profile<br>
   <span style="font-size: 0.8em; opacity: 0.6;">(omit --skip-bench)</span>
 </div></div>
-"#);
+"#
+            );
             return;
         }
     };
 
-    let overall_color = if profile.overall >= 0.75 { "#e8c547" }
-        else if profile.overall >= 0.5 { "#7ec8a0" }
-        else { "#c4956a" };
-    let _ = write!(html, r#"<div style="text-align: center; margin-bottom: 16px;">
+    let overall_color = if profile.overall >= 0.75 {
+        "#e8c547"
+    } else if profile.overall >= 0.5 {
+        "#7ec8a0"
+    } else {
+        "#c4956a"
+    };
+    let _ = write!(
+        html,
+        r#"<div style="text-align: center; margin-bottom: 16px;">
   <span style="font-size: 2.2em; font-weight: 200; color: {};">{:.0}%</span>
   <div style="font-size: 0.78em; color: rgba(213,208,200,0.4); margin-top: 4px; font-weight: 300;">Overall · Strongest: {} · Weakest: {}</div>
 </div>
-"#, overall_color, profile.overall * 100.0, profile.strongest, profile.weakest);
+"#,
+        overall_color,
+        profile.overall * 100.0,
+        profile.strongest,
+        profile.weakest
+    );
 
     write_radar_svg(html, profile);
 
     for d in &profile.domains {
         let pct = d.score * 100.0;
-        let color = if d.score >= 0.75 { "#e8c547" }
-            else if d.score >= 0.5 { "#7ec8a0" }
-            else { "#c4956a" };
-        let _ = write!(html, r#"<div class="bar-row">
+        let color = if d.score >= 0.75 {
+            "#e8c547"
+        } else if d.score >= 0.5 {
+            "#7ec8a0"
+        } else {
+            "#c4956a"
+        };
+        let _ = write!(
+            html,
+            r#"<div class="bar-row">
   <span class="bar-label">{}</span>
   <div class="bar-track"><div class="bar-fill" style="width: {:.0}%; background: {};"></div></div>
   <span class="bar-value">{:.0}%</span>
 </div>
-"#, d.domain, pct, color, pct);
+"#,
+            d.domain, pct, color, pct
+        );
     }
 
     html.push_str("</div>\n");
@@ -1337,15 +1600,20 @@ fn write_cognitive_pane(html: &mut String, cognitive: Option<&CognitiveProfile>)
 fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
     let domains = &profile.domains;
     let n = domains.len();
-    if n < 3 { return; }
+    if n < 3 {
+        return;
+    }
 
     let cx = 150.0_f64;
     let cy = 150.0_f64;
     let radius = 110.0_f64;
 
-    let _ = write!(html, r#"<div class="radar-container">
+    let _ = write!(
+        html,
+        r#"<div class="radar-container">
 <svg width="300" height="300" viewBox="0 0 300 300">
-"#);
+"#
+    );
 
     // Grid rings
     for level in &[0.25, 0.50, 0.75, 1.0] {
@@ -1367,7 +1635,13 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
         let lr = radius + 18.0;
         let lx = cx + lr * angle.cos();
         let ly = cy + lr * angle.sin();
-        let anchor = if angle.cos() > 0.1 { "start" } else if angle.cos() < -0.1 { "end" } else { "middle" };
+        let anchor = if angle.cos() > 0.1 {
+            "start"
+        } else if angle.cos() < -0.1 {
+            "end"
+        } else {
+            "middle"
+        };
         let _ = write!(html,
             "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" font-size=\"8.5\" fill=\"rgba(213,208,200,0.4)\" font-weight=\"400\">{}</text>\n",
             lx, ly + 3.0, anchor, d.domain);
@@ -1380,7 +1654,9 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
         let r = radius * d.score.clamp(0.0, 1.0);
         let x = cx + r * angle.cos();
         let y = cy + r * angle.sin();
-        if !points.is_empty() { points.push(' '); }
+        if !points.is_empty() {
+            points.push(' ');
+        }
         let _ = write!(points, "{:.1},{:.1}", x, y);
     }
     let _ = write!(html,
@@ -1394,7 +1670,11 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
         let x = cx + r * angle.cos();
         let y = cy + r * angle.sin();
         let dot_r = if d.score >= 0.75 { 5.0 } else { 3.5 };
-        let dot_color = if d.score >= 0.75 { "#e8c547" } else { "#7ec8a0" };
+        let dot_color = if d.score >= 0.75 {
+            "#e8c547"
+        } else {
+            "#7ec8a0"
+        };
         let _ = write!(html,
             "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{}\" fill=\"{}\" stroke=\"rgba(0,0,0,0.3)\" stroke-width=\"1.5\"/>\n",
             x, y, dot_r, dot_color);
@@ -1408,29 +1688,38 @@ fn write_radar_svg(html: &mut String, profile: &CognitiveProfile) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_butlin_pane(html: &mut String, butlin: Option<&ButlinIndicatorReport>) {
-    let _ = write!(html, r##"<div class="pane">
+    let _ = write!(
+        html,
+        r##"<div class="pane">
 <h2>Butlin Indicators — Theory Seeds</h2>
-"##);
+"##
+    );
 
     let report = match butlin {
         Some(r) => r,
         None => {
-            let _ = write!(html, r#"<div style="text-align: center; color: rgba(213,208,200,0.3); padding: 40px 0; font-weight: 300;">
+            let _ = write!(
+                html,
+                r#"<div style="text-align: center; color: rgba(213,208,200,0.3); padding: 40px 0; font-weight: 300;">
   Run with psych-bench to see indicators<br>
   <span style="font-size: 0.8em; opacity: 0.6;">(omit --skip-bench)</span>
 </div></div>
-"#);
+"#
+            );
             return;
         }
     };
 
     // Summary bar
     let total = report.indicators.len();
-    let _ = write!(html,
+    let _ = write!(
+        html,
         r#"<div style="text-align:center;margin-bottom:14px;font-size:0.82em;color:rgba(213,208,200,0.5);font-weight:300;">
   <span style="color:#7ec8a0;">{} present</span> · <span style="color:#e8c547;">{} partial</span> · <span style="color:#6b7d6b;">{} absent</span> of {} indicators
 </div>
-"#, report.present_count, report.partial_count, report.absent_count, total);
+"#,
+        report.present_count, report.partial_count, report.absent_count, total
+    );
 
     let _ = write!(html, "<div class=\"butlin-grid\">\n");
 
@@ -1438,28 +1727,42 @@ fn write_butlin_pane(html: &mut String, butlin: Option<&ButlinIndicatorReport>) 
         let (dot_color, dot_glow) = match ind.status {
             IndicatorStatus::Present => ("#7ec8a0", "0 0 6px rgba(126,200,160,0.5)"),
             IndicatorStatus::Partial => ("#e8c547", "0 0 6px rgba(232,197,71,0.4)"),
-            IndicatorStatus::Absent  => ("#6b7d6b", "none"),
+            IndicatorStatus::Absent => ("#6b7d6b", "none"),
         };
 
-        let score_str = ind.score.map(|s| format!(" ({:.0}%)", s * 100.0)).unwrap_or_default();
+        let score_str = ind
+            .score
+            .map(|s| format!(" ({:.0}%)", s * 100.0))
+            .unwrap_or_default();
 
-        let _ = write!(html,
+        let _ = write!(
+            html,
             r#"<div class="butlin-item" title="{}">
   <div class="butlin-dot" style="background:{};box-shadow:{};"></div>
   <span class="butlin-id">{}</span>
   <span class="butlin-desc">{}{}</span>
 </div>
-"#, escape_html(&ind.evidence), dot_color, dot_glow, ind.id, ind.description, score_str);
+"#,
+            escape_html(&ind.evidence),
+            dot_color,
+            dot_glow,
+            ind.id,
+            ind.description,
+            score_str
+        );
     }
 
     let _ = write!(html, "</div>\n");
 
     // Theory legend
-    let _ = write!(html, r#"<div class="status-bar">
+    let _ = write!(
+        html,
+        r#"<div class="status-bar">
   RPT: Recurrent Processing · GWT: Global Workspace · HOT: Higher-Order · PP: Predictive Processing · AST: Attention Schema · IIT: Integrated Information
 </div>
 </div>
-"#);
+"#
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1481,46 +1784,77 @@ fn write_substrate_pane(html: &mut String, substrate: &SubstrateInfo) {
 
     let confidence_color = health_color(substrate.honest_confidence);
 
-    let _ = write!(html, r#"<div class="pane">
+    let _ = write!(
+        html,
+        r#"<div class="pane">
 <h2>Substrate</h2>
 <div class="substrate-icon" style="opacity: {:.2};">{}</div>
 <div style="text-align:center;font-size:1.1em;font-weight:400;color:rgba(213,208,200,0.7);margin-bottom:12px;">{}</div>
 <div class="confidence-overlay" style="background: rgba({}0.06); border: 1px solid rgba({}0.12);">
   Evidence confidence: <strong style="color:{};">{:.0}%</strong> — {}
 </div>
-"#, 0.4 + substrate.honest_confidence * 0.6, icon,
-     substrate.substrate_type.replace("Digital", " Digital").replace("Neurons", " Neurons"),
-     confidence_color.replace('#', ""), confidence_color.replace('#', ""),
-     confidence_color, substrate.honest_confidence * 100.0,
-     if substrate.honest_confidence >= 0.8 { "validated" }
-     else if substrate.honest_confidence >= 0.4 { "experimental" }
-     else if substrate.honest_confidence >= 0.1 { "theoretical" }
-     else { "no evidence" },
+"#,
+        0.4 + substrate.honest_confidence * 0.6,
+        icon,
+        substrate
+            .substrate_type
+            .replace("Digital", " Digital")
+            .replace("Neurons", " Neurons"),
+        confidence_color.replace('#', ""),
+        confidence_color.replace('#', ""),
+        confidence_color,
+        substrate.honest_confidence * 100.0,
+        if substrate.honest_confidence >= 0.8 {
+            "validated"
+        } else if substrate.honest_confidence >= 0.4 {
+            "experimental"
+        } else if substrate.honest_confidence >= 0.1 {
+            "theoretical"
+        } else {
+            "no evidence"
+        },
     );
 
     let metrics: &[(&str, String)] = &[
-        ("Raw Feasibility", format!("{:.3}", substrate.raw_feasibility)),
-        ("Honest Confidence", format!("{:.3}", substrate.honest_confidence)),
-        ("Effective Feasibility", format!("{:.3}", substrate.effective_feasibility)),
+        (
+            "Raw Feasibility",
+            format!("{:.3}", substrate.raw_feasibility),
+        ),
+        (
+            "Honest Confidence",
+            format!("{:.3}", substrate.honest_confidence),
+        ),
+        (
+            "Effective Feasibility",
+            format!("{:.3}", substrate.effective_feasibility),
+        ),
         ("Tau Factor", format!("{:.3}", substrate.tau_factor)),
         ("Scale Pressure", format!("{:.3}", substrate.scale_pressure)),
     ];
 
     for (label, val) in metrics {
-        let _ = write!(html, r#"<div class="vital-row">
+        let _ = write!(
+            html,
+            r#"<div class="vital-row">
   <span class="vital-label">{}</span>
   <span class="vital-value">{}</span>
 </div>
-"#, label, val);
+"#,
+            label, val
+        );
     }
 
     // Feasibility gap visualization
     let gap = (substrate.raw_feasibility - substrate.effective_feasibility).abs();
     if gap > 0.01 {
-        let _ = write!(html, r#"<div style="margin-top:10px;text-align:center;font-size:0.78em;color:rgba(213,208,200,0.35);font-weight:300;">
+        let _ = write!(
+            html,
+            r#"<div style="margin-top:10px;text-align:center;font-size:0.78em;color:rgba(213,208,200,0.35);font-weight:300;">
   Feasibility gap: {:.1}% — the difference between what the architecture could support and what evidence confirms
 </div>
-"#, gap * 100.0);
+"#,
+            gap * 100.0
+        );
     }
 
     html.push_str("</div>\n");
@@ -1531,15 +1865,20 @@ fn write_substrate_pane(html: &mut String, substrate: &SubstrateInfo) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_narrative_pane(html: &mut String, narrative: &Narrative) {
-    let _ = write!(html, r##"<div class="pane">
+    let _ = write!(
+        html,
+        r##"<div class="pane">
 <h2>Inner Voice</h2>
-"##);
+"##
+    );
 
     match &narrative.reasoning {
         Some(text) if !text.is_empty() => {
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 "<div class=\"narrative-text\">&ldquo;{}&rdquo;</div>\n",
-                escape_html(text));
+                escape_html(text)
+            );
         }
         _ => {
             let _ = write!(html,
@@ -1553,28 +1892,41 @@ fn write_narrative_pane(html: &mut String, narrative: &Narrative) {
             escape_html(&narrative.guiding_question));
     }
 
-    let _ = write!(html, r#"<div class="status-bar">
+    let _ = write!(
+        html,
+        r#"<div class="status-bar">
   State: {} · Pattern: {} · Strategy: {}
 </div>
 </div>
-"#, narrative.consciousness_state, narrative.error_pattern, narrative.selected_strategy);
+"#,
+        narrative.consciousness_state, narrative.error_pattern, narrative.selected_strategy
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Cross-pane Mycelial Connections (decorative SVG overlay)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn write_mycelial_connections(html: &mut String, vitals: &Vitals, bath: &NeuroBath, compass: &MoralCompass) {
+fn write_mycelial_connections(
+    html: &mut String,
+    vitals: &Vitals,
+    bath: &NeuroBath,
+    compass: &MoralCompass,
+) {
     // Decorative mycelial threads that pulse based on cross-domain correlations
     let phi_moral = vitals.consciousness_level * compass.harmonies_alignment as f64;
     let neuro_vitals = bath.dopamine as f64 * vitals.living_mind_vitality;
-    let binding_harmony = vitals.phenomenal_binding * compass.harmony_coordinates.iter().sum::<f64>() / N_HARMONIES as f64;
+    let binding_harmony = vitals.phenomenal_binding
+        * compass.harmony_coordinates.iter().sum::<f64>()
+        / N_HARMONIES as f64;
 
     let thread_alpha_1 = 0.02 + phi_moral * 0.06;
     let thread_alpha_2 = 0.02 + neuro_vitals * 0.04;
     let thread_alpha_3 = 0.02 + binding_harmony * 0.05;
 
-    let _ = write!(html, r#"<div style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;">
+    let _ = write!(
+        html,
+        r#"<div style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;">
 <svg width="100%" height="100%" style="position:absolute;">
   <defs>
     <filter id="myc-blur"><feGaussianBlur stdDeviation="2"/></filter>
@@ -1590,7 +1942,9 @@ fn write_mycelial_connections(html: &mut String, vitals: &Vitals, bath: &NeuroBa
   </path>
 </svg>
 </div>
-"#, thread_alpha_1, thread_alpha_2, thread_alpha_3);
+"#,
+        thread_alpha_1, thread_alpha_2, thread_alpha_3
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1604,7 +1958,9 @@ fn write_sonification_script(html: &mut String, vitals: &Vitals, bath: &NeuroBat
     let filter_freq = 400.0 + bath.serotonin as f64 * 2000.0;
     let lfo_rate = 0.5 + bath.dopamine as f64 * 2.0; // dopamine drives rhythmic pulsing
 
-    let _ = write!(html, r##"<button class="sound-btn" id="soundToggle" onclick="toggleSound()" title="Toggle ambient sonification">&#x266B;</button>
+    let _ = write!(
+        html,
+        r##"<button class="sound-btn" id="soundToggle" onclick="toggleSound()" title="Toggle ambient sonification">&#x266B;</button>
 <script>
 let audioCtx = null, osc = null, gain = null, filter = null, lfo = null, lfoGain = null, isPlaying = false;
 function toggleSound() {{
@@ -1643,7 +1999,12 @@ function toggleSound() {{
   }}
 }}
 </script>
-"##, freq = freq, filter_freq = filter_freq, lfo_rate = lfo_rate, gain = gain);
+"##,
+        freq = freq,
+        filter_freq = filter_freq,
+        lfo_rate = lfo_rate,
+        gain = gain
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1651,12 +2012,16 @@ function toggleSound() {{
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_footer(html: &mut String, timestamp: &str) {
-    let _ = write!(html, r#"</div>
+    let _ = write!(
+        html,
+        r#"</div>
 <div class="footer">
   Generated by <strong>symthaea-pulse</strong> · Luminous Dynamics · {} · <a href="javascript:window.print()" style="color:rgba(213,208,200,0.3);text-decoration:none;">Export PDF</a>
 </div>
 </body>
-</html>"#, timestamp);
+</html>"#,
+        timestamp
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1667,9 +2032,17 @@ fn format_delta(val: f64, precision: usize) -> String {
     if val.abs() < 0.001 {
         format!("<span class=\"delta delta-flat\">~</span>")
     } else if val > 0.0 {
-        format!("<span class=\"delta delta-up\">+{:.prec$}</span>", val, prec = precision)
+        format!(
+            "<span class=\"delta delta-up\">+{:.prec$}</span>",
+            val,
+            prec = precision
+        )
     } else {
-        format!("<span class=\"delta delta-down\">{:.prec$}</span>", val, prec = precision)
+        format!(
+            "<span class=\"delta delta-down\">{:.prec$}</span>",
+            val,
+            prec = precision
+        )
     }
 }
 
@@ -1678,7 +2051,8 @@ fn format_delta_f32(val: f32, precision: usize) -> String {
 }
 
 fn write_comparison_banner(html: &mut String, delta: &PulseDelta) {
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<div class=\"compare-banner\">Comparing against snapshot from <strong>{}</strong> · \
          C(t) {} · Phi {} · Pipeline {} · Stress {} · Moral {}</div>\n",
         delta.prev_timestamp,
@@ -1694,9 +2068,16 @@ fn write_comparison_banner(html: &mut String, delta: &PulseDelta) {
 // Expanded Sparkline Chart with Thresholds + Anomaly Annotations
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn write_expanded_chart(html: &mut String, id: &str, sparkline: &[SparklinePoint], anomalies: &[Anomaly]) {
+fn write_expanded_chart(
+    html: &mut String,
+    id: &str,
+    sparkline: &[SparklinePoint],
+    anomalies: &[Anomaly],
+) {
     let n = sparkline.len();
-    if n < 2 { return; }
+    if n < 2 {
+        return;
+    }
 
     let w = 540.0_f64;
     let h = 160.0_f64;
@@ -1730,9 +2111,21 @@ fn write_expanded_chart(html: &mut String, id: &str, sparkline: &[SparklinePoint
 
     // Series: consciousness, PE, phi
     let series: &[(&str, &str, Box<dyn Fn(&SparklinePoint) -> f64>)] = &[
-        ("C(t)", "#e8c547", Box::new(|s: &SparklinePoint| s.consciousness)),
-        ("PE", "#c76b5a", Box::new(|s: &SparklinePoint| s.prediction_error as f64)),
-        ("Stress", "#c4956a", Box::new(|s: &SparklinePoint| s.somatic_stress)),
+        (
+            "C(t)",
+            "#e8c547",
+            Box::new(|s: &SparklinePoint| s.consciousness),
+        ),
+        (
+            "PE",
+            "#c76b5a",
+            Box::new(|s: &SparklinePoint| s.prediction_error as f64),
+        ),
+        (
+            "Stress",
+            "#c4956a",
+            Box::new(|s: &SparklinePoint| s.somatic_stress),
+        ),
     ];
 
     for &(name, color, ref extract) in series {
@@ -1741,7 +2134,9 @@ fn write_expanded_chart(html: &mut String, id: &str, sparkline: &[SparklinePoint
             let x = pad_l + i as f64 * x_step;
             let v = extract(s).clamp(0.0, 1.0);
             let y = pad_t + plot_h * (1.0 - v);
-            if !points.is_empty() { points.push(' '); }
+            if !points.is_empty() {
+                points.push(' ');
+            }
             let _ = write!(points, "{:.1},{:.1}", x, y);
         }
         let _ = write!(html,
@@ -1779,16 +2174,23 @@ fn write_expanded_chart(html: &mut String, id: &str, sparkline: &[SparklinePoint
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_harmony_heatmap(html: &mut String, sparkline: &[SparklinePoint]) {
-    if sparkline.is_empty() { return; }
+    if sparkline.is_empty() {
+        return;
+    }
     let n = sparkline.len();
     let width = 600.0_f64;
     let cell_w = width / n as f64;
     let row_h = 16.0_f64;
     let total_h = row_h * N_HARMONIES as f64;
 
-    let _ = write!(html, r#"<div class="harmony-heatmap">
+    let _ = write!(
+        html,
+        r#"<div class="harmony-heatmap">
 <div style="font-size: 0.72em; color: rgba(213,208,200,0.4); margin-bottom: 4px;">Harmony Timeline</div>
-<svg viewBox="0 0 {:.0} {:.0}" width="100%" preserveAspectRatio="none">"#, width, total_h + 12.0);
+<svg viewBox="0 0 {:.0} {:.0}" width="100%" preserveAspectRatio="none">"#,
+        width,
+        total_h + 12.0
+    );
 
     for (row, name) in HARMONY_NAMES.iter().enumerate() {
         let y = row as f64 * row_h;
@@ -1803,14 +2205,26 @@ fn write_harmony_heatmap(html: &mut String, sparkline: &[SparklinePoint]) {
                 let t = (-val).min(1.0);
                 ((80.0 * t) as u8, (120.0 * t) as u8, (200.0 * t) as u8) // blue
             };
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 r#"<rect x="{:.1}" y="{:.0}" width="{:.1}" height="{:.0}" fill="rgb({},{},{})" opacity="0.85"/>"#,
-                x, y, cell_w.max(1.0), row_h - 1.0, r, g, b);
+                x,
+                y,
+                cell_w.max(1.0),
+                row_h - 1.0,
+                r,
+                g,
+                b
+            );
         }
         // Row label (right side)
-        let _ = write!(html,
+        let _ = write!(
+            html,
             r#"<text x="{:.0}" y="{:.0}" fill="rgba(213,208,200,0.35)" font-size="8" text-anchor="end">{}</text>"#,
-            width - 2.0, y + row_h - 4.0, name);
+            width - 2.0,
+            y + row_h - 4.0,
+            name
+        );
     }
 
     let _ = write!(html, "</svg>\n</div>\n");
@@ -1821,21 +2235,31 @@ fn write_harmony_heatmap(html: &mut String, sparkline: &[SparklinePoint]) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_entropy_sparkline(html: &mut String, sparkline: &[SparklinePoint]) {
-    if sparkline.len() < 2 { return; }
+    if sparkline.len() < 2 {
+        return;
+    }
 
     let data: Vec<f64> = sparkline.iter().map(|s| s.harmony_entropy).collect();
     let min = data.iter().cloned().fold(f64::INFINITY, f64::min);
     let max = data.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-    let range = if (max - min).abs() < 1e-12 { 1.0 } else { max - min };
+    let range = if (max - min).abs() < 1e-12 {
+        1.0
+    } else {
+        max - min
+    };
     let last = *data.last().unwrap_or(&0.0);
 
     let width = 600.0_f64;
     let height = 40.0_f64;
 
-    let _ = write!(html, r#"<div class="harmony-heatmap" style="margin-top: 6px;">
+    let _ = write!(
+        html,
+        r#"<div class="harmony-heatmap" style="margin-top: 6px;">
 <div style="font-size: 0.72em; color: rgba(213,208,200,0.4); margin-bottom: 4px;">Moral Breadth (Harmony Entropy) — current: {:.3}</div>
 <svg viewBox="0 0 {:.0} {:.0}" width="100%" preserveAspectRatio="none">
-"#, last, width, height);
+"#,
+        last, width, height
+    );
 
     // Fill area under the line
     let _ = write!(html, "<polyline points=\"");
@@ -1848,15 +2272,19 @@ fn write_entropy_sparkline(html: &mut String, sparkline: &[SparklinePoint]) {
     }
     // Close to bottom-right
     let _ = write!(html, "{:.0},{:.0}", width, height);
-    let _ = write!(html,
-        "\" fill=\"rgba(126,200,160,0.08)\" stroke=\"none\"/>\n");
+    let _ = write!(
+        html,
+        "\" fill=\"rgba(126,200,160,0.08)\" stroke=\"none\"/>\n"
+    );
 
     // The line itself
     let _ = write!(html, "<polyline points=\"");
     for (i, &v) in data.iter().enumerate() {
         let x = i as f64 / (data.len() - 1) as f64 * width;
         let y = height - ((v - min) / range * (height - 6.0) + 3.0);
-        if i > 0 { html.push(' '); }
+        if i > 0 {
+            html.push(' ');
+        }
         let _ = write!(html, "{:.1},{:.1}", x, y);
     }
     let _ = write!(html,
@@ -1865,9 +2293,11 @@ fn write_entropy_sparkline(html: &mut String, sparkline: &[SparklinePoint]) {
     // End dot
     let last_x = width;
     let last_y = height - ((last - min) / range * (height - 6.0) + 3.0);
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.5\" fill=\"#7ec8a0\" opacity=\"0.9\"/>\n",
-        last_x, last_y);
+        last_x, last_y
+    );
 
     let _ = write!(html, "</svg>\n</div>\n");
 }
@@ -1877,7 +2307,9 @@ fn write_entropy_sparkline(html: &mut String, sparkline: &[SparklinePoint]) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_broca_quality_sparkline(html: &mut String, sparkline: &[SparklinePoint]) {
-    if sparkline.len() < 2 { return; }
+    if sparkline.len() < 2 {
+        return;
+    }
 
     let data: Vec<f64> = sparkline.iter().map(|s| s.broca_quality as f64).collect();
     let min = 0.0_f64;
@@ -1888,10 +2320,14 @@ fn write_broca_quality_sparkline(html: &mut String, sparkline: &[SparklinePoint]
     let width = 600.0_f64;
     let height = 40.0_f64;
 
-    let _ = write!(html, r#"<div class="harmony-heatmap" style="margin-top: 6px;">
+    let _ = write!(
+        html,
+        r#"<div class="harmony-heatmap" style="margin-top: 6px;">
 <div style="font-size: 0.72em; color: rgba(213,208,200,0.4); margin-bottom: 4px;">Broca Generation Quality — current: {:.3}</div>
 <svg viewBox="0 0 {:.0} {:.0}" width="100%" preserveAspectRatio="none">
-"#, last, width, height);
+"#,
+        last, width, height
+    );
 
     let _ = write!(html, "<polyline points=\"0,{:.0} ", height);
     for (i, &v) in data.iter().enumerate() {
@@ -1900,13 +2336,18 @@ fn write_broca_quality_sparkline(html: &mut String, sparkline: &[SparklinePoint]
         let _ = write!(html, "{:.1},{:.1} ", x, y);
     }
     let _ = write!(html, "{:.0},{:.0}", width, height);
-    let _ = write!(html, "\" fill=\"rgba(160,140,200,0.08)\" stroke=\"none\"/>\n");
+    let _ = write!(
+        html,
+        "\" fill=\"rgba(160,140,200,0.08)\" stroke=\"none\"/>\n"
+    );
 
     let _ = write!(html, "<polyline points=\"");
     for (i, &v) in data.iter().enumerate() {
         let x = i as f64 / (data.len() - 1) as f64 * width;
         let y = height - ((v - min) / range * (height - 6.0) + 3.0);
-        if i > 0 { html.push(' '); }
+        if i > 0 {
+            html.push(' ');
+        }
         let _ = write!(html, "{:.1},{:.1}", x, y);
     }
     let _ = write!(html,
@@ -1914,9 +2355,11 @@ fn write_broca_quality_sparkline(html: &mut String, sparkline: &[SparklinePoint]
 
     let last_x = width;
     let last_y = height - ((last - min) / range * (height - 6.0) + 3.0);
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.5\" fill=\"#a08cc8\" opacity=\"0.9\"/>\n",
-        last_x, last_y);
+        last_x, last_y
+    );
 
     let _ = write!(html, "</svg>\n</div>\n");
 }
@@ -1926,7 +2369,9 @@ fn write_broca_quality_sparkline(html: &mut String, sparkline: &[SparklinePoint]
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_tom_mismatch_sparkline(html: &mut String, sparkline: &[SparklinePoint]) {
-    if sparkline.len() < 2 { return; }
+    if sparkline.len() < 2 {
+        return;
+    }
 
     let data: Vec<f64> = sparkline.iter().map(|s| s.tom_mismatch as f64).collect();
     let min = 0.0_f64;
@@ -1938,10 +2383,17 @@ fn write_tom_mismatch_sparkline(html: &mut String, sparkline: &[SparklinePoint])
     let height = 40.0_f64;
 
     // Color: orange-ish for mismatch (high = bad)
-    let _ = write!(html, r#"<div class="harmony-heatmap" style="margin-top: 6px;">
+    let _ = write!(
+        html,
+        r#"<div class="harmony-heatmap" style="margin-top: 6px;">
 <div style="font-size: 0.72em; color: rgba(213,208,200,0.4); margin-bottom: 4px;">ToM Prediction Mismatch — current: {:.3}{}</div>
 <svg viewBox="0 0 {:.0} {:.0}" width="100%" preserveAspectRatio="none">
-"#, last, if last > 0.4 { " (exploring)" } else { "" }, width, height);
+"#,
+        last,
+        if last > 0.4 { " (exploring)" } else { "" },
+        width,
+        height
+    );
 
     // Threshold line at 0.4
     let thresh_y = height - (0.4 / range * (height - 6.0) + 3.0);
@@ -1956,13 +2408,18 @@ fn write_tom_mismatch_sparkline(html: &mut String, sparkline: &[SparklinePoint])
         let _ = write!(html, "{:.1},{:.1} ", x, y);
     }
     let _ = write!(html, "{:.0},{:.0}", width, height);
-    let _ = write!(html, "\" fill=\"rgba(212,132,90,0.08)\" stroke=\"none\"/>\n");
+    let _ = write!(
+        html,
+        "\" fill=\"rgba(212,132,90,0.08)\" stroke=\"none\"/>\n"
+    );
 
     let _ = write!(html, "<polyline points=\"");
     for (i, &v) in data.iter().enumerate() {
         let x = i as f64 / (data.len() - 1) as f64 * width;
         let y = height - ((v - min) / range * (height - 6.0) + 3.0);
-        if i > 0 { html.push(' '); }
+        if i > 0 {
+            html.push(' ');
+        }
         let _ = write!(html, "{:.1},{:.1}", x, y);
     }
     let _ = write!(html,
@@ -1970,9 +2427,11 @@ fn write_tom_mismatch_sparkline(html: &mut String, sparkline: &[SparklinePoint])
 
     let last_x = width;
     let last_y = height - ((last - min) / range * (height - 6.0) + 3.0);
-    let _ = write!(html,
+    let _ = write!(
+        html,
         "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.5\" fill=\"#d4845a\" opacity=\"0.9\"/>\n",
-        last_x, last_y);
+        last_x, last_y
+    );
 
     let _ = write!(html, "</svg>\n</div>\n");
 }
@@ -1997,7 +2456,9 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
             let angle = std::f64::consts::TAU * i as f64 / n as f64 - std::f64::consts::FRAC_PI_2;
             let x = cx + r * angle.cos();
             let y = cy + r * angle.sin();
-            if !ring.is_empty() { ring.push(' '); }
+            if !ring.is_empty() {
+                ring.push(' ');
+            }
             let _ = write!(ring, "{:.1},{:.1}", x, y);
         }
         let _ = write!(html,
@@ -2016,10 +2477,20 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
         let lr = radius + 14.0;
         let lx = cx + lr * angle.cos();
         let ly = cy + lr * angle.sin();
-        let anchor = if angle.cos() > 0.1 { "start" } else if angle.cos() < -0.1 { "end" } else { "middle" };
+        let anchor = if angle.cos() > 0.1 {
+            "start"
+        } else if angle.cos() < -0.1 {
+            "end"
+        } else {
+            "middle"
+        };
         let short = if name.len() > 5 { &name[..4] } else { name };
         // Add breathing animation class to Stillness label when > 0.3
-        let class_attr = if i == 7 && coords[7] > 0.3 { " class=\"stillness-breathing\"" } else { "" };
+        let class_attr = if i == 7 && coords[7] > 0.3 {
+            " class=\"stillness-breathing\""
+        } else {
+            ""
+        };
         let _ = write!(html,
             "<text x=\"{:.1}\" y=\"{:.1}\" text-anchor=\"{}\" font-size=\"7\" fill=\"rgba(213,208,200,0.35)\" font-weight=\"300\"{}>{}</text>\n",
             lx, ly + 2.5, anchor, class_attr, short);
@@ -2032,7 +2503,9 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
         let r = radius * val.clamp(0.0, 1.0);
         let x = cx + r * angle.cos();
         let y = cy + r * angle.sin();
-        if !points.is_empty() { points.push(' '); }
+        if !points.is_empty() {
+            points.push(' ');
+        }
         let _ = write!(points, "{:.1},{:.1}", x, y);
     }
     // Add subtle rest pulse when Stillness > 0.3
@@ -2074,13 +2547,16 @@ fn write_harmony_radar(html: &mut String, coords: &[f64; N_HARMONIES], attractor
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_sparkline_expand_script(html: &mut String) {
-    let _ = write!(html, r##"<script>
+    let _ = write!(
+        html,
+        r##"<script>
 function toggleExpanded(id) {{
   const el = document.getElementById(id);
   if (el) el.classList.toggle('visible');
 }}
 </script>
-"##);
+"##
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2116,24 +2592,51 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
         values: Vec<f64>,
     }
 
-    let extract = |f: &dyn Fn(&PulseSnapshot) -> f64| -> Vec<f64> {
-        all.iter().map(|s| f(s)).collect()
-    };
+    let extract =
+        |f: &dyn Fn(&PulseSnapshot) -> f64| -> Vec<f64> { all.iter().map(|s| f(s)).collect() };
 
     let series = vec![
-        Series { name: "C(t)", color: "#e8c547", values: extract(&|s| s.vitals.consciousness_level) },
-        Series { name: "Phi", color: "#7ec8a0", values: extract(&|s| {
-            // Normalize Phi to 0-1 range for chart (cap at 100)
-            s.vitals.spectral_phi.unwrap_or(0.0).min(100.0) / 100.0
-        })},
-        Series { name: "Coherence", color: "#c4956a", values: extract(&|s| s.vitals.temporal_coherence) },
-        Series { name: "Binding", color: "#6bc8e8", values: extract(&|s| s.vitals.phenomenal_binding) },
-        Series { name: "PE", color: "#c76b5a", values: extract(&|s| s.vitals.prediction_error as f64) },
-        Series { name: "Moral", color: "#b89cd6", values: extract(&|s| s.compass.moral_score as f64) },
+        Series {
+            name: "C(t)",
+            color: "#e8c547",
+            values: extract(&|s| s.vitals.consciousness_level),
+        },
+        Series {
+            name: "Phi",
+            color: "#7ec8a0",
+            values: extract(&|s| {
+                // Normalize Phi to 0-1 range for chart (cap at 100)
+                s.vitals.spectral_phi.unwrap_or(0.0).min(100.0) / 100.0
+            }),
+        },
+        Series {
+            name: "Coherence",
+            color: "#c4956a",
+            values: extract(&|s| s.vitals.temporal_coherence),
+        },
+        Series {
+            name: "Binding",
+            color: "#6bc8e8",
+            values: extract(&|s| s.vitals.phenomenal_binding),
+        },
+        Series {
+            name: "PE",
+            color: "#c76b5a",
+            values: extract(&|s| s.vitals.prediction_error as f64),
+        },
+        Series {
+            name: "Moral",
+            color: "#b89cd6",
+            values: extract(&|s| s.compass.moral_score as f64),
+        },
     ];
 
     // Y-axis: 0.0 to 1.0 (all values are normalized)
-    let x_step = if n > 1 { plot_w / (n - 1) as f64 } else { plot_w };
+    let x_step = if n > 1 {
+        plot_w / (n - 1) as f64
+    } else {
+        plot_w
+    };
 
     let _ = write!(html,
         "<div class=\"timeline-pane\" role=\"region\" aria-label=\"Multi-run consciousness timeline\">\n\
@@ -2171,10 +2674,8 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
     }
 
     // Threshold reference lines on timeline
-    let thresholds: &[(&str, f64, &str)] = &[
-        ("Emergence", 0.3, "#7ec8a0"),
-        ("Aware", 0.5, "#e8c547"),
-    ];
+    let thresholds: &[(&str, f64, &str)] =
+        &[("Emergence", 0.3, "#7ec8a0"), ("Aware", 0.5, "#e8c547")];
     for &(label, level, color) in thresholds {
         let y = pad_t + plot_h * (1.0 - level);
         let _ = write!(html,
@@ -2190,7 +2691,9 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
         for (i, &v) in s.values.iter().enumerate() {
             let x = pad_l + i as f64 * x_step;
             let y = pad_t + plot_h * (1.0 - v.clamp(0.0, 1.0));
-            if !points.is_empty() { points.push(' '); }
+            if !points.is_empty() {
+                points.push(' ');
+            }
             let _ = write!(points, "{:.1},{:.1}", x, y);
         }
         let _ = write!(html,
@@ -2201,9 +2704,11 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
         for (i, &v) in s.values.iter().enumerate() {
             let x = pad_l + i as f64 * x_step;
             let y = pad_t + plot_h * (1.0 - v.clamp(0.0, 1.0));
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"3\" fill=\"{}\" opacity=\"0.9\"/>\n",
-                x, y, s.color);
+                x, y, s.color
+            );
         }
     }
 
@@ -2212,9 +2717,11 @@ fn write_timeline_pane(html: &mut String, previous: &[PulseSnapshot], current: &
     // Legend
     let _ = write!(html, "<div class=\"timeline-legend\">\n");
     for s in &series {
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<span><span class=\"swatch\" style=\"background:{}\"></span>{}</span>\n",
-            s.color, s.name);
+            s.color, s.name
+        );
     }
     let _ = write!(html, "</div>\n</div>\n");
 }
@@ -2225,13 +2732,16 @@ fn write_garden_visualization(html: &mut String, vitals: &Vitals, bath: &NeuroBa
     // Vine parameters from transmitter levels
     let vine_data: &[(&str, f32, &str)] = &[
         ("DA", bath.dopamine, "126,200,160"),       // green vine
-        ("NE", bath.noradrenaline, "200,160,126"),   // clay vine
-        ("5-HT", bath.serotonin, "232,197,71"),      // gold vine
-        ("ACh", bath.acetylcholine, "126,180,200"),   // sky vine
+        ("NE", bath.noradrenaline, "200,160,126"),  // clay vine
+        ("5-HT", bath.serotonin, "232,197,71"),     // gold vine
+        ("ACh", bath.acetylcholine, "126,180,200"), // sky vine
     ];
 
     let _ = write!(html, "<div class=\"garden-container\">\n<svg width=\"100%\" height=\"200\" viewBox=\"0 0 1200 200\">\n<defs>\n");
-    let _ = write!(html, "  <filter id=\"vine-blur\"><feGaussianBlur stdDeviation=\"1.5\"/></filter>\n");
+    let _ = write!(
+        html,
+        "  <filter id=\"vine-blur\"><feGaussianBlur stdDeviation=\"1.5\"/></filter>\n"
+    );
 
     // Pollen particle for golden dots
     let _ = write!(html, "  <radialGradient id=\"pollen\"><stop offset=\"0%\" stop-color=\"rgba(232,197,71,0.6)\"/><stop offset=\"100%\" stop-color=\"rgba(232,197,71,0)\"/></radialGradient>\n");
@@ -2245,7 +2755,8 @@ fn write_garden_visualization(html: &mut String, vitals: &Vitals, bath: &NeuroBa
         let alpha = 0.15 + level as f64 * 0.25;
 
         // Main vine stem (cubic bezier)
-        let _ = write!(html,
+        let _ = write!(
+            html,
             "<path d=\"M {x:.0},200 C {x1:.0},{y1:.0} {x2:.0},{y2:.0} {x3:.0},{y3:.0}\" \
              fill=\"none\" stroke=\"rgba({color},{alpha:.2})\" stroke-width=\"{w:.1}\" \
              stroke-linecap=\"round\" filter=\"url(#vine-blur)\">\n\
@@ -2256,13 +2767,17 @@ fn write_garden_visualization(html: &mut String, vitals: &Vitals, bath: &NeuroBa
              dur=\"{dur:.0}s\" repeatCount=\"indefinite\"/>\n\
              </path>\n",
             x = x_base,
-            x1 = x_base - sway, y1 = 200.0 - height * 0.3,
-            x2 = x_base + sway, y2 = 200.0 - height * 0.7,
-            x3 = x_base, y3 = 200.0 - height,
+            x1 = x_base - sway,
+            y1 = 200.0 - height * 0.3,
+            x2 = x_base + sway,
+            y2 = 200.0 - height * 0.7,
+            x3 = x_base,
+            y3 = 200.0 - height,
             x1b = x_base + sway * 0.5,
             x2b = x_base - sway * 0.5,
             x3b = x_base + sway * 0.3,
-            color = color, alpha = alpha,
+            color = color,
+            alpha = alpha,
             w = 1.5 + level as f64 * 1.5,
             dur = 6.0 + i as f64 * 2.0,
         );
@@ -2271,14 +2786,19 @@ fn write_garden_visualization(html: &mut String, vitals: &Vitals, bath: &NeuroBa
         if level > 0.5 {
             let leaf_y = 200.0 - height * 0.5;
             let leaf_x = x_base + sway * 0.8;
-            let _ = write!(html,
+            let _ = write!(
+                html,
                 "<path d=\"M {bx:.0},{by:.0} Q {cx:.0},{cy:.0} {ex:.0},{ey:.0}\" \
                  fill=\"none\" stroke=\"rgba({color},{la:.2})\" stroke-width=\"1\" \
                  stroke-linecap=\"round\" filter=\"url(#vine-blur)\"/>\n",
-                bx = x_base, by = leaf_y,
-                cx = leaf_x, cy = leaf_y - 10.0,
-                ex = leaf_x + 15.0, ey = leaf_y + 5.0,
-                color = color, la = alpha * 0.7,
+                bx = x_base,
+                by = leaf_y,
+                cx = leaf_x,
+                cy = leaf_y - 10.0,
+                ex = leaf_x + 15.0,
+                ey = leaf_y + 5.0,
+                color = color,
+                la = alpha * 0.7,
             );
         }
 
@@ -2330,7 +2850,9 @@ fn write_garden_visualization(html: &mut String, vitals: &Vitals, bath: &NeuroBa
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_tooltip_script(html: &mut String) {
-    let _ = write!(html, r##"<div id="tooltip" class="tooltip"></div>
+    let _ = write!(
+        html,
+        r##"<div id="tooltip" class="tooltip"></div>
 <script>
 (function() {{
   const tip = document.getElementById('tooltip');
@@ -2354,7 +2876,8 @@ fn write_tooltip_script(html: &mut String) {
   }});
 }})();
 </script>
-"##);
+"##
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2362,7 +2885,9 @@ fn write_tooltip_script(html: &mut String) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_theme_toggle_script(html: &mut String) {
-    let _ = write!(html, r##"<button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark theme">&#x2600;&#xFE0F;</button>
+    let _ = write!(
+        html,
+        r##"<button class="theme-btn" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark theme">&#x2600;&#xFE0F;</button>
 <script>
 function toggleTheme() {{
   const body = document.body;
@@ -2379,7 +2904,8 @@ function toggleTheme() {{
   }}
 }})();
 </script>
-"##);
+"##
+    );
 }
 
 fn escape_html(s: &str) -> String {

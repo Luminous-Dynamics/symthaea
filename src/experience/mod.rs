@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub use kosmic_state::{
-    GisState, GisType, HarmonicState, KosmicSong, MoralUncertainty, SevenHarmonies,
+    EightHarmonies, GisState, GisType, HarmonicState, KosmicSong, MoralUncertainty,
 };
 pub use memory::{EpisodicMemory, ThoughtTrace, UserEpistemicMirror};
 pub use signals::{PrincipledSignals, SignalComputer};
@@ -206,7 +206,7 @@ impl ExperienceBus {
 
     /// Update wisdom state from current signals
     ///
-    /// This bridges the principled signals to the Seven Harmonies:
+    /// This bridges the principled signals to the Eight Harmonies:
     /// - High prediction error → boost Wisdom ("What don't I know?")
     /// - Low coherence → boost Coherence ("Does this hang together?")
     /// - High uncertainty → boost Play ("What haven't I tried?")
@@ -565,7 +565,7 @@ impl ExperienceBus {
     }
 
     /// Update KosmicSong state
-    pub fn update_kosmic_state(&mut self, phi: f32, harmonies: SevenHarmonies) {
+    pub fn update_kosmic_state(&mut self, phi: f32, harmonies: EightHarmonies) {
         self.kosmic_state.phi = phi;
         self.kosmic_state.harmonies = harmonies;
     }

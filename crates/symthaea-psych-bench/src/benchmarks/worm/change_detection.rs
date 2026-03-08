@@ -8,10 +8,10 @@ use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
-use std::collections::BTreeMap;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
+use std::collections::BTreeMap;
 
 use symthaea_core::hdc::ContinuousHV;
 
@@ -58,7 +58,8 @@ impl ChangeDetectionBenchmark {
             // Time pressure: +0.10/unit adds encoding degradation, reflecting reduced dwell time
             // in visual WM consolidation under speed emphasis (Vogel et al., 2006).
             let diff_model = difficulty_model_for("WorM::ChangeDetection");
-            let noise_frac = (0.05 * set_size as f32 + config.time_pressure as f32 * 0.10) * diff_model.interference_multiplier(config.difficulty) as f32;
+            let noise_frac = (0.05 * set_size as f32 + config.time_pressure as f32 * 0.10)
+                * diff_model.interference_multiplier(config.difficulty) as f32;
             let encoding_noise_seed = rng_state.wrapping_add(700 + pos as u64);
             let noisy_hv = if noise_frac > 0.01 {
                 let noise = ContinuousHV::random(dim, encoding_noise_seed);
@@ -208,7 +209,9 @@ impl PsychBenchmark for ChangeDetectionBenchmark {
 
         result.conditions = 4;
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

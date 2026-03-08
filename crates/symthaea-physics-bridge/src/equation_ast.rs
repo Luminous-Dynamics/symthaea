@@ -460,10 +460,7 @@ mod tests {
 
         let sim = enc.similarity(&prod_ab, &prod_ba);
         // Position binding means order matters
-        assert!(
-            sim < 0.99,
-            "Product should preserve order, got sim = {sim}"
-        );
+        assert!(sim < 0.99, "Product should preserve order, got sim = {sim}");
     }
 
     #[test]
@@ -475,10 +472,7 @@ mod tests {
         let divergence = make_diffop(DiffOperator::Divergence, psi);
 
         let sim = enc.similarity(&laplacian, &divergence);
-        assert!(
-            sim < 0.9,
-            "Laplacian ≠ Divergence, got sim = {sim}"
-        );
+        assert!(sim < 0.9, "Laplacian ≠ Divergence, got sim = {sim}");
     }
 
     #[test]

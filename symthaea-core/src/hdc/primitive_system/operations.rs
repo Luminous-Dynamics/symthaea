@@ -410,7 +410,7 @@ impl PrimitiveSystem {
     /// // results[1] = top 5 similar to encoding2
     /// // etc.
     /// ```
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     pub fn batch_find_similar(
         &self,
         queries: &[BinaryHV],
@@ -436,7 +436,7 @@ impl PrimitiveSystem {
     }
 
     /// Batch find similar primitives (sequential version for no-parallel builds).
-    #[cfg(not(feature = "rayon"))]
+    #[cfg(not(feature = "parallel"))]
     pub fn batch_find_similar(
         &self,
         queries: &[BinaryHV],

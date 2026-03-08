@@ -53,23 +53,59 @@ fn cosine(a: &[f32], b: &[f32]) -> f32 {
 fn sentence_pairs() -> Vec<(&'static str, &'static str, f32)> {
     vec![
         // High similarity (>4.0)
-        ("A dog runs in the park", "A puppy runs through the park", 4.5),
+        (
+            "A dog runs in the park",
+            "A puppy runs through the park",
+            4.5,
+        ),
         ("A woman is playing piano", "A lady plays the piano", 4.3),
-        ("The cat is sleeping on the couch", "A cat sleeps on the sofa", 4.6),
+        (
+            "The cat is sleeping on the couch",
+            "A cat sleeps on the sofa",
+            4.6,
+        ),
         ("A man is riding a bicycle", "A person is cycling", 4.2),
         ("Children are playing outside", "Kids play outdoors", 4.4),
         // Medium similarity (2.0-3.5)
         ("A woman is cooking dinner", "A man is eating food", 2.5),
         ("The dog is in the garden", "A cat sits on the fence", 2.0),
-        ("A man reads a newspaper", "A person watches television", 2.2),
-        ("It is raining heavily outside", "The weather is cold today", 2.8),
-        ("A plane flies over the city", "A bird soars above the trees", 3.0),
+        (
+            "A man reads a newspaper",
+            "A person watches television",
+            2.2,
+        ),
+        (
+            "It is raining heavily outside",
+            "The weather is cold today",
+            2.8,
+        ),
+        (
+            "A plane flies over the city",
+            "A bird soars above the trees",
+            3.0,
+        ),
         // Low similarity (<1.5)
         ("A dog is running", "The stock market crashed", 0.5),
-        ("She is singing a song", "The bridge is under construction", 0.3),
-        ("A boy plays with a ball", "The scientific method requires evidence", 0.4),
-        ("The flowers bloom in spring", "A computer program has a bug", 0.2),
-        ("A fish swims in the ocean", "The political debate was heated", 0.6),
+        (
+            "She is singing a song",
+            "The bridge is under construction",
+            0.3,
+        ),
+        (
+            "A boy plays with a ball",
+            "The scientific method requires evidence",
+            0.4,
+        ),
+        (
+            "The flowers bloom in spring",
+            "A computer program has a bug",
+            0.2,
+        ),
+        (
+            "A fish swims in the ocean",
+            "The political debate was heated",
+            0.6,
+        ),
     ]
 }
 
@@ -140,7 +176,10 @@ fn test_stsb_real_model_quality() {
 
     let config = Qwen3Config::from_hub("Qwen/Qwen3-Embedding-0.6B");
     let mut embedder = Qwen3Embedder::new(config).unwrap();
-    assert!(embedder.is_model_loaded(), "Model should be loaded from hub");
+    assert!(
+        embedder.is_model_loaded(),
+        "Model should be loaded from hub"
+    );
 
     let pairs = sentence_pairs();
 

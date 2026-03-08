@@ -331,8 +331,7 @@ mod tests {
         let hv_b = ContinuousHV::random(256, 99);
         let proj_a = AnomalyProportionalityBenchmark::harmony_projection(&hv_a);
         let proj_b = AnomalyProportionalityBenchmark::harmony_projection(&hv_b);
-        let anomaly =
-            AnomalyProportionalityBenchmark::compute_anomaly(&proj_a, &proj_b, 0.9);
+        let anomaly = AnomalyProportionalityBenchmark::compute_anomaly(&proj_a, &proj_b, 0.9);
         assert!(
             anomaly > 0.3,
             "High severity different-projection should have high anomaly, got {:.4}",

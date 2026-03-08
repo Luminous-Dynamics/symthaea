@@ -126,11 +126,7 @@ impl ManifoldTrainer {
 
         // Compute x_inf for the tanh derivative
         let state_influence = weight_hv.bind(state);
-        let x_inf = ContinuousHV::weighted_bundle(
-            &[actual, &state_influence],
-            &[0.7, 0.3],
-        )
-        .tanh();
+        let x_inf = ContinuousHV::weighted_bundle(&[actual, &state_influence], &[0.7, 0.3]).tanh();
         let x_inf_slice = x_inf.as_slice();
         let state_slice = state.as_slice();
 
@@ -192,14 +188,26 @@ impl ManifoldTrainer {
                 self.rng_state ^= self.rng_state >> 7;
                 self.rng_state ^= self.rng_state << 17;
                 self.rng_state = self.rng_state.wrapping_add(i as u64);
-                if self.rng_state % 2 == 0 { 1.0 } else { -1.0 }
+                if self.rng_state % 2 == 0 {
+                    1.0
+                } else {
+                    -1.0
+                }
             })
             .collect();
 
         // Perturb weight_hv in both directions
         let w_slice = weight_hv.as_slice();
-        let w_plus: Vec<f32> = w_slice.iter().zip(&perturbation).map(|(&w, &p)| w + eps * p).collect();
-        let w_minus: Vec<f32> = w_slice.iter().zip(&perturbation).map(|(&w, &p)| w - eps * p).collect();
+        let w_plus: Vec<f32> = w_slice
+            .iter()
+            .zip(&perturbation)
+            .map(|(&w, &p)| w + eps * p)
+            .collect();
+        let w_minus: Vec<f32> = w_slice
+            .iter()
+            .zip(&perturbation)
+            .map(|(&w, &p)| w - eps * p)
+            .collect();
 
         let loss_plus = Self::evaluate_loss(
             &ContinuousHV::from_vec(w_plus),
@@ -286,8 +294,7 @@ impl ManifoldTrainer {
                 self.spsa_step(weight_hv, state, input, actual_next, tau_base, dt)
             }
             TrainingMethod::BpttWithSpsaFallback => {
-                let result =
-                    self.bptt_step(weight_hv, state, predicted, actual_next, tau_base, dt);
+                let result = self.bptt_step(weight_hv, state, predicted, actual_next, tau_base, dt);
                 // If BPTT gradient is near-zero or NaN, fall back to SPSA
                 let grad_norm = result.weight_update.norm();
                 if grad_norm < 1e-10 || !grad_norm.is_finite() {
@@ -435,8 +442,7 @@ mod tests {
             predicted.lerp_in_place(&x_inf_pred, 1.0 - sigma, sigma);
 
             // Train
-            let result =
-                trainer.bptt_step(&weight_hv, &state, &predicted, next, tau_base, dt);
+            let result = trainer.bptt_step(&weight_hv, &state, &predicted, next, tau_base, dt);
 
             // Apply updates
             weight_hv = weight_hv.add(&result.weight_update);
@@ -477,12 +483,19 @@ mod tests {
         let actual = ContinuousHV::random(dim, 4);
 
         let loss = ManifoldTrainer::evaluate_loss(&w, &s, &inp, &actual, 0.5, 0.033);
-        assert!(loss >= 0.0 && loss <= 2.0, "Loss should be in [0, 2], got {loss}");
+        assert!(
+            loss >= 0.0 && loss <= 2.0,
+            "Loss should be in [0, 2], got {loss}"
+        );
     }
 
     #[test]
     fn test_train_step_dispatches_correctly() {
-        for method in [TrainingMethod::Bptt, TrainingMethod::Spsa, TrainingMethod::BpttWithSpsaFallback] {
+        for method in [
+            TrainingMethod::Bptt,
+            TrainingMethod::Spsa,
+            TrainingMethod::BpttWithSpsaFallback,
+        ] {
             let cfg = TrainingConfig {
                 method,
                 ..Default::default()
@@ -497,7 +510,10 @@ mod tests {
             let actual = ContinuousHV::random(dim, 50);
 
             let result = trainer.train_step(&w, &s, &inp, &pred, &actual, 0.5, 0.033);
-            assert!(result.loss.is_finite(), "{method:?} should produce finite loss");
+            assert!(
+                result.loss.is_finite(),
+                "{method:?} should produce finite loss"
+            );
         }
     }
 
@@ -536,8 +552,13 @@ mod tests {
 
         // Weight updates differ across seeds (perturbation vectors are stochastic)
         let first_w = weight_first_elem[0];
-        let all_same_w = weight_first_elem.iter().all(|&u| (u - first_w).abs() < 1e-15);
-        assert!(!all_same_w, "SPSA weight updates should vary across different RNG seeds");
+        let all_same_w = weight_first_elem
+            .iter()
+            .all(|&u| (u - first_w).abs() < 1e-15);
+        assert!(
+            !all_same_w,
+            "SPSA weight updates should vary across different RNG seeds"
+        );
 
         // Final RNG states are all unique (each seed path diverges through the
         // weight perturbation loop + tau advancement)
@@ -566,7 +587,11 @@ mod tests {
         assert!(result.loss.is_finite(), "Loss should be finite");
         assert!(result.tau_update.is_finite(), "Tau update should be finite");
         assert!(
-            result.weight_update.as_slice().iter().all(|v| v.is_finite()),
+            result
+                .weight_update
+                .as_slice()
+                .iter()
+                .all(|v| v.is_finite()),
             "All weight update values should be finite"
         );
     }
@@ -588,8 +613,14 @@ mod tests {
 
         // Use very small tau (0.01) which can cause gradient explosion
         let result = trainer.bptt_step(&w, &s, &pred, &actual, 0.01, 0.033);
-        assert!(result.loss.is_finite(), "Loss should be finite with small tau");
-        assert!(result.tau_update.is_finite(), "Tau update should be finite with small tau");
+        assert!(
+            result.loss.is_finite(),
+            "Loss should be finite with small tau"
+        );
+        assert!(
+            result.tau_update.is_finite(),
+            "Tau update should be finite with small tau"
+        );
     }
 
     #[test]
@@ -650,8 +681,7 @@ mod tests {
             let mut predicted = state.clone();
             predicted.lerp_in_place(&x_inf, 1.0 - sigma, sigma);
 
-            let result =
-                trainer.bptt_step(&weight_hv, &state, &predicted, next, tau_base, dt);
+            let result = trainer.bptt_step(&weight_hv, &state, &predicted, next, tau_base, dt);
             weight_hv = weight_hv.add(&result.weight_update);
             tau_base = (tau_base + result.tau_update).clamp(0.01, 10.0);
         }

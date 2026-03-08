@@ -113,7 +113,8 @@ impl CognitiveLoopService {
         }
         // ── Sleep→Wake transition: apply sleep recovery (Xie et al. 2013) ──
         {
-            let is_sleep_now = self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            let is_sleep_now =
+                self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             if self.neuromod.was_sleeping && !is_sleep_now {
                 let quality =
                     (self.neuromod.bath.allostatic_recovery_cycles as f32 / 100.0).clamp(0.0, 1.0);
@@ -268,7 +269,8 @@ impl CognitiveLoopService {
         // Allostatic load accumulation (McEwen 1998)
         {
             let cortisol = self.neuromod.bath.to_hormone_state().cortisol as f32;
-            let is_sleep = self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
+            let is_sleep =
+                self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             self.neuromod
                 .bath
                 .accumulate_allostatic_load(cortisol, is_sleep);
@@ -361,7 +363,9 @@ impl CognitiveLoopService {
                 let total = v.total_validations();
                 if total >= 3 {
                     let improvement_ratio = v.improvements as f32 / total as f32;
-                    self.neuromod.self_assessment.adapt_sensitivity(improvement_ratio);
+                    self.neuromod
+                        .self_assessment
+                        .adapt_sensitivity(improvement_ratio);
                 }
             }
 
@@ -380,7 +384,8 @@ impl CognitiveLoopService {
                         "Self-assessment triggered auto-calibration"
                     );
                     self.neuromod.pending_calibration = Some(cal);
-                    self.neuromod.pending_calibration_since_cycle = Some(self.stats.total_cycles as u64);
+                    self.neuromod.pending_calibration_since_cycle =
+                        Some(self.stats.total_cycles as u64);
                 }
             }
         }
@@ -537,12 +542,10 @@ impl CognitiveLoopService {
         // Phase 2.2: feedback proposal attribution telemetry
         metadata.feedback.feedback_confidence_proposals =
             self.feedback_state.confidence.len() as u32;
-        metadata.feedback.feedback_lr_proposals =
-            self.feedback_state.learning_rate.len() as u32;
+        metadata.feedback.feedback_lr_proposals = self.feedback_state.learning_rate.len() as u32;
         metadata.feedback.feedback_exploration_proposals =
             self.feedback_state.exploration.len() as u32;
-        metadata.feedback.feedback_threshold_proposals =
-            self.feedback_state.threshold.len() as u32;
+        metadata.feedback.feedback_threshold_proposals = self.feedback_state.threshold.len() as u32;
         // Consensus outcomes from last end_cycle() integration
         if let Some(ref consensus) = self.feedback_state.last_consensus {
             metadata.feedback.consensus_confidence = consensus.consensus_confidence;

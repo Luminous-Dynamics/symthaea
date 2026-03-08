@@ -1433,7 +1433,9 @@ mod tests {
     fn test_epistemic_exploration_params() {
         assert!(EPISTEMIC_EXPLORE_THRESHOLD > 0.0);
         assert!(EPISTEMIC_EXPLORE_SCALE > 0.0);
-        assert!(EPISTEMIC_LOW_THRESHOLD > 0.0 && EPISTEMIC_LOW_THRESHOLD < EPISTEMIC_EXPLORE_THRESHOLD);
+        assert!(
+            EPISTEMIC_LOW_THRESHOLD > 0.0 && EPISTEMIC_LOW_THRESHOLD < EPISTEMIC_EXPLORE_THRESHOLD
+        );
         assert!(EPISTEMIC_LOW_DAMPEN > 0.0);
         assert!(EPISTEMIC_OSCILLATION_THRESHOLD > 0.0);
         assert!(EPISTEMIC_OSCILLATION_MULTIPLIER > 1.0);

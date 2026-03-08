@@ -40,8 +40,8 @@ pub struct MelNormalization {
 impl Default for MelNormalization {
     fn default() -> Self {
         Self {
-            mean: vec![-6.0],  // Global mean (approximate log-mel center for speech)
-            std: vec![3.0],    // Global std
+            mean: vec![-6.0], // Global mean (approximate log-mel center for speech)
+            std: vec![3.0],   // Global std
             clip_min: -4.0,
             clip_max: 4.0,
             enabled: true,
@@ -91,8 +91,16 @@ impl MelNormalization {
 
         let per_bin = self.mean.len() > 1;
         for (i, val) in mel.iter_mut().enumerate() {
-            let mean = if per_bin { self.mean[i % self.mean.len()] } else { self.mean[0] };
-            let std = if per_bin { self.std[i % self.std.len()] } else { self.std[0] };
+            let mean = if per_bin {
+                self.mean[i % self.mean.len()]
+            } else {
+                self.mean[0]
+            };
+            let std = if per_bin {
+                self.std[i % self.std.len()]
+            } else {
+                self.std[0]
+            };
             *val = ((*val - mean) / std.max(1e-6)).clamp(self.clip_min, self.clip_max);
         }
     }
@@ -209,9 +217,9 @@ impl Resonator {
     }
 
     fn process(&mut self, input: f32) -> f32 {
-        let output =
-            self.b0 * input + self.b1 * self.x1 + self.b2 * self.x2 - self.a1 * self.y1
-                - self.a2 * self.y2;
+        let output = self.b0 * input + self.b1 * self.x1 + self.b2 * self.x2
+            - self.a1 * self.y1
+            - self.a2 * self.y2;
         self.x2 = self.x1;
         self.x1 = input;
         self.y2 = self.y1;
@@ -268,9 +276,7 @@ impl FormantToMelConverter {
 
         // Hann window
         let window: Vec<f32> = (0..config.n_fft)
-            .map(|i| {
-                0.5 * (1.0 - (2.0 * PI * i as f32 / (config.n_fft - 1) as f32).cos())
-            })
+            .map(|i| 0.5 * (1.0 - (2.0 * PI * i as f32 / (config.n_fft - 1) as f32).cos()))
             .collect();
 
         // FFT plan
@@ -282,7 +288,11 @@ impl FormantToMelConverter {
             config,
             samples_per_frame,
             audio_buffer: Vec::with_capacity(2048),
-            resonators: [Resonator::default(), Resonator::default(), Resonator::default()],
+            resonators: [
+                Resonator::default(),
+                Resonator::default(),
+                Resonator::default(),
+            ],
             glottal_phase: 0.0,
             mel_filters,
             window,
@@ -318,7 +328,11 @@ impl FormantToMelConverter {
                 };
                 let half = self.samples_per_frame / 2;
                 let first_half = self.synthesize_source_filter_n(&interp, &interp_vq, half);
-                let second_half = self.synthesize_source_filter_n(frame, voice_quality, self.samples_per_frame - half);
+                let second_half = self.synthesize_source_filter_n(
+                    frame,
+                    voice_quality,
+                    self.samples_per_frame - half,
+                );
                 self.audio_buffer.extend_from_slice(&first_half);
                 self.audio_buffer.extend_from_slice(&second_half);
             } else {
@@ -363,11 +377,7 @@ impl FormantToMelConverter {
 
     // ── Source-filter synthesis ──────────────────────────────────────────
 
-    fn synthesize_source_filter(
-        &mut self,
-        frame: &FormantFrame,
-        vq: &MelVoiceQuality,
-    ) -> Vec<f32> {
+    fn synthesize_source_filter(&mut self, frame: &FormantFrame, vq: &MelVoiceQuality) -> Vec<f32> {
         self.synthesize_source_filter_n(frame, vq, self.samples_per_frame)
     }
 
@@ -389,7 +399,7 @@ impl FormantToMelConverter {
         let rd = vq.rd.clamp(0.3, 2.7);
         let breathiness = self.config.aspiration_base
             + (rd - 1.0).max(0.0) * 0.03  // Rd contribution: breathy voice adds noise
-            + (1.0 - vq.arousal) * 0.01;   // Low arousal adds slight breathiness
+            + (1.0 - vq.arousal) * 0.01; // Low arousal adds slight breathiness
 
         let mut samples = Vec::with_capacity(n);
         let f0 = frame.f0.max(0.0);
@@ -474,7 +484,8 @@ impl FormantToMelConverter {
             .collect();
 
         // FFT in-place
-        self.fft.process_with_scratch(&mut buffer, &mut self.scratch);
+        self.fft
+            .process_with_scratch(&mut buffer, &mut self.scratch);
 
         // Power spectrum (first n_fft/2 + 1 bins)
         let power: Vec<f32> = buffer
@@ -643,9 +654,16 @@ mod tests {
             all_mels.extend(converter.push_frame(&frame, &vq));
         }
 
-        assert!(!all_mels.is_empty(), "Should produce at least one mel frame");
+        assert!(
+            !all_mels.is_empty(),
+            "Should produce at least one mel frame"
+        );
         for mel in &all_mels {
-            assert_eq!(mel.len(), n_mels, "Each mel frame should have {n_mels} bins");
+            assert_eq!(
+                mel.len(),
+                n_mels,
+                "Each mel frame should have {n_mels} bins"
+            );
         }
     }
 
@@ -705,14 +723,10 @@ mod tests {
         let n = mels_breathy[0].len();
         let upper_start = n * 4 / 5;
 
-        let breathy_upper: f32 = mels_breathy
-            .last()
-            .unwrap()[upper_start..]
+        let breathy_upper: f32 = mels_breathy.last().unwrap()[upper_start..]
             .iter()
             .sum::<f32>();
-        let pressed_upper: f32 = mels_pressed
-            .last()
-            .unwrap()[upper_start..]
+        let pressed_upper: f32 = mels_pressed.last().unwrap()[upper_start..]
             .iter()
             .sum::<f32>();
 
@@ -919,12 +933,18 @@ mod tests {
 
         // Compute spectral flatness proxy: std_dev / mean
         let vowel_mean: f32 = vowel_mel.iter().sum::<f32>() / vowel_mel.len() as f32;
-        let vowel_var: f32 =
-            vowel_mel.iter().map(|x| (x - vowel_mean).powi(2)).sum::<f32>() / vowel_mel.len() as f32;
+        let vowel_var: f32 = vowel_mel
+            .iter()
+            .map(|x| (x - vowel_mean).powi(2))
+            .sum::<f32>()
+            / vowel_mel.len() as f32;
 
         let fric_mean: f32 = fric_mel.iter().sum::<f32>() / fric_mel.len() as f32;
-        let fric_var: f32 =
-            fric_mel.iter().map(|x| (x - fric_mean).powi(2)).sum::<f32>() / fric_mel.len() as f32;
+        let fric_var: f32 = fric_mel
+            .iter()
+            .map(|x| (x - fric_mean).powi(2))
+            .sum::<f32>()
+            / fric_mel.len() as f32;
 
         // Fricatives should have flatter spectrum (lower variance in mel domain)
         // This is a soft check — the key point is both produce valid output

@@ -56,7 +56,10 @@ fn test_capability_card_from_live_service() {
     let card = service.capability_card(AgentPubKey::test_key(1));
 
     // Card should have populated fields from the service
-    assert!(card.verify_hash(), "Card from live service should have valid hash");
+    assert!(
+        card.verify_hash(),
+        "Card from live service should have valid hash"
+    );
     assert!(card.hdc_dimension > 0, "HDC dimension should be populated");
     assert!(card.cfc_neurons > 0, "CfC neurons should be populated");
     assert_eq!(card.format_version, 1);
@@ -87,11 +90,23 @@ fn test_reputation_bridge_lifecycle() {
 
     // First interaction: accepted but not vouched
     let r1 = bridge.process_card(&card);
-    assert!(matches!(r1, VouchDecision::Accepted { interactions: 1, needed: 3 }));
+    assert!(matches!(
+        r1,
+        VouchDecision::Accepted {
+            interactions: 1,
+            needed: 3
+        }
+    ));
 
     // Second interaction
     let r2 = bridge.process_card(&card);
-    assert!(matches!(r2, VouchDecision::Accepted { interactions: 2, needed: 3 }));
+    assert!(matches!(
+        r2,
+        VouchDecision::Accepted {
+            interactions: 2,
+            needed: 3
+        }
+    ));
 
     // Third interaction: vouch triggers
     let r3 = bridge.process_card(&card);
@@ -128,7 +143,11 @@ fn test_handshake_identical_peers() {
     let result = evaluate_compatibility(&a, &b, &HandshakeConfig::default());
 
     // Same substrate (both SiliconDigital default), same features, same phi
-    assert!(result.total_score > 0.9, "Identical configs: {:.3}", result.total_score);
+    assert!(
+        result.total_score > 0.9,
+        "Identical configs: {:.3}",
+        result.total_score
+    );
     assert!(result.approved);
     assert!((result.substrate_compat - 1.0).abs() < 0.01);
     assert!((result.feature_overlap - 1.0).abs() < 0.01);
@@ -143,7 +162,11 @@ fn test_handshake_different_phi_reduces_compatibility() {
     let result = evaluate_compatibility(&a, &b, &HandshakeConfig::default());
 
     // Large phi difference → low phi_compat (e^(-2*0.8) ≈ 0.20)
-    assert!(result.phi_compat < 0.3, "Phi compat should be low: {:.3}", result.phi_compat);
+    assert!(
+        result.phi_compat < 0.3,
+        "Phi compat should be low: {:.3}",
+        result.phi_compat
+    );
     // But still approved (substrate + empty features still contribute)
     assert!(result.total_score > 0.0);
 }
@@ -196,7 +219,10 @@ fn test_find_by_capability_returns_sorted_by_reputation() {
     // The only public way to populate the cache is via set_local_agent (creates defaults)
     // or verify_challenge. Let's test find_by_capability returns empty for unmatched cap.
     let results = cortex2.find_by_capability("nonexistent");
-    assert!(results.is_empty(), "Should return empty for unknown capability");
+    assert!(
+        results.is_empty(),
+        "Should return empty for unknown capability"
+    );
 }
 
 // ── Test 6: Substrate manager accessible via capability card ─────────
@@ -209,8 +235,7 @@ fn test_substrate_telemetry_in_cycle_metadata() {
     // Substrate telemetry should be populated via #[serde(flatten)]
     let meta = &result.metadata;
     assert!(
-        meta.substrate_feasibility >= 0.0
-            && meta.substrate_feasibility <= 1.0,
+        meta.substrate_feasibility >= 0.0 && meta.substrate_feasibility <= 1.0,
         "Substrate feasibility should be in [0,1]: {}",
         meta.substrate_feasibility
     );
@@ -234,7 +259,8 @@ fn test_substrate_telemetry_survives_json_roundtrip() {
         serde_json::from_str(&json).expect("deserialize metadata");
 
     assert!(
-        (restored.substrate.substrate_feasibility - result.metadata.substrate.substrate_feasibility)
+        (restored.substrate.substrate_feasibility
+            - result.metadata.substrate.substrate_feasibility)
             .abs()
             < 1e-6,
         "Substrate feasibility should survive JSON roundtrip"
@@ -387,7 +413,10 @@ fn test_full_discovery_pipeline() {
 
     // Handshake: evaluate compatibility
     let result = evaluate_compatibility(&card_a, &card_b, &HandshakeConfig::default());
-    assert!(result.approved, "Two cards from same service should be compatible");
+    assert!(
+        result.approved,
+        "Two cards from same service should be compatible"
+    );
     assert!(
         result.total_score > 0.8,
         "Same-service cards should score high: {:.3}",

@@ -8,10 +8,10 @@ use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
-use std::collections::BTreeMap;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::wm::{WmConfig, WorkingMemory};
+use std::collections::BTreeMap;
 
 /// Long-range understanding benchmark.
 pub struct LongRangeBenchmark;
@@ -76,7 +76,8 @@ impl LongRangeBenchmark {
         // Time pressure: base 0.2 threshold for long-range retrieval; +0.10/unit raises criterion,
         // modeling truncated memory search under deadline (Ratcliff & McKoon, 2008 DDM).
         let diff_model = difficulty_model_for("MemoryAgent::LongRange");
-        let threshold = 0.2 * diff_model.interference_multiplier(config.difficulty) as f32 + config.time_pressure as f32 * 0.10;
+        let threshold = 0.2 * diff_model.interference_multiplier(config.difficulty) as f32
+            + config.time_pressure as f32 * 0.10;
         let accuracy = if max_sim > threshold { 1.0 } else { 0.0 };
 
         // RT proxy: delay ticks add retention interval cost, retrieval
@@ -141,7 +142,9 @@ impl PsychBenchmark for LongRangeBenchmark {
 
         result.conditions = 4;
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

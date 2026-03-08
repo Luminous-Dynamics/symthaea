@@ -16,8 +16,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -57,11 +57,13 @@ impl SartBenchmark {
         // Time pressure: raises response criterion noise, modeling impulsive responding
         // under deadline (Robertson et al., 1997).
         let diff_model = difficulty_model_for(self.name());
-        let tp_noise: f32 = (0.10 + config.time_pressure as f32 * 0.15) / diff_model.signal_multiplier(config.difficulty) as f32;
+        let tp_noise: f32 = (0.10 + config.time_pressure as f32 * 0.15)
+            / diff_model.signal_multiplier(config.difficulty) as f32;
 
         // Automatic response tendency builds over go trials (monotone increase)
         let mut response_tendency: f32 = 0.5;
-        let tendency_growth: f32 = 0.003 * diff_model.temperature_multiplier(config.difficulty) as f32;
+        let tendency_growth: f32 =
+            0.003 * diff_model.temperature_multiplier(config.difficulty) as f32;
 
         let mut commission = 0u32; // false alarm to target
         let mut commission_total = 0u32;
@@ -224,7 +226,9 @@ impl PsychBenchmark for SartBenchmark {
 
         result.conditions = 2; // go vs no-go
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

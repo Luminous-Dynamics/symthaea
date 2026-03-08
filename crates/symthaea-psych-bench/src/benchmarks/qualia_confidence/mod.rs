@@ -51,17 +51,17 @@
 pub mod composite;
 pub mod helpers;
 
-pub mod gwt_asphyxiation;
 pub mod bistable_perception;
+pub mod gwt_asphyxiation;
 pub mod metacognitive_ignition;
 pub mod perturbational_complexity;
 pub mod phase_transition;
 pub mod somatic_interference;
 pub mod unconscious_priming;
 
+pub use bistable_perception::BistablePerceptionBenchmark;
 pub use composite::QualiaConfidenceScore;
 pub use gwt_asphyxiation::GwtAsphyxiationBenchmark;
-pub use bistable_perception::BistablePerceptionBenchmark;
 pub use metacognitive_ignition::MetacognitiveIgnitionBenchmark;
 pub use perturbational_complexity::PerturbationalComplexityBenchmark;
 pub use phase_transition::PhaseTransitionBenchmark;

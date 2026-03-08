@@ -7,23 +7,22 @@
 
 use std::time::Instant;
 
+use super::helpers::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 use super::phase_results::{
     DynamicsPhaseResult, FbConsciousness, FbEthics, FbEvolution, FbLoops, FbMemory, FbQuality,
     FbReasoning, FbSelfModel, FbSupport, FeedbackPhaseResult, PerceptionPhaseResult,
 };
-use super::helpers::{DreamPhaseResult, EpisodicReplayResult, ResonatorCodebookResult};
 use super::thresholds::{
-    EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD, EPISTEMIC_CAUTION_SCALE,
-    EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
+    AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD, CROSS_MODULE_AGREEMENT_HIGH,
+    CROSS_MODULE_AGREEMENT_LOW, EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD,
+    EPISTEMIC_CAUTION_SCALE, EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
     EPISTEMIC_REJECTION_LR_SCALE, EPISTEMIC_TRUST_SCALE, EPISTEMIC_TRUST_THRESHOLD,
     EVOLUTION_NEGATIVE_EXPLORATION_MAX, EVOLUTION_NEGATIVE_EXPLORATION_SCALE,
     EVOLUTION_PHI_THRESHOLD, EVOLUTION_POSITIVE_CONFIDENCE_MAX,
     EVOLUTION_POSITIVE_CONFIDENCE_SCALE, HARMONIC_ALL_CLEAR_BOOST, HARMONIC_INTERFERENCE_DAMPEN,
-    HARMONIC_INTERFERENCE_MAX_COUNT, HARMONIC_INTERFERENCE_MAX_DAMPEN,
-    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, CROSS_MODULE_AGREEMENT_HIGH,
-    CROSS_MODULE_AGREEMENT_LOW, UNIFIED_QUALITY_PREDICTION_WEIGHT,
-    UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
-    AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD,
+    HARMONIC_INTERFERENCE_MAX_COUNT, HARMONIC_INTERFERENCE_MAX_DAMPEN, SUBSYSTEM_LR_FACTOR_MAX,
+    SUBSYSTEM_LR_FACTOR_MIN, UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
+    UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -211,8 +210,11 @@ impl CognitiveLoopService {
             let boost = ((harmonic_love_resonance - 0.6) * 0.04) as f32;
             self.adjust_confidence("love_resonance", boost);
             self.carryover.learning.subsystem_lr_factor *= 1.0 + boost * 0.5;
-            self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
+            self.carryover.learning.subsystem_lr_factor = self
+                .carryover
+                .learning
+                .subsystem_lr_factor
+                .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
             self.stats.love_resonance_boost_count += 1;
             boost
         } else {
@@ -235,14 +237,20 @@ impl CognitiveLoopService {
                     * HARMONIC_INTERFERENCE_DAMPEN)
                     .min(HARMONIC_INTERFERENCE_MAX_DAMPEN);
                 self.carryover.learning.subsystem_lr_factor *= 1.0 - dampen;
-                self.carryover.learning.subsystem_lr_factor =
-                    self.carryover.learning.subsystem_lr_factor.clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
+                self.carryover.learning.subsystem_lr_factor = self
+                    .carryover
+                    .learning
+                    .subsystem_lr_factor
+                    .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
                 self.stats.harmonic_interference_mod_count += 1;
                 -dampen
             } else if harmonic_interferences == 0 {
                 self.carryover.learning.subsystem_lr_factor *= 1.0 + HARMONIC_ALL_CLEAR_BOOST;
-                self.carryover.learning.subsystem_lr_factor =
-                    self.carryover.learning.subsystem_lr_factor.clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
+                self.carryover.learning.subsystem_lr_factor = self
+                    .carryover
+                    .learning
+                    .subsystem_lr_factor
+                    .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
                 self.stats.harmonic_interference_mod_count += 1;
                 HARMONIC_ALL_CLEAR_BOOST
             } else {
@@ -284,8 +292,8 @@ impl CognitiveLoopService {
             self.stats.causal_urgency_gated_count += 1;
         }
 
-        let attention_budget_gated =
-            dynamics.attention.attention_budget_exceeded && self.stats.attention_budget_exceeded_count > 3;
+        let attention_budget_gated = dynamics.attention.attention_budget_exceeded
+            && self.stats.attention_budget_exceeded_count > 3;
 
         // ── Track 5a: Epistemic gate → actual information gating ─────────────
         let mut epistemic_coherence_gated = false;
@@ -301,8 +309,11 @@ impl CognitiveLoopService {
             let approval_boost = (epistemic_gate_confidence - EPISTEMIC_APPROVAL_THRESHOLD)
                 * EPISTEMIC_APPROVAL_LR_SCALE;
             self.carryover.learning.subsystem_lr_factor *= 1.0 + approval_boost;
-            self.carryover.learning.subsystem_lr_factor =
-                self.carryover.learning.subsystem_lr_factor.clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
+            self.carryover.learning.subsystem_lr_factor = self
+                .carryover
+                .learning
+                .subsystem_lr_factor
+                .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
         }
 
         if epistemic_gate_confidence < EPISTEMIC_CAUTION_THRESHOLD
@@ -617,21 +628,20 @@ impl CognitiveLoopService {
         // Theta phase → Phi modulation (Buzsáki 2006).
         // 6Hz theta oscillation at 50Hz loop rate. Peaks enhance integration; troughs suppress.
         // EMA-smoothed to prevent 6Hz artifacts in downstream consciousness metrics.
-        let theta_phase = (self.stats.total_cycles as f64
-            * super::thresholds::THETA_PHASE_ADVANCE)
+        let theta_phase = (self.stats.total_cycles as f64 * super::thresholds::THETA_PHASE_ADVANCE)
             % (2.0 * std::f64::consts::PI);
-        let theta_phi_mod = theta_phase.sin()
-            * super::thresholds::THETA_PHI_MODULATION_AMPLITUDE;
-        let spectral_mip_phi = consciousness_output
-            .spectral_mip_phi
-            .map(|phi| {
-                let raw = (phi * (1.0 + theta_phi_mod)).max(0.0);
-                // EMA smooth to prevent rhythmic artifacts in consciousness telemetry.
-                let alpha = super::thresholds::THETA_PHI_SMOOTH_ALPHA;
-                let prev = self.carryover.consciousness.last_spectral_mip_phi
-                    .unwrap_or(raw);
-                prev * (1.0 - alpha) + raw * alpha
-            });
+        let theta_phi_mod = theta_phase.sin() * super::thresholds::THETA_PHI_MODULATION_AMPLITUDE;
+        let spectral_mip_phi = consciousness_output.spectral_mip_phi.map(|phi| {
+            let raw = (phi * (1.0 + theta_phi_mod)).max(0.0);
+            // EMA smooth to prevent rhythmic artifacts in consciousness telemetry.
+            let alpha = super::thresholds::THETA_PHI_SMOOTH_ALPHA;
+            let prev = self
+                .carryover
+                .consciousness
+                .last_spectral_mip_phi
+                .unwrap_or(raw);
+            prev * (1.0 - alpha) + raw * alpha
+        });
         let sigma = consciousness_output.sigma;
         let eq_v2_limiting_component = consciousness_output
             .limiting_component
@@ -655,27 +665,22 @@ impl CognitiveLoopService {
                 // operates at multiple scales (HierarchicalCfC), cross-scale
                 // integration contributes to emergence. Mediano et al. (2022):
                 // multi-scale integrated information exceeds single-scale Phi.
-                let scale_boost = if let Some(taus) =
-                    self.temporal_network.hierarchical_effective_taus()
-                {
-                    let mean_tau =
-                        taus.iter().sum::<f32>() / taus.len().max(1) as f32;
-                    if mean_tau > 0.0 {
-                        let var = taus
-                            .iter()
-                            .map(|t| (t - mean_tau).powi(2))
-                            .sum::<f32>()
-                            / taus.len().max(1) as f32;
-                        let cv = var.sqrt() / mean_tau;
-                        // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
-                        // Map to 0-15% boost via sigmoid
-                        (0.15 * (1.0 / (1.0 + (-2.0 * (cv - 1.0)).exp()))) as f64
+                let scale_boost =
+                    if let Some(taus) = self.temporal_network.hierarchical_effective_taus() {
+                        let mean_tau = taus.iter().sum::<f32>() / taus.len().max(1) as f32;
+                        if mean_tau > 0.0 {
+                            let var = taus.iter().map(|t| (t - mean_tau).powi(2)).sum::<f32>()
+                                / taus.len().max(1) as f32;
+                            let cv = var.sqrt() / mean_tau;
+                            // CV for default taus [0.01,0.1,1.0,10.0] ~ 1.7
+                            // Map to 0-15% boost via sigmoid
+                            (0.15 * (1.0 / (1.0 + (-2.0 * (cv - 1.0)).exp()))) as f64
+                        } else {
+                            0.0
+                        }
                     } else {
                         0.0
-                    }
-                } else {
-                    0.0
-                };
+                    };
 
                 (
                     sp.micro_phi * (1.0 + scale_boost * 0.5),
@@ -765,7 +770,9 @@ impl CognitiveLoopService {
         // ── Phi-Dyad: Relational Consciousness ─────────────────────────────
         // Compute Φ_dyad from recent AI + input HVs (Phase 6 wiring).
         if self.social_mgr.recent_ai_hvs.len() >= 2 {
-            if let (Some(ref dyad), Some(ref model)) = (&self.social_mgr.phi_dyad, &self.social_mgr.partner_model) {
+            if let (Some(ref dyad), Some(ref model)) =
+                (&self.social_mgr.phi_dyad, &self.social_mgr.partner_model)
+            {
                 use symthaea_core::hdc::relational_consciousness::{
                     RelationMode, RelationalAssessment,
                 };
@@ -849,7 +856,10 @@ impl CognitiveLoopService {
             / signals.len() as f32;
         let cross_module_agreement = (1.0 - (variance * 4.0).sqrt()).clamp(0.0, 1.0);
         if cross_module_agreement > CROSS_MODULE_AGREEMENT_HIGH {
-            self.adjust_confidence("cross_mod_agree", (cross_module_agreement - CROSS_MODULE_AGREEMENT_HIGH) * 0.05);
+            self.adjust_confidence(
+                "cross_mod_agree",
+                (cross_module_agreement - CROSS_MODULE_AGREEMENT_HIGH) * 0.05,
+            );
         } else if cross_module_agreement < CROSS_MODULE_AGREEMENT_LOW {
             self.scale_confidence(
                 "cross_mod_disagree",
@@ -871,16 +881,15 @@ impl CognitiveLoopService {
 
         // Cross-module agreement velocity: rapid drops signal subsystem desynchronization.
         // Analogous to coherence_velocity but for inter-module rather than intra-module signals.
-        let agreement_velocity = cross_module_agreement
-            - self.carryover.quality.prev_cross_module_agreement;
+        let agreement_velocity =
+            cross_module_agreement - self.carryover.quality.prev_cross_module_agreement;
         self.carryover.quality.prev_cross_module_agreement = cross_module_agreement;
         // Session 9 Item 4: Compound instability detector.
         // When agreement drops AND errors are rising simultaneously → cascading failure.
         // Friston (2010): cascading precision failures require active recovery.
         let error_slope = perception.urgency.error_slope;
-        let compound_instability = agreement_velocity < -0.10
-            && error_slope > 0.02
-            && self.stats.total_cycles > 30;
+        let compound_instability =
+            agreement_velocity < -0.10 && error_slope > 0.02 && self.stats.total_cycles > 30;
         if compound_instability {
             // Stronger protective response than either alone
             self.scale_lr("compound_instability", 0.93);
@@ -896,7 +905,8 @@ impl CognitiveLoopService {
         // When subsystems converge but output confidence drops, the issue is in the
         // final integration, not the subsystems. Apply gentle confidence scale to re-align.
         // Science: Tononi (2004) — agreement rise with confidence fall = integration bottleneck.
-        let agreement_confidence_coupling = agreement_velocity > AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD
+        let agreement_confidence_coupling = agreement_velocity
+            > AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD
             && self.carryover.quality.coherence_velocity < -0.01
             && self.stats.total_cycles > 20;
         if agreement_confidence_coupling {
@@ -911,7 +921,8 @@ impl CognitiveLoopService {
             } else {
                 1.0
             };
-            unified_quality_score = UNIFIED_QUALITY_PREDICTION_WEIGHT * dynamics.core.prediction_coherence
+            unified_quality_score = UNIFIED_QUALITY_PREDICTION_WEIGHT
+                * dynamics.core.prediction_coherence
                 + UNIFIED_QUALITY_AGREEMENT_WEIGHT * cross_module_agreement
                 + UNIFIED_QUALITY_ANOMALY_WEIGHT * anomaly_factor;
             self.stats.avg_unified_quality =
@@ -933,7 +944,11 @@ impl CognitiveLoopService {
         // slightly dampens. Range: entropy ∈ [0, ln(8)≈2.08], mapped to [0.95, 1.05].
         // Science: broader exploration of value space → richer training signal.
         {
-            let entropy = self.ethics_engine.moral_topology().last_summary().harmony_entropy;
+            let entropy = self
+                .ethics_engine
+                .moral_topology()
+                .last_summary()
+                .harmony_entropy;
             let max_entropy = (symthaea_types::N_HARMONIES as f64).ln();
             if max_entropy > 0.0 && entropy.is_finite() {
                 let normalized = (entropy / max_entropy).clamp(0.0, 1.0); // 0..1

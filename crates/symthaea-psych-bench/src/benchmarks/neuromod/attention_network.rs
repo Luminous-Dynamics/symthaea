@@ -6,8 +6,8 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -248,7 +248,9 @@ impl PsychBenchmark for AttentionNetworkBenchmark {
 
         result.conditions = 8;
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

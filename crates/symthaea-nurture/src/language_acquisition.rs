@@ -152,20 +152,48 @@ pub fn language_milestones() -> Vec<LanguageMilestone> {
 pub fn milestones_expected_by(age: &DevelopmentalAge) -> Vec<&'static str> {
     let months = age.months;
     let mut expected = Vec::new();
-    if months >= 2.0 { expected.push("Cooing"); }
-    if months >= 4.0 { expected.push("Vocal play"); }
-    if months >= 6.0 { expected.push("Babbling"); }
-    if months >= 8.0 { expected.push("Canonical babbling"); }
-    if months >= 10.0 { expected.push("First words"); }
-    if months >= 12.0 { expected.push("Pointing with vocalization"); }
-    if months >= 15.0 { expected.push("10+ word vocabulary"); }
-    if months >= 18.0 { expected.push("Two-word phrases"); }
-    if months >= 24.0 { expected.push("50+ word vocabulary"); }
-    if months >= 30.0 { expected.push("Multi-word sentences"); }
-    if months >= 36.0 { expected.push("Simple sentences"); }
-    if months >= 42.0 { expected.push("Questions and negation"); }
-    if months >= 48.0 { expected.push("Complex sentences"); }
-    if months >= 60.0 { expected.push("Narrative ability"); }
+    if months >= 2.0 {
+        expected.push("Cooing");
+    }
+    if months >= 4.0 {
+        expected.push("Vocal play");
+    }
+    if months >= 6.0 {
+        expected.push("Babbling");
+    }
+    if months >= 8.0 {
+        expected.push("Canonical babbling");
+    }
+    if months >= 10.0 {
+        expected.push("First words");
+    }
+    if months >= 12.0 {
+        expected.push("Pointing with vocalization");
+    }
+    if months >= 15.0 {
+        expected.push("10+ word vocabulary");
+    }
+    if months >= 18.0 {
+        expected.push("Two-word phrases");
+    }
+    if months >= 24.0 {
+        expected.push("50+ word vocabulary");
+    }
+    if months >= 30.0 {
+        expected.push("Multi-word sentences");
+    }
+    if months >= 36.0 {
+        expected.push("Simple sentences");
+    }
+    if months >= 42.0 {
+        expected.push("Questions and negation");
+    }
+    if months >= 48.0 {
+        expected.push("Complex sentences");
+    }
+    if months >= 60.0 {
+        expected.push("Narrative ability");
+    }
     expected
 }
 

@@ -94,11 +94,11 @@ fn diphthong_offset_phoneme(phoneme: &str) -> Option<&'static str> {
     // Strip stress digit for matching
     let base = phoneme.trim_end_matches(|c: char| c.is_ascii_digit());
     match base {
-        "AY" => Some("IY1"),  // "my": AA → IY
-        "AW" => Some("UW1"),  // "how": AA → UW
-        "OY" => Some("IY1"),  // "boy": AO → IY
-        "EY" => Some("IY1"),  // "day": EH → IY
-        "OW" => Some("UW1"),  // "go":  AO → UW
+        "AY" => Some("IY1"), // "my": AA → IY
+        "AW" => Some("UW1"), // "how": AA → UW
+        "OY" => Some("IY1"), // "boy": AO → IY
+        "EY" => Some("IY1"), // "day": EH → IY
+        "OW" => Some("UW1"), // "go":  AO → UW
         _ => None,
     }
 }
@@ -2539,16 +2539,15 @@ impl ReplVoiceOutput {
                     };
 
                     // For diphthongs, switch to offset phoneme in the glide portion
-                    let effective_phoneme: &str =
-                        if let Some(offset) = diphthong_offset {
-                            if frame_i >= diphthong_switch_frame {
-                                offset
-                            } else {
-                                &timed_phoneme.phoneme
-                            }
+                    let effective_phoneme: &str = if let Some(offset) = diphthong_offset {
+                        if frame_i >= diphthong_switch_frame {
+                            offset
                         } else {
                             &timed_phoneme.phoneme
-                        };
+                        }
+                    } else {
+                        &timed_phoneme.phoneme
+                    };
 
                     let remaining = n_frames - frame_i;
                     let frame = pipeline.tick_with_anticipation(
@@ -2807,7 +2806,11 @@ mod tests {
     #[test]
     fn test_cmudict_loaded() {
         // CMU dict should have >100K entries
-        assert!(CMUDICT.len() > 100_000, "CMU dict should have >100K entries, got {}", CMUDICT.len());
+        assert!(
+            CMUDICT.len() > 100_000,
+            "CMU dict should have >100K entries, got {}",
+            CMUDICT.len()
+        );
     }
 
     #[test]
@@ -2825,7 +2828,11 @@ mod tests {
         let g2p = SimpleG2P::new();
         // "serendipity" is NOT in our 400-word hardcoded dict, but IS in CMU dict
         let phones = g2p.word_to_phonemes("serendipity");
-        assert!(phones.len() >= 5, "serendipity should have 5+ phonemes via CMU dict: {:?}", phones);
+        assert!(
+            phones.len() >= 5,
+            "serendipity should have 5+ phonemes via CMU dict: {:?}",
+            phones
+        );
         // CMU dict: S EH2 R AH0 N D IH1 P AH0 T IY0
         assert!(phones.contains(&"S"), "Should start with S: {:?}", phones);
     }

@@ -16,8 +16,8 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -62,7 +62,8 @@ impl VisualSearchBenchmark {
         let diff_model = difficulty_model_for(self.name());
         let sig_mult = diff_model.signal_multiplier(config.difficulty);
         let threshold: f64 = (0.35 - pressure * 0.10) * sig_mult;
-        let temperature: f64 = (0.25 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
+        let temperature: f64 =
+            (0.25 + pressure * 0.15) * diff_model.temperature_multiplier(config.difficulty);
 
         let set_sizes = [4usize, 8, 16, 24];
         let trials_per_size = 20;
@@ -96,7 +97,8 @@ impl VisualSearchBenchmark {
 
                     // Encoding noise degrades perceptual discriminability
                     let noise_degrade = config.effective_noise() as f32 * 0.4;
-                    let sim = item.similarity(&target_template) as f64 * (1.0 - noise_degrade as f64);
+                    let sim =
+                        item.similarity(&target_template) as f64 * (1.0 - noise_degrade as f64);
                     if sim > max_feat_sim {
                         max_feat_sim = sim;
                     }
@@ -143,7 +145,8 @@ impl VisualSearchBenchmark {
                     };
 
                     let noise_degrade = config.effective_noise() as f32 * 0.4;
-                    let sim = item.similarity(&target_template) as f64 * (1.0 - noise_degrade as f64);
+                    let sim =
+                        item.similarity(&target_template) as f64 * (1.0 - noise_degrade as f64);
                     if sim > max_conj_sim {
                         max_conj_sim = sim;
                     }
@@ -301,7 +304,9 @@ impl PsychBenchmark for VisualSearchBenchmark {
 
         result.conditions = 8; // 2 search types × 4 set sizes
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

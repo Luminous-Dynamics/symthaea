@@ -39,7 +39,11 @@ pub struct CapabilityCard {
 
 impl CapabilityCard {
     /// Build a card from config + runtime stats, sealed with BLAKE3.
-    pub fn from_config(agent_key: AgentPubKey, config: &CognitiveLoopConfig, stats: &CardStats) -> Self {
+    pub fn from_config(
+        agent_key: AgentPubKey,
+        config: &CognitiveLoopConfig,
+        stats: &CardStats,
+    ) -> Self {
         let mut card = Self {
             format_version: 1,
             agent_key,
@@ -116,14 +120,20 @@ mod tests {
     #[test]
     fn test_hash_integrity() {
         let card = test_card();
-        assert!(card.verify_hash(), "Fresh card should pass hash verification");
+        assert!(
+            card.verify_hash(),
+            "Fresh card should pass hash verification"
+        );
     }
 
     #[test]
     fn test_hash_tamper_detection() {
         let mut card = test_card();
         card.phi = 9999.0;
-        assert!(!card.verify_hash(), "Tampered card should fail hash verification");
+        assert!(
+            !card.verify_hash(),
+            "Tampered card should fail hash verification"
+        );
     }
 
     #[test]
@@ -131,6 +141,9 @@ mod tests {
         let card = test_card();
         let json = serde_json::to_string(&card).expect("serialize");
         let restored: CapabilityCard = serde_json::from_str(&json).expect("deserialize");
-        assert!(restored.verify_hash(), "Deserialized card should pass hash verification");
+        assert!(
+            restored.verify_hash(),
+            "Deserialized card should pass hash verification"
+        );
     }
 }

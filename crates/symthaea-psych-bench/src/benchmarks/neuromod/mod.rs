@@ -37,9 +37,9 @@ pub mod yerkes_dodson;
 
 pub use allostatic_stress::AllostaticStressBenchmark;
 pub use antagonist_profiles::AntagonistProfilesBenchmark;
-pub use consciousness_feedback::ConsciousnessFeedbackBenchmark;
 pub use attention_network::AttentionNetworkBenchmark;
 pub use behavioral_knockout::BehavioralKnockoutBenchmark;
+pub use consciousness_feedback::ConsciousnessFeedbackBenchmark;
 pub use consciousness_pharmacology::ConsciousnessPharmacologyBenchmark;
 pub use dose_response::DoseResponseBenchmark;
 pub use injection_challenge::InjectionChallengeBenchmark;

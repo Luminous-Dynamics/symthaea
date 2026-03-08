@@ -1,4 +1,4 @@
-//! # Seven Harmonies: Value Alignment Framework
+//! # Eight Harmonies: Value Alignment Framework
 //!
 //! Re-exports from the `symthaea-harmonies` sub-crate.
 //! See [`symthaea_harmonies`] for full documentation.

@@ -2,9 +2,9 @@
 
 use std::time::Instant;
 
+use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent};
 use crate::consciousness::cross_modal_binding::Modality;
 use crate::consciousness::multi_modal_integration::ModalInput;
-use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent};
 
 use super::types::{ConsciousnessEngineInput, ConsciousnessEngineOutput};
 use super::ConsciousnessEngine;
@@ -46,9 +46,7 @@ impl ConsciousnessEngine {
             // Ensures structural Phi is available within the first 100 cycles for
             // short benchmarks and cold-start validation.
             if let Some(ref r) = result {
-                if let Some(structural) =
-                    self.spectral_mip_finder.compute_structural_hierarchy(r)
-                {
+                if let Some(structural) = self.spectral_mip_finder.compute_structural_hierarchy(r) {
                     self.cache.last_structural_phi = Some(structural);
                 }
             }

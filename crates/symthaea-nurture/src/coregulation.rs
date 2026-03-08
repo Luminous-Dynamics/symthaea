@@ -69,8 +69,7 @@ impl CoRegulationState {
             // The formula: damping * synchrony * oxytocin_coupling * (calm - 0.5)
             // When caregiver_calm > 0.5, infant arousal decreases
             // When caregiver_calm < 0.5 (anxious caregiver), arousal can increase
-            let damping =
-                self.damping_factor * self.synchrony * self.oxytocin_mediated_coupling;
+            let damping = self.damping_factor * self.synchrony * self.oxytocin_mediated_coupling;
             *infant_arousal -= damping * (caregiver_calm - 0.5);
             *infant_arousal = infant_arousal.clamp(0.0, 1.0);
 
@@ -78,8 +77,7 @@ impl CoRegulationState {
             self.synchrony = (self.synchrony + 0.01).min(1.0);
 
             // Oxytocin coupling strengthens with repeated contact
-            self.oxytocin_mediated_coupling =
-                (self.oxytocin_mediated_coupling + 0.002).min(1.0);
+            self.oxytocin_mediated_coupling = (self.oxytocin_mediated_coupling + 0.002).min(1.0);
 
             AttachmentNeuromodulation::coregulation(self.synchrony)
         } else {
@@ -182,7 +180,7 @@ mod tests {
         let mut arousal_calm = 0.8;
         let mut arousal_anxious = 0.8;
 
-        state1.regulate(&mut arousal_calm, 0.95, true);    // Very calm
+        state1.regulate(&mut arousal_calm, 0.95, true); // Very calm
         state2.regulate(&mut arousal_anxious, 0.55, true); // Barely calm
 
         assert!(

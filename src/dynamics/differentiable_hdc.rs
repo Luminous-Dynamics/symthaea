@@ -285,7 +285,11 @@ impl DifferentiableHDCEncoder {
     /// For bipolar {-1, +1}: cosine similarity
     /// For binary {0, 1}: Hamming similarity
     pub fn similarity(a: &[f32], b: &[f32]) -> f32 {
-        debug_assert_eq!(a.len(), b.len(), "DifferentiableHDC::similarity length mismatch");
+        debug_assert_eq!(
+            a.len(),
+            b.len(),
+            "DifferentiableHDC::similarity length mismatch"
+        );
         if a.len() != b.len() {
             return 0.0;
         }

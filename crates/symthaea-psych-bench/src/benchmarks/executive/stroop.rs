@@ -235,7 +235,6 @@ impl PsychBenchmark for StroopBenchmark {
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
-
         let start = std::time::Instant::now();
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
         let diff_model = difficulty_model_for(self.name());

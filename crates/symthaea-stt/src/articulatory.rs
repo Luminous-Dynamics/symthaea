@@ -1377,7 +1377,9 @@ mod tests {
         let mapper = ArticulatoryMapper::new();
 
         // All vowels should be Voiced with Manner::Vowel
-        for phone in &["IY", "IH", "EY", "EH", "AE", "AH", "ER", "UW", "UH", "OW", "AA", "AO"] {
+        for phone in &[
+            "IY", "IH", "EY", "EH", "AE", "AH", "ER", "UW", "UH", "OW", "AA", "AO",
+        ] {
             let f = mapper.get(phone).unwrap();
             assert_eq!(f.manner, Manner::Vowel, "{phone} should be Vowel");
             assert_eq!(f.voicing, Voicing::Voiced, "{phone} should be Voiced");
@@ -1423,11 +1425,7 @@ mod tests {
     fn test_find_by_features_voicing() {
         let mapper = ArticulatoryMapper::new();
 
-        let voiced_stops = mapper.find_by_features(
-            Some(Voicing::Voiced),
-            Some(Manner::Stop),
-            None,
-        );
+        let voiced_stops = mapper.find_by_features(Some(Voicing::Voiced), Some(Manner::Stop), None);
 
         assert!(voiced_stops.contains(&"B".to_string()));
         assert!(voiced_stops.contains(&"D".to_string()));
@@ -1452,16 +1450,9 @@ mod tests {
         let hdc = ArticulatoryHDC::new();
 
         let expected = [
-            "P", "B", "T", "D", "K", "G",
-            "F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH",
-            "CH", "JH",
-            "M", "N", "NG",
-            "L", "R",
-            "W", "Y",
-            "IY", "IH", "EY", "EH", "AE",
-            "AH", "ER",
-            "UW", "UH", "OW", "AA", "AO",
-            "AY", "AW", "OY",
+            "P", "B", "T", "D", "K", "G", "F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH", "CH",
+            "JH", "M", "N", "NG", "L", "R", "W", "Y", "IY", "IH", "EY", "EH", "AE", "AH", "ER",
+            "UW", "UH", "OW", "AA", "AO", "AY", "AW", "OY",
         ];
 
         for phone in &expected {
@@ -1497,9 +1488,8 @@ mod tests {
 
         // Every phoneme should resonate back to itself
         let phonemes = [
-            "P", "B", "T", "D", "K", "G", "F", "V",
-            "M", "N", "NG", "L", "R", "W", "Y",
-            "IY", "AH", "AA",
+            "P", "B", "T", "D", "K", "G", "F", "V", "M", "N", "NG", "L", "R", "W", "Y", "IY", "AH",
+            "AA",
         ];
 
         for phone in &phonemes {

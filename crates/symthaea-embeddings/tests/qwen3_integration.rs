@@ -77,10 +77,7 @@ mod integration {
                 result.dimension, QWEN3_STANDARD_DIMENSION,
                 "Text {i} has wrong dimension"
             );
-            assert!(
-                !result.is_simulated,
-                "Text {i} should not be simulated"
-            );
+            assert!(!result.is_simulated, "Text {i} should not be simulated");
         }
 
         // Verify batch results match sequential results

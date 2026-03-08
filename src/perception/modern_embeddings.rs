@@ -770,7 +770,8 @@ impl PhenomenalLayerAnalyzer {
         let mut peak_layer = 0;
 
         for output in &layers {
-            let depth_fraction = output.layer_idx as f64 / num_layers.saturating_sub(1).max(1) as f64;
+            let depth_fraction =
+                output.layer_idx as f64 / num_layers.saturating_sub(1).max(1) as f64;
 
             // Compute Phi loading
             let phi_loading = self.compute_phi_loading(&output.activation);

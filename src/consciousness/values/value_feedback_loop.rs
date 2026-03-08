@@ -3,7 +3,7 @@
 //! Implements a feedback loop that allows the system to learn and
 //! improve its value alignment based on outcomes and corrections.
 
-use super::seven_harmonies::Harmony;
+use super::eight_harmonies::Harmony;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::ContinuousHV;

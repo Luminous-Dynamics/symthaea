@@ -203,9 +203,7 @@ impl ProsodyContext {
         // Vowel reduction: unstressed vowels centralize toward schwa.
         // In natural speech, unstressed vowels are shorter and their formants
         // drift toward a neutral position (~500, ~1500 Hz).
-        if self.stress == 0
-            && matches!(frame.source_type, SourceType::Vowel | SourceType::Liquid)
-        {
+        if self.stress == 0 && matches!(frame.source_type, SourceType::Vowel | SourceType::Liquid) {
             const SCHWA_F1: f32 = 500.0;
             const SCHWA_F2: f32 = 1500.0;
             const REDUCTION: f32 = 0.3; // 30% toward schwa
@@ -738,8 +736,7 @@ impl VocalTractPipeline {
             let mut hv = if self.coarticulation_counter < self.coarticulation_frames {
                 self.coarticulation_counter += 1;
                 if let Some(ref prev_hv) = self.prev_phoneme_bound_hv {
-                    let t =
-                        self.coarticulation_counter as f32 / self.coarticulation_frames as f32;
+                    let t = self.coarticulation_counter as f32 / self.coarticulation_frames as f32;
                     prev_hv.scale(1.0 - t).add(&new_bound.scale(t))
                 } else {
                     new_bound.clone()
@@ -758,7 +755,8 @@ impl VocalTractPipeline {
                     // Blend factor: 0 at start of window, up to 0.3 at phoneme end
                     let t = 1.0 - (phoneme_remaining_frames as f32 / window as f32);
                     let anticipation_blend = t * 0.3;
-                    hv = hv.scale(1.0 - anticipation_blend)
+                    hv = hv
+                        .scale(1.0 - anticipation_blend)
                         .add(&next_bound.scale(anticipation_blend));
                 }
             }
@@ -1017,7 +1015,10 @@ mod tests {
     #[test]
     fn test_phoneme_routing_different_output() {
         let genesis = GenesisSeed::from_phrase("test-phoneme-routing");
-        let config = VocalTractConfig { fourier_frequencies: vec![], ..VocalTractConfig::default() };
+        let config = VocalTractConfig {
+            fourier_frequencies: vec![],
+            ..VocalTractConfig::default()
+        };
         let mut pipeline = VocalTractPipeline::new_with_config(&genesis, &config);
         let state = VoiceCognitiveState::default();
 
@@ -1329,7 +1330,10 @@ mod tests {
     #[test]
     fn test_coarticulation_blending() {
         let genesis = GenesisSeed::from_phrase("test-coarticulation");
-        let config = VocalTractConfig { fourier_frequencies: vec![], ..VocalTractConfig::default() };
+        let config = VocalTractConfig {
+            fourier_frequencies: vec![],
+            ..VocalTractConfig::default()
+        };
         let mut pipeline = VocalTractPipeline::new_with_config(&genesis, &config);
         let state = VoiceCognitiveState::default();
 
@@ -1891,7 +1895,10 @@ mod tests {
     #[test]
     fn test_anticipatory_blending() {
         let genesis = GenesisSeed::from_phrase("test-anticipatory");
-        let config = VocalTractConfig { fourier_frequencies: vec![], ..VocalTractConfig::default() };
+        let config = VocalTractConfig {
+            fourier_frequencies: vec![],
+            ..VocalTractConfig::default()
+        };
         let mut pipeline = VocalTractPipeline::new_with_config(&genesis, &config);
         let state = VoiceCognitiveState::default();
         let prosody = ProsodyContext::default();
@@ -1960,12 +1967,9 @@ mod tests {
         let prosody = ProsodyContext::default();
 
         // Both pipelines produce same output when next_phoneme is None
-        let frame1 = pipeline1.tick_with_anticipation(
-            &state, None, 0.005, Some("AH"), None, 0, &prosody,
-        );
-        let frame2 = pipeline2.tick_with_prosody(
-            &state, None, 0.005, Some("AH"), &prosody,
-        );
+        let frame1 =
+            pipeline1.tick_with_anticipation(&state, None, 0.005, Some("AH"), None, 0, &prosody);
+        let frame2 = pipeline2.tick_with_prosody(&state, None, 0.005, Some("AH"), &prosody);
 
         // Should be very close (tick_with_anticipation duplicates the cognitive/motor logic)
         assert!(

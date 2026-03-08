@@ -9,6 +9,7 @@
 
 use super::core::{ApproximationTier, TieredPhi};
 use crate::hdc::binary_hv::BinaryHV;
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use std::time::Instant;
 
@@ -235,20 +236,29 @@ impl PhiPyramid {
         }
 
         // Step 2: Compute Φ at each scale
-        let scale_results: Vec<(f64, usize, usize)> =
-            if self.config.parallel_scales && scales.len() > 2 {
-                // Parallel computation across scales
-                scales
-                    .par_iter()
-                    .map(|&cluster_size| self.compute_scale(components, cluster_size))
-                    .collect()
-            } else {
-                // Sequential for small scale count
+        let scale_results: Vec<(f64, usize, usize)> = {
+            #[cfg(feature = "parallel")]
+            {
+                if self.config.parallel_scales && scales.len() > 2 {
+                    scales
+                        .par_iter()
+                        .map(|&cluster_size| self.compute_scale(components, cluster_size))
+                        .collect()
+                } else {
+                    scales
+                        .iter()
+                        .map(|&cluster_size| self.compute_scale(components, cluster_size))
+                        .collect()
+                }
+            }
+            #[cfg(not(feature = "parallel"))]
+            {
                 scales
                     .iter()
                     .map(|&cluster_size| self.compute_scale(components, cluster_size))
                     .collect()
-            };
+            }
+        };
 
         // Extract results
         let phi_by_scale: Vec<f64> = scale_results.iter().map(|r| r.0).collect();

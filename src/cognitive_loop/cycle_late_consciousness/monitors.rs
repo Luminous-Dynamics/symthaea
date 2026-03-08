@@ -68,18 +68,20 @@ impl CognitiveLoopService {
                                     .episodes
                                     .iter()
                                     .map(|ep| {
-                                        let dot: f32 = ep.hv
+                                        let dot: f32 = ep
+                                            .hv
                                             .iter()
                                             .zip(projected.iter())
                                             .map(|(a, b)| a * b)
                                             .sum();
-                                        let denom = (ep.hv.iter().map(|x| x * x).sum::<f32>().sqrt()
-                                                * projected
-                                                    .iter()
-                                                    .map(|x| x * x)
-                                                    .sum::<f32>()
-                                                    .sqrt())
-                                            .max(1e-8);
+                                        let denom = (ep
+                                            .hv
+                                            .iter()
+                                            .map(|x| x * x)
+                                            .sum::<f32>()
+                                            .sqrt()
+                                            * projected.iter().map(|x| x * x).sum::<f32>().sqrt())
+                                        .max(1e-8);
                                         dot / denom
                                     })
                                     .fold(0.0f32, f32::max);
@@ -559,11 +561,15 @@ impl CognitiveLoopService {
             hierarchical_total_free_energy,
             predictive_self_safety,
             attention_schema_focus,
-            attention_fatigue: self.self_model_tier.attention_schema
+            attention_fatigue: self
+                .self_model_tier
+                .attention_schema
                 .as_ref()
                 .map(|s| s.fatigue_level())
                 .unwrap_or(0.0),
-            attention_prediction_accuracy: self.self_model_tier.attention_schema
+            attention_prediction_accuracy: self
+                .self_model_tier
+                .attention_schema
                 .as_ref()
                 .map(|s| s.prediction_accuracy() as f32)
                 .unwrap_or(0.0),

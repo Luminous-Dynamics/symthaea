@@ -1,8 +1,8 @@
 //! Types for the consciousness engine — output, input, weights, coupling, cache.
 
+use crate::consciousness::consciousness_equation_v2::CoreComponent;
 use symthaea_core::consciousness_metrics::StructuralPhiResult;
 use symthaea_core::hdc::{BinaryHV, ContinuousHV};
-use crate::consciousness::consciousness_equation_v2::CoreComponent;
 
 /// Classification of weight convergence dynamics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

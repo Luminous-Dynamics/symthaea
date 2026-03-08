@@ -431,9 +431,11 @@ mod tests {
         sys.process_separation(10.0); // Calm → Quiet (>5 min)
         sys.process_separation(10.0); // Quiet → Vocalization (>15 min cumulative)
         sys.process_separation(20.0); // Vocalization → Protest (>30 min cumulative)
-        assert!(sys.separation_distress_level > 0.3,
+        assert!(
+            sys.separation_distress_level > 0.3,
             "After protest-level separation, distress should be > 0.3, got {}",
-            sys.separation_distress_level);
+            sys.separation_distress_level
+        );
 
         // Reunion
         let neuromod = sys.process_reunion(&reliable);

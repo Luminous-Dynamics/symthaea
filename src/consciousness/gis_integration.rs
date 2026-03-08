@@ -34,7 +34,7 @@
 //! 1. **ConsciousnessGraph** - Uncertainty tracking per state
 //! 2. **Prefrontal Cortex** - Decision gating based on epistemic confidence
 //! 3. **Dark Spot DHT** - Network-level ignorance sharing
-//! 4. **Seven Harmonies** - Value-aligned uncertainty handling
+//! 4. **Eight Harmonies** - Value-aligned uncertainty handling
 
 use std::collections::HashMap;
 use std::time::SystemTime;

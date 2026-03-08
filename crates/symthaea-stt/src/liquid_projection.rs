@@ -941,7 +941,10 @@ mod tests {
         // Same index should produce same HV
         let aa1 = targets1.get("AA").unwrap();
         let aa2 = targets2.get("AA").unwrap();
-        assert_eq!(aa1.words, aa2.words, "PhonemeTargets should be deterministic");
+        assert_eq!(
+            aa1.words, aa2.words,
+            "PhonemeTargets should be deterministic"
+        );
     }
 
     #[test]
@@ -1216,10 +1219,7 @@ mod tests {
         assert_eq!(output.len(), 2);
         // Tanh output should be in [-1, 1]
         for &v in &output {
-            assert!(
-                v >= -1.0 && v <= 1.0,
-                "tanh output out of range: {v}"
-            );
+            assert!(v >= -1.0 && v <= 1.0, "tanh output out of range: {v}");
         }
     }
 
@@ -1246,7 +1246,10 @@ mod tests {
             .iter()
             .zip(rp2.weights.iter())
             .any(|(r1, r2)| r1.iter().zip(r2.iter()).any(|(a, b)| (a - b).abs() > 1e-10));
-        assert!(different, "different seeds should produce different weights");
+        assert!(
+            different,
+            "different seeds should produce different weights"
+        );
     }
 
     #[test]

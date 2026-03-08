@@ -6,8 +6,8 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 
 use super::sample_action;
@@ -232,7 +232,11 @@ impl PsychBenchmark for TwoStepBenchmark {
                     trial_idx: trace.len(),
                     condition: "two_step".to_string(),
                     correct: mb > 0.0,
-                    rt_ticks: if rts.is_empty() { 0.0 } else { rts.iter().sum::<f64>() / rts.len() as f64 },
+                    rt_ticks: if rts.is_empty() {
+                        0.0
+                    } else {
+                        rts.iter().sum::<f64>() / rts.len() as f64
+                    },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,
@@ -250,7 +254,9 @@ impl PsychBenchmark for TwoStepBenchmark {
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }

@@ -22,8 +22,8 @@ use std::sync::Arc;
 
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 use symthaea::swarm::{
-    evaluate_compatibility, AgentPubKey, CapabilityCard, HandshakeConfig,
-    ReputationBridge, VouchDecision,
+    evaluate_compatibility, AgentPubKey, CapabilityCard, HandshakeConfig, ReputationBridge,
+    VouchDecision,
 };
 use symthaea_core::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent};
 use symthaea_core::hdc::BinaryHV;
@@ -97,9 +97,18 @@ fn main() {
         tau_factors.iter().copied().fold(f32::MAX, f32::min),
         tau_factors.iter().copied().fold(f32::MIN, f32::max)
     );
-    println!("  All finite:        {}", if all_finite { "PASS" } else { "FAIL" });
-    println!("  All bounded [0,1]: {}", if all_bounded { "PASS" } else { "FAIL" });
-    println!("  Tau all positive:  {}", if tau_all_positive { "PASS" } else { "FAIL" });
+    println!(
+        "  All finite:        {}",
+        if all_finite { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "  All bounded [0,1]: {}",
+        if all_bounded { "PASS" } else { "FAIL" }
+    );
+    println!(
+        "  Tau all positive:  {}",
+        if tau_all_positive { "PASS" } else { "FAIL" }
+    );
 
     assert!(all_finite, "Substrate feasibility must be finite");
     assert!(all_bounded, "Substrate feasibility must be in [0,1]");
@@ -182,13 +191,24 @@ fn main() {
     println!("  Cards built: {}", cards_built.len());
 
     let all_valid = cards_built.iter().all(|c| c.verify_hash());
-    println!("  All hashes valid:  {}", if all_valid { "PASS" } else { "FAIL" });
+    println!(
+        "  All hashes valid:  {}",
+        if all_valid { "PASS" } else { "FAIL" }
+    );
 
     // Check fields are populated
-    let all_populated = cards_built.iter().all(|c| c.hdc_dimension > 0 && c.cfc_neurons > 0);
-    println!("  All fields populated: {}", if all_populated { "PASS" } else { "FAIL" });
+    let all_populated = cards_built
+        .iter()
+        .all(|c| c.hdc_dimension > 0 && c.cfc_neurons > 0);
+    println!(
+        "  All fields populated: {}",
+        if all_populated { "PASS" } else { "FAIL" }
+    );
 
-    assert!(all_valid, "All capability cards must pass hash verification");
+    assert!(
+        all_valid,
+        "All capability cards must pass hash verification"
+    );
     assert!(all_populated, "All cards must have populated fields");
 
     // JSON roundtrip
@@ -197,7 +217,10 @@ fn main() {
         let restored: CapabilityCard = serde_json::from_str(&json).unwrap();
         restored.verify_hash()
     });
-    println!("  JSON roundtrip:    {}", if roundtrip_ok { "PASS" } else { "FAIL" });
+    println!(
+        "  JSON roundtrip:    {}",
+        if roundtrip_ok { "PASS" } else { "FAIL" }
+    );
     assert!(roundtrip_ok, "Cards must survive JSON roundtrip");
 
     // ── 3. Reputation bridge under load ─────────────────────────────────
@@ -243,7 +266,10 @@ fn main() {
 
     assert!(self_compat.total_score > 0.9, "Self-compat should be ~1.0");
     assert!(self_compat.approved, "Self should always be approved");
-    assert!(cross_compat.approved, "Same-service cards should be compatible");
+    assert!(
+        cross_compat.approved,
+        "Same-service cards should be compatible"
+    );
 
     // ── 5. GlobalWorkspace handler dispatch soak ────────────────────────
 
@@ -261,9 +287,19 @@ fn main() {
 
     // Register handlers for two modules
     let dc = dispatch_counter.clone();
-    ws.register_handler("perception", Box::new(move |_| { dc.fetch_add(1, Ordering::Relaxed); }));
+    ws.register_handler(
+        "perception",
+        Box::new(move |_| {
+            dc.fetch_add(1, Ordering::Relaxed);
+        }),
+    );
     let mc = memory_counter.clone();
-    ws.register_handler("memory", Box::new(move |_| { mc.fetch_add(1, Ordering::Relaxed); }));
+    ws.register_handler(
+        "memory",
+        Box::new(move |_| {
+            mc.fetch_add(1, Ordering::Relaxed);
+        }),
+    );
 
     let mut total_broadcasts = 0usize;
     for i in 0..200 {

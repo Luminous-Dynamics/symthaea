@@ -228,10 +228,14 @@ fn bind_scalar_unrolled(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048])
         .chunks_exact_mut(8)
         .zip(a.chunks_exact(8).zip(b.chunks_exact(8)))
     {
-        let av = u64::from_ne_bytes([a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3],
-                                     a_chunk[4], a_chunk[5], a_chunk[6], a_chunk[7]]);
-        let bv = u64::from_ne_bytes([b_chunk[0], b_chunk[1], b_chunk[2], b_chunk[3],
-                                     b_chunk[4], b_chunk[5], b_chunk[6], b_chunk[7]]);
+        let av = u64::from_ne_bytes([
+            a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3], a_chunk[4], a_chunk[5], a_chunk[6],
+            a_chunk[7],
+        ]);
+        let bv = u64::from_ne_bytes([
+            b_chunk[0], b_chunk[1], b_chunk[2], b_chunk[3], b_chunk[4], b_chunk[5], b_chunk[6],
+            b_chunk[7],
+        ]);
         r_chunk.copy_from_slice(&(av ^ bv).to_ne_bytes());
     }
 }
@@ -355,10 +359,14 @@ fn intersection_scalar_unrolled(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8
         .chunks_exact_mut(8)
         .zip(a.chunks_exact(8).zip(b.chunks_exact(8)))
     {
-        let av = u64::from_ne_bytes([a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3],
-                                     a_chunk[4], a_chunk[5], a_chunk[6], a_chunk[7]]);
-        let bv = u64::from_ne_bytes([b_chunk[0], b_chunk[1], b_chunk[2], b_chunk[3],
-                                     b_chunk[4], b_chunk[5], b_chunk[6], b_chunk[7]]);
+        let av = u64::from_ne_bytes([
+            a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3], a_chunk[4], a_chunk[5], a_chunk[6],
+            a_chunk[7],
+        ]);
+        let bv = u64::from_ne_bytes([
+            b_chunk[0], b_chunk[1], b_chunk[2], b_chunk[3], b_chunk[4], b_chunk[5], b_chunk[6],
+            b_chunk[7],
+        ]);
         r_chunk.copy_from_slice(&(av & bv).to_ne_bytes());
     }
 }
@@ -482,10 +490,14 @@ fn union_scalar_unrolled(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]
         .chunks_exact_mut(8)
         .zip(a.chunks_exact(8).zip(b.chunks_exact(8)))
     {
-        let av = u64::from_ne_bytes([a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3],
-                                     a_chunk[4], a_chunk[5], a_chunk[6], a_chunk[7]]);
-        let bv = u64::from_ne_bytes([b_chunk[0], b_chunk[1], b_chunk[2], b_chunk[3],
-                                     b_chunk[4], b_chunk[5], b_chunk[6], b_chunk[7]]);
+        let av = u64::from_ne_bytes([
+            a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3], a_chunk[4], a_chunk[5], a_chunk[6],
+            a_chunk[7],
+        ]);
+        let bv = u64::from_ne_bytes([
+            b_chunk[0], b_chunk[1], b_chunk[2], b_chunk[3], b_chunk[4], b_chunk[5], b_chunk[6],
+            b_chunk[7],
+        ]);
         r_chunk.copy_from_slice(&(av | bv).to_ne_bytes());
     }
 }
@@ -627,10 +639,14 @@ fn matching_bits_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
     let mut differing: u64 = 0;
 
     for (a_chunk, b_chunk) in a.chunks_exact(8).zip(b.chunks_exact(8)) {
-        let av = u64::from_ne_bytes([a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3],
-                                     a_chunk[4], a_chunk[5], a_chunk[6], a_chunk[7]]);
-        let bv = u64::from_ne_bytes([b_chunk[0], b_chunk[1], b_chunk[2], b_chunk[3],
-                                     b_chunk[4], b_chunk[5], b_chunk[6], b_chunk[7]]);
+        let av = u64::from_ne_bytes([
+            a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3], a_chunk[4], a_chunk[5], a_chunk[6],
+            a_chunk[7],
+        ]);
+        let bv = u64::from_ne_bytes([
+            b_chunk[0], b_chunk[1], b_chunk[2], b_chunk[3], b_chunk[4], b_chunk[5], b_chunk[6],
+            b_chunk[7],
+        ]);
         differing += (av ^ bv).count_ones() as u64;
     }
 
@@ -724,8 +740,10 @@ unsafe fn invert_sse41(a: &[u8; 2048], result: &mut [u8; 2048]) {
 #[inline]
 fn invert_scalar(a: &[u8; 2048], result: &mut [u8; 2048]) {
     for (r_chunk, a_chunk) in result.chunks_exact_mut(8).zip(a.chunks_exact(8)) {
-        let av = u64::from_ne_bytes([a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3],
-                                     a_chunk[4], a_chunk[5], a_chunk[6], a_chunk[7]]);
+        let av = u64::from_ne_bytes([
+            a_chunk[0], a_chunk[1], a_chunk[2], a_chunk[3], a_chunk[4], a_chunk[5], a_chunk[6],
+            a_chunk[7],
+        ]);
         r_chunk.copy_from_slice(&(!av).to_ne_bytes());
     }
 }

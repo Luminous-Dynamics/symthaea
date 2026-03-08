@@ -56,7 +56,11 @@ fn main() {
     let mean_min = stats.mean.iter().cloned().fold(f32::INFINITY, f32::min);
     let mean_max = stats.mean.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let var_min = stats.variance.iter().cloned().fold(f32::INFINITY, f32::min);
-    let var_max = stats.variance.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let var_max = stats
+        .variance
+        .iter()
+        .cloned()
+        .fold(f32::NEG_INFINITY, f32::max);
 
     println!("Embedding stats:");
     println!("  dim:       {}", stats.dim);

@@ -132,8 +132,7 @@ impl SelfAssessmentMonitor {
             self.inhibition_error_ema * (1.0 - ALPHA) + input.inhibition_error_rate as f64 * ALPHA;
         self.social_coherence_ema =
             self.social_coherence_ema * (1.0 - ALPHA) + input.social_coherence as f64 * ALPHA;
-        self.ei_ratio_ema =
-            self.ei_ratio_ema * (1.0 - ALPHA) + input.ei_ratio as f64 * ALPHA;
+        self.ei_ratio_ema = self.ei_ratio_ema * (1.0 - ALPHA) + input.ei_ratio as f64 * ALPHA;
         self.excitotoxicity_ema =
             self.excitotoxicity_ema * (1.0 - ALPHA) + input.excitotoxicity_risk as f64 * ALPHA;
         self.sleep_pressure_ema =

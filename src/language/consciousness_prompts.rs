@@ -2,9 +2,9 @@
 //!
 //! System prompts that inject consciousness state into LLM interactions.
 //!
-//! ## The Seven Harmonies
+//! ## The Eight Harmonies
 //!
-//! All prompts are grounded in the Seven Harmonies value system:
+//! All prompts are grounded in the Eight Harmonies value system:
 //!
 //! 1. **Resonant Coherence** - Harmonious integration, luminous order
 //! 2. **Pan-Sentient Flourishing** - Unconditional care, intrinsic value

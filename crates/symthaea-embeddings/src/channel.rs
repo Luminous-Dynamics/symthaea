@@ -59,14 +59,9 @@ impl EmbeddingChannel {
                 };
 
                 while let Ok(req) = request_rx.recv() {
-                    let result = embedder
-                        .embed(&req.text)
-                        .map_err(|e| e.to_string());
+                    let result = embedder.embed(&req.text).map_err(|e| e.to_string());
 
-                    let response = EmbedResponse {
-                        id: req.id,
-                        result,
-                    };
+                    let response = EmbedResponse { id: req.id, result };
                     // If the receiver was dropped, we just discard the response
                     let _ = req.response_tx.try_send(response);
                 }
@@ -82,7 +77,10 @@ impl EmbeddingChannel {
     ///
     /// Returns a receiver for the response. Fails with `TrySendError::Full`
     /// if the channel is at capacity (backpressure).
-    pub fn request(&self, text: &str) -> Result<mpsc::Receiver<EmbedResponse>, mpsc::TrySendError<()>> {
+    pub fn request(
+        &self,
+        text: &str,
+    ) -> Result<mpsc::Receiver<EmbedResponse>, mpsc::TrySendError<()>> {
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let (response_tx, response_rx) = mpsc::sync_channel(1);
 
@@ -92,12 +90,10 @@ impl EmbeddingChannel {
             response_tx,
         };
 
-        self.request_tx
-            .try_send(req)
-            .map_err(|e| match e {
-                mpsc::TrySendError::Full(_) => mpsc::TrySendError::Full(()),
-                mpsc::TrySendError::Disconnected(_) => mpsc::TrySendError::Disconnected(()),
-            })?;
+        self.request_tx.try_send(req).map_err(|e| match e {
+            mpsc::TrySendError::Full(_) => mpsc::TrySendError::Full(()),
+            mpsc::TrySendError::Disconnected(_) => mpsc::TrySendError::Disconnected(()),
+        })?;
 
         Ok(response_rx)
     }
@@ -186,7 +182,10 @@ mod tests {
         }
 
         // We should have sent at least 2 (the capacity)
-        assert!(sent >= 2, "Should send at least capacity messages, sent {sent}");
+        assert!(
+            sent >= 2,
+            "Should send at least capacity messages, sent {sent}"
+        );
 
         // All sent requests should eventually complete
         for rx in receivers {

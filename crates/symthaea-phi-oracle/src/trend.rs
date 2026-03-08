@@ -172,7 +172,11 @@ mod tests {
         TrendPoint {
             step,
             integration_index: idx,
-            normalized_index: if total_mi > 1e-12 { (idx / total_mi).clamp(0.0, 1.0) } else { 0.0 },
+            normalized_index: if total_mi > 1e-12 {
+                (idx / total_mi).clamp(0.0, 1.0)
+            } else {
+                0.0
+            },
             total_mi,
             partition_sizes: (3, 3),
         }
@@ -185,7 +189,10 @@ mod tests {
             trend.record_point(make_point(i, i as f64 * 0.1));
         }
         let slope = trend.trend_slope().unwrap();
-        assert!(slope > 0.0, "increasing data should have positive slope, got {slope}");
+        assert!(
+            slope > 0.0,
+            "increasing data should have positive slope, got {slope}"
+        );
         assert!(trend.is_strengthening());
         assert!(!trend.is_weakening());
     }
@@ -197,7 +204,10 @@ mod tests {
             trend.record_point(make_point(i, 1.0 - i as f64 * 0.1));
         }
         let slope = trend.trend_slope().unwrap();
-        assert!(slope < 0.0, "decreasing data should have negative slope, got {slope}");
+        assert!(
+            slope < 0.0,
+            "decreasing data should have negative slope, got {slope}"
+        );
         assert!(trend.is_weakening());
         assert!(!trend.is_strengthening());
     }

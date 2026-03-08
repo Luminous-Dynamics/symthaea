@@ -564,7 +564,8 @@ impl Default for CognitiveLoopConfig {
                 ..HdcLtcBridgeConfig::default()
             },
             temporal_backend: TemporalBackend::default(),
-            hierarchical_cfc_config: crate::dynamics::hierarchical_cfc::HierarchicalCfCConfig::default(),
+            hierarchical_cfc_config:
+                crate::dynamics::hierarchical_cfc::HierarchicalCfCConfig::default(),
             learning_threshold: 0.05,
             buffer_size: 1000,
             enable_consolidation: true,

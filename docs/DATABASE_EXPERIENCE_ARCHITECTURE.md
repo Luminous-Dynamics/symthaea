@@ -17,7 +17,7 @@ We identified that Φ (integrated information) was being used as a magic number 
 
 This architecture integrates with:
 - **GIS v3.0 Benevolent Intelligence**: Predictive Epistemics, Epistemic Mirror, Rashomon Engine, Axiomatic Value Core
-- **GIS v4.0 Kosmic Song**: KosmicSong unified identity, Seven Harmonies as epistemic lenses, MoralUncertainty
+- **GIS v4.0 Kosmic Song**: KosmicSong unified identity, Eight Harmonies as epistemic lenses, MoralUncertainty
 
 ---
 
@@ -721,7 +721,7 @@ pub struct KosmicSong {
     // IIT Component (monitoring only)
     phi: f32,
 
-    // Seven Harmonies (epistemic lenses)
+    // Eight Harmonies (epistemic lenses)
     harmonies: SevenHarmonies,
 
     // Graceful Ignorance System

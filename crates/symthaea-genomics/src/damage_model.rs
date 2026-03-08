@@ -309,7 +309,10 @@ mod tests {
     fn test_deamination_fraction_monotonic() {
         let model = DamageModel::new(15.0);
         let ages = [0.0, 100.0, 1_000.0, 10_000.0, 100_000.0];
-        let fractions: Vec<f64> = ages.iter().map(|&a| model.expected_deamination_fraction(a)).collect();
+        let fractions: Vec<f64> = ages
+            .iter()
+            .map(|&a| model.expected_deamination_fraction(a))
+            .collect();
 
         for i in 1..fractions.len() {
             assert!(
@@ -369,7 +372,10 @@ mod tests {
             .iter()
             .filter(|e| e.damage_type == DamageType::Depurination)
             .count();
-        assert_eq!(depurination_count, 2, "Each N base should be detected as depurination");
+        assert_eq!(
+            depurination_count, 2,
+            "Each N base should be detected as depurination"
+        );
     }
 
     #[test]
@@ -387,7 +393,11 @@ mod tests {
     fn test_cumulative_probability_bounds() {
         assert!((cumulative_probability(0.001, 0.0)).abs() < 1e-10);
         let p = cumulative_probability(0.001, 10_000.0);
-        assert!(p >= 0.0 && p <= 1.0, "Probability must be in [0,1], got {}", p);
+        assert!(
+            p >= 0.0 && p <= 1.0,
+            "Probability must be in [0,1], got {}",
+            p
+        );
     }
 
     #[test]

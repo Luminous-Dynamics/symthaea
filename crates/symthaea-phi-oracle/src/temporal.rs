@@ -1,4 +1,4 @@
-use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNeuron, UnifiedConfig, UnifiedActivation};
+use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
 
 use crate::result::TemporalCoherence;
 
@@ -187,7 +187,10 @@ mod tests {
     fn test_cv_noisy_signal() {
         let values: Vec<f64> = (0..100).map(|i| 10.0 + (i as f64 * 0.37).sin()).collect();
         let cv = coefficient_of_variation(&values);
-        assert!(cv > 0.0 && cv < 1.0, "moderate noise should have 0 < CV < 1, got {cv}");
+        assert!(
+            cv > 0.0 && cv < 1.0,
+            "moderate noise should have 0 < CV < 1, got {cv}"
+        );
     }
 
     #[test]

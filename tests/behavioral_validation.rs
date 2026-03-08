@@ -167,7 +167,10 @@ fn test_novel_vs_familiar_surprise() {
     eprintln!("=== Novel vs Familiar Results ===");
     eprintln!("Familiar avg PE:       {familiar_avg:.6}");
     eprintln!("Novel avg PE:          {novel_avg:.6}");
-    eprintln!("Familiar surprise %:   {:.1}%", familiar_surprise_rate * 100.0);
+    eprintln!(
+        "Familiar surprise %:   {:.1}%",
+        familiar_surprise_rate * 100.0
+    );
     eprintln!("Novel surprise %:      {:.1}%", novel_surprise_rate * 100.0);
 
     // Novel content should produce AT LEAST as much prediction error as familiar.
@@ -212,8 +215,8 @@ fn test_consciousness_responds_to_engagement() {
         high_engagement_consciousness.push(result.metadata.consciousness_level);
     }
 
-    let low_avg: f64 =
-        low_engagement_consciousness.iter().sum::<f64>() / low_engagement_consciousness.len() as f64;
+    let low_avg: f64 = low_engagement_consciousness.iter().sum::<f64>()
+        / low_engagement_consciousness.len() as f64;
     let high_avg: f64 = high_engagement_consciousness.iter().sum::<f64>()
         / high_engagement_consciousness.len() as f64;
 
@@ -335,13 +338,25 @@ fn test_500_cycle_behavioral_demonstration() {
         .chunks(100)
         .map(|w| w.iter().sum::<f32>() / w.len() as f32)
         .collect();
-    eprintln!("\nPE by 100-cycle window: {:?}", windows.iter().map(|w| format!("{w:.4}")).collect::<Vec<_>>());
+    eprintln!(
+        "\nPE by 100-cycle window: {:?}",
+        windows
+            .iter()
+            .map(|w| format!("{w:.4}"))
+            .collect::<Vec<_>>()
+    );
 
     let consciousness_windows: Vec<f64> = consciousness_history
         .chunks(100)
         .map(|w| w.iter().sum::<f64>() / w.len() as f64)
         .collect();
-    eprintln!("Consciousness by window: {:?}", consciousness_windows.iter().map(|w| format!("{w:.4}")).collect::<Vec<_>>());
+    eprintln!(
+        "Consciousness by window: {:?}",
+        consciousness_windows
+            .iter()
+            .map(|w| format!("{w:.4}"))
+            .collect::<Vec<_>>()
+    );
 
     // ── Assertions ──
 
@@ -350,7 +365,10 @@ fn test_500_cycle_behavioral_demonstration() {
     assert_eq!(consciousness_history.len(), 500);
 
     // 2. All values finite
-    assert!(pe_history.iter().all(|e| e.is_finite()), "PE contains NaN/Inf");
+    assert!(
+        pe_history.iter().all(|e| e.is_finite()),
+        "PE contains NaN/Inf"
+    );
     assert!(
         consciousness_history.iter().all(|c| c.is_finite()),
         "Consciousness contains NaN/Inf"
@@ -439,8 +457,7 @@ fn test_full_profile_vs_default_consciousness() {
 
     let default_c_avg: f64 =
         default_consciousness.iter().sum::<f64>() / default_consciousness.len() as f64;
-    let full_c_avg: f64 =
-        full_consciousness.iter().sum::<f64>() / full_consciousness.len() as f64;
+    let full_c_avg: f64 = full_consciousness.iter().sum::<f64>() / full_consciousness.len() as f64;
     let default_pe_avg: f32 = default_pe.iter().sum::<f32>() / default_pe.len() as f32;
     let full_pe_avg: f32 = full_pe.iter().sum::<f32>() / full_pe.len() as f32;
 
@@ -450,10 +467,7 @@ fn test_full_profile_vs_default_consciousness() {
     eprintln!("\n{}", "=".repeat(70));
     eprintln!("  FULL-PROFILE vs DEFAULT COMPARISON (200 cycles)");
     eprintln!("{}", "=".repeat(70));
-    eprintln!(
-        "{:<20} {:>15} {:>15}",
-        "Metric", "Default", "Full Profile"
-    );
+    eprintln!("{:<20} {:>15} {:>15}", "Metric", "Default", "Full Profile");
     eprintln!("{}", "-".repeat(70));
     eprintln!(
         "{:<20} {:>15.6} {:>15.6}",
@@ -469,9 +483,7 @@ fn test_full_profile_vs_default_consciousness() {
     );
     eprintln!(
         "{:<20} {:>15.6} {:>15.6}",
-        "Error Trend",
-        default_stats.error_trend,
-        full_stats.error_trend
+        "Error Trend", default_stats.error_trend, full_stats.error_trend
     );
     eprintln!(
         "{:<20} {:>15.4} {:>15.4}",

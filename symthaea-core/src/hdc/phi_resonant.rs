@@ -41,6 +41,7 @@ state(t+1) = normalize(∑ⱼ similarity(i,j) × state_j(t))
 */
 
 use super::unified_hv::ContinuousHV;
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -390,21 +391,23 @@ impl ResonantPhiCalculator {
         let n = components.len();
         let self_coupling = self.config.self_coupling;
 
-        (0..n)
-            .into_par_iter()
-            .map(|i| {
-                let mut row = vec![0.0; n];
-                for j in 0..n {
-                    if i == j {
-                        row[j] = self_coupling;
-                    } else {
-                        let sim = components[i].similarity(&components[j]);
-                        row[j] = ((sim as f64 + 1.0) / 2.0).clamp(0.0, 1.0);
-                    }
+        let row_fn = |i: usize| {
+            let mut row = vec![0.0; n];
+            for j in 0..n {
+                if i == j {
+                    row[j] = self_coupling;
+                } else {
+                    let sim = components[i].similarity(&components[j]);
+                    row[j] = ((sim as f64 + 1.0) / 2.0).clamp(0.0, 1.0);
                 }
-                row
-            })
-            .collect()
+            }
+            row
+        };
+
+        #[cfg(feature = "parallel")]
+        { (0..n).into_par_iter().map(row_fn).collect() }
+        #[cfg(not(feature = "parallel"))]
+        { (0..n).map(row_fn).collect() }
     }
 
     /// Single resonance step: update all resonators based on current state
@@ -417,7 +420,11 @@ impl ResonantPhiCalculator {
         similarity_matrix: &[Vec<f64>],
     ) -> Vec<ContinuousHV> {
         let n = current_state.len();
+        #[cfg(feature = "parallel")]
         let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
+        #[cfg(not(feature = "parallel"))]
+        let use_parallel = false;
+        let _ = n; // suppress unused warning
 
         if use_parallel {
             self.resonance_step_parallel(current_state, similarity_matrix)
@@ -454,6 +461,7 @@ impl ResonantPhiCalculator {
     /// Parallel resonance step using rayon
     ///
     /// Each node update is independent and can be computed in parallel
+    #[cfg(feature = "parallel")]
     fn resonance_step_parallel(
         &self,
         current_state: &[ContinuousHV],

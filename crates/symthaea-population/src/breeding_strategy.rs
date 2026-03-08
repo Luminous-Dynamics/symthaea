@@ -134,10 +134,7 @@ pub fn select_pairs_maximum_avoidance(
 ///
 /// Pairs are selected to maximize genome HV distance (= minimize similarity),
 /// promoting genetically dissimilar pairings without needing pedigree data.
-pub fn select_pairs_hdc_distance(
-    population: &Population,
-    num_pairs: usize,
-) -> Vec<MatingPair> {
+pub fn select_pairs_hdc_distance(population: &Population, num_pairs: usize) -> Vec<MatingPair> {
     let females: Vec<&crate::types::Individual> = population.females();
     let males: Vec<&crate::types::Individual> = population.males();
 
@@ -167,12 +164,13 @@ pub fn select_pairs_hdc_distance(
             used_males.insert(*m);
 
             // Compute HLA complementarity from genome HVs
-            let Some(f_ind) = population.individuals.iter().find(|i| i.id == *f) else { continue };
-            let Some(m_ind) = population.individuals.iter().find(|i| i.id == *m) else { continue };
-            let hla = crate::hdc_genetics::hla_complementarity(
-                &f_ind.genome_hv,
-                &m_ind.genome_hv,
-            );
+            let Some(f_ind) = population.individuals.iter().find(|i| i.id == *f) else {
+                continue;
+            };
+            let Some(m_ind) = population.individuals.iter().find(|i| i.id == *m) else {
+                continue;
+            };
+            let hla = crate::hdc_genetics::hla_complementarity(&f_ind.genome_hv, &m_ind.genome_hv);
 
             selected.push(MatingPair {
                 parent_a: *f,
@@ -238,9 +236,7 @@ pub fn select_pairs(
         BreedingStrategy::MaximumAvoidance => {
             select_pairs_maximum_avoidance(population, pedigree, num_pairs)
         }
-        BreedingStrategy::HdcDistanceMaximize => {
-            select_pairs_hdc_distance(population, num_pairs)
-        }
+        BreedingStrategy::HdcDistanceMaximize => select_pairs_hdc_distance(population, num_pairs),
         BreedingStrategy::BalancedContribution => {
             select_pairs_balanced_contribution(population, num_pairs)
         }
@@ -316,8 +312,14 @@ mod tests {
         let mut seen_a = std::collections::HashSet::new();
         let mut seen_b = std::collections::HashSet::new();
         for p in &pairs {
-            assert!(seen_a.insert(p.parent_a), "duplicate female in random pairing");
-            assert!(seen_b.insert(p.parent_b), "duplicate male in random pairing");
+            assert!(
+                seen_a.insert(p.parent_a),
+                "duplicate female in random pairing"
+            );
+            assert!(
+                seen_b.insert(p.parent_b),
+                "duplicate male in random pairing"
+            );
         }
     }
 
@@ -333,18 +335,70 @@ mod tests {
     fn test_minimum_kinship_selects_lowest() {
         // Create pedigree where some individuals are related
         let mut ped = Pedigree::new();
-        ped.add_entry(PedigreeEntry { individual_id: 0, parent_a_id: None, parent_b_id: None, generation: 0 });
-        ped.add_entry(PedigreeEntry { individual_id: 1, parent_a_id: None, parent_b_id: None, generation: 0 });
-        ped.add_entry(PedigreeEntry { individual_id: 2, parent_a_id: None, parent_b_id: None, generation: 0 });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 0,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 1,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 2,
+            parent_a_id: None,
+            parent_b_id: None,
+            generation: 0,
+        });
         // Individual 3 is offspring of 0 and 2 (so related to both)
-        ped.add_entry(PedigreeEntry { individual_id: 3, parent_a_id: Some(0), parent_b_id: Some(2), generation: 1 });
+        ped.add_entry(PedigreeEntry {
+            individual_id: 3,
+            parent_a_id: Some(0),
+            parent_b_id: Some(2),
+            generation: 1,
+        });
 
         let pop = Population {
             individuals: vec![
-                Individual { id: 0, sex: BiologicalSex::Female, genotypes: vec![], genome_hv: ContinuousHV::random(HDC_DIMENSION, 0), generation: 0, parent_ids: (None, None), fitness: 1.0 },
-                Individual { id: 1, sex: BiologicalSex::Female, genotypes: vec![], genome_hv: ContinuousHV::random(HDC_DIMENSION, 1000), generation: 0, parent_ids: (None, None), fitness: 1.0 },
-                Individual { id: 2, sex: BiologicalSex::Male, genotypes: vec![], genome_hv: ContinuousHV::random(HDC_DIMENSION, 2000), generation: 0, parent_ids: (None, None), fitness: 1.0 },
-                Individual { id: 3, sex: BiologicalSex::Male, genotypes: vec![], genome_hv: ContinuousHV::random(HDC_DIMENSION, 3000), generation: 1, parent_ids: (Some(0), Some(2)), fitness: 1.0 },
+                Individual {
+                    id: 0,
+                    sex: BiologicalSex::Female,
+                    genotypes: vec![],
+                    genome_hv: ContinuousHV::random(HDC_DIMENSION, 0),
+                    generation: 0,
+                    parent_ids: (None, None),
+                    fitness: 1.0,
+                },
+                Individual {
+                    id: 1,
+                    sex: BiologicalSex::Female,
+                    genotypes: vec![],
+                    genome_hv: ContinuousHV::random(HDC_DIMENSION, 1000),
+                    generation: 0,
+                    parent_ids: (None, None),
+                    fitness: 1.0,
+                },
+                Individual {
+                    id: 2,
+                    sex: BiologicalSex::Male,
+                    genotypes: vec![],
+                    genome_hv: ContinuousHV::random(HDC_DIMENSION, 2000),
+                    generation: 0,
+                    parent_ids: (None, None),
+                    fitness: 1.0,
+                },
+                Individual {
+                    id: 3,
+                    sex: BiologicalSex::Male,
+                    genotypes: vec![],
+                    genome_hv: ContinuousHV::random(HDC_DIMENSION, 3000),
+                    generation: 1,
+                    parent_ids: (Some(0), Some(2)),
+                    fitness: 1.0,
+                },
             ],
             generation: 1,
             founding_size: 3,
@@ -457,8 +511,10 @@ mod tests {
         let hdc_pairs = select_pairs_hdc_distance(&pop, 5);
 
         // They should produce different pairings (highly likely with 10x10)
-        let random_set: std::collections::HashSet<(u64, u64)> =
-            random_pairs.iter().map(|p| (p.parent_a, p.parent_b)).collect();
+        let random_set: std::collections::HashSet<(u64, u64)> = random_pairs
+            .iter()
+            .map(|p| (p.parent_a, p.parent_b))
+            .collect();
         let hdc_set: std::collections::HashSet<(u64, u64)> =
             hdc_pairs.iter().map(|p| (p.parent_a, p.parent_b)).collect();
 

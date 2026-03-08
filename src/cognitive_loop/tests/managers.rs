@@ -14,7 +14,11 @@ use super::super::*;
 fn voice_coherence_bridge_default_state() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Bridge should start with zero smoothed coherence
-    assert!(service.voice_coherence.bridge.smoothed_coherence().is_finite());
+    assert!(service
+        .voice_coherence
+        .bridge
+        .smoothed_coherence()
+        .is_finite());
     // Voice feedback should start with default quality
     let summary = service.voice_coherence.voice.summary();
     assert!(summary.articulation_quality.is_finite());
@@ -33,7 +37,11 @@ fn voice_coherence_bridge_reset_restores_clean_state() {
     // Reset
     service.reset();
     // State should be clean
-    assert!(service.voice_coherence.bridge.smoothed_coherence().is_finite());
+    assert!(service
+        .voice_coherence
+        .bridge
+        .smoothed_coherence()
+        .is_finite());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -85,10 +93,16 @@ fn social_manager_phi_dyad_disabled_by_default() {
 fn gwt_manager_default_flags() {
     let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     // Memory flag should be false initially
-    assert!(!service.gwt_mgr.memory_flag.load(std::sync::atomic::Ordering::Relaxed));
+    assert!(!service
+        .gwt_mgr
+        .memory_flag
+        .load(std::sync::atomic::Ordering::Relaxed));
     // Perception count should be 0
     assert_eq!(
-        service.gwt_mgr.perception_count.load(std::sync::atomic::Ordering::Relaxed),
+        service
+            .gwt_mgr
+            .perception_count
+            .load(std::sync::atomic::Ordering::Relaxed),
         0
     );
 }
@@ -140,7 +154,11 @@ fn full_service_reset_restores_all_managers() {
     // All managers should be at clean state
     assert!((service.social_mgr.social.social_trust - 0.5).abs() < f32::EPSILON);
     assert!((service.social_mgr.social.relational_psi - 0.0).abs() < f64::EPSILON);
-    assert!(service.voice_coherence.bridge.smoothed_coherence().is_finite());
+    assert!(service
+        .voice_coherence
+        .bridge
+        .smoothed_coherence()
+        .is_finite());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -149,30 +167,50 @@ fn full_service_reset_restores_all_managers() {
 
 #[test]
 fn construct_minimal_profile_succeeds() {
-    let config = CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Minimal);
+    let config =
+        CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Minimal);
     let service = CognitiveLoopService::new(config);
-    assert!(service.is_ok(), "Minimal profile construction failed: {:?}", service.err());
+    assert!(
+        service.is_ok(),
+        "Minimal profile construction failed: {:?}",
+        service.err()
+    );
 }
 
 #[test]
 fn construct_standard_profile_succeeds() {
-    let config = CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Standard);
+    let config =
+        CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Standard);
     let service = CognitiveLoopService::new(config);
-    assert!(service.is_ok(), "Standard profile construction failed: {:?}", service.err());
+    assert!(
+        service.is_ok(),
+        "Standard profile construction failed: {:?}",
+        service.err()
+    );
 }
 
 #[test]
 fn construct_full_profile_succeeds() {
-    let config = CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Full);
+    let config =
+        CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Full);
     let service = CognitiveLoopService::new(config);
-    assert!(service.is_ok(), "Full profile construction failed: {:?}", service.err());
+    assert!(
+        service.is_ok(),
+        "Full profile construction failed: {:?}",
+        service.err()
+    );
 }
 
 #[test]
 fn construct_research_profile_succeeds() {
-    let config = CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Research);
+    let config =
+        CognitiveLoopConfig::from_profile(super::super::config::ConsciousnessProfile::Research);
     let service = CognitiveLoopService::new(config);
-    assert!(service.is_ok(), "Research profile construction failed: {:?}", service.err());
+    assert!(
+        service.is_ok(),
+        "Research profile construction failed: {:?}",
+        service.err()
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -245,6 +283,35 @@ fn soak_social_signals_survive_500_cycles() {
                 service.social_mgr.social.external_reward.abs() < f32::EPSILON,
                 "external_reward not consumed by cycle {i}"
             );
+        }
+    }
+}
+
+#[test]
+fn diagnostic_round5_trajectory() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let inputs = [
+        "the cat sat on the mat",
+        "quantum mechanics describes wave functions",
+        "consciousness emerges from integrated information",
+        "ethical reasoning requires empathy",
+    ];
+    let milestones = [10, 50, 100, 200, 300, 500];
+    let mut milestone_idx = 0;
+    for i in 0..501 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        if milestone_idx < milestones.len() && i == milestones[milestone_idx] {
+            let m = &result.metadata;
+            eprintln!(
+                "Cycle {i}: C={:.4} softmin={:.4} weighted={:.4} btl={} N={:.4} Soc={:.4}",
+                m.consciousness_level,
+                m.mce_softmin,
+                m.mce_weighted_sum,
+                m.mce_bottleneck,
+                m.mce_narrative,
+                m.mce_social,
+            );
+            milestone_idx += 1;
         }
     }
 }

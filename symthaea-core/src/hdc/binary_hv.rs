@@ -588,8 +588,9 @@ impl BinaryHV {
         // Convert bytes to u64 words for efficient rotation (2048 bytes = 256 u64 words)
         let mut words = [0u64; 256];
         for (i, chunk) in self.0.chunks_exact(8).enumerate() {
-            words[i] = u64::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3],
-                                           chunk[4], chunk[5], chunk[6], chunk[7]]);
+            words[i] = u64::from_ne_bytes([
+                chunk[0], chunk[1], chunk[2], chunk[3], chunk[4], chunk[5], chunk[6], chunk[7],
+            ]);
         }
 
         let mut result_words = [0u64; 256];
@@ -1179,7 +1180,7 @@ impl BinaryHV {
     ///
     /// For large target sets (>1000), this provides significant speedup
     /// on multi-core systems.
-    #[cfg(feature = "rayon")]
+    #[cfg(feature = "parallel")]
     pub fn batch_similarity_parallel(query: &Self, targets: &[Self]) -> Vec<f32> {
         use rayon::prelude::*;
         targets.par_iter().map(|t| query.similarity(t)).collect()

@@ -25,8 +25,16 @@ fn ultimatum_game_loop_runs() {
     let stimuli = bench.generate_stimuli(&config);
     assert!(!stimuli.is_empty(), "stimuli should be non-empty");
     for s in &stimuli {
-        assert_eq!(s.alternatives.len(), 2, "ultimatum has 2 alternatives (reject/accept)");
-        assert!(s.correct_idx < 2, "correct_idx out of bounds: {}", s.correct_idx);
+        assert_eq!(
+            s.alternatives.len(),
+            2,
+            "ultimatum has 2 alternatives (reject/accept)"
+        );
+        assert!(
+            s.correct_idx < 2,
+            "correct_idx out of bounds: {}",
+            s.correct_idx
+        );
     }
 }
 
@@ -57,7 +65,11 @@ fn emotional_stroop_loop_runs() {
     assert_eq!(stimuli.len(), 80, "emotional stroop has 80 trials");
     for s in &stimuli {
         assert_eq!(s.alternatives.len(), 4, "stroop has 4 color alternatives");
-        assert!(s.correct_idx < 4, "correct_idx out of bounds: {}", s.correct_idx);
+        assert!(
+            s.correct_idx < 4,
+            "correct_idx out of bounds: {}",
+            s.correct_idx
+        );
     }
 }
 

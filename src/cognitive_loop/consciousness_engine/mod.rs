@@ -21,18 +21,18 @@
 //! 4. **Backward compatible**: All existing carryover fields populated
 //! 5. **WASM-ready**: Output struct uses only Copy/Clone types (no trait objects)
 
-mod types;
-mod measure;
 mod helpers;
+mod measure;
+mod types;
 
 pub(crate) use types::{
     ConsciousnessEngineCache, ConsciousnessEngineInput, MoralConsciousnessCoupling,
 };
 
-use symthaea_core::consciousness_metrics::SpectralMIPFinder;
 use crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2;
 use crate::consciousness::multi_modal_integration::MultiModalIntegrator;
 use crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline;
+use symthaea_core::consciousness_metrics::SpectralMIPFinder;
 
 /// The unified consciousness measurement engine.
 ///

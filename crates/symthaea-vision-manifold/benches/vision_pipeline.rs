@@ -3,15 +3,13 @@
 //! Validates 50Hz (20ms budget) feasibility for real frame sizes.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use symthaea_vision_manifold::encoder::MotionField;
 use symthaea_vision_manifold::{
     MultiScaleEncoder, PatchHdcEncoder, VisionBridge, VisionConfig, VisionManifold,
 };
-use symthaea_vision_manifold::encoder::MotionField;
 
 fn gradient_frame(width: u32, height: u32) -> Vec<u8> {
-    (0..width * height)
-        .map(|i| (i % 256) as u8)
-        .collect()
+    (0..width * height).map(|i| (i % 256) as u8).collect()
 }
 
 fn rgb_frame(width: u32, height: u32) -> Vec<u8> {

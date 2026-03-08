@@ -37,6 +37,7 @@ mod calculator;
 mod conceptual;
 mod entropy;
 mod iit4;
+#[cfg(feature = "parallel")]
 mod parallel;
 mod quantum;
 mod simd;
@@ -53,6 +54,7 @@ pub use calculator::*;
 pub use conceptual::*;
 pub use entropy::*;
 pub use iit4::*;
+#[cfg(feature = "parallel")]
 pub use parallel::*;
 pub use quantum::*;
 pub use simd::*;

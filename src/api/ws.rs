@@ -176,6 +176,12 @@ pub struct DemoCycleData {
     /// True when anomaly response modulations were applied this cycle.
     #[serde(default)]
     pub moral_anomaly_response_applied: bool,
+    /// True when trajectory convergence (compartmentalized adversarial pattern) detected.
+    #[serde(default)]
+    pub moral_trajectory_convergence: bool,
+    /// Trajectory convergence severity [0.0, 1.0].
+    #[serde(default)]
+    pub moral_convergence_severity: f64,
 
     // ── Vision Manifold Telemetry ──
     /// Whether the vision manifold is active this cycle.

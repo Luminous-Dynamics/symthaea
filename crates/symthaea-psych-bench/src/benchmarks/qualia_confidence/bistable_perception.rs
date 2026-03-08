@@ -99,11 +99,8 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
             let mut ws = GlobalWorkspace::new(ws_config);
 
             // Submit ambiguous stimulus at moderate activation
-            let stim_content = WorkspaceContent::new(
-                vec![ambiguous.clone()],
-                0.50,
-                "stimulus".to_string(),
-            );
+            let stim_content =
+                WorkspaceContent::new(vec![ambiguous.clone()], 0.50, "stimulus".to_string());
             ws.submit(stim_content);
 
             // Submit interpretation A with activation + jitter + hysteresis
@@ -121,11 +118,8 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
                 0.0
             };
             let activation_a = (BASE_ACTIVATION + jitter_a + boost_a).clamp(0.0, 1.0);
-            let content_a = WorkspaceContent::new(
-                vec![proto_a],
-                activation_a,
-                "interpretation_A".to_string(),
-            );
+            let content_a =
+                WorkspaceContent::new(vec![proto_a], activation_a, "interpretation_A".to_string());
             ws.submit(content_a);
 
             // Submit interpretation B with activation + jitter + hysteresis
@@ -136,11 +130,8 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
                 0.0
             };
             let activation_b = (BASE_ACTIVATION + jitter_b + boost_b).clamp(0.0, 1.0);
-            let content_b = WorkspaceContent::new(
-                vec![proto_b],
-                activation_b,
-                "interpretation_B".to_string(),
-            );
+            let content_b =
+                WorkspaceContent::new(vec![proto_b], activation_b, "interpretation_B".to_string());
             ws.submit(content_b);
 
             // Process workspace competition
@@ -163,7 +154,11 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
             } else {
                 // Both or neither in workspace — use activation comparison
                 // This is the core switching mechanism: when jitter overcomes hysteresis
-                if activation_a > activation_b { 0 } else { 1 }
+                if activation_a > activation_b {
+                    0
+                } else {
+                    1
+                }
             };
 
             current_winner = new_winner;
@@ -202,10 +197,7 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
             );
 
             let cv = coefficient_of_variation(&isis);
-            result.insert(
-                "cv_switch_interval",
-                MetricValue::from_samples(&[cv]),
-            );
+            result.insert("cv_switch_interval", MetricValue::from_samples(&[cv]));
 
             // Periodicity: autocorrelation of ISIs at lag 1
             let periodicity = if isis.len() >= 4 {
@@ -221,28 +213,16 @@ impl PsychBenchmark for BistablePerceptionBenchmark {
             // Dominance ratio: fraction of time spent in dominant interpretation
             let a_count = winners.iter().filter(|&&w| w == 0).count();
             let dominance = (a_count as f64 / NUM_CYCLES as f64 - 0.5).abs() + 0.5;
-            result.insert(
-                "dominance_ratio",
-                MetricValue::from_samples(&[dominance]),
-            );
+            result.insert("dominance_ratio", MetricValue::from_samples(&[dominance]));
         } else {
             // Not enough switches for ISI analysis
             result.insert(
                 "mean_switch_interval",
                 MetricValue::from_samples(&[NUM_CYCLES as f64]),
             );
-            result.insert(
-                "cv_switch_interval",
-                MetricValue::from_samples(&[0.0]),
-            );
-            result.insert(
-                "periodicity_score",
-                MetricValue::from_samples(&[0.0]),
-            );
-            result.insert(
-                "dominance_ratio",
-                MetricValue::from_samples(&[1.0]),
-            );
+            result.insert("cv_switch_interval", MetricValue::from_samples(&[0.0]));
+            result.insert("periodicity_score", MetricValue::from_samples(&[0.0]));
+            result.insert("dominance_ratio", MetricValue::from_samples(&[1.0]));
         }
 
         // A wins fraction

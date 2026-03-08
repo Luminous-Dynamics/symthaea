@@ -61,19 +61,28 @@ mod tests {
         let hcg_15 = hcg_curve(GestationalWeek::new(15));
         let hcg_30 = hcg_curve(GestationalWeek::new(30));
 
-        assert!(hcg_10 > hcg_8, "hCG should rise to peak: {hcg_10} > {hcg_8}");
+        assert!(
+            hcg_10 > hcg_8,
+            "hCG should rise to peak: {hcg_10} > {hcg_8}"
+        );
         assert!(
             hcg_10 > hcg_15,
             "hCG should decline after peak: {hcg_10} > {hcg_15}"
         );
-        assert!(hcg_30 < hcg_10, "hCG declines from peak: {hcg_30} < {hcg_10}");
+        assert!(
+            hcg_30 < hcg_10,
+            "hCG declines from peak: {hcg_30} < {hcg_10}"
+        );
     }
 
     #[test]
     fn test_hcg_peak_value() {
         let peak = hcg_curve(GestationalWeek::new(10));
         // At w=10: 100_000 * (10/10)^2 = 100,000 (continuous with decay branch)
-        assert!(peak > 5000.0, "hCG at week 10 should be significant: {peak}");
+        assert!(
+            peak > 5000.0,
+            "hCG at week 10 should be significant: {peak}"
+        );
     }
 
     #[test]
@@ -110,7 +119,10 @@ mod tests {
         for w in 0..=40 {
             let h = target_hormones(GestationalWeek::new(w));
             assert!(h.hcg >= 0.0, "hCG must be non-negative at week {w}");
-            assert!(h.progesterone > 0.0, "Progesterone must be positive at week {w}");
+            assert!(
+                h.progesterone > 0.0,
+                "Progesterone must be positive at week {w}"
+            );
             assert!(h.estradiol > 0.0, "Estradiol must be positive at week {w}");
             assert!(h.cortisol > 0.0, "Cortisol must be positive at week {w}");
             assert!(h.thyroid_t4 > 0.0, "T4 must be positive at week {w}");

@@ -9,9 +9,7 @@
 //!
 //! Run with: `cargo run -p symthaea-vision-manifold --example vision_demo`
 
-use symthaea_vision_manifold::{
-    ManifoldHealth, SceneMemory, VisionBridge, VisionConfig,
-};
+use symthaea_vision_manifold::{ManifoldHealth, SceneMemory, VisionBridge, VisionConfig};
 
 fn moving_stripe_frame(width: u32, height: u32, offset: u32) -> Vec<u8> {
     let mut pixels = Vec::with_capacity((width * height) as usize);
@@ -19,7 +17,11 @@ fn moving_stripe_frame(width: u32, height: u32, offset: u32) -> Vec<u8> {
         for x in 0..width {
             let stripe = ((x + offset) / 8) % 2;
             let gradient = (y * 255 / height.max(1)) as u8;
-            pixels.push(if stripe == 0 { gradient } else { 255 - gradient });
+            pixels.push(if stripe == 0 {
+                gradient
+            } else {
+                255 - gradient
+            });
         }
     }
     pixels
@@ -90,7 +92,10 @@ fn main() {
         if i == 30 || i == 35 || i == 49 {
             println!(
                 "  frame {:>2}: pred_err={:.4}, coherence={:.4}, motion={:.4}, salient={}",
-                i, tel.prediction_error, tel.manifold_coherence, tel.motion_surprise,
+                i,
+                tel.prediction_error,
+                tel.manifold_coherence,
+                tel.motion_surprise,
                 tel.num_salient_patches,
             );
         }
@@ -165,5 +170,8 @@ fn main() {
     println!("  coherence:          {:.4}", health.mean_coherence);
     println!("  is_healthy:         {}", health.is_healthy);
 
-    println!("\n=== Demo complete: {} frames processed ===", bridge.frame_count());
+    println!(
+        "\n=== Demo complete: {} frames processed ===",
+        bridge.frame_count()
+    );
 }

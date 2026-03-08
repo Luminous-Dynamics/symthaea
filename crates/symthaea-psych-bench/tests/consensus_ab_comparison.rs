@@ -113,11 +113,7 @@ fn consensus_vs_sequential_psych_bench() {
     let pairs = vec![
         run_benchmark_pair(&StroopBenchmark, "Executive::Stroop", &config),
         run_benchmark_pair(&NBackBenchmark, "WorM::N-back", &config),
-        run_benchmark_pair(
-            &WisconsinCardSortingBenchmark,
-            "Executive::WCST",
-            &config,
-        ),
+        run_benchmark_pair(&WisconsinCardSortingBenchmark, "Executive::WCST", &config),
         run_benchmark_pair(&GoNoGoBenchmark, "Inhibition::GoNoGo", &config),
         run_benchmark_pair(&ArcFluidBenchmark, "Reasoning::ArcFluid", &config),
     ];
@@ -133,7 +129,11 @@ fn consensus_vs_sequential_psych_bench() {
     // Aggregate metrics
     let n = pairs.len() as f64;
     let mean_acc_delta: f64 = pairs.iter().map(|p| p.accuracy_delta()).sum::<f64>() / n;
-    let mean_pe_delta: f64 = pairs.iter().map(|p| p.prediction_error_delta()).sum::<f64>() / n;
+    let mean_pe_delta: f64 = pairs
+        .iter()
+        .map(|p| p.prediction_error_delta())
+        .sum::<f64>()
+        / n;
 
     let seq_total_ms: u64 = pairs.iter().map(|p| p.sequential.elapsed_ms).sum();
     let con_total_ms: u64 = pairs.iter().map(|p| p.consensus.elapsed_ms).sum();

@@ -3,7 +3,7 @@
 //! Standardized evaluation of Symthaea's neuroscience-inspired subsystems
 //! against established psychological benchmarks and published human baselines.
 //!
-//! ## Benchmarks (76 across 16 domains)
+//! ## Benchmarks (79 across 16 domains)
 //!
 //! - **WorM** (6) — Working memory (N-back, change detection, serial recall,
 //!   spatial updating, binding, digit span)
@@ -28,7 +28,8 @@
 //! - **Sustained Attention** (3) — SART, PVT, CPT
 //! - **Motor** (3) — SRTT, Fitts' Law, Bimanual coordination
 //! - **Language** (4) — Garden path, semantic coherence, lexical decision, semantic priming
-//! - **Social** (3) — Reading the Mind in the Eyes, Ultimatum Game, Social Norm
+//! - **Social** (6) — Reading the Mind in the Eyes, Ultimatum Game, Social Norm,
+//!   Prisoner's Dilemma, Public Goods Game, Dictator Game
 //! - **Neuromod** (11) — Reward learning, Yerkes-Dodson, attention network,
 //!   mood induction, pharmacological ablation/challenge, injection challenge,
 //!   allostatic stress, live-loop ablation, behavioral knockout, consciousness pharmacology

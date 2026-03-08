@@ -32,11 +32,11 @@ pub fn advance_separation(
 ) -> SeparationStage {
     // Attachment style modulates escalation speed
     let escalation_rate = match attachment.style {
-        AttachmentStyle::Anxious => 2.0,       // Hypervigilant, rapid protest
-        AttachmentStyle::Avoidant => 0.3,      // Suppressed, stays quiet longer
-        AttachmentStyle::Disorganized => 1.5,  // Unpredictable, somewhat fast
-        AttachmentStyle::Secure => 1.0,        // Normal, proportionate
-        AttachmentStyle::Forming => 1.0,       // Default
+        AttachmentStyle::Anxious => 2.0,      // Hypervigilant, rapid protest
+        AttachmentStyle::Avoidant => 0.3,     // Suppressed, stays quiet longer
+        AttachmentStyle::Disorganized => 1.5, // Unpredictable, somewhat fast
+        AttachmentStyle::Secure => 1.0,       // Normal, proportionate
+        AttachmentStyle::Forming => 1.0,      // Default
     };
 
     let effective_minutes = minutes_elapsed * escalation_rate;
@@ -103,7 +103,11 @@ mod tests {
     fn test_quiet_to_vocalization_at_15_minutes() {
         let attachment = make_attachment(AttachmentStyle::Secure);
         let result = advance_separation(SeparationStage::Quiet, 14.0, &attachment);
-        assert_eq!(result, SeparationStage::Quiet, "Should stay quiet at 14 min");
+        assert_eq!(
+            result,
+            SeparationStage::Quiet,
+            "Should stay quiet at 14 min"
+        );
 
         let result = advance_separation(SeparationStage::Quiet, 16.0, &attachment);
         assert_eq!(

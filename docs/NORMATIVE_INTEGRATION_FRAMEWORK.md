@@ -120,7 +120,7 @@ unresolved moral conflict reduces unified experience coherence.
 
 Sliding window of recent moral scenarios analyzed via:
 - Betti numbers (beta_0 = unity, beta_1 = circular reasoning)
-- Harmony projection (7D softmax onto Seven Harmonies axes)
+- Harmony projection (7D softmax onto Eight Harmonies axes)
 - PGA (principal geodesic analysis on moral hypersphere)
 - Moral free energy (KL divergence from prior moral distribution)
 
@@ -198,7 +198,7 @@ current framework is architecturally incapable of measuring.
    The benchmark validates that the design works as intended, not that it
    reflects biological reality.
 
-2. **Hardcoded moral dimensions**: The Seven Harmonies are our normative
+2. **Hardcoded moral dimensions**: The Eight Harmonies are our normative
    framework, not empirically derived from human moral cognition. Different
    moral axes might produce different coupling patterns.
 

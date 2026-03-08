@@ -1314,6 +1314,14 @@ pub struct EthicalTelemetry {
     pub moral_fragmentation_increase: bool,
     /// True when anomaly response modulations were applied this cycle.
     pub moral_anomaly_response_applied: bool,
+    /// True when trajectory convergence (compartmentalized adversarial pattern) detected.
+    /// This is the most dangerous class of anomaly: individually benign requests forming
+    /// an emergent hazardous cluster.
+    #[serde(default)]
+    pub moral_trajectory_convergence: bool,
+    /// Trajectory convergence severity in \[0.0, 1.0\].
+    #[serde(default)]
+    pub moral_convergence_severity: f64,
     /// Harmony entropy (moral breadth): Shannon entropy of harmony variance distribution.
     /// Range: [0, ln(8)] ≈ [0, 2.08]. Higher = broader moral engagement.
     #[serde(default)]
@@ -1531,4 +1539,3 @@ pub struct ModuleTimings {
     /// Moral topology: persistent homology analysis on moral scenarios
     pub moral_topology: u64,
 }
-

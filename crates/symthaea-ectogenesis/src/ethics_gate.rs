@@ -67,40 +67,28 @@ impl EctogenesisEthicsGate {
         match proxy {
             ConsentProxy::PreSentient => {
                 if benefit_score < 0.3 {
-                    return Err(
-                        "Insufficient benefit for pre-sentient intervention".into(),
-                    );
+                    return Err("Insufficient benefit for pre-sentient intervention".into());
                 }
                 Ok(())
             }
             ConsentProxy::EmergingSentience => {
                 if !self.guardian_consent {
-                    return Err(
-                        "Guardian consent required for emerging sentience".into(),
-                    );
+                    return Err("Guardian consent required for emerging sentience".into());
                 }
                 if benefit_score < 0.5 {
-                    return Err(
-                        "Clear benefit required for emerging sentience".into(),
-                    );
+                    return Err("Clear benefit required for emerging sentience".into());
                 }
                 Ok(())
             }
             ConsentProxy::Sentient => {
                 if !self.guardian_consent {
-                    return Err(
-                        "Guardian consent required for sentient being".into(),
-                    );
+                    return Err("Guardian consent required for sentient being".into());
                 }
                 if !self.ethics_board_approved {
-                    return Err(
-                        "Ethics board approval required for sentient being".into(),
-                    );
+                    return Err("Ethics board approval required for sentient being".into());
                 }
                 if benefit_score < 0.7 {
-                    return Err(
-                        "Strong benefit required for sentient being intervention".into(),
-                    );
+                    return Err("Strong benefit required for sentient being intervention".into());
                 }
                 Ok(())
             }
@@ -133,98 +121,75 @@ mod tests {
     #[test]
     fn test_pre_sentient_allows_low_bar() {
         let gate = EctogenesisEthicsGate::unapproved();
-        let result = gate.check_intervention(
-            GestationalWeek::new(3),
-            "nutrient adjustment",
-            0.4,
-        );
+        let result = gate.check_intervention(GestationalWeek::new(3), "nutrient adjustment", 0.4);
         assert!(result.is_ok(), "Pre-sentient should allow benefit >= 0.3");
     }
 
     #[test]
     fn test_pre_sentient_rejects_insufficient_benefit() {
         let gate = EctogenesisEthicsGate::unapproved();
-        let result = gate.check_intervention(
-            GestationalWeek::new(3),
-            "experimental procedure",
-            0.1,
-        );
+        let result =
+            gate.check_intervention(GestationalWeek::new(3), "experimental procedure", 0.1);
         assert!(result.is_err(), "Pre-sentient should reject benefit < 0.3");
     }
 
     #[test]
     fn test_emerging_sentience_requires_guardian() {
         let gate = EctogenesisEthicsGate::unapproved();
-        let result = gate.check_intervention(
-            GestationalWeek::new(15),
-            "hormone adjustment",
-            0.8,
+        let result = gate.check_intervention(GestationalWeek::new(15), "hormone adjustment", 0.8);
+        assert!(
+            result.is_err(),
+            "Emerging sentience should require guardian consent"
         );
-        assert!(result.is_err(), "Emerging sentience should require guardian consent");
         assert!(result.unwrap_err().contains("Guardian consent"));
     }
 
     #[test]
     fn test_emerging_sentience_with_guardian_and_benefit() {
         let gate = EctogenesisEthicsGate::new(true, false);
-        let result = gate.check_intervention(
-            GestationalWeek::new(15),
-            "hormone adjustment",
-            0.6,
+        let result = gate.check_intervention(GestationalWeek::new(15), "hormone adjustment", 0.6);
+        assert!(
+            result.is_ok(),
+            "Should allow with guardian + adequate benefit"
         );
-        assert!(result.is_ok(), "Should allow with guardian + adequate benefit");
     }
 
     #[test]
     fn test_emerging_sentience_rejects_low_benefit() {
         let gate = EctogenesisEthicsGate::new(true, false);
-        let result = gate.check_intervention(
-            GestationalWeek::new(15),
-            "cosmetic gene edit",
-            0.3,
+        let result = gate.check_intervention(GestationalWeek::new(15), "cosmetic gene edit", 0.3);
+        assert!(
+            result.is_err(),
+            "Should reject low benefit in emerging sentience"
         );
-        assert!(result.is_err(), "Should reject low benefit in emerging sentience");
     }
 
     #[test]
     fn test_sentient_requires_all_approvals() {
         // No approvals
         let gate = EctogenesisEthicsGate::unapproved();
-        let result = gate.check_intervention(
-            GestationalWeek::new(30),
-            "steroid injection",
-            0.9,
-        );
+        let result = gate.check_intervention(GestationalWeek::new(30), "steroid injection", 0.9);
         assert!(result.is_err());
 
         // Guardian only
         let gate = EctogenesisEthicsGate::new(true, false);
-        let result = gate.check_intervention(
-            GestationalWeek::new(30),
-            "steroid injection",
-            0.9,
-        );
+        let result = gate.check_intervention(GestationalWeek::new(30), "steroid injection", 0.9);
         assert!(result.is_err(), "Should require ethics board too");
         assert!(result.unwrap_err().contains("Ethics board"));
 
         // Both
         let gate = EctogenesisEthicsGate::fully_approved();
-        let result = gate.check_intervention(
-            GestationalWeek::new(30),
-            "steroid injection",
-            0.9,
+        let result = gate.check_intervention(GestationalWeek::new(30), "steroid injection", 0.9);
+        assert!(
+            result.is_ok(),
+            "Should allow with all approvals + high benefit"
         );
-        assert!(result.is_ok(), "Should allow with all approvals + high benefit");
     }
 
     #[test]
     fn test_sentient_rejects_low_benefit() {
         let gate = EctogenesisEthicsGate::fully_approved();
-        let result = gate.check_intervention(
-            GestationalWeek::new(30),
-            "elective procedure",
-            0.5,
-        );
+        let result = gate.check_intervention(GestationalWeek::new(30), "elective procedure", 0.5);
         assert!(result.is_err(), "Sentient should require benefit >= 0.7");
     }
 

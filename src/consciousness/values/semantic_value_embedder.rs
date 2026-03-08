@@ -3,7 +3,7 @@
 //! Creates semantic embeddings that incorporate value alignment,
 //! allowing concepts to be represented with their ethical implications.
 
-use super::seven_harmonies::Harmony;
+use super::eight_harmonies::Harmony;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};

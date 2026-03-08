@@ -40,8 +40,8 @@ impl Metrics {
     /// Get or initialize the global metrics instance.
     pub fn global() -> &'static Metrics {
         METRICS.get_or_init(|| {
-            let phase_buckets = prometheus::exponential_buckets(0.0001, 2.0, 15)
-                .expect("valid histogram buckets");
+            let phase_buckets =
+                prometheus::exponential_buckets(0.0001, 2.0, 15).expect("valid histogram buckets");
 
             Metrics {
                 consciousness_cycles_total: register_counter!(
@@ -64,8 +64,11 @@ impl Metrics {
                 )
                 .expect("register consciousness_level"),
 
-                phi_value: register_gauge!("phi_value", "Current Phi (integrated information) value")
-                    .expect("register phi_value"),
+                phi_value: register_gauge!(
+                    "phi_value",
+                    "Current Phi (integrated information) value"
+                )
+                .expect("register phi_value"),
 
                 gate_vetoes_total: register_counter!(
                     "gate_vetoes_total",
@@ -125,7 +128,11 @@ impl Drop for PhaseTimer {
         m.phase_duration_seconds
             .with_label_values(&[self.phase])
             .observe(elapsed);
-        tracing::debug!(phase = self.phase, elapsed_ms = elapsed * 1000.0, "pipeline phase completed");
+        tracing::debug!(
+            phase = self.phase,
+            elapsed_ms = elapsed * 1000.0,
+            "pipeline phase completed"
+        );
     }
 }
 

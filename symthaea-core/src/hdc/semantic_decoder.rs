@@ -499,7 +499,7 @@ impl SemanticDecoder {
 
     /// Decode with harmonic weighting for primitive selection
     ///
-    /// This integrates the Seven Harmonies into primitive selection:
+    /// This integrates the Eight Harmonies into primitive selection:
     /// - When Wisdom is dominant, primitives like EVIDENCE and UNCERTAINTY are boosted
     /// - When Coherence is dominant, INTEGRATION and CONSISTENCY are preferred
     /// - When Play is dominant, NOVELTY and EXPLORATION primitives are favored

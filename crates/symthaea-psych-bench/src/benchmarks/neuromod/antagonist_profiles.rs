@@ -132,7 +132,7 @@ impl PsychBenchmark for AntagonistProfilesBenchmark {
                 bath.update(&inputs);
             }
             bath.inject_d2_antagonist(0.3, 20); // short half-life
-            // Run past expiration
+                                                // Run past expiration
             for _ in 0..200 {
                 bath.update(&inputs);
             }
@@ -165,8 +165,14 @@ impl PsychBenchmark for AntagonistProfilesBenchmark {
 
         // D2 reduces flexibility
         let d2_effect = base_flexibility - d2_flexibility;
-        result.insert("d2_flexibility_reduction", MetricValue::from_samples(&[d2_effect]));
-        result.insert("d2_flexibility_mean", MetricValue::from_samples(&[d2_flexibility]));
+        result.insert(
+            "d2_flexibility_reduction",
+            MetricValue::from_samples(&[d2_effect]),
+        );
+        result.insert(
+            "d2_flexibility_mean",
+            MetricValue::from_samples(&[d2_flexibility]),
+        );
         if config.trial_trace {
             trace.push(TrialOutcome {
                 trial_idx,
@@ -183,7 +189,10 @@ impl PsychBenchmark for AntagonistProfilesBenchmark {
 
         // GABA-A raises E/I
         let gaba_effect = gaba_a_ei - base_ei;
-        result.insert("gaba_a_ei_increase", MetricValue::from_samples(&[gaba_effect]));
+        result.insert(
+            "gaba_a_ei_increase",
+            MetricValue::from_samples(&[gaba_effect]),
+        );
         result.insert("gaba_a_ei_mean", MetricValue::from_samples(&[gaba_a_ei]));
         if config.trial_trace {
             trace.push(TrialOutcome {
@@ -201,8 +210,14 @@ impl PsychBenchmark for AntagonistProfilesBenchmark {
 
         // 5-HT2A reduces consciousness
         let sht2a_effect = base_confidence - sht2a_confidence;
-        result.insert("sht2a_confidence_reduction", MetricValue::from_samples(&[sht2a_effect]));
-        result.insert("sht2a_confidence_mean", MetricValue::from_samples(&[sht2a_confidence]));
+        result.insert(
+            "sht2a_confidence_reduction",
+            MetricValue::from_samples(&[sht2a_effect]),
+        );
+        result.insert(
+            "sht2a_confidence_mean",
+            MetricValue::from_samples(&[sht2a_confidence]),
+        );
         if config.trial_trace {
             trace.push(TrialOutcome {
                 trial_idx,
@@ -219,7 +234,10 @@ impl PsychBenchmark for AntagonistProfilesBenchmark {
 
         // Wearoff: flexibility should recover toward baseline
         let wearoff_recovery = wearoff - d2_flexibility; // should be positive
-        result.insert("wearoff_recovery", MetricValue::from_samples(&[wearoff_recovery]));
+        result.insert(
+            "wearoff_recovery",
+            MetricValue::from_samples(&[wearoff_recovery]),
+        );
         result.insert("wearoff_flexibility", MetricValue::from_samples(&[wearoff]));
         if config.trial_trace {
             trace.push(TrialOutcome {
@@ -236,7 +254,10 @@ impl PsychBenchmark for AntagonistProfilesBenchmark {
         }
 
         // Concurrent: partial attenuation of agonist by antagonist
-        result.insert("concurrent_flexibility", MetricValue::from_samples(&[concurrent]));
+        result.insert(
+            "concurrent_flexibility",
+            MetricValue::from_samples(&[concurrent]),
+        );
         if config.trial_trace {
             let concurrent_effect = (concurrent - base_flexibility).abs();
             trace.push(TrialOutcome {
@@ -252,9 +273,15 @@ impl PsychBenchmark for AntagonistProfilesBenchmark {
             trial_idx += 1;
         }
 
-        result.insert("baseline_flexibility", MetricValue::from_samples(&[base_flexibility]));
+        result.insert(
+            "baseline_flexibility",
+            MetricValue::from_samples(&[base_flexibility]),
+        );
         result.insert("baseline_ei", MetricValue::from_samples(&[base_ei]));
-        result.insert("baseline_consciousness", MetricValue::from_samples(&[base_confidence]));
+        result.insert(
+            "baseline_consciousness",
+            MetricValue::from_samples(&[base_confidence]),
+        );
 
         if config.trial_trace {
             result.trial_trace = trace;
@@ -312,7 +339,11 @@ mod tests {
     fn test_sht2a_reduces_confidence() {
         let bench = AntagonistProfilesBenchmark;
         let result = bench.run(&config());
-        let reduction = result.metrics.get("sht2a_confidence_reduction").unwrap().mean;
+        let reduction = result
+            .metrics
+            .get("sht2a_confidence_reduction")
+            .unwrap()
+            .mean;
         assert!(
             reduction > 0.0,
             "5-HT2A antagonist should reduce confidence delta: delta={reduction}"

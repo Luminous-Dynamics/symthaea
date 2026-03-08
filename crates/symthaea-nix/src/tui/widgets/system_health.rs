@@ -170,7 +170,10 @@ impl Widget for SystemHealth<'_> {
 
         // Memory sparkline (when history available)
         if y < inner.y + inner.height && self.snapshot.memory_history.len() >= 2 {
-            let spark = Self::render_sparkline(&self.snapshot.memory_history, inner.width.saturating_sub(12) as usize);
+            let spark = Self::render_sparkline(
+                &self.snapshot.memory_history,
+                inner.width.saturating_sub(12) as usize,
+            );
             let spark_line = Line::from(vec![
                 Span::raw("Mem trend "),
                 Span::styled(spark, Style::default().fg(Color::Cyan)),

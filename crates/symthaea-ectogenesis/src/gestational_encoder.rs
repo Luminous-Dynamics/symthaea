@@ -111,7 +111,10 @@ mod tests {
         let week = GestationalWeek::new(25);
         let normative = encode_normative_trajectory(week);
         let score = anomaly_score(&normative, &normative);
-        assert!(score < 0.01, "Self-comparison should have near-zero anomaly, got {score}");
+        assert!(
+            score < 0.01,
+            "Self-comparison should have near-zero anomaly, got {score}"
+        );
     }
 
     #[test]
@@ -133,7 +136,10 @@ mod tests {
         let hv1 = encode_fetal_state(&m1);
         let hv2 = encode_fetal_state(&m2);
         let sim = hv1.similarity(&hv2);
-        assert!(sim > 0.5, "Similar metrics should produce similar HVs, got sim={sim}");
+        assert!(
+            sim > 0.5,
+            "Similar metrics should produce similar HVs, got sim={sim}"
+        );
     }
 
     #[test]

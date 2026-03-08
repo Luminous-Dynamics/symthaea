@@ -98,9 +98,7 @@ impl CognitiveLoopService {
 
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
-    pub fn vision_evaluate_horizons(
-        &self,
-    ) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
+    pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
         self.vision_bridge
             .as_ref()
             .map(|b| b.manifold().evaluate_horizons())
@@ -267,5 +265,4 @@ impl CognitiveLoopService {
     pub fn inject_vision_frame(&mut self, frame: Vec<u8>) {
         self.vision_frame_buffer = Some(frame);
     }
-
 }

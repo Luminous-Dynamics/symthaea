@@ -89,14 +89,19 @@ impl PredictiveCodingHierarchy {
         let (_blended, scale_hvs, _patches) =
             self.encoder.encode_frame(pixels, width, height, channels);
 
-        let fine_hv = scale_hvs.first().cloned().unwrap_or_else(|| ContinuousHV::zero(self.dim));
-        let coarse_hv = scale_hvs.last().cloned().unwrap_or_else(|| ContinuousHV::zero(self.dim));
+        let fine_hv = scale_hvs
+            .first()
+            .cloned()
+            .unwrap_or_else(|| ContinuousHV::zero(self.dim));
+        let coarse_hv = scale_hvs
+            .last()
+            .cloned()
+            .unwrap_or_else(|| ContinuousHV::zero(self.dim));
 
         // Generate prediction of fine scale from previous coarse scale
         if let Some(prev_coarse) = self.last_coarse_hv.clone() {
             let predicted_fine = self.predict_fine(&prev_coarse);
-            self.prediction_error =
-                1.0 - fine_hv.similarity(&predicted_fine).clamp(-1.0, 1.0);
+            self.prediction_error = 1.0 - fine_hv.similarity(&predicted_fine).clamp(-1.0, 1.0);
 
             // Update prediction weight via simple Hebbian-like rule:
             // Move prediction_weight to reduce the gap between predicted_fine and actual fine
@@ -105,7 +110,8 @@ impl PredictiveCodingHierarchy {
             self.prediction_error = 1.0; // No prediction yet
         }
 
-        self.error_ema = self.ema_decay * self.error_ema + (1.0 - self.ema_decay) * self.prediction_error;
+        self.error_ema =
+            self.ema_decay * self.error_ema + (1.0 - self.ema_decay) * self.prediction_error;
         self.last_coarse_hv = Some(coarse_hv.clone());
 
         PredictiveOutput {
@@ -189,8 +195,14 @@ impl PredictiveCodingHierarchy {
         let (_blended, scale_hvs, all_patches) =
             self.encoder.encode_frame(pixels, width, height, channels);
 
-        let fine_hv = scale_hvs.first().cloned().unwrap_or_else(|| ContinuousHV::zero(self.dim));
-        let coarse_hv = scale_hvs.last().cloned().unwrap_or_else(|| ContinuousHV::zero(self.dim));
+        let fine_hv = scale_hvs
+            .first()
+            .cloned()
+            .unwrap_or_else(|| ContinuousHV::zero(self.dim));
+        let coarse_hv = scale_hvs
+            .last()
+            .cloned()
+            .unwrap_or_else(|| ContinuousHV::zero(self.dim));
 
         // Step 1: Apply top-down prior from previous coarse prediction
         let top_down_fine = if let Some(ref prev_coarse) = self.last_coarse_hv {
@@ -228,7 +240,8 @@ impl PredictiveCodingHierarchy {
             self.prediction_error = 1.0;
         }
 
-        self.error_ema = self.ema_decay * self.error_ema + (1.0 - self.ema_decay) * self.prediction_error;
+        self.error_ema =
+            self.ema_decay * self.error_ema + (1.0 - self.ema_decay) * self.prediction_error;
         self.last_coarse_hv = Some(coarse_hv.clone());
 
         PredictiveOutput {

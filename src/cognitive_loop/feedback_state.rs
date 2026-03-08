@@ -107,7 +107,9 @@ impl ProposalCollector {
     /// 0.0 = unanimous, 0.5 = maximally conflicted, 1.0 only if single contrary.
     /// Science: conflicting proposals = subsystems disagree about direction.
     pub fn conflict_ratio(&self) -> f32 {
-        let adds: Vec<f64> = self.proposals.iter()
+        let adds: Vec<f64> = self
+            .proposals
+            .iter()
             .filter_map(|ap| match ap.proposal {
                 FeedbackProposal::Add(d) => Some(d),
                 _ => None,
@@ -393,17 +395,28 @@ impl FeedbackState {
             let ratio = (consensus_val - start_val).abs() / start_val.abs().max(0.1);
             if ratio > divergence_threshold {
                 *count += 1;
-                consensus_val * (1.0 - blend_toward_start)
-                    + start_val * blend_toward_start
+                consensus_val * (1.0 - blend_toward_start) + start_val * blend_toward_start
             } else {
                 consensus_val
             }
         };
         let consensus = ConsensusResult {
-            consensus_confidence: dampen(consensus.consensus_confidence, base_confidence, &mut dampened_count),
+            consensus_confidence: dampen(
+                consensus.consensus_confidence,
+                base_confidence,
+                &mut dampened_count,
+            ),
             consensus_lr: dampen(consensus.consensus_lr, base_lr, &mut dampened_count),
-            consensus_exploration: dampen(consensus.consensus_exploration, base_exploration, &mut dampened_count),
-            consensus_threshold: dampen(consensus.consensus_threshold, base_threshold, &mut dampened_count),
+            consensus_exploration: dampen(
+                consensus.consensus_exploration,
+                base_exploration,
+                &mut dampened_count,
+            ),
+            consensus_threshold: dampen(
+                consensus.consensus_threshold,
+                base_threshold,
+                &mut dampened_count,
+            ),
         };
         self.feedback_dampened_count = dampened_count;
 
@@ -413,13 +426,21 @@ impl FeedbackState {
     }
 
     /// Cycle-start confidence snapshot.
-    pub fn cycle_start_confidence(&self) -> f64 { self.cycle_start_confidence }
+    pub fn cycle_start_confidence(&self) -> f64 {
+        self.cycle_start_confidence
+    }
     /// Cycle-start LR snapshot.
-    pub fn cycle_start_lr(&self) -> f64 { self.cycle_start_lr }
+    pub fn cycle_start_lr(&self) -> f64 {
+        self.cycle_start_lr
+    }
     /// Cycle-start exploration snapshot.
-    pub fn cycle_start_exploration(&self) -> f64 { self.cycle_start_exploration }
+    pub fn cycle_start_exploration(&self) -> f64 {
+        self.cycle_start_exploration
+    }
     /// Cycle-start threshold snapshot.
-    pub fn cycle_start_threshold(&self) -> f64 { self.cycle_start_threshold }
+    pub fn cycle_start_threshold(&self) -> f64 {
+        self.cycle_start_threshold
+    }
 
     /// Backwards-compatible `end_cycle` for tests — delegates to `end_cycle_ext`
     /// with no streak/flow context.
@@ -432,8 +453,13 @@ impl FeedbackState {
         current_threshold: f64,
     ) -> ConsensusResult {
         self.end_cycle_ext(
-            current_confidence, current_lr, current_exploration, current_threshold,
-            0, false, 0.0,
+            current_confidence,
+            current_lr,
+            current_exploration,
+            current_threshold,
+            0,
+            false,
+            0.0,
         )
     }
 
@@ -493,7 +519,12 @@ impl FeedbackState {
     /// Ties broken arbitrarily. Returns "" if no proposals.
     pub fn dominant_source(&self) -> &'static str {
         let mut counts: Vec<(&'static str, usize)> = Vec::new();
-        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+        for collector in [
+            &self.confidence,
+            &self.learning_rate,
+            &self.exploration,
+            &self.threshold,
+        ] {
             for ap in collector.proposals() {
                 if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == ap.source) {
                     entry.1 += 1;
@@ -502,7 +533,11 @@ impl FeedbackState {
                 }
             }
         }
-        counts.iter().max_by_key(|(_, c)| *c).map(|(s, _)| *s).unwrap_or("")
+        counts
+            .iter()
+            .max_by_key(|(_, c)| *c)
+            .map(|(s, _)| *s)
+            .unwrap_or("")
     }
 
     /// Fraction of total proposals contributed by the dominant source.
@@ -513,7 +548,12 @@ impl FeedbackState {
             return 0.0;
         }
         let mut counts: Vec<(&'static str, usize)> = Vec::new();
-        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+        for collector in [
+            &self.confidence,
+            &self.learning_rate,
+            &self.exploration,
+            &self.threshold,
+        ] {
             for ap in collector.proposals() {
                 if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == ap.source) {
                     entry.1 += 1;
@@ -543,7 +583,12 @@ impl FeedbackState {
     /// Science: Dehaene (2014) — healthy cognition requires multi-source consensus.
     pub fn distinct_source_count(&self) -> usize {
         let mut seen: Vec<&'static str> = Vec::with_capacity(16);
-        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+        for collector in [
+            &self.confidence,
+            &self.learning_rate,
+            &self.exploration,
+            &self.threshold,
+        ] {
             for ap in collector.proposals() {
                 if !seen.contains(&ap.source) {
                     seen.push(ap.source);
@@ -562,7 +607,12 @@ impl FeedbackState {
             return 1.0; // No proposals = maximally diverse (vacuously)
         }
         let mut seen: Vec<&'static str> = Vec::with_capacity(total);
-        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+        for collector in [
+            &self.confidence,
+            &self.learning_rate,
+            &self.exploration,
+            &self.threshold,
+        ] {
             for ap in collector.proposals() {
                 if !seen.contains(&ap.source) {
                     seen.push(ap.source);

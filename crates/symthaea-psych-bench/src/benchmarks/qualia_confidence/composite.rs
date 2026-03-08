@@ -354,14 +354,20 @@ mod tests {
         let results = run_all_benchmarks();
         let score = QualiaConfidenceScore::from_results(&results);
         assert_eq!(
-            score.predictions_met, score.predictions_total,
+            score.predictions_met,
+            score.predictions_total,
             "All predictions should be met: {}/{}\n{}",
             score.predictions_met,
             score.predictions_total,
             score
                 .indicators
                 .iter()
-                .map(|i| format!("  {} = {:.4} ({})", i.name, i.raw_value, if i.prediction_met { "MET" } else { "FAILED" }))
+                .map(|i| format!(
+                    "  {} = {:.4} ({})",
+                    i.name,
+                    i.raw_value,
+                    if i.prediction_met { "MET" } else { "FAILED" }
+                ))
                 .collect::<Vec<_>>()
                 .join("\n")
         );
@@ -374,7 +380,8 @@ mod tests {
         assert!(
             score.composite >= 0.40,
             "Composite should be at least Weak: {} ({})",
-            score.composite, score.level
+            score.composite,
+            score.level
         );
     }
 
@@ -386,7 +393,9 @@ mod tests {
             assert!(
                 ind.score > 0.0,
                 "Indicator '{}' should have positive score: {} (raw={})",
-                ind.name, ind.score, ind.raw_value
+                ind.name,
+                ind.score,
+                ind.raw_value
             );
         }
     }
@@ -395,7 +404,10 @@ mod tests {
     fn test_missing_results_gives_zero() {
         let score = QualiaConfidenceScore::from_results(&[]);
         assert_eq!(score.predictions_met, 0);
-        assert!(score.composite < 0.01, "Empty results should give near-zero score");
+        assert!(
+            score.composite < 0.01,
+            "Empty results should give near-zero score"
+        );
     }
 
     #[test]
@@ -413,14 +425,21 @@ mod tests {
         // Verify the thresholds are consistent
         assert_eq!(
             ConfidenceLevel::Strong,
-            if 0.85 >= 0.80 { ConfidenceLevel::Strong }
-            else { ConfidenceLevel::Moderate }
+            if 0.85 >= 0.80 {
+                ConfidenceLevel::Strong
+            } else {
+                ConfidenceLevel::Moderate
+            }
         );
         assert_eq!(
             ConfidenceLevel::Moderate,
-            if 0.70 >= 0.80 { ConfidenceLevel::Strong }
-            else if 0.70 >= 0.60 { ConfidenceLevel::Moderate }
-            else { ConfidenceLevel::Weak }
+            if 0.70 >= 0.80 {
+                ConfidenceLevel::Strong
+            } else if 0.70 >= 0.60 {
+                ConfidenceLevel::Moderate
+            } else {
+                ConfidenceLevel::Weak
+            }
         );
     }
 }

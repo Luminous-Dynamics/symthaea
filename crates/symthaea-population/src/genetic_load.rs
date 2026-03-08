@@ -206,40 +206,80 @@ mod tests {
 
     #[test]
     fn test_count_deleterious_none() {
-        let ind = make_individual_with_genotypes(1, vec![
-            Genotype { locus_id: 0, allele_a: Allele::neutral(1), allele_b: Allele::neutral(2) },
-            Genotype { locus_id: 1, allele_a: Allele::neutral(3), allele_b: Allele::neutral(4) },
-        ]);
+        let ind = make_individual_with_genotypes(
+            1,
+            vec![
+                Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::neutral(1),
+                    allele_b: Allele::neutral(2),
+                },
+                Genotype {
+                    locus_id: 1,
+                    allele_a: Allele::neutral(3),
+                    allele_b: Allele::neutral(4),
+                },
+            ],
+        );
         assert_eq!(count_deleterious(&ind), 0);
     }
 
     #[test]
     fn test_count_deleterious_some() {
-        let ind = make_individual_with_genotypes(1, vec![
-            Genotype { locus_id: 0, allele_a: Allele::neutral(1), allele_b: Allele::deleterious(2, -0.1, 0.5) },
-            Genotype { locus_id: 1, allele_a: Allele::neutral(3), allele_b: Allele::neutral(4) },
-            Genotype { locus_id: 2, allele_a: Allele::deleterious(5, -0.05, 0.3), allele_b: Allele::deleterious(6, -0.05, 0.3) },
-        ]);
+        let ind = make_individual_with_genotypes(
+            1,
+            vec![
+                Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::neutral(1),
+                    allele_b: Allele::deleterious(2, -0.1, 0.5),
+                },
+                Genotype {
+                    locus_id: 1,
+                    allele_a: Allele::neutral(3),
+                    allele_b: Allele::neutral(4),
+                },
+                Genotype {
+                    locus_id: 2,
+                    allele_a: Allele::deleterious(5, -0.05, 0.3),
+                    allele_b: Allele::deleterious(6, -0.05, 0.3),
+                },
+            ],
+        );
         assert_eq!(count_deleterious(&ind), 2);
     }
 
     #[test]
     fn test_count_homozygous_deleterious() {
-        let ind = make_individual_with_genotypes(1, vec![
-            Genotype { locus_id: 0, allele_a: Allele::deleterious(1, -0.1, 0.5), allele_b: Allele::deleterious(2, -0.1, 0.5) },
-            Genotype { locus_id: 1, allele_a: Allele::neutral(3), allele_b: Allele::deleterious(4, -0.05, 0.3) },
-        ]);
+        let ind = make_individual_with_genotypes(
+            1,
+            vec![
+                Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::deleterious(1, -0.1, 0.5),
+                    allele_b: Allele::deleterious(2, -0.1, 0.5),
+                },
+                Genotype {
+                    locus_id: 1,
+                    allele_a: Allele::neutral(3),
+                    allele_b: Allele::deleterious(4, -0.05, 0.3),
+                },
+            ],
+        );
         assert_eq!(count_homozygous_deleterious(&ind), 1);
     }
 
     #[test]
     fn test_population_genetic_load_zero() {
         let pop = Population {
-            individuals: vec![
-                make_individual_with_genotypes(1, vec![
-                    Genotype { locus_id: 0, allele_a: Allele::neutral(1), allele_b: Allele::neutral(2) },
-                ]),
-            ],
+            individuals: vec![make_individual_with_genotypes(
+                1,
+                vec![Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::neutral(1),
+                    allele_b: Allele::neutral(2),
+                }],
+            )],
             generation: 0,
             founding_size: 1,
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
@@ -250,11 +290,14 @@ mod tests {
     #[test]
     fn test_population_genetic_load_full() {
         let pop = Population {
-            individuals: vec![
-                make_individual_with_genotypes(1, vec![
-                    Genotype { locus_id: 0, allele_a: Allele::deleterious(1, -0.1, 0.5), allele_b: Allele::neutral(2) },
-                ]),
-            ],
+            individuals: vec![make_individual_with_genotypes(
+                1,
+                vec![Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::deleterious(1, -0.1, 0.5),
+                    allele_b: Allele::neutral(2),
+                }],
+            )],
             generation: 0,
             founding_size: 1,
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
@@ -297,15 +340,23 @@ mod tests {
 
         let load_low = population_genetic_load(&make_pop(1, 10));
         let load_high = population_genetic_load(&make_pop(5, 10));
-        assert!(load_high > load_low, "more deleterious alleles = higher load");
+        assert!(
+            load_high > load_low,
+            "more deleterious alleles = higher load"
+        );
     }
 
     #[test]
     fn test_purging_potential_no_deleterious() {
         let pop = Population {
-            individuals: vec![make_individual_with_genotypes(1, vec![
-                Genotype { locus_id: 0, allele_a: Allele::neutral(1), allele_b: Allele::neutral(2) },
-            ])],
+            individuals: vec![make_individual_with_genotypes(
+                1,
+                vec![Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::neutral(1),
+                    allele_b: Allele::neutral(2),
+                }],
+            )],
             generation: 0,
             founding_size: 1,
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
@@ -316,109 +367,161 @@ mod tests {
     #[test]
     fn test_purging_potential_all_homozygous() {
         let pop = Population {
-            individuals: vec![make_individual_with_genotypes(1, vec![
-                Genotype { locus_id: 0, allele_a: Allele::deleterious(1, -0.1, 0.5), allele_b: Allele::deleterious(2, -0.1, 0.5) },
-            ])],
+            individuals: vec![make_individual_with_genotypes(
+                1,
+                vec![Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::deleterious(1, -0.1, 0.5),
+                    allele_b: Allele::deleterious(2, -0.1, 0.5),
+                }],
+            )],
             generation: 0,
             founding_size: 1,
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
         };
-        assert!((purging_potential(&pop) - 1.0).abs() < 1e-10, "all homozygous deleterious = purging potential 1.0");
+        assert!(
+            (purging_potential(&pop) - 1.0).abs() < 1e-10,
+            "all homozygous deleterious = purging potential 1.0"
+        );
     }
 
     #[test]
     fn test_purging_potential_heterozygous() {
         let pop = Population {
-            individuals: vec![make_individual_with_genotypes(1, vec![
-                Genotype { locus_id: 0, allele_a: Allele::neutral(1), allele_b: Allele::deleterious(2, -0.1, 0.5) },
-            ])],
+            individuals: vec![make_individual_with_genotypes(
+                1,
+                vec![Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::neutral(1),
+                    allele_b: Allele::deleterious(2, -0.1, 0.5),
+                }],
+            )],
             generation: 0,
             founding_size: 1,
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
         };
-        assert_eq!(purging_potential(&pop), 0.0, "heterozygous deleterious = purging potential 0");
+        assert_eq!(
+            purging_potential(&pop),
+            0.0,
+            "heterozygous deleterious = purging potential 0"
+        );
     }
 
     #[test]
     fn test_compute_fitness_no_deleterious() {
-        let ind = make_individual_with_genotypes(1, vec![
-            Genotype { locus_id: 0, allele_a: Allele::neutral(1), allele_b: Allele::neutral(2) },
-            Genotype { locus_id: 1, allele_a: Allele::neutral(3), allele_b: Allele::neutral(4) },
-        ]);
+        let ind = make_individual_with_genotypes(
+            1,
+            vec![
+                Genotype {
+                    locus_id: 0,
+                    allele_a: Allele::neutral(1),
+                    allele_b: Allele::neutral(2),
+                },
+                Genotype {
+                    locus_id: 1,
+                    allele_a: Allele::neutral(3),
+                    allele_b: Allele::neutral(4),
+                },
+            ],
+        );
         assert!((compute_fitness(&ind) - 1.0).abs() < 1e-10);
     }
 
     #[test]
     fn test_compute_fitness_heterozygous_deleterious() {
-        let ind = make_individual_with_genotypes(1, vec![
-            Genotype {
+        let ind = make_individual_with_genotypes(
+            1,
+            vec![Genotype {
                 locus_id: 0,
                 allele_a: Allele::deleterious(1, -0.1, 0.5),
                 allele_b: Allele::neutral(2),
-            },
-        ]);
+            }],
+        );
         let fitness = compute_fitness(&ind);
         // Expected: 1 + h*s = 1 + 0.5*(-0.1) = 0.95
-        assert!((fitness - 0.95).abs() < 1e-10, "het fitness = 0.95, got {fitness}");
+        assert!(
+            (fitness - 0.95).abs() < 1e-10,
+            "het fitness = 0.95, got {fitness}"
+        );
     }
 
     #[test]
     fn test_compute_fitness_homozygous_deleterious() {
-        let ind = make_individual_with_genotypes(1, vec![
-            Genotype {
+        let ind = make_individual_with_genotypes(
+            1,
+            vec![Genotype {
                 locus_id: 0,
                 allele_a: Allele::deleterious(1, -0.1, 0.5),
                 allele_b: Allele::deleterious(2, -0.1, 0.5),
-            },
-        ]);
+            }],
+        );
         let fitness = compute_fitness(&ind);
         // Expected: 1 + s = 1 + (-0.1) = 0.9
-        assert!((fitness - 0.9).abs() < 1e-10, "hom fitness = 0.9, got {fitness}");
+        assert!(
+            (fitness - 0.9).abs() < 1e-10,
+            "hom fitness = 0.9, got {fitness}"
+        );
     }
 
     #[test]
     fn test_compute_fitness_non_negative() {
-        let ind = make_individual_with_genotypes(1, vec![
-            Genotype {
+        let ind = make_individual_with_genotypes(
+            1,
+            vec![Genotype {
                 locus_id: 0,
                 allele_a: Allele::deleterious(1, -2.0, 1.0),
                 allele_b: Allele::deleterious(2, -2.0, 1.0),
-            },
-        ]);
+            }],
+        );
         let fitness = compute_fitness(&ind);
-        assert!(fitness >= 0.0, "fitness should be non-negative, got {fitness}");
+        assert!(
+            fitness >= 0.0,
+            "fitness should be non-negative, got {fitness}"
+        );
     }
 
     #[test]
     fn test_mean_deleterious_effect() {
         let pop = Population {
-            individuals: vec![make_individual_with_genotypes(1, vec![
-                Genotype {
+            individuals: vec![make_individual_with_genotypes(
+                1,
+                vec![Genotype {
                     locus_id: 0,
                     allele_a: Allele::deleterious(1, -0.1, 0.5),
                     allele_b: Allele::deleterious(2, -0.3, 0.5),
-                },
-            ])],
+                }],
+            )],
             generation: 0,
             founding_size: 1,
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
         };
         let mean_s = mean_deleterious_effect(&pop);
-        assert!((mean_s - 0.2).abs() < 1e-10, "mean |s| = (0.1+0.3)/2 = 0.2, got {mean_s}");
+        assert!(
+            (mean_s - 0.2).abs() < 1e-10,
+            "mean |s| = (0.1+0.3)/2 = 0.2, got {mean_s}"
+        );
     }
 
     #[test]
     fn test_plan_genetic_rescue() {
         let pop = Population {
-            individuals: (0..50).map(|i| make_individual_with_genotypes(i, vec![])).collect(),
+            individuals: (0..50)
+                .map(|i| make_individual_with_genotypes(i, vec![]))
+                .collect(),
             generation: 5,
             founding_size: 50,
             diversity_hv: ContinuousHV::zero(HDC_DIMENSION),
         };
         let plan = plan_genetic_rescue(&pop, 0.5, 0.3);
-        assert!(plan.num_migrants >= 1, "should recommend at least 1 migrant");
+        assert!(
+            plan.num_migrants >= 1,
+            "should recommend at least 1 migrant"
+        );
         assert_eq!(plan.target_generation, 6, "should target next generation");
-        assert!(plan.expected_heterozygosity_gain > 0.0, "should expect positive gain");
+        assert!(
+            plan.expected_heterozygosity_gain > 0.0,
+            "should expect positive gain"
+        );
     }
 
     #[test]
@@ -437,7 +540,10 @@ mod tests {
     #[test]
     fn test_generations_to_fixation_neutral() {
         let fix_time = generations_to_fixation(100.0, 0.0);
-        assert!((fix_time - 400.0).abs() < 1e-10, "neutral: 4*Ne = 400, got {fix_time}");
+        assert!(
+            (fix_time - 400.0).abs() < 1e-10,
+            "neutral: 4*Ne = 400, got {fix_time}"
+        );
     }
 
     #[test]

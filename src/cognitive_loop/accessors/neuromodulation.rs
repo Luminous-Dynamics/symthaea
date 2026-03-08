@@ -223,7 +223,9 @@ impl CognitiveLoopService {
         if let Some(mut cal) = self.neuromod.pending_calibration.take() {
             self.neuromod.pending_calibration_since_cycle = None;
             // Record in history before applying (captures the intended adjustment)
-            self.neuromod.calibration_history.record(&cal, self.stats.total_cycles as u64);
+            self.neuromod
+                .calibration_history
+                .record(&cal, self.stats.total_cycles as u64);
 
             // Check for systematic drift and auto-adjust baselines.
             // McEwen (1998): allostatic overload from persistent one-directional
@@ -231,15 +233,66 @@ impl CognitiveLoopService {
             let nudges = self.neuromod.calibration_history.compute_baseline_nudges();
             for (transmitter, nudge) in &nudges {
                 let applied = match transmitter.as_str() {
-                    "DA" => { self.neuromod.bath.dopamine.adjust_baseline(*nudge, 0.2, 0.8); true }
-                    "NE" | "NE-alpha" | "NE-beta" => { self.neuromod.bath.noradrenaline.adjust_baseline(*nudge, 0.2, 0.8); true }
-                    "5-HT" => { self.neuromod.bath.serotonin.adjust_baseline(*nudge, 0.2, 0.8); true }
-                    "ACh" => { self.neuromod.bath.acetylcholine.adjust_baseline(*nudge, 0.2, 0.8); true }
-                    "GABA" | "GABA-A" | "GABA-B" => { self.neuromod.bath.gaba.adjust_baseline(*nudge, 0.2, 0.8); true }
-                    "Oxytocin" => { self.neuromod.bath.oxytocin.adjust_baseline(*nudge, 0.2, 0.8); true }
-                    "Glutamate" => { self.neuromod.bath.glutamate.adjust_baseline(*nudge, 0.2, 0.8); true }
-                    "Adenosine" => { self.neuromod.bath.adenosine.adjust_baseline(*nudge, 0.2, 0.8); true }
-                    "Endocannabinoid" => { self.neuromod.bath.endocannabinoid.adjust_baseline(*nudge, 0.2, 0.8); true }
+                    "DA" => {
+                        self.neuromod
+                            .bath
+                            .dopamine
+                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
+                    "NE" | "NE-alpha" | "NE-beta" => {
+                        self.neuromod
+                            .bath
+                            .noradrenaline
+                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
+                    "5-HT" => {
+                        self.neuromod
+                            .bath
+                            .serotonin
+                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
+                    "ACh" => {
+                        self.neuromod
+                            .bath
+                            .acetylcholine
+                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
+                    "GABA" | "GABA-A" | "GABA-B" => {
+                        self.neuromod.bath.gaba.adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
+                    "Oxytocin" => {
+                        self.neuromod
+                            .bath
+                            .oxytocin
+                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
+                    "Glutamate" => {
+                        self.neuromod
+                            .bath
+                            .glutamate
+                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
+                    "Adenosine" => {
+                        self.neuromod
+                            .bath
+                            .adenosine
+                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
+                    "Endocannabinoid" => {
+                        self.neuromod
+                            .bath
+                            .endocannabinoid
+                            .adjust_baseline(*nudge, 0.2, 0.8);
+                        true
+                    }
                     _ => false,
                 };
                 if applied {
@@ -420,8 +473,9 @@ impl CognitiveLoopService {
                     if let Some(ref mut pipe) = child.stdout {
                         let _ = pipe.read_to_string(&mut stdout);
                     }
-                    match super::super::calibration::NeuromodCalibration::from_json_z_scores(&stdout)
-                    {
+                    match super::super::calibration::NeuromodCalibration::from_json_z_scores(
+                        &stdout,
+                    ) {
                         Ok(cal) => {
                             tracing::info!(
                                 adjustments = cal.adjustments.len(),
@@ -429,7 +483,8 @@ impl CognitiveLoopService {
                                 "Async calibration battery completed"
                             );
                             self.neuromod.pending_calibration = Some(cal);
-                            self.neuromod.pending_calibration_since_cycle = Some(self.stats.total_cycles as u64);
+                            self.neuromod.pending_calibration_since_cycle =
+                                Some(self.stats.total_cycles as u64);
                             return true;
                         }
                         Err(e) => {

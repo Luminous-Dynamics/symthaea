@@ -26,16 +26,16 @@
 //! - [`monitor`]: Autonomous self-assessment metacognitive monitor
 //! - [`history`]: Calibration history and systematic drift tracking
 
-pub mod normative;
-pub mod monitor;
 pub mod history;
+pub mod monitor;
+pub mod normative;
 
 // Re-export primary types for backward compatibility
+pub use history::{CalibrationHistory, CalibrationSnapshot, CalibrationValidator};
+pub use monitor::{SelfAssessmentInput, SelfAssessmentMonitor};
 pub use normative::{
     NeuromodCalibration, ReceptorSubtype, SharedCalibrationProfile, TransmitterCalibration,
 };
-pub use monitor::{SelfAssessmentInput, SelfAssessmentMonitor};
-pub use history::{CalibrationHistory, CalibrationSnapshot, CalibrationValidator};
 
 // Re-export test-only helpers for the tests submodule
 #[cfg(test)]

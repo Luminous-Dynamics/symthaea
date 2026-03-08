@@ -12,36 +12,34 @@
 
 #![cfg(feature = "symthaea-backend")]
 
+use std::collections::BTreeMap;
 use symthaea_psych_bench::harness::report::MetricValue;
 use symthaea_psych_bench::harness::snapshot::{
     RegressionReport, RegressionSeverity, RegressionSnapshot,
 };
-use std::collections::BTreeMap;
 
 /// Build a minimal snapshot from hand-specified benchmark/metric/value triples.
 fn synthetic_snapshot(name: &str, data: &[(&str, &str, f64)]) -> RegressionSnapshot {
     let mut metrics: BTreeMap<String, BTreeMap<String, MetricValue>> = BTreeMap::new();
     for &(bench, metric, val) in data {
-        metrics
-            .entry(bench.to_string())
-            .or_default()
-            .insert(
-                metric.to_string(),
-                MetricValue {
-                    mean: val,
-                    std_dev: val * 0.05,
-                    n: 20,
-                    ci_lower: val * 0.95,
-                    ci_upper: val * 1.05,
-                },
-            );
+        metrics.entry(bench.to_string()).or_default().insert(
+            metric.to_string(),
+            MetricValue {
+                mean: val,
+                std_dev: val * 0.05,
+                n: 20,
+                ci_lower: val * 0.95,
+                ci_upper: val * 1.05,
+            },
+        );
     }
     RegressionSnapshot {
         name: name.to_string(),
         timestamp: chrono::Utc::now().to_rfc3339(),
         git_hash: None,
         config_summary: "regression guard test".to_string(),
-        schema_version: symthaea_psych_bench::harness::snapshot::SNAPSHOT_SCHEMA_VERSION.to_string(),
+        schema_version: symthaea_psych_bench::harness::snapshot::SNAPSHOT_SCHEMA_VERSION
+            .to_string(),
         metrics,
     }
 }
@@ -129,7 +127,10 @@ fn test_snapshot_round_trip() {
         "Round-trip comparison should have no regressions"
     );
     assert_eq!(report.summary.total_metrics, 2);
-    assert!(report.results.iter().all(|r| r.severity == RegressionSeverity::Pass));
+    assert!(report
+        .results
+        .iter()
+        .all(|r| r.severity == RegressionSeverity::Pass));
 
     let _ = std::fs::remove_file(&path);
 }

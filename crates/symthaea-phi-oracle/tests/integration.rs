@@ -30,20 +30,29 @@ fn test_end_to_end_random_system() {
     assert!(oracle.ready(), "should be ready after 60 observations");
     let report = oracle.measure().expect("should produce a report");
 
-    assert!(report.integration_index >= 0.0, "integration index must be non-negative");
+    assert!(
+        report.integration_index >= 0.0,
+        "integration index must be non-negative"
+    );
     assert!(report.total_mutual_information >= 0.0);
     assert_eq!(report.num_observations, 60);
 
     // MIP should partition the 8 variables into two non-empty groups
     let (a, b) = &report.minimum_information_partition;
-    assert!(!a.is_empty() && !b.is_empty(), "MIP should produce non-trivial partition");
+    assert!(
+        !a.is_empty() && !b.is_empty(),
+        "MIP should produce non-trivial partition"
+    );
     assert_eq!(a.len() + b.len(), 8, "partition should cover all variables");
 
     // Spectral order should include all 8 variables
     assert_eq!(report.spectral_order.len(), 8);
 
     // Temporal coherence should be present (we configured temporal probes)
-    let tc = report.temporal_coherence.as_ref().expect("temporal coherence should exist");
+    let tc = report
+        .temporal_coherence
+        .as_ref()
+        .expect("temporal coherence should exist");
     assert_eq!(tc.cv_by_tau.len(), 3);
     assert!(tc.dominant_timescale > 0.0);
 }
@@ -100,11 +109,7 @@ fn test_correlated_vs_uncorrelated() {
 #[test]
 fn test_covariance_bypass() {
     let encoder = CovarianceEncoder::new(3);
-    let mut oracle = IntegrationOracle::new(
-        Box::new(encoder),
-        OracleConfig::default(),
-    )
-    .unwrap();
+    let mut oracle = IntegrationOracle::new(Box::new(encoder), OracleConfig::default()).unwrap();
 
     // 3x3 covariance matrix (row-major) with known structure:
     // Variables 0,1 are correlated; variable 2 is independent.
@@ -118,7 +123,9 @@ fn test_covariance_bypass() {
     oracle.observe_covariance(&cov, 3, 100).unwrap();
     assert!(oracle.ready());
 
-    let report = oracle.measure().expect("should produce report from covariance");
+    let report = oracle
+        .measure()
+        .expect("should produce report from covariance");
     assert!(report.integration_index >= 0.0);
     assert_eq!(report.num_observations, 100);
 
@@ -128,7 +135,11 @@ fn test_covariance_bypass() {
         !a.is_empty() && !b.is_empty(),
         "MIP should produce non-trivial partition"
     );
-    assert_eq!(a.len() + b.len(), 3, "partition should cover all 3 variables");
+    assert_eq!(
+        a.len() + b.len(),
+        3,
+        "partition should cover all 3 variables"
+    );
 
     // Integration index should be positive — the system has structure
     // (variables 0 and 1 are correlated at r=0.8).
@@ -196,11 +207,7 @@ fn test_reset_clears_everything() {
 #[test]
 fn test_covariance_deterministic() {
     let encoder = CovarianceEncoder::new(4);
-    let mut oracle = IntegrationOracle::new(
-        Box::new(encoder),
-        OracleConfig::default(),
-    )
-    .unwrap();
+    let mut oracle = IntegrationOracle::new(Box::new(encoder), OracleConfig::default()).unwrap();
 
     // Identity covariance (all variables independent)
     #[rustfmt::skip]
@@ -242,8 +249,7 @@ fn test_covariance_deterministic() {
 #[test]
 fn test_signal_loss_fixed() {
     let num_nodes = 6;
-    let encoder = TimeSeriesEncoder::new(num_nodes, 256, 42)
-        .with_name("signal-loss-regression");
+    let encoder = TimeSeriesEncoder::new(num_nodes, 256, 42).with_name("signal-loss-regression");
 
     let config = OracleConfig {
         window_size: 50,
@@ -275,8 +281,7 @@ fn test_signal_loss_fixed() {
             }
             forces[i] -= 0.1 * state[i];
             if i == 0 || i == 3 {
-                forces[i] +=
-                    0.5 * (step as f64 * dt * 2.0 * std::f64::consts::PI * 0.1).sin();
+                forces[i] += 0.5 * (step as f64 * dt * 2.0 * std::f64::consts::PI * 0.1).sin();
             }
         }
 
@@ -343,7 +348,10 @@ fn test_trend_tracking() {
     }
 
     assert_eq!(trend.len(), 2);
-    assert!(trend.trend_slope().is_some(), "should have slope with 2 points");
+    assert!(
+        trend.trend_slope().is_some(),
+        "should have slope with 2 points"
+    );
 
     // Display should work
     let display = format!("{trend}");
@@ -376,7 +384,10 @@ fn test_display_integration_report() {
     assert!(display.contains("Part A:"), "display: {display}");
     assert!(display.contains("Part B:"), "display: {display}");
     assert!(display.contains("Temporal Coherence"), "display: {display}");
-    assert!(display.contains("Variable contributions"), "display: {display}");
+    assert!(
+        display.contains("Variable contributions"),
+        "display: {display}"
+    );
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -386,15 +397,21 @@ fn test_display_integration_report() {
 /// Normalized index should always be in [0, 1].
 #[test]
 fn test_normalized_index_bounds() {
-    let mut oracle = IntegrationOracle::new_simple(4, OracleConfig {
-        window_size: 20,
-        temporal_probes: vec![],
-        ..Default::default()
-    }).unwrap();
+    let mut oracle = IntegrationOracle::new_simple(
+        4,
+        OracleConfig {
+            window_size: 20,
+            temporal_probes: vec![],
+            ..Default::default()
+        },
+    )
+    .unwrap();
 
     for t in 0..40 {
         let common = (t as f64 * 0.1).sin();
-        oracle.observe(&[common, common * 0.8, common * -0.5, (t as f64 * 0.3).cos()]).unwrap();
+        oracle
+            .observe(&[common, common * 0.8, common * -0.5, (t as f64 * 0.3).cos()])
+            .unwrap();
     }
 
     let report = oracle.measure().expect("should produce report");
@@ -473,14 +490,22 @@ fn test_hierarchical_multi_scale() {
 
     let mut oracle = IntegrationOracle::new(Box::new(encoder), config).unwrap();
     for t in 0..60 {
-        let obs: Vec<f64> = (0..8).map(|i| (t as f64 * 0.1 + i as f64 * 0.3).sin()).collect();
+        let obs: Vec<f64> = (0..8)
+            .map(|i| (t as f64 * 0.1 + i as f64 * 0.3).sin())
+            .collect();
         oracle.observe(&obs).unwrap();
     }
 
-    let hier = oracle.measure_hierarchical().expect("should produce hierarchical report");
+    let hier = oracle
+        .measure_hierarchical()
+        .expect("should produce hierarchical report");
 
     // Should have at least 2 scales: 8 vars and 4 vars
-    assert!(hier.scales.len() >= 2, "should have >= 2 scales, got {:?}", hier.scales);
+    assert!(
+        hier.scales.len() >= 2,
+        "should have >= 2 scales, got {:?}",
+        hier.scales
+    );
     assert_eq!(hier.scales[0], 8);
     assert_eq!(hier.phi_by_scale.len(), hier.scales.len());
 

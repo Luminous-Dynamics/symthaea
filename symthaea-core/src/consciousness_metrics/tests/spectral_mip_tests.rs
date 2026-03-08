@@ -1033,10 +1033,7 @@ fn test_structural_phi_block_diagonal_finds_clusters() {
         structural.micro_phi > 0.0,
         "Micro phi should be positive for correlated blocks"
     );
-    assert!(
-        structural.macro_phi > 0.0,
-        "Macro phi should be positive"
-    );
+    assert!(structural.macro_phi > 0.0, "Macro phi should be positive");
     // All fields should be finite
     assert!(structural.micro_phi.is_finite());
     assert!(structural.meso_phi.is_finite());
@@ -1083,9 +1080,11 @@ fn test_structural_phi_three_blocks() {
         structural.num_clusters
     );
     // With near-zero inter-block coupling, micro >> meso
-    assert!(structural.micro_phi > structural.meso_phi,
+    assert!(
+        structural.micro_phi > structural.meso_phi,
         "Within-cluster integration ({}) should exceed between-cluster ({})",
-        structural.micro_phi, structural.meso_phi
+        structural.micro_phi,
+        structural.meso_phi
     );
 }
 

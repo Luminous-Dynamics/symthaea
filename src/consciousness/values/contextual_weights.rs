@@ -31,7 +31,7 @@
 //! └─────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use super::seven_harmonies::Harmony;
+use super::eight_harmonies::Harmony;
 use std::collections::HashMap;
 
 /// Type of action being evaluated.

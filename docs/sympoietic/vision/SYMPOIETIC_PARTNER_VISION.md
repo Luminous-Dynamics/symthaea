@@ -259,7 +259,7 @@ impl ProactivePartnership {
 ```rust
 /// Shared Value Space that Evolves Together
 pub struct SharedValueSpace {
-    /// Immutable foundation: Seven Harmonies
+    /// Immutable foundation: Eight Harmonies
     foundation: SevenHarmonies,
 
     /// Learned refinements from this specific partnership
@@ -686,7 +686,7 @@ The path forward:
 
 - [Generalization Refactoring Plan](./GENERALIZATION_REFACTORING_PLAN.md)
 - [Brain and Mind Models Review](./BRAIN_AND_MIND_MODELS_REVIEW.md)
-- [Seven Harmonies Framework](./src/consciousness/seven_harmonies.rs)
+- [Eight Harmonies Framework](./src/consciousness/seven_harmonies.rs)
 - [IIT 4.0 Implementation](./src/hdc/phi_real.rs)
 
 ---

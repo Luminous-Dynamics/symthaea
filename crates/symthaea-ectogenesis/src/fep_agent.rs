@@ -69,16 +69,9 @@ impl WombFepAgent {
             expected.heart_rate_bpm,
             expected.heart_rate_bpm.max(1.0),
         );
-        let lung_err = self.channel_surprise(
-            metrics.lung_maturity,
-            expected.lung_maturity,
-            1.0,
-        );
-        let movement_err = self.channel_surprise(
-            metrics.movement_score,
-            expected.movement_score,
-            1.0,
-        );
+        let lung_err = self.channel_surprise(metrics.lung_maturity, expected.lung_maturity, 1.0);
+        let movement_err =
+            self.channel_surprise(metrics.movement_score, expected.movement_score, 1.0);
         let brain_err = self.channel_surprise(
             metrics.brain_activity_score,
             expected.brain_activity_score,

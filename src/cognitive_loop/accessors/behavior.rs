@@ -212,7 +212,8 @@ impl CognitiveLoopService {
 
     /// Update listener prediction feedback
     pub fn update_listener_prediction(&mut self, success: f32) {
-        self.voice_coherence.voice
+        self.voice_coherence
+            .voice
             .update_listener_prediction(success);
     }
 
@@ -274,7 +275,8 @@ impl CognitiveLoopService {
                 .last_spectral_mip_phi
                 .unwrap_or(0.5) as f32,
             expected_free_energy: self
-                .fep.agent
+                .fep
+                .agent
                 .last_fe_components
                 .as_ref()
                 .map(|fe| fe.total as f32)
@@ -303,7 +305,8 @@ impl CognitiveLoopService {
 
     /// Get the current FEP free energy (if available)
     pub fn fep_free_energy(&self) -> Option<f64> {
-        self.fep.agent
+        self.fep
+            .agent
             .last_fe_components
             .as_ref()
             .map(|fe| fe.total)

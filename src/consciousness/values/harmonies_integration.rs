@@ -1,9 +1,9 @@
-//! # Harmonies Integration: Seven Harmonies Value Framework
+//! # Harmonies Integration: Eight Harmonies Value Framework
 //!
-//! Integrates the Seven Harmonies value system into consciousness operations.
+//! Integrates the Eight Harmonies value system into consciousness operations.
 //! This provides ethical and value-aligned decision making.
 
-use super::seven_harmonies::{AlignmentResult, Harmony, SevenHarmonies};
+use super::eight_harmonies::{AlignmentResult, Harmony, EightHarmonies};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -117,8 +117,8 @@ pub struct ValueEvaluation {
 pub struct HarmoniesIntegrator {
     /// Configuration
     config: HarmoniesIntegrationConfig,
-    /// The seven harmonies system
-    harmonies: SevenHarmonies,
+    /// The eight harmonies system
+    harmonies: EightHarmonies,
     /// Harmony embeddings (semantically grounded via HarmonyBasis)
     harmony_embeddings: HashMap<Harmony, ContinuousHV>,
     /// Shared semantic basis for harmony projection and free energy
@@ -162,7 +162,7 @@ impl HarmoniesIntegrator {
         config: HarmoniesIntegrationConfig,
         harmony_basis: Arc<HarmonyBasis>,
     ) -> Self {
-        let harmonies = SevenHarmonies::default();
+        let harmonies = EightHarmonies::default();
 
         // Build harmony embeddings from the semantic basis vectors
         let all_harmonies = Harmony::all();
@@ -372,7 +372,7 @@ impl HarmoniesIntegrator {
         }
     }
 
-    /// Get alignment for the Seven Harmonies
+    /// Get alignment for the Eight Harmonies
     pub fn check_alignment(&mut self, description: &str) -> AlignmentResult {
         self.harmonies.evaluate(description)
     }

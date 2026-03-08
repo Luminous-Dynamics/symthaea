@@ -9,7 +9,7 @@
 //! |-------|--------|----------|---------|
 //! | 1 | MoralParser + MoralAlgebra | 7 cycles | HDC moral algebra (Luo & Lakoff 2019) |
 //! | 2 | UnifiedValueEvaluator | 19 cycles | Value alignment (Panksepp 1998) |
-//! | 3 | HarmoniesIntegrator | 19 cycles | Seven Harmonies (Schwartz 2012) |
+//! | 3 | HarmoniesIntegrator | 19 cycles | Eight Harmonies (Schwartz 2012) |
 //!
 //! ## Design Principles
 //!
@@ -66,7 +66,7 @@ pub(crate) struct EthicsEngineOutput {
     pub value_gate_factor: f32,
 
     // ── Stage 3: Harmonies ─────────────────────────────────────────────
-    /// Seven Harmonies alignment [0, 1]
+    /// Eight Harmonies alignment [0, 1]
     pub harmonies_alignment: f32,
     /// Whether action is approved by harmonies
     pub harmonies_approved: bool,
@@ -442,7 +442,7 @@ impl EthicsEngine {
         };
 
         // ═══════════════════════════════════════════════════════════════════
-        // STAGE 3: Harmonies Integrator — Seven Harmonies alignment
+        // STAGE 3: Harmonies Integrator — Eight Harmonies alignment
         // Every 19 cycles (co-prime with value evaluator — same cadence)
         //
         // Now uses semantically grounded basis vectors (not random) and

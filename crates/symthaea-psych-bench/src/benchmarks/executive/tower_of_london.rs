@@ -21,8 +21,8 @@
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
-use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use crate::harness::trial_analysis::TrialOutcome;
+use crate::harness::{BenchmarkProvenance, PsychBenchmark};
 use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -517,7 +517,11 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
                     trial_idx: trace.len(),
                     condition: "tower".to_string(),
                     correct: r.overall_optimal_rate > 0.5,
-                    rt_ticks: if r.rt_ticks.is_empty() { 0.0 } else { r.rt_ticks.iter().sum::<f64>() / r.rt_ticks.len() as f64 },
+                    rt_ticks: if r.rt_ticks.is_empty() {
+                        0.0
+                    } else {
+                        r.rt_ticks.iter().sum::<f64>() / r.rt_ticks.len() as f64
+                    },
                     similarity: 0.0,
                     confidence: 0.0,
                     response_idx: 0,
@@ -540,7 +544,9 @@ impl PsychBenchmark for TowerOfLondonBenchmark {
 
         result.conditions = 3;
         result.trials_per_condition = config.trials_per_condition;
-        if config.trial_trace { result.trial_trace = trace; }
+        if config.trial_trace {
+            result.trial_trace = trace;
+        }
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
     }
@@ -599,7 +605,9 @@ mod tests {
         for &(_, to) in &moves {
             if to == 0 {
                 // Only valid if peg 0 is empty after the move (from == 0)
-                unreachable!("legal_moves() should not produce a move to full peg 0 unless it's the source");
+                unreachable!(
+                    "legal_moves() should not produce a move to full peg 0 unless it's the source"
+                );
             }
         }
     }

@@ -2189,7 +2189,8 @@ pub fn language_baselines() -> BaselineMap {
         Baseline {
             value: 0.05,
             sd: Some(0.04),
-            source: "Graesser et al. (2004), scale: HDC cosine similarity between context/topic HVs",
+            source:
+                "Graesser et al. (2004), scale: HDC cosine similarity between context/topic HVs",
             population: "human adults",
         },
     );
@@ -2370,6 +2371,90 @@ pub fn social_baselines() -> BaselineMap {
             value: 0.30,
             sd: Some(0.08),
             source: "Camerer (2003), offer level at 50% acceptance",
+            population: "human adults",
+        },
+    );
+    // Prisoner's Dilemma baselines (Sally, 1995; Rapoport & Chammah, 1965)
+    m.insert(
+        "cooperation_rate",
+        Baseline {
+            value: 0.47,
+            sd: Some(0.15),
+            source: "Sally (1995) meta-analysis, one-shot cooperation rate",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "mutual_cooperation_rate",
+        Baseline {
+            value: 0.30,
+            sd: Some(0.12),
+            source: "Sally (1995), fraction of mutual cooperation outcomes",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "payoff_efficiency",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.10),
+            source: "Rapoport & Chammah (1965), actual/optimal payoff ratio",
+            population: "human adults",
+        },
+    );
+    // Public Goods Game baselines (Ledyard, 1995; Chaudhuri, 2011)
+    m.insert(
+        "contribution_rate",
+        Baseline {
+            value: 0.47,
+            sd: Some(0.15),
+            source: "Ledyard (1995), fraction of endowment contributed",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "free_rider_fraction",
+        Baseline {
+            value: 0.25,
+            sd: Some(0.10),
+            source: "Chaudhuri (2011), fraction contributing < 10%",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "punishment_effect",
+        Baseline {
+            value: 0.15,
+            sd: Some(0.08),
+            source: "Fehr & Gachter (2000), contribution increase with punishment",
+            population: "human adults",
+        },
+    );
+    // Dictator Game baselines (Engel, 2011 meta-analysis)
+    m.insert(
+        "mean_offer",
+        Baseline {
+            value: 0.28,
+            sd: Some(0.13),
+            source: "Engel (2011), mean fraction given across 616 treatments",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "positive_offer_rate",
+        Baseline {
+            value: 0.64,
+            sd: Some(0.12),
+            source: "Engel (2011), fraction offering > 0",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "generosity_index",
+        Baseline {
+            value: 0.35,
+            sd: Some(0.10),
+            source: "Engel (2011), mean offer conditional on giving > 0",
             population: "human adults",
         },
     );
@@ -2693,7 +2778,8 @@ pub fn neuromod_baselines() -> BaselineMap {
         Baseline {
             value: 2.0,
             sd: Some(0.8),
-            source: "Doya (2002); Cohen (1988), DA knockout Cohen's d on learning rate ~2.0 (large)",
+            source:
+                "Doya (2002); Cohen (1988), DA knockout Cohen's d on learning rate ~2.0 (large)",
             population: "computational model",
         },
     );
@@ -3144,19 +3230,49 @@ mod tests {
     fn test_neuromod_baselines_key_entries() {
         let baselines = neuromod_baselines();
         // DoseResponse
-        assert!(baselines.contains_key("da_monotonicity"), "Missing da_monotonicity");
-        assert!(baselines.contains_key("gaba_monotonicity"), "Missing gaba_monotonicity");
+        assert!(
+            baselines.contains_key("da_monotonicity"),
+            "Missing da_monotonicity"
+        );
+        assert!(
+            baselines.contains_key("gaba_monotonicity"),
+            "Missing gaba_monotonicity"
+        );
         // ToleranceWithdrawal
-        assert!(baselines.contains_key("tolerance_count"), "Missing tolerance_count");
-        assert!(baselines.contains_key("withdrawal_count"), "Missing withdrawal_count");
+        assert!(
+            baselines.contains_key("tolerance_count"),
+            "Missing tolerance_count"
+        );
+        assert!(
+            baselines.contains_key("withdrawal_count"),
+            "Missing withdrawal_count"
+        );
         // BehavioralKnockout
-        assert!(baselines.contains_key("ne_ko_exploration_d"), "Missing ne_ko_exploration_d");
-        assert!(baselines.contains_key("gaba_ko_inhibition_d"), "Missing gaba_ko_inhibition_d");
+        assert!(
+            baselines.contains_key("ne_ko_exploration_d"),
+            "Missing ne_ko_exploration_d"
+        );
+        assert!(
+            baselines.contains_key("gaba_ko_inhibition_d"),
+            "Missing gaba_ko_inhibition_d"
+        );
         // AntagonistProfiles
-        assert!(baselines.contains_key("d2_flexibility_reduction"), "Missing d2_flexibility_reduction");
-        assert!(baselines.contains_key("wearoff_recovery"), "Missing wearoff_recovery");
+        assert!(
+            baselines.contains_key("d2_flexibility_reduction"),
+            "Missing d2_flexibility_reduction"
+        );
+        assert!(
+            baselines.contains_key("wearoff_recovery"),
+            "Missing wearoff_recovery"
+        );
         // ConsciousnessPharmacology
-        assert!(baselines.contains_key("anxiolytic_proxy_peak"), "Missing anxiolytic_proxy_peak");
-        assert!(baselines.contains_key("ecb_proxy_mean"), "Missing ecb_proxy_mean");
+        assert!(
+            baselines.contains_key("anxiolytic_proxy_peak"),
+            "Missing anxiolytic_proxy_peak"
+        );
+        assert!(
+            baselines.contains_key("ecb_proxy_mean"),
+            "Missing ecb_proxy_mean"
+        );
     }
 }

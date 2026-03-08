@@ -165,10 +165,9 @@ impl PhysicsIntegration {
     ) -> bool {
         let tau = substrate_tau_factor.max(0.01);
         let effective_interval = ((base_interval as f32 / tau).round() as usize).max(1);
-        let effective_blend = (base_blend_weight
-            * tau
-            * (1.0 + substrate_scale_pressure.clamp(0.0, 1.0) * 0.1))
-        .clamp(0.0, 1.0);
+        let effective_blend =
+            (base_blend_weight * tau * (1.0 + substrate_scale_pressure.clamp(0.0, 1.0) * 0.1))
+                .clamp(0.0, 1.0);
 
         self.last_effective_interval = effective_interval;
         self.last_effective_blend = effective_blend;
@@ -252,7 +251,10 @@ mod tests {
 
         pi.query_cycle(0, 1, 0.5, 1.0, 0.0, &hv, &mut state);
         // At least some values should have changed
-        let changed = state.iter().zip(original.iter()).any(|(a, b)| (a - b).abs() > 1e-6);
+        let changed = state
+            .iter()
+            .zip(original.iter())
+            .any(|(a, b)| (a - b).abs() > 1e-6);
         assert!(changed, "Physics blend should modify compressed state");
     }
 
@@ -276,7 +278,10 @@ mod tests {
         assert!(w > 0.0, "Blend weight should be > 0 after successful query");
         if let Some(phv) = pi.last_physics_hv() {
             let stride = phv.values.len() / compressed_len;
-            assert_eq!(stride, 64, "Expected stride of 64 for 16384→256 compression");
+            assert_eq!(
+                stride, 64,
+                "Expected stride of 64 for 16384→256 compression"
+            );
             for i in 0..compressed_len {
                 let expected = w * phv.values[i * stride];
                 assert!(
@@ -311,7 +316,10 @@ mod tests {
         // base_interval=10, tau=2.0 → effective_interval = round(10/2) = 5
         // cycle 5 should query
         let queried = pi.query_cycle(5, 10, 0.1, 2.0, 0.0, &hv, &mut state);
-        assert!(queried, "tau=2.0 should halve interval: cycle 5 should query with base 10");
+        assert!(
+            queried,
+            "tau=2.0 should halve interval: cycle 5 should query with base 10"
+        );
         assert_eq!(pi.last_effective_interval, 5);
     }
 
@@ -324,7 +332,10 @@ mod tests {
         // base_interval=10, tau=0.5 → effective_interval = round(10/0.5) = 20
         // cycle 10 should NOT query
         let queried = pi.query_cycle(10, 10, 0.1, 0.5, 0.0, &hv, &mut state);
-        assert!(!queried, "tau=0.5 should double interval: cycle 10 should NOT query with base 10");
+        assert!(
+            !queried,
+            "tau=0.5 should double interval: cycle 10 should NOT query with base 10"
+        );
         assert_eq!(pi.last_effective_interval, 20);
 
         // cycle 20 should query
@@ -347,12 +358,15 @@ mod tests {
         assert!(
             pi_fast.last_effective_blend > pi_base.last_effective_blend,
             "tau=2.0 should produce higher blend than tau=1.0: {} vs {}",
-            pi_fast.last_effective_blend, pi_base.last_effective_blend,
+            pi_fast.last_effective_blend,
+            pi_base.last_effective_blend,
         );
         // Both should be score-weighted (≤ substrate-modulated value)
-        assert!(pi_fast.last_effective_blend <= 0.2 + 1e-6,
+        assert!(
+            pi_fast.last_effective_blend <= 0.2 + 1e-6,
             "score-weighted blend should be ≤ substrate-modulated 0.2, got {}",
-            pi_fast.last_effective_blend);
+            pi_fast.last_effective_blend
+        );
     }
 
     #[test]
@@ -370,7 +384,8 @@ mod tests {
         assert!(
             pi_sp.last_effective_blend > pi_no_sp.last_effective_blend,
             "scale_pressure=1.0 should boost blend beyond scale_pressure=0.0: {} vs {}",
-            pi_sp.last_effective_blend, pi_no_sp.last_effective_blend,
+            pi_sp.last_effective_blend,
+            pi_no_sp.last_effective_blend,
         );
     }
 
@@ -388,14 +403,20 @@ mod tests {
         pi.set_pareto_context(ctx);
 
         let t = pi.telemetry();
-        assert!(t.pareto_context.is_some(), "Pareto context should be present after inject");
+        assert!(
+            t.pareto_context.is_some(),
+            "Pareto context should be present after inject"
+        );
         let pc = t.pareto_context.unwrap();
         assert_eq!(pc.frontier_size, 5);
         assert!((pc.best_analogy_score - 0.85).abs() < 1e-6);
 
         // Second drain should be None
         let t2 = pi.telemetry();
-        assert!(t2.pareto_context.is_none(), "Pareto context should be drained after first read");
+        assert!(
+            t2.pareto_context.is_none(),
+            "Pareto context should be drained after first read"
+        );
     }
 
     #[test]
@@ -406,7 +427,10 @@ mod tests {
 
         let t = pi.telemetry();
         // PhysicsBridge always has catalog entries → top_domain should be non-empty
-        assert!(!t.top_domain.is_empty(), "top_domain should be populated after a query");
+        assert!(
+            !t.top_domain.is_empty(),
+            "top_domain should be populated after a query"
+        );
     }
 
     // ── Task 3: Cached encoder tests ──
@@ -416,7 +440,10 @@ mod tests {
         let mut pi = PhysicsIntegration::new();
         assert!(pi.encoder.is_none(), "Encoder should be None initially");
         let _enc = pi.encoder();
-        assert!(pi.encoder.is_some(), "Encoder should be Some after first access");
+        assert!(
+            pi.encoder.is_some(),
+            "Encoder should be Some after first access"
+        );
     }
 
     #[test]
@@ -465,12 +492,24 @@ mod tests {
         let hv = symthaea_core::hdc::BinaryHV::random(42);
         let mut state = vec![0.5f32; 32];
 
-        assert_eq!(pi.last_top_score, 0.0, "top_score should be 0.0 before any query");
-        assert!(pi.last_top_domain.is_empty(), "top_domain should be empty before any query");
+        assert_eq!(
+            pi.last_top_score, 0.0,
+            "top_score should be 0.0 before any query"
+        );
+        assert!(
+            pi.last_top_domain.is_empty(),
+            "top_domain should be empty before any query"
+        );
 
         pi.query_cycle(0, 1, 0.1, 1.0, 0.0, &hv, &mut state);
 
-        assert!(pi.last_top_score > 0.0, "top_score should be > 0 after query");
-        assert!(!pi.last_top_domain.is_empty(), "top_domain should be non-empty after query");
+        assert!(
+            pi.last_top_score > 0.0,
+            "top_score should be > 0 after query"
+        );
+        assert!(
+            !pi.last_top_domain.is_empty(),
+            "top_domain should be non-empty after query"
+        );
     }
 }

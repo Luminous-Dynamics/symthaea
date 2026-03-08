@@ -263,8 +263,7 @@ mod tests {
 
     #[test]
     fn test_override_decision_passes_at_90() {
-        let decision =
-            PopulationDecision::OverrideAiRecommendation("emergency".to_string());
+        let decision = PopulationDecision::OverrideAiRecommendation("emergency".to_string());
         assert!(decision_passes(&decision, 0.90));
         assert!(decision_passes(&decision, 1.0));
         assert!(!decision_passes(&decision, 0.89));
@@ -296,7 +295,11 @@ mod tests {
             GovernanceTier::Citizen
         );
         assert_eq!(
-            PopulationDecision::SetGrowthTarget { size: 100, generation: 5 }.required_tier(),
+            PopulationDecision::SetGrowthTarget {
+                size: 100,
+                generation: 5
+            }
+            .required_tier(),
             GovernanceTier::Steward
         );
         assert_eq!(

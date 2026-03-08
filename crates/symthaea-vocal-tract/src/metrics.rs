@@ -339,9 +339,21 @@ pub fn compute_spectral_tilt(samples: &[f32], f1: f32, f2: f32, f3: f32, sample_
     // Slope gives dB/octave
     let log_freqs = [f1.log2(), f2.log2(), f3.log2()];
     let log_powers: [f32; 3] = [
-        if powers[0] > 1e-20 { 10.0 * powers[0].log10() } else { -200.0 },
-        if powers[1] > 1e-20 { 10.0 * powers[1].log10() } else { -200.0 },
-        if powers[2] > 1e-20 { 10.0 * powers[2].log10() } else { -200.0 },
+        if powers[0] > 1e-20 {
+            10.0 * powers[0].log10()
+        } else {
+            -200.0
+        },
+        if powers[1] > 1e-20 {
+            10.0 * powers[1].log10()
+        } else {
+            -200.0
+        },
+        if powers[2] > 1e-20 {
+            10.0 * powers[2].log10()
+        } else {
+            -200.0
+        },
     ];
 
     // Simple linear regression: slope = (Σxy - n*mx*my) / (Σx² - n*mx²)
@@ -686,10 +698,7 @@ mod tests {
 
         let tilt = compute_spectral_tilt(&samples, 500.0, 1500.0, 2500.0, sample_rate);
         // Should be negative (energy decreases with frequency)
-        assert!(
-            tilt < 0.0,
-            "Spectral tilt should be negative: {tilt:.1}"
-        );
+        assert!(tilt < 0.0, "Spectral tilt should be negative: {tilt:.1}");
     }
 
     #[test]

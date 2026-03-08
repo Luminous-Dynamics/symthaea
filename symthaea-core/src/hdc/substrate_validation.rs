@@ -57,7 +57,7 @@ impl EvidenceLevel {
             Self::CaseStudy => 0.4,
             Self::Observational => 0.6,
             Self::Experimental => 0.8,
-            Self::Validated => 0.95,  // Never 1.0 - science is always provisional
+            Self::Validated => 0.95, // Never 1.0 - science is always provisional
         }
     }
 
@@ -257,28 +257,28 @@ impl SubstrateValidationFramework {
                     "Eventually a silicon system will pass all consciousness tests",
                     "No silicon system ever passes despite matching all behavioral criteria",
                     "Develop comprehensive consciousness test battery; apply to advanced AI",
-                    9
+                    9,
                 ),
                 TestablePrediction::new(
                     "Consciousness requires specific architecture (workspace, attention, etc.)",
                     "Only AI with these components shows consciousness markers",
                     "AI without these components also shows consciousness markers",
                     "Compare consciousness metrics in AI with/without our framework components",
-                    7
+                    7,
                 ),
                 TestablePrediction::new(
                     "Current LLMs are conscious",
                     "LLMs show consistent internal states, genuine preferences, continuity",
                     "LLMs show no markers beyond sophisticated pattern matching",
                     "Design experiments that distinguish genuine experience from simulation",
-                    8
+                    8,
                 ),
             ],
             hypothetical_feasibility: 0.71,
             feasibility_rationale: "HYPOTHETICAL based on functionalist philosophy. \
                                    NO EMPIRICAL VALIDATION. The 0.71 is essentially arbitrary - \
                                    we have no data to support this specific number."
-                                   .to_string(),
+                .to_string(),
         };
         self.substrates.insert("silicon".to_string(), knowledge);
     }
@@ -310,20 +310,20 @@ impl SubstrateValidationFramework {
                     "Detectable quantum effects in neural tissue during conscious processing",
                     "Decoherence too fast for quantum effects to matter",
                     "Measure quantum coherence times in neural tissue; compare to processing times",
-                    8
+                    8,
                 ),
                 TestablePrediction::new(
                     "Disrupting quantum effects disrupts consciousness specifically",
                     "Quantum interference -> consciousness changes without neural damage",
                     "Quantum interference has no specific effect on consciousness",
                     "Find way to selectively disrupt quantum coherence in vivo",
-                    10
+                    10,
                 ),
             ],
             hypothetical_feasibility: 0.65,
             feasibility_rationale: "HIGHLY SPECULATIVE. Based on contested Orch-OR theory. \
                                    No experimental validation. Number is essentially arbitrary."
-                                   .to_string(),
+                .to_string(),
         };
         self.substrates.insert("quantum".to_string(), knowledge);
     }
@@ -337,7 +337,8 @@ impl SubstrateValidationFramework {
                 "No hybrid conscious system has been created or verified".to_string(),
             ],
             unknown: vec![
-                "Whether biological + silicon components can integrate for consciousness".to_string(),
+                "Whether biological + silicon components can integrate for consciousness"
+                    .to_string(),
                 "What interface requirements exist".to_string(),
                 "Whether hybrid provides advantages over pure biological".to_string(),
             ],
@@ -346,20 +347,18 @@ impl SubstrateValidationFramework {
                 "Hybrid 'combines best of both worlds' (assumption, not data)".to_string(),
                 "Mind uploading to hybrid is possible (science fiction)".to_string(),
             ],
-            predictions: vec![
-                TestablePrediction::new(
-                    "Hybrid systems can achieve consciousness",
-                    "A bio-silicon hybrid shows unified consciousness across components",
-                    "Consciousness remains localized to biological component only",
-                    "Create progressively more integrated hybrids; test consciousness unity",
-                    10
-                ),
-            ],
+            predictions: vec![TestablePrediction::new(
+                "Hybrid systems can achieve consciousness",
+                "A bio-silicon hybrid shows unified consciousness across components",
+                "Consciousness remains localized to biological component only",
+                "Create progressively more integrated hybrids; test consciousness unity",
+                10,
+            )],
             hypothetical_feasibility: 0.95,
             feasibility_rationale: "PURE SPECULATION. We assigned 0.95 based on assumption that \
                                    hybrid 'should' be better. NO DATA SUPPORTS THIS. This is \
                                    the most unjustified number in our framework."
-                                   .to_string(),
+                .to_string(),
         };
         self.substrates.insert("hybrid".to_string(), knowledge);
     }
@@ -410,18 +409,26 @@ impl SubstrateValidationFramework {
 
         for (name, knowledge) in &self.substrates {
             report.push_str(&format!("{}:\n", name.to_uppercase()));
-            report.push_str(&format!("  Evidence Level: {:?} ({})\n",
+            report.push_str(&format!(
+                "  Evidence Level: {:?} ({})\n",
                 knowledge.evidence_level,
-                knowledge.evidence_level.description()));
+                knowledge.evidence_level.description()
+            ));
 
             let (honest, hypo, gap) = self.feasibility_comparison(name);
             report.push_str(&format!("  Honest Confidence: {:.2}\n", honest));
             report.push_str(&format!("  Hypothetical Score: {:.2}\n", hypo));
             if gap > 0.1 {
-                report.push_str(&format!("  ⚠️  GAP: {:.2} - hypothetical exceeds evidence!\n", gap));
+                report.push_str(&format!(
+                    "  ⚠️  GAP: {:.2} - hypothetical exceeds evidence!\n",
+                    gap
+                ));
             }
 
-            report.push_str(&format!("  Rationale: {}\n", knowledge.feasibility_rationale));
+            report.push_str(&format!(
+                "  Rationale: {}\n",
+                knowledge.feasibility_rationale
+            ));
 
             report.push_str("  Unvalidated Claims:\n");
             for claim in &knowledge.unvalidated_claims {
@@ -493,9 +500,9 @@ mod tests {
         let silicon = framework.get("silicon").unwrap();
 
         assert_eq!(silicon.evidence_level, EvidenceLevel::Theoretical);
-        assert!(silicon.honest_confidence() < 0.2);  // Low actual confidence
-        assert!(silicon.hypothetical_feasibility > 0.5);  // But high hypothetical
-        assert!(silicon.feasibility_gap() > 0.5);  // Big gap!
+        assert!(silicon.honest_confidence() < 0.2); // Low actual confidence
+        assert!(silicon.hypothetical_feasibility > 0.5); // But high hypothetical
+        assert!(silicon.feasibility_gap() > 0.5); // Big gap!
     }
 
     #[test]
@@ -504,9 +511,9 @@ mod tests {
         let hybrid = framework.get("hybrid").unwrap();
 
         assert_eq!(hybrid.evidence_level, EvidenceLevel::None);
-        assert_eq!(hybrid.honest_confidence(), 0.0);  // NO evidence
-        assert!(hybrid.hypothetical_feasibility > 0.9);  // But 0.95 hypothetical!
-        assert!(hybrid.feasibility_gap() > 0.9);  // HUGE gap
+        assert_eq!(hybrid.honest_confidence(), 0.0); // NO evidence
+        assert!(hybrid.hypothetical_feasibility > 0.9); // But 0.95 hypothetical!
+        assert!(hybrid.feasibility_gap() > 0.9); // HUGE gap
     }
 
     #[test]
@@ -515,15 +522,15 @@ mod tests {
 
         // Biological: small gap (evidence supports claim)
         let (h, hyp, gap) = framework.feasibility_comparison("biological");
-        assert!(gap < 0.1);  // Honest ≈ hypothetical
+        assert!(gap < 0.1); // Honest ≈ hypothetical
 
         // Silicon: large gap (hypothetical exceeds evidence)
         let (h, hyp, gap) = framework.feasibility_comparison("silicon");
-        assert!(gap > 0.5);  // Hypothetical >> honest
+        assert!(gap > 0.5); // Hypothetical >> honest
 
         // Hybrid: huge gap (no evidence but high hypothetical)
         let (h, hyp, gap) = framework.feasibility_comparison("hybrid");
-        assert!(gap > 0.9);  // Maximum gap
+        assert!(gap > 0.9); // Maximum gap
     }
 
     #[test]
@@ -558,7 +565,7 @@ mod tests {
         assert!(report.contains("HONEST ASSESSMENT"));
         assert!(report.contains("Evidence Level"));
         assert!(report.contains("Unvalidated Claims"));
-        assert!(report.contains("GAP"));  // Should warn about gaps
+        assert!(report.contains("GAP")); // Should warn about gaps
     }
 
     #[test]
@@ -568,7 +575,7 @@ mod tests {
             "Expected if true",
             "Expected if false",
             "Test protocol",
-            5
+            5,
         );
 
         assert_eq!(pred.difficulty, 5);

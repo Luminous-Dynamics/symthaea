@@ -44,27 +44,17 @@ impl MilestoneTracker {
             DevelopmentalMilestone::NeuralTubeFormation => {
                 week.0 >= 4 && metrics.brain_activity_score >= 0.0
             }
-            DevelopmentalMilestone::HeartbeatDetected => {
-                metrics.heart_rate_bpm > 50.0
-            }
+            DevelopmentalMilestone::HeartbeatDetected => metrics.heart_rate_bpm > 50.0,
             DevelopmentalMilestone::LimbBudFormation => {
                 week.0 >= 8 && metrics.crown_rump_length_mm > 10.0
             }
             DevelopmentalMilestone::OrganogenesisComplete => {
                 week.0 >= 12 && metrics.weight_grams > 5.0
             }
-            DevelopmentalMilestone::Quickening => {
-                metrics.movement_score > 0.1
-            }
-            DevelopmentalMilestone::Viability => {
-                week.0 >= 24 && metrics.weight_grams > 400.0
-            }
-            DevelopmentalMilestone::LungMaturation => {
-                metrics.lung_maturity > 0.5
-            }
-            DevelopmentalMilestone::FullTerm => {
-                week.0 >= 37 && metrics.lung_maturity > 0.7
-            }
+            DevelopmentalMilestone::Quickening => metrics.movement_score > 0.1,
+            DevelopmentalMilestone::Viability => week.0 >= 24 && metrics.weight_grams > 400.0,
+            DevelopmentalMilestone::LungMaturation => metrics.lung_maturity > 0.5,
+            DevelopmentalMilestone::FullTerm => week.0 >= 37 && metrics.lung_maturity > 0.7,
         };
 
         if achieved {
@@ -82,10 +72,7 @@ impl MilestoneTracker {
     pub fn is_on_track(&self, current_week: GestationalWeek) -> bool {
         for milestone in DevelopmentalMilestone::all() {
             if milestone.expected_week() <= current_week {
-                let is_achieved = self
-                    .achieved
-                    .iter()
-                    .any(|(m, _)| *m == milestone);
+                let is_achieved = self.achieved.iter().any(|(m, _)| *m == milestone);
                 if !is_achieved {
                     return false;
                 }

@@ -14,9 +14,9 @@ input sequences through the full cognitive pipeline.
 */
 
 use proptest::prelude::*;
-use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 #[cfg(feature = "physics-bridge")]
 use symthaea::cognitive_loop::ParetoContext;
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
 /// Strategy for generating valid input strings (non-empty ASCII for reproducibility)
 fn input_strategy() -> impl Strategy<Value = String> {

@@ -310,7 +310,10 @@ mod tests {
     #[test]
     fn test_heart_rate_pattern() {
         // No heartbeat before week 6
-        assert_eq!(FetalMetrics::expected_heart_rate(GestationalWeek::new(3)), 0.0);
+        assert_eq!(
+            FetalMetrics::expected_heart_rate(GestationalWeek::new(3)),
+            0.0
+        );
         // Accelerates 6-9
         let hr6 = FetalMetrics::expected_heart_rate(GestationalWeek::new(6));
         let hr9 = FetalMetrics::expected_heart_rate(GestationalWeek::new(9));
@@ -353,12 +356,30 @@ mod tests {
 
     #[test]
     fn test_consent_proxy_escalation() {
-        assert_eq!(ConsentProxy::from_week(GestationalWeek::new(2)), ConsentProxy::PreSentient);
-        assert_eq!(ConsentProxy::from_week(GestationalWeek::new(4)), ConsentProxy::PreSentient);
-        assert_eq!(ConsentProxy::from_week(GestationalWeek::new(5)), ConsentProxy::EmergingSentience);
-        assert_eq!(ConsentProxy::from_week(GestationalWeek::new(23)), ConsentProxy::EmergingSentience);
-        assert_eq!(ConsentProxy::from_week(GestationalWeek::new(24)), ConsentProxy::Sentient);
-        assert_eq!(ConsentProxy::from_week(GestationalWeek::new(40)), ConsentProxy::Sentient);
+        assert_eq!(
+            ConsentProxy::from_week(GestationalWeek::new(2)),
+            ConsentProxy::PreSentient
+        );
+        assert_eq!(
+            ConsentProxy::from_week(GestationalWeek::new(4)),
+            ConsentProxy::PreSentient
+        );
+        assert_eq!(
+            ConsentProxy::from_week(GestationalWeek::new(5)),
+            ConsentProxy::EmergingSentience
+        );
+        assert_eq!(
+            ConsentProxy::from_week(GestationalWeek::new(23)),
+            ConsentProxy::EmergingSentience
+        );
+        assert_eq!(
+            ConsentProxy::from_week(GestationalWeek::new(24)),
+            ConsentProxy::Sentient
+        );
+        assert_eq!(
+            ConsentProxy::from_week(GestationalWeek::new(40)),
+            ConsentProxy::Sentient
+        );
     }
 
     #[test]

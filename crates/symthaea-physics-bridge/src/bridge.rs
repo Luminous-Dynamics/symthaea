@@ -36,7 +36,11 @@ impl PhysicsBridge {
     ///
     /// The returned HV captures the "semantic neighborhood" of the query
     /// in physics-equation space, suitable for `cycle_with_hv()`.
-    pub fn query_equation(&mut self, equation: &PhysicsEquation, max_results: usize) -> ContinuousHV {
+    pub fn query_equation(
+        &mut self,
+        equation: &PhysicsEquation,
+        max_results: usize,
+    ) -> ContinuousHV {
         self.last_results = self.engine.search_equation(equation, max_results);
         self.query_count += 1;
 
@@ -146,7 +150,10 @@ mod tests {
         assert!(hv.values.iter().all(|v| v.is_finite()));
         // Normalized output
         let norm: f32 = hv.values.iter().map(|v| v * v).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 0.01, "Expected normalized, got norm = {norm}");
+        assert!(
+            (norm - 1.0).abs() < 0.01,
+            "Expected normalized, got norm = {norm}"
+        );
     }
 
     #[test]

@@ -295,15 +295,13 @@ impl NixPipelineProcessor {
         let knowledge_answer = if plan.needs_clarification || plan.actions.is_empty() {
             let query_hv =
                 crate::support::knowledge::KnowledgeBase::encode_text(&mut self.codebook, input);
-            self.knowledge_base
-                .as_ref()
-                .and_then(|kb| {
-                    let matches = kb.search_by_hv(&query_hv, 1);
-                    matches
-                        .first()
-                        .filter(|m| m.similarity > 0.3)
-                        .map(|m| m.article.solution.to_string())
-                })
+            self.knowledge_base.as_ref().and_then(|kb| {
+                let matches = kb.search_by_hv(&query_hv, 1);
+                matches
+                    .first()
+                    .filter(|m| m.similarity > 0.3)
+                    .map(|m| m.article.solution.to_string())
+            })
         } else {
             None
         };
@@ -368,7 +366,7 @@ impl NixPipelineProcessor {
         } else {
             format!("outcome:failure:{}", action)
         };
-        let predicted_effects = vec![
+        let predicted_effects = [
             format!("outcome:success:{}", action),
             format!("outcome:failure:{}", action),
         ];
@@ -569,7 +567,10 @@ mod tests {
 
         let gc_conf = proc
             .causal_graph()
-            .edge_confidence("action:nix-collect-garbage", "outcome:success:nix-collect-garbage")
+            .edge_confidence(
+                "action:nix-collect-garbage",
+                "outcome:success:nix-collect-garbage",
+            )
             .unwrap_or(0.0);
         assert!(
             gc_conf > 0.5,

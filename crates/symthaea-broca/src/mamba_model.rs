@@ -146,7 +146,13 @@ pub struct LoraAdapter {
 
 impl LoraAdapter {
     /// Create a new LoRA adapter.
-    pub fn new(in_dim: usize, out_dim: usize, rank: usize, alpha: f32, device: &Device) -> Result<Self> {
+    pub fn new(
+        in_dim: usize,
+        out_dim: usize,
+        rank: usize,
+        alpha: f32,
+        device: &Device,
+    ) -> Result<Self> {
         // A: random init scaled by 1/sqrt(rank)
         let a_scale = 1.0 / (rank as f64).sqrt();
         let a_data = Tensor::randn(0.0f32, a_scale as f32, (rank, in_dim), device)?;
@@ -285,8 +291,7 @@ impl MambaBlock {
             proj_for_conv
                 .unsqueeze(D::Minus1)?
                 .broadcast_as((b_sz, self.d_inner, D_STATE))?;
-        state.hs[li] =
-            ((&state.hs[li] * (&delta * &a)?.exp()?)? + &delta * &b * &proj_for_conv_b)?;
+        state.hs[li] = ((&state.hs[li] * (&delta * &a)?.exp()?)? + &delta * &b * &proj_for_conv_b)?;
         let ss = (state.hs[li]
             .matmul(&c.unsqueeze(D::Minus1)?)?
             .squeeze(D::Minus1)?
@@ -421,17 +426,13 @@ impl Model {
     /// context instead of zeros.
     ///
     /// Should be called after `State::new()` but before `inject_sequence()`.
-    pub fn warmstart_conv_history(
-        &self,
-        summary: &Tensor,
-        state: &mut State,
-    ) -> Result<()> {
+    pub fn warmstart_conv_history(&self, summary: &Tensor, state: &mut State) -> Result<()> {
         for (li, layer) in self.layers.iter().enumerate() {
             // Run summary through in_proj to get d_inner*2, take first half (x path)
             let proj = layer.mixer.in_proj.forward(summary)?;
             let chunks = proj.chunk(2, D::Minus1)?;
             let x_proj = &chunks[0]; // (1, d_inner)
-            // Fill all D_CONV history slots with this projection
+                                     // Fill all D_CONV history slots with this projection
             for slot in 0..D_CONV {
                 state.prev_xs[li][slot] = x_proj.clone();
             }
@@ -462,28 +463,22 @@ impl Model {
         for layer in &mut self.layers {
             let d_inner = layer.mixer.d_inner;
             let d_model = d_inner / 2; // d_inner = d_model * 2
-            // in_proj: [d_model] → [d_inner * 2]
-            layer.mixer.lora_in_proj = Some(LoraAdapter::new(
-                d_model,
-                d_inner * 2,
-                rank,
-                alpha,
-                device,
-            )?);
+                                       // in_proj: [d_model] → [d_inner * 2]
+            layer.mixer.lora_in_proj =
+                Some(LoraAdapter::new(d_model, d_inner * 2, rank, alpha, device)?);
             // out_proj: [d_inner] → [d_model]
-            layer.mixer.lora_out_proj = Some(LoraAdapter::new(
-                d_inner,
-                d_model,
-                rank,
-                alpha,
-                device,
-            )?);
+            layer.mixer.lora_out_proj =
+                Some(LoraAdapter::new(d_inner, d_model, rank, alpha, device)?);
         }
         Ok(())
     }
 
     /// Apply LoRA gradients from a GradStore to all LoRA parameters.
-    pub fn apply_lora_grads(&self, grads: &candle_core::backprop::GradStore, lr: f32) -> Result<()> {
+    pub fn apply_lora_grads(
+        &self,
+        grads: &candle_core::backprop::GradStore,
+        lr: f32,
+    ) -> Result<()> {
         for layer in &self.layers {
             if let Some(ref lora) = layer.mixer.lora_in_proj {
                 lora.apply_grads(grads, lr)?;
@@ -497,6 +492,8 @@ impl Model {
 
     /// Whether LoRA is enabled.
     pub fn has_lora(&self) -> bool {
-        self.layers.first().map_or(false, |l| l.mixer.lora_in_proj.is_some())
+        self.layers
+            .first()
+            .map_or(false, |l| l.mixer.lora_in_proj.is_some())
     }
 }

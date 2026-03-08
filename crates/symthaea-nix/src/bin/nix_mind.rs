@@ -1077,10 +1077,7 @@ fn cmd_predict(horizons_str: &str, format: OutputFormat) {
             let count = saved.samples.len();
             let m = PredictiveMonitor::load(saved, AlertThresholds::default());
             if matches!(format, OutputFormat::Human) {
-                println!(
-                    "  Loaded {} historical samples from daemon.",
-                    count
-                );
+                println!("  Loaded {} historical samples from daemon.", count);
             }
             m
         } else {
@@ -1144,7 +1141,10 @@ fn cmd_predict(horizons_str: &str, format: OutputFormat) {
             }
             println!();
             if monitor.sample_count() > 1 {
-                println!("  ({} total samples — using daemon history)", monitor.sample_count());
+                println!(
+                    "  ({} total samples — using daemon history)",
+                    monitor.sample_count()
+                );
             } else {
                 println!("  Note: predictions improve with continuous monitoring via the daemon.");
             }

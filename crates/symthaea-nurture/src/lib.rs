@@ -25,34 +25,34 @@
 //! 4. **Developmental Milestones** (WHO, 2006): 30+ milestones across gross motor,
 //!    fine motor, language, social, and cognitive domains with normative z-scoring.
 
-pub mod types;
 pub mod attachment;
-pub mod secure_base;
-pub mod separation_distress;
+pub mod attachment_style_formation;
 pub mod contingency_learning;
-pub mod internal_working_model;
 pub mod coregulation;
 pub mod critical_periods;
-pub mod attachment_style_formation;
-pub mod feeding;
-pub mod language_acquisition;
-pub mod motor_development;
-pub mod sleep;
-pub mod milestones;
 pub mod developmental_profile;
+pub mod feeding;
+pub mod internal_working_model;
+pub mod language_acquisition;
+pub mod milestones;
+pub mod motor_development;
+pub mod secure_base;
+pub mod separation_distress;
+pub mod sleep;
+pub mod types;
 
-pub use types::*;
 pub use attachment::AttachmentSystem;
+pub use attachment_style_formation::{determine_style, style_probability_distribution};
+pub use contingency_learning::ContingencyLearner;
+pub use coregulation::CoRegulationState;
+pub use critical_periods::{CriticalPeriodDomain, CriticalPeriodModel};
+pub use developmental_profile::{DevelopmentalProfile, DomainScore};
+pub use feeding::{FeedingProgram, FeedingStage};
+pub use internal_working_model::{encode_working_model, update_working_model};
+pub use language_acquisition::{language_milestones, InfantDirectedSpeech, LanguageMilestone};
+pub use milestones::{DevelopmentalMilestoneDb, Milestone};
+pub use motor_development::{fine_motor_milestones, gross_motor_milestones, MotorMilestone};
 pub use secure_base::SecureBase;
 pub use separation_distress::{advance_separation, neuromod_for_stage};
-pub use contingency_learning::ContingencyLearner;
-pub use internal_working_model::{update_working_model, encode_working_model};
-pub use coregulation::CoRegulationState;
-pub use critical_periods::{CriticalPeriodModel, CriticalPeriodDomain};
-pub use attachment_style_formation::{determine_style, style_probability_distribution};
-pub use feeding::{FeedingProgram, FeedingStage};
-pub use language_acquisition::{InfantDirectedSpeech, LanguageMilestone, language_milestones};
-pub use motor_development::{MotorMilestone, gross_motor_milestones, fine_motor_milestones};
 pub use sleep::SleepSchedule;
-pub use milestones::{DevelopmentalMilestoneDb, Milestone};
-pub use developmental_profile::{DevelopmentalProfile, DomainScore};
+pub use types::*;

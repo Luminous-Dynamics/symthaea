@@ -1574,19 +1574,24 @@ impl Symthaea {
             let content_lower = content.to_lowercase();
             let intent = match category {
                 CodeIntentCategory::Create => {
-                    let target = CodeTarget::new(&func_name, entity_kind)
-                        .with_language(lang.clone());
+                    let target =
+                        CodeTarget::new(&func_name, entity_kind).with_language(lang.clone());
                     let mut spec = CodeSpec::new(&lang, &func_name, content);
                     if let Some(ref sig) = inferred_sig {
                         spec = spec.with_signature(sig.as_str());
                     }
                     // Detect multi-entity patterns: "struct with method(s)"
                     if entity_kind == EntityKind::Struct {
-                        if content_lower.contains("method") || content_lower.contains("impl")
-                            || content_lower.contains("distance") || content_lower.contains("area")
-                            || content_lower.contains("display") || content_lower.contains("calculate")
+                        if content_lower.contains("method")
+                            || content_lower.contains("impl")
+                            || content_lower.contains("distance")
+                            || content_lower.contains("area")
+                            || content_lower.contains("display")
+                            || content_lower.contains("calculate")
                         {
-                            spec = spec.with_constraint("MULTI_ENTITY: generate struct + impl block + methods");
+                            spec = spec.with_constraint(
+                                "MULTI_ENTITY: generate struct + impl block + methods",
+                            );
                         }
                     }
                     // Item 3 (Phase 3h): Detect algorithm patterns and inject as
@@ -1613,8 +1618,8 @@ impl Symthaea {
                     crate::language::code_intent::CodeIntent::Create { target, spec }
                 }
                 _ => {
-                    let target = CodeTarget::new(&func_name, entity_kind)
-                        .with_language(lang.clone());
+                    let target =
+                        CodeTarget::new(&func_name, entity_kind).with_language(lang.clone());
                     let mut spec = CodeSpec::new(&lang, &func_name, content);
                     if let Some(ref sig) = inferred_sig {
                         spec = spec.with_signature(sig.as_str());
@@ -1652,14 +1657,12 @@ impl Symthaea {
 
             // Item 1 (Phase 3h): Test-first generation — produce tests BEFORE
             // implementation so they serve as independent behavioral oracle
-            pregenerated_tests = if let crate::language::code_intent::CodeIntent::Create {
-                ref spec, ..
-            } = intent
-            {
-                self.code_generator.generate_tests_only(spec)
-            } else {
-                None
-            };
+            pregenerated_tests =
+                if let crate::language::code_intent::CodeIntent::Create { ref spec, .. } = intent {
+                    self.code_generator.generate_tests_only(spec)
+                } else {
+                    None
+                };
 
             let generated = self.code_generator.generate(&intent, &gen_ctx);
 
@@ -1956,10 +1959,7 @@ impl Symthaea {
                     // Item 1 (Phase 3h): Use pregenerated tests as verification
                     // oracle when code has no inline tests
                     "rust" if pregenerated_tests.is_some() => {
-                        executor.execute_rust(
-                            &current_code,
-                            pregenerated_tests.as_deref(),
-                        )
+                        executor.execute_rust(&current_code, pregenerated_tests.as_deref())
                     }
                     "rust" => executor.execute_rust(&current_code, None),
                     "python" => executor.execute_python(&current_code),
@@ -1985,8 +1985,7 @@ impl Symthaea {
                 last_compiled = exec_result.compiled;
                 last_simulated = exec_result.simulated;
 
-                if (exec_result.compiled || exec_result.simulated)
-                    && exec_result.tests_failed == 0
+                if (exec_result.compiled || exec_result.simulated) && exec_result.tests_failed == 0
                 {
                     compile_ok = true;
                 } else if attempt < MAX_CODE_RETRIES {
@@ -2026,8 +2025,10 @@ impl Symthaea {
                             // Behavioral failure: code compiles but tests fail
                             ctx.notes.push(format!(
                                 "TESTS FAILED (attempt {}/{}): {} passed, {} failed",
-                                attempt, MAX_CODE_RETRIES,
-                                exec_result.tests_passed, exec_result.tests_failed
+                                attempt,
+                                MAX_CODE_RETRIES,
+                                exec_result.tests_passed,
+                                exec_result.tests_failed
                             ));
                             if let Some(ref err) = exec_result.runtime_error {
                                 // Include actual vs expected from test output
@@ -2096,12 +2097,12 @@ impl Symthaea {
                 // loop can pick it up as an FEP prediction error signal
                 if let Some(ref mut ctx) = thought.code_context {
                     // Encode surprise as a note the cognitive loop can parse
-                    ctx.notes.push(format!("CODE_SURPRISE:{:.3}", code_surprise));
+                    ctx.notes
+                        .push(format!("CODE_SURPRISE:{:.3}", code_surprise));
                     // Update intent_similarity inversely with surprise
                     // (high surprise = low achieved similarity)
-                    ctx.intent_similarity = Some(
-                        ctx.intent_similarity.unwrap_or(0.5) * (1.0 - code_surprise * 0.5)
-                    );
+                    ctx.intent_similarity =
+                        Some(ctx.intent_similarity.unwrap_or(0.5) * (1.0 - code_surprise * 0.5));
                 }
                 tracing::debug!(
                     target: "symthaea::code",
@@ -2131,12 +2132,8 @@ impl Symthaea {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap_or_default()
                     .as_secs();
-                let episode = crate::memory::Episode::new(
-                    intent_hv,
-                    code_hv,
-                    phi as f64,
-                    timestamp,
-                );
+                let episode =
+                    crate::memory::Episode::new(intent_hv, code_hv, phi as f64, timestamp);
                 self.episodic_memory.store_if_significant(episode);
 
                 // Cache the successful generation for few-shot retrieval
@@ -2146,7 +2143,8 @@ impl Symthaea {
                     .and_then(|c| c.spec_purpose.clone())
                     .unwrap_or_default();
                 if !purpose.is_empty() {
-                    self.code_generation_cache.push((purpose, verified_code.clone()));
+                    self.code_generation_cache
+                        .push((purpose, verified_code.clone()));
                     // Cap cache at 32 entries (FIFO)
                     if self.code_generation_cache.len() > 32 {
                         self.code_generation_cache.remove(0);
@@ -2717,21 +2715,26 @@ impl Symthaea {
     fn extract_code_metadata(
         content: &str,
         lang: &str,
-    ) -> (String, crate::language::code_parser::EntityKind, Option<String>) {
+    ) -> (
+        String,
+        crate::language::code_parser::EntityKind,
+        Option<String>,
+    ) {
         use crate::language::code_parser::EntityKind;
         let lower = content.to_lowercase();
         let words: Vec<&str> = content.split_whitespace().collect();
 
         // Detect entity kind
-        let entity_kind = if lower.contains("struct") || lower.contains("class") || lower.contains("type ") {
-            EntityKind::Struct
-        } else if lower.contains("trait") || lower.contains("interface") {
-            EntityKind::Trait
-        } else if lower.contains("module") || lower.contains("mod ") {
-            EntityKind::Module
-        } else {
-            EntityKind::Function
-        };
+        let entity_kind =
+            if lower.contains("struct") || lower.contains("class") || lower.contains("type ") {
+                EntityKind::Struct
+            } else if lower.contains("trait") || lower.contains("interface") {
+                EntityKind::Trait
+            } else if lower.contains("module") || lower.contains("mod ") {
+                EntityKind::Module
+            } else {
+                EntityKind::Function
+            };
 
         // Extract function name — look for known patterns
         let func_name = Self::extract_func_name_from_nl(&lower, &words);
@@ -2753,8 +2756,7 @@ impl Symthaea {
         for (i, w) in words.iter().enumerate() {
             let wl = w.to_lowercase();
             if (wl == "called" || wl == "named") && i + 1 < words.len() {
-                let name = words[i + 1]
-                    .trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
+                let name = words[i + 1].trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
                 if !name.is_empty() {
                     return name.to_lowercase();
                 }
@@ -2815,7 +2817,15 @@ impl Symthaea {
         }
 
         // Pattern 3: "function/fn X" or "implement X"
-        let prefix_words = ["function", "fn", "implement", "create", "write", "build", "make"];
+        let prefix_words = [
+            "function",
+            "fn",
+            "implement",
+            "create",
+            "write",
+            "build",
+            "make",
+        ];
         for (i, w) in words.iter().enumerate() {
             let wl = w.to_lowercase();
             if prefix_words.contains(&wl.as_str()) && i + 1 < words.len() {
@@ -2833,7 +2843,9 @@ impl Symthaea {
                     let candidate = words[j]
                         .trim_matches(|c: char| !c.is_alphanumeric() && c != '_')
                         .to_lowercase();
-                    if candidate.len() >= 2 && candidate.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                    if candidate.len() >= 2
+                        && candidate.chars().all(|c| c.is_alphanumeric() || c == '_')
+                    {
                         return candidate;
                     }
                 }
@@ -2841,9 +2853,28 @@ impl Symthaea {
         }
 
         // Fallback: use first meaningful word after removing stop words
-        let stop = ["write", "create", "implement", "make", "build", "a", "an",
-                     "the", "that", "which", "to", "for", "in", "rust", "python",
-                     "function", "method", "struct", "class", "new"];
+        let stop = [
+            "write",
+            "create",
+            "implement",
+            "make",
+            "build",
+            "a",
+            "an",
+            "the",
+            "that",
+            "which",
+            "to",
+            "for",
+            "in",
+            "rust",
+            "python",
+            "function",
+            "method",
+            "struct",
+            "class",
+            "new",
+        ];
         for w in words {
             let wl = w.to_lowercase();
             let clean = wl.trim_matches(|c: char| !c.is_alphanumeric() && c != '_');
@@ -2870,7 +2901,10 @@ impl Symthaea {
         let mut params: Vec<(&str, &str)> = Vec::new();
 
         // "two numbers/integers" → (a: i32, b: i32)
-        if lower.contains("two number") || lower.contains("two integer") || lower.contains("2 number") {
+        if lower.contains("two number")
+            || lower.contains("two integer")
+            || lower.contains("2 number")
+        {
             params.push(("a", "i32"));
             params.push(("b", "i32"));
         } else if lower.contains("two float") || lower.contains("two decimal") {
@@ -2879,11 +2913,21 @@ impl Symthaea {
         } else if lower.contains("two string") {
             params.push(("a", "&str"));
             params.push(("b", "&str"));
-        } else if lower.contains("a string") || lower.contains("a str") || lower.contains("given string") {
+        } else if lower.contains("a string")
+            || lower.contains("a str")
+            || lower.contains("given string")
+        {
             params.push(("s", "&str"));
-        } else if lower.contains("a number") || lower.contains("an integer") || lower.contains("given number") {
+        } else if lower.contains("a number")
+            || lower.contains("an integer")
+            || lower.contains("given number")
+        {
             params.push(("n", "i32"));
-        } else if lower.contains("a vector") || lower.contains("a list") || lower.contains("an array") || lower.contains("a vec") {
+        } else if lower.contains("a vector")
+            || lower.contains("a list")
+            || lower.contains("an array")
+            || lower.contains("a vec")
+        {
             if lower.contains("string") || lower.contains("str") {
                 params.push(("items", "Vec<String>"));
             } else {
@@ -2900,27 +2944,57 @@ impl Symthaea {
         }
 
         // Detect return type from NL
-        let ret = if lower.contains("return") && lower.contains("bool") || lower.contains("check if") || lower.contains("is even") || lower.contains("is odd") || lower.contains("is empty") || lower.contains("is positive") || lower.contains("is negative") {
+        let ret = if lower.contains("return") && lower.contains("bool")
+            || lower.contains("check if")
+            || lower.contains("is even")
+            || lower.contains("is odd")
+            || lower.contains("is empty")
+            || lower.contains("is positive")
+            || lower.contains("is negative")
+        {
             " -> bool"
-        } else if lower.contains("return") && lower.contains("string") || lower.contains("reverse a string") || lower.contains("uppercase") || lower.contains("lowercase") || lower.contains("capitalize") {
+        } else if lower.contains("return") && lower.contains("string")
+            || lower.contains("reverse a string")
+            || lower.contains("uppercase")
+            || lower.contains("lowercase")
+            || lower.contains("capitalize")
+        {
             " -> String"
-        } else if lower.contains("return") && lower.contains("vector") || lower.contains("return") && lower.contains("vec") || lower.contains("sort") && params.iter().any(|(_, t)| t.contains("Vec")) {
+        } else if lower.contains("return") && lower.contains("vector")
+            || lower.contains("return") && lower.contains("vec")
+            || lower.contains("sort") && params.iter().any(|(_, t)| t.contains("Vec"))
+        {
             " -> Vec<i32>"
         } else if lower.contains("return") && lower.contains("float") {
             " -> f64"
-        } else if params.iter().any(|(_, t)| t.contains("Vec")) && (lower.contains("sum") || lower.contains("count") || lower.contains("max") || lower.contains("min")) {
+        } else if params.iter().any(|(_, t)| t.contains("Vec"))
+            && (lower.contains("sum")
+                || lower.contains("count")
+                || lower.contains("max")
+                || lower.contains("min"))
+        {
             " -> i32"
         } else if params.iter().any(|(_, t)| *t == "i32" || *t == "f64") {
-            if params[0].1 == "f64" { " -> f64" } else { " -> i32" }
+            if params[0].1 == "f64" {
+                " -> f64"
+            } else {
+                " -> i32"
+            }
         } else {
             ""
         };
 
-        let params_str: Vec<String> = params.iter()
+        let params_str: Vec<String> = params
+            .iter()
             .map(|(n, t)| format!("{}: {}", n, t))
             .collect();
 
-        Some(format!("fn {}({}){}", func_name, params_str.join(", "), ret))
+        Some(format!(
+            "fn {}({}){}",
+            func_name,
+            params_str.join(", "),
+            ret
+        ))
     }
 
     ///

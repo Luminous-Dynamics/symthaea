@@ -814,10 +814,7 @@ mod tests {
             key_metric_for_benchmark("WorM::N-back"),
             "nback_2::accuracy"
         );
-        assert_eq!(
-            key_metric_for_benchmark("WorM::DigitSpan"),
-            "forward_span"
-        );
+        assert_eq!(key_metric_for_benchmark("WorM::DigitSpan"), "forward_span");
         assert_eq!(
             key_metric_for_benchmark("Metacognition::FeelingOfKnowing"),
             "fok_gamma"

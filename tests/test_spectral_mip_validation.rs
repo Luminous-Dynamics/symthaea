@@ -297,7 +297,11 @@ fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
 ///
 /// Generates `num_samples` ContinuousHV snapshots from the given covariance
 /// (Cholesky decomposition → correlated samples), feeds them to the finder.
-fn spectral_phi_from_covariance(cov: &[f64], n: usize, num_samples: usize) -> Option<SpectralMIPResult> {
+fn spectral_phi_from_covariance(
+    cov: &[f64],
+    n: usize,
+    num_samples: usize,
+) -> Option<SpectralMIPResult> {
     let config = SpectralMIPConfig {
         num_components: n,
         window_size: num_samples,
@@ -406,9 +410,7 @@ fn test_spectral_mip_vs_exhaustive_correlation() {
         ),
         (
             "random",
-            Box::new(|n, rho| {
-                random_covariance(n, 1000 + n as u64 * 100 + (rho * 10.0) as u64)
-            }),
+            Box::new(|n, rho| random_covariance(n, 1000 + n as u64 * 100 + (rho * 10.0) as u64)),
         ),
     ];
 
@@ -551,9 +553,8 @@ fn test_spectral_mip_modular_finds_natural_partition() {
         // The MIP should split into two groups of ~4
         let a_len = result.mip.part_a.len();
         let b_len = result.mip.part_b.len();
-        let balanced = (a_len == 4 && b_len == 4)
-            || (a_len == 3 && b_len == 5)
-            || (a_len == 5 && b_len == 3);
+        let balanced =
+            (a_len == 4 && b_len == 4) || (a_len == 3 && b_len == 5) || (a_len == 5 && b_len == 3);
         println!(
             "  Balanced split: {} ({} vs {})",
             if balanced { "✅" } else { "⚠️" },

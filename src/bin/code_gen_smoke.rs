@@ -25,13 +25,48 @@ fn main() {
     println!("── Native Emitter (no LLM needed) ──\n");
 
     let native_cases: Vec<(&str, &str, &str, &str)> = vec![
-        ("add", "Add two numbers", "fn add(a: i32, b: i32) -> i32", "a + b"),
-        ("reverse", "Reverse a string", "fn reverse(s: &str) -> String", "chars().rev()"),
-        ("factorial", "Compute factorial", "fn factorial(n: u64) -> u64", ".product()"),
-        ("is_even", "Check if a number is even", "fn is_even(n: i32) -> bool", "% 2 == 0"),
-        ("sort", "Sort a vector", "fn sort(items: Vec<i32>) -> Vec<i32>", ".sort()"),
-        ("uppercase", "Convert to uppercase", "fn uppercase(s: &str) -> String", ".to_uppercase()"),
-        ("fibonacci", "Compute fibonacci", "fn fibonacci(n: u64) -> u64", "let (mut a, mut b)"),
+        (
+            "add",
+            "Add two numbers",
+            "fn add(a: i32, b: i32) -> i32",
+            "a + b",
+        ),
+        (
+            "reverse",
+            "Reverse a string",
+            "fn reverse(s: &str) -> String",
+            "chars().rev()",
+        ),
+        (
+            "factorial",
+            "Compute factorial",
+            "fn factorial(n: u64) -> u64",
+            ".product()",
+        ),
+        (
+            "is_even",
+            "Check if a number is even",
+            "fn is_even(n: i32) -> bool",
+            "% 2 == 0",
+        ),
+        (
+            "sort",
+            "Sort a vector",
+            "fn sort(items: Vec<i32>) -> Vec<i32>",
+            ".sort()",
+        ),
+        (
+            "uppercase",
+            "Convert to uppercase",
+            "fn uppercase(s: &str) -> String",
+            ".to_uppercase()",
+        ),
+        (
+            "fibonacci",
+            "Compute fibonacci",
+            "fn fibonacci(n: u64) -> u64",
+            "let (mut a, mut b)",
+        ),
         ("abs", "Absolute value", "fn abs(n: i32) -> i32", ".abs()"),
     ];
 
@@ -52,8 +87,19 @@ fn main() {
             println!("  [PASS] {} — native body generated", name);
             native_ok += 1;
         } else {
-            println!("  [FAIL] {} — todo={}, fragment={}", name, has_todo, has_fragment);
-            println!("         Generated: {}", result.source.lines().take(3).collect::<Vec<_>>().join(" | "));
+            println!(
+                "  [FAIL] {} — todo={}, fragment={}",
+                name, has_todo, has_fragment
+            );
+            println!(
+                "         Generated: {}",
+                result
+                    .source
+                    .lines()
+                    .take(3)
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            );
             native_fail += 1;
         }
     }
@@ -65,8 +111,18 @@ fn main() {
     println!("── Composition (multi-step operations) ──\n");
 
     let composition_cases: Vec<(&str, &str, &str, &str)> = vec![
-        ("filter_and_sum", "Filter even numbers and sum them", "fn filter_and_sum(items: Vec<i32>) -> i32", ".filter"),
-        ("sort_and_take", "Sort and take first 3", "fn sort_and_take(items: Vec<i32>) -> Vec<i32>", ".take"),
+        (
+            "filter_and_sum",
+            "Filter even numbers and sum them",
+            "fn filter_and_sum(items: Vec<i32>) -> i32",
+            ".filter",
+        ),
+        (
+            "sort_and_take",
+            "Sort and take first 3",
+            "fn sort_and_take(items: Vec<i32>) -> Vec<i32>",
+            ".take",
+        ),
     ];
 
     for (name, purpose, sig, expected) in &composition_cases {
@@ -76,8 +132,16 @@ fn main() {
         };
         let result = gen.generate(&intent, &ctx);
         let ok = result.source.contains(expected) && !result.source.contains("todo!");
-        println!("  [{}] {} — {}", if ok { "PASS" } else { "FAIL" }, name,
-            if ok { "composed chain generated" } else { "missing chain" });
+        println!(
+            "  [{}] {} — {}",
+            if ok { "PASS" } else { "FAIL" },
+            name,
+            if ok {
+                "composed chain generated"
+            } else {
+                "missing chain"
+            }
+        );
     }
 
     // ── Section 3: LLM Completion Detection ──────────────────────────
@@ -85,8 +149,16 @@ fn main() {
     println!("\n── LLM Completion Detection ──\n");
 
     let complex_cases: Vec<(&str, &str, &str)> = vec![
-        ("dijkstra", "Implement Dijkstra's shortest path algorithm", "fn dijkstra(graph: &[Vec<(usize, u32)>], start: usize) -> Vec<u32>"),
-        ("solve_knapsack", "Implement dynamic programming knapsack solver", "fn solve_knapsack(weights: &[u32], values: &[u32], capacity: u32) -> u32"),
+        (
+            "dijkstra",
+            "Implement Dijkstra's shortest path algorithm",
+            "fn dijkstra(graph: &[Vec<(usize, u32)>], start: usize) -> Vec<u32>",
+        ),
+        (
+            "solve_knapsack",
+            "Implement dynamic programming knapsack solver",
+            "fn solve_knapsack(weights: &[u32], values: &[u32], capacity: u32) -> u32",
+        ),
     ];
 
     for (name, purpose, sig) in &complex_cases {
@@ -96,10 +168,16 @@ fn main() {
         };
         let result = gen.generate(&intent, &ctx);
         let needs_llm = result.source.contains("todo!");
-        println!("  [{}] {} — {}",
+        println!(
+            "  [{}] {} — {}",
             if needs_llm { "PASS" } else { "WARN" },
             name,
-            if needs_llm { "correctly detected as needing LLM" } else { "unexpectedly native (check emitter)" });
+            if needs_llm {
+                "correctly detected as needing LLM"
+            } else {
+                "unexpectedly native (check emitter)"
+            }
+        );
     }
 
     // ── Section 4: Python Generation ─────────────────────────────────
@@ -119,9 +197,12 @@ fn main() {
         };
         let result = gen.generate(&intent, &ctx);
         let ok = result.source.contains(expected);
-        println!("  [{}] {} (Python) — {}",
-            if ok { "PASS" } else { "FAIL" }, name,
-            if ok { "correct body" } else { &result.source });
+        println!(
+            "  [{}] {} (Python) — {}",
+            if ok { "PASS" } else { "FAIL" },
+            name,
+            if ok { "correct body" } else { &result.source }
+        );
     }
 
     // ── Summary ──────────────────────────────────────────────────────

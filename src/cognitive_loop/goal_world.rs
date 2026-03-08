@@ -301,8 +301,10 @@ mod tests {
         wm.update_sensory(&input);
         let error_before = wm.avg_error;
         wm.incorporate_causal_structure(&[]);
-        assert!((wm.avg_error - error_before).abs() < f32::EPSILON,
-            "empty causal edges should not change error");
+        assert!(
+            (wm.avg_error - error_before).abs() < f32::EPSILON,
+            "empty causal edges should not change error"
+        );
     }
 
     #[test]
@@ -317,8 +319,12 @@ mod tests {
         // Apply causal structure → should reduce error
         let edges = vec![(0, 1, 0.8), (2, 3, 0.9)];
         wm.incorporate_causal_structure(&edges);
-        assert!(wm.level_errors[0] < error_before,
-            "causal structure should reduce prediction error: {} < {}", wm.level_errors[0], error_before);
+        assert!(
+            wm.level_errors[0] < error_before,
+            "causal structure should reduce prediction error: {} < {}",
+            wm.level_errors[0],
+            error_before
+        );
     }
 
     #[test]
@@ -332,10 +338,17 @@ mod tests {
         let edges: Vec<(usize, usize, f32)> = (0..63).map(|i| (i, i + 1, 5.0)).collect();
         wm.incorporate_causal_structure(&edges);
         // With 30% cap: error >= 0.7 * original
-        assert!(wm.level_errors[0] >= error_before * 0.69,
+        assert!(
+            wm.level_errors[0] >= error_before * 0.69,
             "reduction should be capped at ~30%: {} >= {} * 0.69",
-            wm.level_errors[0], error_before);
-        assert!(wm.level_errors[0] < error_before,
-            "should still reduce: {} < {}", wm.level_errors[0], error_before);
+            wm.level_errors[0],
+            error_before
+        );
+        assert!(
+            wm.level_errors[0] < error_before,
+            "should still reduce: {} < {}",
+            wm.level_errors[0],
+            error_before
+        );
     }
 }

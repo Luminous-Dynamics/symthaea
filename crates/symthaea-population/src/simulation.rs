@@ -10,11 +10,11 @@ use crate::breeding_strategy::select_pairs;
 use crate::diversity::observed_heterozygosity;
 use crate::effective_population::ne_sex_ratio;
 use crate::genetic_load::{compute_fitness, population_genetic_load};
-use crate::hdc_genetics::{encode_individual, compute_diversity_hv};
+use crate::hdc_genetics::{compute_diversity_hv, encode_individual};
 use crate::inbreeding::inbreeding_coefficient_from_heterozygosity;
 use crate::types::{
-    Allele, BiologicalSex, BreedingStrategy, Genotype, Individual, Locus, Pedigree,
-    PedigreeEntry, Population,
+    Allele, BiologicalSex, BreedingStrategy, Genotype, Individual, Locus, Pedigree, PedigreeEntry,
+    Population,
 };
 
 use serde::{Deserialize, Serialize};
@@ -96,13 +96,7 @@ impl PopulationSimulator {
         for gen in 1..=generations {
             // Select breeding pairs
             let num_pairs = self.target_population_size / 2;
-            let pairs = select_pairs(
-                self.strategy,
-                &current_pop,
-                pedigree,
-                num_pairs.max(1),
-                rng,
-            );
+            let pairs = select_pairs(self.strategy, &current_pop, pedigree, num_pairs.max(1), rng);
 
             // Generate offspring
             let mut offspring = Vec::new();
@@ -124,9 +118,7 @@ impl PopulationSimulator {
                         if offspring.len() >= self.target_population_size {
                             break;
                         }
-                        let child = self.generate_offspring(
-                            next_id, pa, pb, gen, loci, rng,
-                        );
+                        let child = self.generate_offspring(next_id, pa, pb, gen, loci, rng);
                         pedigree.add_entry(PedigreeEntry {
                             individual_id: child.id,
                             parent_a_id: Some(pa.id),
@@ -660,7 +652,9 @@ mod tests {
             let n_loci = loci.len();
             let total: f64 = (0..n_loci)
                 .map(|li| {
-                    let genos: Vec<_> = pop.individuals.iter()
+                    let genos: Vec<_> = pop
+                        .individuals
+                        .iter()
                         .filter_map(|ind| ind.genotypes.get(li).cloned())
                         .collect();
                     crate::diversity::observed_heterozygosity(&genos)
@@ -682,15 +676,17 @@ mod tests {
         // Compare simulation heterozygosity vs analytical at each generation
         // Allow 30% tolerance due to stochastic drift
         for snap in &result.generations {
-            let analytical = crate::diversity::heterozygosity_after_generations(
-                h0, ne, snap.generation,
-            );
+            let analytical =
+                crate::diversity::heterozygosity_after_generations(h0, ne, snap.generation);
             if snap.generation > 0 && analytical > 0.01 {
                 let relative_error = (snap.heterozygosity - analytical).abs() / analytical;
                 assert!(
                     relative_error < 0.5,
                     "Gen {}: sim H={:.4}, analytical H={:.4}, relative error={:.2}%",
-                    snap.generation, snap.heterozygosity, analytical, relative_error * 100.0
+                    snap.generation,
+                    snap.heterozygosity,
+                    analytical,
+                    relative_error * 100.0
                 );
             }
         }
@@ -707,7 +703,10 @@ mod tests {
         let (pop, _) = make_founder_population(15, 15, &loci, &mut rng);
 
         let initial_state = PopulationTrajectoryPredictor::encode_population_state(&pop);
-        assert!(initial_state.norm() > 0.0, "Initial state should be non-zero");
+        assert!(
+            initial_state.norm() > 0.0,
+            "Initial state should be non-zero"
+        );
 
         let mut predictor = PopulationTrajectoryPredictor::new();
 
@@ -720,12 +719,21 @@ mod tests {
 
         // Both should be valid non-zero states
         assert!(state_5.norm() > 0.0, "5-gen prediction should be non-zero");
-        assert!(state_100.norm() > 0.0, "100-gen prediction should be non-zero");
+        assert!(
+            state_100.norm() > 0.0,
+            "100-gen prediction should be non-zero"
+        );
 
         // Decoded metrics should be in reasonable ranges
         let h_5 = PopulationTrajectoryPredictor::decode_heterozygosity(&state_5);
         let h_100 = PopulationTrajectoryPredictor::decode_heterozygosity(&state_100);
-        assert!(h_5 >= 0.0 && h_5 <= 1.0, "Decoded H at gen 5 should be in [0,1]: {h_5}");
-        assert!(h_100 >= 0.0 && h_100 <= 1.0, "Decoded H at gen 100 should be in [0,1]: {h_100}");
+        assert!(
+            h_5 >= 0.0 && h_5 <= 1.0,
+            "Decoded H at gen 5 should be in [0,1]: {h_5}"
+        );
+        assert!(
+            h_100 >= 0.0 && h_100 <= 1.0,
+            "Decoded H at gen 100 should be in [0,1]: {h_100}"
+        );
     }
 }

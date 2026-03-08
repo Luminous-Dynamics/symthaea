@@ -8,7 +8,7 @@
 
 Symthaea HLB is a consciousness-aware system that integrates:
 - **Hyperdimensional Computing (HDC)**: 16,384-bit binary vectors (HV16) for semantic encoding
-- **Seven Harmonies Value System**: Ethical alignment framework with word-level bundling
+- **Eight Harmonies Value System**: Ethical alignment framework with word-level bundling
 - **Multi-Database Architecture**: Specialized databases for different "mental roles"
 - **Sleep-Memory Consolidation**: HDC-based memory compression during sleep cycles
 - **Motor Cortex Action Inference**: Consciousness-level-gated action execution
@@ -17,7 +17,7 @@ Symthaea HLB is a consciousness-aware system that integrates:
 
 1. **Prefrontal/Coherence Routing**: Input processing and attention allocation
 2. **Deterministic HDC Hashing**: `hash_projection` → HV16 bundling with word-level semantic alignment
-3. **Safety Gates**: Guardrails + Thymus tri-state verification + Seven Harmonies evaluation
+3. **Safety Gates**: Guardrails + Thymus tri-state verification + Eight Harmonies evaluation
 4. **LTC Processing**: Liquid Time Constant network for temporal dynamics
 5. **Consciousness Graph Update**: Φ (integrated information) computation
 6. **Memory Store**: Short-term → long-term consolidation via sleep cycles
@@ -37,7 +37,7 @@ Symthaea HLB is a consciousness-aware system that integrates:
 | Subsystem | Key files | Status |
 |-----------|-----------|--------|
 | **HDC Core** | `src/hdc/binary_hv.rs`, `hash_projection.rs`, `resonator.rs` | Active: Deterministic HV16 (16,384-bit) vectors with BLAKE3 hashing |
-| **Seven Harmonies** | `src/consciousness/seven_harmonies.rs` | Active: Word-level bundling via BLAKE3 for semantic alignment |
+| **Eight Harmonies** | `src/consciousness/seven_harmonies.rs` | Active: Word-level bundling via BLAKE3 for semantic alignment |
 | **Consciousness** | `src/consciousness/*.rs` | Active: Φ computation, attention mechanisms, value evaluation |
 | **Memory** | `src/memory/*`, `src/sleep_cycles.rs`, `src/brain/consolidation.rs` | Active: HDC-based memory consolidation integrated with sleep cycles |
 | **Databases** | `src/databases/*` | Active: UnifiedMind with mental-role architecture (Qdrant/Cozo/Lance/Duck) |
@@ -74,7 +74,7 @@ Actions are classified by consciousness requirement:
 | Governance | ≥ 0.3 | Service management, policy changes |
 | Basic | ≥ 0.2 | File operations, queries |
 
-### Seven Harmonies Value System
+### Eight Harmonies Value System
 
 Word-level semantic alignment using BLAKE3 hashing:
 - `encode_text_wordwise()`: Bundled word vectors via majority vote
@@ -102,7 +102,7 @@ Word-level semantic alignment using BLAKE3 hashing:
 ## Testing Status
 
 Test coverage includes:
-- **Seven Harmonies**: 8 tests for semantic alignment
+- **Eight Harmonies**: 8 tests for semantic alignment
 - **Streaming Causal**: 8 tests for time eviction and alerts
 - **Sleep Cycles**: 5 tests for memory consolidation
 - **Database Integration**: 8 tests for UnifiedMind

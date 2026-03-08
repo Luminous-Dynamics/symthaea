@@ -39,11 +39,7 @@ struct SafetensorsMapper {
 }
 
 impl<B: Backend> ModuleMapper<B> for SafetensorsMapper {
-    fn map_float<const D: usize>(
-        &mut self,
-        _id: ParamId,
-        tensor: Tensor<B, D>,
-    ) -> Tensor<B, D> {
+    fn map_float<const D: usize>(&mut self, _id: ParamId, tensor: Tensor<B, D>) -> Tensor<B, D> {
         let idx = self.counter;
         self.counter += 1;
         if idx < self.replacements.len() {
@@ -64,8 +60,8 @@ impl<B: Backend> ModuleMapper<B> for SafetensorsMapper {
 /// The `Mmap` derefs to `&[u8]`, so `SafeTensors::deserialize(&mmap)` works unchanged.
 #[allow(unsafe_code)]
 fn mmap_file(path: &Path) -> Result<memmap2::Mmap> {
-    let file = std::fs::File::open(path)
-        .with_context(|| format!("Failed to open {}", path.display()))?;
+    let file =
+        std::fs::File::open(path).with_context(|| format!("Failed to open {}", path.display()))?;
     unsafe { memmap2::MmapOptions::new().map(&file) }
         .map_err(|e| anyhow::anyhow!("mmap failed for {}: {e}", path.display()))
 }
@@ -211,9 +207,9 @@ fn load_sharded(
             .map_err(|e| anyhow::anyhow!("Failed to parse shard {shard_file}: {e}"))?;
 
         for &(idx, name, transpose) in tensors {
-            let view = st
-                .tensor(name)
-                .map_err(|e| anyhow::anyhow!("Missing tensor '{name}' in shard {shard_file}: {e}"))?;
+            let view = st.tensor(name).map_err(|e| {
+                anyhow::anyhow!("Missing tensor '{name}' in shard {shard_file}: {e}")
+            })?;
             let repl = convert_tensor(&view, transpose)
                 .with_context(|| format!("Failed to convert tensor '{name}' from {shard_file}"))?;
             replacements[idx] = Some(repl);
@@ -330,9 +326,7 @@ fn convert_tensor(
 
 /// List all tensor names, shapes, and dtypes in a safetensors file.
 #[allow(dead_code)]
-pub fn list_tensors(
-    data: &[u8],
-) -> Result<Vec<(String, Vec<usize>, safetensors::Dtype)>> {
+pub fn list_tensors(data: &[u8]) -> Result<Vec<(String, Vec<usize>, safetensors::Dtype)>> {
     let st = safetensors::SafeTensors::deserialize(data)
         .map_err(|e| anyhow::anyhow!("Failed to parse safetensors: {e}"))?;
     let mut result: Vec<_> = st
@@ -403,16 +397,11 @@ mod tests {
             let numel: usize = shape.iter().product();
             // Fill with deterministic f32 values: (idx * 1000 + element) * 0.001
             let base = (idx as f32) * 0.1;
-            let values: Vec<f32> = (0..numel)
-                .map(|i| base + (i as f32) * 0.0001)
-                .collect();
+            let values: Vec<f32> = (0..numel).map(|i| base + (i as f32) * 0.0001).collect();
             expected_values.push((name.clone(), values.clone()));
 
             let raw_bytes: Vec<u8> = match dtype {
-                Dtype::F32 => values
-                    .iter()
-                    .flat_map(|v| v.to_le_bytes())
-                    .collect(),
+                Dtype::F32 => values.iter().flat_map(|v| v.to_le_bytes()).collect(),
                 Dtype::F16 => values
                     .iter()
                     .flat_map(|v| half::f16::from_f32(*v).to_le_bytes())

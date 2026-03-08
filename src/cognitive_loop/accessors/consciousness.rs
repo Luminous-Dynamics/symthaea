@@ -91,7 +91,8 @@ impl CognitiveLoopService {
             flow_periods: self.flow_state.flow_periods,
             avg_flow_duration_secs: self.flow_state.avg_flow_duration_secs,
             fep_free_energy: self
-                .fep.agent
+                .fep
+                .agent
                 .last_fe_components
                 .as_ref()
                 .map(|fe| fe.total)
@@ -341,7 +342,7 @@ impl CognitiveLoopService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // EXPERIENCE BUS: Principled signals + Seven Harmonies
+    // EXPERIENCE BUS: Principled signals + Eight Harmonies
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Current principled signals from experience bus.
@@ -349,7 +350,7 @@ impl CognitiveLoopService {
         self.experience_bus.as_ref().map(|bus| bus.signals())
     }
 
-    /// KosmicSong state (Seven Harmonies + GIS + moral uncertainty).
+    /// KosmicSong state (Eight Harmonies + GIS + moral uncertainty).
     pub fn kosmic_state(&self) -> Option<&crate::experience::KosmicSong> {
         self.experience_bus.as_ref().map(|bus| bus.kosmic())
     }

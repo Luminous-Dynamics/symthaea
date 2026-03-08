@@ -16,7 +16,7 @@ thiserror = { workspace = true }
 uuid = { workspace = true }
 # im removed: planned for immutable data structures but never imported
 bincode = { workspace = true }
-rayon = { workspace = true }
+rayon = { workspace = true, optional = true }
 anyhow = { workspace = true }
 blake3 = { workspace = true }
 sha3 = "0.10"  # SHAKE-256 Keccak sponge for deterministic genesis
@@ -106,10 +106,10 @@ name = "orthogonal_init_bench"
 harness = false
 
 [features]
-default = ["simd"]
+default = ["simd", "parallel"]
 embeddings = []       # Enable embedding model integration
 thread_local_cache = []  # Enable thread-local caching in Phi engine
-rayon = []            # Enable parallel computation with rayon
+parallel = ["dep:rayon"]  # Enable parallel computation with rayon
 simd = []             # Enable SIMD-accelerated continuous HV operations (4x+ speedup)
 
 # Multi-Database Consciousness Architecture features

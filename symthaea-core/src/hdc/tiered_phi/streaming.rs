@@ -39,6 +39,7 @@
 //! }
 //! ```
 
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -431,26 +432,28 @@ impl StreamingPhiGradient {
         }
 
         // For each component, estimate gradient by computing Φ without it
-        let gradients: Vec<f64> = (0..n)
-            .into_par_iter()
-            .map(|i| {
-                // Create component list without i
-                let remaining: Vec<BinaryHV> = components
-                    .iter()
-                    .enumerate()
-                    .filter(|(j, _)| *j != i)
-                    .map(|(_, c)| *c)
-                    .collect();
+        let gradient_fn = |i: usize| {
+            // Create component list without i
+            let remaining: Vec<BinaryHV> = components
+                .iter()
+                .enumerate()
+                .filter(|(j, _)| *j != i)
+                .map(|(_, c)| *c)
+                .collect();
 
-                // Use fresh calculator to avoid state contamination
-                let mut calc = TieredPhi::new(ApproximationTier::SpectralConnectivity);
-                let phi_without = calc.compute(&remaining);
+            // Use fresh calculator to avoid state contamination
+            let mut calc = TieredPhi::new(ApproximationTier::SpectralConnectivity);
+            let phi_without = calc.compute(&remaining);
 
-                // Gradient = how much Φ drops when we remove this component
-                // Positive gradient means component helps, negative means it hurts
-                base_phi - phi_without
-            })
-            .collect();
+            // Gradient = how much Φ drops when we remove this component
+            // Positive gradient means component helps, negative means it hurts
+            base_phi - phi_without
+        };
+
+        #[cfg(feature = "parallel")]
+        let gradients: Vec<f64> = (0..n).into_par_iter().map(gradient_fn).collect();
+        #[cfg(not(feature = "parallel"))]
+        let gradients: Vec<f64> = (0..n).map(gradient_fn).collect();
 
         gradients
     }

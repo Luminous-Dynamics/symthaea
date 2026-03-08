@@ -170,7 +170,8 @@ impl CalibrationHistory {
         let mut total = 0.0;
         let mut count = 0usize;
         for i in 1..self.entries.len() {
-            total += (self.entries[i].applied_at_cycle - self.entries[i - 1].applied_at_cycle) as f64;
+            total +=
+                (self.entries[i].applied_at_cycle - self.entries[i - 1].applied_at_cycle) as f64;
             count += 1;
         }
         Some(total / count as f64)
@@ -230,7 +231,13 @@ impl Default for CalibrationValidator {
 
 impl CalibrationValidator {
     /// Record pre-calibration metrics when a calibration is about to be applied.
-    pub fn record_pre_calibration(&mut self, pe_ema: f64, coherence_ema: f64, confidence_error_ema: f64, cycle: u64) {
+    pub fn record_pre_calibration(
+        &mut self,
+        pe_ema: f64,
+        coherence_ema: f64,
+        confidence_error_ema: f64,
+        cycle: u64,
+    ) {
         self.pending_validation = Some(MetricSnapshot {
             pe_ema,
             coherence_ema,
@@ -241,7 +248,13 @@ impl CalibrationValidator {
 
     /// Check whether enough time has passed to validate the calibration.
     /// Returns `Some(improved)` if validation window has elapsed.
-    pub fn check_validation(&mut self, pe_ema: f64, coherence_ema: f64, confidence_error_ema: f64, cycle: u64) -> Option<bool> {
+    pub fn check_validation(
+        &mut self,
+        pe_ema: f64,
+        coherence_ema: f64,
+        confidence_error_ema: f64,
+        cycle: u64,
+    ) -> Option<bool> {
         let pre = self.pending_validation.as_ref()?;
         if cycle < pre.cycle + self.settling_cycles {
             return None; // Not enough settling time
@@ -256,7 +269,8 @@ impl CalibrationValidator {
         let pe_worsened = pe_ema > pre.pe_ema + 0.02;
         let coherence_worsened = coherence_ema < pre.coherence_ema - 0.02;
 
-        let improvement_count = pe_improved as u8 + coherence_improved as u8 + confidence_improved as u8;
+        let improvement_count =
+            pe_improved as u8 + coherence_improved as u8 + confidence_improved as u8;
         let worsened_count = pe_worsened as u8 + coherence_worsened as u8;
 
         let improved = improvement_count > worsened_count;

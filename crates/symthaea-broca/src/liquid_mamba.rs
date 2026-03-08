@@ -182,7 +182,6 @@ pub struct LiquidMambaConfig {
     pub fep_low_multiplier: f32,
 
     // ─── Improvement A-F config fields ───
-
     /// Chunk dimension for temporal projection (default 256 = bottleneck_dim).
     /// When non-zero, overrides bottleneck_dim for temporal chunk sizing.
     #[serde(default)]
@@ -614,16 +613,16 @@ impl LiquidMambaGenerator {
             let ssm_context = if let Some(ref tp) = self.temporal_proj {
                 // Temporal: chunk 16384D → N×768D soft tokens → forward_embeds()
                 let sequence = if self.config.temporal_chunk_budget > 0 {
-                    tp.project_to_ssm_sequence_topk(
-                        &thought_hv,
-                        self.config.temporal_chunk_budget,
-                    )
+                    tp.project_to_ssm_sequence_topk(&thought_hv, self.config.temporal_chunk_budget)
                 } else {
                     tp.project_to_ssm_sequence(&thought_hv)
                 };
                 self.mamba.inject_context_sequence(&sequence)?;
                 // Keep a single-vector summary for veto re-injection
-                sequence.last().cloned().unwrap_or_else(|| vec![0.0; self.config.ssm_dim])
+                sequence
+                    .last()
+                    .cloned()
+                    .unwrap_or_else(|| vec![0.0; self.config.ssm_dim])
             } else {
                 // Spatial: 16384D → 256D → 768D → inject_initial_context()
                 let ctx = self.projection.project_to_ssm(&thought_hv);
@@ -683,19 +682,16 @@ impl LiquidMambaGenerator {
                 if self.config.enable_gating {
                     let effective_epistemic =
                         (channels.epistemic_ordinal() + token_pe_boost).clamp(0.0, 4.0);
-                    self.epistemic_gate
-                        .apply(&mut logits, effective_epistemic);
+                    self.epistemic_gate.apply(&mut logits, effective_epistemic);
                 }
 
                 // 7d. Emotional modulation
                 if self.config.enable_gating {
-                    self.emotional_modulator
-                        .apply(&mut logits, channels, pos);
+                    self.emotional_modulator.apply(&mut logits, channels, pos);
                 }
 
                 // 7e. Top-k sampling
-                let next_token =
-                    top_k_sample(&logits, self.config.top_k, self.config.temperature);
+                let next_token = top_k_sample(&logits, self.config.top_k, self.config.temperature);
 
                 // 7f. Back-project token to HDC (unconditional — for distillation + veto)
                 let token_emb = self.mamba.embedding_vector(next_token)?;
@@ -758,8 +754,7 @@ impl LiquidMambaGenerator {
 
                 // 7h. Decode token
                 if next_token == eos_id {
-                    let semantic_pe =
-                        self.semantic_prediction_error(&thought_hv, &output_hvs);
+                    let semantic_pe = self.semantic_prediction_error(&thought_hv, &output_hvs);
                     return Ok(GenerationResult {
                         text,
                         token_ids: tokens,
@@ -1061,8 +1056,7 @@ impl LiquidMambaGenerator {
                     rng_state ^= rng_state << 13;
                     rng_state ^= rng_state >> 7;
                     rng_state ^= rng_state << 17;
-                    let noise =
-                        ((rng_state as f32) / (u64::MAX as f32) - 0.5) * 2.0 * noise_scale;
+                    let noise = ((rng_state as f32) / (u64::MAX as f32) - 0.5) * 2.0 * noise_scale;
                     *w += noise;
                 }
                 tp.load_weights(&weights);
@@ -1095,8 +1089,7 @@ impl LiquidMambaGenerator {
                     rng_state ^= rng_state << 13;
                     rng_state ^= rng_state >> 7;
                     rng_state ^= rng_state << 17;
-                    let noise =
-                        ((rng_state as f32) / (u64::MAX as f32) - 0.5) * 2.0 * noise_scale;
+                    let noise = ((rng_state as f32) / (u64::MAX as f32) - 0.5) * 2.0 * noise_scale;
                     *w += noise;
                 }
                 self.projection.load_weights(&weights);
@@ -1267,11 +1260,9 @@ impl LiquidMambaGenerator {
                 } else {
                     // Single rotating position (legacy behavior)
                     let pos = self.generation_count % num_chunks;
-                    let ssm_grads = self.mamba.compute_e2e_token_loss_at(
-                        &sequence,
-                        &result.token_ids,
-                        pos,
-                    );
+                    let ssm_grads =
+                        self.mamba
+                            .compute_e2e_token_loss_at(&sequence, &result.token_ids, pos);
                     if let Ok(grad) = ssm_grads {
                         let mut sparse: Vec<Option<Vec<f32>>> = vec![None; num_chunks];
                         sparse[pos] = Some(grad);
@@ -1332,8 +1323,8 @@ impl LiquidMambaGenerator {
                 // Prefix token loss (only useful when Mamba output is meaningful)
                 if self.config.prefix_loss_weight > 0.0 && result.output_hvs.len() >= 4 {
                     let prefix_len = (result.output_hvs.len() / 4).max(1);
-                    let prefix_bundle =
-                        self.attention_weighted_bundle(&thought_hv, &result.output_hvs[..prefix_len]);
+                    let prefix_bundle = self
+                        .attention_weighted_bundle(&thought_hv, &result.output_hvs[..prefix_len]);
                     self.projection
                         .compute_gradients(&thought_hv, &prefix_bundle);
                 }
@@ -1364,7 +1355,9 @@ impl LiquidMambaGenerator {
                     let scale = 1.0 + self.config.surprise_gradient_alpha * result.semantic_pe;
                     self.projection.scale_accumulated_gradients(scale);
                 }
-                let metrics = self.projection.apply_gradients(effective_lr, self.config.grad_clip);
+                let metrics = self
+                    .projection
+                    .apply_gradients(effective_lr, self.config.grad_clip);
                 if let Some(ref mut diag) = self.diagnostics {
                     diag.record_step(&metrics, effective_lr);
                     let bottleneck = self.projection.bottleneck_activation(&thought_hv);
@@ -2358,10 +2351,7 @@ mod tests {
             lr <= min_lr * 1.5,
             "LR at step 300 should be near min_lr ({min_lr}), got {lr}"
         );
-        assert!(
-            lr > 0.0,
-            "LR should still be positive"
-        );
+        assert!(lr > 0.0, "LR should still be positive");
     }
 
     // ─── Multi-Position E2E Gradient tests ───────────────────────────────
@@ -2375,12 +2365,16 @@ mod tests {
         let tokens = vec![1, 2, 3];
         let positions = vec![2, 5, 10, 14];
 
-        let results = mock.compute_e2e_token_loss_multi(&sequence, &tokens, &positions)
+        let results = mock
+            .compute_e2e_token_loss_multi(&sequence, &tokens, &positions)
             .expect("multi-position should succeed");
 
         assert_eq!(results.len(), 4, "should return K=4 gradients");
         for (pos, grad) in &results {
-            assert!(positions.contains(pos), "pos {pos} not in requested positions");
+            assert!(
+                positions.contains(pos),
+                "pos {pos} not in requested positions"
+            );
             assert_eq!(grad.len(), d);
             assert!(grad.iter().all(|x| x.is_finite()));
         }
@@ -2411,11 +2405,10 @@ mod tests {
 
         // Directly call multi-position
         let positions: Vec<usize> = (0..4).map(|i| i * num_chunks / 4).collect();
-        let results = gen.mamba.compute_e2e_token_loss_multi(
-            &sequence,
-            &[1, 2],
-            &positions,
-        ).expect("multi-position should succeed");
+        let results = gen
+            .mamba
+            .compute_e2e_token_loss_multi(&sequence, &[1, 2], &positions)
+            .expect("multi-position should succeed");
 
         // Should have exactly 4 entries
         assert_eq!(results.len(), 4, "should return 4 gradient entries");
@@ -2430,7 +2423,7 @@ mod tests {
         let config_single = LiquidMambaConfig {
             temporal_projection: true,
             temporal_rotate_grad_position: true,
-            e2e_grad_chunks: 1,  // Legacy single position
+            e2e_grad_chunks: 1, // Legacy single position
             enable_consciousness_gating: false,
             enable_veto: false,
             ..Default::default()
@@ -2438,7 +2431,9 @@ mod tests {
         let mut gen = LiquidMambaGenerator::with_mock(&genesis, config_single);
 
         // Run a generate + distill cycle — should work same as before
-        let channels = ThoughtChannels { channels: [0.3; 20] };
+        let channels = ThoughtChannels {
+            channels: [0.3; 20],
+        };
         let result = gen.generate(&channels);
         gen.distill_step(&channels, &result);
         // No panic means backward compat is preserved
@@ -2461,7 +2456,8 @@ mod tests {
                 .map(|i| (offset + i * num_chunks / k) % num_chunks)
                 .collect();
 
-            let results = mock.compute_e2e_token_loss_multi(&sequence, &tokens, &positions)
+            let results = mock
+                .compute_e2e_token_loss_multi(&sequence, &tokens, &positions)
                 .expect("should succeed");
             assert_eq!(results.len(), k);
 
@@ -2469,9 +2465,11 @@ mod tests {
             let mut sorted: Vec<usize> = results.iter().map(|(p, _)| *p).collect();
             sorted.sort();
             for i in 1..sorted.len() {
-                let gap = (sorted[i] + num_chunks - sorted[i-1]) % num_chunks;
-                assert!(gap >= num_chunks / k - 1 && gap <= num_chunks / k + 1,
-                    "positions should be roughly evenly spaced, gap={gap}");
+                let gap = (sorted[i] + num_chunks - sorted[i - 1]) % num_chunks;
+                assert!(
+                    gap >= num_chunks / k - 1 && gap <= num_chunks / k + 1,
+                    "positions should be roughly evenly spaced, gap={gap}"
+                );
             }
         }
     }
@@ -2497,7 +2495,9 @@ mod tests {
         let initial_weights = tp.flatten_weights();
 
         // Run enough distill steps to trigger gradient application
-        let channels = ThoughtChannels { channels: [0.5; 20] };
+        let channels = ThoughtChannels {
+            channels: [0.5; 20],
+        };
         for _ in 0..5 {
             let result = gen.generate(&channels);
             gen.distill_step(&channels, &result);
@@ -2506,10 +2506,15 @@ mod tests {
         // Weights should have changed
         let tp = gen.temporal_proj().unwrap();
         let updated_weights = tp.flatten_weights();
-        let diff: f32 = initial_weights.iter().zip(updated_weights.iter())
+        let diff: f32 = initial_weights
+            .iter()
+            .zip(updated_weights.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
-        assert!(diff > 0.0, "weights should update after distill steps with multi-position E2E");
+        assert!(
+            diff > 0.0,
+            "weights should update after distill steps with multi-position E2E"
+        );
     }
 
     #[test]

@@ -161,7 +161,8 @@ impl HdcAssembler {
         contigs
             .iter()
             .map(|read_indices| {
-                let contig_reads: Vec<&DnaSequence> = read_indices.iter().map(|&i| &reads[i]).collect();
+                let contig_reads: Vec<&DnaSequence> =
+                    read_indices.iter().map(|&i| &reads[i]).collect();
                 self.consensus(&contig_reads)
             })
             .collect()
@@ -325,7 +326,10 @@ mod tests {
             !overlaps.is_empty(),
             "Identical reads should have high overlap"
         );
-        assert!(overlaps[0].2 > 0.9, "Identical reads should have similarity near 1.0");
+        assert!(
+            overlaps[0].2 > 0.9,
+            "Identical reads should have similarity near 1.0"
+        );
     }
 
     #[test]

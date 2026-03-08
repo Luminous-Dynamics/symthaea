@@ -50,8 +50,8 @@ use symthaea_psych_bench::benchmarks::motor::{
 };
 use symthaea_psych_bench::benchmarks::neuromod::{
     AllostaticStressBenchmark, AntagonistProfilesBenchmark, AttentionNetworkBenchmark,
-    BehavioralKnockoutBenchmark, ConsciousnessFeedbackBenchmark, ConsciousnessPharmacologyBenchmark,
-    DoseResponseBenchmark, InjectionChallengeBenchmark,
+    BehavioralKnockoutBenchmark, ConsciousnessFeedbackBenchmark,
+    ConsciousnessPharmacologyBenchmark, DoseResponseBenchmark, InjectionChallengeBenchmark,
     MoodInductionBenchmark, MoralOxytocinBenchmark, MultiTransmitterSynergyBenchmark,
     PharmacologicalAblationBenchmark, PharmacologicalChallengeBenchmark, RewardLearningBenchmark,
     ToleranceWithdrawalBenchmark, YerkesDodsonBenchmark,
@@ -296,7 +296,11 @@ fn main() {
             )
             .unwrap();
         }
-        eprintln!("  Wrote {} ({} domains)", path.display(), profile.domains.len());
+        eprintln!(
+            "  Wrote {} ({} domains)",
+            path.display(),
+            profile.domains.len()
+        );
     }
 
     // ── CSV 2: normative_zscores.csv ────────────────────────────────
@@ -345,10 +349,7 @@ fn main() {
         for &preset in presets {
             let ac = preset.to_config(42);
             eprintln!("  Running ablation: {}...", ac.name);
-            let ab_results: Vec<_> = benchmarks
-                .par_iter()
-                .map(|b| b.run(&ac.base))
-                .collect();
+            let ab_results: Vec<_> = benchmarks.par_iter().map(|b| b.run(&ac.base)).collect();
             let mut ab_report = BenchmarkReport::new();
             for r in ab_results {
                 ab_report.add(r);
@@ -364,9 +365,7 @@ fn main() {
         write!(f, "domain").unwrap();
         for name in &preset_names {
             // Sanitize column name for pgfplotstableread (no spaces or parens)
-            let clean = name
-                .replace(' ', "")
-                .replace("(K=3)", "");
+            let clean = name.replace(' ', "").replace("(K=3)", "");
             write!(f, ",{}", clean).unwrap();
         }
         writeln!(f).unwrap();
@@ -448,13 +447,21 @@ fn main() {
             ("Reasoning::ArcFluid", "sat_arcfluid.csv"),
         ];
         for (bench_name, filename) in &name_map {
-            if let Some(curve) = sat_battery.curves.iter().find(|c| c.benchmark == *bench_name) {
+            if let Some(curve) = sat_battery
+                .curves
+                .iter()
+                .find(|c| c.benchmark == *bench_name)
+            {
                 let p = out.join(filename);
                 let mut bf = fs::File::create(&p).unwrap();
                 writeln!(bf, "time_pressure,accuracy,mean_rt").unwrap();
                 for pt in &curve.points {
-                    writeln!(bf, "{:.6},{:.6},{:.6}", pt.time_pressure, pt.accuracy, pt.mean_rt)
-                        .unwrap();
+                    writeln!(
+                        bf,
+                        "{:.6},{:.6},{:.6}",
+                        pt.time_pressure, pt.accuracy, pt.mean_rt
+                    )
+                    .unwrap();
                 }
                 eprintln!("  Wrote {}", p.display());
             }
@@ -693,7 +700,9 @@ fn main() {
                     let best = protos
                         .iter()
                         .enumerate()
-                        .max_by(|(_, a), (_, b)| noisy.similarity(a).total_cmp(&noisy.similarity(b)))
+                        .max_by(|(_, a), (_, b)| {
+                            noisy.similarity(a).total_cmp(&noisy.similarity(b))
+                        })
                         .map(|(i, _)| i)
                         .unwrap_or(0);
                     if best == ci {
@@ -705,8 +714,16 @@ fn main() {
 
             let simple_mean = simple_accs.iter().sum::<f64>() / n_runs as f64;
             let complex_mean = complex_accs.iter().sum::<f64>() / n_runs as f64;
-            writeln!(f, "yerkes_dodson,ne,{ne:.2},simple_accuracy,{simple_mean:.6}").unwrap();
-            writeln!(f, "yerkes_dodson,ne,{ne:.2},complex_accuracy,{complex_mean:.6}").unwrap();
+            writeln!(
+                f,
+                "yerkes_dodson,ne,{ne:.2},simple_accuracy,{simple_mean:.6}"
+            )
+            .unwrap();
+            writeln!(
+                f,
+                "yerkes_dodson,ne,{ne:.2},complex_accuracy,{complex_mean:.6}"
+            )
+            .unwrap();
         }
         eprintln!("  Panel (a): Yerkes-Dodson NE sweep done");
 
@@ -747,9 +764,17 @@ fn main() {
                     let choice = if r < p0 { 0 } else { 1 };
 
                     let reward = if !in_reversal {
-                        if choice == 0 { 1.0 } else { 0.0 }
+                        if choice == 0 {
+                            1.0
+                        } else {
+                            0.0
+                        }
                     } else {
-                        if choice == 1 { 1.0 } else { 0.0 }
+                        if choice == 1 {
+                            1.0
+                        } else {
+                            0.0
+                        }
                     };
 
                     let rpe = reward - q[choice];
@@ -841,9 +866,9 @@ fn main() {
                         let total: f32 = ws.iter().sum();
                         let nw: Vec<f32> = ws.iter().map(|w| w / total).collect();
                         let stim = ContinuousHV::weighted_bundle(&comps, &nw);
-                        let margin =
-                            (stim.similarity(&left_p) as f64 - stim.similarity(&right_p) as f64)
-                                .abs();
+                        let margin = (stim.similarity(&left_p) as f64
+                            - stim.similarity(&right_p) as f64)
+                            .abs();
                         let mut rt = 5.0 + (1.0 - margin.min(1.0)) * 8.0;
                         // NE-mediated alerting: temporal preparation reduces baseline RT
                         if alert_cue {
@@ -923,11 +948,21 @@ fn main() {
                 for _ in 0..warmup {
                     bath.update(&neutral_inputs);
                     match name {
-                        "da" => bath.clamp_all_levels(Some(dose), None, None, None, None, None, None),
-                        "ne" => bath.clamp_all_levels(None, Some(dose), None, None, None, None, None),
-                        "sht" => bath.clamp_all_levels(None, None, Some(dose), None, None, None, None),
-                        "ach" => bath.clamp_all_levels(None, None, None, Some(dose), None, None, None),
-                        "gaba" => bath.clamp_all_levels(None, None, None, None, Some(dose), None, None),
+                        "da" => {
+                            bath.clamp_all_levels(Some(dose), None, None, None, None, None, None)
+                        }
+                        "ne" => {
+                            bath.clamp_all_levels(None, Some(dose), None, None, None, None, None)
+                        }
+                        "sht" => {
+                            bath.clamp_all_levels(None, None, Some(dose), None, None, None, None)
+                        }
+                        "ach" => {
+                            bath.clamp_all_levels(None, None, None, Some(dose), None, None, None)
+                        }
+                        "gaba" => {
+                            bath.clamp_all_levels(None, None, None, None, Some(dose), None, None)
+                        }
                         _ => {}
                     }
                 }
@@ -935,11 +970,21 @@ fn main() {
                 for _ in 0..observe {
                     bath.update(&neutral_inputs);
                     match name {
-                        "da" => bath.clamp_all_levels(Some(dose), None, None, None, None, None, None),
-                        "ne" => bath.clamp_all_levels(None, Some(dose), None, None, None, None, None),
-                        "sht" => bath.clamp_all_levels(None, None, Some(dose), None, None, None, None),
-                        "ach" => bath.clamp_all_levels(None, None, None, Some(dose), None, None, None),
-                        "gaba" => bath.clamp_all_levels(None, None, None, None, Some(dose), None, None),
+                        "da" => {
+                            bath.clamp_all_levels(Some(dose), None, None, None, None, None, None)
+                        }
+                        "ne" => {
+                            bath.clamp_all_levels(None, Some(dose), None, None, None, None, None)
+                        }
+                        "sht" => {
+                            bath.clamp_all_levels(None, None, Some(dose), None, None, None, None)
+                        }
+                        "ach" => {
+                            bath.clamp_all_levels(None, None, None, Some(dose), None, None, None)
+                        }
+                        "gaba" => {
+                            bath.clamp_all_levels(None, None, None, None, Some(dose), None, None)
+                        }
                         _ => {}
                     }
                     sum += metric_fn(&bath) as f64;

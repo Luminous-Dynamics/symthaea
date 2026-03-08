@@ -241,7 +241,9 @@ impl PersistentCache {
         bytes
             .chunks_exact(4)
             .map(|chunk| {
-                let arr: [u8; 4] = chunk.try_into().expect("chunks_exact(4) guarantees 4-byte slices");
+                let arr: [u8; 4] = chunk
+                    .try_into()
+                    .expect("chunks_exact(4) guarantees 4-byte slices");
                 f32::from_le_bytes(arr)
             })
             .collect()
@@ -264,7 +266,9 @@ impl PersistentCache {
         bytes
             .chunks_exact(2)
             .map(|chunk| {
-                let arr: [u8; 2] = chunk.try_into().expect("chunks_exact(2) guarantees 2-byte slices");
+                let arr: [u8; 2] = chunk
+                    .try_into()
+                    .expect("chunks_exact(2) guarantees 2-byte slices");
                 half::f16::from_le_bytes(arr).to_f32()
             })
             .collect()
@@ -351,7 +355,11 @@ mod tests {
                 use_f16_storage: false,
             })
             .unwrap();
-            assert_eq!(cache.len().unwrap(), 0, "Cache should be cleared on model change");
+            assert_eq!(
+                cache.len().unwrap(),
+                0,
+                "Cache should be cleared on model change"
+            );
             assert!(cache.get("key1").unwrap().is_none());
         }
 
@@ -385,7 +393,10 @@ mod tests {
             })
             .unwrap();
             let retrieved = cache.get("test sentence").unwrap();
-            assert!(retrieved.is_some(), "Should find embedding from previous session");
+            assert!(
+                retrieved.is_some(),
+                "Should find embedding from previous session"
+            );
             let emb = retrieved.unwrap();
             assert_eq!(emb.len(), 1024);
             assert!((emb[0] - 0.0).abs() < 1e-6);
@@ -510,8 +521,16 @@ mod tests {
         let f32_bytes = PersistentCache::f32_to_bytes(&embedding);
         let f16_bytes = PersistentCache::f32_to_f16_bytes(&embedding);
 
-        assert_eq!(f32_bytes.len(), 1024 * 4, "f32 should be 4 bytes per element");
-        assert_eq!(f16_bytes.len(), 1024 * 2, "f16 should be 2 bytes per element");
+        assert_eq!(
+            f32_bytes.len(),
+            1024 * 4,
+            "f32 should be 4 bytes per element"
+        );
+        assert_eq!(
+            f16_bytes.len(),
+            1024 * 2,
+            "f16 should be 2 bytes per element"
+        );
         assert_eq!(
             f16_bytes.len() * 2,
             f32_bytes.len(),

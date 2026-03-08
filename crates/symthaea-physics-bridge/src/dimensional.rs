@@ -113,10 +113,7 @@ mod tests {
         });
         // Identical dimensions → identical encoding
         let sim = energy.similarity(&torque);
-        assert!(
-            sim > 0.999,
-            "Energy ≈ Torque (same dims), got sim = {sim}"
-        );
+        assert!(sim > 0.999, "Energy ≈ Torque (same dims), got sim = {sim}");
     }
 
     #[test]
@@ -167,10 +164,7 @@ mod tests {
         assert!(norm < 1e-10, "Dimensionless should be zero vector");
         // Similarity with non-zero should be 0 (cosine with zero vec)
         let sim = dimless.similarity(&energy);
-        assert!(
-            sim.abs() < 0.01,
-            "Dimensionless ⊥ Energy, got sim = {sim}"
-        );
+        assert!(sim.abs() < 0.01, "Dimensionless ⊥ Energy, got sim = {sim}");
     }
 
     #[test]

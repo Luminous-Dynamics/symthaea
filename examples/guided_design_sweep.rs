@@ -83,7 +83,12 @@ fn main() {
     println!(
         "  {} points, {} feasible",
         mass_result.sweep.points.len(),
-        mass_result.sweep.points.iter().filter(|p| p.feasible).count(),
+        mass_result
+            .sweep
+            .points
+            .iter()
+            .filter(|p| p.feasible)
+            .count(),
     );
     println!();
 
@@ -99,7 +104,12 @@ fn main() {
     println!(
         "  {} points, {} feasible",
         cost_result.sweep.points.len(),
-        cost_result.sweep.points.iter().filter(|p| p.feasible).count(),
+        cost_result
+            .sweep
+            .points
+            .iter()
+            .filter(|p| p.feasible)
+            .count(),
     );
     println!();
 
@@ -158,10 +168,7 @@ fn main() {
         multi.cost.sweep.points.len(),
         multi.cost.plateau_regions.len(),
     );
-    println!(
-        "Cross-correlated plateaus: {}",
-        multi.cross_plateaus.len()
-    );
+    println!("Cross-correlated plateaus: {}", multi.cross_plateaus.len());
     for (i, cp) in multi.cross_plateaus.iter().enumerate() {
         println!(
             "  [{i}] {:?} @ {:.1}–{:.1} kW (all_feasible={})",

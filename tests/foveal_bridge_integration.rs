@@ -166,7 +166,11 @@ mod vision_signal_tests {
             .map(|i| {
                 let x = i % 32;
                 let y = i / 32;
-                if (x + y) % 2 == 0 { 255 } else { 0 }
+                if (x + y) % 2 == 0 {
+                    255
+                } else {
+                    0
+                }
             })
             .collect();
 
@@ -225,10 +229,8 @@ mod vision_signal_tests {
         );
 
         // Late surprise (last 10) should be ≤ early surprise (first 10) + tolerance
-        let early_avg: f32 =
-            surprises[..10].iter().sum::<f32>() / 10.0;
-        let late_avg: f32 =
-            surprises[surprises.len() - 10..].iter().sum::<f32>() / 10.0;
+        let early_avg: f32 = surprises[..10].iter().sum::<f32>() / 10.0;
+        let late_avg: f32 = surprises[surprises.len() - 10..].iter().sum::<f32>() / 10.0;
         assert!(
             late_avg <= early_avg + 0.05,
             "Surprise should converge: early={early_avg:.4}, late={late_avg:.4}"
@@ -402,13 +404,23 @@ mod per_region_substrate_tests {
 
         // Uniform should have empty per_region_feasibility
         assert!(
-            uniform_result.metadata.substrate.per_region_feasibility.is_empty(),
+            uniform_result
+                .metadata
+                .substrate
+                .per_region_feasibility
+                .is_empty(),
             "Uniform config should have empty per_region_feasibility"
         );
 
         // Effective feasibility should differ between the two
-        let uniform_eff = uniform_result.metadata.substrate.substrate_effective_feasibility;
-        let mixed_eff = mixed_result.metadata.substrate.substrate_effective_feasibility;
+        let uniform_eff = uniform_result
+            .metadata
+            .substrate
+            .substrate_effective_feasibility;
+        let mixed_eff = mixed_result
+            .metadata
+            .substrate
+            .substrate_effective_feasibility;
         assert!(
             (uniform_eff - mixed_eff).abs() > 0.001,
             "Effective feasibility should differ: uniform={uniform_eff:.4}, mixed={mixed_eff:.4}"

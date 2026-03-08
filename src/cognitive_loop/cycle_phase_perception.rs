@@ -9,7 +9,9 @@
 
 use std::time::Instant;
 
-use super::phase_results::{PercEncoding, PercMoral, PercStrategy, PercExploration, PercUrgency, PerceptionPhaseResult};
+use super::phase_results::{
+    PercEncoding, PercExploration, PercMoral, PercStrategy, PercUrgency, PerceptionPhaseResult,
+};
 use super::{CognitiveLoopService, CycleResult, ModuleTimings};
 
 impl CognitiveLoopService {
@@ -104,9 +106,7 @@ impl CognitiveLoopService {
             let w = self.config.vision_frame_width;
             let h = self.config.vision_frame_height;
             let dt = self.config.cfc_config.delta_t;
-            let (hv, tel) = bridge.process_frame_with_telemetry(
-                &frame, w, h, 1, dt,
-            );
+            let (hv, tel) = bridge.process_frame_with_telemetry(&frame, w, h, 1, dt);
             (Some(hv), Some(tel))
         } else {
             (None, None)
@@ -152,7 +152,8 @@ impl CognitiveLoopService {
         // PHASE 1.4: Foveation Dispatch (dorsal surprise → ventral recognition)
         // ═══════════════════════════════════════════════════════════════════════
         #[cfg(feature = "foveation")]
-        let fov_results: Vec<symthaea_foveation::FoveationResult> = if !self.config.enable_foveation {
+        let fov_results: Vec<symthaea_foveation::FoveationResult> = if !self.config.enable_foveation
+        {
             Vec::new()
         } else {
             let mut collected = Vec::new();
@@ -260,9 +261,7 @@ impl CognitiveLoopService {
                         .round()
                         .max(0.0) as usize;
                     bridge.manifold_mut().surprise_map_mut().dampen(
-                        pred_row,
-                        pred_col,
-                        0.5, // halve surprise at this location
+                        pred_row, pred_col, 0.5, // halve surprise at this location
                     );
                 }
             }
@@ -371,7 +370,10 @@ mod tests {
         let mut svc = make_service();
         let mut timings = ModuleTimings::default();
         let result = svc.phase_perception("hello world", Instant::now(), &mut timings);
-        assert!(result.is_ok(), "phase_perception should return Ok for normal input");
+        assert!(
+            result.is_ok(),
+            "phase_perception should return Ok for normal input"
+        );
     }
 
     #[test]

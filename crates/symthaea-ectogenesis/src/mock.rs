@@ -165,7 +165,10 @@ mod tests {
         // Weight should generally increase (normative trajectory)
         let early_weight = history[10].weight_grams;
         let late_weight = history[35].weight_grams;
-        assert!(late_weight > early_weight, "Weight should increase over gestation");
+        assert!(
+            late_weight > early_weight,
+            "Weight should increase over gestation"
+        );
     }
 
     #[test]
@@ -196,7 +199,10 @@ mod tests {
                 break;
             }
         }
-        assert!(any_changed, "Complications should alter at least one metric");
+        assert!(
+            any_changed,
+            "Complications should alter at least one metric"
+        );
         // Suppress unused variable warnings
         let _ = (normal_weight, normal_hr, normal_movement, normal_lung);
     }

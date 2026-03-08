@@ -137,16 +137,16 @@ mod tests {
             ne < 100.0,
             "imbalanced sex ratio should give Ne < N, got {ne}"
         );
-        assert!(
-            (ne - 36.0).abs() < 0.1,
-            "10F + 90M => Ne=36, got {ne}"
-        );
+        assert!((ne - 36.0).abs() < 0.1, "10F + 90M => Ne=36, got {ne}");
     }
 
     #[test]
     fn test_ne_sex_ratio_extreme() {
         let ne = ne_sex_ratio(1, 99);
-        assert!(ne < 5.0, "extreme imbalance: Ne should be very low, got {ne}");
+        assert!(
+            ne < 5.0,
+            "extreme imbalance: Ne should be very low, got {ne}"
+        );
     }
 
     #[test]

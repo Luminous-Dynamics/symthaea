@@ -7,14 +7,18 @@
 ///
 /// Uses the same hash pattern as `gwt_asphyxiation.rs` for consistency.
 pub fn jitter_from_seed(seed: u64, amplitude: f64) -> f64 {
-    let h = seed.wrapping_mul(0x9E3779B97F4A7C15).wrapping_add(0x6A09E667);
+    let h = seed
+        .wrapping_mul(0x9E3779B97F4A7C15)
+        .wrapping_add(0x6A09E667);
     let frac = (h >> 11) as f64 / (1u64 << 53) as f64;
     (frac - 0.5) * 2.0 * amplitude
 }
 
 /// Deterministic float in [0, 1) from seed.
 pub fn float_from_seed(seed: u64) -> f64 {
-    let h = seed.wrapping_mul(0x9E3779B97F4A7C15).wrapping_add(0x6A09E667);
+    let h = seed
+        .wrapping_mul(0x9E3779B97F4A7C15)
+        .wrapping_add(0x6A09E667);
     (h >> 11) as f64 / (1u64 << 53) as f64
 }
 
@@ -292,7 +296,12 @@ pub fn inverse_normal_cdf(p: f64) -> f64 {
 /// - d' > 0 means discriminability (higher = better separation)
 /// - c < 0 means liberal bias (observer says "yes" more than ideal)
 /// - c > 0 means conservative bias
-pub fn sdt_dprime(hit_rate: f64, false_alarm_rate: f64, n_signal: usize, n_noise: usize) -> (f64, f64) {
+pub fn sdt_dprime(
+    hit_rate: f64,
+    false_alarm_rate: f64,
+    n_signal: usize,
+    n_noise: usize,
+) -> (f64, f64) {
     // Apply 1/(2N) correction for extreme rates
     let hr = if hit_rate <= 0.0 || hit_rate >= 1.0 {
         let n = n_signal.max(1) as f64;
@@ -325,7 +334,10 @@ mod tests {
         // All-same: very low complexity
         let seq = vec![false; 100];
         let c = lempel_ziv_76(&seq);
-        assert!(c <= 5, "Constant sequence should have very low complexity: {c}");
+        assert!(
+            c <= 5,
+            "Constant sequence should have very low complexity: {c}"
+        );
     }
 
     #[test]
@@ -364,7 +376,10 @@ mod tests {
     fn test_sigmoid_fit_recovery() {
         // Generate sigmoid data: y = 1.0 / (1 + exp(-10*(x - 0.5)))
         let x: Vec<f64> = (0..11).map(|i| i as f64 / 10.0).collect();
-        let y: Vec<f64> = x.iter().map(|&xi| 1.0 / (1.0 + (-10.0 * (xi - 0.5)).exp())).collect();
+        let y: Vec<f64> = x
+            .iter()
+            .map(|&xi| 1.0 / (1.0 + (-10.0 * (xi - 0.5)).exp()))
+            .collect();
         let (l, k, x0, r2) = sigmoid_fit(&x, &y);
         assert!(
             r2 > 0.95,
@@ -399,7 +414,10 @@ mod tests {
     fn test_autocorrelation_zero_lag() {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let ac = autocorrelation(&values, 0);
-        assert!((ac - 1.0).abs() < 1e-10, "Lag-0 autocorrelation should be 1.0: {ac}");
+        assert!(
+            (ac - 1.0).abs() < 1e-10,
+            "Lag-0 autocorrelation should be 1.0: {ac}"
+        );
     }
 
     #[test]
@@ -430,14 +448,13 @@ mod tests {
         assert_eq!(pearson_correlation(&x, &constant), 0.0);
 
         // Uncorrelated (approximately)
-        let noisy: Vec<f64> = (0..100u64)
-            .map(|i| float_from_seed(i * 17 + 3))
-            .collect();
-        let noisy2: Vec<f64> = (0..100u64)
-            .map(|i| float_from_seed(i * 31 + 7))
-            .collect();
+        let noisy: Vec<f64> = (0..100u64).map(|i| float_from_seed(i * 17 + 3)).collect();
+        let noisy2: Vec<f64> = (0..100u64).map(|i| float_from_seed(i * 31 + 7)).collect();
         let r_noise = pearson_correlation(&noisy, &noisy2);
-        assert!(r_noise.abs() < 0.3, "Independent series should be ~0: {r_noise}");
+        assert!(
+            r_noise.abs() < 0.3,
+            "Independent series should be ~0: {r_noise}"
+        );
     }
 
     #[test]
@@ -453,13 +470,19 @@ mod tests {
             assert!(
                 (z_low + z_high).abs() < 0.01,
                 "z({p}) + z({}) should be ~0: {} + {} = {}",
-                1.0 - p, z_low, z_high, z_low + z_high
+                1.0 - p,
+                z_low,
+                z_high,
+                z_low + z_high
             );
         }
 
         // Known values: z(0.975) ≈ 1.96, z(0.84) ≈ 1.0
         let z_975 = inverse_normal_cdf(0.975);
-        assert!((z_975 - 1.96).abs() < 0.01, "z(0.975) should be ~1.96: {z_975}");
+        assert!(
+            (z_975 - 1.96).abs() < 0.01,
+            "z(0.975) should be ~1.96: {z_975}"
+        );
         let z_84 = inverse_normal_cdf(0.84);
         assert!((z_84 - 1.0).abs() < 0.02, "z(0.84) should be ~1.0: {z_84}");
     }
@@ -468,19 +491,31 @@ mod tests {
     fn test_sdt_dprime() {
         // Perfect discriminator: hit=1.0, FA=0.0 → very high d'
         let (dp, _) = sdt_dprime(1.0, 0.0, 100, 100);
-        assert!(dp > 4.0, "Perfect discriminator should have very high d': {dp}");
+        assert!(
+            dp > 4.0,
+            "Perfect discriminator should have very high d': {dp}"
+        );
 
         // Chance performance: hit≈FA → d'≈0
         let (dp_chance, _) = sdt_dprime(0.50, 0.50, 100, 100);
-        assert!(dp_chance.abs() < 0.1, "Chance should give d'≈0: {dp_chance}");
+        assert!(
+            dp_chance.abs() < 0.1,
+            "Chance should give d'≈0: {dp_chance}"
+        );
 
         // Liberal bias: high hit + high FA → negative criterion
         let (_, c_liberal) = sdt_dprime(0.90, 0.60, 100, 100);
-        assert!(c_liberal < 0.0, "Liberal observer should have c<0: {c_liberal}");
+        assert!(
+            c_liberal < 0.0,
+            "Liberal observer should have c<0: {c_liberal}"
+        );
 
         // Conservative bias: low hit + low FA → positive criterion
         let (_, c_conservative) = sdt_dprime(0.40, 0.10, 100, 100);
-        assert!(c_conservative > 0.0, "Conservative observer should have c>0: {c_conservative}");
+        assert!(
+            c_conservative > 0.0,
+            "Conservative observer should have c>0: {c_conservative}"
+        );
     }
 
     #[test]

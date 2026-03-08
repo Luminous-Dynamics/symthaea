@@ -1038,7 +1038,10 @@ mod tests {
     fn test_repetition_penalty_no_history() {
         let decoder = PhonemeDecoder::new();
         let penalty = decoder.compute_repetition_penalty("AA");
-        assert!((penalty - 1.0).abs() < 1e-6, "no history should give 1.0 penalty");
+        assert!(
+            (penalty - 1.0).abs() < 1e-6,
+            "no history should give 1.0 penalty"
+        );
     }
 
     #[test]
@@ -1154,9 +1157,7 @@ mod tests {
         });
 
         // All scores below threshold
-        let sims: Vec<Vec<(String, f32)>> = (0..5)
-            .map(|_| vec![("AA".to_string(), 0.1)])
-            .collect();
+        let sims: Vec<Vec<(String, f32)>> = (0..5).map(|_| vec![("AA".to_string(), 0.1)]).collect();
 
         let phonemes = decoder.decode_sequence(&sims);
         // No phoneme should be emitted since confidence is below threshold

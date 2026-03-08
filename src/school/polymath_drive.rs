@@ -97,8 +97,14 @@ pub async fn run_polymath_collisions(
             let domain_b = &domain_keys[1];
 
             // SAFETY: domains are built from non-empty objective groups
-            let obj_a = domains[domain_a].choose(&mut rng).copied().expect("domain non-empty");
-            let obj_b = domains[domain_b].choose(&mut rng).copied().expect("domain non-empty");
+            let obj_a = domains[domain_a]
+                .choose(&mut rng)
+                .copied()
+                .expect("domain non-empty");
+            let obj_b = domains[domain_b]
+                .choose(&mut rng)
+                .copied()
+                .expect("domain non-empty");
 
             let similarity = obj_a.encoding.similarity(&obj_b.encoding);
             if similarity >= config.min_similarity && similarity <= config.max_similarity {

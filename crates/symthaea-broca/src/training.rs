@@ -405,7 +405,9 @@ pub fn train_with_adam(
                         target_id as usize,
                         lr,
                         config.grad_clip,
-                        adam_state.as_mut().expect("invariant: adam_state is Some when config.use_adam"),
+                        adam_state
+                            .as_mut()
+                            .expect("invariant: adam_state is Some when config.use_adam"),
                     )
                 } else {
                     apply_weight_tied_gradient(
@@ -1118,7 +1120,10 @@ mod tests {
                 "All channels should be finite"
             );
             // Non-empty target text
-            assert!(!pair.target_text.is_empty(), "Target text should not be empty");
+            assert!(
+                !pair.target_text.is_empty(),
+                "Target text should not be empty"
+            );
             // Token IDs present
             assert!(
                 !pair.target_ids.is_empty(),

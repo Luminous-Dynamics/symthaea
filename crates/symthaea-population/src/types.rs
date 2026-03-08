@@ -191,12 +191,17 @@ impl Pedigree {
 
     /// Find entry for a given individual.
     pub fn find(&self, individual_id: u64) -> Option<&PedigreeEntry> {
-        self.entries.iter().find(|e| e.individual_id == individual_id)
+        self.entries
+            .iter()
+            .find(|e| e.individual_id == individual_id)
     }
 
     /// Get all entries for a given generation.
     pub fn generation_entries(&self, generation: u32) -> Vec<&PedigreeEntry> {
-        self.entries.iter().filter(|e| e.generation == generation).collect()
+        self.entries
+            .iter()
+            .filter(|e| e.generation == generation)
+            .collect()
     }
 }
 

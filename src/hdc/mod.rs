@@ -377,7 +377,7 @@ pub mod moral_text_encoder;
 /// the same loop that achieved 87.6% on MNIST and 91.7% on ISOLET.
 pub mod moral_prototypes;
 
-/// Shared Seven Harmonies basis vectors and moral free energy (FEP).
+/// Shared Eight Harmonies basis vectors and moral free energy (FEP).
 pub mod harmony_basis;
 
 /// Persistent homology on moral scenario hypervectors.

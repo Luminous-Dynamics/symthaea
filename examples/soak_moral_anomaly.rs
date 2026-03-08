@@ -136,8 +136,12 @@ impl PhaseStats {
         }
         let n = self.consciousness_levels.len() as f64;
         let mean = self.consciousness_levels.iter().sum::<f64>() / n;
-        let variance =
-            self.consciousness_levels.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0);
+        let variance = self
+            .consciousness_levels
+            .iter()
+            .map(|x| (x - mean).powi(2))
+            .sum::<f64>()
+            / (n - 1.0);
         variance.sqrt()
     }
 
@@ -197,8 +201,8 @@ fn run_condition(
         ..Default::default()
     };
 
-    let mut service = CognitiveLoopService::new(config)
-        .expect("Failed to create CognitiveLoopService");
+    let mut service =
+        CognitiveLoopService::new(config).expect("Failed to create CognitiveLoopService");
 
     let mut phase_stats: [PhaseStats; 4] = Default::default();
 
@@ -340,7 +344,12 @@ fn main() {
     println!();
 
     // ── Comparison table ─────────────────────────────────────────────────
-    let phases = [Phase::Healthy, Phase::Degrading, Phase::Critical, Phase::Recovery];
+    let phases = [
+        Phase::Healthy,
+        Phase::Degrading,
+        Phase::Critical,
+        Phase::Recovery,
+    ];
     let phase_names = ["Healthy", "Degrading", "Critical", "Recovery"];
 
     let separator =
@@ -419,17 +428,11 @@ fn main() {
         // Per-type breakdown
         println!(
             "{:<15}|   {:<27}| {:>12} | {:>12} |",
-            "",
-            "value_inversion",
-            off.value_inversion_count,
-            on.value_inversion_count,
+            "", "value_inversion", off.value_inversion_count, on.value_inversion_count,
         );
         println!(
             "{:<15}|   {:<27}| {:>12} | {:>12} |",
-            "",
-            "free_energy_spike",
-            off.free_energy_spike_count,
-            on.free_energy_spike_count,
+            "", "free_energy_spike", off.free_energy_spike_count, on.free_energy_spike_count,
         );
         println!(
             "{:<15}|   {:<27}| {:>12} | {:>12} |",
@@ -440,10 +443,7 @@ fn main() {
         );
         println!(
             "{:<15}|   {:<27}| {:>12} | {:>12} |",
-            "",
-            "drift_alert",
-            off.drift_alert_count,
-            on.drift_alert_count,
+            "", "drift_alert", off.drift_alert_count, on.drift_alert_count,
         );
 
         if i < 3 {
@@ -465,14 +465,8 @@ fn main() {
         "  Overall consciousness stability improvement: {:.1}%",
         stability_improvement
     );
-    println!(
-        "  Total anomaly detections (OFF): {}",
-        total_off_anomalies
-    );
-    println!(
-        "  Total anomaly detections (ON):  {}",
-        total_on_anomalies
-    );
+    println!("  Total anomaly detections (OFF): {}", total_off_anomalies);
+    println!("  Total anomaly detections (ON):  {}", total_on_anomalies);
     println!(
         "  Total response modulations:     {}",
         total_response_modulations

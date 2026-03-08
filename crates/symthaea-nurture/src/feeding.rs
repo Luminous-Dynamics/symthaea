@@ -44,9 +44,17 @@ impl FeedingProgram {
         let (stage, caloric_target, feedings) = if months < 6.0 {
             (FeedingStage::ExclusiveMilk, 500.0 + months * 15.0, 8)
         } else if months < 12.0 {
-            (FeedingStage::IntroductionSolids, 700.0 + (months - 6.0) * 20.0, 6)
+            (
+                FeedingStage::IntroductionSolids,
+                700.0 + (months - 6.0) * 20.0,
+                6,
+            )
         } else if months < 24.0 {
-            (FeedingStage::MixedFeeding, 900.0 + (months - 12.0) * 10.0, 5)
+            (
+                FeedingStage::MixedFeeding,
+                900.0 + (months - 12.0) * 10.0,
+                5,
+            )
         } else {
             (FeedingStage::AdultDiet, 1100.0 + (months - 24.0) * 5.0, 4)
         };
@@ -164,6 +172,9 @@ mod tests {
         program.record_allergy("dairy".to_string());
 
         program.advance(&DevelopmentalAge::new(18.0));
-        assert!(program.has_allergy("dairy"), "Allergies should persist across advances");
+        assert!(
+            program.has_allergy("dairy"),
+            "Allergies should persist across advances"
+        );
     }
 }

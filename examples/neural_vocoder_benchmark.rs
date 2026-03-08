@@ -14,6 +14,7 @@
 
 use std::f32::consts::PI;
 use std::time::Instant;
+use symthaea::voice::neural_vocoder::NeuralVocoderConfig;
 use symthaea::voice::{
     vocal_tract_controller::VocalTractController,
     vocal_tract_encoder::VoiceCognitiveState,
@@ -21,9 +22,10 @@ use symthaea::voice::{
     vocoder::{FormantVocoder, VocoderConfig},
     FormantFrame,
 };
-use symthaea::voice::neural_vocoder::NeuralVocoderConfig;
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_vocal_tract::formant_to_mel::{FormantToMelConfig, FormantToMelConverter, MelNormalization, MelVoiceQuality};
+use symthaea_vocal_tract::formant_to_mel::{
+    FormantToMelConfig, FormantToMelConverter, MelNormalization, MelVoiceQuality,
+};
 
 fn main() {
     println!("═══════════════════════════════════════════════════════════════");
@@ -53,14 +55,19 @@ fn main() {
 
     let mel_config = FormantToMelConfig::default();
     let mut mel_converter = FormantToMelConverter::new(mel_config);
-    let vq = MelVoiceQuality { rd: 1.3, arousal: 0.6 };
+    let vq = MelVoiceQuality {
+        rd: 1.3,
+        arousal: 0.6,
+    };
 
     // Generate formant frames via streaming vocal tract
     let mut streaming_dsp = StreamingVocalTract::new(&genesis, sample_rate, frame_rate);
     let mut formant_frames = Vec::with_capacity(total_frames);
     for i in 0..total_frames {
         let ph = phonemes[i % phonemes.len()];
-        let frame = streaming_dsp.pipeline.tick_phoneme(&state, None, 0.005, Some(ph));
+        let frame = streaming_dsp
+            .pipeline
+            .tick_phoneme(&state, None, 0.005, Some(ph));
         formant_frames.push(frame);
     }
 
@@ -103,7 +110,10 @@ fn main() {
     println!("   Frames: {total_frames}");
     println!("   Samples: {}", dsp_audio.len());
     println!("   Audio duration: {dsp_duration:.2}s");
-    println!("   Synthesis time: {:.2}ms", dsp_elapsed.as_secs_f64() * 1000.0);
+    println!(
+        "   Synthesis time: {:.2}ms",
+        dsp_elapsed.as_secs_f64() * 1000.0
+    );
     println!(
         "   Real-time factor: {:.1}x\n",
         dsp_duration / dsp_elapsed.as_secs_f64()
@@ -149,7 +159,11 @@ fn main() {
             );
 
             // Save neural WAV
-            save_wav("audio_output/neural_vocoder_bigvgan.wav", &neural_audio, sample_rate);
+            save_wav(
+                "audio_output/neural_vocoder_bigvgan.wav",
+                &neural_audio,
+                sample_rate,
+            );
         } else {
             println!("   Status: Model loaded but channel failed\n");
         }
@@ -166,24 +180,57 @@ fn main() {
     println!("   ─────────────────────────────");
 
     let test_sentences: Vec<(&str, Vec<&str>)> = vec![
-        ("Hello world", vec!["HH", "AH", "L", "OW", "W", "ER", "L", "D"]),
+        (
+            "Hello world",
+            vec!["HH", "AH", "L", "OW", "W", "ER", "L", "D"],
+        ),
         ("How are you", vec!["HH", "AW", "AA", "R", "Y", "UW"]),
-        ("Good morning", vec!["G", "UH", "D", "M", "AO", "R", "N", "IH", "NG"]),
+        (
+            "Good morning",
+            vec!["G", "UH", "D", "M", "AO", "R", "N", "IH", "NG"],
+        ),
         ("Thank you", vec!["TH", "AE", "NG", "K", "Y", "UW"]),
-        ("I love music", vec!["AY", "L", "AH", "V", "M", "Y", "UW", "Z", "IH", "K"]),
-        ("Beautiful day", vec!["B", "Y", "UW", "T", "AH", "F", "AH", "L", "D", "EY"]),
-        ("Open the door", vec!["OW", "P", "AH", "N", "DH", "AH", "D", "AO", "R"]),
-        ("Please help me", vec!["P", "L", "IY", "Z", "HH", "EH", "L", "P", "M", "IY"]),
-        ("See you later", vec!["S", "IY", "Y", "UW", "L", "EY", "T", "ER"]),
-        ("Come back soon", vec!["K", "AH", "M", "B", "AE", "K", "S", "UW", "N"]),
+        (
+            "I love music",
+            vec!["AY", "L", "AH", "V", "M", "Y", "UW", "Z", "IH", "K"],
+        ),
+        (
+            "Beautiful day",
+            vec!["B", "Y", "UW", "T", "AH", "F", "AH", "L", "D", "EY"],
+        ),
+        (
+            "Open the door",
+            vec!["OW", "P", "AH", "N", "DH", "AH", "D", "AO", "R"],
+        ),
+        (
+            "Please help me",
+            vec!["P", "L", "IY", "Z", "HH", "EH", "L", "P", "M", "IY"],
+        ),
+        (
+            "See you later",
+            vec!["S", "IY", "Y", "UW", "L", "EY", "T", "ER"],
+        ),
+        (
+            "Come back soon",
+            vec!["K", "AH", "M", "B", "AE", "K", "S", "UW", "N"],
+        ),
     ];
 
-    let vq_report = MelVoiceQuality { rd: 1.3, arousal: 0.6 };
+    let vq_report = MelVoiceQuality {
+        rd: 1.3,
+        arousal: 0.6,
+    };
     let mut mel_config_raw = FormantToMelConfig::default();
     mel_config_raw.normalization = MelNormalization::disabled();
 
-    println!("   {:20} {:>6} {:>8} {:>10}", "Sentence", "RMS", "MCD(dB)", "Flatness");
-    println!("   {:20} {:>6} {:>8} {:>10}", "────────", "───", "───────", "────────");
+    println!(
+        "   {:20} {:>6} {:>8} {:>10}",
+        "Sentence", "RMS", "MCD(dB)", "Flatness"
+    );
+    println!(
+        "   {:20} {:>6} {:>8} {:>10}",
+        "────────", "───", "───────", "────────"
+    );
 
     let mut all_sentence_audio = Vec::new();
 
@@ -197,9 +244,13 @@ fn main() {
 
         for i in 0..frames_per_sentence {
             let ph = phonemes_seq[i % phonemes_seq.len()];
-            let frame = streaming.pipeline.tick_phoneme(&state, None, 0.005, Some(ph));
+            let frame = streaming
+                .pipeline
+                .tick_phoneme(&state, None, 0.005, Some(ph));
             mels.extend(mel_conv.push_frame(&frame, &vq_report));
-            let chunk = streaming.vocoder.synthesize_frame(&frame, samples_per_frame);
+            let chunk = streaming
+                .vocoder
+                .synthesize_frame(&frame, samples_per_frame);
             audio.extend_from_slice(&chunk);
         }
 
@@ -236,8 +287,11 @@ fn main() {
 
     // Save per-sentence WAV files
     for (i, (text, audio)) in all_sentence_audio.iter().enumerate() {
-        let path = format!("audio_output/sentence_{:02}_{}.wav",
-            i, text.replace(' ', "_").to_lowercase());
+        let path = format!(
+            "audio_output/sentence_{:02}_{}.wav",
+            i,
+            text.replace(' ', "_").to_lowercase()
+        );
         save_wav(&path, audio, sample_rate);
     }
 
@@ -245,7 +299,11 @@ fn main() {
     generate_html_report(&all_sentence_audio, sample_rate);
 
     // ── Save DSP WAV ────────────────────────────────────────────────
-    save_wav("audio_output/neural_vocoder_dsp_baseline.wav", &dsp_audio, sample_rate);
+    save_wav(
+        "audio_output/neural_vocoder_dsp_baseline.wav",
+        &dsp_audio,
+        sample_rate,
+    );
 
     println!();
     println!("═══════════════════════════════════════════════════════════════");
@@ -268,7 +326,9 @@ fn compute_mcd(a: &[Vec<f32>], b: &[Vec<f32>]) -> f32 {
         let ceps_a = dct_ii(&a[i], n_ceps);
         let ceps_b = dct_ii(&b[i], n_ceps);
 
-        let dist: f64 = ceps_a.iter().zip(ceps_b.iter())
+        let dist: f64 = ceps_a
+            .iter()
+            .zip(ceps_b.iter())
             .skip(1)
             .map(|(&ca, &cb)| {
                 let d = (ca - cb) as f64;
@@ -302,7 +362,8 @@ fn dct_ii(log_mel: &[f32], n_ceps: usize) -> Vec<f32> {
 }
 
 fn generate_html_report(sentences: &[(String, Vec<f32>)], sample_rate: u32) {
-    let mut html = String::from(r#"<!DOCTYPE html>
+    let mut html = String::from(
+        r#"<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Symthaea Vocoder Quality Report</title>
 <style>
 body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2em auto; background: #1a1a2e; color: #e0e0e0; }
@@ -320,12 +381,16 @@ footer { margin-top: 2em; font-size: 0.85em; color: #666; }
 <p>Generated by <code>neural_vocoder_benchmark</code></p>
 <h2>Per-Sentence Audio Comparison</h2>
 <table><tr><th>#</th><th>Sentence</th><th>DSP Audio</th><th>Duration</th></tr>
-"#);
+"#,
+    );
 
     for (i, (text, audio)) in sentences.iter().enumerate() {
         let duration = audio.len() as f32 / sample_rate as f32;
-        let wav_name = format!("sentence_{:02}_{}.wav",
-            i, text.replace(' ', "_").to_lowercase());
+        let wav_name = format!(
+            "sentence_{:02}_{}.wav",
+            i,
+            text.replace(' ', "_").to_lowercase()
+        );
         html.push_str(&format!(
             "<tr><td>{}</td><td>{}</td><td><audio controls src=\"{}\"></audio></td><td>{:.2}s</td></tr>\n",
             i + 1, text, wav_name, duration
@@ -333,11 +398,13 @@ footer { margin-top: 2em; font-size: 0.85em; color: #666; }
     }
 
     html.push_str("</table>\n");
-    html.push_str(r#"<h2>Full Baseline</h2>
+    html.push_str(
+        r#"<h2>Full Baseline</h2>
 <p>5-second DSP baseline:</p>
 <audio controls src="neural_vocoder_dsp_baseline.wav" style="width:100%"></audio>
 <footer>Symthaea voice pipeline &mdash; consciousness-first synthesis</footer>
-</body></html>"#);
+</body></html>"#,
+    );
 
     let path = "audio_output/vocoder_quality_report.html";
     if let Some(parent) = std::path::Path::new(path).parent() {

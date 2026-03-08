@@ -835,7 +835,12 @@ impl Default for QualityGateThresholds {
 
 /// Classify a metric value against a threshold and return a status string.
 #[cfg(feature = "mamba")]
-fn quality_gate(value: f32, good_threshold: f32, ok_threshold: f32, higher_is_better: bool) -> &'static str {
+fn quality_gate(
+    value: f32,
+    good_threshold: f32,
+    ok_threshold: f32,
+    higher_is_better: bool,
+) -> &'static str {
     if higher_is_better {
         if value >= good_threshold {
             "GOOD"
@@ -865,14 +870,8 @@ pub fn format_liquid_mamba_eval_report(
 ) -> String {
     let mut s = String::new();
     s.push_str("=== Liquid-Mamba Evaluation Report ===\n\n");
-    s.push_str(&format!(
-        "{:<20} {:>10}  {}\n",
-        "Metric", "Value", "Status"
-    ));
-    s.push_str(&format!(
-        "{:<20} {:>10}  {}\n",
-        "------", "-----", "------"
-    ));
+    s.push_str(&format!("{:<20} {:>10}  {}\n", "Metric", "Value", "Status"));
+    s.push_str(&format!("{:<20} {:>10}  {}\n", "------", "-----", "------"));
     s.push_str(&format!(
         "{:<20} {:>10.2}  \n",
         "Samples", result.base.num_samples
@@ -895,19 +894,34 @@ pub fn format_liquid_mamba_eval_report(
         "Avg semantic PE", result.avg_semantic_pe
     ));
 
-    let rank_status = quality_gate(result.avg_effective_rank, thresholds.rank_good, thresholds.rank_ok, true);
+    let rank_status = quality_gate(
+        result.avg_effective_rank,
+        thresholds.rank_good,
+        thresholds.rank_ok,
+        true,
+    );
     s.push_str(&format!(
         "{:<20} {:>10.2}  {}\n",
         "Effective rank", result.avg_effective_rank, rank_status
     ));
 
-    let d1_status = quality_gate(result.distinct_1, thresholds.distinct1_good, thresholds.distinct1_ok, true);
+    let d1_status = quality_gate(
+        result.distinct_1,
+        thresholds.distinct1_good,
+        thresholds.distinct1_ok,
+        true,
+    );
     s.push_str(&format!(
         "{:<20} {:>10.4}  {}\n",
         "Distinct-1", result.distinct_1, d1_status
     ));
 
-    let d2_status = quality_gate(result.distinct_2, thresholds.distinct2_good, thresholds.distinct2_ok, true);
+    let d2_status = quality_gate(
+        result.distinct_2,
+        thresholds.distinct2_good,
+        thresholds.distinct2_ok,
+        true,
+    );
     s.push_str(&format!(
         "{:<20} {:>10.4}  {}\n",
         "Distinct-2", result.distinct_2, d2_status
@@ -929,25 +943,19 @@ pub fn format_liquid_mamba_eval_report(
         "{:<20} {:>10.6}  {}\n",
         "PE trend", result.pe_trend, pe_trend_status
     ));
-    s.push_str(&format!(
-        "{:<20} {:>10.4}\n",
-        "PE mean", result.pe_mean
-    ));
+    s.push_str(&format!("{:<20} {:>10.4}\n", "PE mean", result.pe_mean));
     s.push_str(&format!(
         "{:<20} {:>10.4}\n",
         "PE std dev", result.pe_std_dev
     ));
 
     if let Some(ref gating) = result.gating_verification {
-        s.push_str(&format!("\n--- Consciousness Gating Test ({} pairs) ---\n", gating.test_count));
         s.push_str(&format!(
-            "{:<20} {:>10} {:>10}\n",
-            "", "Certain", "Unknown"
+            "\n--- Consciousness Gating Test ({} pairs) ---\n",
+            gating.test_count
         ));
-        s.push_str(&format!(
-            "{:<20} {:>10} {:>10}\n",
-            "", "-------", "-------"
-        ));
+        s.push_str(&format!("{:<20} {:>10} {:>10}\n", "", "Certain", "Unknown"));
+        s.push_str(&format!("{:<20} {:>10} {:>10}\n", "", "-------", "-------"));
         s.push_str(&format!(
             "{:<20} {:>9.2}% {:>9.2}%\n",
             "Hedging",
@@ -1005,7 +1013,12 @@ pub fn format_liquid_mamba_eval_report(
                 sample.intent,
                 sample.semantic_pe,
                 sample.english_ratio * 100.0,
-                sample.text.replace('\n', " ").chars().take(120).collect::<String>(),
+                sample
+                    .text
+                    .replace('\n', " ")
+                    .chars()
+                    .take(120)
+                    .collect::<String>(),
             ));
         }
     }
@@ -1289,7 +1302,8 @@ mod tests {
                 sample_outputs: vec![],
             };
 
-            let report = format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
+            let report =
+                format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
             assert!(report.contains("Liquid-Mamba"), "Should have L-M header");
             assert!(report.contains("120.5"), "Should contain perplexity");
             assert!(report.contains("semantic PE"), "Should contain semantic PE");
@@ -1298,9 +1312,15 @@ mod tests {
                 report.contains("PASS"),
                 "Should pass gating test (0.15 > 0.05)"
             );
-            assert!(report.contains("Coherence"), "Should contain coherence column");
+            assert!(
+                report.contains("Coherence"),
+                "Should contain coherence column"
+            );
             assert!(report.contains("Veto rate"), "Should contain veto rate");
-            assert!(report.contains("IMPROVING"), "PE trend -0.01 should show IMPROVING");
+            assert!(
+                report.contains("IMPROVING"),
+                "PE trend -0.01 should show IMPROVING"
+            );
             assert!(report.contains("GOOD"), "Distinct-1 0.85 should show GOOD");
         }
 
@@ -1385,7 +1405,8 @@ mod tests {
                 sample_outputs: vec![],
             };
 
-            let report = format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
+            let report =
+                format_liquid_mamba_eval_report(&result, &QualityGateThresholds::default());
             assert!(
                 report.contains("FAIL"),
                 "Should fail gating test (0.05 < 0.10)"
@@ -1477,9 +1498,18 @@ mod tests {
                 "Gating verification should produce results"
             );
             let gating = result.gating_verification.unwrap();
-            assert!(gating.certain_hedging.is_finite(), "Certain hedging should be finite");
-            assert!(gating.unknown_hedging.is_finite(), "Unknown hedging should be finite");
-            assert!(gating.test_count > 0, "Should have tested at least one pair");
+            assert!(
+                gating.certain_hedging.is_finite(),
+                "Certain hedging should be finite"
+            );
+            assert!(
+                gating.unknown_hedging.is_finite(),
+                "Unknown hedging should be finite"
+            );
+            assert!(
+                gating.test_count > 0,
+                "Should have tested at least one pair"
+            );
             // With a trained projection, unknown_hedging > certain_hedging.
             // With random projection, this may not hold — just verify they're computed.
         }

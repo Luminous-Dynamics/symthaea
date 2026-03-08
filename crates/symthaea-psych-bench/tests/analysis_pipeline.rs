@@ -92,7 +92,12 @@ fn test_cross_domain_matrix_from_single_report() {
 
     // Correlations should be finite when trace data is present
     for corr in &matrix.correlations {
-        assert!(corr.r.is_finite(), "r not finite for {} vs {}", corr.domain_a, corr.domain_b);
+        assert!(
+            corr.r.is_finite(),
+            "r not finite for {} vs {}",
+            corr.domain_a,
+            corr.domain_b
+        );
         assert!(corr.n > 0);
         assert!(corr.p_value.is_finite());
     }

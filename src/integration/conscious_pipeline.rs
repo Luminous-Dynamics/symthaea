@@ -372,17 +372,18 @@ impl ConsciousPipeline {
         // If nix cognition is surprised or predicts danger, downgrade the
         // execution strategy to be more cautious.
         #[cfg(feature = "nix-mind")]
-        let nix_deep_result: Option<symthaea_nix::plugin::pipeline_integration::NixPipelineResult> =
-            if nix_understanding.confidence >= 0.3 {
-                if let Some(ref mut hook) = self.nix_hook {
-                    let confidence = nix_understanding.confidence as f64;
-                    Some(hook.process_nix_input(input, phi, confidence))
-                } else {
-                    None
-                }
+        let nix_deep_result: Option<
+            symthaea_nix::plugin::pipeline_integration::NixPipelineResult,
+        > = if nix_understanding.confidence >= 0.3 {
+            if let Some(ref mut hook) = self.nix_hook {
+                let confidence = nix_understanding.confidence as f64;
+                Some(hook.process_nix_input(input, phi, confidence))
             } else {
                 None
-            };
+            }
+        } else {
+            None
+        };
 
         #[cfg(feature = "nix-mind")]
         let execution_strategy = {
@@ -1108,7 +1109,8 @@ mod tests {
             Self {
                 surprised: false,
                 phi_allowed: true,
-                quadrant: symthaea_nix::plugin::pipeline_integration::NixConsciousnessQuadrant::Confident,
+                quadrant:
+                    symthaea_nix::plugin::pipeline_integration::NixConsciousnessQuadrant::Confident,
                 process_called: AtomicBool::new(false),
                 post_execute_called: AtomicBool::new(false),
                 feedback_called: AtomicBool::new(false),
@@ -1120,7 +1122,8 @@ mod tests {
             Self {
                 surprised: true,
                 phi_allowed: false,
-                quadrant: symthaea_nix::plugin::pipeline_integration::NixConsciousnessQuadrant::Curious,
+                quadrant:
+                    symthaea_nix::plugin::pipeline_integration::NixConsciousnessQuadrant::Curious,
                 process_called: AtomicBool::new(false),
                 post_execute_called: AtomicBool::new(false),
                 feedback_called: AtomicBool::new(false),
@@ -1128,9 +1131,9 @@ mod tests {
         }
 
         fn make_result(&self) -> symthaea_nix::plugin::pipeline_integration::NixPipelineResult {
+            use symthaea_core::hdc::ContinuousHV;
             use symthaea_nix::mind::{ActionPlan, InferredGoal};
             use symthaea_nix::plugin::pipeline_integration::{NixPipelineResult, NixPipelineStage};
-            use symthaea_core::hdc::ContinuousHV;
 
             NixPipelineResult {
                 plan: ActionPlan {
@@ -1171,16 +1174,19 @@ mod tests {
             _phi: f64,
             _confidence: f64,
         ) -> symthaea_nix::plugin::pipeline_integration::NixPipelineResult {
-            self.process_called.store(true, std::sync::atomic::Ordering::Relaxed);
+            self.process_called
+                .store(true, std::sync::atomic::Ordering::Relaxed);
             self.make_result()
         }
 
         fn post_execute(&mut self, _action: &str, _success: bool, _output: &str) {
-            self.post_execute_called.store(true, std::sync::atomic::Ordering::Relaxed);
+            self.post_execute_called
+                .store(true, std::sync::atomic::Ordering::Relaxed);
         }
 
         fn feedback(&mut self, _was_positive: bool) {
-            self.feedback_called.store(true, std::sync::atomic::Ordering::Relaxed);
+            self.feedback_called
+                .store(true, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
@@ -1206,9 +1212,7 @@ mod tests {
             explain_reasoning: true,
         };
 
-        let nix_caution = hook.surprised
-            || !hook.quadrant.allows_execution()
-            || !hook.phi_allowed;
+        let nix_caution = hook.surprised || !hook.quadrant.allows_execution() || !hook.phi_allowed;
 
         let downgraded = if nix_caution {
             match &original {
@@ -1225,24 +1229,36 @@ mod tests {
             original
         };
 
-        assert!(matches!(downgraded, ExecutionStrategy::Curious { explore_first: true, .. }));
+        assert!(matches!(
+            downgraded,
+            ExecutionStrategy::Curious {
+                explore_first: true,
+                ..
+            }
+        ));
     }
 
     #[cfg(feature = "nix-mind")]
     #[test]
     fn test_nix_hook_feedback_forwarding() {
         let mut hook = MockNixHook::confident();
-        assert!(!hook.feedback_called.load(std::sync::atomic::Ordering::Relaxed));
+        assert!(!hook
+            .feedback_called
+            .load(std::sync::atomic::Ordering::Relaxed));
 
         symthaea_nix::plugin::pipeline_integration::NixPipelineHook::feedback(&mut hook, true);
-        assert!(hook.feedback_called.load(std::sync::atomic::Ordering::Relaxed));
+        assert!(hook
+            .feedback_called
+            .load(std::sync::atomic::Ordering::Relaxed));
     }
 
     #[cfg(feature = "nix-mind")]
     #[test]
     fn test_nix_hook_post_execute_called() {
         let mut hook = MockNixHook::confident();
-        assert!(!hook.post_execute_called.load(std::sync::atomic::Ordering::Relaxed));
+        assert!(!hook
+            .post_execute_called
+            .load(std::sync::atomic::Ordering::Relaxed));
 
         symthaea_nix::plugin::pipeline_integration::NixPipelineHook::post_execute(
             &mut hook,
@@ -1250,7 +1266,9 @@ mod tests {
             true,
             "activation successful",
         );
-        assert!(hook.post_execute_called.load(std::sync::atomic::Ordering::Relaxed));
+        assert!(hook
+            .post_execute_called
+            .load(std::sync::atomic::Ordering::Relaxed));
     }
 
     #[test]

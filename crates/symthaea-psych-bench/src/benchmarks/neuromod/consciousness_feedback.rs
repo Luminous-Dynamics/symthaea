@@ -124,14 +124,8 @@ impl ConsciousnessFeedbackBenchmark {
             "psi_consciousness_mod_r",
             MetricValue::from_samples(&[r_psi_consmod]),
         );
-        result.insert(
-            "psi_serotonin_r",
-            MetricValue::from_samples(&[r_psi_sht]),
-        );
-        result.insert(
-            "top_quartile_sht",
-            MetricValue::from_samples(&[top_sht]),
-        );
+        result.insert("psi_serotonin_r", MetricValue::from_samples(&[r_psi_sht]));
+        result.insert("top_quartile_sht", MetricValue::from_samples(&[top_sht]));
         result.insert(
             "bottom_quartile_sht",
             MetricValue::from_samples(&[bottom_sht]),

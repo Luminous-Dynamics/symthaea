@@ -102,7 +102,11 @@ impl PhaseStats {
             return 0.0;
         }
         let mean = self.mean_consciousness();
-        let var = self.consciousness_levels.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+        let var = self
+            .consciousness_levels
+            .iter()
+            .map(|x| (x - mean).powi(2))
+            .sum::<f64>()
             / (n as f64 - 1.0);
         var.sqrt()
     }
@@ -317,7 +321,10 @@ fn main() {
     println!("║       Substrate × Moral Topology Interaction Study                ║");
     println!("║                                                                    ║");
     println!("║  {TOTAL_CYCLES} cycles per substrate: {WARMUP_CYCLES} warmup + {STABLE_CYCLES} stable + {SHIFT_CYCLES} shift       ║");
-    println!("║  Substrates: {}                                             ║", SUBSTRATES.len());
+    println!(
+        "║  Substrates: {}                                             ║",
+        SUBSTRATES.len()
+    );
     println!("╚════════════════════════════════════════════════════════════════════╝");
     println!();
 

@@ -855,7 +855,10 @@ fn test_semantic_encoder_construction() {
     let mut config = CognitiveLoopConfig::default();
     config.enable_semantic_encoder = true;
     let service = CognitiveLoopService::new(config);
-    assert!(service.is_ok(), "CognitiveLoopService with semantic-encoder should construct");
+    assert!(
+        service.is_ok(),
+        "CognitiveLoopService with semantic-encoder should construct"
+    );
 }
 
 #[cfg(feature = "semantic-encoder")]
@@ -872,7 +875,10 @@ fn test_semantic_encoder_cycle() {
     service.cycle("hello world again");
 
     let sim = service.stats().semantic_encoder_similarity;
-    assert!(sim.is_finite(), "semantic_encoder_similarity should be finite, got {sim}");
+    assert!(
+        sim.is_finite(),
+        "semantic_encoder_similarity should be finite, got {sim}"
+    );
 }
 
 #[cfg(feature = "semantic-encoder")]
@@ -880,7 +886,10 @@ fn test_semantic_encoder_cycle() {
 fn test_semantic_encoder_disabled_by_default() {
     // Default config with feature on should NOT spawn the channel
     let config = CognitiveLoopConfig::default();
-    assert!(!config.enable_semantic_encoder, "semantic encoder should be disabled by default");
+    assert!(
+        !config.enable_semantic_encoder,
+        "semantic encoder should be disabled by default"
+    );
 
     let mut service = CognitiveLoopService::new(config).unwrap();
     // Run a cycle — similarity should stay at 0.0 since no channel is spawned

@@ -69,8 +69,7 @@ pub const CANONICAL_SENTENCE_ENDINGS: &[&str] = &[". ", "! ", "? ", "...", "\n"]
 pub const CANONICAL_INFORMAL_WORDS: &[&str] = &["gonna", "wanna", "gotta", "kinda", "sorta"];
 
 /// Canonical softening words boosted under negative valence.
-pub const CANONICAL_SOFTENING_WORDS: &[&str] =
-    &["unfortunately", "sorry", "however", "although"];
+pub const CANONICAL_SOFTENING_WORDS: &[&str] = &["unfortunately", "sorry", "however", "although"];
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GatingConfig
@@ -178,9 +177,7 @@ impl EpistemicGate {
         let resolve = |words: &[&str]| -> Vec<u32> {
             words
                 .iter()
-                .filter_map(|w| {
-                    backend.encode(w).ok().and_then(|ids| ids.first().copied())
-                })
+                .filter_map(|w| backend.encode(w).ok().and_then(|ids| ids.first().copied()))
                 .collect()
         };
 
@@ -317,9 +314,7 @@ impl EmotionalModulator {
         let resolve = |words: &[&str]| -> Vec<u32> {
             words
                 .iter()
-                .filter_map(|w| {
-                    backend.encode(w).ok().and_then(|ids| ids.first().copied())
-                })
+                .filter_map(|w| backend.encode(w).ok().and_then(|ids| ids.first().copied()))
                 .collect()
         };
 
@@ -619,8 +614,16 @@ mod tests {
 
         // Old eval list (10 words)
         let old_eval: std::collections::HashSet<&str> = [
-            "perhaps", "maybe", "might", "possibly", "uncertain", "unclear", "likely", "probably",
-            "could", "seem",
+            "perhaps",
+            "maybe",
+            "might",
+            "possibly",
+            "uncertain",
+            "unclear",
+            "likely",
+            "probably",
+            "could",
+            "seem",
         ]
         .into_iter()
         .collect();
@@ -701,7 +704,10 @@ mod tests {
         gate.apply(&mut logits, 4.0); // OutOfDomain
         let is_id = tok.token_id("is");
         if is_id != tok.unk_id {
-            assert!(logits[is_id as usize] < 0.5, "Factual tokens penalized under OOD");
+            assert!(
+                logits[is_id as usize] < 0.5,
+                "Factual tokens penalized under OOD"
+            );
         }
     }
 
@@ -732,7 +738,9 @@ mod tests {
         let mut feedback = CoherenceFeedback::new(0.3);
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-veto");
         let hv = symthaea_core::hdc::ContinuousHV::from_genesis(
-            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+            &genesis,
+            "a",
+            symthaea_core::hdc::HDC_DIMENSION,
         );
         let weight = feedback.update(&hv, &hv);
         assert!(!feedback.should_veto(), "Self-similar should not veto");
@@ -754,18 +762,28 @@ mod tests {
 
         let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-veto-config");
         let a = symthaea_core::hdc::ContinuousHV::from_genesis(
-            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+            &genesis,
+            "a",
+            symthaea_core::hdc::HDC_DIMENSION,
         );
         let b = symthaea_core::hdc::ContinuousHV::from_genesis(
-            &genesis, "b", symthaea_core::hdc::HDC_DIMENSION,
+            &genesis,
+            "b",
+            symthaea_core::hdc::HDC_DIMENSION,
         );
 
         // Nearly orthogonal HVs — coherence near 0
         feedback_strict.update(&a, &b);
         feedback_lenient.update(&a, &b);
 
-        assert!(feedback_strict.should_veto(), "Strict threshold (0.5) should veto near-orthogonal");
-        assert!(feedback_lenient.should_veto(), "Lenient threshold (0.1) should also veto near-zero coherence");
+        assert!(
+            feedback_strict.should_veto(),
+            "Strict threshold (0.5) should veto near-orthogonal"
+        );
+        assert!(
+            feedback_lenient.should_veto(),
+            "Lenient threshold (0.1) should also veto near-zero coherence"
+        );
     }
 
     #[test]
@@ -774,7 +792,10 @@ mod tests {
             veto_threshold: 0.42,
             ..GatingConfig::default()
         };
-        let feedback = CoherenceFeedback::with_veto_threshold(config.coherence_drift_threshold, config.veto_threshold);
+        let feedback = CoherenceFeedback::with_veto_threshold(
+            config.coherence_drift_threshold,
+            config.veto_threshold,
+        );
         // Just verify construction — the threshold is stored
         assert!(!feedback.should_veto(), "Fresh feedback should not veto");
     }

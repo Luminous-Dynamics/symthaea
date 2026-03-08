@@ -215,6 +215,8 @@ impl DemoRunner {
             moral_drift_alert: m.ethics.moral_drift_alert,
             moral_fragmentation_increase: m.ethics.moral_fragmentation_increase,
             moral_anomaly_response_applied: m.ethics.moral_anomaly_response_applied,
+            moral_trajectory_convergence: m.ethics.moral_trajectory_convergence,
+            moral_convergence_severity: m.ethics.moral_convergence_severity,
             // Vision manifold telemetry (defaults, overwritten below if active)
             vision_active: false,
             vision_prediction_error: 0.0,

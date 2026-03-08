@@ -1,7 +1,7 @@
 //! Helper methods — weight management, convergence detection, unified computation.
 
-use super::types::{ConsciousnessWeights, WeightConvergenceState};
 use super::super::types::ConsciousnessCache;
+use super::types::{ConsciousnessWeights, WeightConvergenceState};
 use super::ConsciousnessEngine;
 use crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline;
 

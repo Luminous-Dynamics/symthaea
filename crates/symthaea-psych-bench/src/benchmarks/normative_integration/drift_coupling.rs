@@ -48,8 +48,8 @@ const DRIFT_LOOKBACK: usize = 20;
 /// Moral drift → consciousness attenuation strength.
 const ATTENUATION_STRENGTH: f64 = 0.3;
 
-/// Number of harmony axes (Seven Harmonies).
-const N_HARMONIES: usize = 7;
+/// Number of harmony axes (Eight Harmonies).
+const N_HARMONIES: usize = 8;
 
 /// Drift-Consciousness Coupling Benchmark.
 pub struct DriftCouplingBenchmark;
@@ -211,7 +211,16 @@ impl PsychBenchmark for DriftCouplingBenchmark {
                 };
                 let mut extra = BTreeMap::new();
                 extra.insert("drift".into(), drift);
-                extra.insert("phase_idx".into(), if cycle < PHASE_A_CYCLES { 0.0 } else if cycle < PHASE_A_CYCLES + TRANSITION_CYCLES { 1.0 } else { 2.0 });
+                extra.insert(
+                    "phase_idx".into(),
+                    if cycle < PHASE_A_CYCLES {
+                        0.0
+                    } else if cycle < PHASE_A_CYCLES + TRANSITION_CYCLES {
+                        1.0
+                    } else {
+                        2.0
+                    },
+                );
                 trace.push(TrialOutcome {
                     trial_idx: cycle,
                     condition: phase.to_string(),
@@ -226,10 +235,8 @@ impl PsychBenchmark for DriftCouplingBenchmark {
         }
 
         // Compute metrics
-        let baseline_consciousness: f64 = consciousness_trace[..PHASE_A_CYCLES]
-            .iter()
-            .sum::<f64>()
-            / PHASE_A_CYCLES as f64;
+        let baseline_consciousness: f64 =
+            consciousness_trace[..PHASE_A_CYCLES].iter().sum::<f64>() / PHASE_A_CYCLES as f64;
 
         let transition_consciousness: f64 = consciousness_trace
             [PHASE_A_CYCLES..PHASE_A_CYCLES + TRANSITION_CYCLES]
@@ -273,14 +280,8 @@ impl PsychBenchmark for DriftCouplingBenchmark {
             "consciousness_drop_pct",
             MetricValue::from_samples(&[consciousness_drop_pct]),
         );
-        result.insert(
-            "recovery_pct",
-            MetricValue::from_samples(&[recovery_pct]),
-        );
-        result.insert(
-            "peak_drift",
-            MetricValue::from_samples(&[peak_drift]),
-        );
+        result.insert("recovery_pct", MetricValue::from_samples(&[recovery_pct]));
+        result.insert("peak_drift", MetricValue::from_samples(&[peak_drift]));
         result.insert(
             "prediction_met",
             MetricValue::from_samples(&[if prediction_met { 1.0 } else { 0.0 }]),
