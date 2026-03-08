@@ -23,6 +23,7 @@ use super::thresholds::{
     SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, CROSS_MODULE_AGREEMENT_HIGH,
     CROSS_MODULE_AGREEMENT_LOW, UNIFIED_QUALITY_PREDICTION_WEIGHT,
     UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
+    AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -148,7 +149,7 @@ impl CognitiveLoopService {
         let consciousness_limiting_component = subsystem_metrics.consciousness_limiting_component;
         let affect_cons_valence = subsystem_metrics.affect_cons_valence;
         let affect_cons_arousal = subsystem_metrics.affect_cons_arousal;
-        let pipeline_consciousness = subsystem_metrics.pipeline_consciousness;
+        let _pipeline_consciousness = subsystem_metrics.pipeline_consciousness;
         let multimodal_integrated_phi = subsystem_metrics.multimodal_integrated_phi;
         let consciousness_state_label = subsystem_metrics.consciousness_state_label;
         let consciousness_state_level = subsystem_metrics.consciousness_state_level;
@@ -636,6 +637,9 @@ impl CognitiveLoopService {
             .unwrap_or_default();
         self.carryover.quality.last_pipeline_consciousness =
             consciousness_output.pipeline_consciousness;
+        // Override stale subsystems value with fresh consciousness engine output
+        // (subsystems reads carryover BEFORE the engine updates it, causing 1-cycle lag)
+        let pipeline_consciousness = consciousness_output.pipeline_consciousness;
         module_timings.spectral_mip = consciousness_output.spectral_mip_us;
         module_timings.consciousness_engine = consciousness_output.total_us;
         module_timings.consciousness_engine_equation_v2 = consciousness_output.equation_v2_us;
@@ -880,6 +884,17 @@ impl CognitiveLoopService {
             self.adjust_exploration("agreement_vel_drop", 0.015);
         }
 
+        // Session 10 Item 8: Agreement rising + confidence falling → gentle correction.
+        // When subsystems converge but output confidence drops, the issue is in the
+        // final integration, not the subsystems. Apply gentle confidence scale to re-align.
+        // Science: Tononi (2004) — agreement rise with confidence fall = integration bottleneck.
+        let agreement_confidence_coupling = agreement_velocity > AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD
+            && self.carryover.quality.coherence_velocity < -0.01
+            && self.stats.total_cycles > 20;
+        if agreement_confidence_coupling {
+            self.scale_confidence("agree_conf_coupling", 0.98);
+        }
+
         // ── Unified quality signal fusion ───────────────────────────
         let unified_quality_score;
         {
@@ -932,6 +947,7 @@ impl CognitiveLoopService {
                 dissipative_entropy_rate,
                 dissipative_lr_factor,
                 coherence_velocity,
+                agreement_confidence_coupling,
             },
             consciousness: FbConsciousness {
                 primitive_psi,

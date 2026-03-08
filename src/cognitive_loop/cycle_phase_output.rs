@@ -485,6 +485,12 @@ impl CognitiveLoopService {
         metadata.flow_feedback_relaxed = self.flow_state.in_flow
             && self.flow_state.intensity > 0.5;
         metadata.homeostasis_efficiency = self.carryover.quality.homeostasis_efficiency;
+        // Session 10 telemetry
+        metadata.confidence_crash_detected = self.carryover.quality.crash_freeze_remaining
+            == super::thresholds::CONFIDENCE_CRASH_FREEZE_CYCLES.saturating_sub(1);
+        metadata.crash_freeze_remaining = self.carryover.quality.crash_freeze_remaining;
+        metadata.hysteresis_factor = self.carryover.quality.hysteresis_factor;
+        metadata.agreement_confidence_coupling = feedback.quality.agreement_confidence_coupling;
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
@@ -756,6 +762,30 @@ impl CognitiveLoopService {
 
         // Session 9 telemetry (part 2 — after dominant_concentration computed)
         metadata.dominant_source_concentration = dominant_concentration;
+
+        // Session 10 Item 6: Proposal diversity → consensus quality metric.
+        // If fewer than 3 distinct sources after warmup, boost exploration to recruit more.
+        // Science: Dehaene (2014) — GWT requires multi-source consensus for ignition.
+        {
+            use super::thresholds::{
+                PROPOSAL_DIVERSITY_MIN_SOURCES, PROPOSAL_DIVERSITY_WARMUP,
+                PROPOSAL_DIVERSITY_EXPLORATION_BOOST,
+            };
+            let source_count = self.feedback_state.distinct_source_count();
+            metadata.proposal_source_count = source_count as u32;
+            if source_count < PROPOSAL_DIVERSITY_MIN_SOURCES
+                && self.stats.total_cycles > PROPOSAL_DIVERSITY_WARMUP
+                && self.feedback_state.total_proposals() > 2
+            {
+                self.feedback_state.exploration.propose(
+                    "low_diversity",
+                    super::feedback_state::FeedbackProposal::Add(
+                        PROPOSAL_DIVERSITY_EXPLORATION_BOOST as f64,
+                    ),
+                );
+                metadata.low_diversity_boost = true;
+            }
+        }
 
         // ── Phase 2.2: End feedback proposal collection ──────────────────
         // Session 9: Pass dampening streak + flow state for adaptive integration.

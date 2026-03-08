@@ -7015,3 +7015,58 @@ fn test_active_rest_dream_fields_finite() {
     let stats = service.stats();
     assert!(stats.phi_rest_quality_factor.is_finite());
 }
+
+// ── Broca quality EMA tracking ────────────────────────────────────────
+
+#[test]
+fn test_broca_quality_ema_initialized() {
+    // Verify broca quality stats fields exist and are properly defaulted
+    let config = CognitiveLoopConfig::default();
+    let service = CognitiveLoopService::new(config).unwrap();
+    let stats = service.stats();
+    assert_eq!(stats.broca_quality_ema, 0.0);
+    assert_eq!(stats.broca_low_quality_streak, 0);
+    assert_eq!(stats.broca_generation_count, 0);
+}
+
+// ── ToM exploration trigger ───────────────────────────────────────────
+
+#[test]
+fn test_tom_exploration_stats_initialized() {
+    // Verify ToM stats fields exist and are properly defaulted
+    let config = CognitiveLoopConfig::default();
+    let service = CognitiveLoopService::new(config).unwrap();
+    let stats = service.stats();
+    assert_eq!(stats.tom_prediction_mismatch_ema, 0.0);
+    assert_eq!(stats.tom_exploration_triggers, 0);
+}
+
+#[test]
+fn test_tom_telemetry_in_metadata() {
+    // Verify ToM fields appear in CycleMetadata
+    let config = CognitiveLoopConfig::default();
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    for _ in 0..5 {
+        let result = service.cycle("test social prediction");
+        let m = &result.metadata;
+        assert!(m.tom_prediction_mismatch.is_finite(),
+            "tom_prediction_mismatch not finite");
+        assert!(m.tom_prediction_mismatch >= 0.0 && m.tom_prediction_mismatch <= 1.0,
+            "tom_prediction_mismatch out of [0,1]: {}", m.tom_prediction_mismatch);
+    }
+}
+
+// ── Cross-subsystem telemetry completeness ────────────────────────────
+
+#[test]
+fn test_broca_telemetry_quality_fields() {
+    // Verify new BrocaGenerationTelemetry fields are accessible
+    let config = CognitiveLoopConfig::default();
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    let result = service.cycle("test broca telemetry");
+    let broca = &result.metadata.broca;
+    // These should exist and be finite (defaulted to 0.0 when broca isn't enabled)
+    assert!(broca.quality.is_finite(), "broca.quality not finite");
+    assert!(broca.long_coherence.is_finite(), "broca.long_coherence not finite");
+    assert!(broca.semantic_pe.is_finite(), "broca.semantic_pe not finite");
+}
