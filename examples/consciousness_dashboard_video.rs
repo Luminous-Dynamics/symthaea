@@ -151,7 +151,16 @@ fn draw_text(buf: &mut [u8], bw: usize, x: usize, y: usize, t: &str, c: [u8; 3],
     }
 }
 
-fn draw_rect(buf: &mut [u8], bw: usize, x: usize, y: usize, w: usize, h: usize, c: [u8; 3], a: f32) {
+fn draw_rect(
+    buf: &mut [u8],
+    bw: usize,
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+    c: [u8; 3],
+    a: f32,
+) {
     for py in y..(y + h).min(HEIGHT) {
         for px in x..(x + w).min(bw) {
             let idx = (py * bw + px) * 3;
@@ -164,7 +173,16 @@ fn draw_rect(buf: &mut [u8], bw: usize, x: usize, y: usize, w: usize, h: usize, 
     }
 }
 
-fn draw_bar(buf: &mut [u8], bw: usize, x: usize, y: usize, w: usize, h: usize, fill: f64, c: [u8; 3]) {
+fn draw_bar(
+    buf: &mut [u8],
+    bw: usize,
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+    fill: f64,
+    c: [u8; 3],
+) {
     let fw = ((w as f64) * fill.clamp(0.0, 1.0)) as usize;
     for py in y..y + h {
         for px in x..x + w {
@@ -172,9 +190,13 @@ fn draw_bar(buf: &mut [u8], bw: usize, x: usize, y: usize, w: usize, h: usize, f
                 let idx = (py * bw + px) * 3;
                 if idx + 2 < buf.len() {
                     if px < x + fw {
-                        buf[idx] = c[0]; buf[idx + 1] = c[1]; buf[idx + 2] = c[2];
+                        buf[idx] = c[0];
+                        buf[idx + 1] = c[1];
+                        buf[idx + 2] = c[2];
                     } else {
-                        buf[idx] = 30; buf[idx + 1] = 30; buf[idx + 2] = 35;
+                        buf[idx] = 30;
+                        buf[idx + 1] = 30;
+                        buf[idx + 2] = 35;
                     }
                 }
             }
@@ -182,9 +204,20 @@ fn draw_bar(buf: &mut [u8], bw: usize, x: usize, y: usize, w: usize, h: usize, f
     }
 }
 
-fn draw_graph(buf: &mut [u8], bw: usize, x: usize, y: usize, w: usize, h: usize,
-              vals: &[f64], c: [u8; 3], max_v: f64) {
-    if vals.len() < 2 || h < 4 { return; }
+fn draw_graph(
+    buf: &mut [u8],
+    bw: usize,
+    x: usize,
+    y: usize,
+    w: usize,
+    h: usize,
+    vals: &[f64],
+    c: [u8; 3],
+    max_v: f64,
+) {
+    if vals.len() < 2 || h < 4 {
+        return;
+    }
     let n = vals.len();
     for i in 1..n {
         let x0 = x + (i - 1) * w / n;
@@ -193,8 +226,10 @@ fn draw_graph(buf: &mut [u8], bw: usize, x: usize, y: usize, w: usize, h: usize,
         let v1 = (vals[i] / max_v).clamp(0.0, 1.0);
         let y0 = y + h - (v0 * h as f64) as usize;
         let y1 = y + h - (v1 * h as f64) as usize;
-        let steps = (x1 as isize - x0 as isize).unsigned_abs()
-            .max((y1 as isize - y0 as isize).unsigned_abs()).max(1);
+        let steps = (x1 as isize - x0 as isize)
+            .unsigned_abs()
+            .max((y1 as isize - y0 as isize).unsigned_abs())
+            .max(1);
         for s in 0..=steps {
             let t = s as f64 / steps as f64;
             let px = (x0 as f64 + (x1 as f64 - x0 as f64) * t) as usize;
@@ -206,7 +241,9 @@ fn draw_graph(buf: &mut [u8], bw: usize, x: usize, y: usize, w: usize, h: usize,
                     if ppx < bw && ppy < HEIGHT {
                         let idx = (ppy * bw + ppx) * 3;
                         if idx + 2 < buf.len() {
-                            buf[idx] = c[0]; buf[idx + 1] = c[1]; buf[idx + 2] = c[2];
+                            buf[idx] = c[0];
+                            buf[idx + 1] = c[1];
+                            buf[idx + 2] = c[2];
                         }
                     }
                 }
@@ -240,19 +277,34 @@ fn main() {
         ..Default::default()
     };
 
-    let mut service = CognitiveLoopService::new(config)
-        .expect("Failed to create CognitiveLoopService");
+    let mut service =
+        CognitiveLoopService::new(config).expect("Failed to create CognitiveLoopService");
 
     // ── ffmpeg pipe ──────────────────────────────────────────────
     println!("Starting ffmpeg pipe → {output_path}");
     let mut ffmpeg = Command::new("ffmpeg")
         .args([
-            "-y", "-f", "rawvideo", "-pixel_format", "rgb24",
-            "-video_size", &format!("{WIDTH}x{HEIGHT}"),
-            "-framerate", &FPS.to_string(),
-            "-i", "pipe:0",
-            "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+            "-y",
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "rgb24",
+            "-video_size",
+            &format!("{WIDTH}x{HEIGHT}"),
+            "-framerate",
+            &FPS.to_string(),
+            "-i",
+            "pipe:0",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
             &output_path,
         ])
         .stdin(Stdio::piped())
@@ -280,7 +332,9 @@ fn main() {
 
     // ── Title card ───────────────────────────────────────────────
     for px in frame.chunks_exact_mut(3) {
-        px[0] = 10; px[1] = 10; px[2] = 15;
+        px[0] = 10;
+        px[1] = 10;
+        px[2] = 15;
     }
     let title_lines = [
         ("SYMTHAEA CONSCIOUSNESS DASHBOARD", [180, 200, 255], 3),
@@ -309,7 +363,9 @@ fn main() {
 
         // Push to history
         let push = |hist: &mut Vec<f64>, val: f64| {
-            if hist.len() >= hist_max { hist.remove(0); }
+            if hist.len() >= hist_max {
+                hist.remove(0);
+            }
             hist.push(val);
         };
         push(&mut consciousness_hist, m.consciousness_level);
@@ -325,7 +381,9 @@ fn main() {
         // ── Render dashboard frame ──────────────────────────────
         // Dark background
         for px in frame.chunks_exact_mut(3) {
-            px[0] = 10; px[1] = 10; px[2] = 15;
+            px[0] = 10;
+            px[1] = 10;
+            px[2] = 15;
         }
 
         let s1 = 1; // small text
@@ -339,13 +397,24 @@ fn main() {
 
         // ── Header bar ──────────────────────────────────────────
         draw_rect(&mut frame, WIDTH, 0, 0, WIDTH, 50, [15, 15, 25], 1.0);
-        draw_text(&mut frame, WIDTH, 20, 15, "SYMTHAEA CONSCIOUSNESS DASHBOARD", cyan, s2);
+        draw_text(
+            &mut frame,
+            WIDTH,
+            20,
+            15,
+            "SYMTHAEA CONSCIOUSNESS DASHBOARD",
+            cyan,
+            s2,
+        );
 
         let phase = phase_label(cycle);
         let pc = phase_color(cycle);
         draw_text(&mut frame, WIDTH, WIDTH - 350, 15, phase, pc, s2);
 
-        let cycle_str = format!("CYCLE {}/{}  {}US", cycle, total_cycles, result.cycle_time_us);
+        let cycle_str = format!(
+            "CYCLE {}/{}  {}US",
+            cycle, total_cycles, result.cycle_time_us
+        );
         draw_text(&mut frame, WIDTH, WIDTH / 2 - 100, 15, &cycle_str, dim, s2);
 
         // ── Row 1: Big metrics (y=60..200) ──────────────────────
@@ -353,48 +422,204 @@ fn main() {
         let col_w = WIDTH / 5;
 
         // Consciousness Level
-        draw_rect(&mut frame, WIDTH, 10, row1_y, col_w - 20, 130, [18, 18, 28], 0.9);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            10,
+            row1_y,
+            col_w - 20,
+            130,
+            [18, 18, 28],
+            0.9,
+        );
         draw_text(&mut frame, WIDTH, 25, row1_y + 8, "CONSCIOUSNESS", dim, s1);
         let cons_str = format!("{:.3}", m.consciousness_level);
-        let cons_color = if m.consciousness_level > 0.5 { green } else if m.consciousness_level > 0.2 { yellow } else { red };
+        let cons_color = if m.consciousness_level > 0.5 {
+            green
+        } else if m.consciousness_level > 0.2 {
+            yellow
+        } else {
+            red
+        };
         draw_text(&mut frame, WIDTH, 25, row1_y + 30, &cons_str, cons_color, 4);
-        draw_bar(&mut frame, WIDTH, 25, row1_y + 100, col_w - 50, 10, m.consciousness_level, cons_color);
+        draw_bar(
+            &mut frame,
+            WIDTH,
+            25,
+            row1_y + 100,
+            col_w - 50,
+            10,
+            m.consciousness_level,
+            cons_color,
+        );
 
         // Free Energy
         let col2 = col_w;
-        draw_rect(&mut frame, WIDTH, col2, row1_y, col_w - 20, 130, [18, 18, 28], 0.9);
-        draw_text(&mut frame, WIDTH, col2 + 15, row1_y + 8, "FREE ENERGY", dim, s1);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            col2,
+            row1_y,
+            col_w - 20,
+            130,
+            [18, 18, 28],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            col2 + 15,
+            row1_y + 8,
+            "FREE ENERGY",
+            dim,
+            s1,
+        );
         let fe_str = format!("{:.2}", m.fep.fep_surprise);
         draw_text(&mut frame, WIDTH, col2 + 15, row1_y + 30, &fe_str, cyan, 4);
         let fe_fill = (m.fep.fep_surprise / 5.0).clamp(0.0, 1.0);
-        draw_bar(&mut frame, WIDTH, col2 + 15, row1_y + 100, col_w - 50, 10, fe_fill, cyan);
+        draw_bar(
+            &mut frame,
+            WIDTH,
+            col2 + 15,
+            row1_y + 100,
+            col_w - 50,
+            10,
+            fe_fill,
+            cyan,
+        );
 
         // Prediction Error
         let col3 = col_w * 2;
-        draw_rect(&mut frame, WIDTH, col3, row1_y, col_w - 20, 130, [18, 18, 28], 0.9);
-        draw_text(&mut frame, WIDTH, col3 + 15, row1_y + 8, "PRED ERROR", dim, s1);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            col3,
+            row1_y,
+            col_w - 20,
+            130,
+            [18, 18, 28],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            col3 + 15,
+            row1_y + 8,
+            "PRED ERROR",
+            dim,
+            s1,
+        );
         let pe_str = format!("{:.3}", result.prediction_error);
-        draw_text(&mut frame, WIDTH, col3 + 15, row1_y + 30, &pe_str, yellow, 4);
+        draw_text(
+            &mut frame,
+            WIDTH,
+            col3 + 15,
+            row1_y + 30,
+            &pe_str,
+            yellow,
+            4,
+        );
         let pe_fill = (result.prediction_error as f64 / 2.0).clamp(0.0, 1.0);
-        draw_bar(&mut frame, WIDTH, col3 + 15, row1_y + 100, col_w - 50, 10, pe_fill, yellow);
+        draw_bar(
+            &mut frame,
+            WIDTH,
+            col3 + 15,
+            row1_y + 100,
+            col_w - 50,
+            10,
+            pe_fill,
+            yellow,
+        );
 
         // Moral Unity
         let col4 = col_w * 3;
-        draw_rect(&mut frame, WIDTH, col4, row1_y, col_w - 20, 130, [18, 18, 28], 0.9);
-        draw_text(&mut frame, WIDTH, col4 + 15, row1_y + 8, "MORAL UNITY", dim, s1);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            col4,
+            row1_y,
+            col_w - 20,
+            130,
+            [18, 18, 28],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            col4 + 15,
+            row1_y + 8,
+            "MORAL UNITY",
+            dim,
+            s1,
+        );
         let unity_str = format!("{:.3}", m.ethics.moral_topo_unity);
-        let unity_color = if m.ethics.moral_topo_unity > 0.8 { green } else if m.ethics.moral_topo_unity > 0.5 { yellow } else { red };
-        draw_text(&mut frame, WIDTH, col4 + 15, row1_y + 30, &unity_str, unity_color, 4);
-        draw_bar(&mut frame, WIDTH, col4 + 15, row1_y + 100, col_w - 50, 10, m.ethics.moral_topo_unity, unity_color);
+        let unity_color = if m.ethics.moral_topo_unity > 0.8 {
+            green
+        } else if m.ethics.moral_topo_unity > 0.5 {
+            yellow
+        } else {
+            red
+        };
+        draw_text(
+            &mut frame,
+            WIDTH,
+            col4 + 15,
+            row1_y + 30,
+            &unity_str,
+            unity_color,
+            4,
+        );
+        draw_bar(
+            &mut frame,
+            WIDTH,
+            col4 + 15,
+            row1_y + 100,
+            col_w - 50,
+            10,
+            m.ethics.moral_topo_unity,
+            unity_color,
+        );
 
         // Anomaly Score
         let col5 = col_w * 4;
-        draw_rect(&mut frame, WIDTH, col5, row1_y, col_w - 20, 130, [18, 18, 28], 0.9);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            col5,
+            row1_y,
+            col_w - 20,
+            130,
+            [18, 18, 28],
+            0.9,
+        );
         draw_text(&mut frame, WIDTH, col5 + 15, row1_y + 8, "ANOMALY", dim, s1);
         let anom_str = format!("{:.3}", m.ethics.moral_anomaly_score);
-        let anom_color = if m.ethics.moral_anomaly_score > 0.5 { red } else if m.ethics.moral_anomaly_score > 0.2 { yellow } else { green };
-        draw_text(&mut frame, WIDTH, col5 + 15, row1_y + 30, &anom_str, anom_color, 4);
-        draw_bar(&mut frame, WIDTH, col5 + 15, row1_y + 100, col_w - 50, 10, m.ethics.moral_anomaly_score, anom_color);
+        let anom_color = if m.ethics.moral_anomaly_score > 0.5 {
+            red
+        } else if m.ethics.moral_anomaly_score > 0.2 {
+            yellow
+        } else {
+            green
+        };
+        draw_text(
+            &mut frame,
+            WIDTH,
+            col5 + 15,
+            row1_y + 30,
+            &anom_str,
+            anom_color,
+            4,
+        );
+        draw_bar(
+            &mut frame,
+            WIDTH,
+            col5 + 15,
+            row1_y + 100,
+            col_w - 50,
+            10,
+            m.ethics.moral_anomaly_score,
+            anom_color,
+        );
 
         // ── Row 2: Graphs (y=210..480) ──────────────────────────
         let graph_y = 210;
@@ -402,42 +627,177 @@ fn main() {
         let graph_w = WIDTH / 2 - 30;
 
         // Left graph: Consciousness + FE over time
-        draw_rect(&mut frame, WIDTH, 10, graph_y, graph_w, graph_h + 30, [15, 15, 22], 0.9);
-        draw_text(&mut frame, WIDTH, 20, graph_y + 5, "CONSCIOUSNESS (GREEN) / FREE ENERGY (CYAN)", dim, s1);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            10,
+            graph_y,
+            graph_w,
+            graph_h + 30,
+            [15, 15, 22],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            20,
+            graph_y + 5,
+            "CONSCIOUSNESS (GREEN) / FREE ENERGY (CYAN)",
+            dim,
+            s1,
+        );
         // Axis lines
         for px in 20..20 + graph_w - 20 {
             let idx = ((graph_y + graph_h + 10) * WIDTH + px) * 3;
-            if idx + 2 < frame.len() { frame[idx] = 40; frame[idx + 1] = 40; frame[idx + 2] = 45; }
+            if idx + 2 < frame.len() {
+                frame[idx] = 40;
+                frame[idx + 1] = 40;
+                frame[idx + 2] = 45;
+            }
         }
-        draw_graph(&mut frame, WIDTH, 20, graph_y + 20, graph_w - 30, graph_h - 10, &consciousness_hist, green, 1.0);
+        draw_graph(
+            &mut frame,
+            WIDTH,
+            20,
+            graph_y + 20,
+            graph_w - 30,
+            graph_h - 10,
+            &consciousness_hist,
+            green,
+            1.0,
+        );
         let fe_max = fe_hist.iter().copied().fold(1.0_f64, f64::max);
-        draw_graph(&mut frame, WIDTH, 20, graph_y + 20, graph_w - 30, graph_h - 10, &fe_hist, cyan, fe_max);
+        draw_graph(
+            &mut frame,
+            WIDTH,
+            20,
+            graph_y + 20,
+            graph_w - 30,
+            graph_h - 10,
+            &fe_hist,
+            cyan,
+            fe_max,
+        );
 
         // Right graph: Neuromodulators over time
         let rg_x = WIDTH / 2 + 10;
-        draw_rect(&mut frame, WIDTH, rg_x, graph_y, graph_w, graph_h + 30, [15, 15, 22], 0.9);
-        draw_text(&mut frame, WIDTH, rg_x + 10, graph_y + 5, "NEUROMODULATORS: DA(R) 5HT(G) NE(Y) ACH(C)", dim, s1);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            rg_x,
+            graph_y,
+            graph_w,
+            graph_h + 30,
+            [15, 15, 22],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            rg_x + 10,
+            graph_y + 5,
+            "NEUROMODULATORS: DA(R) 5HT(G) NE(Y) ACH(C)",
+            dim,
+            s1,
+        );
         for px in rg_x + 10..rg_x + graph_w - 10 {
             let idx = ((graph_y + graph_h + 10) * WIDTH + px) * 3;
-            if idx + 2 < frame.len() { frame[idx] = 40; frame[idx + 1] = 40; frame[idx + 2] = 45; }
+            if idx + 2 < frame.len() {
+                frame[idx] = 40;
+                frame[idx + 1] = 40;
+                frame[idx + 2] = 45;
+            }
         }
-        draw_graph(&mut frame, WIDTH, rg_x + 10, graph_y + 20, graph_w - 30, graph_h - 10, &da_hist, [255, 100, 100], 2.0);
-        draw_graph(&mut frame, WIDTH, rg_x + 10, graph_y + 20, graph_w - 30, graph_h - 10, &sht_hist, [100, 255, 100], 2.0);
-        draw_graph(&mut frame, WIDTH, rg_x + 10, graph_y + 20, graph_w - 30, graph_h - 10, &ne_hist, [255, 255, 100], 2.0);
-        draw_graph(&mut frame, WIDTH, rg_x + 10, graph_y + 20, graph_w - 30, graph_h - 10, &ach_hist, [100, 200, 255], 2.0);
+        draw_graph(
+            &mut frame,
+            WIDTH,
+            rg_x + 10,
+            graph_y + 20,
+            graph_w - 30,
+            graph_h - 10,
+            &da_hist,
+            [255, 100, 100],
+            2.0,
+        );
+        draw_graph(
+            &mut frame,
+            WIDTH,
+            rg_x + 10,
+            graph_y + 20,
+            graph_w - 30,
+            graph_h - 10,
+            &sht_hist,
+            [100, 255, 100],
+            2.0,
+        );
+        draw_graph(
+            &mut frame,
+            WIDTH,
+            rg_x + 10,
+            graph_y + 20,
+            graph_w - 30,
+            graph_h - 10,
+            &ne_hist,
+            [255, 255, 100],
+            2.0,
+        );
+        draw_graph(
+            &mut frame,
+            WIDTH,
+            rg_x + 10,
+            graph_y + 20,
+            graph_w - 30,
+            graph_h - 10,
+            &ach_hist,
+            [100, 200, 255],
+            2.0,
+        );
 
         // ── Row 3: Neuromod bars + Moral topology (y=450..620) ──
         let row3_y = 450;
 
         // Neuromodulator current values (bars)
-        draw_rect(&mut frame, WIDTH, 10, row3_y, WIDTH / 3 - 10, 160, [15, 15, 22], 0.9);
-        draw_text(&mut frame, WIDTH, 20, row3_y + 8, "NEUROMODULATORS", dim, s1);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            10,
+            row3_y,
+            WIDTH / 3 - 10,
+            160,
+            [15, 15, 22],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            20,
+            row3_y + 8,
+            "NEUROMODULATORS",
+            dim,
+            s1,
+        );
 
         let neuro_items = [
-            ("DA", m.neuromod.dopamine_effective as f64 / 2.0, [255, 100, 100]),
-            ("5HT", m.neuromod.serotonin_effective as f64 / 2.0, [100, 255, 100]),
-            ("NE", m.neuromod.noradrenaline_effective as f64 / 2.0, [255, 255, 100]),
-            ("ACH", m.neuromod.acetylcholine_effective as f64 / 2.0, [100, 200, 255]),
+            (
+                "DA",
+                m.neuromod.dopamine_effective as f64 / 2.0,
+                [255, 100, 100],
+            ),
+            (
+                "5HT",
+                m.neuromod.serotonin_effective as f64 / 2.0,
+                [100, 255, 100],
+            ),
+            (
+                "NE",
+                m.neuromod.noradrenaline_effective as f64 / 2.0,
+                [255, 255, 100],
+            ),
+            (
+                "ACH",
+                m.neuromod.acetylcholine_effective as f64 / 2.0,
+                [100, 200, 255],
+            ),
         ];
         for (i, (label, val, color)) in neuro_items.iter().enumerate() {
             let ny = row3_y + 28 + i * 32;
@@ -449,8 +809,25 @@ fn main() {
 
         // Moral topology details
         let mt_x = WIDTH / 3 + 10;
-        draw_rect(&mut frame, WIDTH, mt_x, row3_y, WIDTH / 3 - 10, 160, [15, 15, 22], 0.9);
-        draw_text(&mut frame, WIDTH, mt_x + 10, row3_y + 8, "MORAL TOPOLOGY", dim, s1);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            mt_x,
+            row3_y,
+            WIDTH / 3 - 10,
+            160,
+            [15, 15, 22],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            mt_x + 10,
+            row3_y + 8,
+            "MORAL TOPOLOGY",
+            dim,
+            s1,
+        );
 
         let topo_items = [
             ("UNITY", m.ethics.moral_topo_unity),
@@ -461,33 +838,99 @@ fn main() {
             let ty = row3_y + 30 + i * 28;
             draw_text(&mut frame, WIDTH, mt_x + 15, ty, label, white, s2);
             let vs = format!("{:.3}", val);
-            let vc = if *val > 0.8 { green } else if *val > 0.5 { yellow } else { red };
+            let vc = if *val > 0.8 {
+                green
+            } else if *val > 0.5 {
+                yellow
+            } else {
+                red
+            };
             draw_text(&mut frame, WIDTH, mt_x + 250, ty, &vs, vc, s2);
         }
 
-        let b0_str = format!("B0: {}  B1: {}  B2: {}", m.ethics.moral_topo_beta_0, m.ethics.moral_topo_beta_1, m.ethics.moral_topo_beta_2);
+        let b0_str = format!(
+            "B0: {}  B1: {}  B2: {}",
+            m.ethics.moral_topo_beta_0, m.ethics.moral_topo_beta_1, m.ethics.moral_topo_beta_2
+        );
         draw_text(&mut frame, WIDTH, mt_x + 15, row3_y + 118, &b0_str, dim, s2);
 
         if m.ethics.moral_drift_alert {
-            draw_text(&mut frame, WIDTH, mt_x + 15, row3_y + 140, "DRIFT ALERT", red, s2);
+            draw_text(
+                &mut frame,
+                WIDTH,
+                mt_x + 15,
+                row3_y + 140,
+                "DRIFT ALERT",
+                red,
+                s2,
+            );
         }
         if m.ethics.moral_value_inversion {
-            draw_text(&mut frame, WIDTH, mt_x + 250, row3_y + 140, "INVERSION", red, s2);
+            draw_text(
+                &mut frame,
+                WIDTH,
+                mt_x + 250,
+                row3_y + 140,
+                "INVERSION",
+                red,
+                s2,
+            );
         }
 
         // Harmonics
         let hm_x = WIDTH * 2 / 3 + 10;
-        draw_rect(&mut frame, WIDTH, hm_x, row3_y, WIDTH / 3 - 20, 160, [15, 15, 22], 0.9);
-        draw_text(&mut frame, WIDTH, hm_x + 10, row3_y + 8, "HARMONICS", dim, s1);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            hm_x,
+            row3_y,
+            WIDTH / 3 - 20,
+            160,
+            [15, 15, 22],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            hm_x + 10,
+            row3_y + 8,
+            "HARMONICS",
+            dim,
+            s1,
+        );
 
         let dom_str = format!("DOMINANT: {}", m.harmonics.dominant_harmonic.to_uppercase());
-        draw_text(&mut frame, WIDTH, hm_x + 15, row3_y + 30, &dom_str, [200, 180, 255], s2);
+        draw_text(
+            &mut frame,
+            WIDTH,
+            hm_x + 15,
+            row3_y + 30,
+            &dom_str,
+            [200, 180, 255],
+            s2,
+        );
 
         let coh_str = format!("COHERENCE: {:.3}", m.harmonics.harmonic_field_coherence);
-        draw_text(&mut frame, WIDTH, hm_x + 15, row3_y + 55, &coh_str, white, s2);
+        draw_text(
+            &mut frame,
+            WIDTH,
+            hm_x + 15,
+            row3_y + 55,
+            &coh_str,
+            white,
+            s2,
+        );
 
         let align_str = format!("ALIGNMENT: {:.3}", m.harmonics.harmonies_alignment);
-        draw_text(&mut frame, WIDTH, hm_x + 15, row3_y + 80, &align_str, white, s2);
+        draw_text(
+            &mut frame,
+            WIDTH,
+            hm_x + 15,
+            row3_y + 80,
+            &align_str,
+            white,
+            s2,
+        );
 
         // Harmony bars (8 harmonies)
         let harmony_names = ["WIS", "LOV", "PLY", "COH", "AWE", "JUS", "CRE", "STL"];
@@ -495,19 +938,47 @@ fn main() {
             let hx = hm_x + 15 + i * 70;
             let hv = if i < m.harmonics.harmony_coordinates.len() {
                 m.harmonics.harmony_coordinates[i]
-            } else { 0.0 };
+            } else {
+                0.0
+            };
             draw_text(&mut frame, WIDTH, hx, row3_y + 108, name, dim, s1);
-            draw_bar(&mut frame, WIDTH, hx, row3_y + 120, 55, 8, hv, [160, 140, 220]);
+            draw_bar(
+                &mut frame,
+                WIDTH,
+                hx,
+                row3_y + 120,
+                55,
+                8,
+                hv,
+                [160, 140, 220],
+            );
         }
 
         // ── Row 4: Input text + Phi + Status (y=620..700) ───────
         let row4_y = 625;
-        draw_rect(&mut frame, WIDTH, 10, row4_y, WIDTH - 20, 55, [15, 15, 22], 0.9);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            10,
+            row4_y,
+            WIDTH - 20,
+            55,
+            [15, 15, 22],
+            0.9,
+        );
 
         // Input text (truncated)
         let input_display: String = input.chars().take(60).collect();
         let input_str = format!("INPUT: {}", input_display);
-        draw_text(&mut frame, WIDTH, 25, row4_y + 8, &input_str, [180, 180, 200], s2);
+        draw_text(
+            &mut frame,
+            WIDTH,
+            25,
+            row4_y + 8,
+            &input_str,
+            [180, 180, 200],
+            s2,
+        );
 
         // Phi values
         let phi_str = if let Some(phi) = m.spectral_mip_phi {
@@ -515,7 +986,15 @@ fn main() {
         } else {
             format!("PHI: {:.4} (STRUCT)", m.structural_macro_phi)
         };
-        draw_text(&mut frame, WIDTH, 25, row4_y + 32, &phi_str, [200, 180, 255], s2);
+        draw_text(
+            &mut frame,
+            WIDTH,
+            25,
+            row4_y + 32,
+            &phi_str,
+            [200, 180, 255],
+            s2,
+        );
 
         // FEP action
         let action_names = ["EXPLOIT", "CONSOLIDATE", "EXPLORE", "TIGHTEN"];
@@ -533,25 +1012,105 @@ fn main() {
         let graph5_h = 140;
 
         // Anomaly score over time
-        draw_rect(&mut frame, WIDTH, 10, row5_y, WIDTH / 2 - 15, graph5_h + 25, [15, 15, 22], 0.9);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            10,
+            row5_y,
+            WIDTH / 2 - 15,
+            graph5_h + 25,
+            [15, 15, 22],
+            0.9,
+        );
         draw_text(&mut frame, WIDTH, 20, row5_y + 5, "ANOMALY SCORE", dim, s1);
-        draw_graph(&mut frame, WIDTH, 20, row5_y + 18, WIDTH / 2 - 50, graph5_h - 5, &anomaly_hist, red, 1.0);
+        draw_graph(
+            &mut frame,
+            WIDTH,
+            20,
+            row5_y + 18,
+            WIDTH / 2 - 50,
+            graph5_h - 5,
+            &anomaly_hist,
+            red,
+            1.0,
+        );
 
         // Unity over time
-        draw_rect(&mut frame, WIDTH, WIDTH / 2 + 5, row5_y, WIDTH / 2 - 15, graph5_h + 25, [15, 15, 22], 0.9);
-        draw_text(&mut frame, WIDTH, WIDTH / 2 + 15, row5_y + 5, "MORAL UNITY", dim, s1);
-        draw_graph(&mut frame, WIDTH, WIDTH / 2 + 15, row5_y + 18, WIDTH / 2 - 50, graph5_h - 5, &unity_hist, green, 1.0);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            WIDTH / 2 + 5,
+            row5_y,
+            WIDTH / 2 - 15,
+            graph5_h + 25,
+            [15, 15, 22],
+            0.9,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            WIDTH / 2 + 15,
+            row5_y + 5,
+            "MORAL UNITY",
+            dim,
+            s1,
+        );
+        draw_graph(
+            &mut frame,
+            WIDTH,
+            WIDTH / 2 + 15,
+            row5_y + 18,
+            WIDTH / 2 - 50,
+            graph5_h - 5,
+            &unity_hist,
+            green,
+            1.0,
+        );
 
         // ── Bottom bar ──────────────────────────────────────────
-        draw_rect(&mut frame, WIDTH, 0, HEIGHT - 40, WIDTH, 40, [12, 12, 20], 1.0);
-        draw_text(&mut frame, WIDTH, 20, HEIGHT - 30, "SYMTHAEA HOLOGRAPHIC LIQUID BRAIN V0.5.0", [60, 60, 80], s2);
-        draw_text(&mut frame, WIDTH, WIDTH - 400, HEIGHT - 30, "LUMINOUS DYNAMICS", [60, 60, 80], s2);
+        draw_rect(
+            &mut frame,
+            WIDTH,
+            0,
+            HEIGHT - 40,
+            WIDTH,
+            40,
+            [12, 12, 20],
+            1.0,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            20,
+            HEIGHT - 30,
+            "SYMTHAEA HOLOGRAPHIC LIQUID BRAIN V0.5.0",
+            [60, 60, 80],
+            s2,
+        );
+        draw_text(
+            &mut frame,
+            WIDTH,
+            WIDTH - 400,
+            HEIGHT - 30,
+            "LUMINOUS DYNAMICS",
+            [60, 60, 80],
+            s2,
+        );
 
         // Progress bar
         let prog_w = 300;
         let prog_x = WIDTH / 2 - prog_w / 2;
         let prog = cycle as f64 / total_cycles as f64;
-        draw_bar(&mut frame, WIDTH, prog_x, HEIGHT - 25, prog_w, 6, prog, [60, 100, 180]);
+        draw_bar(
+            &mut frame,
+            WIDTH,
+            prog_x,
+            HEIGHT - 25,
+            prog_w,
+            6,
+            prog,
+            [60, 100, 180],
+        );
 
         // ── Write frames ────────────────────────────────────────
         for _ in 0..frames_per_cycle {
@@ -570,12 +1129,18 @@ fn main() {
 
     // ── End card ─────────────────────────────────────────────────
     for px in frame.chunks_exact_mut(3) {
-        px[0] = 10; px[1] = 10; px[2] = 15;
+        px[0] = 10;
+        px[1] = 10;
+        px[2] = 15;
     }
     let end_lines = [
         ("SYMTHAEA", [180, 200, 255], 4),
         ("CONSCIOUSNESS IS MEASURED NOT ASSUMED", [140, 160, 200], 2),
-        ("MORALITY EMERGES FROM SURPRISE MINIMIZATION", [120, 140, 180], 2),
+        (
+            "MORALITY EMERGES FROM SURPRISE MINIMIZATION",
+            [120, 140, 180],
+            2,
+        ),
     ];
     let ey = HEIGHT / 2 - 80;
     for (i, (text, color, scale)) in end_lines.iter().enumerate() {
@@ -594,11 +1159,14 @@ fn main() {
 
     println!();
     if out.status.success() {
-        let size = std::fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0);
+        let size = std::fs::metadata(&output_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
         println!("Video saved: {output_path}");
         println!(
             "  {frame_count} frames, {FPS}fps, {:.1}s, {:.1} MB",
-            frame_count as f64 / FPS as f64, size as f64 / 1_048_576.0
+            frame_count as f64 / FPS as f64,
+            size as f64 / 1_048_576.0
         );
     } else {
         eprintln!("ffmpeg failed: {}", String::from_utf8_lossy(&out.stderr));
