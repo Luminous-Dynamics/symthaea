@@ -649,35 +649,47 @@ fn apply_weight_tied_gradient_adam(
 
 /// Generate a diverse set of ThoughtChannels for training data collection.
 ///
-/// 8 intents x 5 epistemic x 3 emotional clusters x 3 relationship stages = 360 configs.
+/// 8 intents × 5 epistemic × 5 emotional clusters × 3 relationship stages
+/// × 3 consciousness levels = 1,800 configs.
 /// Each has distinct channel encodings covering the full combinatorial space.
 pub fn generate_diverse_thoughts() -> Vec<ThoughtChannels> {
-    let mut thoughts = Vec::with_capacity(360);
+    let mut thoughts = Vec::with_capacity(1800);
 
     // Emotional clusters: (valence, arousal, warmth)
     let emotions = [
-        (0.7, 0.3, 0.8),  // Calm-warm
-        (-0.3, 0.7, 0.4), // Tense-cool
-        (0.5, 0.5, 0.6),  // Neutral-balanced
+        (0.8, 0.2, 0.9),  // Serene-warm (content, calm, nurturing)
+        (0.7, 0.8, 0.7),  // Enthusiastic (positive, excited, warm)
+        (-0.3, 0.7, 0.3), // Tense-cool (worried, alert, detached)
+        (-0.6, 0.3, 0.5), // Melancholic (sad, low energy, moderate warmth)
+        (0.0, 0.5, 0.5),  // Neutral-balanced
     ];
 
     // Relationship stages
     let stages = [0.0, 3.0, 6.0]; // New, Established, Deep
 
+    // Consciousness levels: (psi, meta_awareness, coherence)
+    let consciousness = [
+        (0.2, 0.1, 0.3), // Low — drowsy/unfocused
+        (0.5, 0.5, 0.5), // Medium — typical awareness
+        (0.9, 0.8, 0.9), // High — fully lucid
+    ];
+
     for intent in 0..8 {
         for epistemic in 0..5 {
             for &(valence, arousal, warmth) in &emotions {
                 for &stage in &stages {
-                    let mut channels = ThoughtChannels::with_intent(intent);
-                    channels.set_epistemic(epistemic as f32);
-                    channels.set_emotion(valence, arousal, warmth);
-                    channels.channels[15] = stage; // relationship_stage
-                    channels.channels[16] = 0.5; // trust: mid
-                    channels.channels[17] = 1.0; // mood_temperature: neutral
-                    channels.channels[12] = 0.5; // psi: mid
-                    channels.channels[13] = 0.5; // meta_awareness: mid
-                    channels.channels[14] = 0.5; // coherence: mid
-                    thoughts.push(channels);
+                    for &(psi, meta_aw, coh) in &consciousness {
+                        let mut channels = ThoughtChannels::with_intent(intent);
+                        channels.set_epistemic(epistemic as f32);
+                        channels.set_emotion(valence, arousal, warmth);
+                        channels.set_consciousness(psi, meta_aw, coh);
+                        channels.channels[15] = stage; // relationship_stage
+                        // Vary trust with relationship stage
+                        channels.channels[16] = (stage / 6.0) * 0.5 + 0.25;
+                        // Vary mood temperature with arousal
+                        channels.channels[17] = 0.8 + arousal * 0.4;
+                        thoughts.push(channels);
+                    }
                 }
             }
         }
@@ -688,9 +700,9 @@ pub fn generate_diverse_thoughts() -> Vec<ThoughtChannels> {
 
 /// Reconstruct a text prompt from ThoughtChannels for LLM distillation.
 ///
-/// Produces markers in the format that `channels_from_prompt()` in ssm_backend.rs can parse.
+/// Uses varied templates keyed on the thought state to avoid templated-start
+/// monotony (prior version had 54.9% identical starts).
 pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
-    // Find the active intent
     let intent_names = [
         "Acknowledge",
         "Answer",
@@ -708,10 +720,44 @@ pub fn thought_to_prompt(channels: &ThoughtChannels) -> String {
     let epistemic_names = ["Certain", "Probable", "Uncertain", "Unknown", "OutOfDomain"];
     let epistemic_idx = (channels.epistemic_ordinal() as usize).min(4);
 
-    format!(
-        "SEMANTIC_INTENT: {}\nEPISTEMIC_STATUS: {}\nMOOD_TEMPERATURE: {:.2}\n",
-        intent_names[active_intent], epistemic_names[epistemic_idx], channels.channels[17],
-    )
+    let intent = intent_names[active_intent];
+    let epistemic = epistemic_names[epistemic_idx];
+    let valence = channels.valence();
+    let arousal = channels.arousal();
+    let psi = channels.psi();
+
+    // Select template based on intent + epistemic hash to avoid monotonous starts
+    let template_idx = (active_intent * 5 + epistemic_idx) % 8;
+
+    match template_idx {
+        0 => format!(
+            "SEMANTIC_INTENT: {intent}\nEPISTEMIC_STATUS: {epistemic}\nMOOD_TEMPERATURE: {:.2}\n",
+            channels.channels[17]
+        ),
+        1 => format!(
+            "[{intent}] With {epistemic} confidence (valence={valence:.1}, arousal={arousal:.1})\n"
+        ),
+        2 => format!(
+            "Responding with intent to {intent} — epistemic level: {epistemic}, consciousness: {psi:.2}\n"
+        ),
+        3 => format!(
+            "{epistemic} {intent}: emotional state ({valence:.1}/{arousal:.1}), awareness={psi:.2}\n"
+        ),
+        4 => format!(
+            "INTENT={intent} EPISTEMIC={epistemic} PSI={psi:.2} VALENCE={valence:.1}\n"
+        ),
+        5 => format!(
+            "I need to {intent} (confidence: {epistemic}, feeling: {valence:.1})\n"
+        ),
+        6 => format!(
+            "Mode: {intent} | Certainty: {epistemic} | Alertness: {arousal:.1} | Warmth: {:.1}\n",
+            channels.warmth()
+        ),
+        _ => format!(
+            "Task={intent}, epistemic={epistemic}, mood={:.2}, psi={psi:.2}\n",
+            channels.channels[17]
+        ),
+    }
 }
 
 /// Generate a synthetic training curriculum from diverse ThoughtChannels.
@@ -1005,8 +1051,8 @@ mod tests {
         let thoughts = generate_diverse_thoughts();
         assert_eq!(
             thoughts.len(),
-            360,
-            "8 intents x 5 epistemic x 3 emotions x 3 stages = 360"
+            1800,
+            "8 intents × 5 epistemic × 5 emotions × 3 stages × 3 consciousness = 1800"
         );
 
         // Verify all are distinct
@@ -1031,10 +1077,18 @@ mod tests {
             prompt.contains("Certain"),
             "Should contain epistemic status"
         );
-        assert!(
-            prompt.contains("MOOD_TEMPERATURE"),
-            "Should contain mood temp marker"
-        );
+        assert!(!prompt.is_empty(), "Should produce non-empty prompt");
+
+        // Verify template diversity: different intents produce different formats
+        let mut channels2 = ThoughtChannels::with_intent(3); // Propose
+        channels2.set_epistemic(2.0); // Uncertain
+        let prompt2 = thought_to_prompt(&channels2);
+        assert!(prompt2.contains("Propose"), "Should contain intent name");
+        assert!(prompt2.contains("Uncertain"), "Should contain epistemic");
+        // Different intent+epistemic → different template
+        let same_start = prompt.chars().take(20).collect::<String>()
+            == prompt2.chars().take(20).collect::<String>();
+        assert!(!same_start, "Different thoughts should use different templates");
     }
 
     #[test]

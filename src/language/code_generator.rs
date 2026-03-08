@@ -32,6 +32,138 @@ use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_memory::CodebaseMemory;
 use crate::mind::structured_thought::EpistemicStatus;
 
+/// Basic dataflow information extracted from generated code.
+///
+/// Tracks variable definitions, uses, and potential issues like unused
+/// variables or use-before-definition. This is a lightweight static
+/// analysis — not a full CFG, but catches common generation errors.
+#[derive(Debug, Clone, Default)]
+pub struct DataflowInfo {
+    /// Variables defined in the code (name, line)
+    pub definitions: Vec<(String, usize)>,
+    /// Variables used in the code (name, line)
+    pub uses: Vec<(String, usize)>,
+    /// Variables defined but never used
+    pub unused: Vec<String>,
+    /// Variables used before definition
+    pub use_before_def: Vec<String>,
+}
+
+impl DataflowInfo {
+    /// Analyze a Rust source string for basic dataflow.
+    pub fn analyze_rust(source: &str) -> Self {
+        let mut defs = Vec::new();
+        let mut uses = Vec::new();
+
+        for (line_num, line) in source.lines().enumerate() {
+            let trimmed = line.trim();
+
+            // Track let bindings
+            if let Some(rest) = trimmed.strip_prefix("let ") {
+                let rest = rest.strip_prefix("mut ").unwrap_or(rest);
+                // Extract variable name (up to : or = or whitespace)
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_')
+                    .collect();
+                if !name.is_empty() && name != "_" {
+                    defs.push((name, line_num));
+                }
+            }
+
+            // Track function parameter bindings
+            if trimmed.starts_with("fn ") || trimmed.starts_with("pub fn ") {
+                if let Some(paren_start) = trimmed.find('(') {
+                    if let Some(paren_end) = trimmed.find(')') {
+                        let params = &trimmed[paren_start + 1..paren_end];
+                        for param in params.split(',') {
+                            let param = param.trim();
+                            let name: String = param
+                                .chars()
+                                .take_while(|c| c.is_alphanumeric() || *c == '_')
+                                .collect();
+                            if !name.is_empty()
+                                && name != "_"
+                                && name != "self"
+                                && name != "&self"
+                                && name != "mut"
+                            {
+                                defs.push((name, line_num));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Track identifier uses (simple heuristic: word chars in expressions)
+            // Skip comment lines and string literals for now
+            if !trimmed.starts_with("//") && !trimmed.starts_with("let ") {
+                for word in trimmed.split(|c: char| !c.is_alphanumeric() && c != '_') {
+                    if !word.is_empty()
+                        && word.chars().next().map_or(false, |c| c.is_lowercase())
+                        && !is_rust_keyword(word)
+                    {
+                        uses.push((word.to_string(), line_num));
+                    }
+                }
+            }
+        }
+
+        // Compute unused and use-before-def
+        let def_names: std::collections::HashSet<_> = defs.iter().map(|(n, _)| n.clone()).collect();
+        let use_names: std::collections::HashSet<_> = uses.iter().map(|(n, _)| n.clone()).collect();
+
+        let unused: Vec<String> = def_names.difference(&use_names).cloned().collect();
+
+        let mut use_before_def = Vec::new();
+        for (use_name, use_line) in &uses {
+            let first_def = defs
+                .iter()
+                .filter(|(n, _)| n == use_name)
+                .map(|(_, l)| *l)
+                .min();
+            if let Some(def_line) = first_def {
+                if *use_line < def_line {
+                    use_before_def.push(use_name.clone());
+                }
+            }
+        }
+
+        Self {
+            definitions: defs,
+            uses,
+            unused,
+            use_before_def,
+        }
+    }
+
+    /// Returns true if no issues were found
+    pub fn is_clean(&self) -> bool {
+        self.use_before_def.is_empty()
+    }
+}
+
+fn is_rust_keyword(word: &str) -> bool {
+    matches!(
+        word,
+        "fn" | "let" | "mut" | "if" | "else" | "for" | "in" | "while"
+            | "loop" | "match" | "return" | "break" | "continue" | "pub"
+            | "use" | "mod" | "struct" | "enum" | "trait" | "impl" | "self"
+            | "super" | "crate" | "as" | "ref" | "true" | "false" | "type"
+            | "where" | "async" | "await" | "move" | "dyn" | "const"
+            | "static" | "extern" | "unsafe" | "iter" | "map" | "filter"
+            | "collect" | "clone" | "len" | "push" | "new" | "some"
+            | "none" | "ok" | "err" | "vec" | "format" | "println"
+            | "assert" | "assert_eq" | "todo" | "unimplemented" | "unwrap"
+            | "expect" | "cloned" | "into" | "from" | "default" | "sum"
+            | "product" | "min" | "max" | "sort" | "rev" | "take"
+            | "skip" | "zip" | "entry" | "or_insert" | "contains"
+            | "is_empty" | "to_string" | "to_vec" | "to_lowercase"
+            | "to_uppercase" | "trim" | "chars" | "lines" | "split"
+            | "join" | "replace" | "starts_with" | "ends_with"
+    )
+}
+
 /// Result of code generation
 #[derive(Debug, Clone)]
 pub struct GeneratedCode {
@@ -51,6 +183,8 @@ pub struct GeneratedCode {
     pub phi_score: f32,
     /// Primitives that were composed for this generation
     pub primitives_used: Vec<String>,
+    /// Dataflow analysis of generated code
+    pub dataflow: Option<DataflowInfo>,
 }
 
 /// Context provided to the code generator
@@ -177,6 +311,145 @@ impl CodeGenerator {
         &self.primitive_executor
     }
 
+    /// Extract an SSM distillation target from a successful native generation.
+    ///
+    /// Returns `Some((purpose_embedding, source_code, quality))` when the generated
+    /// code is high-confidence native (no `todo!()`, high intent similarity).
+    /// The cognitive loop can feed these to Broca's SSM as training targets,
+    /// teaching the language model to reproduce native-quality code patterns.
+    pub fn distillation_target(
+        &self,
+        spec: &CodeSpec,
+        result: &GeneratedCode,
+    ) -> Option<(ContinuousHV, String, f32)> {
+        // Only distill native Rust code that was generated with high confidence
+        if spec.language != "rust" {
+            return None;
+        }
+        if result.source.contains("todo!") || result.source.contains("unimplemented!") {
+            return None; // LLM fallback — not a native pattern
+        }
+        if result.intent_similarity < 0.5 {
+            return None; // Low confidence generation
+        }
+        // Check dataflow cleanliness
+        if let Some(ref df) = result.dataflow {
+            if !df.is_clean() {
+                return None; // Has use-before-def issues
+            }
+        }
+        // Check no type warnings
+        if result.notes.iter().any(|n| n.starts_with("TYPE_MISMATCH")) {
+            return None;
+        }
+
+        let purpose_hv = self.encode_spec(spec);
+        // Quality signal: intent_similarity weighted by phi
+        let quality = result.intent_similarity * 0.7 + result.phi_score.min(1.0) * 0.3;
+
+        Some((purpose_hv, result.source.clone(), quality))
+    }
+
+    /// Validate type consistency between spec signature and generated code.
+    ///
+    /// Checks:
+    /// - Return type in generated code matches spec's return type
+    /// - Parameter types referenced in body are compatible with spec
+    /// - Iterator chain return types (e.g., .sum() → numeric, .collect() → Vec)
+    ///
+    /// Returns a list of type warnings (empty = all good).
+    pub fn validate_types(spec: &CodeSpec, source: &str) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        let sig = match spec.signature.as_deref() {
+            Some(s) => s,
+            None => return warnings,
+        };
+
+        let parsed = match super::emitters::parse_rust_signature_pub(sig) {
+            Some(p) => p,
+            None => return warnings,
+        };
+
+        let ret_type = parsed.return_type.as_deref().unwrap_or("");
+
+        // Check iterator chain return type consistency
+        if source.contains(".collect()") || source.contains(".collect::<") {
+            if !ret_type.contains("Vec")
+                && !ret_type.contains("HashMap")
+                && !ret_type.contains("HashSet")
+                && !ret_type.contains("String")
+                && !ret_type.is_empty()
+            {
+                warnings.push(format!(
+                    "TYPE_MISMATCH: .collect() used but return type is '{}' (expected Vec/HashMap/HashSet/String)",
+                    ret_type
+                ));
+            }
+        }
+
+        if source.contains(".sum()") {
+            if !ret_type.contains("i32")
+                && !ret_type.contains("i64")
+                && !ret_type.contains("u32")
+                && !ret_type.contains("u64")
+                && !ret_type.contains("f32")
+                && !ret_type.contains("f64")
+                && !ret_type.contains("usize")
+                && !ret_type.is_empty()
+            {
+                warnings.push(format!(
+                    "TYPE_MISMATCH: .sum() used but return type is '{}' (expected numeric)",
+                    ret_type
+                ));
+            }
+        }
+
+        if source.contains(".len()") && !ret_type.is_empty() {
+            if !ret_type.contains("usize")
+                && !ret_type.contains("u32")
+                && !ret_type.contains("i32")
+            {
+                warnings.push(format!(
+                    "TYPE_HINT: .len() returns usize but return type is '{}'",
+                    ret_type
+                ));
+            }
+        }
+
+        // Check if bool operations match bool return type
+        let has_bool_ops = source.contains(" == ")
+            || source.contains(" != ")
+            || source.contains(" > ")
+            || source.contains(" < ")
+            || source.contains(" >= ")
+            || source.contains(" <= ");
+        if has_bool_ops && ret_type == "bool" {
+            // Good: bool ops with bool return — no warning
+        } else if has_bool_ops
+            && !ret_type.contains("bool")
+            && !ret_type.is_empty()
+            && !source.contains("if ")
+            && !source.contains("filter")
+            && !source.contains("while")
+        {
+            // Bool ops but non-bool return and not in a conditional — might be OK
+            // (e.g., inside .filter()), so only warn if it looks like the final expression
+            if source.lines().last().map_or(false, |l| {
+                let t = l.trim();
+                (t.contains("==") || t.contains("!=") || t.contains("> ") || t.contains("< "))
+                    && !t.starts_with("//")
+            }) {
+                warnings.push(format!(
+                    "TYPE_MISMATCH: final expression is boolean but return type is '{}'",
+                    ret_type
+                ));
+            }
+        }
+
+        warnings
+    }
+
     /// Generate ONLY the test assertions for a spec, without the implementation.
     ///
     /// Used for test-first generation: produce behavioral expectations before
@@ -204,7 +477,7 @@ impl CodeGenerator {
                 tests.push(format!("    }}"));
             }
 
-            // From auto-generation
+            // From auto-generation (example-based)
             let auto = super::emitters::generate_auto_tests_pub(
                 &parsed.name,
                 &spec.purpose,
@@ -213,6 +486,19 @@ impl CodeGenerator {
             for (i, assertion) in auto.iter().enumerate() {
                 tests.push(format!("    #[test]"));
                 tests.push(format!("    fn test_auto_{}() {{", i));
+                tests.push(format!("        {}", assertion));
+                tests.push(format!("    }}"));
+            }
+
+            // From property-based generation (invariant tests)
+            let props = super::emitters::generate_property_tests_pub(
+                &parsed.name,
+                &spec.purpose,
+                Some(&parsed),
+            );
+            for (i, assertion) in props.iter().enumerate() {
+                tests.push(format!("    #[test]"));
+                tests.push(format!("    fn test_property_{}() {{", i));
                 tests.push(format!("        {}", assertion));
                 tests.push(format!("    }}"));
             }
@@ -266,6 +552,28 @@ impl CodeGenerator {
             notes.push(format!("PAST_EXAMPLE({}):\n{}", purpose, code));
         }
 
+        // Dataflow analysis for Rust code
+        let dataflow = if spec.language == "rust" && !source.contains("todo!") {
+            let df = DataflowInfo::analyze_rust(&source);
+            if !df.use_before_def.is_empty() {
+                notes.push(format!(
+                    "DATAFLOW_WARNING: possible use-before-def: {:?}",
+                    df.use_before_def
+                ));
+            }
+            Some(df)
+        } else {
+            None
+        };
+
+        // Type consistency validation
+        if spec.language == "rust" && !source.contains("todo!") {
+            let type_warnings = Self::validate_types(spec, &source);
+            for w in type_warnings {
+                notes.push(w);
+            }
+        }
+
         GeneratedCode {
             source,
             language: spec.language.clone(),
@@ -279,6 +587,7 @@ impl CodeGenerator {
                 .iter()
                 .map(|p| p.primitive.name.clone())
                 .collect(),
+            dataflow,
         }
     }
 
@@ -332,6 +641,7 @@ impl CodeGenerator {
                 .iter()
                 .map(|p| p.primitive.name.clone())
                 .collect(),
+            dataflow: None,
         }
     }
 
@@ -492,19 +802,33 @@ impl CodeGenerator {
         lines.join("\n")
     }
 
-    /// Generate code explanation
+    /// Generate code explanation with structural analysis.
+    ///
+    /// Brief: one-liner. Standard: structure + location. Detailed: full
+    /// breakdown of entities, complexity hints, and algorithm patterns detected
+    /// via HDC encoding.
     fn generate_explanation(
         &self,
         target: &CodeTarget,
         depth: super::code_intent::ExplanationDepth,
-        _context: &CodeContext,
+        context: &CodeContext,
         primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
+        let mut notes = Vec::new();
+
         let explanation = match depth {
             super::code_intent::ExplanationDepth::Brief => {
                 format!("// `{}` is a {:?}", target.name, target.kind)
             }
             super::code_intent::ExplanationDepth::Standard => {
+                let name_hv = self.encoder.encode_name(&target.name);
+                let similar = self.find_similar_context(&name_hv, context);
+                if !similar.is_empty() {
+                    notes.push(format!(
+                        "SIMILAR_ENTITIES: {} related patterns found in codebase",
+                        similar.len()
+                    ));
+                }
                 format!(
                     "// `{}` is a {:?}\n// Located in: {}",
                     target.name,
@@ -513,13 +837,54 @@ impl CodeGenerator {
                 )
             }
             _ => {
-                format!(
-                    "// Detailed analysis of `{}` ({:?})\n// Path: {}\n// Language: {}\n// (Full analysis requires LLM organ translation)",
-                    target.name,
-                    target.kind,
-                    target.path.as_deref().unwrap_or("unknown"),
-                    target.language.as_deref().unwrap_or("unknown"),
-                )
+                let name_hv = self.encoder.encode_name(&target.name);
+                let similar = self.find_similar_context(&name_hv, context);
+
+                let mut lines = Vec::new();
+                lines.push(format!("// === {} ({:?}) ===", target.name, target.kind));
+                lines.push(format!(
+                    "// Path: {}",
+                    target.path.as_deref().unwrap_or("unknown")
+                ));
+                lines.push(format!(
+                    "// Language: {}",
+                    target.language.as_deref().unwrap_or("unknown")
+                ));
+
+                // Algorithm pattern detection via HDC
+                if let Some(pattern) =
+                    crate::dynamics::cfc_code_sequencer::CfCCodeSequencer::detect_algorithm_pattern(
+                        &name_hv,
+                    )
+                {
+                    lines.push(format!("// Detected algorithm family: {:?}", pattern));
+                    notes.push(format!("ALGORITHM_PATTERN:{:?}", pattern));
+                }
+
+                // Complexity hints from entity kind
+                let complexity_hint = match target.kind {
+                    EntityKind::Function => "O(?) — analyze body for loops/recursion",
+                    EntityKind::Struct => "data structure — check field count and nesting",
+                    EntityKind::Trait => "interface — check implementors for dispatch cost",
+                    EntityKind::TraitImpl => "implementation — check method count",
+                    EntityKind::Enum => "sum type — check variant count for match exhaustiveness",
+                    _ => "unknown entity kind",
+                };
+                lines.push(format!("// Complexity hint: {}", complexity_hint));
+
+                if !similar.is_empty() {
+                    lines.push(format!(
+                        "// Related patterns: {} found in codebase context",
+                        similar.len()
+                    ));
+                }
+
+                lines.push(format!(
+                    "// Phi (integration): {:.3}",
+                    primitive_result.phi
+                ));
+
+                lines.join("\n")
             }
         };
 
@@ -532,13 +897,14 @@ impl CodeGenerator {
             plan_steps: Vec::new(),
             epistemic_status: EpistemicStatus::Probable,
             intent_similarity: 0.7,
-            notes: vec!["Explanation skeleton — full translation requires LLM organ".to_string()],
+            notes,
             phi_score: primitive_result.phi,
             primitives_used: primitive_result
                 .primitives
                 .iter()
                 .map(|p| p.primitive.name.clone())
                 .collect(),
+            dataflow: None,
         }
     }
 
@@ -582,6 +948,7 @@ impl CodeGenerator {
                 .iter()
                 .map(|p| p.primitive.name.clone())
                 .collect(),
+            dataflow: None,
         }
     }
 
@@ -642,6 +1009,7 @@ impl CodeGenerator {
                 .iter()
                 .map(|p| p.primitive.name.clone())
                 .collect(),
+            dataflow: None,
         }
     }
 
@@ -677,6 +1045,7 @@ impl CodeGenerator {
                 .iter()
                 .map(|p| p.primitive.name.clone())
                 .collect(),
+            dataflow: None,
         }
     }
 

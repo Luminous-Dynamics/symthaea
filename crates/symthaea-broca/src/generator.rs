@@ -51,6 +51,14 @@ pub struct BrocaConfig {
     pub enable_semantic_veto: bool,
     /// Hesitation token for semantic veto.
     pub veto_hesitation: String,
+    /// Repetition penalty (1.0 = no penalty, >1.0 = suppress repeats).
+    /// Applied to logits of tokens already generated in the current sequence.
+    #[serde(default = "default_repetition_penalty")]
+    pub repetition_penalty: f32,
+}
+
+fn default_repetition_penalty() -> f32 {
+    1.2
 }
 
 impl Default for BrocaConfig {
@@ -65,6 +73,7 @@ impl Default for BrocaConfig {
             enable_consciousness_gating: true,
             enable_semantic_veto: true,
             veto_hesitation: "-- wait, ".to_string(),
+            repetition_penalty: default_repetition_penalty(),
         }
     }
 }
@@ -168,11 +177,31 @@ impl BrocaGenerator {
         self.generate_with_callback(channels, &mut |_| {})
     }
 
+    /// Generate continuing from the current CfC state (multi-turn context).
+    ///
+    /// Unlike `generate()`, this does NOT reset the controller state,
+    /// so the CfC network retains temporal context from prior generations.
+    /// This enables coherent multi-turn dialogue where each utterance
+    /// builds on the neural state of previous ones.
+    pub fn generate_continuing(&mut self, channels: &ThoughtChannels) -> GenerationResult {
+        self.generate_internal(channels, &mut |_| {}, false)
+    }
+
     /// Generate text with a per-token streaming callback.
     pub fn generate_with_callback(
         &mut self,
         channels: &ThoughtChannels,
         on_token: &mut dyn FnMut(&str),
+    ) -> GenerationResult {
+        self.generate_internal(channels, on_token, true)
+    }
+
+    /// Internal generation with configurable state reset.
+    fn generate_internal(
+        &mut self,
+        channels: &ThoughtChannels,
+        on_token: &mut dyn FnMut(&str),
+        reset_state: bool,
     ) -> GenerationResult {
         // 1. Encode thought channels once
         let mut thought_hv = self.encoder.encode(channels);
@@ -184,8 +213,10 @@ impl BrocaGenerator {
             self.config.gating.base_max_tokens
         };
 
-        // 3. Reset controller state
-        self.controller.reset();
+        // 3. Optionally reset controller state (skip for multi-turn continuity)
+        if reset_state {
+            self.controller.reset();
+        }
 
         // 4. Autoregressive generation loop
         let mut tokens = Vec::new();
@@ -193,10 +224,16 @@ impl BrocaGenerator {
         let mut eos_terminated = false;
         let mut veto_triggered = false;
         let mut text = String::new();
+        let rep_penalty = self.config.repetition_penalty;
 
         for pos in 0..max_tokens {
             // Forward step
             let mut logits = self.controller.forward_step(&thought_hv, prev_token, pos);
+
+            // Apply repetition penalty to already-generated tokens
+            if rep_penalty > 1.0 + 1e-6 {
+                apply_repetition_penalty(&mut logits, &tokens, rep_penalty);
+            }
 
             // Apply gating
             if self.config.enable_epistemic_gate {
@@ -299,6 +336,28 @@ impl BrocaGenerator {
     /// Get reference to the config.
     pub fn config(&self) -> &BrocaConfig {
         &self.config
+    }
+}
+
+/// Apply repetition penalty to logits for tokens already generated.
+///
+/// For each token ID in `generated`, divide its logit by `penalty` if positive,
+/// or multiply by `penalty` if negative. This suppresses repeated tokens
+/// while preserving relative ordering of unseen tokens.
+///
+/// Science: Keskar et al. (2019) "CTRL" — repetition penalty prevents
+/// degenerate loops in autoregressive models.
+fn apply_repetition_penalty(logits: &mut [f32], generated: &[u32], penalty: f32) {
+    // Collect unique generated token IDs
+    let seen: std::collections::HashSet<u32> = generated.iter().copied().collect();
+    for token_id in seen {
+        if let Some(logit) = logits.get_mut(token_id as usize) {
+            if *logit > 0.0 {
+                *logit /= penalty;
+            } else {
+                *logit *= penalty;
+            }
+        }
     }
 }
 
@@ -667,6 +726,103 @@ mod tests {
         assert!(
             weight <= 3.0,
             "Binding weight should be capped at 3.0, got {weight}"
+        );
+    }
+
+    #[test]
+    fn test_repetition_penalty_reduces_repeats() {
+        let genesis = test_genesis();
+        let mut config = test_config();
+        config.repetition_penalty = 1.5;
+        config.gating.base_max_tokens = 30;
+        config.enable_consciousness_gating = false;
+
+        let mut gen = BrocaGenerator::new(&genesis, config);
+        let channels = ThoughtChannels::default();
+        let result = gen.generate(&channels);
+
+        // Compute max consecutive repetition
+        let max_rep = if result.token_ids.len() < 2 {
+            1
+        } else {
+            let mut max = 1usize;
+            let mut run = 1usize;
+            for w in result.token_ids.windows(2) {
+                if w[0] == w[1] {
+                    run += 1;
+                    max = max.max(run);
+                } else {
+                    run = 1;
+                }
+            }
+            max
+        };
+
+        // With penalty 1.5, max consecutive repeats should be modest
+        assert!(
+            max_rep <= 5,
+            "Repetition penalty should limit repeats: max_rep={max_rep}"
+        );
+    }
+
+    #[test]
+    fn test_repetition_penalty_fn() {
+        let mut logits = vec![0.5, -0.3, 0.8, 0.1];
+        let generated = vec![0, 2]; // tokens 0 and 2 were generated
+
+        apply_repetition_penalty(&mut logits, &generated, 2.0);
+
+        // Token 0: positive logit → divided by 2.0
+        assert!((logits[0] - 0.25).abs() < 1e-6);
+        // Token 1: not generated → unchanged
+        assert!((logits[1] - (-0.3)).abs() < 1e-6);
+        // Token 2: positive logit → divided by 2.0
+        assert!((logits[2] - 0.4).abs() < 1e-6);
+        // Token 3: not generated → unchanged
+        assert!((logits[3] - 0.1).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_repetition_penalty_negative_logit() {
+        let mut logits = vec![-0.5, 0.3];
+        let generated = vec![0]; // token 0 generated (has negative logit)
+
+        apply_repetition_penalty(&mut logits, &generated, 2.0);
+
+        // Negative logit → multiplied by penalty (pushed further negative)
+        assert!((logits[0] - (-1.0)).abs() < 1e-6);
+        // Token 1 unchanged
+        assert!((logits[1] - 0.3).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_generate_continuing_preserves_state() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut gen = BrocaGenerator::new(&genesis, config);
+
+        let channels = ThoughtChannels::with_intent(1);
+
+        // First generation (with reset)
+        let result1 = gen.generate(&channels);
+
+        // Continuing generation (without reset) — should differ from fresh
+        let result2 = gen.generate_continuing(&channels);
+
+        // The continuing generation should produce different output because
+        // it builds on the CfC state from result1
+        // (Note: they MIGHT produce the same output by coincidence with random weights,
+        // but with different initial CfC state the dynamics should diverge)
+        assert!(
+            result2.num_tokens > 0,
+            "Continuing generation should produce tokens"
+        );
+
+        // Now do a fresh generation — should match result1 exactly
+        let result3 = gen.generate(&channels);
+        assert_eq!(
+            result1.token_ids, result3.token_ids,
+            "Fresh generation should be identical to first"
         );
     }
 

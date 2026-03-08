@@ -16,7 +16,7 @@ anyhow = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rand = { workspace = true }
-rayon = { workspace = true }
+rayon = { workspace = true, optional = true }
 
 # Distillation collection (optional)
 ureq = { version = "2.9", optional = true }
@@ -57,7 +57,8 @@ path = "src/bin/broca_embedding_stats.rs"
 required-features = ["mamba"]
 
 [features]
-default = ["simd"]
+default = ["simd", "parallel"]
+parallel = ["dep:rayon"]
 mamba = ["dep:candle-core", "dep:candle-nn", "dep:hf-hub", "dep:tokenizers"]
 cuda = ["mamba", "candle-core/cuda"]
 hf-tokenizer = ["dep:tokenizers"]
