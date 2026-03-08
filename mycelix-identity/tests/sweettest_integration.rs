@@ -206,6 +206,8 @@ pub struct TrustCredential {
     pub expires_at: Option<Timestamp>,
     pub revoked: bool,
     pub revocation_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub revoked_at: Option<Timestamp>,
     pub supersedes: Option<String>,
 }
 
