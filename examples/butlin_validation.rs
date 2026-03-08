@@ -4,6 +4,11 @@
 //! then evaluates all 14 Butlin et al. (2023) consciousness indicators
 //! with runtime-blended scores. Validates 14/14 as Present.
 //!
+//! **Shared formulas** (must match `symthaea-psych-bench/src/benchmarks/butlin/indicators.rs`):
+//! - `normalize_phi(phi) = 2/(1+exp(-phi)) - 1`
+//! - `blend_score = 0.6 * static + 0.4 * runtime`
+//! - HOT-2 runtime: `(bottleneck * 2.0).clamp(0, 1)`
+//!
 //! ```bash
 //! cargo run --example butlin_validation --release
 //! ```

@@ -44,7 +44,7 @@ pub(crate) struct ParsedSignature {
     pub(crate) name: String,
     pub(crate) params: Vec<(String, String)>, // (name, type)
     pub(crate) return_type: Option<String>,
-    pub(crate) is_method: bool, // has &self or &mut self
+    pub(crate) _is_method: bool, // has &self or &mut self
 }
 
 /// Parse a Rust function signature string like "fn foo(a: i32, b: &str) -> String"
@@ -69,14 +69,14 @@ fn parse_rust_signature(sig: &str) -> Option<ParsedSignature> {
 
     // Parse params
     let mut params = Vec::new();
-    let mut is_method = false;
+    let mut _is_method = false;
     for param in params_str.split(',') {
         let param = param.trim();
         if param.is_empty() {
             continue;
         }
         if param == "&self" || param == "&mut self" || param == "self" {
-            is_method = true;
+            _is_method = true;
             continue;
         }
         if let Some(colon_pos) = param.find(':') {
@@ -98,7 +98,7 @@ fn parse_rust_signature(sig: &str) -> Option<ParsedSignature> {
         name,
         params,
         return_type,
-        is_method,
+        _is_method,
     })
 }
 
@@ -623,7 +623,7 @@ fn extract_number_from_text(text: &str) -> Option<usize> {
 }
 
 /// Try to infer function body from input/output examples
-fn infer_from_examples(examples: &[(String, String)], params: &[(String, String)], return_type: Option<&str>) -> Option<String> {
+fn infer_from_examples(examples: &[(String, String)], params: &[(String, String)], _return_type: Option<&str>) -> Option<String> {
     if examples.is_empty() || params.is_empty() {
         return None;
     }
@@ -769,7 +769,7 @@ impl CodeEmitter for RustEmitter {
         let mut has_doc = false;
         let mut field_steps = 0usize;
         let mut method_steps = 0usize;
-        let mut param_steps = 0usize;
+        let mut _param_steps = 0usize;
 
         for step in plan {
             match step.action {
@@ -779,7 +779,7 @@ impl CodeEmitter for RustEmitter {
                 PlanAction::ImplTrait => has_impl = true,
                 PlanAction::AddField => field_steps += 1,
                 PlanAction::AddMethod => method_steps += 1,
-                PlanAction::AddParameter => param_steps += 1,
+                PlanAction::AddParameter => _param_steps += 1,
                 PlanAction::AddErrorHandling => has_error_handling = true,
                 PlanAction::AddDocumentation => has_doc = true,
                 PlanAction::AddImport => {
@@ -1603,7 +1603,7 @@ mod tests {
         assert_eq!(sig.params.len(), 2);
         assert_eq!(sig.params[0], ("a".to_string(), "i32".to_string()));
         assert_eq!(sig.return_type, Some("i32".to_string()));
-        assert!(!sig.is_method);
+        assert!(!sig._is_method);
     }
 
     #[test]
@@ -1611,7 +1611,7 @@ mod tests {
         let sig = parse_rust_signature("fn name(&self) -> &str").unwrap();
         assert_eq!(sig.name, "name");
         assert!(sig.params.is_empty());
-        assert!(sig.is_method);
+        assert!(sig._is_method);
         assert_eq!(sig.return_type, Some("&str".to_string()));
     }
 
@@ -1725,7 +1725,7 @@ mod tests {
             name: "add".to_string(),
             params: vec![("a".to_string(), "i32".to_string()), ("b".to_string(), "i32".to_string())],
             return_type: Some("i32".to_string()),
-            is_method: false,
+            _is_method: false,
         };
         let tests = generate_auto_tests("add", "Add two numbers", Some(&sig));
         assert!(!tests.is_empty(), "Should generate tests for add");
@@ -1738,7 +1738,7 @@ mod tests {
             name: "is_even".to_string(),
             params: vec![("n".to_string(), "i32".to_string())],
             return_type: Some("bool".to_string()),
-            is_method: false,
+            _is_method: false,
         };
         let tests = generate_auto_tests("is_even", "Check if a number is even", Some(&sig));
         assert!(!tests.is_empty(), "Should generate tests for is_even");
@@ -1752,7 +1752,7 @@ mod tests {
             name: "reverse".to_string(),
             params: vec![("s".to_string(), "&str".to_string())],
             return_type: Some("String".to_string()),
-            is_method: false,
+            _is_method: false,
         };
         let tests = generate_auto_tests("reverse", "Reverse a string", Some(&sig));
         assert!(!tests.is_empty(), "Should generate tests for reverse");
@@ -1765,7 +1765,7 @@ mod tests {
             name: "factorial".to_string(),
             params: vec![("n".to_string(), "u64".to_string())],
             return_type: Some("u64".to_string()),
-            is_method: false,
+            _is_method: false,
         };
         let tests = generate_auto_tests("factorial", "Compute factorial", Some(&sig));
         assert!(!tests.is_empty(), "Should generate tests for factorial");
@@ -1778,7 +1778,7 @@ mod tests {
             name: "sort".to_string(),
             params: vec![("items".to_string(), "Vec<i32>".to_string())],
             return_type: Some("Vec<i32>".to_string()),
-            is_method: false,
+            _is_method: false,
         };
         let tests = generate_auto_tests("sort", "Sort a vector", Some(&sig));
         assert!(!tests.is_empty(), "Should generate tests for sort");
