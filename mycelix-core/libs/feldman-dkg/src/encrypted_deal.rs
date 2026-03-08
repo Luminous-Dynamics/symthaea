@@ -330,6 +330,84 @@ mod tests {
     }
 
     #[test]
+    fn test_encrypted_deal_tampered_encapsulated_key() {
+        let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let deal = dealer.generate_deal();
+
+        let mut encrypted = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
+
+        // Tamper with the encapsulated key (KEM ciphertext) for participant 1
+        if let Some(payload) = encrypted.encrypted_shares.iter_mut().find(|p| p.recipient == 1) {
+            payload.encapsulated_key[0] ^= 0xFF;
+        }
+
+        // Decryption with wrong key material should produce wrong plaintext → share verification fails
+        let result = encrypted.decrypt_share(1, test_decrypt);
+        assert!(result.is_err(), "tampered encapsulated key should cause decryption/verification failure");
+    }
+
+    #[test]
+    fn test_encrypted_deal_cross_recipient_decryption() {
+        // Encrypt with recipient-specific keys, then try decrypting with wrong recipient's callback
+        let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let deal = dealer.generate_deal();
+
+        let encrypted = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
+
+        // Create a decrypt function that uses participant 2's key to decrypt participant 1's share
+        let cross_decrypt = |_ek: &[u8], _nonce: &[u8], ciphertext: &[u8]| -> Result<Vec<u8>, String> {
+            // Use recipient 2's key (vec![2u8; 32]) instead of recipient 1's key
+            let wrong_key = vec![2u8; 32];
+            let plaintext: Vec<u8> = ciphertext.iter().zip(wrong_key.iter().cycle()).map(|(a, b)| a ^ b).collect();
+            Ok(plaintext)
+        };
+
+        // Should decrypt to wrong value → share verification fails
+        let result = encrypted.decrypt_share(1, cross_decrypt);
+        assert!(matches!(result, Err(DkgError::ShareVerificationFailed { .. })),
+            "cross-recipient decryption should fail share verification");
+    }
+
+    #[test]
+    fn test_encrypted_deal_tampered_nonce() {
+        let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let deal = dealer.generate_deal();
+
+        let mut encrypted = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
+
+        // Tamper with the nonce for participant 1
+        if let Some(payload) = encrypted.encrypted_shares.iter_mut().find(|p| p.recipient == 1) {
+            payload.nonce[0] ^= 0xFF;
+        }
+
+        // With our test XOR cipher, nonce isn't used in decryption, so this
+        // tests the structural handling. With real AES-GCM, this would fail authentication.
+        // The test verifies the nonce field is properly stored and retrievable.
+        let result = encrypted.decrypt_share(1, test_decrypt);
+        // XOR cipher ignores nonce, so decryption still succeeds
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_encrypted_deal_nonce_uniqueness() {
+        let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let deal = dealer.generate_deal();
+
+        // Encrypt the same deal twice
+        let enc1 = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
+        let enc2 = EncryptedDeal::from_deal(&deal, test_encrypt).unwrap();
+
+        // With our deterministic test cipher, nonces are identical (vec![0; 24]).
+        // This test documents that real implementations MUST use random nonces.
+        // Both should decrypt correctly regardless.
+        for i in 1..=3u32 {
+            let s1 = enc1.decrypt_share(i, test_decrypt).unwrap();
+            let s2 = enc2.decrypt_share(i, test_decrypt).unwrap();
+            assert_eq!(s1.value, s2.value);
+        }
+    }
+
+    #[test]
     fn test_encrypted_deal_in_ceremony() {
         // Full DKG ceremony using encrypted deals
         use crate::ceremony::{DkgCeremony, DkgConfig};

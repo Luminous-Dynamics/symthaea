@@ -146,4 +146,52 @@ mod tests {
         // Verify using the serialized/deserialized key bytes
         assert!(verify(&vk_bytes, message, &signature).is_ok());
     }
+
+    #[test]
+    fn test_empty_message_signing() {
+        let kp = generate_signing_keypair();
+        let signature = sign(&kp.signing_key, b"");
+        assert_eq!(signature.len(), 3309);
+        assert!(verify(&kp.verifying_key_bytes(), b"", &signature).is_ok());
+        // Empty-message sig must not verify against non-empty message
+        assert!(verify(&kp.verifying_key_bytes(), b"x", &signature).is_err());
+    }
+
+    #[test]
+    fn test_large_message_signing() {
+        let kp = generate_signing_keypair();
+        let large_msg = vec![0xABu8; 100_000]; // 100 KB
+        let signature = sign(&kp.signing_key, &large_msg);
+        assert_eq!(signature.len(), 3309);
+        assert!(verify(&kp.verifying_key_bytes(), &large_msg, &signature).is_ok());
+    }
+
+    #[test]
+    fn test_tampered_verifying_key_rejected() {
+        let kp = generate_signing_keypair();
+        let message = b"governance proposal";
+        let signature = sign(&kp.signing_key, message);
+
+        let mut vk_bytes = kp.verifying_key_bytes();
+        vk_bytes[0] ^= 0xFF; // flip one byte
+        let result = verify(&vk_bytes, message, &signature);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_invalid_key_lengths_rejected() {
+        let kp = generate_signing_keypair();
+        let message = b"test";
+        let signature = sign(&kp.signing_key, message);
+
+        // Too-short verifying key
+        let result = verify(&[0u8; 100], message, &signature);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("1952"));
+
+        // Too-short signature
+        let result = verify(&kp.verifying_key_bytes(), message, &[0u8; 100]);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("3309"));
+    }
 }

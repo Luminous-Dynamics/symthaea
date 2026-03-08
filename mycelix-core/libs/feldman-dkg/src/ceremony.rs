@@ -1398,6 +1398,166 @@ mod tests {
     }
 
     #[test]
+    fn test_hybrid_ceremony_full_flow() {
+        use crate::hash_commitment::HashCommitmentSet;
+
+        let config = DkgConfig::new(2, 3).unwrap()
+            .with_commitment_scheme(CommitmentScheme::Hybrid);
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+        assert_eq!(ceremony.phase(), CeremonyPhase::CommitmentCollection);
+
+        // Generate deals
+        let deals: Vec<_> = (1..=3)
+            .map(|i| {
+                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+                dealer.generate_deal()
+            })
+            .collect();
+
+        // Phase 1: Submit hash commitments
+        let mut reveals = Vec::new();
+        for (i, deal) in deals.iter().enumerate() {
+            let (commitment_set, reveal) = HashCommitmentSet::from_deal(deal, &mut OsRng);
+            ceremony.submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0).unwrap();
+            reveals.push(reveal);
+        }
+        assert_eq!(ceremony.phase(), CeremonyPhase::Dealing);
+
+        // Phase 2: Submit deals (Feldman commitments verified on-chain)
+        for (i, deal) in deals.iter().enumerate() {
+            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0).unwrap();
+        }
+
+        // Phase 3: Submit hash reveals
+        for (i, reveal) in reveals.into_iter().enumerate() {
+            ceremony.submit_hash_reveal(ParticipantId((i + 1) as u32), reveal, 0).unwrap();
+        }
+
+        // Phase 4: Verify hash reveals (quantum-resistant verification)
+        ceremony.verify_hash_reveals().unwrap();
+
+        // Phase 5: Finalize — both Feldman + hash verification passed
+        let result = ceremony.finalize().unwrap();
+        assert_eq!(result.qualified_count, 3);
+    }
+
+    #[test]
+    fn test_hybrid_ceremony_wrong_salt_disqualifies() {
+        use crate::hash_commitment::{HashCommitmentSet, HashReveal, CommitmentSalt};
+
+        let config = DkgConfig::new(2, 3).unwrap()
+            .with_commitment_scheme(CommitmentScheme::Hybrid);
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        let deals: Vec<_> = (1..=3)
+            .map(|i| {
+                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+                dealer.generate_deal()
+            })
+            .collect();
+
+        // Submit honest commitments for all
+        let mut reveals = Vec::new();
+        for (i, deal) in deals.iter().enumerate() {
+            let (commitment_set, reveal) = HashCommitmentSet::from_deal(deal, &mut OsRng);
+            ceremony.submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0).unwrap();
+            reveals.push(reveal);
+        }
+
+        // Submit all deals
+        for (i, deal) in deals.iter().enumerate() {
+            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0).unwrap();
+        }
+
+        // Participant 3 submits a reveal with WRONG salts
+        let honest_reveal_3 = reveals.pop().unwrap();
+        let wrong_salts: Vec<(u32, CommitmentSalt)> = honest_reveal_3.salts.iter()
+            .map(|(idx, _)| (*idx, CommitmentSalt::random(&mut OsRng)))
+            .collect();
+        let bad_reveal = HashReveal { dealer: ParticipantId(3), salts: wrong_salts };
+
+        // Submit honest reveals for 1 and 2
+        for (i, reveal) in reveals.into_iter().enumerate() {
+            ceremony.submit_hash_reveal(ParticipantId((i + 1) as u32), reveal, 0).unwrap();
+        }
+        // Submit bad reveal for 3
+        ceremony.submit_hash_reveal(ParticipantId(3), bad_reveal, 0).unwrap();
+
+        // Verify — participant 3 should be disqualified
+        ceremony.verify_hash_reveals().unwrap();
+
+        // Participant 3 should have a CommitRevealMismatch violation
+        let violations = ceremony.violation_tracker().violations_for(ParticipantId(3));
+        assert!(!violations.is_empty(), "participant 3 should have violations");
+        assert!(violations.iter().any(|v| matches!(v.violation_type, ViolationType::CommitRevealMismatch)));
+
+        // Ceremony should still finalize with 2 qualified (threshold met)
+        let result = ceremony.finalize().unwrap();
+        assert_eq!(result.qualified_count, 2);
+    }
+
+    #[test]
+    fn test_hybrid_ceremony_missing_hash_commitments() {
+        let config = DkgConfig::new(2, 3).unwrap()
+            .with_commitment_scheme(CommitmentScheme::Hybrid);
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+        assert_eq!(ceremony.phase(), CeremonyPhase::CommitmentCollection);
+
+        // Only 2 of 3 submit commitments — should NOT transition to Dealing
+        let deals: Vec<_> = (1..=2)
+            .map(|i| {
+                let dealer = crate::dealer::Dealer::new(ParticipantId(i), 2, 3, &mut OsRng).unwrap();
+                dealer.generate_deal()
+            })
+            .collect();
+
+        for (i, deal) in deals.iter().enumerate() {
+            let (commitment_set, _reveal) = crate::hash_commitment::HashCommitmentSet::from_deal(deal, &mut OsRng);
+            ceremony.submit_hash_commitment(ParticipantId((i + 1) as u32), commitment_set, 0).unwrap();
+        }
+
+        // Still in CommitmentCollection — waiting for participant 3
+        assert_eq!(ceremony.phase(), CeremonyPhase::CommitmentCollection);
+
+        // Cannot submit deals yet
+        let dealer3 = crate::dealer::Dealer::new(ParticipantId(3), 2, 3, &mut OsRng).unwrap();
+        let result = ceremony.submit_deal(ParticipantId(3), dealer3.generate_deal(), 0);
+        assert!(result.is_err(), "should not accept deals during CommitmentCollection");
+    }
+
+    #[test]
+    fn test_hybrid_duplicate_hash_commitment_rejected() {
+        let config = DkgConfig::new(2, 3).unwrap()
+            .with_commitment_scheme(CommitmentScheme::Hybrid);
+        let mut ceremony = DkgCeremony::new(config, 0);
+
+        for i in 1..=3 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        let dealer = crate::dealer::Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
+        let deal = dealer.generate_deal();
+        let (cs1, _) = crate::hash_commitment::HashCommitmentSet::from_deal(&deal, &mut OsRng);
+        let (cs2, _) = crate::hash_commitment::HashCommitmentSet::from_deal(&deal, &mut OsRng);
+
+        ceremony.submit_hash_commitment(ParticipantId(1), cs1, 0).unwrap();
+        let result = ceremony.submit_hash_commitment(ParticipantId(1), cs2, 0);
+        assert!(matches!(result, Err(DkgError::DuplicateShare(1))));
+    }
+
+    #[test]
     fn test_verified_complaint_valid_against_bad_share() {
         // 2-of-3 ceremony
         let config = DkgConfig::new(2, 3).unwrap();
