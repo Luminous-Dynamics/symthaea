@@ -329,6 +329,58 @@ impl BrocaGenerator {
 // PROJECTION CHECKPOINT (standalone, for Liquid-Mamba fusion)
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Legacy v3 checkpoint layout (14 positional fields, no num_groups/has_adapter).
+/// Used only for backward-compatible deserialization of older checkpoints.
+#[cfg(feature = "mamba")]
+#[derive(Deserialize)]
+struct ProjectionCheckpointV3 {
+    version: u32,
+    projection_weights: Vec<f32>,
+    hdc_dim: usize,
+    bottleneck_dim: usize,
+    ssm_dim: usize,
+    training_epoch: usize,
+    #[serde(default)]
+    deep: bool,
+    #[serde(default)]
+    inner_dim: usize,
+    #[serde(default)]
+    diagnostics_snapshot: Option<crate::projection::GradientDiagnosticsSnapshot>,
+    #[serde(default)]
+    temporal: bool,
+    #[serde(default)]
+    chunk_dim: usize,
+    #[serde(default)]
+    num_chunks: usize,
+    #[serde(default)]
+    temporal_weights: Option<Vec<f32>>,
+    checksum: [u8; 32],
+}
+
+#[cfg(feature = "mamba")]
+impl From<ProjectionCheckpointV3> for ProjectionCheckpoint {
+    fn from(v3: ProjectionCheckpointV3) -> Self {
+        Self {
+            version: v3.version,
+            projection_weights: v3.projection_weights,
+            hdc_dim: v3.hdc_dim,
+            bottleneck_dim: v3.bottleneck_dim,
+            ssm_dim: v3.ssm_dim,
+            training_epoch: v3.training_epoch,
+            deep: v3.deep,
+            inner_dim: v3.inner_dim,
+            diagnostics_snapshot: v3.diagnostics_snapshot,
+            temporal: v3.temporal,
+            chunk_dim: v3.chunk_dim,
+            num_chunks: v3.num_chunks,
+            temporal_weights: v3.temporal_weights,
+            num_groups: 0,
+            has_adapter: false,
+            checksum: v3.checksum,
+        }
+    }
+}
+
 /// Standalone checkpoint for the HDC↔SSM projection weights.
 ///
 /// Smaller and faster than a full BrocaCheckpoint — only stores the projection
@@ -421,11 +473,11 @@ impl ProjectionCheckpoint {
         self.checksum == expected
     }
 
-    /// Save to a file (MessagePack format).
+    /// Save to a file (MessagePack named-map format for forward compatibility).
     pub fn save_to_file<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         self.checksum = self.compute_checksum();
-        let serialized =
-            rmp_serde::to_vec(self).context("Failed to serialize ProjectionCheckpoint")?;
+        let serialized = rmp_serde::to_vec_named(self)
+            .context("Failed to serialize ProjectionCheckpoint")?;
         let mut file = std::fs::File::create(path.as_ref()).with_context(|| {
             format!(
                 "creating projection checkpoint: {}",
@@ -547,17 +599,23 @@ impl ProjectionCheckpoint {
         let mut buffer = Vec::new();
         file.read_to_end(&mut buffer)?;
 
-        // Try MessagePack (current format) first
+        // Try MessagePack (current named-map format, then legacy positional array, then bincode)
         let checkpoint: Self = if let Ok(ckpt) = rmp_serde::from_slice::<Self>(&buffer) {
-            // MessagePack checkpoint — verify integrity
+            // Named-map or exact-match positional array — verify integrity
             if !ckpt.verify() {
                 anyhow::bail!("Projection checkpoint integrity check failed: checksum mismatch");
             }
             ckpt
+        } else if let Ok(ckpt) =
+            rmp_serde::from_slice::<ProjectionCheckpointV3>(&buffer)
+        {
+            // Legacy v3 positional array (14 fields) — upgrade to v4
+            tracing::warn!("Loaded legacy v3 positional-array checkpoint — upgrading to v4");
+            ckpt.into()
         } else {
-            // Fall back to bincode (legacy format) — skip verify since hash format changed
+            // Fall back to bincode (oldest format) — skip verify since hash format changed
             let ckpt = bincode::deserialize::<Self>(&buffer)
-                .context("Failed to deserialize ProjectionCheckpoint (tried msgpack + bincode)")?;
+                .context("Failed to deserialize ProjectionCheckpoint (tried msgpack named/positional + bincode)")?;
             tracing::warn!(
                 "Loaded legacy bincode projection checkpoint — will be re-saved as MessagePack"
             );
@@ -840,6 +898,41 @@ mod tests {
         let loaded = ProjectionCheckpoint::load_from_file(&path).unwrap();
         assert!(loaded.deep, "deep flag should survive round-trip");
         assert_eq!(loaded.inner_dim, 128, "inner_dim should survive round-trip");
+
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn test_checkpoint_preserves_generation_output() {
+        use crate::encoder::ThoughtChannels;
+        use crate::generator::SamplingStrategy;
+
+        let genesis = test_genesis();
+        let config = BrocaConfig {
+            sampling: SamplingStrategy::Greedy,
+            enable_coherence_feedback: false,
+            enable_semantic_veto: false,
+            ..BrocaConfig::default()
+        };
+        let mut gen = BrocaGenerator::new(&genesis, config.clone());
+
+        let channels = ThoughtChannels::with_intent(1);
+        let result_before = gen.generate(&channels);
+
+        let dir = std::env::temp_dir();
+        let path = dir.join("broca_test_gen_determinism.bin");
+
+        gen.save_checkpoint(&path, 0, 0.0, None, None, None)
+            .unwrap();
+
+        let (mut loaded_gen, _, _, _) = BrocaGenerator::from_checkpoint(&path, &genesis).unwrap();
+        let result_after = loaded_gen.generate(&channels);
+
+        assert_eq!(
+            result_before.token_ids, result_after.token_ids,
+            "Checkpoint round-trip must preserve generation output"
+        );
+        assert_eq!(result_before.text, result_after.text);
 
         let _ = std::fs::remove_file(&path);
     }

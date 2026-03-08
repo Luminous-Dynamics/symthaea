@@ -44,6 +44,14 @@ fn main() {
     let genesis = GenesisSeed::from_phrase(&opts.genesis_phrase);
 
     // Build LiquidMambaGenerator
+    // Build gating config with optional hedging boost override
+    let mut gating_config = symthaea_broca::gating::GatingConfig::default();
+    if let Some(boost) = opts.hedging_boost {
+        gating_config.unknown_hedging_boost = boost;
+        gating_config.uncertain_hedging_boost = boost * 0.5; // proportional
+        tracing::info!(unknown_boost = boost, uncertain_boost = boost * 0.5, "Hedging boost override");
+    }
+
     let lm_config = LiquidMambaConfig {
         model_id: opts.model_id.clone(),
         max_tokens: opts.max_gen_tokens,
@@ -71,6 +79,9 @@ fn main() {
         lora_lr: opts.lora_lr,
         embedding_stats_path: opts.embedding_stats.clone(),
         e2e_grad_chunks: opts.e2e_grad_chunks,
+        gating_config,
+        temperature: opts.temperature.unwrap_or(0.8),
+        top_k: opts.top_k.unwrap_or(40),
         // Disable runtime safety features during batch training:
         // - consciousness_gating: the PE > 0.8 gate in distill_step() blocks all
         //   gradient flow when projection is untrained (PE ≈ 1.0 always).
@@ -557,6 +568,10 @@ struct ProjectionTrainOpts {
     lora_lr: f32,
     embedding_stats: Option<String>,
     e2e_grad_chunks: usize,
+    // ─── Gate + sampling overrides ───
+    hedging_boost: Option<f32>,
+    temperature: Option<f32>,
+    top_k: Option<usize>,
 }
 
 fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
@@ -599,6 +614,9 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
         lora_lr: 0.0001,
         embedding_stats: None,
         e2e_grad_chunks: 1,
+        hedging_boost: None,
+        temperature: None,
+        top_k: None,
     };
 
     let mut i = 1;
@@ -829,6 +847,33 @@ fn parse_args(args: &[String]) -> Result<ProjectionTrainOpts, String> {
                     .parse()
                     .map_err(|_| "--e2e-grad-chunks must be a positive integer")?;
             }
+            "--hedging-boost" => {
+                i += 1;
+                opts.hedging_boost = Some(
+                    args.get(i)
+                        .ok_or("--hedging-boost requires a number")?
+                        .parse()
+                        .map_err(|_| "--hedging-boost must be a float")?,
+                );
+            }
+            "--temperature" => {
+                i += 1;
+                opts.temperature = Some(
+                    args.get(i)
+                        .ok_or("--temperature requires a number")?
+                        .parse()
+                        .map_err(|_| "--temperature must be a float")?,
+                );
+            }
+            "--top-k" => {
+                i += 1;
+                opts.top_k = Some(
+                    args.get(i)
+                        .ok_or("--top-k requires a number")?
+                        .parse()
+                        .map_err(|_| "--top-k must be a positive integer")?,
+                );
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -900,6 +945,11 @@ fn print_usage() {
     eprintln!("  --lora-lr LR                LoRA learning rate (default: 0.0001)");
     eprintln!("  --embedding-stats PATH      Pre-computed embedding stats for manifold moment matching adapter init");
     eprintln!("  --e2e-grad-chunks K         Simultaneous E2E gradient positions per step (default: 1 = legacy rotating)");
+    eprintln!();
+    eprintln!("Gate + sampling overrides:");
+    eprintln!("  --hedging-boost N      Override epistemic hedging boost (default: 5.0, Unknown=N, Uncertain=N/2)");
+    eprintln!("  --temperature T        Sampling temperature (default: 0.8)");
+    eprintln!("  --top-k K              Top-k sampling (default: 40)");
     eprintln!();
     eprintln!("Evaluation options:");
     eprintln!("  --eval PATH            Held-out JSONL for post-training evaluation");

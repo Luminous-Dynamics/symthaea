@@ -242,13 +242,28 @@ impl ThoughtLanguageEncoder {
     }
 
     /// Encode thought channels into a full 16,384D ContinuousHV.
+    ///
+    /// NaN/Inf channel values are replaced with sensible defaults (mid-range)
+    /// to prevent garbage propagation through the HDC pipeline.
     pub fn encode(&self, channels: &ThoughtChannels) -> ContinuousHV {
         let mut bound_hvs: Vec<ContinuousHV> = Vec::with_capacity(NUM_CHANNELS);
 
-        for i in 0..NUM_CHANNELS {
-            let normalized = Self::normalize_channel(i, channels.channels[i]);
+        for (i, (&raw, base)) in channels
+            .channels
+            .iter()
+            .zip(self.base_vectors.iter())
+            .enumerate()
+        {
+            let value = if raw.is_finite() {
+                raw
+            } else {
+                // Default to midpoint of the channel's range
+                let [min, max] = CHANNEL_RANGES[i];
+                (min + max) * 0.5
+            };
+            let normalized = Self::normalize_channel(i, value);
             let level_hv = self.encode_level(normalized);
-            bound_hvs.push(self.base_vectors[i].bind(&level_hv));
+            bound_hvs.push(base.bind(&level_hv));
         }
 
         let refs: Vec<&ContinuousHV> = bound_hvs.iter().collect();
@@ -378,5 +393,55 @@ mod tests {
         let channels = ThoughtChannels::default();
         let hv = enc.encode(&channels);
         assert_eq!(hv.dim(), HDC_DIMENSION);
+    }
+
+    #[test]
+    fn test_nan_inf_channels_produce_finite_output() {
+        let genesis = test_genesis();
+        let enc = ThoughtLanguageEncoder::new(&genesis);
+
+        // All NaN channels
+        let mut channels = ThoughtChannels::default();
+        for c in &mut channels.channels {
+            *c = f32::NAN;
+        }
+        let hv = enc.encode(&channels);
+        assert_eq!(hv.dim(), HDC_DIMENSION);
+        assert!(
+            hv.as_slice().iter().all(|v| v.is_finite()),
+            "NaN input channels should produce finite HV output"
+        );
+
+        // All Inf channels
+        for c in &mut channels.channels {
+            *c = f32::INFINITY;
+        }
+        let hv = enc.encode(&channels);
+        assert!(
+            hv.as_slice().iter().all(|v| v.is_finite()),
+            "Inf input channels should produce finite HV output"
+        );
+    }
+
+    #[test]
+    fn test_nan_channels_use_midpoint_defaults() {
+        let genesis = test_genesis();
+        let enc = ThoughtLanguageEncoder::new(&genesis);
+
+        // NaN channels should produce same encoding as midpoint values
+        let mut nan_channels = ThoughtChannels::default();
+        nan_channels.channels[9] = f32::NAN; // valence (range [-1, 1], midpoint = 0.0)
+
+        let mut mid_channels = ThoughtChannels::default();
+        mid_channels.channels[9] = 0.0; // explicit midpoint
+
+        let hv_nan = enc.encode(&nan_channels);
+        let hv_mid = enc.encode(&mid_channels);
+
+        let sim = hv_nan.similarity(&hv_mid);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "NaN channel should fall back to midpoint: sim={sim}"
+        );
     }
 }

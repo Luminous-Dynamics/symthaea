@@ -166,6 +166,13 @@ impl LanguageController {
         let pos_emb = self.position_base.permute(pos);
         let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
 
+        // Guard: if dt is non-finite, use the configured default
+        let dt = if dt.is_finite() && dt > 0.0 {
+            dt
+        } else {
+            self.config.dt_per_token
+        };
+
         // 2. Evolve network dynamics
         self.network.evolve_closed_form(dt, &input_hv);
 
@@ -180,6 +187,13 @@ impl LanguageController {
             let inv_temp = 1.0 / self.config.logit_temperature;
             for l in &mut logits {
                 *l *= inv_temp;
+            }
+        }
+
+        // Ensure all logits are finite (replace NaN/Inf with 0.0)
+        for l in &mut logits {
+            if !l.is_finite() {
+                *l = 0.0;
             }
         }
 
@@ -426,6 +440,45 @@ mod tests {
 
         ctrl.append_token(&genesis, "new_concept", None);
         assert_eq!(ctrl.vocab_size(), 33);
+    }
+
+    #[test]
+    fn test_logits_always_finite() {
+        let genesis = test_genesis();
+        let config = test_config();
+        let mut ctrl = LanguageController::new(&genesis, &config);
+
+        // Even with out-of-range token ID, logits should be finite
+        let thought_hv = ContinuousHV::from_genesis(&genesis, "test_thought", HDC_DIMENSION);
+        let logits = ctrl.forward_step(&thought_hv, 99999, 0); // way beyond vocab
+        assert!(
+            logits.iter().all(|l| l.is_finite()),
+            "Out-of-range token ID should still produce finite logits"
+        );
+    }
+
+    #[test]
+    fn test_nan_dt_falls_back_to_default() {
+        let genesis = test_genesis();
+        let config = test_config();
+
+        let thought_hv = ContinuousHV::from_genesis(&genesis, "test_thought", HDC_DIMENSION);
+
+        // Normal dt
+        let mut ctrl1 = LanguageController::new(&genesis, &config);
+        let logits_normal = ctrl1.forward_step(&thought_hv, 0, 0);
+
+        // NaN dt should fall back to default
+        let mut ctrl2 = LanguageController::new(&genesis, &config);
+        let logits_nan = ctrl2.forward_step_with_dt(&thought_hv, 0, 0, f32::NAN);
+
+        // Should produce same result as default dt
+        for (a, b) in logits_normal.iter().zip(logits_nan.iter()) {
+            assert!(
+                (a - b).abs() < 1e-5,
+                "NaN dt should fall back to default: {a} vs {b}"
+            );
+        }
     }
 
     #[test]

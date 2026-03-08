@@ -97,22 +97,30 @@ pub struct GatingConfig {
     pub low_warmth_threshold: f32,
     /// Base max tokens (before consciousness scaling).
     pub base_max_tokens: usize,
+    /// Semantic veto threshold — coherence below this triggers mid-sentence correction.
+    #[serde(default = "default_veto_threshold")]
+    pub veto_threshold: f32,
 }
 
 impl Default for GatingConfig {
     fn default() -> Self {
         Self {
             unknown_factual_penalty: -10.0,
-            unknown_hedging_boost: 2.0,
+            unknown_hedging_boost: 5.0,
             uncertain_factual_penalty: -3.0,
-            uncertain_hedging_boost: 1.0,
+            uncertain_hedging_boost: 2.5,
             coherence_drift_threshold: 0.3,
             high_arousal_threshold: 0.7,
             arousal_position_threshold: 10,
             low_warmth_threshold: 0.3,
             base_max_tokens: 128,
+            veto_threshold: 0.25,
         }
     }
+}
+
+fn default_veto_threshold() -> f32 {
+    0.25
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -385,11 +393,16 @@ pub struct CoherenceFeedback {
 impl CoherenceFeedback {
     /// Create a new coherence feedback monitor.
     pub fn new(threshold: f32) -> Self {
+        Self::with_veto_threshold(threshold, 0.25)
+    }
+
+    /// Create with explicit veto threshold.
+    pub fn with_veto_threshold(threshold: f32, veto_threshold: f32) -> Self {
         Self {
             threshold,
             current_coherence: 1.0,
             veto_triggered: false,
-            veto_threshold: 0.25,
+            veto_threshold,
         }
     }
 
@@ -428,7 +441,9 @@ impl CoherenceFeedback {
 /// `max_tokens = base_max * (0.5 + psi)`
 ///
 /// Higher consciousness → more detailed output, lower → terser.
+/// NaN psi is treated as 0.5 (mid-range).
 pub fn consciousness_gated_max_tokens(base_max: usize, psi: f32) -> usize {
+    let psi = if psi.is_finite() { psi } else { 0.5 };
     let factor = 0.5 + psi.clamp(0.0, 1.0);
     ((base_max as f32) * factor) as usize
 }
@@ -729,7 +744,39 @@ mod tests {
         assert_eq!(consciousness_gated_max_tokens(100, -5.0), 50);
         assert_eq!(consciousness_gated_max_tokens(100, 5.0), 150);
         let result = consciousness_gated_max_tokens(100, f32::NAN);
-        assert_eq!(result, 0, "NaN psi → 0 tokens (NaN as usize = 0)");
+        assert_eq!(result, 100, "NaN psi → treated as 0.5 (mid-range)");
+    }
+
+    #[test]
+    fn test_configurable_veto_threshold() {
+        let mut feedback_strict = CoherenceFeedback::with_veto_threshold(0.3, 0.5);
+        let mut feedback_lenient = CoherenceFeedback::with_veto_threshold(0.3, 0.1);
+
+        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase("test-veto-config");
+        let a = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "a", symthaea_core::hdc::HDC_DIMENSION,
+        );
+        let b = symthaea_core::hdc::ContinuousHV::from_genesis(
+            &genesis, "b", symthaea_core::hdc::HDC_DIMENSION,
+        );
+
+        // Nearly orthogonal HVs — coherence near 0
+        feedback_strict.update(&a, &b);
+        feedback_lenient.update(&a, &b);
+
+        assert!(feedback_strict.should_veto(), "Strict threshold (0.5) should veto near-orthogonal");
+        assert!(feedback_lenient.should_veto(), "Lenient threshold (0.1) should also veto near-zero coherence");
+    }
+
+    #[test]
+    fn test_veto_threshold_from_gating_config() {
+        let config = GatingConfig {
+            veto_threshold: 0.42,
+            ..GatingConfig::default()
+        };
+        let feedback = CoherenceFeedback::with_veto_threshold(config.coherence_drift_threshold, config.veto_threshold);
+        // Just verify construction — the threshold is stored
+        assert!(!feedback.should_veto(), "Fresh feedback should not veto");
     }
 
     #[test]
