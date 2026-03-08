@@ -40,6 +40,7 @@
 //! - **Agentic**: Instrumental Actor framework for AI agents (MIP-E-004)
 //! - **Temporal**: Temporal Economics with patient capital (MIP-E-005)
 //! - **Intentions**: Civilizational Intention Framework (MIP-E-007)
+//! - **Finance**: Finance bridge client for cross-cluster currency queries
 //!
 //! ## Features
 //!
@@ -79,6 +80,7 @@ pub mod bridge;
 pub mod credentials;
 pub mod economics;
 pub mod epistemic;
+pub mod finance;
 pub mod error;
 #[cfg(feature = "ts-export")]
 mod export_bindings;
@@ -123,6 +125,12 @@ pub use matl::{ConsensusResult, RbBftConfig, RbBftConsensus, RoundState, Vote, V
 pub use matl::{GovernanceTier, KVector, KVectorDimension, KVectorWeights, KVECTOR_WEIGHTS};
 pub use pagination::{paginate_vec, PaginatedResponse, PaginationRequest};
 pub use storage::{EpistemicStorage, StorageConfig, StorageError, StorageReceipt, StorageRouter};
+
+// Finance bridge exports (cross-cluster finance queries)
+pub use finance::{
+    BalanceResponse, FeeTierResponse, FinanceBridgeClient, FinanceBridgeHealth,
+    FinanceSummaryResponse, TendBalanceResponse, TendLimitResponse,
+};
 pub use zkproof::{GradientProof, GradientProofCircuit, PublicInputs};
 
 // Agentic Economy exports (MIP-E-004: Epistemic-Aware AI Agency)

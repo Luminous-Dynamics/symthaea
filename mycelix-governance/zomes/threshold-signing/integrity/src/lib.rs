@@ -86,6 +86,33 @@ pub enum DkgPhase {
     Disbanded,
 }
 
+/// Severity level for DKG protocol violations.
+///
+/// Typed enum replaces freeform String to prevent parsing errors
+/// and ensure consistent severity handling across locales.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum ViolationSeverity {
+    /// Minor protocol deviation, no security impact
+    Minor,
+    /// Moderate violation, potential for degraded security
+    Moderate,
+    /// Severe violation, active security threat
+    Severe,
+    /// Critical violation, immediate committee compromise risk
+    Critical,
+}
+
+impl std::fmt::Display for ViolationSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Minor => write!(f, "minor"),
+            Self::Moderate => write!(f, "moderate"),
+            Self::Severe => write!(f, "severe"),
+            Self::Critical => write!(f, "critical"),
+        }
+    }
+}
+
 /// Governance scope for signing committees
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum CommitteeScope {
@@ -193,8 +220,8 @@ pub struct DkgViolationReport {
     pub participant_id: u32,
     /// Type of violation
     pub violation_type: String,
-    /// Severity level (minor, moderate, severe, critical)
-    pub severity: String,
+    /// Severity level
+    pub severity: ViolationSeverity,
     /// Penalty score (0.0-1.0)
     pub penalty_score: f64,
     /// Epoch when violation occurred
@@ -678,15 +705,19 @@ fn validate_create_share(
 
 /// Pure validation for violation report -- testable without HDI
 pub fn check_violation_report_validity(report: &DkgViolationReport) -> Result<(), String> {
-    // Severity must be one of the known levels
-    match report.severity.as_str() {
-        "minor" | "moderate" | "severe" | "critical" => {}
-        other => {
-            return Err(format!(
-                "Invalid severity '{}': must be minor, moderate, severe, or critical",
-                other
-            ));
-        }
+    // Severity is now a typed enum — no string parsing needed.
+    // Validate penalty aligns with severity level.
+    let min_penalty = match report.severity {
+        ViolationSeverity::Minor => 0.0,
+        ViolationSeverity::Moderate => 0.1,
+        ViolationSeverity::Severe => 0.3,
+        ViolationSeverity::Critical => 0.5,
+    };
+    if report.penalty_score < min_penalty {
+        return Err(format!(
+            "Penalty score {:.2} too low for {:?} severity (minimum: {:.2})",
+            report.penalty_score, report.severity, min_penalty
+        ));
     }
 
     // Penalty score must be in [0.0, 1.0]
@@ -1035,7 +1066,7 @@ mod tests {
             committee_id: "committee-1".into(),
             participant_id: 3,
             violation_type: "InvalidShare".into(),
-            severity: "moderate".into(),
+            severity: ViolationSeverity::Moderate,
             penalty_score: 0.15,
             epoch: 1,
             reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
@@ -1045,20 +1076,21 @@ mod tests {
     }
 
     #[test]
-    fn test_violation_report_invalid_severity() {
+    fn test_violation_report_penalty_below_severity_minimum() {
+        // Severe requires penalty >= 0.3
         let report = DkgViolationReport {
             committee_id: "committee-1".into(),
             participant_id: 3,
             violation_type: "InvalidShare".into(),
-            severity: "extreme".into(), // invalid
-            penalty_score: 0.15,
+            severity: ViolationSeverity::Severe,
+            penalty_score: 0.15, // too low for Severe
             epoch: 1,
             reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
             reported_at: Timestamp::from_micros(0),
         };
         let result = check_violation_report_validity(&report);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Invalid severity"));
+        assert!(result.unwrap_err().contains("too low"));
     }
 
     #[test]
@@ -1067,7 +1099,7 @@ mod tests {
             committee_id: "committee-1".into(),
             participant_id: 3,
             violation_type: "InvalidShare".into(),
-            severity: "severe".into(),
+            severity: ViolationSeverity::Severe,
             penalty_score: 1.5, // out of range
             epoch: 1,
             reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
@@ -1084,7 +1116,7 @@ mod tests {
             committee_id: "committee-1".into(),
             participant_id: 3,
             violation_type: "InvalidShare".into(),
-            severity: "minor".into(),
+            severity: ViolationSeverity::Minor,
             penalty_score: f64::NAN,
             epoch: 1,
             reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
@@ -1099,7 +1131,7 @@ mod tests {
             committee_id: "committee-1".into(),
             participant_id: 0, // invalid
             violation_type: "InvalidShare".into(),
-            severity: "minor".into(),
+            severity: ViolationSeverity::Minor,
             penalty_score: 0.05,
             epoch: 1,
             reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
@@ -1110,21 +1142,27 @@ mod tests {
 
     #[test]
     fn test_all_severity_levels_accepted() {
-        for severity in &["minor", "moderate", "severe", "critical"] {
+        let levels = [
+            (ViolationSeverity::Minor, 0.05),
+            (ViolationSeverity::Moderate, 0.15),
+            (ViolationSeverity::Severe, 0.35),
+            (ViolationSeverity::Critical, 0.55),
+        ];
+        for (severity, penalty) in &levels {
             let report = DkgViolationReport {
                 committee_id: "committee-1".into(),
                 participant_id: 1,
                 violation_type: "DealTimeout".into(),
-                severity: severity.to_string(),
-                penalty_score: 0.1,
+                severity: severity.clone(),
+                penalty_score: *penalty,
                 epoch: 1,
                 reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
                 reported_at: Timestamp::from_micros(0),
             };
             assert!(
                 check_violation_report_validity(&report).is_ok(),
-                "Severity '{}' should be accepted",
-                severity
+                "Severity {:?} with penalty {} should be accepted",
+                severity, penalty
             );
         }
     }

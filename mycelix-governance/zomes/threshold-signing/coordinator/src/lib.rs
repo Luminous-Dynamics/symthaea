@@ -240,13 +240,15 @@ pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
                         }
                     }
                     None => {
-                        // Bridge unavailable — use trust_score as Φ proxy (degraded mode)
-                        if input.trust_score < min_phi {
-                            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                                "Trust score ({:.2}) below committee Φ minimum ({:.2}) (bridge unavailable)",
-                                input.trust_score, min_phi
-                            ))));
-                        }
+                        // Bridge unavailable — reject registration (fail-closed).
+                        // trust_score is self-reported and cannot substitute for
+                        // a verified consciousness credential.
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Consciousness bridge unavailable: cannot verify Φ score for committee \
+                             with min_phi={:.2}. Registration rejected (fail-closed). \
+                             Ensure governance_bridge zome is installed and responsive.",
+                            min_phi
+                        ))));
                     }
                 }
             }
@@ -1558,7 +1560,7 @@ pub struct ReportViolationInput {
     pub committee_id: String,
     pub participant_id: u32,
     pub violation_type: String,
-    pub severity: String,
+    pub severity: ViolationSeverity,
     pub penalty_score: f64,
     pub epoch: u32,
 }

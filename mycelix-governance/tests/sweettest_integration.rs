@@ -818,11 +818,19 @@ pub struct CombineSignaturesInput {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ViolationSeverity {
+    Minor,
+    Moderate,
+    Severe,
+    Critical,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DkgViolationReport {
     pub committee_id: String,
     pub participant_id: u32,
     pub violation_type: String,
-    pub severity: String,
+    pub severity: ViolationSeverity,
     pub penalty_score: f64,
     pub epoch: u32,
     pub reporter: AgentPubKey,
@@ -834,7 +842,7 @@ pub struct ReportViolationInput {
     pub committee_id: String,
     pub participant_id: u32,
     pub violation_type: String,
-    pub severity: String,
+    pub severity: ViolationSeverity,
     pub penalty_score: f64,
     pub epoch: u32,
 }
@@ -4076,7 +4084,7 @@ mod governance_identity_tests {
             committee_id: committee.id.clone(),
             participant_id: 2,
             violation_type: "InvalidShare".to_string(),
-            severity: "moderate".to_string(),
+            severity: ViolationSeverity::Moderate,
             penalty_score: 0.15,
             epoch: 1,
         };
@@ -4093,7 +4101,7 @@ mod governance_identity_tests {
             decode_entry(&violation_record).expect("Failed to decode violation report");
         assert_eq!(report.committee_id, committee.id);
         assert_eq!(report.participant_id, 2);
-        assert_eq!(report.severity, "moderate");
+        assert_eq!(report.severity, ViolationSeverity::Moderate);
         assert!((report.penalty_score - 0.15).abs() < 1e-10);
 
         // Retrieve violations for the committee
@@ -4150,7 +4158,7 @@ mod governance_identity_tests {
                 committee_id: committee.id.clone(),
                 participant_id: 1,
                 violation_type: "Equivocation".to_string(),
-                severity: "severe".to_string(),
+                severity: ViolationSeverity::Severe,
                 penalty_score: 0.40,
                 epoch: 1,
             };

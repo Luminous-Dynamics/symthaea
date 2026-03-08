@@ -345,7 +345,12 @@ fn validate_create_trust_credential(
         ));
     }
 
-    // Trust score range must be valid
+    // Trust score range must be finite and valid
+    if !cred.trust_score_range.lower.is_finite() || !cred.trust_score_range.upper.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Trust score range values must be finite (no NaN or Infinity)".into(),
+        ));
+    }
     if cred.trust_score_range.lower < 0.0 || cred.trust_score_range.upper > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Trust score range must be within [0, 1]".into(),
@@ -490,6 +495,11 @@ fn validate_create_request(req: AttestationRequest) -> ExternResult<ValidateCall
     }
 
     if let Some(score) = req.min_trust_score {
+        if !score.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Minimum trust score must be finite (no NaN or Infinity)".into(),
+            ));
+        }
         if !(0.0..=1.0).contains(&score) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Minimum trust score must be in [0, 1]".into(),
@@ -575,6 +585,11 @@ fn validate_create_presentation(pres: TrustPresentation) -> ExternResult<Validat
     }
 
     if let Some(ref range) = pres.disclosed_range {
+        if !range.lower.is_finite() || !range.upper.is_finite() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Disclosed range values must be finite (no NaN or Infinity)".into(),
+            ));
+        }
         if range.lower < 0.0 || range.upper > 1.0 || range.lower > range.upper {
             return Ok(ValidateCallbackResult::Invalid(
                 "Disclosed range must be valid".into(),
@@ -600,11 +615,11 @@ pub fn verify_credential_pure(
     let commitment_valid =
         kvector_commitment.len() == 32 && kvector_commitment.iter().any(|&b| b != 0);
 
-    let range_valid = trust_score_range.lower >= 0.0
+    let range_valid = trust_score_range.lower.is_finite()
+        && trust_score_range.upper.is_finite()
+        && trust_score_range.lower >= 0.0
         && trust_score_range.upper <= 1.0
-        && trust_score_range.lower <= trust_score_range.upper
-        && !trust_score_range.lower.is_nan()
-        && !trust_score_range.upper.is_nan();
+        && trust_score_range.lower <= trust_score_range.upper;
 
     let mid_score =
         (trust_score_range.lower as f64 + trust_score_range.upper as f64) / 2.0;
@@ -951,5 +966,39 @@ mod tests {
         let _req = LinkTypes::SubjectToRequest;
         let _pres = LinkTypes::CredentialToPresentation;
         let _tier = LinkTypes::TierToTrustCredential;
+    }
+
+    // --- is_finite() guard tests ---
+
+    #[test]
+    fn verify_credential_pure_rejects_nan_scores() {
+        let commitment = vec![1u8; 32];
+        let range = TrustScoreRange { lower: f32::NAN, upper: 0.5 };
+        let (_, range_valid, _, _) = verify_credential_pure(
+            &commitment, &range, &TrustTier::Basic, &[1, 2, 3],
+        );
+        assert!(!range_valid, "NaN lower should fail range validation");
+
+        let range2 = TrustScoreRange { lower: 0.3, upper: f32::NAN };
+        let (_, range_valid2, _, _) = verify_credential_pure(
+            &commitment, &range2, &TrustTier::Basic, &[1, 2, 3],
+        );
+        assert!(!range_valid2, "NaN upper should fail range validation");
+    }
+
+    #[test]
+    fn verify_credential_pure_rejects_infinity_scores() {
+        let commitment = vec![1u8; 32];
+        let range = TrustScoreRange { lower: f32::INFINITY, upper: 0.5 };
+        let (_, range_valid, _, _) = verify_credential_pure(
+            &commitment, &range, &TrustTier::Basic, &[1, 2, 3],
+        );
+        assert!(!range_valid, "Infinity lower should fail range validation");
+
+        let range2 = TrustScoreRange { lower: 0.3, upper: f32::NEG_INFINITY };
+        let (_, range_valid2, _, _) = verify_credential_pure(
+            &commitment, &range2, &TrustTier::Basic, &[1, 2, 3],
+        );
+        assert!(!range_valid2, "Negative infinity upper should fail range validation");
     }
 }

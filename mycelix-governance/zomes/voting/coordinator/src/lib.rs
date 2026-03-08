@@ -168,6 +168,10 @@ fn verify_record_author(record: &Record) -> ExternResult<AgentPubKey> {
 ///
 /// Cross-calls the proposals zome to fetch the proposal and deserializes
 /// just the voting_starts/voting_ends fields via the proposals_integrity Proposal type.
+///
+/// If the proposals zome is unreachable, voting is REJECTED (fail-closed).
+/// This prevents manipulation during network partitions where an attacker
+/// could vote on expired proposals.
 fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
     if let Some(extern_io) = governance_utils::call_local_best_effort(
         "proposals", "get_proposal", proposal_id.to_string(),
@@ -190,11 +194,14 @@ fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
                         "Voting period has ended for this proposal".into()
                     )));
                 }
+                return Ok(());
             }
         }
     }
-    // Proposals zome unavailable — allow voting (graceful degradation)
-    Ok(())
+    // Proposals zome unavailable or returned unparseable data — fail closed
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Cannot verify voting period: proposals zome unavailable. Voting rejected (fail-closed).".into()
+    )))
 }
 
 // ============================================================================
@@ -228,6 +235,25 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
 
     // Agent-level Sybil prevention: one agent, one vote per proposal
     let _caller = enforce_agent_vote_limit(&input.proposal_id, "agent_vote")?;
+
+    // Multi-agent Sybil defense: require a valid consciousness credential.
+    // Puppet accounts without consciousness assessment cannot vote.
+    // This gates on identity verification + consciousness profile (4D: identity/reputation/community/engagement).
+    if let Some(extern_io) = governance_utils::call_local_best_effort(
+        "governance_bridge", "verify_consciousness_gate",
+        serde_json::json!({"action_type": "Voting", "action_id": input.proposal_id.clone()}),
+    )? {
+        if let Ok(result) = extern_io.decode::<serde_json::Value>() {
+            let has_credential = result.get("has_credential").and_then(|v| v.as_bool()).unwrap_or(false);
+            if !has_credential {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Voting requires a valid consciousness credential. Complete identity verification first.".into()
+                )));
+            }
+        }
+    }
+    // Note: if bridge is unavailable, consciousness gate is skipped for legacy votes.
+    // Φ-weighted votes (cast_phi_weighted_vote) have their own mandatory Φ check.
 
     // Enforce voting period
     verify_voting_period(&input.proposal_id)?;

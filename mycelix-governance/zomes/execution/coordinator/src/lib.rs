@@ -347,6 +347,56 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
                                 )));
                             }
 
+                            // Defense-in-depth: verify committee scope covers this proposal type.
+                            // Fetch the committee to check its scope against the proposal.
+                            if let Ok(ZomeCallResponse::Ok(committee_io)) = call(
+                                CallTargetCell::Local,
+                                ZomeName::from("threshold_signing"),
+                                FunctionName::from("get_committee"),
+                                None,
+                                ExternIO::encode(sig.committee_id.clone())
+                                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+                            ) {
+                                if let Ok(Some(committee_record)) = committee_io.decode::<Option<Record>>() {
+                                    // Decode scope from committee — use serde_json for cross-zome compat
+                                    if let Ok(Some(committee_json)) = committee_record
+                                        .entry()
+                                        .to_app_option::<serde_json::Value>()
+                                    {
+                                        if let Some(scope_str) = committee_json
+                                            .get("scope")
+                                            .and_then(|s| s.as_str())
+                                            .map(String::from)
+                                        {
+                                            // Infer proposal type from signed_content_description
+                                            // Format: "proposal:MIP-001" or "constitutional:CA-001" etc.
+                                            let proposal_type = sig.signed_content_description
+                                                .split(':')
+                                                .next()
+                                                .unwrap_or("unknown");
+
+                                            let scope_allows = match scope_str.as_str() {
+                                                "All" => true,
+                                                "Constitutional" => proposal_type == "constitutional",
+                                                "Treasury" => proposal_type == "treasury",
+                                                "Protocol" => proposal_type == "protocol",
+                                                _ => true, // Custom or unknown — permissive
+                                            };
+
+                                            if !scope_allows {
+                                                return Err(wasm_error!(WasmErrorInner::Guest(
+                                                    format!(
+                                                        "Committee '{}' scope '{}' does not authorize signing '{}' proposals",
+                                                        sig.committee_id, scope_str, proposal_type
+                                                    )
+                                                )));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            // If committee fetch fails, proceed (signature itself is already verified)
+
                             // Emit audit signal with signature details
                             let _ = emit_signal(serde_json::json!({
                                 "type": "ThresholdSignatureVerified",
@@ -624,6 +674,41 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Only council members (guardians) can veto timelocks".into()
             )));
+        }
+    }
+
+    // If the timelock is already in Ready state, require Guardian-tier Φ (0.6)
+    // since cancelling a signed, ready-to-execute proposal is a high-impact action.
+    let tl_pre = find_timelock_by_id(&input.timelock_id)?;
+    let tl_pre_entry: Timelock = tl_pre
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid timelock entry".into())))?;
+
+    if tl_pre_entry.status == TimelockStatus::Ready {
+        // Require elevated consciousness for Ready-state vetoes
+        const GUARDIAN_PHI_THRESHOLD: f64 = 0.6;
+        match governance_utils::call_local_best_effort(
+            "governance_bridge", "verify_consciousness_gate",
+            serde_json::json!({"action_type": "Veto", "action_id": input.timelock_id.clone()}),
+        )? {
+            Some(extern_io) => {
+                if let Ok(result) = extern_io.decode::<serde_json::Value>() {
+                    let phi = result.get("phi").and_then(|p| p.as_f64()).unwrap_or(0.0);
+                    if phi < GUARDIAN_PHI_THRESHOLD {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Vetoing a Ready timelock requires Guardian-tier Φ ({:.2}), caller has {:.2}",
+                            GUARDIAN_PHI_THRESHOLD, phi
+                        ))));
+                    }
+                }
+            }
+            None => {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Cannot veto Ready timelock: consciousness bridge unavailable (fail-closed)".into()
+                )));
+            }
         }
     }
 

@@ -939,16 +939,33 @@ fn aggregate_child_health(child_records: &[Record]) -> ExternResult<AggregateChi
         {
             match council.status {
                 CouncilStatus::Active => {
-                    // Would check latest reflection for actual health
-                    healthy_count += 1;
-                    health_scores.push(0.7); // Placeholder
+                    // Fetch actual health from latest reflection
+                    let child_health = match get_latest_council_reflection(council.id.clone()) {
+                        Ok(Some(ref rec)) => rec
+                            .entry()
+                            .to_app_option::<HolonicReflection>()
+                            .ok()
+                            .flatten()
+                            .map(|r| r.health_score)
+                            .unwrap_or(0.5), // No reflection yet → neutral
+                        _ => 0.5, // Reflection fetch failed → neutral default
+                    };
+                    if child_health < 0.4 {
+                        struggling_count += 1;
+                        children_needing_attention.push(council.id.clone());
+                    } else {
+                        healthy_count += 1;
+                    }
+                    health_scores.push(child_health);
                 }
                 CouncilStatus::Dormant => {
                     dormant_count += 1;
+                    health_scores.push(0.2); // Dormant councils drag down average
                     children_needing_attention.push(council.id);
                 }
                 CouncilStatus::Suspended => {
                     struggling_count += 1;
+                    health_scores.push(0.1); // Suspended is worse than dormant
                     children_needing_attention.push(council.id);
                 }
                 CouncilStatus::Dissolved => {}

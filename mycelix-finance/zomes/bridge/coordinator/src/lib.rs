@@ -611,6 +611,164 @@ pub fn get_community_member_count(dao_did: String) -> ExternResult<u32> {
 }
 
 // ---------------------------------------------------------------------------
+// Cross-Cluster Dispatch Handlers (incoming calls from other clusters)
+// ---------------------------------------------------------------------------
+
+/// Query a member's SAP balance.
+///
+/// Called by other clusters (commons, civic, personal) via
+/// `call(CallTargetCell::OtherRole("finance"), "finance_bridge", "query_sap_balance", ..)`
+#[hdk_extern]
+pub fn query_sap_balance(member_did: String) -> ExternResult<BalanceResponse> {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("payments"),
+        FunctionName::from("get_sap_balance"),
+        None,
+        member_did.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            #[derive(Debug, Deserialize)]
+            struct SapBalance {
+                balance: u64,
+            }
+            let balance = result
+                .decode::<SapBalance>()
+                .map(|b| b.balance)
+                .unwrap_or(0);
+            Ok(BalanceResponse {
+                member_did,
+                currency: "SAP".into(),
+                balance,
+                available: true,
+            })
+        }
+        _ => Ok(BalanceResponse {
+            member_did,
+            currency: "SAP".into(),
+            balance: 0,
+            available: false,
+        }),
+    }
+}
+
+/// Query a member's TEND balance.
+///
+/// Called by other clusters to check mutual credit standing.
+#[hdk_extern]
+pub fn query_tend_balance(member_did: String) -> ExternResult<TendBalanceResponse> {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("tend"),
+        FunctionName::from("get_balance"),
+        None,
+        member_did.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            #[derive(Debug, Deserialize)]
+            struct TendBalance {
+                balance: i32,
+            }
+            let balance = result
+                .decode::<TendBalance>()
+                .map(|b| b.balance)
+                .unwrap_or(0);
+            let tier = fetch_mycel_score(&member_did);
+            Ok(TendBalanceResponse {
+                member_did,
+                balance,
+                mycel_score: tier,
+                available: true,
+            })
+        }
+        _ => Ok(TendBalanceResponse {
+            member_did,
+            balance: 0,
+            mycel_score: 0.0,
+            available: false,
+        }),
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BalanceResponse {
+    pub member_did: String,
+    pub currency: String,
+    pub balance: u64,
+    pub available: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TendBalanceResponse {
+    pub member_did: String,
+    pub balance: i32,
+    pub mycel_score: f64,
+    pub available: bool,
+}
+
+/// Get a unified financial summary for a member across all currencies.
+///
+/// Called by personal bridge, governance, or other clusters to get
+/// a complete financial picture for consciousness gating or governance decisions.
+#[hdk_extern]
+pub fn get_finance_summary(member_did: String) -> ExternResult<FinanceSummaryResponse> {
+    let sap = query_sap_balance(member_did.clone())?;
+    let tend = query_tend_balance(member_did.clone())?;
+    let fee_tier = get_member_fee_tier(member_did.clone())?;
+    let tend_limit = get_member_tend_limit(member_did.clone())?;
+
+    Ok(FinanceSummaryResponse {
+        member_did,
+        sap_balance: sap.balance,
+        tend_balance: tend.balance,
+        mycel_score: tend.mycel_score,
+        fee_tier: fee_tier.tier_name,
+        fee_rate: fee_tier.base_fee_rate,
+        tend_limit: tend_limit.effective_limit,
+        tend_tier: tend_limit.tier_name,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FinanceSummaryResponse {
+    pub member_did: String,
+    pub sap_balance: u64,
+    pub tend_balance: i32,
+    pub mycel_score: f64,
+    pub fee_tier: String,
+    pub fee_rate: f64,
+    pub tend_limit: i32,
+    pub tend_tier: String,
+}
+
+/// Health check for the finance bridge.
+///
+/// Standard bridge health endpoint for cross-cluster monitoring.
+#[hdk_extern]
+pub fn health_check(_: ()) -> ExternResult<FinanceBridgeHealth> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    Ok(FinanceBridgeHealth {
+        healthy: true,
+        agent: format!("did:mycelix:{}", agent),
+        zomes: vec![
+            "payments".into(),
+            "treasury".into(),
+            "tend".into(),
+            "staking".into(),
+            "recognition".into(),
+            "currency_mint".into(),
+        ],
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FinanceBridgeHealth {
+    pub healthy: bool,
+    pub agent: String,
+    pub zomes: Vec<String>,
+}
+
+// ---------------------------------------------------------------------------
 // Rate Limiting Helpers
 // ---------------------------------------------------------------------------
 

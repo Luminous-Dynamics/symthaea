@@ -158,37 +158,83 @@ fn get_latest_agent_snapshot(
     Ok(latest.map(|(r, s, _)| (r, s)))
 }
 
-/// Calculate harmony scores for proposal content
+/// Check if a keyword appears in a negated context.
+/// Scans a window of 5 words before the keyword for negation markers.
+fn is_negated(content_lower: &str, keyword: &str) -> bool {
+    const NEGATION_MARKERS: &[&str] = &[
+        "not", "no", "never", "without", "lack", "against", "anti",
+        "eliminate", "destroy", "end", "remove", "ban", "block", "prevent",
+        "oppose", "reject", "deny", "undermine", "erode",
+    ];
+
+    // Find all occurrences of the keyword
+    let mut start = 0;
+    while let Some(pos) = content_lower[start..].find(keyword) {
+        let abs_pos = start + pos;
+        // Extract up to 60 chars before the keyword match as context window
+        let window_start = abs_pos.saturating_sub(60);
+        let window = &content_lower[window_start..abs_pos];
+        let words: Vec<&str> = window.split_whitespace().collect();
+        // Check last 5 words for negation
+        let check_words = if words.len() > 5 { &words[words.len() - 5..] } else { &words };
+        for w in check_words {
+            if NEGATION_MARKERS.iter().any(|neg| w.contains(neg)) {
+                return true;
+            }
+        }
+        start = abs_pos + keyword.len();
+    }
+    false
+}
+
+/// Calculate harmony scores for proposal content.
+///
+/// Uses keyword matching with negation-awareness: keywords preceded by
+/// negation markers ("not", "destroy", "without", etc.) within a 5-word
+/// window are counted as negative rather than positive signals.
+/// Includes Sacred Stillness (8th Harmony).
 fn calculate_harmony_scores(content: &str) -> Vec<HarmonyScore> {
     let content_lower = content.to_lowercase();
 
-    // Seven Harmonies with keyword-based scoring
+    // Eight Harmonies with keyword-based scoring
     let harmonies = [
-        ("Resonant Coherence", vec!["integration", "wholeness", "coherent", "unified"]),
-        ("Pan-Sentient Flourishing", vec!["flourishing", "wellbeing", "care", "compassion", "help"]),
-        ("Integral Wisdom", vec!["wisdom", "truth", "knowledge", "understanding", "verify"]),
-        ("Infinite Play", vec!["creative", "play", "possibility", "experiment", "novel"]),
-        ("Universal Interconnectedness", vec!["connection", "network", "relationship", "web"]),
-        ("Sacred Reciprocity", vec!["reciprocity", "balance", "exchange", "mutual", "fair"]),
-        ("Evolutionary Progression", vec!["evolution", "growth", "progress", "development"]),
+        ("Resonant Coherence", vec!["integration", "wholeness", "coherent", "unified", "harmony"]),
+        ("Pan-Sentient Flourishing", vec!["flourishing", "wellbeing", "care", "compassion", "help", "nurture"]),
+        ("Integral Wisdom", vec!["wisdom", "truth", "knowledge", "understanding", "verify", "discern"]),
+        ("Infinite Play", vec!["creative", "play", "possibility", "experiment", "novel", "explore"]),
+        ("Universal Interconnectedness", vec!["connection", "network", "relationship", "web", "community"]),
+        ("Sacred Reciprocity", vec!["reciprocity", "balance", "exchange", "mutual", "fair", "equitable"]),
+        ("Evolutionary Progression", vec!["evolution", "growth", "progress", "development", "adapt"]),
+        ("Sacred Stillness", vec!["stillness", "rest", "contemplation", "reflection", "pause", "silence"]),
     ];
 
     harmonies
         .iter()
         .map(|(name, keywords)| {
-            let keyword_count = keywords
-                .iter()
-                .filter(|kw| content_lower.contains(*kw))
-                .count();
+            let mut positive_count = 0u32;
+            let mut negated_count = 0u32;
 
-            // Base score of 0.0, increase for each keyword found
-            let score = (keyword_count as f64 * 0.2).min(1.0);
+            for kw in keywords {
+                if content_lower.contains(*kw) {
+                    if is_negated(&content_lower, kw) {
+                        negated_count += 1;
+                    } else {
+                        positive_count += 1;
+                    }
+                }
+            }
 
-            // Check for negative indicators
+            // Each positive keyword adds 0.2, each negated keyword subtracts 0.15
+            let score = (positive_count as f64 * 0.2) - (negated_count as f64 * 0.15);
+
+            // Global negative indicators (apply uniformly to all harmonies)
             let negative_keywords = ["harm", "damage", "destroy", "exclude", "discriminate"];
             let negative_count = negative_keywords
                 .iter()
-                .filter(|kw| content_lower.contains(*kw))
+                .filter(|kw| {
+                    // Only count if not itself negated (e.g., "prevent harm" shouldn't penalize)
+                    content_lower.contains(**kw) && !is_negated(&content_lower, kw)
+                })
                 .count();
 
             let final_score = score - (negative_count as f64 * 0.3);
@@ -310,7 +356,7 @@ mod tests {
     #[test]
     fn test_harmony_scores_empty_content() {
         let scores = calculate_harmony_scores("");
-        assert_eq!(scores.len(), 7, "Should always return 7 harmony scores");
+        assert_eq!(scores.len(), 8, "Should always return 8 harmony scores");
         for s in &scores {
             assert!((s.score - 0.0).abs() < 1e-10, "{} should be 0.0 for empty content", s.harmony);
         }
