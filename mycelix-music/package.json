@@ -58,7 +58,7 @@
   "overrides": {
     "@remix-run/node": ">=2.17.2",
     "immutable": ">=5.0.2",
-    "tar": ">=6.2.1"
+    "tar": ">=7.0.0"
   },
   "engines": {
     "node": ">=20.0.0",
