@@ -7,7 +7,7 @@
 //!
 //! This module provides coordinator functions for the Graceful Ignorance System:
 //! - `classify_with_gis`: Classify claims using 5-type ignorance taxonomy
-//! - `analyze_with_rashomon`: Multi-perspective analysis via Seven Harmonies
+//! - `analyze_with_rashomon`: Multi-perspective analysis via Eight Harmonies
 //! - `publish_dark_spot`: Publish ignorance to collective Dark Spot DHT
 //! - `resolve_dark_spot`: Resolve collective ignorance
 //! - `assess_harmonic_alignment`: Assess agent/claim alignment with Harmonies
@@ -585,7 +585,7 @@ pub struct GisClassifyInput {
 
 /// Analyze a claim/situation using the Rashomon Engine
 ///
-/// Generates perspectives from each of the Seven Harmonies,
+/// Generates perspectives from each of the Eight Harmonies,
 /// identifies agreements and dissents, and synthesizes a unified view.
 #[hdk_extern]
 pub fn analyze_with_rashomon(input: RashomonAnalyzeInput) -> ExternResult<Record> {

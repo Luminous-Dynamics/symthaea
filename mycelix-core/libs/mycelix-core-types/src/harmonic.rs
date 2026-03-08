@@ -1,12 +1,12 @@
 //! Harmonic Types for GIS v4.0 "Kosmic Song"
 //!
-//! The Seven Harmonies represent seven fundamental ways of knowing,
+//! The Eight Harmonies represent eight fundamental ways of knowing,
 //! each providing a distinct epistemic lens through which knowledge is perceived.
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-/// The Seven Harmonies - fundamental epistemic lenses
+/// The Eight Harmonies - fundamental epistemic lenses
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum Harmony {
@@ -42,13 +42,18 @@ pub enum Harmony {
 
     /// Evolutionary Progression (EP) - Developmental-Knowing
     /// "What is emerging?"
-    /// Weight: 0.10
+    /// Weight: 0.09
     EvolutionaryProgression,
+
+    /// Sacred Stillness (SS) - Apophatic-Knowing
+    /// "What must be released?"
+    /// Weight: 0.13
+    SacredStillness,
 }
 
 impl Harmony {
     /// Get all harmonies in order
-    pub const ALL: [Harmony; 7] = [
+    pub const ALL: [Harmony; 8] = [
         Harmony::ResonantCoherence,
         Harmony::PanSentientFlourishing,
         Harmony::IntegralWisdom,
@@ -56,18 +61,20 @@ impl Harmony {
         Harmony::UniversalInterconnectedness,
         Harmony::SacredReciprocity,
         Harmony::EvolutionaryProgression,
+        Harmony::SacredStillness,
     ];
 
     /// Get the base weight for this harmony
     pub fn base_weight(&self) -> f32 {
         match self {
-            Harmony::ResonantCoherence => 0.20,
-            Harmony::PanSentientFlourishing => 0.20,
-            Harmony::IntegralWisdom => 0.15,
-            Harmony::InfinitePlay => 0.10,
-            Harmony::UniversalInterconnectedness => 0.15,
-            Harmony::SacredReciprocity => 0.10,
-            Harmony::EvolutionaryProgression => 0.10,
+            Harmony::ResonantCoherence => 0.17,
+            Harmony::PanSentientFlourishing => 0.17,
+            Harmony::IntegralWisdom => 0.13,
+            Harmony::InfinitePlay => 0.09,
+            Harmony::UniversalInterconnectedness => 0.13,
+            Harmony::SacredReciprocity => 0.09,
+            Harmony::EvolutionaryProgression => 0.09,
+            Harmony::SacredStillness => 0.13,
         }
     }
 
@@ -81,6 +88,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "UI",
             Harmony::SacredReciprocity => "SR",
             Harmony::EvolutionaryProgression => "EP",
+            Harmony::SacredStillness => "SS",
         }
     }
 
@@ -94,6 +102,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "Relational-Knowing",
             Harmony::SacredReciprocity => "Exchange-Knowing",
             Harmony::EvolutionaryProgression => "Developmental-Knowing",
+            Harmony::SacredStillness => "Apophatic-Knowing",
         }
     }
 
@@ -107,6 +116,7 @@ impl Harmony {
             Harmony::UniversalInterconnectedness => "What connections exist?",
             Harmony::SacredReciprocity => "What flows back?",
             Harmony::EvolutionaryProgression => "What is emerging?",
+            Harmony::SacredStillness => "What must be released?",
         }
     }
 
@@ -120,6 +130,7 @@ impl Harmony {
             "UI" => Some(Harmony::UniversalInterconnectedness),
             "SR" => Some(Harmony::SacredReciprocity),
             "EP" => Some(Harmony::EvolutionaryProgression),
+            "SS" => Some(Harmony::SacredStillness),
             _ => None,
         }
     }
@@ -143,6 +154,8 @@ pub struct HarmonicImpact {
     pub sacred_reciprocity: f32,
     /// Impact on Evolutionary Progression (0.0-1.0)
     pub evolutionary_progression: f32,
+    /// Impact on Sacred Stillness (0.0-1.0)
+    pub sacred_stillness: f32,
 }
 
 impl HarmonicImpact {
@@ -156,6 +169,7 @@ impl HarmonicImpact {
             universal_interconnectedness: 0.0,
             sacred_reciprocity: 0.0,
             evolutionary_progression: 0.0,
+            sacred_stillness: 0.0,
         }
     }
 
@@ -169,6 +183,7 @@ impl HarmonicImpact {
             universal_interconnectedness: value,
             sacred_reciprocity: value,
             evolutionary_progression: value,
+            sacred_stillness: value,
         }
     }
 
@@ -182,6 +197,7 @@ impl HarmonicImpact {
             Harmony::UniversalInterconnectedness => self.universal_interconnectedness,
             Harmony::SacredReciprocity => self.sacred_reciprocity,
             Harmony::EvolutionaryProgression => self.evolutionary_progression,
+            Harmony::SacredStillness => self.sacred_stillness,
         }
     }
 
@@ -195,12 +211,13 @@ impl HarmonicImpact {
             Harmony::UniversalInterconnectedness => &mut self.universal_interconnectedness,
             Harmony::SacredReciprocity => &mut self.sacred_reciprocity,
             Harmony::EvolutionaryProgression => &mut self.evolutionary_progression,
+            Harmony::SacredStillness => &mut self.sacred_stillness,
         };
         *target = value;
     }
 
     /// Get as array (ordered by Harmony::ALL)
-    pub fn to_array(&self) -> [f32; 7] {
+    pub fn to_array(&self) -> [f32; 8] {
         [
             self.resonant_coherence,
             self.pan_sentient_flourishing,
@@ -209,11 +226,12 @@ impl HarmonicImpact {
             self.universal_interconnectedness,
             self.sacred_reciprocity,
             self.evolutionary_progression,
+            self.sacred_stillness,
         ]
     }
 
     /// Create from array (ordered by Harmony::ALL)
-    pub fn from_array(values: [f32; 7]) -> Self {
+    pub fn from_array(values: [f32; 8]) -> Self {
         Self {
             resonant_coherence: values[0],
             pan_sentient_flourishing: values[1],
@@ -222,6 +240,7 @@ impl HarmonicImpact {
             universal_interconnectedness: values[4],
             sacred_reciprocity: values[5],
             evolutionary_progression: values[6],
+            sacred_stillness: values[7],
         }
     }
 
@@ -287,6 +306,7 @@ impl HarmonicImpact {
             && in_range(self.universal_interconnectedness)
             && in_range(self.sacred_reciprocity)
             && in_range(self.evolutionary_progression)
+            && in_range(self.sacred_stillness)
     }
 
     /// Clamp all values to [0.0, 1.0]
@@ -299,6 +319,7 @@ impl HarmonicImpact {
             universal_interconnectedness: self.universal_interconnectedness.clamp(0.0, 1.0),
             sacred_reciprocity: self.sacred_reciprocity.clamp(0.0, 1.0),
             evolutionary_progression: self.evolutionary_progression.clamp(0.0, 1.0),
+            sacred_stillness: self.sacred_stillness.clamp(0.0, 1.0),
         }
     }
 }
@@ -408,7 +429,8 @@ impl HarmonicProfile {
         self.dominant = self.activations.primary_harmony();
 
         // Alignment is cosine similarity to a balanced profile
-        let balanced = HarmonicImpact::uniform(1.0 / 7.0);
+        let n = Harmony::ALL.len() as f32;
+        let balanced = HarmonicImpact::uniform(1.0 / n);
         let dot: f32 = Harmony::ALL
             .iter()
             .map(|h| self.activations.get(*h) * balanced.get(*h))
@@ -418,7 +440,7 @@ impl HarmonicProfile {
             .map(|h| self.activations.get(*h).powi(2))
             .sum::<f32>()
             .sqrt();
-        let mag_balanced: f32 = (7.0 * (1.0 / 7.0_f32).powi(2)).sqrt();
+        let mag_balanced: f32 = (n * (1.0 / n).powi(2)).sqrt();
 
         self.alignment = if mag_self > 0.0 {
             dot / (mag_self * mag_balanced)

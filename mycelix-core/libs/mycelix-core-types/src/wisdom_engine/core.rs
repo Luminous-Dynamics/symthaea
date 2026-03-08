@@ -1,6 +1,6 @@
 //! Core WisdomEngine types and the Four Components
 //!
-//! 1. **The Lens** (HarmonicWeights) - The Seven Harmonies as epistemic lenses
+//! 1. **The Lens** (HarmonicWeights) - The Eight Harmonies as epistemic lenses
 //! 2. **The Setting** (CommunityProfile) - Per-community harmonic weight profiles
 //! 3. **The Mirror** (DiversityAuditor) - Bias detection and diversity metrics
 //! 4. **The Hand** (ReparationsManager) - Power corrections for marginalized voices
@@ -31,39 +31,42 @@ use super::{CommunityId, PredictionId, CausalNodeId};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct HarmonicWeights {
-    /// Resonant Coherence weight (default: 0.20)
+    /// Resonant Coherence weight (default: 0.17)
     pub rc: f32,
-    /// Pan-Sentient Flourishing weight (default: 0.20)
+    /// Pan-Sentient Flourishing weight (default: 0.17)
     pub psf: f32,
-    /// Integral Wisdom weight (default: 0.15)
+    /// Integral Wisdom weight (default: 0.13)
     pub iw: f32,
-    /// Infinite Play weight (default: 0.10)
+    /// Infinite Play weight (default: 0.09)
     pub ip: f32,
-    /// Universal Interconnectedness weight (default: 0.15)
+    /// Universal Interconnectedness weight (default: 0.13)
     pub ui: f32,
-    /// Sacred Reciprocity weight (default: 0.10)
+    /// Sacred Reciprocity weight (default: 0.09)
     pub sr: f32,
-    /// Evolutionary Progression weight (default: 0.10)
+    /// Evolutionary Progression weight (default: 0.09)
     pub ep: f32,
+    /// Sacred Stillness weight (default: 0.13)
+    pub ss: f32,
 }
 
 impl HarmonicWeights {
     /// Create with default (base) weights from Harmony enum
     pub fn default_weights() -> Self {
         Self {
-            rc: 0.20,
-            psf: 0.20,
-            iw: 0.15,
-            ip: 0.10,
-            ui: 0.15,
-            sr: 0.10,
-            ep: 0.10,
+            rc: 0.17,
+            psf: 0.17,
+            iw: 0.13,
+            ip: 0.09,
+            ui: 0.13,
+            sr: 0.09,
+            ep: 0.09,
+            ss: 0.13,
         }
     }
 
-    /// Create balanced weights (all equal: 1/7)
+    /// Create balanced weights (all equal: 1/8)
     pub fn balanced() -> Self {
-        let w = 1.0 / 7.0;
+        let w = 1.0 / 8.0;
         Self {
             rc: w,
             psf: w,
@@ -72,6 +75,7 @@ impl HarmonicWeights {
             ui: w,
             sr: w,
             ep: w,
+            ss: w,
         }
     }
 
@@ -79,13 +83,14 @@ impl HarmonicWeights {
     /// Prioritizes: UI (interconnectedness) and SR (reciprocity)
     pub fn indigenous_profile() -> Self {
         Self {
-            rc: 0.12,
-            psf: 0.15,
-            iw: 0.10,
-            ip: 0.13,
-            ui: 0.25,  // Elevated - interconnectedness
-            sr: 0.20,  // Elevated - reciprocity
+            rc: 0.10,
+            psf: 0.13,
+            iw: 0.08,
+            ip: 0.11,
+            ui: 0.23,  // Elevated - interconnectedness
+            sr: 0.18,  // Elevated - reciprocity
             ep: 0.05,
+            ss: 0.12,
         }
     }
 
@@ -93,13 +98,14 @@ impl HarmonicWeights {
     /// Prioritizes: IW (truth/wisdom) and RC (coherence)
     pub fn scientific_profile() -> Self {
         Self {
-            rc: 0.25,  // Elevated - coherence
-            psf: 0.10,
-            iw: 0.30,  // Elevated - truth/wisdom
-            ip: 0.10,
-            ui: 0.10,
-            sr: 0.08,
+            rc: 0.22,  // Elevated - coherence
+            psf: 0.09,
+            iw: 0.27,  // Elevated - truth/wisdom
+            ip: 0.09,
+            ui: 0.09,
+            sr: 0.07,
             ep: 0.07,
+            ss: 0.10,
         }
     }
 
@@ -107,13 +113,14 @@ impl HarmonicWeights {
     /// Prioritizes: IP (play/creativity) and PSF (flourishing)
     pub fn artistic_profile() -> Self {
         Self {
-            rc: 0.10,
-            psf: 0.25,  // Elevated - flourishing
-            iw: 0.08,
-            ip: 0.30,  // Elevated - infinite play
-            ui: 0.12,
-            sr: 0.10,
+            rc: 0.08,
+            psf: 0.22,  // Elevated - flourishing
+            iw: 0.07,
+            ip: 0.27,  // Elevated - infinite play
+            ui: 0.10,
+            sr: 0.08,
             ep: 0.05,
+            ss: 0.13,
         }
     }
 
@@ -121,27 +128,29 @@ impl HarmonicWeights {
     /// Prioritizes: PSF (flourishing) and SR (reciprocity)
     pub fn governance_profile() -> Self {
         Self {
-            rc: 0.15,
-            psf: 0.25,  // Elevated - care for all
-            iw: 0.12,
+            rc: 0.13,
+            psf: 0.22,  // Elevated - care for all
+            iw: 0.10,
             ip: 0.05,
-            ui: 0.13,
-            sr: 0.20,  // Elevated - fair exchange
-            ep: 0.10,
+            ui: 0.12,
+            sr: 0.18,  // Elevated - fair exchange
+            ep: 0.08,
+            ss: 0.12,
         }
     }
 
     /// Create weights for Contemplative/Spiritual communities
-    /// Prioritizes: RC (coherence) and UI (interconnectedness)
+    /// Prioritizes: RC (coherence), UI (interconnectedness), and SS (stillness)
     pub fn contemplative_profile() -> Self {
         Self {
-            rc: 0.25,  // Elevated - integration
-            psf: 0.15,
-            iw: 0.15,
-            ip: 0.10,
-            ui: 0.25,  // Elevated - unity
+            rc: 0.20,  // Elevated - integration
+            psf: 0.12,
+            iw: 0.12,
+            ip: 0.08,
+            ui: 0.20,  // Elevated - unity
             sr: 0.05,
             ep: 0.05,
+            ss: 0.18,  // Elevated - sacred stillness
         }
     }
 
@@ -155,6 +164,7 @@ impl HarmonicWeights {
             Harmony::UniversalInterconnectedness => self.ui,
             Harmony::SacredReciprocity => self.sr,
             Harmony::EvolutionaryProgression => self.ep,
+            Harmony::SacredStillness => self.ss,
         }
     }
 
@@ -168,19 +178,20 @@ impl HarmonicWeights {
             Harmony::UniversalInterconnectedness => &mut self.ui,
             Harmony::SacredReciprocity => &mut self.sr,
             Harmony::EvolutionaryProgression => &mut self.ep,
+            Harmony::SacredStillness => &mut self.ss,
         };
         *target = value;
     }
 
     /// Check if weights sum to approximately 1.0
     pub fn is_normalized(&self) -> bool {
-        let sum = self.rc + self.psf + self.iw + self.ip + self.ui + self.sr + self.ep;
+        let sum = self.rc + self.psf + self.iw + self.ip + self.ui + self.sr + self.ep + self.ss;
         (sum - 1.0).abs() < 0.01
     }
 
     /// Normalize weights to sum to 1.0
     pub fn normalize(&mut self) {
-        let sum = self.rc + self.psf + self.iw + self.ip + self.ui + self.sr + self.ep;
+        let sum = self.rc + self.psf + self.iw + self.ip + self.ui + self.sr + self.ep + self.ss;
         if sum > 0.0 {
             self.rc /= sum;
             self.psf /= sum;
@@ -189,6 +200,7 @@ impl HarmonicWeights {
             self.ui /= sum;
             self.sr /= sum;
             self.ep /= sum;
+            self.ss /= sum;
         }
     }
 
@@ -201,15 +213,16 @@ impl HarmonicWeights {
             + self.ui * impact.universal_interconnectedness
             + self.sr * impact.sacred_reciprocity
             + self.ep * impact.evolutionary_progression
+            + self.ss * impact.sacred_stillness
     }
 
     /// Get as array (ordered by Harmony::ALL)
-    pub fn to_array(&self) -> [f32; 7] {
-        [self.rc, self.psf, self.iw, self.ip, self.ui, self.sr, self.ep]
+    pub fn to_array(&self) -> [f32; 8] {
+        [self.rc, self.psf, self.iw, self.ip, self.ui, self.sr, self.ep, self.ss]
     }
 
     /// Create from array
-    pub fn from_array(values: [f32; 7]) -> Self {
+    pub fn from_array(values: [f32; 8]) -> Self {
         Self {
             rc: values[0],
             psf: values[1],
@@ -218,6 +231,7 @@ impl HarmonicWeights {
             ui: values[4],
             sr: values[5],
             ep: values[6],
+            ss: values[7],
         }
     }
 }
@@ -1630,7 +1644,7 @@ pub struct CausalAdjustment {
     pub suggested_weights: HarmonicWeights,
 
     /// The delta from current weights
-    pub weight_deltas: [f32; 7],
+    pub weight_deltas: [f32; 8],
 
     /// Confidence in this adjustment (based on prediction confidence and oracle trust)
     pub confidence: f32,

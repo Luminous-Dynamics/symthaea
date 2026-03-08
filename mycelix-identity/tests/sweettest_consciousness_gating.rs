@@ -238,10 +238,7 @@ async fn test_identity_bridge_health_check() {
         "API version should be at least 1, got: {}",
         health.api_version
     );
-    assert!(
-        !health.agent.is_empty(),
-        "Agent string should not be empty"
-    );
+    assert!(!health.agent.is_empty(), "Agent string should not be empty");
 }
 
 /// Bridge API version should be stable and queryable.
@@ -889,11 +886,7 @@ async fn test_bridge_read_operations_not_gated() {
 
     // verify_did — read-only, should succeed
     let is_valid: bool = conductor
-        .call(
-            &alice.zome("identity_bridge"),
-            "verify_did",
-            did.clone(),
-        )
+        .call(&alice.zome("identity_bridge"), "verify_did", did.clone())
         .await;
 
     assert!(is_valid, "verify_did should return true for a valid DID");
@@ -1110,11 +1103,7 @@ async fn test_matl_score_query_not_gated() {
     let did = format!("did:mycelix:{}", agent);
 
     let matl_score: f64 = conductor
-        .call(
-            &alice.zome("identity_bridge"),
-            "get_matl_score",
-            did,
-        )
+        .call(&alice.zome("identity_bridge"), "get_matl_score", did)
         .await;
 
     assert!(

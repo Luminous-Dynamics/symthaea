@@ -50,11 +50,11 @@ pub struct ConsciousnessMetrics {
     pub coherence: f32,
 
     /// Harmonic alignment score (0.0 to 1.0)
-    /// Measures how balanced the seven harmonies are
+    /// Measures how balanced the eight harmonies are
     pub harmonic_alignment: f32,
 
-    /// Individual harmony activations (7 values, each 0.0 to 1.0)
-    pub harmony_activations: [f32; 7],
+    /// Individual harmony activations (8 values, each 0.0 to 1.0)
+    pub harmony_activations: [f32; 8],
 
     /// Moral uncertainty components
     pub moral_uncertainty: MoralUncertaintyMetrics,
@@ -120,7 +120,7 @@ impl ConsciousnessMetrics {
     }
 
     /// Builder: set harmony activations
-    pub fn with_harmony_activations(mut self, activations: [f32; 7]) -> Self {
+    pub fn with_harmony_activations(mut self, activations: [f32; 8]) -> Self {
         // Normalize
         let sum: f32 = activations.iter().sum();
         if sum > 0.01 {

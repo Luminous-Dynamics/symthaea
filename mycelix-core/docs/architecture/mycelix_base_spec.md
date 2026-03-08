@@ -1206,7 +1206,7 @@ What other approaches were evaluated?
 ```
 ┌────────────────────────────────────────────┐
 │  Mycelix Ethical (Optional)                │
-│  • Seven Harmonies                         │
+│  • Eight Harmonies                         │
 │  • Constitutional governance               │
 │  • Treasury management                     │
 └────────────────────────────────────────────┘

@@ -6,7 +6,7 @@
 //!
 //! ## The Four Core Components
 //!
-//! 1. **The Lens** (HarmonicWeights) - The Seven Harmonies as epistemic lenses
+//! 1. **The Lens** (HarmonicWeights) - The Eight Harmonies as epistemic lenses
 //! 2. **The Setting** (CommunityProfile) - Per-community harmonic weight profiles
 //! 3. **The Mirror** (DiversityAuditor) - Bias detection and diversity metrics
 //! 4. **The Hand** (ReparationsManager) - Power corrections for marginalized voices

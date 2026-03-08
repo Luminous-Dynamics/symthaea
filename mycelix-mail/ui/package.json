@@ -23,6 +23,9 @@
     "lint:frontend": "cd frontend && npm run lint",
     "clean": "rm -rf node_modules backend/node_modules frontend/node_modules backend/dist frontend/dist"
   },
+  "overrides": {
+    "tar": ">=6.2.1"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2"
   },

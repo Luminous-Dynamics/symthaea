@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@mycelix/supplychain-sdk": "file:../sdk",
-    "next": "^14.2.29",
+    "next": "^15.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -19,7 +19,7 @@
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
     "eslint": "^8.56.0",
-    "eslint-config-next": "^14.0.4",
+    "eslint-config-next": "^15.3.0",
     "typescript": "^5.3.3"
   }
 }

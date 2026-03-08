@@ -6,7 +6,7 @@
 //!
 //! ## The Seven Components Demonstrated:
 //!
-//! 1. **The Lens** (HarmonicWeights) - Seven Harmonies as cultural lenses
+//! 1. **The Lens** (HarmonicWeights) - Eight Harmonies as cultural lenses
 //! 2. **The Setting** (CommunityProfile) - Per-community epistemic profiles
 //! 3. **The Mirror** (DiversityAuditor) - Bias detection and diversity tracking
 //! 4. **The Hand** (ReparationsManager) - Power corrections for marginalized voices
@@ -681,7 +681,7 @@ fn main() {
     println!("┌─────────────────┬──────────────────────────────────────────────────┐");
     println!("│ Component       │ What It Does                                     │");
     println!("├─────────────────┼──────────────────────────────────────────────────┤");
-    println!("│ The Lens        │ Seven Harmonies as cultural epistemic lenses     │");
+    println!("│ The Lens        │ Eight Harmonies as cultural epistemic lenses     │");
     println!("│ The Setting     │ Community-specific profiles and preferences      │");
     println!("│ The Mirror      │ Tracks diversity & detects systemic bias         │");
     println!("│ The Hand        │ Epistemic reparations for marginalized voices    │");

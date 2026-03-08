@@ -4,7 +4,7 @@
 //!
 //! - **K-Vector**: 8-dimensional trust representation
 //! - **E/N/M/H Classification**: Epistemic classification system
-//! - **Harmonic Types**: Seven Harmonies integration for GIS v4
+//! - **Harmonic Types**: Eight Harmonies integration for GIS v4
 //! - **Moral Uncertainty**: Tripartite moral uncertainty model
 //! - **WisdomEngine**: Full Stack Wisdom / Holistic Epistemics architecture with
 //!   advanced features including Temporal Pattern Decay, Confidence Calibration,
@@ -21,7 +21,7 @@
 //! The WisdomEngine provides the most advanced epistemic architecture for decentralized
 //! networks, combining four components:
 //!
-//! 1. **The Lens** - Harmonic-weighted scoring through the Seven Harmonies
+//! 1. **The Lens** - Harmonic-weighted scoring through the Eight Harmonies
 //! 2. **The Setting** - Community-specific epistemic profiles
 //! 3. **The Mirror** - Diversity metrics and bias detection
 //! 4. **The Hand** - Epistemic reparations for marginalized voices

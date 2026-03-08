@@ -10,7 +10,7 @@
 //! System, enabling:
 //! - 5-type ignorance classification (κ, ι₁, ι₂, ι₃, ι∞)
 //! - 3D uncertainty quantification (epistemic, aleatoric, structural)
-//! - Multi-perspective Rashomon analysis via Seven Harmonies
+//! - Multi-perspective Rashomon analysis via Eight Harmonies
 //! - Dark Spot DHT for collective ignorance resolution
 //!
 //! Updated to use HDI 0.7 patterns
@@ -238,7 +238,7 @@ pub struct GisClassification {
     pub classifier: String,
 }
 
-/// The Seven Harmonies of the Kosmic Song
+/// The Eight Harmonies of the Kosmic Song
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Harmony {
     /// Resonant Coherence: Integration and wholeness
@@ -486,7 +486,7 @@ pub enum AlignmentSubjectType {
     Action,
 }
 
-/// Scores for each of the Seven Harmonies
+/// Scores for each of the Eight Harmonies
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct HarmonicScores {
     pub resonant_coherence: f64,
