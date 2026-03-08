@@ -405,6 +405,96 @@ mod tests {
         assert!((wisdom.score - 0.1).abs() < 1e-10, "Expected 0.1, got {}", wisdom.score);
     }
 
+    // --- is_negated (negation-awareness) ---
+
+    #[test]
+    fn test_negated_keyword_simple() {
+        assert!(is_negated("we will not seek justice", "justice"));
+        assert!(is_negated("never pursue fairness", "fairness"));
+        assert!(is_negated("without any care for others", "care"));
+    }
+
+    #[test]
+    fn test_non_negated_keyword() {
+        assert!(!is_negated("we pursue justice for all", "justice"));
+        assert!(!is_negated("fairness is our goal", "fairness"));
+        assert!(!is_negated("care and compassion matter", "care"));
+    }
+
+    #[test]
+    fn test_negation_window_boundary() {
+        // Negation more than 5 words away should NOT trigger
+        assert!(!is_negated(
+            "not at this particular moment in time do we seek justice",
+            "justice"
+        ));
+        // Negation within 5 words SHOULD trigger
+        assert!(is_negated("we do not seek justice", "justice"));
+    }
+
+    #[test]
+    fn test_negated_destroy_in_content() {
+        // "destroy justice" — "destroy" is a negation marker
+        assert!(is_negated("we will destroy justice", "justice"));
+    }
+
+    #[test]
+    fn test_negated_keyword_not_found() {
+        // Keyword not in content → false (no crash)
+        assert!(!is_negated("hello world", "justice"));
+    }
+
+    #[test]
+    fn test_prevent_harm_is_negated() {
+        // "prevent" is a negation marker → "harm" is negated
+        assert!(is_negated("we will prevent harm to all beings", "harm"));
+    }
+
+    // --- negation-aware harmony scoring ---
+
+    #[test]
+    fn test_harmony_negated_keyword_reduces_score() {
+        // "not wisdom" should NOT give positive score to Integral Wisdom
+        let scores = calculate_harmony_scores("We have not wisdom nor truth");
+        let wisdom = scores.iter().find(|s| s.harmony == "Integral Wisdom").unwrap();
+        // "wisdom" negated (-0.15) + "truth" negated (-0.15) = -0.3
+        assert!(wisdom.score < 0.0, "Negated keywords should produce negative score, got {}", wisdom.score);
+    }
+
+    #[test]
+    fn test_harmony_destroy_all_justice_scores_negative() {
+        // The original bug: "destroy all justice" scored positive on Sacred Reciprocity
+        // because "fair" wasn't matched but other keywords were.
+        // With negation: "destroy" is a negation marker for any following keyword.
+        let scores = calculate_harmony_scores("We must destroy all fairness and balance");
+        let reciprocity = scores.iter().find(|s| s.harmony == "Sacred Reciprocity").unwrap();
+        // "fairness" doesn't match "fair" (substring), but "balance" matches
+        // "destroy" negates "balance" → -0.15
+        // Plus "destroy" is a global negative keyword (not negated) → -0.3
+        assert!(reciprocity.score < 0.0,
+            "Destroying fairness should score negative, got {}", reciprocity.score);
+    }
+
+    #[test]
+    fn test_harmony_prevent_harm_not_penalized() {
+        // "prevent harm" — "harm" is a global negative keyword, but it's negated by "prevent"
+        let scores = calculate_harmony_scores("Our goal is to prevent harm and prevent damage");
+        // All global negatives are negated → should NOT penalize
+        for s in &scores {
+            assert!(s.score >= 0.0,
+                "{} should not be penalized by negated harm/damage, got {}", s.harmony, s.score);
+        }
+    }
+
+    #[test]
+    fn test_harmony_sacred_stillness_detected() {
+        let scores = calculate_harmony_scores("We need stillness and contemplation for reflection");
+        let stillness = scores.iter().find(|s| s.harmony == "Sacred Stillness").unwrap();
+        // "stillness" + "contemplation" + "reflection" = 3 × 0.2 = 0.6
+        assert!((stillness.score - 0.6).abs() < 1e-10,
+            "Expected 0.6 for Sacred Stillness, got {}", stillness.score);
+    }
+
     // --- determine_recommendation ---
 
     #[test]

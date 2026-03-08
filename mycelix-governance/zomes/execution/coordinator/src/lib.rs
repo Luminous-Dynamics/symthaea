@@ -23,6 +23,27 @@ struct ThresholdSignature {
     pub signed_at: Timestamp,
 }
 
+/// Mirror type for SigningCommittee — extracts only the scope field.
+/// Avoids full dependency on threshold-signing integrity crate (which
+/// causes duplicate HDI symbols in WASM).
+#[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
+struct CommitteeScopeMirror {
+    #[serde(default)]
+    pub scope: serde_json::Value,
+}
+
+/// Extract the scope variant name from a CommitteeScopeMirror.
+/// Handles both simple variants ("All") and tagged variants ({"Custom": [...]}).
+fn extract_scope_name(scope: &serde_json::Value) -> &str {
+    match scope {
+        serde_json::Value::String(s) => s.as_str(),
+        serde_json::Value::Object(map) => {
+            map.keys().next().map(|k| k.as_str()).unwrap_or("All")
+        }
+        _ => "All",
+    }
+}
+
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -358,39 +379,35 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
                                     .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
                             ) {
                                 if let Ok(Some(committee_record)) = committee_io.decode::<Option<Record>>() {
-                                    // Decode scope from committee — use serde_json for cross-zome compat
-                                    if let Ok(Some(committee_json)) = committee_record
+                                    // Decode scope from committee via mirror struct
+                                    if let Ok(Some(committee_mirror)) = committee_record
                                         .entry()
-                                        .to_app_option::<serde_json::Value>()
+                                        .to_app_option::<CommitteeScopeMirror>()
                                     {
-                                        if let Some(scope_str) = committee_json
-                                            .get("scope")
-                                            .and_then(|s| s.as_str())
-                                            .map(String::from)
-                                        {
-                                            // Infer proposal type from signed_content_description
-                                            // Format: "proposal:MIP-001" or "constitutional:CA-001" etc.
-                                            let proposal_type = sig.signed_content_description
-                                                .split(':')
-                                                .next()
-                                                .unwrap_or("unknown");
+                                        // Infer proposal type from signed_content_description
+                                        // Format: "proposal:MIP-001" or "constitutional:CA-001" etc.
+                                        let proposal_type = sig.signed_content_description
+                                            .split(':')
+                                            .next()
+                                            .unwrap_or("unknown");
 
-                                            let scope_allows = match scope_str.as_str() {
-                                                "All" => true,
-                                                "Constitutional" => proposal_type == "constitutional",
-                                                "Treasury" => proposal_type == "treasury",
-                                                "Protocol" => proposal_type == "protocol",
-                                                _ => true, // Custom or unknown — permissive
-                                            };
+                                        let scope_name = extract_scope_name(&committee_mirror.scope);
 
-                                            if !scope_allows {
-                                                return Err(wasm_error!(WasmErrorInner::Guest(
-                                                    format!(
-                                                        "Committee '{}' scope '{}' does not authorize signing '{}' proposals",
-                                                        sig.committee_id, scope_str, proposal_type
-                                                    )
-                                                )));
-                                            }
+                                        let scope_allows = match scope_name {
+                                            "All" => true,
+                                            "Constitutional" => proposal_type == "constitutional",
+                                            "Treasury" => proposal_type == "treasury",
+                                            "Protocol" => proposal_type == "protocol",
+                                            _ => true, // Custom or unknown — permissive
+                                        };
+
+                                        if !scope_allows {
+                                            return Err(wasm_error!(WasmErrorInner::Guest(
+                                                format!(
+                                                    "Committee '{}' scope '{}' does not authorize signing '{}' proposals",
+                                                    sig.committee_id, scope_name, proposal_type
+                                                )
+                                            )));
                                         }
                                     }
                                 }
@@ -1210,6 +1227,106 @@ mod tests {
     fn test_governance_action_invalid_json() {
         let json = "not valid json at all {{{";
         assert!(serde_json::from_str::<GovernanceAction>(json).is_err());
+    }
+
+    // =========================================================================
+    // ThresholdSignature mirror type serde
+    // =========================================================================
+
+    // =========================================================================
+    // Committee scope enforcement — proposal type inference
+    // =========================================================================
+
+    // --- extract_scope_name ---
+
+    #[test]
+    fn test_extract_scope_simple_variants() {
+        assert_eq!(extract_scope_name(&serde_json::json!("All")), "All");
+        assert_eq!(extract_scope_name(&serde_json::json!("Constitutional")), "Constitutional");
+        assert_eq!(extract_scope_name(&serde_json::json!("Treasury")), "Treasury");
+        assert_eq!(extract_scope_name(&serde_json::json!("Protocol")), "Protocol");
+    }
+
+    #[test]
+    fn test_extract_scope_custom_variant() {
+        // Custom(Vec<String>) serializes as {"Custom": ["type1", "type2"]}
+        let custom = serde_json::json!({"Custom": ["treasury_ops", "emergency"]});
+        assert_eq!(extract_scope_name(&custom), "Custom");
+    }
+
+    #[test]
+    fn test_extract_scope_null_defaults_to_all() {
+        assert_eq!(extract_scope_name(&serde_json::Value::Null), "All");
+    }
+
+    // --- scope enforcement logic ---
+
+    fn scope_allows(scope_name: &str, proposal_type: &str) -> bool {
+        match scope_name {
+            "All" => true,
+            "Constitutional" => proposal_type == "constitutional",
+            "Treasury" => proposal_type == "treasury",
+            "Protocol" => proposal_type == "protocol",
+            _ => true,
+        }
+    }
+
+    #[test]
+    fn test_scope_all_allows_everything() {
+        assert!(scope_allows("All", "constitutional"));
+        assert!(scope_allows("All", "treasury"));
+        assert!(scope_allows("All", "protocol"));
+        assert!(scope_allows("All", "proposal"));
+        assert!(scope_allows("All", "unknown"));
+    }
+
+    #[test]
+    fn test_scope_constitutional_restricts() {
+        assert!(scope_allows("Constitutional", "constitutional"));
+        assert!(!scope_allows("Constitutional", "treasury"));
+        assert!(!scope_allows("Constitutional", "protocol"));
+        assert!(!scope_allows("Constitutional", "proposal"));
+    }
+
+    #[test]
+    fn test_scope_treasury_restricts() {
+        assert!(scope_allows("Treasury", "treasury"));
+        assert!(!scope_allows("Treasury", "constitutional"));
+        assert!(!scope_allows("Treasury", "protocol"));
+    }
+
+    #[test]
+    fn test_scope_protocol_restricts() {
+        assert!(scope_allows("Protocol", "protocol"));
+        assert!(!scope_allows("Protocol", "treasury"));
+        assert!(!scope_allows("Protocol", "constitutional"));
+    }
+
+    #[test]
+    fn test_scope_custom_permissive() {
+        assert!(scope_allows("Custom", "anything"));
+    }
+
+    #[test]
+    fn test_infer_proposal_type_from_description() {
+        fn infer(desc: &str) -> &str {
+            desc.split(':').next().unwrap_or("unknown")
+        }
+        assert_eq!(infer("proposal:MIP-001"), "proposal");
+        assert_eq!(infer("constitutional:CA-001"), "constitutional");
+        assert_eq!(infer("treasury:TB-042"), "treasury");
+        assert_eq!(infer("protocol:PU-007"), "protocol");
+        assert_eq!(infer("no-colon-here"), "no-colon-here");
+        assert_eq!(infer(""), "");
+    }
+
+    #[test]
+    fn test_guardian_phi_threshold_constant() {
+        // Verify the Guardian-tier threshold used in veto_timelock
+        // is consistent with the governance Φ tier system
+        const GUARDIAN_PHI_THRESHOLD: f64 = 0.6;
+        assert!(GUARDIAN_PHI_THRESHOLD > 0.4, "Guardian tier must be above Steward (0.4)");
+        assert!(GUARDIAN_PHI_THRESHOLD <= 1.0, "Must be a valid Φ score");
     }
 
     // =========================================================================

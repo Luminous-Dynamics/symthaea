@@ -1515,6 +1515,43 @@ mod tests {
     }
 
     // =========================================================================
+    // health_score — child health scoring (dormant/suspended)
+    // =========================================================================
+
+    #[test]
+    fn test_health_score_with_dormant_children() {
+        // Dormant children contribute 0.2 health, dragging average down
+        let child_health = AggregateChildHealth {
+            healthy_count: 1,
+            struggling_count: 0,
+            dormant_count: 2,
+            average_health: (0.7 + 0.2 + 0.2) / 3.0, // ~0.367
+            children_needing_attention: vec!["dormant-1".into(), "dormant-2".into()],
+        };
+        let score = calculate_health_score(0.8, 0.6, 0.5, &Some(child_health.clone()), &[]);
+        // base = 0.475, child = 0.367 * 0.25 = 0.092
+        // total ≈ 0.567
+        assert!(score < 0.625, "Dormant children should reduce score below no-dormant case");
+        assert!(score > 0.4, "Score should still be reasonable, got {}", score);
+    }
+
+    #[test]
+    fn test_health_score_with_suspended_children() {
+        // Suspended children contribute 0.1 health
+        let child_health = AggregateChildHealth {
+            healthy_count: 0,
+            struggling_count: 2,
+            dormant_count: 0,
+            average_health: 0.1, // All suspended → 0.1
+            children_needing_attention: vec!["sus-1".into(), "sus-2".into()],
+        };
+        let score = calculate_health_score(0.8, 0.6, 0.5, &Some(child_health), &[]);
+        // base = 0.475, child = 0.1 * 0.25 = 0.025
+        // total ≈ 0.500
+        assert!(score < 0.55, "Suspended children should heavily drag down score, got {}", score);
+    }
+
+    // =========================================================================
     // identify_opportunities — suggestions based on gaps
     // =========================================================================
 

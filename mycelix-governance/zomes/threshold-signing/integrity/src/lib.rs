@@ -1167,6 +1167,87 @@ mod tests {
         }
     }
 
+    // --- ViolationSeverity penalty alignment ---
+
+    #[test]
+    fn test_minor_penalty_at_zero_accepted() {
+        let report = DkgViolationReport {
+            committee_id: "c-1".into(),
+            participant_id: 1,
+            violation_type: "LateResponse".into(),
+            severity: ViolationSeverity::Minor,
+            penalty_score: 0.0, // Minor allows 0.0
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        assert!(check_violation_report_validity(&report).is_ok());
+    }
+
+    #[test]
+    fn test_moderate_penalty_below_minimum_rejected() {
+        let report = DkgViolationReport {
+            committee_id: "c-1".into(),
+            participant_id: 1,
+            violation_type: "InvalidShare".into(),
+            severity: ViolationSeverity::Moderate,
+            penalty_score: 0.05, // Below 0.1 minimum for Moderate
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        let result = check_violation_report_validity(&report);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too low"));
+    }
+
+    #[test]
+    fn test_critical_penalty_at_boundary_accepted() {
+        let report = DkgViolationReport {
+            committee_id: "c-1".into(),
+            participant_id: 1,
+            violation_type: "Equivocation".into(),
+            severity: ViolationSeverity::Critical,
+            penalty_score: 0.5, // Exactly at minimum for Critical
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        assert!(check_violation_report_validity(&report).is_ok());
+    }
+
+    #[test]
+    fn test_critical_penalty_below_boundary_rejected() {
+        let report = DkgViolationReport {
+            committee_id: "c-1".into(),
+            participant_id: 1,
+            violation_type: "Equivocation".into(),
+            severity: ViolationSeverity::Critical,
+            penalty_score: 0.49, // Just below 0.5 minimum for Critical
+            epoch: 1,
+            reporter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            reported_at: Timestamp::from_micros(0),
+        };
+        let result = check_violation_report_validity(&report);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_violation_severity_display() {
+        assert_eq!(ViolationSeverity::Minor.to_string(), "minor");
+        assert_eq!(ViolationSeverity::Moderate.to_string(), "moderate");
+        assert_eq!(ViolationSeverity::Severe.to_string(), "severe");
+        assert_eq!(ViolationSeverity::Critical.to_string(), "critical");
+    }
+
+    #[test]
+    fn test_violation_severity_serde_roundtrip() {
+        let original = ViolationSeverity::Critical;
+        let serialized = serde_json::to_string(&original).unwrap();
+        let deserialized: ViolationSeverity = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(original, deserialized);
+    }
+
     // =========================================================================
     // END-TO-END DKG INTEGRATION TEST
     // =========================================================================
