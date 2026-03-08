@@ -118,21 +118,22 @@ cargo test --test telemetry_validation
 
 | Requirement | Article | Status | Gap | Priority |
 |-------------|---------|--------|-----|----------|
-| Technical documentation | Art. 11 | Partial | Need structured Annex IV package assembling existing docs into required format | **High** |
-| Risk management | Art. 9 | 70% | Formalize residual risk acceptance criteria; document risk-benefit analysis for consciousness subsystems | Medium |
-| Data governance | Art. 10 | 85% | `DATA_GOVERNANCE.md` with training data provenance (Section 4), bias audit, and data quality assurance | Low |
-| Human oversight | Art. 14 | 90% | `HUMAN_OVERSIGHT.md` — override procedures, kill-switch, operator roles, `SafetyOverrideEntry` audit trail, `SeriousIncidentReport` | Low |
-| Accuracy and robustness | Art. 15 | 75% | Soak tests and proptests in place; need formal accuracy metrics and adversarial robustness testing | Low |
-| Quality management | Art. 17 | 85% | `QMS.md` — quality objectives, gates, metrics, non-conformance management; CI compliance dashboard job | Low |
-| Logging | Art. 12 | 80% | `SafetyAuditReport` + `CycleMetadata` + `SeriousIncidentReport` (Article 73); retention policy in DATA_GOVERNANCE.md | Low |
-| Transparency | Art. 13 | 85% | `TRANSPARENCY_OBLIGATIONS.md` — system description, metrics explained, limitations, contestability, data transparency | Low |
+| Technical documentation | Art. 11 | 90% | `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` — master index covering all 9 Annex IV elements with cross-references | Low |
+| Risk management | Art. 9 | 75% | Risk register + treatment plan in place; formalize residual risk acceptance criteria | Medium |
+| Data governance | Art. 10 | 85% | `DATA_GOVERNANCE.md` with training data provenance, bias audit, and data quality assurance | Low |
+| Human oversight | Art. 14 | 90% | `HUMAN_OVERSIGHT.md` — override procedures, kill-switch, operator roles, `SeriousIncidentReport` | Low |
+| Accuracy and robustness | Art. 15 | 80% | Soak tests, proptests, adversarial tests in place; formal accuracy metrics documented in Annex IV §6 | Low |
+| Quality management | Art. 17 | 90% | `QMS.md` + `DEVELOPMENT_PROCEDURES.md` — quality gates, CI pipeline, threshold protocol | Low |
+| Logging | Art. 12 | 85% | `SafetyAuditReport` + `CycleMetadata` + `SeriousIncidentReport` (Article 73); retention policy | Low |
+| Transparency | Art. 13 | 90% | `TRANSPARENCY_OBLIGATIONS.md` + Annex IV §9 — system description, metrics, limitations, contestability | Low |
 
 ### Priority actions
 
-1. **(High)** Assemble technical documentation into Annex IV structure — consolidate existing architecture docs, test results, and design rationale.
-2. **(High)** Complete human oversight mechanisms — finalize `SafetyOverrideLog`, document emergency shutdown procedures, define operator roles and escalation paths.
-3. **(Medium)** Formalize QMS — document development processes, change management, incident response aligned with ISO/IEC 42001.
-4. **(Medium)** Complete data governance — training data lineage, bias assessment methodology, data quality monitoring.
+1. ~~**(High)** Assemble Annex IV technical documentation~~ — **Done**: `ANNEX_IV_TECHNICAL_DOCUMENTATION.md`
+2. ~~**(High)** Complete human oversight mechanisms~~ — **Done**: `HUMAN_OVERSIGHT.md`
+3. ~~**(Medium)** Formalize QMS and development procedures~~ — **Done**: `QMS.md` + `DEVELOPMENT_PROCEDURES.md`
+4. **(Medium)** Formal data quality framework — psych-bench baselines need formal quality metrics
+5. **(Medium)** External stakeholder feedback loop — needed for NIST GOV-6 and IEEE 7000 value validation
 
 ---
 
@@ -140,8 +141,8 @@ cargo test --test telemetry_validation
 
 | Phase | Period | Objective | Status |
 |-------|--------|-----------|--------|
-| Phase 1 | Q1 2026 | Compliance documentation framework | Complete (this work) |
-| Phase 2 | Q2 2026 | Close High-priority gaps (human oversight, technical dossier) | Planned |
+| Phase 1 | Q1 2026 | Compliance documentation framework | Complete |
+| Phase 2 | Q1 2026 | Close High-priority gaps (Annex IV, human oversight, development procedures, value verification) | **Complete** |
 | Phase 3 | Q3 2026 | Internal conformity assessment dry run | Planned |
 | Phase 4 | Q4 2026 | Submit for third-party assessment if required | Contingent |
 

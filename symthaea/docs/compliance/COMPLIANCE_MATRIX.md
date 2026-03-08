@@ -13,12 +13,12 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 
 | Framework | Coverage | Status | Notes |
 |-----------|----------|--------|-------|
-| **ISO/IEC 42001:2023** (AI Management System) | 90% | Strong | QMS.md + SDLC + risk treatment + explainability + data provenance + post-market monitoring |
+| **ISO/IEC 42001:2023** (AI Management System) | 95% | Near-complete | QMS + SDLC + development procedures + risk treatment + explainability + data provenance + post-market monitoring |
 | **ISO/IEC 23894** (AI Risk Management) | 90% | Strong | Risk register + ADR process + incident runbook + risk treatment plan (top 5) |
 | **ISO/IEC 42005** (AI Impact Assessment) | 80% | Strong | FRIA complete; ongoing monitoring via SafetyAgent + CalibrationHistory |
-| **IEEE 7000-2021** (Value-Based Design) | 85% | Strong | Eight Harmonies mathematically traced; consent detection hardened (R-2.3 fix) |
-| **EU AI Act** (High-Risk) | 85% | Strong | Art. 13 transparency + Art. 14 human oversight + Art. 73 incident reporting + Art. 72 post-market monitoring |
-| **NIST AI RMF 1.0** | 80% | Strong | Map/Measure strong; Manage improved with risk treatment plan; Govern improved with QMS |
+| **IEEE 7000-2021** (Value-Based Design) | 90% | Strong | Eight Harmonies mathematically traced; formal value verification protocol; consent detection hardened |
+| **EU AI Act** (High-Risk) | 90% | Strong | Annex IV package + Art. 13 transparency + Art. 14 human oversight + Art. 73 incident reporting + Art. 72 post-market monitoring |
+| **NIST AI RMF 1.0** | 85% | Strong | Map/Measure strong; Manage improved with risk treatment plan; Govern improved with QMS + development procedures |
 
 ---
 
@@ -37,7 +37,7 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 | **A.4.2** | AI risk assessment | Done | `AI_RISK_REGISTER.md` — 15 risks, 6 categories, scored with mitigations |
 | **A.4.3** | AI risk treatment | Done | `RISK_TREATMENT_PLAN.md` — top 5 risks with treatment strategies, residual risk, acceptance criteria |
 | **A.4.4** | Responsible AI considerations | Done | Ethics Engine (3-stage pipeline); Seven Harmonies; Appendix P (consciousness rights) |
-| **A.4.5** | AI system development processes | Partial | CI with 39 feature matrix, clippy, fmt; formal development procedures not documented |
+| **A.4.5** | AI system development processes | Done | `DEVELOPMENT_PROCEDURES.md` — change procedures, threshold protocol, feature flag discipline, CI pipeline, testing hierarchy |
 | **A.5.2** | Data management | Done | Holochain DHT (no central store); CfC temporal dynamics; identity vaults; `DATA_GOVERNANCE.md` (6 categories); GDPR 95% coverage |
 | **A.5.3** | Data quality | Partial | Psych-bench normative baselines; no formal data quality framework |
 | **A.6.2** | AI system operation and monitoring | Done | SafetyAgent (NRC-style Green/Yellow/Orange/Red); CycleMetadata 75+ fields/cycle; SelfAssessmentMonitor; CalibrationHistory |
@@ -61,8 +61,8 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 - Lifecycle processes (A.3.3)
 
 **Weak areas** (<50% coverage):
-- Third-party management (A.7.2)
-- Formal QMS documentation
+- Third-party management (A.7.2) — partially addressed via `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7
+- Data quality framework (A.5.3) — informal via psych-bench, no formal framework
 
 ---
 
@@ -90,7 +90,7 @@ This is Symthaea's strongest compliance area. The Seven Harmonies are mathematic
 | Value identification | Done | Seven Harmonies defined and documented |
 | Value prioritization | Done | Ethics pipeline priority: consent > deontological > value alignment > harmonies |
 | Value-based requirements | Done | Thresholds.rs: each constant cites scientific basis for its value |
-| Value verification | Partial | Tests verify technical correctness; no formal value verification protocol |
+| Value verification | Done | `VALUE_VERIFICATION.md` — formal protocol mapping each Harmony to code paths, test assertions, and behavioral validation |
 | Value validation | Partial | Psych-bench provides behavioral baselines; no formal stakeholder validation |
 
 ---
@@ -247,14 +247,18 @@ Example constants and their compliance relevance:
 - ~~Training data provenance~~ — DATA_GOVERNANCE.md Section 4 (ISO 42001 A.7.4, bias audit, data quality assurance)
 - ~~Article 62→73 references~~ — INCIDENT_RUNBOOK.md corrected to reference Article 73 (serious incidents)
 - ~~Compliance dashboard in CI~~ — `ci.yml` compliance job runs dashboard and verifies all suites pass
+- ~~Annex IV technical documentation package~~ — `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` (master index cross-referencing all 9 Annex IV elements)
+- ~~Third-party AI component assessment~~ — `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7 (5 approved models, supply chain risk, integration safeguards)
+- ~~Value verification protocol~~ — `VALUE_VERIFICATION.md` (IEEE 7000, 8 Harmonies mapped to code + tests + behavior)
+- ~~Development procedures~~ — `DEVELOPMENT_PROCEDURES.md` (ISO 42001 A.4.5, threshold protocol, feature flag discipline, CI pipeline)
 
 ### Priority 1 (Complete by Q2 2026)
-1. Formal third-party AI component assessment for ISO 42001 A.7.2
-2. Annex IV technical documentation package assembly
+1. Formal data quality framework for ISO 42001 A.5.3
+2. External stakeholder feedback mechanism for NIST GOV-6
 
 ### Priority 2 (Complete by Q3 2026)
-3. External stakeholder feedback mechanism for NIST GOV-6
-4. Value drift regression baseline artifact
+3. Value drift regression baseline artifact
+4. Formal third-party supplier assessment process (beyond model assessment)
 
 ### Priority 3 (Ongoing)
 5. Quarterly compliance matrix review and update

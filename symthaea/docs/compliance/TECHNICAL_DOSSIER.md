@@ -1,8 +1,8 @@
 # EU AI Act Article 11 Technical Documentation
 
 **System**: Symthaea ("Holographic Liquid Brain")
-**Version**: v0.5.0
-**Date**: 2026-03-06
+**Version**: v1.9.0
+**Date**: 2026-03-08
 **Classification**: See `EU_AI_ACT_CLASSIFICATION.md`
 **Annex IV Reference**: Regulation (EU) 2024/1689, Annex IV
 
@@ -11,7 +11,7 @@
 ## 1. General Description
 
 - **System name**: Symthaea ("Holographic Liquid Brain")
-- **Version**: v0.5.0
+- **Version**: v1.9.0
 - **Purpose**: Consciousness-first AI system implementing predictive coding, hyperdimensional computing (HDC), Integrated Information Theory (IIT/Phi), and active inference via the Free Energy Principle
 - **Intended use**: Research platform for consciousness science; not deployed for decisions affecting natural persons
 - **Scale**: ~985K lines Rust (~778K code), ~3,735+ tests (main crate), 65+ workspace members
@@ -50,11 +50,11 @@
 - **No external personal data**: Symthaea does not ingest, process, or train on data from natural persons
 - **Consciousness metrics are synthetic**: All Phi, coherence, and neuromodulator readings are internally generated
 - **Sensor inputs**: When connected, inputs pass through SafetyAgent gating before reaching the cognitive loop
-- **Data governance policy**: Planned (`DATA_GOVERNANCE.md` -- to be created)
+- **Data governance policy**: `DATA_GOVERNANCE.md` — 6 data source categories, bias audit, data quality assurance, provenance tracking
 
 ## 6. Testing and Validation
 
-- **Test suite scale**: ~3,735+ tests in the main crate; 8,600+ across the full Mycelix workspace
+- **Test suite scale**: ~4,067+ tests in the main crate; 12,000+ across the full workspace
 - **Key test categories**:
   - Adversarial moral algebra: 26 tests exercising ethical edge cases
   - Safety agent escalation soak: 15 tests simulating up to 1,000 cognitive cycles under stress
@@ -77,10 +77,10 @@ Per `COMPLIANCE_MATRIX.md`, current coverage:
 
 | Standard | Coverage | Notes |
 |----------|----------|-------|
-| ISO 42001 (AI Management) | 65% | Management system partially implemented |
-| IEEE 7000 (Ethical Design) | 80% | Seven Harmonies value framework in production |
-| NIST AI RMF | 60% | Govern/Map/Measure/Manage functions addressed |
-| EU AI Act | 55% | Target: 80% by August 2026 |
+| ISO 42001 (AI Management) | 95% | QMS + development procedures + risk treatment + data provenance |
+| IEEE 7000 (Ethical Design) | 90% | Eight Harmonies value framework with formal verification protocol |
+| NIST AI RMF | 85% | Govern/Map/Measure/Manage all addressed |
+| EU AI Act | 90% | Annex IV package + Articles 9/10/11/12/13/14/15/72/73 covered |
 
 ---
 
@@ -102,4 +102,6 @@ Per `COMPLIANCE_MATRIX.md`, current coverage:
 
 ---
 
-*This document is maintained as a living index per EU AI Act Article 11(1). It references detailed documentation rather than duplicating content. Last updated: 2026-03-06.*
+**Note**: For the complete Annex IV package, see `ANNEX_IV_TECHNICAL_DOCUMENTATION.md`.
+
+*This document is maintained as a living index per EU AI Act Article 11(1). It references detailed documentation rather than duplicating content. Last updated: 2026-03-08.*

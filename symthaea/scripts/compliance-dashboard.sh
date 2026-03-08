@@ -173,7 +173,10 @@ for doc in \
     "docs/compliance/QMS.md" \
     "docs/compliance/POST_MARKET_MONITORING.md" \
     "docs/compliance/TRANSPARENCY_OBLIGATIONS.md" \
-    "docs/compliance/HUMAN_OVERSIGHT.md"; do
+    "docs/compliance/HUMAN_OVERSIGHT.md" \
+    "docs/compliance/ANNEX_IV_TECHNICAL_DOCUMENTATION.md" \
+    "docs/compliance/VALUE_VERIFICATION.md" \
+    "docs/compliance/DEVELOPMENT_PROCEDURES.md"; do
     DOCS_CHECKED=$((DOCS_CHECKED + 1))
     if [ ! -f "$doc" ]; then
         DOCS_MISSING=$((DOCS_MISSING + 1))
