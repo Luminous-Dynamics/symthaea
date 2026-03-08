@@ -27,29 +27,57 @@ use holochain::sweettest::*;
 /// pulling in WASM-only integrity crates.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct RegisterPropertyInput {
-    property_type: String,
+    property_type: PropertyType,
     title: String,
     description: String,
     owner_did: String,
-    co_owners: Vec<String>,
+    co_owners: Vec<CoOwner>,
     geolocation: Option<GeoLocation>,
     address: Option<Address>,
-    metadata: std::collections::HashMap<String, String>,
+    metadata: PropertyMetadata,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum PropertyType {
+    Land,
+    Building,
+    Unit,
+    Equipment,
+    Intellectual,
+    Digital,
+    Other(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CoOwner {
+    did: String,
+    share_basis_points: u32,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct GeoLocation {
     latitude: f64,
     longitude: f64,
+    boundaries: Option<Vec<(f64, f64)>>,
+    area_sqm: Option<f64>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct Address {
     street: String,
     city: String,
-    state: String,
-    postal_code: String,
+    region: String,
     country: String,
+    postal_code: Option<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct PropertyMetadata {
+    appraised_value: Option<f64>,
+    currency: Option<String>,
+    legal_description: Option<String>,
+    parcel_number: Option<String>,
+    attachments: Vec<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -97,11 +125,22 @@ enum PlotStatus {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+enum PlotType {
+    Garden,
+    FoodForest,
+    Orchard,
+    Greenhouse,
+    Raised,
+    Rooftop,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct Plot {
     id: String,
     name: String,
     area_sqm: f64,
     soil_type: SoilType,
+    plot_type: PlotType,
     location_lat: f64,
     location_lon: f64,
     steward: AgentPubKey,
@@ -139,6 +178,19 @@ enum VehicleType {
     Bus,
     Cargo,
     ElectricScooter,
+    Helicopter,
+    EVTOL,
+    AirTaxi,
+    Ferry,
+    Boat,
+    Train,
+    Tram,
+    Skateboard,
+    Wheelchair,
+    Segway,
+    AutonomousVehicle,
+    Drone,
+    Other(String),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -183,9 +235,14 @@ struct RideOffer {
 
 /// Helper to get the commons DNA path
 fn commons_dna_path() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("dna")
-        .join("commons.dna")
+    if let Ok(custom) = std::env::var("COMMONS_DNA_PATH") {
+        return std::path::PathBuf::from(custom);
+    }
+    let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.pop(); // tests/ -> mycelix-commons/
+    path.push("dna");
+    path.push("mycelix_commons.dna");
+    path
 }
 
 /// Test: Bridge health check returns all 5 domains
@@ -217,7 +274,7 @@ async fn test_cross_domain_dispatch_property() {
 
     // Register a property first
     let input = RegisterPropertyInput {
-        property_type: "residential".to_string(),
+        property_type: PropertyType::Building,
         title: "Test House".to_string(),
         description: "Cross-domain test property".to_string(),
         owner_did: "did:test:alice".to_string(),
@@ -225,19 +282,27 @@ async fn test_cross_domain_dispatch_property() {
         geolocation: Some(GeoLocation {
             latitude: 32.9483,
             longitude: -96.7299,
+            boundaries: None,
+            area_sqm: Some(150.0),
         }),
         address: Some(Address {
             street: "100 Main St".to_string(),
             city: "Richardson".to_string(),
-            state: "TX".to_string(),
-            postal_code: "75080".to_string(),
+            region: "TX".to_string(),
             country: "US".to_string(),
+            postal_code: Some("75080".to_string()),
         }),
-        metadata: std::collections::HashMap::new(),
+        metadata: PropertyMetadata {
+            appraised_value: None,
+            currency: None,
+            legal_description: None,
+            parcel_number: None,
+            attachments: vec![],
+        },
     };
 
     // Call property_registry directly
-    let record: Record = conductor
+    let _record: Record = conductor
         .call(&cell.zome("property_registry"), "register_property", input.clone())
         .await;
 
@@ -265,14 +330,20 @@ async fn test_housing_queries_property_via_bridge() {
 
     // Register a property
     let input = RegisterPropertyInput {
-        property_type: "land".to_string(),
+        property_type: PropertyType::Land,
         title: "CLT Land Parcel".to_string(),
         description: "Land for community land trust".to_string(),
         owner_did: "did:test:trust".to_string(),
         co_owners: vec![],
         geolocation: None,
         address: None,
-        metadata: std::collections::HashMap::new(),
+        metadata: PropertyMetadata {
+            appraised_value: None,
+            currency: None,
+            legal_description: None,
+            parcel_number: None,
+            attachments: vec![],
+        },
     };
 
     let _record: Record = conductor
@@ -305,6 +376,7 @@ async fn test_cross_domain_dispatch_food_production() {
         name: "Community Garden Alpha".to_string(),
         area_sqm: 250.0,
         soil_type: SoilType::Loam,
+        plot_type: PlotType::Garden,
         location_lat: 32.9483,
         location_lon: -96.7299,
         steward: agent,
@@ -471,6 +543,7 @@ async fn test_food_queries_via_bridge() {
         name: "Herb Spiral".to_string(),
         area_sqm: 50.0,
         soil_type: SoilType::Sandy,
+        plot_type: PlotType::Garden,
         location_lat: 32.95,
         location_lon: -96.73,
         steward: agent,
@@ -869,7 +942,7 @@ async fn setup_civic_conductor() -> (SweetConductor, SweetApp, SweetCell) {
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("civic", &[dna]).await.unwrap();
-    let cell = app.into_cells().into_iter().next().unwrap();
+    let cell = app.clone().into_cells().into_iter().next().unwrap();
 
     (conductor, app, cell)
 }
@@ -1267,7 +1340,7 @@ async fn test_cross_cluster_housing_governance_escalates_to_justice() {
 
     // 1. Register a property (the housing complex subject to governance)
     let prop_input = RegisterPropertyInput {
-        property_type: "land".to_string(),
+        property_type: PropertyType::Land,
         title: "Oakwood Housing Cooperative".to_string(),
         description: "12-unit cooperative with shared governance".to_string(),
         owner_did: "did:mycelix:oakwood-coop".to_string(),
@@ -1275,15 +1348,23 @@ async fn test_cross_cluster_housing_governance_escalates_to_justice() {
         geolocation: Some(GeoLocation {
             latitude: 32.9550,
             longitude: -96.7350,
+            boundaries: None,
+            area_sqm: None,
         }),
         address: Some(Address {
             street: "450 Oakwood Lane".to_string(),
             city: "Richardson".to_string(),
-            state: "TX".to_string(),
-            postal_code: "75080".to_string(),
+            region: "TX".to_string(),
             country: "US".to_string(),
+            postal_code: Some("75080".to_string()),
         }),
-        metadata: std::collections::HashMap::new(),
+        metadata: PropertyMetadata {
+            appraised_value: None,
+            currency: None,
+            legal_description: None,
+            parcel_number: None,
+            attachments: vec![],
+        },
     };
 
     let prop_record: Record = conductor
@@ -2187,7 +2268,7 @@ async fn setup_conductor() -> (SweetConductor, SweetApp, SweetCell) {
 
     let mut conductor = SweetConductor::from_standard_config().await;
     let app = conductor.setup_app("commons", &[dna]).await.unwrap();
-    let cell = app.into_cells().into_iter().next().unwrap();
+    let cell = app.clone().into_cells().into_iter().next().unwrap();
 
     (conductor, app, cell)
 }
