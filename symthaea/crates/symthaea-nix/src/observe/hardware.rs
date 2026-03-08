@@ -24,6 +24,12 @@ pub struct HardwareInfo {
     pub gpus: Vec<GpuInfo>,
     /// Mounted disks/filesystems.
     pub disks: Vec<DiskInfo>,
+    /// CPU load averages [1min, 5min, 15min] from /proc/loadavg.
+    pub load_average: [f64; 3],
+    /// Total swap in MiB.
+    pub swap_total_mb: u64,
+    /// Used swap in MiB (total - free).
+    pub swap_used_mb: u64,
 }
 
 /// Information about a detected GPU.
@@ -62,6 +68,13 @@ impl HardwareObserver {
 
         let (cpu_model, cpu_cores) = Self::parse_cpuinfo(&cpuinfo);
         let (memory_total_mb, memory_available_mb) = Self::parse_meminfo(&meminfo)?;
+        let (swap_total_mb, swap_used_mb) = Self::parse_swap(&meminfo);
+
+        // Load average from /proc/loadavg
+        let load_average = std::fs::read_to_string("/proc/loadavg")
+            .ok()
+            .map(|s| Self::parse_loadavg(&s))
+            .unwrap_or([0.0; 3]);
 
         // GPU detection via lspci (may not be available on all systems)
         let gpus = match Command::new("lspci").args(["-mm", "-nn"]).output() {
@@ -91,6 +104,9 @@ impl HardwareObserver {
             memory_available_mb,
             gpus,
             disks,
+            load_average,
+            swap_total_mb,
+            swap_used_mb,
         })
     }
 
@@ -213,6 +229,42 @@ impl HardwareObserver {
             }
         }
         segments
+    }
+
+    /// Parse `/proc/loadavg` to extract 1min, 5min, 15min load averages.
+    ///
+    /// Format: `0.42 0.35 0.31 1/234 5678`
+    pub fn parse_loadavg(content: &str) -> [f64; 3] {
+        let parts: Vec<&str> = content.split_whitespace().collect();
+        if parts.len() >= 3 {
+            [
+                parts[0].parse().unwrap_or(0.0),
+                parts[1].parse().unwrap_or(0.0),
+                parts[2].parse().unwrap_or(0.0),
+            ]
+        } else {
+            [0.0; 3]
+        }
+    }
+
+    /// Parse swap info from `/proc/meminfo`.
+    ///
+    /// Returns (swap_total_mb, swap_used_mb).
+    pub fn parse_swap(meminfo_content: &str) -> (u64, u64) {
+        let mut total_kb: u64 = 0;
+        let mut free_kb: u64 = 0;
+
+        for line in meminfo_content.lines() {
+            if line.starts_with("SwapTotal:") {
+                total_kb = Self::parse_meminfo_value(line).unwrap_or(0);
+            } else if line.starts_with("SwapFree:") {
+                free_kb = Self::parse_meminfo_value(line).unwrap_or(0);
+            }
+        }
+
+        let total_mb = total_kb / 1024;
+        let used_mb = total_kb.saturating_sub(free_kb) / 1024;
+        (total_mb, used_mb)
     }
 
     /// Parse `df --output=source,target,size,used -B1` output.
@@ -375,5 +427,42 @@ tmpfs          /run                16777216     8388608
     fn test_parse_df_empty() {
         let disks = HardwareObserver::parse_df("Filesystem Mounted on 1B-blocks Used\n");
         assert!(disks.is_empty());
+    }
+
+    #[test]
+    fn test_parse_loadavg() {
+        let load = HardwareObserver::parse_loadavg("0.42 0.35 0.31 1/234 5678\n");
+        assert!((load[0] - 0.42).abs() < 1e-6);
+        assert!((load[1] - 0.35).abs() < 1e-6);
+        assert!((load[2] - 0.31).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_parse_loadavg_empty() {
+        let load = HardwareObserver::parse_loadavg("");
+        assert_eq!(load, [0.0; 3]);
+    }
+
+    #[test]
+    fn test_parse_swap() {
+        let (total, used) = HardwareObserver::parse_swap(MOCK_MEMINFO);
+        assert_eq!(total, 8388608 / 1024); // 8192 MiB
+        assert_eq!(used, 0); // SwapFree == SwapTotal
+    }
+
+    #[test]
+    fn test_parse_swap_partial_usage() {
+        let meminfo = "SwapTotal:       8388608 kB\nSwapFree:        4194304 kB\n";
+        let (total, used) = HardwareObserver::parse_swap(meminfo);
+        assert_eq!(total, 8388608 / 1024);
+        assert_eq!(used, 4194304 / 1024);
+    }
+
+    #[test]
+    fn test_parse_swap_no_swap() {
+        let meminfo = "MemTotal:       32768000 kB\n";
+        let (total, used) = HardwareObserver::parse_swap(meminfo);
+        assert_eq!(total, 0);
+        assert_eq!(used, 0);
     }
 }

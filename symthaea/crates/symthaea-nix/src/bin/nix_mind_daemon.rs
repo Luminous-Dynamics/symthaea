@@ -28,9 +28,12 @@ use symthaea_nix::observe::SystemObserver;
 use symthaea_nix::support::health_check::{HealthAssessor, HealthStatus};
 use symthaea_nix::support::knowledge::{DynamicKnowledgeArticle, KnowledgeBase, KnowledgeCategory};
 use symthaea_nix::support::poml::{PomlContext, PomlProcessor, PomlValue};
+use symthaea_nix::mind::active_inference::NixActiveInference;
+use symthaea_nix::plugin::domain_plugin::NixOsPlugin;
 use symthaea_nix::support::predictive::{
     AlertThresholds, PredictiveMonitor, SavedPredictiveState, SystemTelemetry,
 };
+use symthaea_nix::traits::DomainPlugin;
 
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
@@ -63,6 +66,12 @@ struct DaemonState {
     last_hw_probe: Option<symthaea_nix::observe::hardware::HardwareInfo>,
     /// Whether the daemon is in degraded mode (using cached data).
     degraded: bool,
+    /// Active inference engine for formulating maintenance goals.
+    active_inference: NixActiveInference,
+    /// NixOS domain plugin for enriching anomaly diagnostics.
+    nix_plugin: NixOsPlugin,
+    /// Count of maintenance plans generated (dry-run).
+    maintenance_plan_count: u32,
 }
 
 /// Tracks alert continuity across IPC cycles.
@@ -120,6 +129,9 @@ impl DaemonState {
             watchdog_status: None,
             last_hw_probe: None,
             degraded: false,
+            active_inference: NixActiveInference::new(),
+            nix_plugin: NixOsPlugin,
+            maintenance_plan_count: 0,
         }
     }
 
@@ -289,6 +301,9 @@ impl DaemonState {
             None
         };
 
+        // Feed the state to the active inference engine
+        self.active_inference.observe_state(state_hv.clone());
+
         self.prev_snapshot = Some(snapshot);
         self.prev_state_hv = Some(state_hv);
     }
@@ -350,9 +365,16 @@ impl DaemonState {
                 );
             }
 
+            // Enrich anomaly with NixOS domain diagnosis (AS)
+            let enriched_reason = if let Some(diag) = self.nix_plugin.diagnose_error(&anomaly.entry.message) {
+                format!("{} [{}:{}]", anomaly.reason, diag.error_type, diag.suggestion.as_deref().unwrap_or(""))
+            } else {
+                anomaly.reason.clone()
+            };
+
             self.recent_anomalies.push(AnomalyEntry {
                 score: anomaly.anomaly_score as f64,
-                reason: anomaly.reason.clone(),
+                reason: enriched_reason,
                 unit: anomaly.entry.unit.clone(),
             });
         }
@@ -493,6 +515,28 @@ impl DaemonState {
         // Prune alert state for alerts that are no longer active
         self.alert_state.retain(|k, _| active_keys.contains(k));
 
+        // Record predictions for accuracy tracking (AP)
+        let predictions_for_tracking = self.predictive_monitor.predict_all_horizons();
+        self.predictive_monitor.record_predictions(&predictions_for_tracking);
+
+        // Active inference: formulate maintenance goals on high-confidence persistent alerts (AO)
+        for alert in &alerts {
+            if alert.consecutive_cycles >= 3 && alert.confidence > 0.6 {
+                let goal_description = format!(
+                    "Maintain {} below {} (currently {} predicted {})",
+                    alert.metric, alert.threshold, alert.current_value, alert.predicted_value
+                );
+                let plan = self.active_inference.process_input(&goal_description);
+                if let Some(best) = plan.actions.first() {
+                    eprintln!(
+                        "nix-mind-daemon: maintenance plan (dry-run): {} → {:?} (EFE={:.3})",
+                        alert.metric, best.action, best.expected_free_energy
+                    );
+                    self.maintenance_plan_count += 1;
+                }
+            }
+        }
+
         // Export top-10 strongest causal edges
         let top_causal_edges: Vec<CausalEdgeEntry> = self
             .causal_graph
@@ -529,6 +573,16 @@ impl DaemonState {
             memory_used_percent: self.last_memory_pct,
             watchdog_status: self.watchdog_status.clone(),
             degraded: self.degraded,
+            prediction_accuracy: self.predictive_monitor.rolling_mae(),
+            maintenance_plan_count: self.maintenance_plan_count,
+            load_average_1m: self.last_hw_probe.as_ref().map(|h| h.load_average[0]),
+            swap_used_percent: self.last_hw_probe.as_ref().and_then(|h| {
+                if h.swap_total_mb > 0 {
+                    Some(h.swap_used_mb as f64 / h.swap_total_mb as f64 * 100.0)
+                } else {
+                    None
+                }
+            }),
         }
     }
 }

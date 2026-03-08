@@ -496,6 +496,7 @@ impl App {
         self.alerts.support_status = snap.support_status.clone();
         self.alerts.recommendation_count = snap.recommendation_count;
         self.alerts.watchdog_status = snap.watchdog_status.clone();
+        self.alerts.prediction_accuracy = snap.prediction_accuracy;
 
         self.refresh_generations();
     }
@@ -523,6 +524,9 @@ impl App {
                     number: g.number,
                     date: g.date.clone(),
                     current: g.current,
+                    size_delta_bytes: None,
+                    status: None,
+                    age_hours: None,
                 })
                 .collect();
         }
@@ -984,6 +988,10 @@ mod tests {
             memory_used_percent: Some(55.0),
             watchdog_status: Some("stabilized".into()),
             degraded: false,
+            prediction_accuracy: Some(3.5),
+            maintenance_plan_count: 1,
+            load_average_1m: Some(0.5),
+            swap_used_percent: Some(12.0),
         };
 
         app.apply_daemon_snapshot(&snap);

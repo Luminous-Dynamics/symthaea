@@ -114,7 +114,7 @@ impl<'a> AnyKnowledgeMatch<'a> {
 
     pub fn commands(&self) -> Vec<&str> {
         match self {
-            Self::Static(m) => m.article.commands.iter().copied().collect(),
+            Self::Static(m) => m.article.commands.to_vec(),
             Self::Dynamic { article, .. } => article.commands.iter().map(|s| s.as_str()).collect(),
         }
     }

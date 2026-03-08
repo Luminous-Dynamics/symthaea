@@ -66,6 +66,18 @@ pub struct DaemonSnapshot {
     /// Whether the daemon is in degraded mode (hardware probe failures cached).
     #[serde(default)]
     pub degraded: bool,
+    /// Rolling mean absolute error of predictions (lower = more accurate).
+    #[serde(default)]
+    pub prediction_accuracy: Option<f64>,
+    /// Number of active inference maintenance plans generated (dry-run).
+    #[serde(default)]
+    pub maintenance_plan_count: u32,
+    /// CPU load average [1min] from the latest hardware probe.
+    #[serde(default)]
+    pub load_average_1m: Option<f64>,
+    /// Swap usage percentage.
+    #[serde(default)]
+    pub swap_used_percent: Option<f64>,
 }
 
 /// A causal edge entry for IPC (lightweight copy of CausalEdge).
@@ -370,6 +382,10 @@ mod tests {
             memory_used_percent: None,
             watchdog_status: None,
             degraded: false,
+            prediction_accuracy: None,
+            maintenance_plan_count: 0,
+            load_average_1m: None,
+            swap_used_percent: None,
         }
     }
 
