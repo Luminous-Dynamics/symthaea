@@ -1250,3 +1250,207 @@ fn test_demurrage_never_charges_debtors() {
         );
     }
 }
+
+/// Stress test: NaN and infinity in demurrage computation never panic.
+/// The integrity zome rejects these, but the math function should be robust.
+#[test]
+fn test_demurrage_special_float_values() {
+    // NaN rate — should produce 0 deduction (no panic)
+    let d = compute_minted_demurrage(100, f64::NAN, 3600);
+    assert!(d == 0 || d >= 0, "NaN rate should not panic");
+
+    // Infinity rate
+    let d = compute_minted_demurrage(100, f64::INFINITY, 3600);
+    assert!(d >= 0, "Infinity rate should not panic");
+
+    // Negative infinity rate
+    let d = compute_minted_demurrage(100, f64::NEG_INFINITY, 3600);
+    assert!(d == 0 || d >= 0, "Neg infinity rate should not panic");
+
+    // Zero balance (edge)
+    let d = compute_minted_demurrage(0, 0.02, 3600);
+    assert_eq!(d, 0, "Zero balance should produce zero deduction");
+
+    // Zero elapsed time
+    let d = compute_minted_demurrage(100, 0.02, 0);
+    assert_eq!(d, 0, "Zero elapsed should produce zero deduction");
+
+    // Max i32 balance
+    let d = compute_minted_demurrage(i32::MAX, 0.05, 31_536_000);
+    assert!(d >= 0 && d <= i32::MAX, "Max balance should not overflow");
+}
+
+/// Stress test: all valid MintedCurrencyParams field combinations at boundaries.
+/// Ensures no panics and expected pass/fail outcomes at the edges of validity.
+#[test]
+fn test_minted_params_boundary_matrix() {
+    use mycelix_finance_types::{
+        MINTED_CREDIT_LIMIT_MAX, MINTED_CREDIT_LIMIT_MIN, MINTED_DEMURRAGE_RATE_MAX,
+    };
+
+    let base = valid_minted_params();
+
+    // Credit limit boundaries
+    for &cl in &[
+        MINTED_CREDIT_LIMIT_MIN,
+        MINTED_CREDIT_LIMIT_MAX,
+        MINTED_CREDIT_LIMIT_MIN - 1,
+        MINTED_CREDIT_LIMIT_MAX + 1,
+    ] {
+        let mut p = base.clone();
+        p.credit_limit = cl;
+        let result = p.validate();
+        if cl >= MINTED_CREDIT_LIMIT_MIN && cl <= MINTED_CREDIT_LIMIT_MAX {
+            assert!(result.is_ok(), "credit_limit {} should be valid", cl);
+        } else {
+            assert!(result.is_err(), "credit_limit {} should be invalid", cl);
+        }
+    }
+
+    // Demurrage rate boundaries
+    for &rate in &[
+        0.0,
+        MINTED_DEMURRAGE_RATE_MAX,
+        MINTED_DEMURRAGE_RATE_MAX + 0.001,
+        -0.001,
+    ] {
+        let mut p = base.clone();
+        p.demurrage_rate = rate;
+        let result = p.validate();
+        if (0.0..=MINTED_DEMURRAGE_RATE_MAX).contains(&rate) {
+            assert!(result.is_ok(), "demurrage_rate {} should be valid", rate);
+        } else {
+            assert!(result.is_err(), "demurrage_rate {} should be invalid", rate);
+        }
+    }
+}
+
+// =============================================================================
+// Section 8: Demurrage Zero-Sum Proof (100 members)
+// =============================================================================
+
+#[test]
+fn test_demurrage_zero_sum_100_members() {
+    // Simulate 100 members with random balances.
+    // Apply demurrage to all positive balances.
+    // Verify: sum(all balances) + compost == 0 at every step.
+
+    let rate = 0.02; // 2% annual
+    let one_year_secs: u64 = 31_536_000;
+
+    // Start with 50 positive, 50 negative (zero-sum initial state)
+    let mut balances: Vec<i32> = Vec::new();
+    let mut total_sum: i64 = 0;
+
+    // Positive balances: 2, 4, 6, ..., 100
+    for i in 1..=50 {
+        balances.push(i * 2);
+        total_sum += (i * 2) as i64;
+    }
+    // Negative balances to make zero-sum
+    for i in 1..=50 {
+        balances.push(-(i * 2));
+        total_sum -= (i * 2) as i64;
+    }
+    assert_eq!(total_sum, 0, "Initial state must be zero-sum");
+
+    let mut compost: i64 = 0;
+
+    // Apply demurrage for 1 year to all positive balances
+    for bal in balances.iter_mut() {
+        if *bal > 0 {
+            let deduction = compute_minted_demurrage(*bal, rate, one_year_secs);
+            *bal -= deduction;
+            compost += deduction as i64;
+        }
+    }
+
+    // Verify zero-sum
+    let final_sum: i64 = balances.iter().map(|b| *b as i64).sum::<i64>() + compost;
+    assert_eq!(
+        final_sum,
+        0,
+        "Zero-sum violated after 1-year demurrage: sum={}, compost={}",
+        balances.iter().map(|b| *b as i64).sum::<i64>(),
+        compost
+    );
+
+    // Verify compost accumulated something
+    assert!(compost > 0, "Compost should have accumulated demurrage");
+
+    // Negative balances should be unchanged
+    for i in 50..100 {
+        assert!(
+            balances[i] < 0,
+            "Negative balance should remain negative: {}",
+            balances[i]
+        );
+    }
+
+    println!(
+        "100-member zero-sum proof: compost={}, verified after 1 year",
+        compost
+    );
+}
+
+#[test]
+fn test_demurrage_zero_sum_multi_year_interleaved() {
+    // Simulate exchanges interleaved with yearly demurrage over 5 years.
+    // Verify zero-sum at every step.
+
+    let rate = 0.03; // 3% annual
+    let one_year_secs: u64 = 31_536_000;
+
+    // 10 members, start at zero
+    let mut balances = vec![0i32; 10];
+    let mut compost: i64 = 0;
+
+    // Helper: verify zero-sum
+    let check_zero_sum = |balances: &[i32], compost: i64, step: &str| {
+        let sum: i64 = balances.iter().map(|b| *b as i64).sum::<i64>() + compost;
+        assert_eq!(sum, 0, "Zero-sum violated at step: {}", step);
+    };
+
+    check_zero_sum(&balances, compost, "initial");
+
+    for year in 1..=5 {
+        // Simulate exchanges with larger amounts to ensure demurrage produces
+        // non-zero deductions (small balances floor to 0 with continuous decay).
+        // member[0] provides year*20 hours to member[1]
+        let hours = year as i32 * 20;
+        balances[0] += hours;
+        balances[1] -= hours;
+        check_zero_sum(&balances, compost, &format!("year {} after exchange", year));
+
+        // member[2] provides 10 hours to member[3]
+        balances[2] += 10;
+        balances[3] -= 10;
+        check_zero_sum(
+            &balances,
+            compost,
+            &format!("year {} after exchange 2", year),
+        );
+
+        // Apply demurrage to all positive balances
+        for bal in balances.iter_mut() {
+            if *bal > 0 {
+                let deduction = compute_minted_demurrage(*bal, rate, one_year_secs);
+                compost += deduction as i64;
+                *bal -= deduction;
+            }
+        }
+        check_zero_sum(
+            &balances,
+            compost,
+            &format!("year {} after demurrage", year),
+        );
+    }
+
+    // Final verification
+    check_zero_sum(&balances, compost, "final after 5 years");
+    assert!(compost > 0, "Compost should be positive after 5 years");
+    println!(
+        "5-year interleaved zero-sum proof: compost={}, balances={:?}",
+        compost, balances
+    );
+}

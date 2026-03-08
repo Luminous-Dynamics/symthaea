@@ -54,7 +54,8 @@ impl DnaPaths {
     }
 
     pub fn federated_learning() -> PathBuf {
-        Self::workspace_root().join("../mycelix-core/zomes/federated_learning/workdir/dna/federated_learning.dna")
+        Self::workspace_root()
+            .join("../mycelix-core/zomes/federated_learning/workdir/dna/federated_learning.dna")
     }
 
     /// Commons cluster DNA -- old unified (property + housing + care + mutualaid + water + food + transport).
@@ -114,6 +115,7 @@ impl DnaPaths {
             ("commons_care", Self::commons_care()),
             ("civic", Self::civic()),
             ("attribution", Self::attribution()),
+            ("finance", Self::finance()),
         ]
     }
 }
@@ -173,16 +175,13 @@ impl TestAgent {
         I: serde::Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        let cell = self
-            .role_cells
-            .get(role_name)
-            .unwrap_or_else(|| {
-                panic!(
-                    "No cell found for role '{}'. Available roles: {:?}",
-                    role_name,
-                    self.role_cells.keys().collect::<Vec<_>>()
-                )
-            });
+        let cell = self.role_cells.get(role_name).unwrap_or_else(|| {
+            panic!(
+                "No cell found for role '{}'. Available roles: {:?}",
+                role_name,
+                self.role_cells.keys().collect::<Vec<_>>()
+            )
+        });
         let zome = cell.zome(zome_name);
         self.conductor.call(&zome, fn_name, input).await
     }
@@ -200,16 +199,13 @@ impl TestAgent {
         I: serde::Serialize + std::fmt::Debug,
         O: serde::de::DeserializeOwned + std::fmt::Debug,
     {
-        let cell = self
-            .role_cells
-            .get(role_name)
-            .unwrap_or_else(|| {
-                panic!(
-                    "No cell found for role '{}'. Available roles: {:?}",
-                    role_name,
-                    self.role_cells.keys().collect::<Vec<_>>()
-                )
-            });
+        let cell = self.role_cells.get(role_name).unwrap_or_else(|| {
+            panic!(
+                "No cell found for role '{}'. Available roles: {:?}",
+                role_name,
+                self.role_cells.keys().collect::<Vec<_>>()
+            )
+        });
         let zome = cell.zome(zome_name);
         self.conductor.call_fallible(&zome, fn_name, input).await
     }
@@ -217,11 +213,7 @@ impl TestAgent {
 
 /// Set up N test agents sharing a DNA, with peer exchange for DHT sync.
 /// Returns TestAgent structs with conductor, cell, and agent_pubkey.
-pub async fn setup_test_agents(
-    dna_path: &PathBuf,
-    app_name: &str,
-    n: usize,
-) -> Vec<TestAgent> {
+pub async fn setup_test_agents(dna_path: &PathBuf, app_name: &str, n: usize) -> Vec<TestAgent> {
     let dna = SweetDnaFile::from_bundle(dna_path)
         .await
         .unwrap_or_else(|e| panic!("Failed to load DNA from {:?}: {:?}", dna_path, e));
@@ -230,10 +222,7 @@ pub async fn setup_test_agents(
 
     for _ in 0..n {
         let mut conductor = SweetConductor::from_standard_config().await;
-        let app = conductor
-            .setup_app(app_name, [&dna])
-            .await
-            .unwrap();
+        let app = conductor.setup_app(app_name, [&dna]).await.unwrap();
 
         let cell = app.cells()[0].clone();
         let agent_pubkey = cell.agent_pubkey().clone();
@@ -270,10 +259,7 @@ pub async fn setup_test_agents(
 ///   actual DNAs are loaded from `DnaPaths::unified_happ_dnas()`).
 /// * `n` - Number of test agents to create.
 #[allow(dead_code)]
-pub async fn setup_test_agents_from_happ(
-    _happ_path: &PathBuf,
-    n: usize,
-) -> Vec<TestAgent> {
+pub async fn setup_test_agents_from_happ(_happ_path: &PathBuf, n: usize) -> Vec<TestAgent> {
     let role_dnas = DnaPaths::unified_happ_dnas();
 
     // Load all available DNAs
