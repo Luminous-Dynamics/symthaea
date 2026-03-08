@@ -207,11 +207,13 @@ impl CognitiveLoopService {
             "Psych-bench calibration ingested (pending sleep→wake)"
         );
         self.neuromod.pending_calibration = Some(cal);
+        self.neuromod.pending_calibration_since_cycle = Some(self.stats.total_cycles as u64);
     }
 
     /// Ingest a pre-built calibration directly (e.g., from raw z-scores).
     pub fn ingest_calibration_raw(&mut self, cal: super::super::calibration::NeuromodCalibration) {
         self.neuromod.pending_calibration = Some(cal);
+        self.neuromod.pending_calibration_since_cycle = Some(self.stats.total_cycles as u64);
     }
 
     /// Force-apply any pending calibration immediately (bypasses sleep→wake gate).
@@ -219,6 +221,7 @@ impl CognitiveLoopService {
     /// Use sparingly — normal flow waits for sleep→wake transition.
     pub fn apply_pending_calibration(&mut self) {
         if let Some(mut cal) = self.neuromod.pending_calibration.take() {
+            self.neuromod.pending_calibration_since_cycle = None;
             // Record in history before applying (captures the intended adjustment)
             self.neuromod.calibration_history.record(&cal, self.stats.total_cycles as u64);
 
@@ -426,6 +429,7 @@ impl CognitiveLoopService {
                                 "Async calibration battery completed"
                             );
                             self.neuromod.pending_calibration = Some(cal);
+                            self.neuromod.pending_calibration_since_cycle = Some(self.stats.total_cycles as u64);
                             return true;
                         }
                         Err(e) => {
