@@ -158,6 +158,34 @@ jobs:
           RUST_BACKTRACE: 1
         timeout-minutes: 30
 
+  butlin-validation:
+    name: Butlin Consciousness Indicators (14/14)
+    runs-on: ubuntu-latest
+    needs: [check]
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-butlin-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-butlin-
+      - name: Run Butlin validation (14/14 gate)
+        run: cargo run --example butlin_validation --release
+        env:
+          RUST_BACKTRACE: 1
+        timeout-minutes: 15
+
   mujoco-tests:
     name: MuJoCo Flight Tests
     runs-on: ubuntu-latest
