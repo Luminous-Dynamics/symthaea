@@ -171,11 +171,11 @@ fn test_full_agent_lifecycle() {
     let phi_config = CoherenceMeasurementConfig::default();
     let phi_result = measure_coherence(&outputs, &phi_config).unwrap();
 
-    println!("Phi measurement: {:.4}", phi_result.phi);
+    println!("Phi measurement: {:.4}", phi_result.coherence);
     println!("Coherence state: {:?}", phi_result.coherence_state);
 
     // Consistent outputs should have high coherence
-    assert!(phi_result.phi > 0.8);
+    assert!(phi_result.coherence > 0.8);
     assert!(matches!(
         phi_result.coherence_state,
         CoherenceState::Coherent
@@ -262,7 +262,7 @@ fn test_full_agent_lifecycle() {
     // Simulate more measurements over time
     for _ in 0..5 {
         let similar_result = mycelix_sdk::agentic::AgentCoherenceResult {
-            phi: phi_result.phi * 0.98, // Slightly varying
+            coherence: phi_result.coherence * 0.98, // Slightly varying
             coherence_state: CoherenceState::Coherent,
             sample_size: 10,
             output_contributions: vec![],
@@ -275,7 +275,7 @@ fn test_full_agent_lifecycle() {
     }
 
     println!("\nCoherence history:");
-    println!("  Rolling Phi: {:.4}", coherence_history.rolling_phi);
+    println!("  Rolling Phi: {:.4}", coherence_history.rolling_coherence);
     println!("  Current state: {:?}", coherence_history.current_state());
     println!(
         "  Trend: {} (1=improving, 0=stable, -1=declining)",
@@ -294,7 +294,7 @@ fn test_full_agent_lifecycle() {
     println!("\n========== EPISTEMIC FINGERPRINT ==========");
     println!("Agent ID: {}", agent.agent_id.as_str());
     println!("Trust Score: {:.4}", agent.k_vector.trust_score());
-    println!("Coherence (Phi): {:.4}", coherence_history.rolling_phi);
+    println!("Coherence (Phi): {:.4}", coherence_history.rolling_coherence);
     println!("Epistemic Quality: {:.4}", epistemic_stats.quality_score());
     println!("KREDIT Cap: {}", agent.kredit_cap);
     println!("Status: {:?}", agent.status);
@@ -443,11 +443,11 @@ fn test_diverse_outputs_lower_coherence() {
     let phi_result =
         measure_coherence(&diverse_outputs, &CoherenceMeasurementConfig::default()).unwrap();
 
-    println!("Diverse outputs Phi: {:.4}", phi_result.phi);
+    println!("Diverse outputs Phi: {:.4}", phi_result.coherence);
     println!("Coherence state: {:?}", phi_result.coherence_state);
 
     // Should be less coherent than consistent outputs
-    assert!(phi_result.phi < 0.8);
+    assert!(phi_result.coherence < 0.8);
 }
 
 #[test]

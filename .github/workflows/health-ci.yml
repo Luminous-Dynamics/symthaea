@@ -1,0 +1,309 @@
+# Mycelix Health - Tier 1 MVP CI
+# Zomes: Patient, Provider, Records, Prescriptions, Consent, Bridge, Shared
+# Status: 7 active zomes, 8 deferred (Tier 2), 22 archived (Tier 3)
+
+name: Health
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mycelix-health/**'
+      - '.github/workflows/health-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mycelix-health/**'
+      - '.github/workflows/health-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: health-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUST_LOG: info
+
+jobs:
+  # ============================================================================
+  # Lint (parallel with build)
+  # ============================================================================
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Check formatting
+        run: |
+          nix develop ./mycelix-health --command bash -c '
+            cd mycelix-health
+            cargo fmt --check
+          '
+
+      - name: Run Clippy
+        run: |
+          nix develop ./mycelix-health --command bash -c '
+            cd mycelix-health
+            cargo clippy --workspace --all-targets -- -D warnings
+          '
+
+  # ============================================================================
+  # Build WASM Zomes
+  # ============================================================================
+  build-zomes:
+    name: Build WASM Zomes
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-health/target/
+          key: ${{ runner.os }}-cargo-health-build-${{ hashFiles('mycelix-health/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-health-build-
+
+      - name: Build all zomes (WASM)
+        run: |
+          nix develop ./mycelix-health --command bash -c '
+            cd mycelix-health
+
+            echo "=== Building Health WASM Zomes (Tier 1 MVP) ==="
+            cargo build --release --workspace --target wasm32-unknown-unknown
+
+            echo ""
+            echo "=== Built WASM artifacts ==="
+            ls -lh target/wasm32-unknown-unknown/release/*.wasm 2>/dev/null || echo "No .wasm files found"
+
+            echo ""
+            echo "=== Zome sizes ==="
+            for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
+              if [ -f "$wasm" ]; then
+                name=$(basename "$wasm" .wasm)
+                size=$(stat -c %s "$wasm" 2>/dev/null || stat -f %z "$wasm" 2>/dev/null || echo "?")
+                printf "  %-35s %s bytes\n" "$name" "$size"
+              fi
+            done
+          '
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-zome-wasm
+          path: mycelix-health/target/wasm32-unknown-unknown/release/*.wasm
+          if-no-files-found: warn
+
+  # ============================================================================
+  # Unit Tests (per-crate)
+  # ============================================================================
+  test-zomes:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: build-zomes
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-health/target/
+          key: ${{ runner.os }}-cargo-health-test-${{ hashFiles('mycelix-health/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-health-build-
+
+      - name: Run zome unit tests
+        run: |
+          nix develop ./mycelix-health --command bash -c '
+            cd mycelix-health
+
+            echo "=== Running Health workspace unit tests ==="
+            cargo test --workspace
+
+            echo ""
+            echo "=== All unit tests passed ==="
+          '
+
+  # ============================================================================
+  # Package DNA
+  # ============================================================================
+  package-dna:
+    name: Package DNA
+    runs-on: ubuntu-latest
+    needs: [build-zomes, test-zomes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: health-zome-wasm
+          path: mycelix-health/target/wasm32-unknown-unknown/release/
+
+      - name: Package Health DNA
+        run: |
+          nix develop ./mycelix-health --command bash -c '
+            cd mycelix-health
+
+            echo "=== Packaging Health DNA ==="
+            mkdir -p dist
+            hc dna pack dna/ -o dist/health.dna
+
+            echo ""
+            echo "=== DNA packaged ==="
+            ls -lh dist/health.dna
+          '
+
+      - name: Upload DNA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-dna
+          path: mycelix-health/dist/health.dna
+          if-no-files-found: error
+
+  # ============================================================================
+  # Summary
+  # ============================================================================
+  health-summary:
+    name: Health Summary
+    if: always()
+    needs: [lint, build-zomes, test-zomes, package-dna]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate summary
+        run: |
+          format_status() {
+            case "$1" in
+              success) echo "pass" ;;
+              failure) echo "**FAILED**" ;;
+              cancelled) echo "cancelled" ;;
+              skipped) echo "skipped" ;;
+              *) echo "$1" ;;
+            esac
+          }
+
+          echo "## Health CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tier 1 MVP: Patient | Provider | Records | Prescriptions | Consent | Bridge" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          FAILURES=""
+          [ "${{ needs.lint.result }}" = "failure" ] && FAILURES="$FAILURES lint"
+          [ "${{ needs.build-zomes.result }}" = "failure" ] && FAILURES="$FAILURES build-zomes"
+          [ "${{ needs.test-zomes.result }}" = "failure" ] && FAILURES="$FAILURES test-zomes"
+
+          if [ -n "$FAILURES" ]; then
+            echo "> [!CAUTION]" >> $GITHUB_STEP_SUMMARY
+            echo "> **Pipeline failed:**$FAILURES" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint & Format | $(format_status '${{ needs.lint.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build WASM Zomes | $(format_status '${{ needs.build-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | $(format_status '${{ needs.test-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Package DNA | $(format_status '${{ needs.package-dna.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Zomes (7 active)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Zome | Role |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| patient | Patient demographics, search, CRUD |" >> $GITHUB_STEP_SUMMARY
+          echo "| provider | Provider registry, credentials |" >> $GITHUB_STEP_SUMMARY
+          echo "| records | Health records (encounters) |" >> $GITHUB_STEP_SUMMARY
+          echo "| prescriptions | Medication management |" >> $GITHUB_STEP_SUMMARY
+          echo "| consent | Consent grant, check, revocation |" >> $GITHUB_STEP_SUMMARY
+          echo "| bridge | Cross-cluster health dispatch |" >> $GITHUB_STEP_SUMMARY
+          echo "| shared | Common types and utilities |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Architecture" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tier 2 Deferred**: 8 zomes (FHIR, CDS, telehealth, trials, etc.)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tier 3 Archived**: 22 zomes in _archive-2026-02-15/" >> $GITHUB_STEP_SUMMARY
+          echo "- Standalone DNA (separate validator sets for HIPAA alignment)" >> $GITHUB_STEP_SUMMARY
+          echo "- Holochain: 0.6.0 | HDK: 0.6.0 | HDI: 0.7.0" >> $GITHUB_STEP_SUMMARY

@@ -390,11 +390,11 @@ fn test_phi_coherence_measurement() {
     let phi_result = measure_coherence(&coherent_outputs, &config).unwrap();
     history.add_measurement(phi_result.clone());
 
-    println!("  Phi: {:.4}", phi_result.phi);
+    println!("  Phi: {:.4}", phi_result.coherence);
     println!("  Coherence State: {:?}", phi_result.coherence_state);
     println!("  Sample Size: {}", phi_result.sample_size);
 
-    assert!(phi_result.phi > 0.7, "Coherent agent should have high Phi");
+    assert!(phi_result.coherence > 0.7, "Coherent agent should have high Phi");
     assert_eq!(phi_result.coherence_state, CoherenceState::Coherent);
 
     // Check action gating
@@ -455,7 +455,7 @@ fn test_phi_coherence_measurement() {
 
     let incoherent_result = measure_coherence(&incoherent_outputs, &config).unwrap();
 
-    println!("  Phi: {:.4}", incoherent_result.phi);
+    println!("  Phi: {:.4}", incoherent_result.coherence);
     println!("  Coherence State: {:?}", incoherent_result.coherence_state);
 
     // Check action gating for incoherent agent
@@ -782,7 +782,7 @@ fn test_complete_integration_flow() {
     let phi_config = CoherenceMeasurementConfig::default();
     let phi_result = measure_coherence(&outputs, &phi_config).unwrap();
 
-    println!("  Phi Value: {:.4}", phi_result.phi);
+    println!("  Phi Value: {:.4}", phi_result.coherence);
     println!("  Coherence State: {:?}", phi_result.coherence_state);
 
     let action_check = check_coherence_for_action(phi_result.coherence_state, true);
@@ -882,7 +882,7 @@ fn test_complete_integration_flow() {
     );
     println!(
         "║  Phi Coherence: {:.4} ({:?})                     ║",
-        phi_result.phi, phi_result.coherence_state
+        phi_result.coherence, phi_result.coherence_state
     );
     println!(
         "║  Uncertainty Level: {:.3} ({:?})           ║",
@@ -897,7 +897,7 @@ fn test_complete_integration_flow() {
         new_trust >= initial_trust,
         "Trust should improve or maintain"
     );
-    assert!(phi_result.phi > 0.0, "Phi should be measurable");
+    assert!(phi_result.coherence > 0.0, "Phi should be measurable");
     assert!(
         guidance.can_proceed(),
         "Low uncertainty should allow proceeding"
@@ -1123,7 +1123,7 @@ fn test_zk_integrated_full_pipeline_demo() {
                 "    {}: {} (Phi: {:.2}, State: {:?})",
                 agent_id.replace("agent-", ""),
                 status,
-                gating.current_phi,
+                gating.current_coherence,
                 gating.current_state
             );
         }

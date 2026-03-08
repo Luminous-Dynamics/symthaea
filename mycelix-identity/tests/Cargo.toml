@@ -52,3 +52,8 @@ path = "sweettest_integration.rs"
 [[test]]
 name = "mfa_sweettest"
 path = "mfa_sweettest.rs"
+
+# Consciousness Gating Sweettest
+[[test]]
+name = "sweettest_consciousness_gating"
+path = "sweettest_consciousness_gating.rs"

@@ -203,7 +203,7 @@ fn demo_complete_epistemic_agent_flow() {
 
     // Measure Phi from the outputs (need at least 3 for default config)
     if let Some(phi_result) = measure_coherence(&outputs, &phi_config) {
-        println!("Phi (coherence):   {:.3}", phi_result.phi);
+        println!("Phi (coherence):   {:.3}", phi_result.coherence);
         println!("Coherence State:   {:?}", phi_result.coherence_state);
         println!("Sample Size:       {}", phi_result.sample_size);
 
@@ -217,7 +217,7 @@ fn demo_complete_epistemic_agent_flow() {
         println!("Can Proceed:       {}", coherence_check.can_proceed());
 
         // Phi should be a valid measurement
-        assert!(phi_result.phi >= 0.0);
+        assert!(phi_result.coherence >= 0.0);
     } else {
         println!(
             "Phi measurement requires at least {} outputs",

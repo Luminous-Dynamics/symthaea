@@ -111,6 +111,11 @@ path = "sweettest_integration.rs"
 name = "currency_mint_test"
 path = "currency_mint_test.rs"
 
+# Consciousness Gating Sweettest (DID identity + MYCEL tier gates)
+[[test]]
+name = "sweettest_consciousness_gating"
+path = "sweettest_consciousness_gating.rs"
+
 # NOTE: economics_stress_test has been moved to types/tests/ where it compiles
 # without the heavy Holochain dependency. Run with:
 #   cargo test -p mycelix_finance_types --test economics_stress_test

@@ -4087,7 +4087,7 @@ mod tests {
         let metrics = pipeline.export_agent_phi_metrics("export-test").unwrap();
 
         assert_eq!(metrics.agent_id, "export-test");
-        assert!((metrics.phi - 0.7).abs() < 0.01);
+        assert!((metrics.coherence - 0.7).abs() < 0.01);
         assert!(metrics.can_high_stakes);
         assert!(!metrics.is_critical);
     }
