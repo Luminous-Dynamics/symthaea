@@ -4,6 +4,7 @@
 //! #[no_mangle] symbols with other coordinators).
 
 use holochain::prelude::*;
+use holochain::sweettest::*;
 use mycelix_finance_types::MintedCurrencyParams;
 
 // ── Mirror types ────────────────────────────────────────────────────────────
@@ -200,4 +201,35 @@ pub fn test_params_with_confirmation(name: &str, symbol: &str) -> MintedCurrency
     p.requires_confirmation = true;
     p.confirmation_timeout_hours = 48;
     p
+}
+
+pub fn test_params_with_rate_limit(
+    name: &str,
+    symbol: &str,
+    max_per_day: u8,
+) -> MintedCurrencyParams {
+    let mut p = test_params(name, symbol);
+    p.max_exchanges_per_day = max_per_day;
+    p
+}
+
+// ── Conductor setup helper ────────────────────────────────────────────────
+
+/// Set up a SweetConductor with `agent_count` agents and the finance DNA installed.
+///
+/// Returns (conductor, agents, apps). Access cells via `apps[i].cells()[0]`.
+pub async fn setup_finance_conductor(
+    agent_count: usize,
+) -> (SweetConductor, Vec<AgentPubKey>, Vec<SweetApp>) {
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), agent_count).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+    (conductor, agents, apps)
 }

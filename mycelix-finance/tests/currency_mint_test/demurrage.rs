@@ -7,7 +7,9 @@
 //!                            test_demurrage_on_non_active_rejected (E23)
 //!   get_demurrage_report   → test_demurrage_and_compost (16.1), test_batch_demurrage_and_report (18.1)
 //!   get_compost_balance    → test_compost_zero_sum (6.1), test_demurrage_and_compost (16.1)
-//!   redistribute_compost   → test_redistribute_compost (16.2), test_redistribute_compost_idempotent (E8)
+//!   redistribute_compost   → test_redistribute_compost (16.2), test_redistribute_compost_idempotent (E8),
+//!                            test_redistribute_on_non_active_rejected (E25),
+//!                            test_redistribute_insufficient_compost (E29)
 
 use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
@@ -103,7 +105,7 @@ async fn test_demurrage_and_compost() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -232,7 +234,7 @@ async fn test_redistribute_compost() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -390,7 +392,7 @@ async fn test_demurrage_zero_balance_noop() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 1).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -463,7 +465,7 @@ async fn test_redistribute_compost_idempotent() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -553,7 +555,7 @@ async fn test_batch_demurrage_member_coverage() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -778,4 +780,165 @@ async fn test_demurrage_on_non_active_rejected() {
     println!("  - apply_minted_demurrage on Retired: rejected");
 
     println!("Test E23 PASSED");
+}
+
+/// Test E25: Redistribute compost on non-Active currency is rejected
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_redistribute_on_non_active_rejected() {
+    println!("Test E25: Redistribute Compost on Non-Active Rejected");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 2).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create, activate, exchange (to have members and potential compost)
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:redist-guard".into(),
+                params: test_params("RedistGuard", "RG"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+    let _: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: bob_did.clone(),
+                hours: 3.0,
+                service_description: "Service before suspension".into(),
+            },
+        )
+        .await;
+
+    // Suspend
+    let _: CurrencyDefinition = conductor
+        .call(&zome_a, "suspend_currency", def.id.clone())
+        .await;
+
+    // redistribute_compost on Suspended — should fail
+    let result: Result<RedistributeCompostResult, _> = conductor
+        .call_fallible(&zome_a, "redistribute_compost", def.id.clone())
+        .await;
+    assert!(
+        result.is_err(),
+        "Redistribute should be rejected on Suspended currency"
+    );
+    println!("  - redistribute_compost on Suspended: rejected");
+
+    // Reactivate → Retire → try again
+    let _: CurrencyDefinition = conductor
+        .call(&zome_a, "reactivate_currency", def.id.clone())
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(&zome_a, "retire_currency", def.id.clone())
+        .await;
+
+    let result: Result<RedistributeCompostResult, _> = conductor
+        .call_fallible(&zome_a, "redistribute_compost", def.id.clone())
+        .await;
+    assert!(
+        result.is_err(),
+        "Redistribute should be rejected on Retired currency"
+    );
+    println!("  - redistribute_compost on Retired: rejected");
+
+    println!("Test E25 PASSED");
+}
+
+/// Test E29: Redistribute compost with zero/insufficient compost returns gracefully
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_redistribute_insufficient_compost() {
+    println!("Test E29: Redistribute With Insufficient Compost");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 2).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create and activate currency
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:insuff-compost".into(),
+                params: test_params("InsuffCompost", "IC"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+
+    // Do an exchange to create members (but compost is 0 — no demurrage applied yet)
+    let _: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: bob_did.clone(),
+                hours: 3.0,
+                service_description: "Service for compost test".into(),
+            },
+        )
+        .await;
+
+    // Redistribute with zero compost — should return gracefully (not error)
+    let result: RedistributeCompostResult = conductor
+        .call(&zome_a, "redistribute_compost", def.id.clone())
+        .await;
+    assert_eq!(result.total_redistributed, 0, "Nothing to redistribute");
+    assert_eq!(result.per_member_amount, 0, "No per-member amount");
+    println!(
+        "  - Zero compost: redistributed={}, per_member={}, remainder={}",
+        result.total_redistributed, result.per_member_amount, result.remainder_kept
+    );
+
+    println!("Test E29 PASSED");
 }

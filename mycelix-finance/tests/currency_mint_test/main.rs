@@ -1,6 +1,8 @@
 //! # Currency Mint (Currency Factory) Integration Tests
 //!
-//! 50 sweettest scenarios covering all 30 coordinator externs.
+//! 56 sweettest scenarios covering all 30 coordinator externs.
+//!
+//! All coordinator guard/branch paths are tested — suite is COMPLETE.
 //!
 //! ## Running Tests
 //!
@@ -24,10 +26,10 @@
 //!
 //! ### Exchanges (8 externs) → exchanges.rs
 //!   record_minted_exchange   → 2.1, 2.2, 12.1, E1, E2, E4, E5, E14, E15, E16, E17, E20
-//!   confirm_minted_exchange  → 3.1, 3.2, 13.1, E13, E18
+//!   confirm_minted_exchange  → 3.1, 3.2, 13.1, E13, E18, E24
 //!   list_pending_exchanges   → 13.1
 //!   list_pending_for_receiver → 13.1
-//!   cancel_expired_exchange  → 14.1 (lifecycle)
+//!   cancel_expired_exchange  → 14.1 (lifecycle), E26, E28
 //!   get_exchange             → 15.1
 //!   get_currency_exchanges   → 18.2
 //!   get_member_exchanges     → 7.1 (balances), 18.2
@@ -45,10 +47,10 @@
 //! ### Demurrage (3 externs) → demurrage.rs
 //!   apply_minted_demurrage   → 16.1, E7, E23
 //!   apply_demurrage_all      → 18.1, E9, E23
-//!   redistribute_compost     → 16.2, E8
+//!   redistribute_compost     → 16.2, E8, E25, E29
 //!
 //! ### Disputes (3 externs) → disputes.rs
-//!   open_minted_dispute      → 8.1, E3, E19, E21
+//!   open_minted_dispute      → 8.1, E3, E19, E21, E27
 //!   resolve_minted_dispute   → 8.2, E22
 //!   get_dispute              → 8.2
 

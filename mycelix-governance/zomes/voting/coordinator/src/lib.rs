@@ -2798,7 +2798,7 @@ pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record
         .collect();
 
     // Calculate harmony coverage from absent_harmonies
-    let total_harmonies = 7.0; // The Seven Harmonies
+    let total_harmonies = 8.0; // The Eight Harmonies
     let absent_count = core_reflection.group_reflection.shadow.absent_harmonies
         .iter()
         .filter(|ah| ah.presence < 0.3)

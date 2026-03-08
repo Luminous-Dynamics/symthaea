@@ -2,7 +2,8 @@
 //!
 //! Coverage:
 //!   open_minted_dispute    → test_open_dispute (8.1), test_duplicate_dispute_rejected (E19),
-//!                            test_dispute_on_unconfirmed_rejected (E21)
+//!                            test_dispute_on_unconfirmed_rejected (E21),
+//!                            test_dispute_by_non_participant_rejected (E27)
 //!   get_dispute            → test_get_and_resolve_dispute (8.2)
 //!   resolve_minted_dispute → test_get_and_resolve_dispute (8.2), test_double_resolution_rejected (E22)
 //!   amend_currency_params  → test_amend_currency_params (9.1), test_amend_guards (E10),
@@ -113,7 +114,7 @@ async fn test_get_and_resolve_dispute() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -222,7 +223,7 @@ async fn test_amend_currency_params() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 1).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -299,7 +300,7 @@ async fn test_dispute_on_retired_currency() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -384,7 +385,7 @@ async fn test_amend_guards() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 1).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -466,7 +467,7 @@ async fn test_amend_suspended_rejected_then_reactivate() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 1).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -816,4 +817,83 @@ async fn test_double_resolution_rejected() {
     println!("  - Double resolution correctly rejected");
 
     println!("Test E22 PASSED");
+}
+
+/// Test E27: Only exchange participants can open a dispute — third party rejected
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_dispute_by_non_participant_rejected() {
+    println!("Test E27: Dispute by Non-Participant Rejected");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 3).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let cell_c = &apps[2].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let zome_c = cell_c.zome("currency_mint");
+    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create, activate, exchange (auto-confirmed)
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:dispute-auth".into(),
+                params: test_params("DisputeAuth", "DA"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+    let exchange: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: bob_did.clone(),
+                hours: 2.0,
+                service_description: "Service for auth test".into(),
+            },
+        )
+        .await;
+    assert!(exchange.confirmed);
+    println!("  - Confirmed exchange recorded (Alice→Bob)");
+
+    // Charlie (non-participant) tries to open dispute — should be rejected
+    let result: Result<MintedDispute, _> = conductor
+        .call_fallible(
+            &zome_c,
+            "open_minted_dispute",
+            OpenDisputeInput {
+                exchange_id: exchange.id.clone(),
+                reason: "I'm not involved but I'm disputing".into(),
+            },
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "Non-participant should not be able to open a dispute"
+    );
+    println!("  - Charlie (non-participant) dispute correctly rejected");
+
+    println!("Test E27 PASSED");
 }

@@ -9,7 +9,9 @@
 //!                               test_daily_rate_limit (E20)
 //!   confirm_minted_exchange   → test_confirmation_flow (3.1), test_confirm_blocked_when_suspended (3.2),
 //!                               test_two_party_confirmation_flow (13.1), test_double_confirm_idempotent (E13),
-//!                               test_confirm_on_suspended_currency (E18)
+//!                               test_confirm_on_suspended_currency (E18), test_confirm_by_non_receiver_rejected (E24)
+//!   cancel_expired_exchange   → test_cancel_expired_exchange (14.1), test_cancel_by_non_participant_rejected (E26),
+//!                               test_cancel_no_timeout_rejected (E28)
 //!   list_pending_exchanges    → test_two_party_confirmation_flow (13.1)
 //!   list_pending_for_receiver → test_two_party_confirmation_flow (13.1)
 //!   get_exchange              → test_get_exchange (15.1)
@@ -394,7 +396,7 @@ async fn test_rate_limit_enforcement() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -481,7 +483,7 @@ async fn test_two_party_confirmation_flow() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -625,7 +627,7 @@ async fn test_get_exchange() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -834,7 +836,7 @@ async fn test_self_exchange_rejected() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 1).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -895,7 +897,7 @@ async fn test_nan_hours_rejected() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -974,7 +976,7 @@ async fn test_credit_limit_enforcement() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -1071,7 +1073,7 @@ async fn test_empty_description_rejected() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -1136,7 +1138,7 @@ async fn test_double_confirm_idempotent() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -1267,7 +1269,7 @@ async fn test_min_service_minutes() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -1348,7 +1350,7 @@ async fn test_max_service_hours() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 2).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 
@@ -1779,4 +1781,227 @@ async fn test_daily_rate_limit() {
     println!("  - Exchange 3 rejected (daily limit reached)");
 
     println!("Test E20 PASSED");
+}
+
+/// Test E24: Only the receiver can confirm — provider attempting confirm is rejected
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_confirm_by_non_receiver_rejected() {
+    println!("Test E24: Confirm by Non-Receiver Rejected");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 2).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create currency with requires_confirmation
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:auth-confirm".into(),
+                params: test_params_with_confirmation("AuthConfirm", "AC"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+
+    // Alice records exchange to Bob (unconfirmed)
+    let exchange: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: bob_did.clone(),
+                hours: 2.0,
+                service_description: "Service needing confirmation".into(),
+            },
+        )
+        .await;
+    assert!(!exchange.confirmed);
+    println!("  - Unconfirmed exchange recorded");
+
+    // Alice (provider) tries to confirm — should be rejected
+    let result: Result<MintedExchange, _> = conductor
+        .call_fallible(&zome_a, "confirm_minted_exchange", exchange.id.clone())
+        .await;
+    assert!(
+        result.is_err(),
+        "Provider should not be able to confirm their own exchange"
+    );
+    println!("  - Provider confirm correctly rejected");
+
+    println!("Test E24 PASSED");
+}
+
+/// Test E26: Only exchange participants can cancel — third party rejected
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_cancel_by_non_participant_rejected() {
+    println!("Test E26: Cancel by Non-Participant Rejected");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 3).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let cell_c = &apps[2].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let zome_c = cell_c.zome("currency_mint");
+    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create currency with confirmation + timeout
+    let mut params = test_params_with_confirmation("CancelAuth", "CA");
+    params.confirmation_timeout_hours = 1;
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:cancel-auth".into(),
+                params,
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+
+    // Alice records exchange to Bob (unconfirmed)
+    let exchange: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: bob_did.clone(),
+                hours: 2.0,
+                service_description: "Service for cancel test".into(),
+            },
+        )
+        .await;
+    assert!(!exchange.confirmed);
+    println!("  - Unconfirmed exchange recorded (Alice→Bob)");
+
+    // Charlie (non-participant) tries to cancel — should be rejected
+    let result: Result<bool, _> = conductor
+        .call_fallible(&zome_c, "cancel_expired_exchange", exchange.id.clone())
+        .await;
+    assert!(
+        result.is_err(),
+        "Non-participant should not be able to cancel"
+    );
+    println!("  - Charlie (non-participant) cancel correctly rejected");
+
+    println!("Test E26 PASSED");
+}
+
+/// Test E28: Cancel on currency with no timeout (timeout_hours=0) is rejected
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_cancel_no_timeout_rejected() {
+    println!("Test E28: Cancel With No Timeout Rejected");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 2).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create currency: requires_confirmation=true but timeout=0 (never expires)
+    let mut params = test_params("NoTimeout", "NT");
+    params.requires_confirmation = true;
+    params.confirmation_timeout_hours = 0;
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:no-timeout".into(),
+                params,
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+
+    // Record unconfirmed exchange
+    let exchange: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: bob_did.clone(),
+                hours: 2.0,
+                service_description: "Service with no timeout".into(),
+            },
+        )
+        .await;
+    assert!(!exchange.confirmed);
+    println!("  - Unconfirmed exchange recorded (timeout=0)");
+
+    // Try to cancel — should fail because timeout=0 means "never expires"
+    let result: Result<bool, _> = conductor
+        .call_fallible(&zome_a, "cancel_expired_exchange", exchange.id.clone())
+        .await;
+    assert!(
+        result.is_err(),
+        "Cancel should fail when timeout is 0 (exchanges never expire)"
+    );
+    println!("  - Cancel with no timeout correctly rejected");
+
+    println!("Test E28 PASSED");
 }

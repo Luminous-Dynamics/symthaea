@@ -21,7 +21,7 @@ async fn test_discovery_active_only() {
     let mut conductor = SweetConductor::from_standard_config().await;
     let agents = SweetAgents::get(conductor.keystore(), 1).await;
     let apps = conductor
-        .setup_app_for_agents("finance", &agents, &[dna])
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
 

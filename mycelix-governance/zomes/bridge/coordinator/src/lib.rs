@@ -8,7 +8,7 @@
 //! This module provides coordinator functions for Symthaea consciousness metrics:
 //! - `record_consciousness_snapshot`: Store Φ measurements from Symthaea
 //! - `verify_consciousness_gate`: Check Φ threshold for governance actions
-//! - `assess_value_alignment`: Evaluate proposal alignment with Seven Harmonies
+//! - `assess_value_alignment`: Evaluate proposal alignment with Eight Harmonies
 //! - `get_agent_consciousness_history`: Track consciousness over time
 //!
 //! Updated to use HDK 0.6 patterns

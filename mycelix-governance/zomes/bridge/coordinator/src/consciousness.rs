@@ -200,7 +200,7 @@ pub struct GateVerificationResult {
 
 /// Assess value alignment of a proposal
 ///
-/// Evaluates how well a proposal aligns with the Seven Harmonies,
+/// Evaluates how well a proposal aligns with the Eight Harmonies,
 /// using the agent's current consciousness state.
 #[hdk_extern]
 pub fn assess_value_alignment(input: AssessAlignmentInput) -> ExternResult<Record> {

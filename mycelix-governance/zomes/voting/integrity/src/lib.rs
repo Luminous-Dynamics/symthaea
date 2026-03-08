@@ -1647,10 +1647,10 @@ fn validate_create_proposal_reflection(
         ));
     }
 
-    // Validate absent harmonies count (max 7 - the Seven Harmonies)
-    if reflection.absent_harmonies.len() > 7 {
+    // Validate absent harmonies count (max 8 - the Eight Harmonies)
+    if reflection.absent_harmonies.len() > 8 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot have more than 7 absent harmonies".into(),
+            "Cannot have more than 8 absent harmonies".into(),
         ));
     }
 

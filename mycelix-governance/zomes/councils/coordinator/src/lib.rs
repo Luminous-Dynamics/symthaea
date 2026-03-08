@@ -598,13 +598,14 @@ pub fn reflect_on_council(council_id: String) -> ExternResult<Record> {
     ];
 
     let harmony_coverage = harmony_presence.iter().map(|h| h.presence).sum::<f64>()
-        / 7.0; // 7 harmonies total
+        / 8.0; // 8 harmonies total
 
     let absent_harmonies = vec![
         "InfinitePlay".to_string(),
         "UniversalInterconnectedness".to_string(),
         "SacredReciprocity".to_string(),
         "EvolutionaryProgression".to_string(),
+        "SacredStillness".to_string(),
     ];
 
     // Identify risk factors

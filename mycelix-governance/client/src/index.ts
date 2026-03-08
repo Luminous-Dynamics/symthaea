@@ -875,7 +875,7 @@ export function isLegitimateResult(
 }
 
 /**
- * The Seven Harmonies of value alignment
+ * The Eight Harmonies of value alignment
  */
 export const SEVEN_HARMONIES = [
   "ResonantCoherence",
