@@ -18,7 +18,10 @@ Tristan Stoltz, Luminous Dynamics
 
 ### 3. Date of Conception
 
-2025-2026
+2025-2026.
+
+First public disclosure: February 5, 2026 (git commit `feat(symthaea): add Symthaea-HLB consciousness-first AI framework v0.5.0`).
+Under 35 USC 102(b)(1)(A), the 1-year grace period expires **February 5, 2027**.
 
 ---
 
@@ -328,6 +331,21 @@ The present invention is novel in the following respects:
 - all federated learning aggregation pipelines in the system import and apply the same veto, dampen, and boost thresholds;
 - all governance modules in the system import and apply the same participation, proposal, voting, and constitutional thresholds; and
 - the threshold configuration is lazily initialized as a static singleton to ensure consistency across all references within a process.
+
+**Claim 15 (independent, broad -- Quality-Aware FL).** A method for federated learning aggregation, comprising:
+- receiving gradient updates from a plurality of distributed participants;
+- assigning a quality score to each participant based on analysis of the participant's computational properties;
+- classifying each participant into one of at least three tiers based on the quality score;
+- adjusting each participant's aggregation weight according to the tier classification;
+- aggregating the weight-adjusted gradient updates;
+- wherein the quality score is derived independently of the gradient updates themselves.
+
+**Claim 16 (independent, broad -- Adaptive Multi-Signal Detection).** A method for detecting adversarial participants in a distributed machine learning system, comprising:
+- computing a plurality of independent anomaly signals for each participant's contribution;
+- combining the anomaly signals via a weighted sum with learnable signal weights;
+- classifying participants as adversarial when the combined score exceeds a threshold;
+- after each aggregation round, adjusting the signal weights based on prediction accuracy against actual outcomes;
+- wherein the signal weights adapt over time to counter evolving attack patterns.
 
 #### Dependent Claims
 

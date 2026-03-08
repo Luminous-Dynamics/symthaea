@@ -19,6 +19,9 @@
 
 **2025** (estimated). First committed implementation: February 5, 2026. Conceptual design and architecture predate the initial commit.
 
+First public disclosure: February 5, 2026 (git commit `feat(symthaea): add Symthaea-HLB consciousness-first AI framework v0.5.0`).
+Under 35 USC 102(b)(1)(A), the 1-year grace period expires **February 5, 2027**.
+
 ---
 
 ### 4. Technical Field
@@ -325,6 +328,10 @@ The following aspects are believed to be new relative to all known prior art:
 **Claim 2 (independent):** A neural processing unit comprising: a state register storing a continuous-valued hypervector of dimension D; a weight hypervector of dimension D; an input mask hypervector of dimension D; and processing logic configured to evolve the state hypervector by computing element-wise binding between the weight hypervector and the state hypervector, computing element-wise binding between the input mask hypervector and an input hypervector, computing a normalized sum of the binding results, applying an activation function, and interpolating between the current state and the activated result using an exponential decay factor dependent on a state-derived time constant.
 
 **Claim 3 (independent):** A computer-implemented method for temporal sequence processing comprising: representing each neuron state as a D-dimensional hypervector where D is at least 1,000; replacing weight matrix multiplications with element-wise hyperdimensional binding operations between weight hypervectors and operand hypervectors; computing temporal state updates using the closed-form solution x(t+dt) = x_inf + (x(t) - x_inf) * exp(-dt / tau(||x||)); and performing said computation in a single SIMD-fused pass through the dimension that eliminates all intermediate hypervector allocations.
+
+**Claim 16 (independent, broad):** A method for neural computation comprising: (a) maintaining a neuron state as a vector of dimension D, where D is at least 100; (b) computing an equilibrium vector by applying element-wise operations between learned weight vectors and the state vector, replacing matrix-vector multiplication with O(D) element-wise operations; (c) deriving a time constant from properties of the state vector; and (d) updating the state vector toward the equilibrium according to continuous-time dynamics governed by the derived time constant.
+
+**Claim 17 (independent, broad):** A computer-implemented method for temporal sequence processing in a neural network, comprising: (a) representing neuron states as high-dimensional vectors; (b) evolving each neuron state toward an equilibrium using a closed-form analytical solution that permits arbitrary-length temporal jumps in O(D) time independent of the jump duration; (c) computing the equilibrium via element-wise vector operations that achieve O(D) parameter scaling per weight component; and (d) training the network via backpropagation through the closed-form step using element-wise gradient identities.
 
 **Claim 4 (dependent on 1):** The method of claim 1, wherein the state-dependent time constant is computed as: tau(x, u) = tau_0 * (1 + backbone * ||x||) * (1 + alpha * sim(u, T_mod)), where tau_0 is a base time constant, backbone is a scaling factor, ||x|| is the L2 norm of the state hypervector, sim denotes cosine similarity, u is the input hypervector, T_mod is a learned tau modulator hypervector, and alpha is a constant (e.g., 0.2).
 

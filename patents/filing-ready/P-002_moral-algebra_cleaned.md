@@ -20,6 +20,9 @@
 
 **February 7, 2026** (initial implementation committed; git SHA `17d8d46ae`). Iterative refinement through March 2026 including ensemble voting, per-category classifiers, cached obligation optimization, and experimental validation on the ETHICS benchmark suite.
 
+First public disclosure: February 7, 2026 (git commit `17d8d46ae`).
+Under 35 USC 102(b)(1)(A), the 1-year grace period expires **February 7, 2027**.
+
 ---
 
 ### 4. Technical Field
@@ -409,6 +412,14 @@ The following aspects of this invention are believed to be novel:
 - (b) generating a word-level channel by hashing each word to a deterministic hypervector, binding with a word-position hypervector, and summing across words;
 - (c) generating a sentiment channel by accumulating a positive seed hypervector for words matching a moral-positive vocabulary and a negative seed hypervector for words matching a moral-negative vocabulary; and
 - (d) combining the three channels with configurable weights, L2-normalizing the result.
+
+**Claim 16 (independent, broad -- Structured Moral Encoding):** A computer-implemented method for producing a moral judgment, comprising:
+- defining a plurality of semantic role primitive vectors, each representing a distinct role in a moral scenario;
+- defining a plurality of moral operator vectors, each representing a compositional relationship;
+- encoding entities from an input scenario by applying element-wise operations between role primitive vectors and entity-specific vectors;
+- composing a moral scenario representation by combining the encoded entities via the moral operator vectors;
+- comparing the composed representation against reference prototype representations to produce a moral judgment;
+- wherein the method is agnostic to the number of semantic roles and moral operators, accepting any plurality of at least three roles and at least two operators.
 
 #### Dependent Claims
 

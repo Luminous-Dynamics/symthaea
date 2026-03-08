@@ -18,7 +18,10 @@
 
 ### 3. Date of Conception
 
-**2026** (implementation completed February-March 2026)
+**2026** (implementation completed February-March 2026).
+
+First public disclosure: February 23, 2026 (git commit adding `symthaea-vocal-tract` crate).
+Under 35 USC 102(b)(1)(A), the 1-year grace period expires **February 23, 2027**.
 
 ---
 
@@ -449,6 +452,20 @@ The following aspects of this invention are believed to be novel, either individ
 - a formant vocoder with manner-aware source excitation;
 - wherein phoneme identity is encoded by binding a phoneme-specific hypervector with the cognitive hypervector.
 
+**Claim 16 (independent, broad -- Generalized LS Refinement):** A method for refining an output projection of a neural network, comprising:
+- evolving a temporal dynamics network to steady state for each of a plurality of input conditions to obtain steady-state internal representations;
+- computing a Gram matrix as the inner product of all pairs of steady-state representations;
+- applying regularization to the Gram matrix;
+- solving the regularized linear system in dual form to obtain coefficients;
+- recovering output projection weights as a linear combination of the steady-state representations weighted by the coefficients;
+- wherein the method is applicable to any neural network with a temporal dynamics component and a linear output projection, independent of the application domain.
+
+**Claim 17 (independent, broad -- Closed-Loop Neural Controller):** A method for controlling a parametric signal generator, comprising:
+- encoding an input condition as a high-dimensional vector via hyperdimensional computing operations;
+- evolving the high-dimensional vector through a continuous-time neural network with state-dependent time constants;
+- projecting the evolved state to a parameter space of the signal generator via a trained output projection;
+- wherein the continuous-time neural network provides inherent temporal smoothing of parameter trajectories without explicit interpolation.
+
 #### Dependent Claims
 
 **Claim 6** (depends on Claim 1): wherein the hyperdimensional computing encoder encodes the cognitive state as a 10-dimensional vector comprising prediction error, motor intention, emotional arousal, emotional valence, uncertainty estimate, attention focus, context novelty, consciousness level, articulation quality, and rate stability.
@@ -510,7 +527,7 @@ Lambda effect is minimal: lambda=0.001 yields 30.4 Hz vs. lambda=0.01 yields 32.
 
 #### 10.3 Spectral Quality
 
-- **Mel Cepstral Distortion (MCD):** 0.02 dB (near-perfect)
+- **Mel Cepstral Distortion (MCD):** 0.02 dB measured against own training targets (note: this metric reflects the output projection's fidelity to its formant targets, not a comparison against natural speech recordings)
 - **Manner classification accuracy:** 10/10 manner types correct
 - **Source type classification:** 12/12 source types correct
 

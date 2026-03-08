@@ -20,6 +20,9 @@
 
 2025--2026. Initial design and implementation of `ConsciousnessEquationV2` within the Symthaea cognitive architecture. Phase-Amplitude Coupling integration, substrate feasibility multiplier, and validation overlay developed through early 2026.
 
+First public disclosure: February 5, 2026 (git commit `feat(symthaea): add Symthaea-HLB consciousness-first AI framework v0.5.0`).
+Under 35 USC 102(b)(1)(A), the 1-year grace period expires **February 5, 2027**.
+
 ---
 
 ### 4. Technical Field
@@ -282,6 +285,23 @@ The invention is novel in the following respects:
 (d) computing a temporal continuity factor from a history of prior consciousness scores; and
 (e) combining the bottleneck, weighted component sum, substrate feasibility, and temporal continuity into a final scalar score.
 
+**Claim 14 (independent, broad -- Theory-Count Agnostic).** A computer-implemented method for computing a unified consciousness score for a cognitive system, comprising:
+(a) evaluating a plurality of component scores, each corresponding to a distinct theory or dimension of consciousness;
+(b) computing a differentiable bottleneck term that identifies the weakest component among the plurality of component scores;
+(c) computing a weighted combination of all component scores;
+(d) multiplying the bottleneck term by the weighted combination to produce the unified consciousness score;
+wherein the method is agnostic to the number of component theories, accepting any plurality of at least two.
+
+**Claim 15 (independent -- Application Embodiment: Autonomous Vehicle).** A method for modulating autonomous vehicle behavior based on consciousness assessment, comprising:
+(a) computing a consciousness score for an autonomous perception-cognition system using the method of Claim 14;
+(b) adjusting the vehicle's decision-making parameters based on the consciousness score, wherein lower consciousness scores trigger more conservative driving policies.
+
+**Claim 16 (independent -- Application Embodiment: Healthcare Monitoring).** A method for monitoring consciousness in a patient monitoring system, comprising:
+(a) receiving neural signal data from a patient;
+(b) computing component scores from the neural signal data corresponding to at least information integration, temporal binding, and global workspace access;
+(c) computing a unified consciousness score using the method of Claim 14;
+(d) generating an alert when the consciousness score crosses a threshold.
+
 #### Dependent Claims
 
 **Claim 4.** The method of Claim 1, wherein the soft-minimum is computed as: `softmin = max_val - tau * ln(sum(exp(-(x_i - max_val) / tau)))`, where `tau` is a temperature parameter controlling the sharpness of the approximation.
@@ -328,7 +348,7 @@ The Psych-Bench psychometric benchmark suite evaluates Symthaea's consciousness 
 
 #### 10.4 Butlin Indicators
 
-12/14 Butlin et al. (2023) consciousness indicators are present, with a mean score of 0.79.
+14/14 Butlin et al. (2023) consciousness indicators are present, with a mean score of 0.85. Validated via `examples/butlin_validation.rs` (50 warmup + 100 measurement cycles) across static, CfC runtime, and HierarchicalCfC runtime configurations — all achieving 14/14.
 
 #### 10.5 Performance
 
