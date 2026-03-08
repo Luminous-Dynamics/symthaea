@@ -205,10 +205,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::MintedExchangeConfirmation(_) => Ok(
                         ValidateCallbackResult::Invalid("Confirmations cannot be updated".into()),
                     ),
-                    EntryTypes::MintedDispute(_) => {
-                        // Disputes can be updated (for resolution)
-                        Ok(ValidateCallbackResult::Valid)
-                    }
+                    EntryTypes::MintedDispute(dispute) => validate_dispute_update(&dispute),
                     EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
                         "Anchors cannot be updated".into(),
                     )),
@@ -412,4 +409,485 @@ fn validate_exchange_confirmation(
         ));
     }
     Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate a dispute update (resolution).
+///
+/// An updated dispute MUST be resolved — otherwise there's no reason to update it.
+/// When resolved, it must have a resolver DID, resolution reason, and resolved_at timestamp.
+/// The base fields (exchange_id, opener_did, reason, opened_at) are immutable but
+/// we can't compare against the original in StoreEntry. We enforce structural consistency:
+/// a resolved dispute must have all resolution fields present.
+fn validate_dispute_update(dispute: &MintedDispute) -> ExternResult<ValidateCallbackResult> {
+    // Basic field validation (same as create)
+    if dispute.exchange_id.is_empty() || dispute.exchange_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange ID must be 1-256 characters".into(),
+        ));
+    }
+    if !dispute.opener_did.starts_with("did:") || dispute.opener_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Opener must be a valid DID".into(),
+        ));
+    }
+
+    // An updated dispute must be resolved — unresolved updates are meaningless
+    match dispute.resolved {
+        None => {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Dispute update must include a resolution (resolved cannot be None)".into(),
+            ));
+        }
+        Some(_) => {
+            // Resolver DID is required
+            match &dispute.resolver_did {
+                None => {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Resolved dispute must have a resolver DID".into(),
+                    ));
+                }
+                Some(did) => {
+                    if !did.starts_with("did:") || did.len() > MAX_DID_LEN {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Resolver must be a valid DID".into(),
+                        ));
+                    }
+                }
+            }
+            // Resolution reason is required
+            match &dispute.resolution_reason {
+                None => {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "Resolved dispute must have a resolution reason".into(),
+                    ));
+                }
+                Some(reason) => {
+                    if reason.is_empty() || reason.len() > MAX_DESCRIPTION_LEN {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Resolution reason must be 1-2000 characters".into(),
+                        ));
+                    }
+                }
+            }
+            // Resolved timestamp is required
+            if dispute.resolved_at.is_none() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Resolved dispute must have a resolved_at timestamp".into(),
+                ));
+            }
+        }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// =============================================================================
+// UNIT TESTS
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
+    }
+
+    // ---- CurrencyDefinition validation ----
+
+    fn valid_currency_def() -> CurrencyDefinition {
+        CurrencyDefinition {
+            id: "currency:test".into(),
+            creator_dao_did: "did:mycelix:dao:test".into(),
+            governance_proposal_id: None,
+            params: MintedCurrencyParams {
+                name: "TestCoin".into(),
+                symbol: "TC".into(),
+                description: "A test currency".into(),
+                credit_limit: 40,
+                demurrage_rate: 0.02,
+                max_service_hours: 8,
+                min_service_minutes: 15,
+                requires_confirmation: false,
+                confirmation_timeout_hours: 0,
+                max_exchanges_per_day: 0,
+            },
+            status: CurrencyStatus::Draft,
+            created_at: ts(1_000_000),
+        }
+    }
+
+    #[test]
+    fn test_currency_create_valid() {
+        let result = validate_create_currency(valid_currency_def()).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_currency_create_rejects_non_draft_status() {
+        let mut def = valid_currency_def();
+        def.status = CurrencyStatus::Active;
+        let result = validate_create_currency(def).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_currency_create_rejects_invalid_did() {
+        let mut def = valid_currency_def();
+        def.creator_dao_did = "not-a-did".into();
+        let result = validate_create_currency(def).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_currency_create_rejects_oversized_id() {
+        let mut def = valid_currency_def();
+        def.id = "x".repeat(MAX_ID_LEN + 1);
+        let result = validate_create_currency(def).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_currency_create_rejects_oversized_did() {
+        let mut def = valid_currency_def();
+        def.creator_dao_did = format!("did:{}", "x".repeat(MAX_DID_LEN));
+        let result = validate_create_currency(def).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_currency_create_rejects_invalid_params_credit_limit_zero() {
+        let mut def = valid_currency_def();
+        def.params.credit_limit = 0;
+        let result = validate_create_currency(def).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_currency_create_rejects_invalid_params_demurrage_too_high() {
+        let mut def = valid_currency_def();
+        def.params.demurrage_rate = 0.06; // 6% > 5% max
+        let result = validate_create_currency(def).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_currency_update_valid() {
+        let mut def = valid_currency_def();
+        def.status = CurrencyStatus::Active;
+        def.params.credit_limit = 80;
+        let result = validate_update_currency(def).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_currency_update_rejects_invalid_params() {
+        let mut def = valid_currency_def();
+        def.params.credit_limit = 999; // exceeds max
+        let result = validate_update_currency(def).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- MintedBalance validation ----
+
+    #[test]
+    fn test_balance_valid() {
+        let bal = MintedBalance {
+            member_did: "did:mycelix:alice".into(),
+            currency_id: "currency:test".into(),
+            balance: 50,
+            total_provided: 100.0,
+            total_received: 50.0,
+            exchange_count: 10,
+            last_activity: ts(1_000_000),
+        };
+        let result = validate_minted_balance(&bal).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_balance_rejects_nan() {
+        let bal = MintedBalance {
+            member_did: "did:mycelix:alice".into(),
+            currency_id: "currency:test".into(),
+            balance: 10,
+            total_provided: f32::NAN,
+            total_received: 5.0,
+            exchange_count: 1,
+            last_activity: ts(1_000_000),
+        };
+        let result = validate_minted_balance(&bal).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_balance_rejects_infinity() {
+        let bal = MintedBalance {
+            member_did: "did:mycelix:alice".into(),
+            currency_id: "currency:test".into(),
+            balance: 10,
+            total_provided: 5.0,
+            total_received: f32::INFINITY,
+            exchange_count: 1,
+            last_activity: ts(1_000_000),
+        };
+        let result = validate_minted_balance(&bal).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_balance_rejects_exceeds_constitutional_max() {
+        let bal = MintedBalance {
+            member_did: "did:mycelix:alice".into(),
+            currency_id: "currency:test".into(),
+            balance: MINTED_CREDIT_LIMIT_MAX + 1,
+            total_provided: 0.0,
+            total_received: 0.0,
+            exchange_count: 0,
+            last_activity: ts(1_000_000),
+        };
+        let result = validate_minted_balance(&bal).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_balance_rejects_invalid_did() {
+        let bal = MintedBalance {
+            member_did: "not-a-did".into(),
+            currency_id: "currency:test".into(),
+            balance: 0,
+            total_provided: 0.0,
+            total_received: 0.0,
+            exchange_count: 0,
+            last_activity: ts(1_000_000),
+        };
+        let result = validate_minted_balance(&bal).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- MintedExchange validation ----
+
+    fn valid_exchange() -> MintedExchange {
+        MintedExchange {
+            id: "mex:test:001".into(),
+            currency_id: "currency:test".into(),
+            provider_did: "did:mycelix:alice".into(),
+            receiver_did: "did:mycelix:bob".into(),
+            hours: 2.0,
+            service_description: "Garden tending".into(),
+            timestamp: ts(1_000_000),
+            confirmed: false,
+        }
+    }
+
+    #[test]
+    fn test_exchange_valid() {
+        let result = validate_minted_exchange(&valid_exchange()).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_exchange_rejects_self_exchange() {
+        let mut ex = valid_exchange();
+        ex.receiver_did = ex.provider_did.clone();
+        let result = validate_minted_exchange(&ex).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_exchange_rejects_nan_hours() {
+        let mut ex = valid_exchange();
+        ex.hours = f32::NAN;
+        let result = validate_minted_exchange(&ex).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_exchange_rejects_zero_hours() {
+        let mut ex = valid_exchange();
+        ex.hours = 0.0;
+        let result = validate_minted_exchange(&ex).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_exchange_rejects_negative_hours() {
+        let mut ex = valid_exchange();
+        ex.hours = -1.0;
+        let result = validate_minted_exchange(&ex).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_exchange_rejects_empty_description() {
+        let mut ex = valid_exchange();
+        ex.service_description = "".into();
+        let result = validate_minted_exchange(&ex).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_exchange_rejects_invalid_provider_did() {
+        let mut ex = valid_exchange();
+        ex.provider_did = "not-a-did".into();
+        let result = validate_minted_exchange(&ex).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- MintedExchangeConfirmation validation ----
+
+    #[test]
+    fn test_confirmation_valid() {
+        let conf = MintedExchangeConfirmation {
+            exchange_id: "mex:test:001".into(),
+            confirmer_did: "did:mycelix:bob".into(),
+            timestamp: ts(2_000_000),
+        };
+        let result = validate_exchange_confirmation(&conf).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_confirmation_rejects_empty_exchange_id() {
+        let conf = MintedExchangeConfirmation {
+            exchange_id: "".into(),
+            confirmer_did: "did:mycelix:bob".into(),
+            timestamp: ts(2_000_000),
+        };
+        let result = validate_exchange_confirmation(&conf).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_confirmation_rejects_invalid_did() {
+        let conf = MintedExchangeConfirmation {
+            exchange_id: "mex:test:001".into(),
+            confirmer_did: "not-a-did".into(),
+            timestamp: ts(2_000_000),
+        };
+        let result = validate_exchange_confirmation(&conf).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- MintedDispute create validation ----
+
+    fn valid_dispute() -> MintedDispute {
+        MintedDispute {
+            exchange_id: "mex:test:123".into(),
+            opener_did: "did:mycelix:alice".into(),
+            reason: "Service not provided".into(),
+            resolved: None,
+            resolver_did: None,
+            resolution_reason: None,
+            opened_at: ts(1_000_000),
+            resolved_at: None,
+        }
+    }
+
+    #[test]
+    fn test_dispute_create_valid() {
+        let result = validate_minted_dispute(&valid_dispute()).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_dispute_create_rejects_empty_exchange_id() {
+        let mut d = valid_dispute();
+        d.exchange_id = "".into();
+        let result = validate_minted_dispute(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_dispute_create_rejects_invalid_opener_did() {
+        let mut d = valid_dispute();
+        d.opener_did = "not-a-did".into();
+        let result = validate_minted_dispute(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_dispute_create_rejects_empty_reason() {
+        let mut d = valid_dispute();
+        d.reason = "".into();
+        let result = validate_minted_dispute(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ---- Dispute update validation ----
+
+    fn valid_resolved_dispute() -> MintedDispute {
+        MintedDispute {
+            exchange_id: "mex:test:123".into(),
+            opener_did: "did:mycelix:alice".into(),
+            reason: "Service not provided".into(),
+            resolved: Some(true),
+            resolver_did: Some("did:mycelix:governance".into()),
+            resolution_reason: Some("Evidence supports the claim".into()),
+            opened_at: ts(1_000_000),
+            resolved_at: Some(ts(2_000_000)),
+        }
+    }
+
+    #[test]
+    fn test_dispute_update_valid_accepted() {
+        let result = validate_dispute_update(&valid_resolved_dispute()).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_dispute_update_valid_rejected() {
+        let mut d = valid_resolved_dispute();
+        d.resolved = Some(false);
+        let result = validate_dispute_update(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_dispute_update_rejects_unresolved() {
+        let mut d = valid_resolved_dispute();
+        d.resolved = None;
+        let result = validate_dispute_update(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_dispute_update_rejects_missing_resolver() {
+        let mut d = valid_resolved_dispute();
+        d.resolver_did = None;
+        let result = validate_dispute_update(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_dispute_update_rejects_invalid_resolver_did() {
+        let mut d = valid_resolved_dispute();
+        d.resolver_did = Some("not-a-did".into());
+        let result = validate_dispute_update(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_dispute_update_rejects_missing_reason() {
+        let mut d = valid_resolved_dispute();
+        d.resolution_reason = None;
+        let result = validate_dispute_update(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_dispute_update_rejects_empty_reason() {
+        let mut d = valid_resolved_dispute();
+        d.resolution_reason = Some("".into());
+        let result = validate_dispute_update(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_dispute_update_rejects_missing_timestamp() {
+        let mut d = valid_resolved_dispute();
+        d.resolved_at = None;
+        let result = validate_dispute_update(&d).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
 }

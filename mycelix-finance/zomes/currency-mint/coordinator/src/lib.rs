@@ -10,7 +10,7 @@
 //! Communities with >10 members require a governance proposal to create a currency.
 //! The proposal ID is recorded in the CurrencyDefinition for audit.
 //!
-//! ## API Surface (30 externs)
+//! ## API Surface (28 externs)
 //!
 //! ### Lifecycle (7)
 //! - `create_currency(CreateCurrencyInput) -> CurrencyDefinition`
@@ -21,8 +21,9 @@
 //! - `get_currency(String) -> Option<CurrencyDefinition>`
 //! - `get_dao_currencies(String) -> Vec<CurrencyDefinition>`
 //!
-//! ### Discovery (1)
+//! ### Discovery (2)
 //! - `list_active_currencies(()) -> Vec<CurrencyDefinition>`
+//! - `search_currencies(String) -> Vec<CurrencyDefinition>`
 //!
 //! ### Exchanges (6)
 //! - `record_minted_exchange(RecordMintedExchangeInput) -> MintedExchange`
@@ -42,13 +43,15 @@
 //! - `get_demurrage_report(String) -> DemurrageReport`
 //! - `get_compost_balance(String) -> CompostBalance`
 //!
-//! ### Demurrage & Compost (2)
+//! ### Demurrage & Compost (3)
 //! - `apply_minted_demurrage(ApplyDemurrageInput) -> DemurrageResult`
+//! - `apply_demurrage_all(String) -> Vec<DemurrageResult>`
 //! - `redistribute_compost(String) -> RedistributeCompostResult`
 //!
-//! ### Disputes (2)
+//! ### Disputes (3)
 //! - `open_minted_dispute(OpenDisputeInput) -> MintedDispute`
 //! - `resolve_minted_dispute(ResolveDisputeInput) -> MintedDispute`
+//! - `get_dispute(String) -> Option<MintedDispute>`
 //!
 //! ### Governance (1)
 //! - `amend_currency_params(AmendCurrencyParamsInput) -> CurrencyDefinition`
@@ -305,6 +308,10 @@ pub fn suspend_currency(currency_id: String) -> ExternResult<CurrencyDefinition>
         record.action_address().clone(),
         &EntryTypes::CurrencyDefinition(updated.clone()),
     )?;
+
+    // Remove from active currencies index — suspended currencies shouldn't appear in discovery
+    remove_from_active_index(record.action_address())?;
+
     Ok(updated)
 }
 
@@ -329,13 +336,23 @@ pub fn reactivate_currency(currency_id: String) -> ExternResult<CurrencyDefiniti
         &EntryTypes::CurrencyDefinition(updated.clone()),
     )?;
 
-    // Re-add to global active currencies index
-    create_link(
-        anchor_hash("all-active-currencies")?,
-        record.action_address().clone(),
-        LinkTypes::DaoToCurrencies,
-        (),
+    // Re-add to global active currencies index (guard against duplicate links)
+    let active_base = anchor_hash("all-active-currencies")?;
+    let existing_active = get_links(
+        LinkQuery::try_new(active_base.clone(), LinkTypes::DaoToCurrencies)?,
+        GetStrategy::default(),
     )?;
+    let already_linked = existing_active
+        .iter()
+        .any(|l| l.target.clone().into_action_hash() == Some(record.action_address().clone()));
+    if !already_linked {
+        create_link(
+            active_base,
+            record.action_address().clone(),
+            LinkTypes::DaoToCurrencies,
+            (),
+        )?;
+    }
 
     Ok(updated)
 }
@@ -371,6 +388,10 @@ pub fn retire_currency(currency_id: String) -> ExternResult<CurrencyDefinition> 
         record.action_address().clone(),
         &EntryTypes::CurrencyDefinition(updated.clone()),
     )?;
+
+    // Clean up the active currencies index to prevent stale link accumulation
+    remove_from_active_index(record.action_address())?;
+
     Ok(updated)
 }
 
@@ -442,6 +463,44 @@ pub fn list_active_currencies(_: ()) -> ExternResult<Vec<CurrencyDefinition>> {
         }
     }
     Ok(currencies)
+}
+
+/// Search active currencies by name or symbol (case-insensitive substring match).
+///
+/// Scans the global active currency index. Useful for multi-community discovery
+/// when a member wants to find currencies to join.
+#[hdk_extern]
+pub fn search_currencies(query: String) -> ExternResult<Vec<CurrencyDefinition>> {
+    let query_lower = query.to_lowercase();
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash("all-active-currencies")?,
+            LinkTypes::DaoToCurrencies,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut results = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(def) = record
+                    .entry()
+                    .to_app_option::<CurrencyDefinition>()
+                    .ok()
+                    .flatten()
+                {
+                    if def.status == CurrencyStatus::Active
+                        && (def.params.name.to_lowercase().contains(&query_lower)
+                            || def.params.symbol.to_lowercase().contains(&query_lower))
+                    {
+                        results.push(def);
+                    }
+                }
+            }
+        }
+    }
+    Ok(results)
 }
 
 // =============================================================================
@@ -975,8 +1034,13 @@ pub fn get_currency_stats(currency_id: String) -> ExternResult<CurrencyStats> {
                     } else {
                         pending_count += 1;
                     }
-                    member_dids.insert(ex.provider_did);
-                    member_dids.insert(ex.receiver_did);
+                    // Exclude compost pseudo-member from member count
+                    if !ex.provider_did.contains("__compost__") {
+                        member_dids.insert(ex.provider_did);
+                    }
+                    if !ex.receiver_did.contains("__compost__") {
+                        member_dids.insert(ex.receiver_did);
+                    }
                 }
             }
         }
@@ -995,6 +1059,10 @@ pub fn get_currency_stats(currency_id: String) -> ExternResult<CurrencyStats> {
         }
     }
 
+    // Include compost balance for complete zero-sum picture
+    let compost_did = format!("did:mycelix:__compost__:{}", currency_id);
+    let compost = get_or_create_minted_balance(compost_did, currency_id.clone())?;
+
     Ok(CurrencyStats {
         currency_id,
         currency_name: def.params.name,
@@ -1003,7 +1071,8 @@ pub fn get_currency_stats(currency_id: String) -> ExternResult<CurrencyStats> {
         member_count: member_dids.len() as u32,
         total_credit,
         total_debt,
-        net_sum: total_credit + total_debt, // should be 0 for zero-sum
+        compost_balance: compost.balance as i64,
+        net_sum: total_credit + total_debt + compost.balance as i64, // should be 0
         total_exchanges,
         confirmed_exchanges: confirmed_count,
         pending_exchanges: pending_count,
@@ -1019,6 +1088,7 @@ pub struct CurrencyStats {
     pub member_count: u32,
     pub total_credit: i64,
     pub total_debt: i64,
+    pub compost_balance: i64,
     pub net_sum: i64,
     pub total_exchanges: u64,
     pub confirmed_exchanges: u64,
@@ -1087,31 +1157,7 @@ pub fn get_demurrage_report(currency_id: String) -> ExternResult<DemurrageReport
         });
     }
 
-    // Collect all member DIDs from exchange links
-    let exchange_links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("mex:{}", currency_id))?,
-            LinkTypes::CurrencyToExchanges,
-        )?,
-        GetStrategy::default(),
-    )?;
-
-    let mut member_dids = std::collections::HashSet::new();
-    for link in exchange_links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    member_dids.insert(ex.provider_did);
-                    member_dids.insert(ex.receiver_did);
-                }
-            }
-        }
-    }
+    let member_dids = collect_currency_members(&currency_id)?;
 
     let now = sys_time()?;
     let mut entries = Vec::new();
@@ -1224,35 +1270,7 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
         });
     }
 
-    // Collect all member DIDs from exchange links (excluding compost pseudo-member)
-    let exchange_links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("mex:{}", currency_id))?,
-            LinkTypes::CurrencyToExchanges,
-        )?,
-        GetStrategy::default(),
-    )?;
-
-    let mut member_dids = std::collections::HashSet::new();
-    for link in exchange_links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    if !ex.provider_did.contains("__compost__") {
-                        member_dids.insert(ex.provider_did);
-                    }
-                    if !ex.receiver_did.contains("__compost__") {
-                        member_dids.insert(ex.receiver_did);
-                    }
-                }
-            }
-        }
-    }
+    let member_dids = collect_currency_members(&currency_id)?;
 
     let member_count = member_dids.len() as u32;
     if member_count == 0 {
@@ -1362,6 +1380,14 @@ pub fn open_minted_dispute(input: OpenDisputeInput) -> ExternResult<MintedDisput
         )));
     }
 
+    // No disputes on retired currencies — balances are frozen, resolution can't reverse them
+    let (_, def) = get_currency_inner(&exchange.currency_id)?;
+    if def.status == CurrencyStatus::Retired {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot open disputes on retired currencies — balances are frozen".into()
+        )));
+    }
+
     // Only participants can open disputes
     let caller = agent_info()?.agent_initial_pubkey;
     let caller_did = format!("did:mycelix:{}", caller);
@@ -1416,42 +1442,9 @@ pub fn open_minted_dispute(input: OpenDisputeInput) -> ExternResult<MintedDisput
 pub fn resolve_minted_dispute(input: ResolveDisputeInput) -> ExternResult<MintedDispute> {
     let (exchange, _) = find_minted_exchange(&input.exchange_id)?;
 
-    // Find the dispute
-    let dispute_anchor = format!("dispute:{}", input.exchange_id);
-    let dispute_links = get_links(
-        LinkQuery::try_new(anchor_hash(&dispute_anchor)?, LinkTypes::ExchangeToDispute)?,
-        GetStrategy::default(),
-    )?;
-
-    let dispute_link = dispute_links
-        .first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
+    let (dispute_record, dispute) =
+        find_dispute_record(&input.exchange_id)?.ok_or(wasm_error!(WasmErrorInner::Guest(
             "No dispute found for this exchange".into()
-        )))?;
-
-    let dispute_hash = dispute_link
-        .target
-        .clone()
-        .into_action_hash()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Invalid dispute link target".into()
-        )))?;
-
-    let dispute_record = get(dispute_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Dispute record not found".into())
-    ))?;
-
-    let dispute = dispute_record
-        .entry()
-        .to_app_option::<MintedDispute>()
-        .map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Deserialization error: {:?}",
-                e
-            )))
-        })?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Dispute entry missing".into()
         )))?;
 
     if dispute.resolved.is_some() {
@@ -1516,6 +1509,12 @@ pub fn resolve_minted_dispute(input: ResolveDisputeInput) -> ExternResult<Minted
     )?;
 
     Ok(resolved_dispute)
+}
+
+/// Get an existing dispute for an exchange, if one exists.
+#[hdk_extern]
+pub fn get_dispute(exchange_id: String) -> ExternResult<Option<MintedDispute>> {
+    Ok(find_dispute_record(&exchange_id)?.map(|(_, dispute)| dispute))
 }
 
 // =============================================================================
@@ -1769,9 +1768,135 @@ pub fn apply_minted_demurrage(input: ApplyDemurrageInput) -> ExternResult<Demurr
     })
 }
 
+/// Apply demurrage to ALL positive-balance members of a currency at once.
+///
+/// Batch version of `apply_minted_demurrage`. Useful for scheduled governance
+/// actions rather than relying solely on lazy-on-read demurrage.
+/// Returns a result for each member that had a deduction applied.
+#[hdk_extern]
+pub fn apply_demurrage_all(currency_id: String) -> ExternResult<Vec<DemurrageResult>> {
+    let (_, def) = get_currency_inner(&currency_id)?;
+
+    if def.status != CurrencyStatus::Active {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Demurrage can only be applied to Active currencies".into()
+        )));
+    }
+
+    if def.params.demurrage_rate <= 0.0 {
+        return Ok(Vec::new());
+    }
+
+    let member_dids = collect_currency_members(&currency_id)?;
+
+    let mut results = Vec::new();
+    for did in member_dids {
+        let result = apply_minted_demurrage(ApplyDemurrageInput {
+            currency_id: currency_id.clone(),
+            member_did: did,
+        })?;
+        if result.deduction > 0 {
+            results.push(result);
+        }
+    }
+
+    Ok(results)
+}
+
 // =============================================================================
 // INTERNAL HELPERS
 // =============================================================================
+
+/// Look up a dispute by exchange_id. Returns the Record (for updates) and the deserialized dispute.
+fn find_dispute_record(exchange_id: &str) -> ExternResult<Option<(Record, MintedDispute)>> {
+    let dispute_anchor = format!("dispute:{}", exchange_id);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&dispute_anchor)?, LinkTypes::ExchangeToDispute)?,
+        GetStrategy::default(),
+    )?;
+
+    let Some(link) = links.first() else {
+        return Ok(None);
+    };
+
+    let action_hash =
+        link.target
+            .clone()
+            .into_action_hash()
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Invalid dispute link target".into()
+            )))?;
+
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Dispute record not found".into())
+    ))?;
+
+    let dispute = record
+        .entry()
+        .to_app_option::<MintedDispute>()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Deserialization error: {:?}",
+                e
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Dispute entry missing".into()
+        )))?;
+
+    Ok(Some((record, dispute)))
+}
+
+/// Remove a currency from the `all-active-currencies` link index.
+/// Called when suspending or retiring a currency to prevent stale discovery results.
+fn remove_from_active_index(currency_action_hash: &ActionHash) -> ExternResult<()> {
+    let active_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash("all-active-currencies")?,
+            LinkTypes::DaoToCurrencies,
+        )?,
+        GetStrategy::default(),
+    )?;
+    for link in active_links {
+        if link.target.clone().into_action_hash() == Some(currency_action_hash.clone()) {
+            delete_link(link.create_link_hash, GetOptions::default())?;
+        }
+    }
+    Ok(())
+}
+
+/// Collect unique member DIDs from a currency's exchange links, excluding compost pseudo-members.
+fn collect_currency_members(currency_id: &str) -> ExternResult<std::collections::HashSet<String>> {
+    let exchange_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("mex:{}", currency_id))?,
+            LinkTypes::CurrencyToExchanges,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut member_dids = std::collections::HashSet::new();
+    for link in exchange_links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(ex) = record
+                    .entry()
+                    .to_app_option::<MintedExchange>()
+                    .ok()
+                    .flatten()
+                {
+                    if !ex.provider_did.contains("__compost__") {
+                        member_dids.insert(ex.provider_did);
+                    }
+                    if !ex.receiver_did.contains("__compost__") {
+                        member_dids.insert(ex.receiver_did);
+                    }
+                }
+            }
+        }
+    }
+    Ok(member_dids)
+}
 
 fn get_currency_inner(currency_id: &str) -> ExternResult<(Record, CurrencyDefinition)> {
     let links = get_links(

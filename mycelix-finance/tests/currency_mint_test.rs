@@ -128,10 +128,25 @@ pub struct CurrencyStats {
     pub member_count: u32,
     pub total_credit: i64,
     pub total_debt: i64,
+    pub compost_balance: i64,
     pub net_sum: i64,
     pub total_exchanges: u64,
     pub confirmed_exchanges: u64,
     pub pending_exchanges: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ResolveDisputeInput {
+    pub exchange_id: String,
+    pub accept: bool,
+    pub resolution_reason: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AmendCurrencyParamsInput {
+    pub currency_id: String,
+    pub new_params: MintedCurrencyParams,
+    pub governance_proposal_id: Option<String>,
 }
 
 fn test_params(name: &str, symbol: &str) -> MintedCurrencyParams {
@@ -1138,7 +1153,10 @@ mod disputes {
                 },
             )
             .await;
-        assert!(exchange.confirmed, "Auto-confirmed (no confirmation required)");
+        assert!(
+            exchange.confirmed,
+            "Auto-confirmed (no confirmation required)"
+        );
 
         // Open dispute
         let dispute: MintedDispute = conductor
@@ -1153,11 +1171,209 @@ mod disputes {
             .await;
 
         assert_eq!(dispute.exchange_id, exchange.id);
-        assert!(dispute.resolved.is_none(), "New dispute should be unresolved");
+        assert!(
+            dispute.resolved.is_none(),
+            "New dispute should be unresolved"
+        );
         println!(
             "  - Dispute opened by {} on exchange {}",
             dispute.opener_did, dispute.exchange_id
         );
         println!("Test 8.1 PASSED");
+    }
+
+    /// Test 8.2: Get dispute and resolve dispute
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_get_and_resolve_dispute() {
+        println!("Test 8.2: Get Dispute and Resolve Dispute");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("finance", &agents, &[dna])
+            .await
+            .expect("Install app");
+
+        let cell_a = &apps[0].cells()[0];
+        let zome_a = cell_a.zome("currency_mint");
+        let receiver_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+        // Create, activate, exchange, dispute
+        let def: CurrencyDefinition = conductor
+            .call(
+                &zome_a,
+                "create_currency",
+                CreateCurrencyInput {
+                    dao_did: "did:mycelix:dao:dispute-resolve".into(),
+                    params: test_params("ResolveCoin", "RC"),
+                    governance_proposal_id: None,
+                },
+            )
+            .await;
+
+        let _: CurrencyDefinition = conductor
+            .call(
+                &zome_a,
+                "activate_currency",
+                ActivateCurrencyInput {
+                    currency_id: def.id.clone(),
+                },
+            )
+            .await;
+
+        let exchange: MintedExchange = conductor
+            .call(
+                &zome_a,
+                "record_minted_exchange",
+                RecordMintedExchangeInput {
+                    currency_id: def.id.clone(),
+                    receiver_did: receiver_did.clone(),
+                    hours: 2.0,
+                    service_description: "Test service".into(),
+                },
+            )
+            .await;
+
+        let _: MintedDispute = conductor
+            .call(
+                &zome_a,
+                "open_minted_dispute",
+                OpenDisputeInput {
+                    exchange_id: exchange.id.clone(),
+                    reason: "Quality issue".into(),
+                },
+            )
+            .await;
+
+        // Get dispute via new extern
+        let fetched: Option<MintedDispute> = conductor
+            .call(&zome_a, "get_dispute", exchange.id.clone())
+            .await;
+        assert!(fetched.is_some(), "get_dispute should return the dispute");
+        let d = fetched.unwrap();
+        assert_eq!(d.exchange_id, exchange.id);
+        assert!(d.resolved.is_none());
+        println!(
+            "  - get_dispute returned dispute for exchange {}",
+            d.exchange_id
+        );
+
+        // Resolve the dispute (reject)
+        let resolved: MintedDispute = conductor
+            .call(
+                &zome_a,
+                "resolve_minted_dispute",
+                ResolveDisputeInput {
+                    exchange_id: exchange.id.clone(),
+                    accept: false,
+                    resolution_reason: "Evidence insufficient".into(),
+                },
+            )
+            .await;
+        assert_eq!(resolved.resolved, Some(false));
+        assert!(resolved.resolver_did.is_some());
+        println!(
+            "  - Dispute resolved (rejected) by {}",
+            resolved.resolver_did.unwrap()
+        );
+
+        // get_dispute should now show resolved
+        let fetched2: Option<MintedDispute> = conductor
+            .call(&zome_a, "get_dispute", exchange.id.clone())
+            .await;
+        let d2 = fetched2.unwrap();
+        assert_eq!(d2.resolved, Some(false));
+        println!("Test 8.2 PASSED");
+    }
+}
+
+// ============================================================================
+// Section 9: Parameter Amendment
+// ============================================================================
+
+#[cfg(test)]
+mod amendment {
+    use super::*;
+
+    /// Test 9.1: Amend currency parameters
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_amend_currency_params() {
+        println!("Test 9.1: Amend Currency Parameters");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path)
+            .await
+            .expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("finance", &agents, &[dna])
+            .await
+            .expect("Install app");
+
+        let cell = &apps[0].cells()[0];
+        let zome = cell.zome("currency_mint");
+
+        // Create and activate
+        let def: CurrencyDefinition = conductor
+            .call(
+                &zome,
+                "create_currency",
+                CreateCurrencyInput {
+                    dao_did: "did:mycelix:dao:amend-test".into(),
+                    params: test_params("AmendCoin", "AC"),
+                    governance_proposal_id: None,
+                },
+            )
+            .await;
+
+        let _: CurrencyDefinition = conductor
+            .call(
+                &zome,
+                "activate_currency",
+                ActivateCurrencyInput {
+                    currency_id: def.id.clone(),
+                },
+            )
+            .await;
+
+        // Amend: raise credit limit from 40 to 80
+        let mut new_params = test_params("AmendCoin", "AC");
+        new_params.credit_limit = 80;
+        new_params.description = "Updated description".into();
+
+        let amended: CurrencyDefinition = conductor
+            .call(
+                &zome,
+                "amend_currency_params",
+                AmendCurrencyParamsInput {
+                    currency_id: def.id.clone(),
+                    new_params: new_params.clone(),
+                    governance_proposal_id: None,
+                },
+            )
+            .await;
+
+        assert_eq!(amended.params.credit_limit, 80);
+        assert_eq!(amended.params.description, "Updated description");
+        assert_eq!(amended.status, CurrencyStatus::Active, "Status unchanged");
+        println!(
+            "  - Credit limit amended: 40 → {}",
+            amended.params.credit_limit
+        );
+
+        // Verify via get_currency
+        let fetched: Option<CurrencyDefinition> =
+            conductor.call(&zome, "get_currency", def.id.clone()).await;
+        let f = fetched.expect("Currency should exist");
+        assert_eq!(f.params.credit_limit, 80);
+        println!("  - get_currency confirms amended params");
+        println!("Test 9.1 PASSED");
     }
 }

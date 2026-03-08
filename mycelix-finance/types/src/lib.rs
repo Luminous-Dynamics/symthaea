@@ -695,10 +695,8 @@ mod tests {
     #[test]
     fn test_hearth_constants() {
         assert_eq!(HEARTH_TEND_CREDIT_LIMIT, 20);
-        assert!(
-            HEARTH_TEND_CREDIT_LIMIT < 40,
-            "Hearth limit must be less than DAO limit"
-        );
+        // Hearth limit must be less than DAO limit (compile-time invariant)
+        const _: () = assert!(HEARTH_TEND_CREDIT_LIMIT < 40);
         assert_eq!(HEARTH_MAX_MEMBERS, 50);
     }
 
@@ -793,7 +791,7 @@ mod tests {
 
     #[test]
     fn test_currency_status_all_variants() {
-        let statuses = vec![
+        let statuses = [
             CurrencyStatus::Draft,
             CurrencyStatus::Active,
             CurrencyStatus::Suspended,
@@ -854,10 +852,8 @@ mod tests {
 
     #[test]
     fn test_sap_mint_caps() {
-        assert!(
-            SAP_MINT_PER_PROPOSAL_MAX < SAP_MINT_ANNUAL_MAX,
-            "Per-proposal cap must be less than annual cap"
-        );
+        // Per-proposal cap must be less than annual cap (compile-time invariant)
+        const _: () = assert!(SAP_MINT_PER_PROPOSAL_MAX < SAP_MINT_ANNUAL_MAX);
         // At most 10 proposals per year at max amount = annual cap
         assert_eq!(SAP_MINT_ANNUAL_MAX / SAP_MINT_PER_PROPOSAL_MAX, 10);
     }

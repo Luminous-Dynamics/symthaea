@@ -1,5 +1,5 @@
 # Mycelix Finance - Three-Currency Economic System CI
-# Zomes: Payments, Treasury, Bridge, Staking, TEND, Recognition, Currency Mint (30 externs)
+# Zomes: Payments, Treasury, Bridge, Staking, TEND, Recognition, Currency Mint (28 externs)
 # Currencies: SAP (circulation), TEND (mutual credit), MYCEL (reputation), Community-minted (Currency Factory)
 
 name: Finance
@@ -220,7 +220,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-finance-build-
 
-      - name: Run economics stress tests (23 tests)
+      - name: Run economics stress tests (26 tests)
         run: |
           nix develop ./mycelix-finance#ci --command bash -c '
             cd mycelix-finance
@@ -444,7 +444,7 @@ jobs:
           echo "| Lint & Format | $(format_status '${{ needs.lint.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Build WASM Zomes | $(format_status '${{ needs.build-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Unit Tests | $(format_status '${{ needs.test-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| Economics Stress Tests (23) | $(format_status '${{ needs.stress-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Economics Stress Tests (26) | $(format_status '${{ needs.stress-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Integration (7 suites) | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package DNA | $(format_status '${{ needs.package-dna.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
