@@ -68,7 +68,8 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let prior_phi = self.unification_engine.psi;
         let prior_reward = self
-            .fep.closed_learning_loop
+            .fep
+            .closed_learning_loop
             .last_result
             .as_ref()
             .map(|r| r.reward);
@@ -76,7 +77,8 @@ impl CognitiveLoopService {
             ResponseStrategy::Supportive
         } else {
             let base_strategy = self
-                .fep.closed_learning_loop
+                .fep
+                .closed_learning_loop
                 .select_strategy(prior_phi, prior_reward);
 
             if let Some(&(plan_action, plan_confidence)) = self.carryover.history.mcts_plan.as_ref()
@@ -106,35 +108,34 @@ impl CognitiveLoopService {
         // ── Social trust → strategy modulation (Decety & Chaminade 2003) ──
         // Proportional: trust deviation from neutral (0.5) scales bias strength
         let trust_deviation = self.social_mgr.social.social_trust - 0.5; // [-0.5, 0.5]
-        let social_strategy_bias = if trust_deviation > 0.1
-            && self.social_mgr.social.social_cooperation_rate > 0.3
-        {
-            // High trust: strength scales [0, 1] over deviation [0.1, 0.5]
-            let strength = ((trust_deviation - 0.1) * 2.5).min(1.0);
-            if strength > 0.5 && selected_strategy == ResponseStrategy::Concise {
-                selected_strategy = ResponseStrategy::Supportive;
-                true
-            } else if strength > 0.3 {
-                self.adjust_exploration("social_trust_high", strength * 0.05);
-                false
+        let social_strategy_bias =
+            if trust_deviation > 0.1 && self.social_mgr.social.social_cooperation_rate > 0.3 {
+                // High trust: strength scales [0, 1] over deviation [0.1, 0.5]
+                let strength = ((trust_deviation - 0.1) * 2.5).min(1.0);
+                if strength > 0.5 && selected_strategy == ResponseStrategy::Concise {
+                    selected_strategy = ResponseStrategy::Supportive;
+                    true
+                } else if strength > 0.3 {
+                    self.adjust_exploration("social_trust_high", strength * 0.05);
+                    false
+                } else {
+                    false
+                }
+            } else if trust_deviation < -0.1 {
+                // Low trust: caution scales [0, 1] over deviation [-0.5, -0.1]
+                let caution = ((-trust_deviation - 0.1) * 2.5).min(1.0);
+                if caution > 0.5 && selected_strategy == ResponseStrategy::Exploratory {
+                    selected_strategy = ResponseStrategy::Detailed;
+                    true
+                } else if caution > 0.3 {
+                    self.adjust_exploration("social_trust_low", -caution * 0.05);
+                    false
+                } else {
+                    false
+                }
             } else {
                 false
-            }
-        } else if trust_deviation < -0.1 {
-            // Low trust: caution scales [0, 1] over deviation [-0.5, -0.1]
-            let caution = ((-trust_deviation - 0.1) * 2.5).min(1.0);
-            if caution > 0.5 && selected_strategy == ResponseStrategy::Exploratory {
-                selected_strategy = ResponseStrategy::Detailed;
-                true
-            } else if caution > 0.3 {
-                self.adjust_exploration("social_trust_low", -caution * 0.05);
-                false
-            } else {
-                false
-            }
-        } else {
-            false
-        };
+            };
 
         // ── ToM prediction mismatch → exploration boost (Frith & Frith 2006) ──
         // When our mental model of the user is inaccurate (high mismatch),
@@ -151,9 +152,7 @@ impl CognitiveLoopService {
                 self.stats.tom_prediction_mismatch_ema * 0.9 + mismatch * 0.1
             };
             // Trigger exploration when mismatch is high (> 0.4) and sustained
-            if self.stats.tom_prediction_mismatch_ema > 0.4
-                && self.stats.total_cycles > 10
-            {
+            if self.stats.tom_prediction_mismatch_ema > 0.4 && self.stats.total_cycles > 10 {
                 let boost = (self.stats.tom_prediction_mismatch_ema - 0.4) * 0.1; // [0, 0.06]
                 self.adjust_exploration("tom_mismatch", boost);
                 self.stats.tom_exploration_triggers += 1;
@@ -237,7 +236,11 @@ impl CognitiveLoopService {
                 let salience_weights: Vec<f32> = (0..n_recent)
                     .map(|i| {
                         let eh_idx = error_hist.len().saturating_sub(n_recent - i);
-                        error_hist.get(eh_idx).copied().unwrap_or(0.1).clamp(0.05, 1.0)
+                        error_hist
+                            .get(eh_idx)
+                            .copied()
+                            .unwrap_or(0.1)
+                            .clamp(0.05, 1.0)
                     })
                     .collect();
 
@@ -249,8 +252,8 @@ impl CognitiveLoopService {
 
                 // Combine salience + theta into binding strength.
                 // Theta gates access; salience weights the contribution.
-                let mean_salience = salience_weights.iter().sum::<f32>()
-                    / salience_weights.len().max(1) as f32;
+                let mean_salience =
+                    salience_weights.iter().sum::<f32>() / salience_weights.len().max(1) as f32;
                 let binding_strength = (mean_salience * theta_weight).clamp(0.1, 0.9);
                 temporal_binding_strength = binding_strength;
 
@@ -270,8 +273,7 @@ impl CognitiveLoopService {
         if self.config.enable_substrate_encoding_noise
             && self.substrate_manager.scale_pressure < 0.0
         {
-            let noise_fraction =
-                (-self.substrate_manager.scale_pressure).min(7.0) / 70.0; // [0.0, 0.1]
+            let noise_fraction = (-self.substrate_manager.scale_pressure).min(7.0) / 70.0; // [0.0, 0.1]
             let seed = self.stats.total_cycles as u64;
             hv16_cached = hv16_cached.add_noise(noise_fraction, seed);
         }
@@ -333,8 +335,7 @@ impl CognitiveLoopService {
         let phi_attention_weight = {
             let raw = if let Some(ref mut gate) = self.phi_attention_gate {
                 let phi_vals = [self.stats.unified_psi as f64];
-                let result =
-                    gate.forward(std::slice::from_ref(&encoding_result.hdv), &phi_vals);
+                let result = gate.forward(std::slice::from_ref(&encoding_result.hdv), &phi_vals);
                 result.weights.first().copied().unwrap_or(1.0)
             } else {
                 1.0
@@ -411,15 +412,15 @@ impl CognitiveLoopService {
         let compressed_state = if self.config.enable_substrate_encoding_noise
             && self.substrate_manager.scale_pressure < 0.0
         {
-            let noise_std =
-                (-self.substrate_manager.scale_pressure).min(7.0) / 35.0; // [0.0, 0.2]
+            let noise_std = (-self.substrate_manager.scale_pressure).min(7.0) / 35.0; // [0.0, 0.2]
             let seed = self.stats.total_cycles as u64;
             compressed_state
                 .into_iter()
                 .enumerate()
                 .map(|(i, v)| {
                     // Simple deterministic pseudo-noise from seed + index
-                    let hash = seed.wrapping_mul(6364136223846793005)
+                    let hash = seed
+                        .wrapping_mul(6364136223846793005)
                         .wrapping_add(i as u64)
                         .wrapping_mul(1442695040888963407);
                     let uniform = (hash >> 33) as f32 / (1u64 << 31) as f32 - 1.0; // [-1, 1]
@@ -515,11 +516,10 @@ impl CognitiveLoopService {
         if self.config.enable_moral_anomaly_response && ethics_output.topology_fresh {
             let report = &ethics_output.anomaly_report;
             let severity = report.anomaly_score as f32;
-            let ac = &self.config.moral_anomaly_config;
-            let lr_inv = ac.response_lr_inversion as f32;
-            let expl_fe = ac.response_exploration_fe as f32;
-            let conf_frag = ac.response_confidence_frag as f32;
-            let lr_drift = ac.response_lr_drift as f32;
+            let lr_inv = self.config.moral_anomaly_config.response_lr_inversion as f32;
+            let expl_fe = self.config.moral_anomaly_config.response_exploration_fe as f32;
+            let conf_frag = self.config.moral_anomaly_config.response_confidence_frag as f32;
+            let lr_drift = self.config.moral_anomaly_config.response_lr_drift as f32;
             if report.value_inversion {
                 self.scale_lr("moral_anomaly_inversion", 1.0 + (lr_inv - 1.0) * severity);
             }
@@ -532,6 +532,16 @@ impl CognitiveLoopService {
             if report.drift_alert {
                 self.scale_lr("moral_anomaly_drift", 1.0 + (lr_drift - 1.0) * severity);
             }
+            // Trajectory convergence: compartmentalized adversarial trajectory detected.
+            // Apply aggressive LR dampening — this is the most dangerous class of anomaly.
+            if report.trajectory_convergence {
+                let lr_conv = self.config.moral_anomaly_config.response_lr_convergence as f32;
+                let conv_severity = report.convergence_severity as f32;
+                self.scale_lr(
+                    "moral_anomaly_convergence",
+                    1.0 + (lr_conv - 1.0) * conv_severity,
+                );
+            }
         }
         self.carryover.quality.last_value_score = ethics_output.value_score;
         if ethics_output.value_gate_factor != 1.0 {
@@ -543,8 +553,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // Science: Friston (2010) — precision (inverse uncertainty) modulates PE weighting.
         let confidence_scale = (1.0 + (self.prediction_confidence - 0.5) * 0.4) as f32;
-        let exploration_scale =
-            (1.0 - (self.curiosity_drive.exploration_urge - 0.5) * 0.2) as f32;
+        let exploration_scale = (1.0 - (self.curiosity_drive.exploration_urge - 0.5) * 0.2) as f32;
         let effective_threshold = self.config.learning_threshold
             * self.carryover.learning.adaptive_threshold_scale as f32
             * confidence_scale
@@ -705,7 +714,9 @@ mod tests {
         svc.social_mgr.social.social_trust = 0.85;
         svc.social_mgr.social.social_cooperation_rate = 0.5;
         // Force CLL to pick Concise
-        svc.fep.closed_learning_loop.force_strategy(ResponseStrategy::Concise);
+        svc.fep
+            .closed_learning_loop
+            .force_strategy(ResponseStrategy::Concise);
         let result = svc.run_strategy_selection(false);
         assert_eq!(result.selected_strategy, ResponseStrategy::Supportive);
         assert!(result.social_strategy_bias);
@@ -717,7 +728,9 @@ mod tests {
         // trust=0.1 → deviation=-0.4, caution=(0.4-0.1)*2.5=0.75 > 0.5
         svc.social_mgr.social.social_trust = 0.1;
         // Force CLL to pick Exploratory
-        svc.fep.closed_learning_loop.force_strategy(ResponseStrategy::Exploratory);
+        svc.fep
+            .closed_learning_loop
+            .force_strategy(ResponseStrategy::Exploratory);
         let result = svc.run_strategy_selection(false);
         assert_eq!(result.selected_strategy, ResponseStrategy::Detailed);
         assert!(result.social_strategy_bias);

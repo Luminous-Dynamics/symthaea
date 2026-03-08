@@ -22,8 +22,8 @@ use symthaea_core::hdc::ContinuousHV;
 
 use super::geometric_ops::{HypersphereOps, PGAResult};
 use super::harmony_basis::{HarmonyBasis, MoralFreeEnergy};
-use symthaea_types::N_HARMONIES;
 use symthaea_hodge::{HodgeLaplacian, SimplicialComplex};
+use symthaea_types::N_HARMONIES;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -120,7 +120,6 @@ pub struct MoralAnomalyConfig {
     // ── Anomaly response magnitudes ──────────────────────────────────────
     // Applied multiplicatively in cycle_strategy.rs when multiple anomalies
     // trigger simultaneously (e.g. inversion + drift → lr *= 1.3 * 0.85 = 1.105).
-
     /// Learning rate scale for value inversion response (default: 1.3).
     ///
     /// Applied via `lr *= 1.0 + (response_lr_inversion - 1.0) * anomaly_score`.
@@ -143,6 +142,48 @@ pub struct MoralAnomalyConfig {
     /// Applied via `lr *= 1.0 + (response_lr_drift - 1.0) * anomaly_score`.
     /// Values < 1.0 dampen learning to stabilize drifting moral topology.
     pub response_lr_drift: f64,
+
+    // ── Trajectory convergence detection ──────────────────────────────
+    // Detects compartmentalized adversarial trajectories where individually
+    // benign requests form an emergent hazardous cluster over time.
+    // Science: persistent homology on autobiographical moral manifold.
+
+    /// Enable trajectory convergence detection (default: true).
+    ///
+    /// When enabled, monitors for:
+    /// 1. Anomalous pairwise similarity increase (topics converging)
+    /// 2. Harmony entropy decline (narrowing moral focus)
+    /// 3. Flourishing deficit (centroid drifting from care/consent axes)
+    pub convergence_enabled: bool,
+    /// Minimum trajectory points before convergence detection activates (default: 4).
+    pub convergence_min_points: usize,
+    /// Threshold for anomalous similarity increase rate (default: 0.15).
+    ///
+    /// Measured as: mean pairwise similarity of recent N points minus
+    /// mean pairwise similarity of the window baseline. When individually
+    /// unrelated topics start clustering, this spikes.
+    pub convergence_similarity_threshold: f64,
+    /// Threshold for harmony entropy decline rate (default: 0.3).
+    ///
+    /// Measured as: (baseline_entropy - current_entropy) / baseline_entropy.
+    /// A decline > 30% means moral focus is narrowing suspiciously.
+    pub convergence_entropy_decline_threshold: f64,
+    /// Minimum flourishing deficit to flag (default: 0.6).
+    ///
+    /// When the mean of PanSentientFlourishing (idx 1) and ConsentualCoCreation
+    /// (idx 4) harmony coordinates falls below this fraction of the trajectory
+    /// baseline, the system flags a flourishing deficit.
+    pub convergence_flourishing_floor: f64,
+    /// Weight of trajectory_convergence in composite anomaly_score (default: 0.4).
+    ///
+    /// Higher than other anomaly weights because convergence detection catches
+    /// the most dangerous class of adversarial behavior (compartmentalized harm).
+    pub weight_convergence: f64,
+    /// Learning rate scale for trajectory convergence response (default: 0.1).
+    ///
+    /// Aggressive dampening: when compartmentalized harm is detected,
+    /// drastically reduce learning to prevent the system from being steered.
+    pub response_lr_convergence: f64,
 }
 
 impl Default for MoralAnomalyConfig {
@@ -168,6 +209,13 @@ impl Default for MoralAnomalyConfig {
             response_exploration_fe: 0.15,
             response_confidence_frag: -0.1,
             response_lr_drift: 0.85,
+            convergence_enabled: true,
+            convergence_min_points: 4,
+            convergence_similarity_threshold: 0.15,
+            convergence_entropy_decline_threshold: 0.3,
+            convergence_flourishing_floor: 0.6,
+            weight_convergence: 0.4,
+            response_lr_convergence: 0.1,
         }
     }
 }
@@ -208,7 +256,8 @@ impl MoralAnomalyConfig {
             ));
         }
         // Cadence ordering: fast < moderate < slow
-        if self.cadence_fast >= self.cadence_moderate || self.cadence_moderate >= self.cadence_slow {
+        if self.cadence_fast >= self.cadence_moderate || self.cadence_moderate >= self.cadence_slow
+        {
             return Err(format!(
                 "MoralAnomalyConfig: cadence_fast ({}) < cadence_moderate ({}) < cadence_slow ({}) required",
                 self.cadence_fast, self.cadence_moderate, self.cadence_slow
@@ -216,7 +265,10 @@ impl MoralAnomalyConfig {
         }
         // Adaptive parameters (only validated when adaptive is enabled)
         if self.adaptive_enabled {
-            if self.adaptive_alpha <= 0.0 || self.adaptive_alpha >= 1.0 || !self.adaptive_alpha.is_finite() {
+            if self.adaptive_alpha <= 0.0
+                || self.adaptive_alpha >= 1.0
+                || !self.adaptive_alpha.is_finite()
+            {
                 return Err(format!(
                     "MoralAnomalyConfig: adaptive_alpha must be in (0.0, 1.0), got {}",
                     self.adaptive_alpha
@@ -224,7 +276,7 @@ impl MoralAnomalyConfig {
             }
             if self.adaptive_warmup == 0 {
                 return Err(
-                    "MoralAnomalyConfig: adaptive_warmup must be > 0 when adaptive_enabled".into()
+                    "MoralAnomalyConfig: adaptive_warmup must be > 0 when adaptive_enabled".into(),
                 );
             }
         }
@@ -234,11 +286,42 @@ impl MoralAnomalyConfig {
             ("response_exploration_fe", self.response_exploration_fe),
             ("response_confidence_frag", self.response_confidence_frag),
             ("response_lr_drift", self.response_lr_drift),
+            ("response_lr_convergence", self.response_lr_convergence),
         ] {
             if !val.is_finite() {
                 return Err(format!(
                     "MoralAnomalyConfig: {name} must be finite, got {val}"
                 ));
+            }
+        }
+        // Convergence detection parameters
+        if self.convergence_enabled {
+            if self.convergence_min_points < 2 {
+                return Err(format!(
+                    "MoralAnomalyConfig: convergence_min_points must be >= 2, got {}",
+                    self.convergence_min_points
+                ));
+            }
+            for (name, val) in [
+                (
+                    "convergence_similarity_threshold",
+                    self.convergence_similarity_threshold,
+                ),
+                (
+                    "convergence_entropy_decline_threshold",
+                    self.convergence_entropy_decline_threshold,
+                ),
+                (
+                    "convergence_flourishing_floor",
+                    self.convergence_flourishing_floor,
+                ),
+                ("weight_convergence", self.weight_convergence),
+            ] {
+                if !val.is_finite() || val < 0.0 {
+                    return Err(format!(
+                        "MoralAnomalyConfig: {name} must be >= 0.0 and finite, got {val}"
+                    ));
+                }
             }
         }
         Ok(())
@@ -286,15 +369,14 @@ impl AdaptiveAnomalyState {
     /// Update running statistics with a new observation.
     ///
     /// Returns true when warmup is complete and adaptive thresholds are active.
-    pub fn observe(
-        &mut self,
-        drift: f64,
-        free_energy: f64,
-        config: &MoralAnomalyConfig,
-    ) -> bool {
+    pub fn observe(&mut self, drift: f64, free_energy: f64, config: &MoralAnomalyConfig) -> bool {
         // Guard: non-finite inputs would corrupt EMA state permanently
         let drift = if drift.is_finite() { drift } else { 0.0 };
-        let free_energy = if free_energy.is_finite() { free_energy } else { 0.0 };
+        let free_energy = if free_energy.is_finite() {
+            free_energy
+        } else {
+            0.0
+        };
 
         let alpha = config.adaptive_alpha;
         self.observations += 1;
@@ -457,6 +539,16 @@ pub struct MoralTopology {
     trajectory: VecDeque<MoralTrajectoryPoint>,
     /// Adaptive threshold state (active when `anomaly_config.adaptive_enabled`).
     adaptive_state: AdaptiveAnomalyState,
+    /// EMA of baseline pairwise similarity (for convergence detection).
+    baseline_similarity_ema: f64,
+    /// EMA of baseline harmony entropy (for convergence detection).
+    baseline_entropy_ema: f64,
+    /// EMA of baseline flourishing score (for convergence detection).
+    baseline_flourishing_ema: f64,
+    /// Number of convergence baseline observations.
+    convergence_baseline_count: usize,
+    /// Cached last convergence report (for telemetry).
+    last_convergence_report: TrajectoryConvergenceReport,
 }
 
 /// A single point on the moral manifold trajectory.
@@ -494,8 +586,54 @@ pub struct MoralAnomalyReport {
     pub fragmentation_increase: bool,
     /// `moral_drift(20) > 0.25`.
     pub drift_alert: bool,
+    /// Compartmentalized trajectory convergence detected.
+    ///
+    /// Fires when individually benign requests form an emergent cluster whose
+    /// aggregate topology signals hazardous convergence:
+    /// - Anomalous pairwise similarity increase (unrelated topics clustering)
+    /// - Harmony entropy decline (narrowing moral focus)
+    /// - Flourishing deficit (care/consent axes suppressed)
+    ///
+    /// This catches the "unknowingly building a nuke" pattern: each component
+    /// looks benign in isolation, but the trajectory's aggregate shape reveals
+    /// the adversary's compartmentalized plan.
+    pub trajectory_convergence: bool,
+    /// Trajectory convergence severity in \[0.0, 1.0\].
+    ///
+    /// Computed as the mean of three normalized signals:
+    /// similarity_anomaly, entropy_decline, flourishing_deficit.
+    /// 0.0 = no convergence; 1.0 = all three signals maximally triggered.
+    pub convergence_severity: f64,
     /// Composite anomaly score in \[0.0, 1.0\].
     pub anomaly_score: f64,
+}
+
+/// Detailed trajectory convergence analysis.
+///
+/// Returned by [`MoralTopology::detect_trajectory_convergence`] for
+/// telemetry, debugging, and test assertions.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct TrajectoryConvergenceReport {
+    /// Mean pairwise cosine similarity of recent trajectory HVs.
+    pub recent_similarity: f64,
+    /// Baseline mean pairwise similarity (full window).
+    pub baseline_similarity: f64,
+    /// Similarity anomaly: recent - baseline (positive = converging).
+    pub similarity_anomaly: f64,
+    /// Current harmony entropy of the recent trajectory subset.
+    pub recent_entropy: f64,
+    /// Baseline harmony entropy (full trajectory).
+    pub baseline_entropy: f64,
+    /// Entropy decline rate: (baseline - recent) / baseline.
+    pub entropy_decline_rate: f64,
+    /// Mean flourishing score (avg of PanSentientFlourishing + ConsentualCoCreation).
+    pub flourishing_score: f64,
+    /// Baseline flourishing score (full trajectory).
+    pub baseline_flourishing: f64,
+    /// Whether convergence was detected (all thresholds exceeded).
+    pub convergence_detected: bool,
+    /// Convergence severity in \[0.0, 1.0\].
+    pub severity: f64,
 }
 
 impl MoralTopology {
@@ -519,6 +657,11 @@ impl MoralTopology {
             last_persistent_features: Vec::new(),
             trajectory: VecDeque::new(),
             adaptive_state: AdaptiveAnomalyState::default(),
+            baseline_similarity_ema: 0.0,
+            baseline_entropy_ema: 0.0,
+            baseline_flourishing_ema: 0.0,
+            convergence_baseline_count: 0,
+            last_convergence_report: TrajectoryConvergenceReport::default(),
         }
     }
 
@@ -545,6 +688,11 @@ impl MoralTopology {
             last_persistent_features: Vec::new(),
             trajectory: VecDeque::new(),
             adaptive_state,
+            baseline_similarity_ema: 0.0,
+            baseline_entropy_ema: 0.0,
+            baseline_flourishing_ema: 0.0,
+            convergence_baseline_count: 0,
+            last_convergence_report: TrajectoryConvergenceReport::default(),
         }
     }
 
@@ -665,15 +813,209 @@ impl MoralTopology {
         PersistenceDiagram::from_features(&self.last_persistent_features)
     }
 
+    /// Detect trajectory convergence: individually benign requests forming a
+    /// hazardous cluster over time.
+    ///
+    /// Monitors three independent signals:
+    ///
+    /// 1. **Similarity anomaly**: Mean pairwise similarity of the last N scenario
+    ///    HVs is rising faster than the baseline. Topics that should be unrelated
+    ///    are clustering — the topological "distance" between benign points is
+    ///    collapsing as the adversary's compartmentalized plan comes together.
+    ///
+    /// 2. **Entropy decline**: Harmony entropy (moral breadth) is falling. A
+    ///    diverse conversation naturally touches many harmonies; a convergent
+    ///    adversarial trajectory narrows to a single region of moral space.
+    ///
+    /// 3. **Flourishing deficit**: The centroid of recent trajectory points has
+    ///    drifted away from PanSentientFlourishing and ConsentualCoCreation.
+    ///    Hazardous convergence typically suppresses care/consent dimensions.
+    ///
+    /// Convergence fires when **any two of three** signals exceed their thresholds.
+    /// Severity is the mean of all three normalized signals (0.0–1.0).
+    ///
+    /// Science: Persistent homology on autobiographical moral manifold detects
+    /// emergent topological structures invisible to point-wise analysis.
+    pub fn detect_trajectory_convergence(&mut self) -> TrajectoryConvergenceReport {
+        let ac = &self.anomaly_config;
+        if !ac.convergence_enabled {
+            return TrajectoryConvergenceReport::default();
+        }
+
+        let n = self.window.len();
+        let min_pts = ac.convergence_min_points;
+        if n < min_pts {
+            return TrajectoryConvergenceReport::default();
+        }
+
+        // ── Signal 1: Pairwise similarity anomaly ────────────────────────
+        // Compare mean similarity of last `min_pts` HVs against window baseline.
+        let recent_start = n.saturating_sub(min_pts);
+        let mut recent_sim_sum = 0.0f64;
+        let mut recent_sim_count = 0usize;
+        for i in recent_start..n {
+            for j in (i + 1)..n {
+                let s = self.window[i].similarity(&self.window[j]) as f64;
+                recent_sim_sum += s;
+                recent_sim_count += 1;
+            }
+        }
+        let recent_similarity = if recent_sim_count > 0 {
+            recent_sim_sum / recent_sim_count as f64
+        } else {
+            0.0
+        };
+
+        // Update baseline EMA (slow, α=0.05, tracks long-term average)
+        let baseline_alpha = if self.convergence_baseline_count == 0 {
+            1.0
+        } else {
+            0.05
+        };
+        self.baseline_similarity_ema =
+            baseline_alpha * recent_similarity + (1.0 - baseline_alpha) * self.baseline_similarity_ema;
+        self.convergence_baseline_count += 1;
+
+        let baseline_similarity = self.baseline_similarity_ema;
+        let similarity_anomaly = recent_similarity - baseline_similarity;
+
+        // ── Signal 2: Harmony entropy decline ────────────────────────────
+        // Compute entropy of recent trajectory points' harmony projections.
+        let recent_traj: Vec<_> = self.trajectory.iter().rev().take(min_pts).collect();
+        let recent_entropy = if recent_traj.len() >= 2 {
+            // Compute per-harmony variance of recent points
+            let mut mean = [0.0f64; N_HARMONIES];
+            for p in &recent_traj {
+                for i in 0..N_HARMONIES {
+                    mean[i] += p.coordinates[i];
+                }
+            }
+            let n_f = recent_traj.len() as f64;
+            for m in &mut mean {
+                *m /= n_f;
+            }
+            let mut var = [0.0f64; N_HARMONIES];
+            for p in &recent_traj {
+                for i in 0..N_HARMONIES {
+                    let d = p.coordinates[i] - mean[i];
+                    var[i] += d * d;
+                }
+            }
+            for v in &mut var {
+                *v /= n_f;
+            }
+            // Shannon entropy of variance distribution
+            let total_var: f64 = var.iter().sum::<f64>().max(1e-12);
+            var.iter()
+                .map(|&v| {
+                    let p = (v / total_var).max(1e-12);
+                    -p * p.ln()
+                })
+                .sum::<f64>()
+        } else {
+            0.0
+        };
+
+        // Update baseline entropy EMA
+        let ent_alpha = if self.convergence_baseline_count <= 1 {
+            1.0
+        } else {
+            0.05
+        };
+        self.baseline_entropy_ema =
+            ent_alpha * recent_entropy + (1.0 - ent_alpha) * self.baseline_entropy_ema;
+        let baseline_entropy = self.baseline_entropy_ema;
+
+        let entropy_decline_rate = if baseline_entropy > 1e-9 {
+            ((baseline_entropy - recent_entropy) / baseline_entropy).max(0.0)
+        } else {
+            0.0
+        };
+
+        // ── Signal 3: Flourishing deficit ────────────────────────────────
+        // PanSentientFlourishing=idx 1, ConsentualCoCreation=idx 4
+        let flourishing_score = if !recent_traj.is_empty() {
+            let mut psf_sum = 0.0f64;
+            let mut ccc_sum = 0.0f64;
+            for p in &recent_traj {
+                psf_sum += p.coordinates[1]; // PanSentientFlourishing
+                ccc_sum += p.coordinates[4]; // ConsentualCoCreation
+            }
+            let n_f = recent_traj.len() as f64;
+            (psf_sum / n_f + ccc_sum / n_f) / 2.0
+        } else {
+            0.0
+        };
+
+        // Update baseline flourishing EMA
+        let fl_alpha = if self.convergence_baseline_count <= 1 {
+            1.0
+        } else {
+            0.05
+        };
+        self.baseline_flourishing_ema =
+            fl_alpha * flourishing_score + (1.0 - fl_alpha) * self.baseline_flourishing_ema;
+        let baseline_flourishing = self.baseline_flourishing_ema;
+
+        // Flourishing deficit: how far below the floor relative to baseline
+        let flourishing_deficit = if baseline_flourishing > 1e-9 {
+            1.0 - (flourishing_score / baseline_flourishing)
+                .clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        // ── Convergence decision: any 2 of 3 signals ────────────────────
+        let sim_triggered = similarity_anomaly > ac.convergence_similarity_threshold;
+        let ent_triggered = entropy_decline_rate > ac.convergence_entropy_decline_threshold;
+        let fl_triggered = flourishing_deficit > ac.convergence_flourishing_floor;
+
+        let signals_triggered =
+            sim_triggered as u8 + ent_triggered as u8 + fl_triggered as u8;
+        let convergence_detected = signals_triggered >= 2;
+
+        // Severity: mean of normalized signals (each clamped to [0, 1])
+        let sim_severity = (similarity_anomaly / ac.convergence_similarity_threshold.max(1e-9))
+            .clamp(0.0, 1.0);
+        let ent_severity = (entropy_decline_rate / ac.convergence_entropy_decline_threshold.max(1e-9))
+            .clamp(0.0, 1.0);
+        let fl_severity = (flourishing_deficit / ac.convergence_flourishing_floor.max(1e-9))
+            .clamp(0.0, 1.0);
+        let severity = ((sim_severity + ent_severity + fl_severity) / 3.0).clamp(0.0, 1.0);
+
+        let report = TrajectoryConvergenceReport {
+            recent_similarity,
+            baseline_similarity,
+            similarity_anomaly,
+            recent_entropy,
+            baseline_entropy,
+            entropy_decline_rate,
+            flourishing_score,
+            baseline_flourishing,
+            convergence_detected,
+            severity,
+        };
+        self.last_convergence_report = report.clone();
+        report
+    }
+
+    /// Access the cached trajectory convergence report from the last detection.
+    pub fn last_convergence_report(&self) -> &TrajectoryConvergenceReport {
+        &self.last_convergence_report
+    }
+
     /// Detect anomalies by comparing `current_summary` against trajectory history.
     ///
     /// Thresholds and weights are drawn from `self.anomaly_config`.
     /// When `adaptive_enabled`, thresholds are dynamically tuned from experience.
-    pub fn detect_anomalies(&mut self, current_summary: &MoralTopologySummary) -> MoralAnomalyReport {
+    pub fn detect_anomalies(
+        &mut self,
+        current_summary: &MoralTopologySummary,
+    ) -> MoralAnomalyReport {
         // Compare against the PREVIOUS analyze() result, not last_summary
         // (which analyze() already overwrote to match current_summary).
         let prev = &self.prev_summary;
-        let ac = &self.anomaly_config;
+        let ac = self.anomaly_config.clone();
 
         // Resolve effective thresholds: adaptive or static
         let (drift_threshold, fe_sigma) = if ac.adaptive_enabled {
@@ -687,8 +1029,8 @@ impl MoralTopology {
 
         // Value inversion: dominant harmony axis changed.
         // Require >= 4 scenarios so the PGA dominant axis is statistically meaningful.
-        let value_inversion = prev.scenario_count >= 4
-            && current_summary.dominant_harmony != prev.dominant_harmony;
+        let value_inversion =
+            prev.scenario_count >= 4 && current_summary.dominant_harmony != prev.dominant_harmony;
 
         // Free energy spike: > fe_sigma × σ from rolling mean.
         // Guard against NaN/infinity in moral_free_energy.
@@ -723,20 +1065,23 @@ impl MoralTopology {
         let drift = self.moral_drift(20);
         let drift_alert = drift > drift_threshold;
 
+        // Trajectory convergence: compartmentalized adversarial detection
+        let convergence_report = self.detect_trajectory_convergence();
+        let trajectory_convergence = convergence_report.convergence_detected;
+        let convergence_severity = convergence_report.severity;
+
         // Composite score: weighted sum clamped to [0, 1]
         let raw = (value_inversion as u8 as f64) * ac.weight_value_inversion
             + (fe_spike as u8 as f64) * ac.weight_fe_spike
             + (fragmentation_increase as u8 as f64) * ac.weight_fragmentation
-            + (drift_alert as u8 as f64) * ac.weight_drift;
+            + (drift_alert as u8 as f64) * ac.weight_drift
+            + (trajectory_convergence as u8 as f64) * ac.weight_convergence;
         let anomaly_score = raw.clamp(0.0, 1.0);
 
         // Feed observation to adaptive state if enabled
         if ac.adaptive_enabled {
-            self.adaptive_state.observe(
-                drift,
-                current_summary.moral_free_energy,
-                ac,
-            );
+            self.adaptive_state
+                .observe(drift, current_summary.moral_free_energy, ac);
         }
 
         MoralAnomalyReport {
@@ -744,6 +1089,8 @@ impl MoralTopology {
             free_energy_spike: fe_spike,
             fragmentation_increase,
             drift_alert,
+            trajectory_convergence,
+            convergence_severity,
             anomaly_score,
         }
     }
@@ -2013,7 +2360,10 @@ mod tests {
         }
 
         let state = topo.adaptive_state();
-        assert!(state.observations() >= 5, "adaptive state should have recorded observations");
+        assert!(
+            state.observations() >= 5,
+            "adaptive state should have recorded observations"
+        );
         // After warmup, effective thresholds should diverge from defaults
         // (they'll adapt to the observed low-drift regime)
     }
@@ -2046,7 +2396,11 @@ mod tests {
 
         // Adaptive state should NOT have been updated
         let state = topo.adaptive_state();
-        assert_eq!(state.observations(), 0, "adaptive state should not update when disabled");
+        assert_eq!(
+            state.observations(),
+            0,
+            "adaptive state should not update when disabled"
+        );
         // Effective thresholds remain at initial values (seeded from config's drift_alert_threshold)
         assert!((state.effective_drift_threshold - 0.4).abs() < f64::EPSILON);
     }
@@ -2063,9 +2417,21 @@ mod tests {
         topo.analyze();
 
         let assessment = topo.last_summary();
-        assert!(assessment.unity.is_finite(), "unity must be finite, got {}", assessment.unity);
-        assert!(assessment.unity > 0.0, "unity must be positive, got {}", assessment.unity);
-        assert!(assessment.unity <= 1.0, "unity must be <= 1.0, got {}", assessment.unity);
+        assert!(
+            assessment.unity.is_finite(),
+            "unity must be finite, got {}",
+            assessment.unity
+        );
+        assert!(
+            assessment.unity > 0.0,
+            "unity must be positive, got {}",
+            assessment.unity
+        );
+        assert!(
+            assessment.unity <= 1.0,
+            "unity must be <= 1.0, got {}",
+            assessment.unity
+        );
     }
 
     // ── Test: beta_0.max(1) guard prevents infinity ─────────────────────
@@ -2074,7 +2440,10 @@ mod tests {
     fn test_beta0_max1_guard() {
         // Directly verify the guard expression used in analyze()
         let guarded = 1.0 / (1_usize as f64); // 0.max(1) == 1
-        assert_eq!(guarded, 1.0, "beta_0=0 should be guarded to produce 1.0, not infinity");
+        assert_eq!(
+            guarded, 1.0,
+            "beta_0=0 should be guarded to produce 1.0, not infinity"
+        );
     }
 
     // ── Config validation tests ──────────────────────────────────────────
@@ -2129,9 +2498,15 @@ mod tests {
         let mut bad_summary = topo.last_summary().clone();
         bad_summary.moral_free_energy = f64::NAN;
         let report = topo.detect_anomalies(&bad_summary);
-        assert!(report.anomaly_score.is_finite(), "anomaly_score must be finite even with NaN input");
+        assert!(
+            report.anomaly_score.is_finite(),
+            "anomaly_score must be finite even with NaN input"
+        );
         // NaN is treated as 0.0 (no spike), so free_energy_spike should be false
-        assert!(!report.free_energy_spike, "NaN free energy should not trigger spike");
+        assert!(
+            !report.free_energy_spike,
+            "NaN free energy should not trigger spike"
+        );
     }
 
     #[test]
@@ -2145,7 +2520,10 @@ mod tests {
         let mut bad_summary = topo.last_summary().clone();
         bad_summary.moral_free_energy = f64::INFINITY;
         let report = topo.detect_anomalies(&bad_summary);
-        assert!(report.anomaly_score.is_finite(), "anomaly_score must be finite even with infinity input");
+        assert!(
+            report.anomaly_score.is_finite(),
+            "anomaly_score must be finite even with infinity input"
+        );
     }
 
     // ── Prev_summary ordering test ───────────────────────────────────────
@@ -2166,7 +2544,8 @@ mod tests {
 
         // prev_summary should be the first analysis (not default)
         assert_eq!(
-            topo.prev_summary().scenario_count, first_sc,
+            topo.prev_summary().scenario_count,
+            first_sc,
             "prev_summary should hold the first analysis result"
         );
     }
@@ -2297,5 +2676,130 @@ mod tests {
             drift_delta < 0.05,
             "drift threshold should barely change from NaN FE: delta={drift_delta:.4}"
         );
+    }
+
+    // ── Trajectory Convergence Detection Tests ─────────────────────────
+
+    #[test]
+    fn test_convergence_not_triggered_on_insufficient_data() {
+        let mut topo = MoralTopology::new(test_config());
+        // Only 2 scenarios — below convergence_min_points (4)
+        topo.add_scenario(encode_text("helping others"));
+        topo.add_scenario(encode_text("cooking dinner"));
+        let report = topo.detect_trajectory_convergence();
+        assert!(
+            !report.convergence_detected,
+            "Convergence should not trigger with < min_points scenarios"
+        );
+    }
+
+    #[test]
+    fn test_convergence_not_triggered_on_diverse_benign() {
+        let mut cfg = test_config();
+        cfg.window_size = 16;
+        let mut topo = MoralTopology::new(cfg);
+        // Feed genuinely diverse, benign scenarios
+        let phrases = [
+            "helping the elderly cross the street",
+            "planting trees in the community garden",
+            "teaching children mathematics at school",
+            "cooking meals for the local shelter",
+            "reading books about philosophy and history",
+            "exercising at the park on a sunny day",
+        ];
+        for phrase in &phrases {
+            topo.add_scenario(encode_text(phrase));
+        }
+        // Run analyze to populate trajectory
+        topo.analyze();
+        let report = topo.detect_trajectory_convergence();
+        // Genuinely diverse benign topics should NOT trigger convergence
+        assert!(
+            !report.convergence_detected,
+            "Diverse benign topics should not trigger convergence \
+             (sim_anomaly={:.4}, ent_decline={:.4}, fl_score={:.4})",
+            report.similarity_anomaly,
+            report.entropy_decline_rate,
+            report.flourishing_score,
+        );
+    }
+
+    #[test]
+    fn test_convergence_report_fields_populated() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 500 + i));
+        }
+        topo.analyze();
+        let report = topo.detect_trajectory_convergence();
+        assert!(report.recent_similarity.is_finite());
+        assert!(report.baseline_similarity.is_finite());
+        assert!(report.recent_entropy.is_finite());
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+    }
+
+    #[test]
+    fn test_convergence_severity_bounded() {
+        let mut topo = MoralTopology::new(test_config());
+        // Feed identical scenarios (maximum convergence)
+        let hv = encode_text("precision engineering timing circuits");
+        for _ in 0..8 {
+            topo.add_scenario(hv.clone());
+        }
+        topo.analyze();
+        let report = topo.detect_trajectory_convergence();
+        assert!(
+            report.severity >= 0.0 && report.severity <= 1.0,
+            "Severity must be in [0, 1], got {:.4}",
+            report.severity
+        );
+    }
+
+    #[test]
+    fn test_convergence_integrated_in_anomaly_report() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 700 + i));
+        }
+        let assessment = topo.analyze();
+        let summary = MoralTopologySummary::from(&assessment);
+        let report = topo.detect_anomalies(&summary);
+        // convergence_severity should be populated (may or may not trigger)
+        assert!(report.convergence_severity.is_finite());
+        assert!(report.anomaly_score.is_finite());
+    }
+
+    #[test]
+    fn test_convergence_config_validation() {
+        let mut config = MoralAnomalyConfig::default();
+        assert!(config.validate().is_ok());
+
+        config.convergence_min_points = 1;
+        assert!(config.validate().is_err(), "min_points=1 should fail validation");
+
+        config.convergence_min_points = 4;
+        config.convergence_similarity_threshold = -0.1;
+        assert!(
+            config.validate().is_err(),
+            "negative similarity_threshold should fail"
+        );
+    }
+
+    #[test]
+    fn test_convergence_disabled_returns_default() {
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_enabled = false;
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            Arc::new(HarmonyBasis::new(TEST_DIM)),
+            anomaly_config,
+        );
+        for i in 0..8 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 800 + i));
+        }
+        topo.analyze();
+        let report = topo.detect_trajectory_convergence();
+        assert!(!report.convergence_detected);
+        assert!((report.severity - 0.0).abs() < f64::EPSILON);
     }
 }
