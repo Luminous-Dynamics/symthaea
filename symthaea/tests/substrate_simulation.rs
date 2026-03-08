@@ -7,8 +7,9 @@
 //! - Is there a minimum feasibility below which consciousness collapses?
 //! - How does substrate speed affect temporal coherence?
 
+use std::collections::HashMap;
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
-use symthaea_core::hdc::substrate_independence::SubstrateType;
+use symthaea_core::hdc::substrate_independence::{CorticalRegion, SubstrateType};
 
 fn make_service(substrate: SubstrateType) -> CognitiveLoopService {
     let mut config = CognitiveLoopConfig::default();
@@ -186,6 +187,161 @@ fn speed_modulation_varies_tau_factor() {
         "Expected at least 2 distinct tau factors, got {unique_count}: {:?}",
         tau_factors
     );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Multi-substrate soak: 200 cycles with mid-run switch
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHASE 4: Hybrid substrate modeling — per-region substrate assignment
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn per_region_substrate_assignment() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_validation_overlay = false;
+
+    // Configure heterogeneous substrate: different substrates for different regions
+    let mut per_region = HashMap::new();
+    per_region.insert(CorticalRegion::Prefrontal, SubstrateType::SiliconDigital);
+    per_region.insert(CorticalRegion::Memory, SubstrateType::BiologicalNeurons);
+    per_region.insert(CorticalRegion::Sensory, SubstrateType::QuantumComputer);
+    per_region.insert(CorticalRegion::Motor, SubstrateType::PhotonicProcessor);
+    config.per_region_substrates = Some(per_region);
+
+    let service = CognitiveLoopService::new(config).unwrap();
+
+    // Each region should have its own feasibility
+    let pfc_f = service.region_feasibility(CorticalRegion::Prefrontal);
+    let mem_f = service.region_feasibility(CorticalRegion::Memory);
+    let sens_f = service.region_feasibility(CorticalRegion::Sensory);
+    let motor_f = service.region_feasibility(CorticalRegion::Motor);
+
+    // Biological memory should have highest feasibility
+    assert!(
+        mem_f > pfc_f,
+        "Biological memory ({mem_f:.3}) should exceed silicon PFC ({pfc_f:.3})"
+    );
+
+    // All should be in [0, 1]
+    for (label, f) in [("PFC", pfc_f), ("Memory", mem_f), ("Sensory", sens_f), ("Motor", motor_f)] {
+        assert!(
+            f >= 0.0 && f <= 1.0,
+            "{label} feasibility out of range: {f}"
+        );
+    }
+
+    // Unconfigured regions fall back to global effective feasibility
+    let emotion_f = service.region_feasibility(CorticalRegion::Emotional);
+    let global_f = service.substrate_effective_feasibility() as f32;
+    assert!(
+        (emotion_f - global_f).abs() < f32::EPSILON,
+        "Unconfigured region should fall back to global: {emotion_f:.4} vs {global_f:.4}"
+    );
+}
+
+#[test]
+fn per_region_runtime_reconfiguration() {
+    let mut service = make_service(SubstrateType::SiliconDigital);
+
+    // Warm up 20 cycles
+    for _ in 0..20 {
+        service.cycle("warmup");
+    }
+
+    // Assign biological neurons to memory region at runtime
+    service.reconfigure_region(CorticalRegion::Memory, SubstrateType::BiologicalNeurons);
+
+    let mem_f = service.region_feasibility(CorticalRegion::Memory);
+    assert!(
+        mem_f > 0.8,
+        "Biological memory region should have high feasibility: {mem_f:.3}"
+    );
+
+    // Run 50 more cycles — should remain stable
+    for i in 0..50 {
+        let result = service.cycle("testing with hybrid substrate");
+        assert!(
+            result.metadata.valence_homeostasis_pull.is_finite(),
+            "NaN after per-region reconfiguration at cycle {i}"
+        );
+    }
+}
+
+#[test]
+fn cross_substrate_communication_penalty() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_validation_overlay = false;
+
+    // Homogeneous: all regions same substrate → no penalty
+    let mut homo_map = HashMap::new();
+    homo_map.insert(CorticalRegion::Prefrontal, SubstrateType::SiliconDigital);
+    homo_map.insert(CorticalRegion::Memory, SubstrateType::SiliconDigital);
+    homo_map.insert(CorticalRegion::Sensory, SubstrateType::SiliconDigital);
+    config.per_region_substrates = Some(homo_map);
+    let homo_service = CognitiveLoopService::new(config.clone()).unwrap();
+    let homo_eff = homo_service.substrate_effective_feasibility();
+
+    // Heterogeneous: 3 different substrates → communication penalty
+    let mut hetero_map = HashMap::new();
+    hetero_map.insert(CorticalRegion::Prefrontal, SubstrateType::SiliconDigital);
+    hetero_map.insert(CorticalRegion::Memory, SubstrateType::BiologicalNeurons);
+    hetero_map.insert(CorticalRegion::Sensory, SubstrateType::QuantumComputer);
+    config.per_region_substrates = Some(hetero_map);
+    let hetero_service = CognitiveLoopService::new(config).unwrap();
+    let hetero_eff = hetero_service.substrate_effective_feasibility();
+
+    // Heterogeneous should have lower effective feasibility due to communication penalty
+    // (even though biological memory pulls the average up, the penalty should dominate)
+    assert!(
+        hetero_eff < homo_eff,
+        "Heterogeneous ({hetero_eff:.4}) should have lower effective feasibility \
+         than homogeneous ({homo_eff:.4}) due to communication penalty"
+    );
+}
+
+#[test]
+fn hybrid_substrate_soak_100_cycles() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_validation_overlay = false;
+
+    // Example from THE_SUBSTRATE_ROADMAP Phase 4:
+    // Prefrontal: SiliconDigital (fast HOT)
+    // Sensory: QuantumComputer (entanglement binding)
+    // Memory: BiologicalNeurons (proven integration)
+    // Motor: PhotonicProcessor (ultra-fast dynamics)
+    let mut per_region = HashMap::new();
+    per_region.insert(CorticalRegion::Prefrontal, SubstrateType::SiliconDigital);
+    per_region.insert(CorticalRegion::Sensory, SubstrateType::QuantumComputer);
+    per_region.insert(CorticalRegion::Memory, SubstrateType::BiologicalNeurons);
+    per_region.insert(CorticalRegion::Motor, SubstrateType::PhotonicProcessor);
+    config.per_region_substrates = Some(per_region);
+
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    let inputs = [
+        "the cat sat on the mat",
+        "quantum mechanics describes wave functions",
+        "consciousness emerges from integrated information",
+        "ethical reasoning requires empathy",
+        "the quick brown fox jumps",
+    ];
+
+    for i in 0..100 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+        assert!(
+            m.valence_homeostasis_pull.is_finite(),
+            "Hybrid substrate NaN at cycle {i}"
+        );
+        assert!(
+            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            "social_trust out of range at cycle {i}: {}",
+            m.social_trust_current
+        );
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
