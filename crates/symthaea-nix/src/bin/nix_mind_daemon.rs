@@ -35,6 +35,9 @@ use symthaea_nix::support::predictive::{
 };
 use symthaea_nix::traits::DomainPlugin;
 
+#[cfg(feature = "observability")]
+use symthaea_nix::observability::{init_tracing, Metrics, PhaseTimer};
+
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
     codebook: NixCodebook,
@@ -851,9 +854,36 @@ fn now_secs() -> u64 {
 }
 
 fn main() -> ! {
+    // Initialize structured JSON logging when observability is enabled.
+    #[cfg(feature = "observability")]
+    init_tracing();
+
     let config = DaemonConfig::load_default();
     let mut state = DaemonState::new(&config);
     let snapshot_path = default_snapshot_path();
+
+    // Spawn Prometheus metrics HTTP endpoint in a background thread.
+    #[cfg(feature = "observability")]
+    {
+        let metrics_port = config.metrics_port;
+        // Eagerly initialize the global metrics registry.
+        let _ = Metrics::global();
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("tokio runtime for metrics server");
+            rt.block_on(async {
+                if let Err(e) = symthaea_nix::observability::serve_metrics(metrics_port).await {
+                    eprintln!("nix-mind-daemon: metrics server failed: {}", e);
+                }
+            });
+        });
+        eprintln!(
+            "nix-mind-daemon: Prometheus metrics endpoint on port {}",
+            metrics_port
+        );
+    }
 
     // Restore persisted working memory
     let wm_path = snapshot_path.with_file_name("working_memory.json");
@@ -943,9 +973,19 @@ fn main() -> ! {
         cycle += 1;
 
         if last_snapshot.elapsed() >= Duration::from_secs(config.snapshot_interval) {
+            #[cfg(feature = "observability")]
+            let _observe_timer = PhaseTimer::start("observe");
+
             match SystemObserver::snapshot() {
                 Ok(snapshot) => {
+                    #[cfg(feature = "observability")]
+                    let _process_timer = PhaseTimer::start("process_snapshot");
+
                     state.process_snapshot(snapshot, &config);
+
+                    #[cfg(feature = "observability")]
+                    drop(_process_timer);
+
                     let fe = state.world_model.free_energy();
 
                     if fe > config.surprise_threshold {
@@ -953,6 +993,16 @@ fn main() -> ! {
                             "nix-mind-daemon: surprise detected (FE={:.3}), cycle {}",
                             fe, cycle
                         );
+                    }
+
+                    // Update observability gauges after snapshot processing.
+                    #[cfg(feature = "observability")]
+                    {
+                        let m = Metrics::global();
+                        m.free_energy.set(fe);
+                        m.causal_edge_count
+                            .set(state.causal_graph.edge_count() as f64);
+                        m.episodic_count.set(state.episodic_memory.len() as f64);
                     }
                 }
                 Err(e) => {
@@ -962,11 +1012,62 @@ fn main() -> ! {
             last_snapshot = Instant::now();
         }
 
-        state.process_journal(config.journal_batch_size);
+        {
+            #[cfg(feature = "observability")]
+            let _journal_timer = PhaseTimer::start("process_journal");
+
+            #[cfg(feature = "observability")]
+            let anomaly_count_before = state.anomaly_count;
+
+            state.process_journal(config.journal_batch_size);
+
+            // Track newly detected anomalies.
+            #[cfg(feature = "observability")]
+            {
+                let new_anomalies = state.anomaly_count - anomaly_count_before;
+                if new_anomalies > 0 {
+                    let m = Metrics::global();
+                    m.anomalies_total.inc_by(new_anomalies as f64);
+                }
+            }
+        }
 
         if cycle % config.ipc_write_interval == 0 {
+            #[cfg(feature = "observability")]
+            let _ipc_timer = PhaseTimer::start("ipc_write");
+
             state.refresh_watchdog_status(&snapshot_path);
             let ipc_snap = state.to_ipc_snapshot();
+
+            // Update consciousness-level and phi gauges from the IPC snapshot.
+            #[cfg(feature = "observability")]
+            {
+                let m = Metrics::global();
+                // consciousness_level: derive from hierarchy errors (lower error = higher consciousness)
+                // The snapshot doesn't expose a single "consciousness level" scalar, so we
+                // use 1.0 - mean(hierarchy_errors) clamped to [0,1] as a proxy.
+                if !ipc_snap.hierarchy_errors.is_empty() {
+                    let mean_err: f64 = ipc_snap.hierarchy_errors.iter().sum::<f64>()
+                        / ipc_snap.hierarchy_errors.len() as f64;
+                    m.consciousness_level.set((1.0 - mean_err).clamp(0.0, 1.0));
+                }
+                // phi_value: use drift_similarity as a proxy (higher = more integrated)
+                m.phi_value.set(ipc_snap.drift_similarity as f64);
+                // Refresh edge/episodic counts from the snapshot
+                m.causal_edge_count.set(ipc_snap.causal_edge_count as f64);
+                m.episodic_count.set(ipc_snap.episodic_count as f64);
+
+                // Increment gate_vetoes_total for any critical alerts (gate veto proxy)
+                let critical_count = ipc_snap
+                    .alerts
+                    .iter()
+                    .filter(|a| matches!(a.severity, AlertSeverity::Critical))
+                    .count();
+                if critical_count > 0 {
+                    m.gate_vetoes_total.inc_by(critical_count as f64);
+                }
+            }
+
             if let Err(e) = ipc_snap.write_to(&snapshot_path) {
                 eprintln!("nix-mind-daemon: IPC write failed: {}", e);
             }
@@ -994,6 +1095,10 @@ fn main() -> ! {
             let causal_path = snapshot_path.with_file_name("causal_graph.json");
             let _ = state.causal_graph.save(&causal_path);
         }
+
+        // Increment the cycle counter for observability.
+        #[cfg(feature = "observability")]
+        Metrics::global().consciousness_cycles_total.inc();
 
         thread::sleep(Duration::from_secs(config.poll_interval));
     }
