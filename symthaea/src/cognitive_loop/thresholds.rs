@@ -1264,6 +1264,225 @@ pub const HYSTERESIS_RELAXATION_FLOOR: f32 = 0.5;
 pub const AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD: f32 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CONTEXT PHI MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Base scale factor for context-phi modulation of unified Psi.
+/// Science: Baars (2002) — global workspace context shapes conscious access weighting.
+pub const CONTEXT_PHI_SCALE_BASE: f32 = 0.8;
+
+/// Range added to base scale proportional to context_phi_weight.
+/// Full range: [0.8, 1.2] maps no-context → full-context.
+pub const CONTEXT_PHI_SCALE_RANGE: f32 = 0.4;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOVE RESONANCE COUPLING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum harmonic love resonance to trigger confidence/soul amplification.
+/// Science: Fredrickson (2013) — positivity resonance requires threshold mutual engagement.
+pub const LOVE_RESONANCE_THRESHOLD: f32 = 0.6;
+
+/// Scale factor for love resonance → confidence boost (per unit above threshold).
+/// Boost = (resonance - threshold) * scale.
+pub const LOVE_RESONANCE_CONFIDENCE_SCALE: f32 = 0.04;
+
+/// Fraction of love resonance boost applied to learning rate.
+/// LR *= 1.0 + boost * fraction.
+pub const LOVE_RESONANCE_LR_FRACTION: f32 = 0.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REASONING CHAIN CONFIDENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum reasoning chain confidence for chain-depth boost to apply.
+/// Science: Stanovich (2011) — Type 2 reasoning only boosts confidence when reliable.
+pub const REASONING_CHAIN_CONFIDENCE_THRESHOLD: f32 = 0.7;
+
+/// Scale factor for reasoning chain confidence boost (per unit above threshold).
+pub const REASONING_CHAIN_BOOST_SCALE: f32 = 0.05;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOCIAL LEARNING MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Base learning rate factor for social trust modulation.
+/// Science: Decety & Chaminade (2003) — social trust modulates learning engagement.
+pub const SOCIAL_LR_BASE: f32 = 0.8;
+
+/// Range of social trust modulation (LR factor = BASE + RANGE * trust).
+/// Full range: [0.8, 1.2] maps distrust → full trust.
+pub const SOCIAL_LR_RANGE: f32 = 0.4;
+
+/// Theory-of-Mind accuracy above which prediction confidence is boosted.
+/// Science: Frith & Frith (2006) — accurate mentalizing reinforces social predictions.
+pub const TOM_ACCURACY_HIGH: f32 = 0.7;
+
+/// Theory-of-Mind accuracy below which prediction confidence is dampened.
+pub const TOM_ACCURACY_LOW: f32 = 0.3;
+
+/// Scale factor for ToM accuracy → confidence adjustment (per unit from threshold).
+pub const TOM_ACCURACY_SCALE: f32 = 0.05;
+
+/// Minimum causal average confidence to trigger urgency gating.
+/// Science: Pearl (2009) — causal reasoning requires sufficient confidence in causal links.
+pub const CAUSAL_URGENCY_CONFIDENCE: f32 = 0.6;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CROSS-MODULE AGREEMENT ACTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence boost scale when cross-module agreement is high.
+pub const AGREEMENT_HIGH_CONFIDENCE_SCALE: f32 = 0.05;
+
+/// Confidence dampen scale when cross-module agreement is low.
+pub const AGREEMENT_LOW_CONFIDENCE_SCALE: f32 = 0.1;
+
+/// Exploration boost scale when cross-module agreement is low.
+/// Science: Dehaene (2011) — disagreement across modules drives exploratory behavior.
+pub const AGREEMENT_LOW_EXPLORATION_SCALE: f32 = 0.15;
+
+/// Very low agreement threshold triggering cautious interpretation.
+pub const AGREEMENT_CRITICAL_THRESHOLD: f32 = 0.2;
+
+/// Threshold scale-up factor when agreement is critically low.
+pub const AGREEMENT_CRITICAL_CAUTION_SCALE: f32 = 1.2;
+
+/// EMA decay factor for tracking average cross-module agreement.
+pub const AGREEMENT_EMA_DECAY: f32 = 0.95;
+
+/// Amplification factor for variance in cross-module agreement computation.
+pub const CROSS_MODULE_VARIANCE_AMPLIFICATION: f32 = 4.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPOUND INSTABILITY DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Agreement velocity threshold for compound instability (negative = dropping).
+/// Science: Friston (2010) — cascading precision failures require active recovery.
+pub const COMPOUND_INSTABILITY_VELOCITY: f32 = -0.10;
+
+/// Error slope threshold for compound instability detection.
+pub const COMPOUND_INSTABILITY_ERROR_SLOPE: f32 = 0.02;
+
+/// Learning rate scale during compound instability (protective dampening).
+pub const COMPOUND_INSTABILITY_LR_SCALE: f32 = 0.93;
+
+/// Exploration boost during compound instability.
+pub const COMPOUND_INSTABILITY_EXPLORATION: f32 = 0.025;
+
+/// Agreement velocity threshold for rapid-drop preemptive response.
+pub const AGREEMENT_VELOCITY_DROP_THRESHOLD: f32 = -0.15;
+
+/// Learning rate scale during rapid agreement drop.
+pub const AGREEMENT_VELOCITY_DROP_LR: f32 = 0.97;
+
+/// Exploration boost during rapid agreement drop.
+pub const AGREEMENT_VELOCITY_DROP_EXPLORATION: f32 = 0.015;
+
+/// Confidence coupling scale when agreement rises but confidence falls.
+/// Science: Tononi (2004) — integration bottleneck requires gentle correction.
+pub const AGREEMENT_CONFIDENCE_COUPLING_SCALE: f32 = 0.98;
+
+/// Coherence velocity threshold for agreement-confidence coupling detection.
+pub const AGREEMENT_COHERENCE_VELOCITY_THRESHOLD: f32 = -0.01;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// QUALITY GATING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA decay factor for unified quality score tracking.
+pub const QUALITY_EMA_DECAY: f32 = 0.9;
+
+/// Learning rate boost scale when quality is high (per unit above threshold).
+pub const QUALITY_HIGH_LR_SCALE: f32 = 0.25;
+
+/// Minimum learning rate factor after quality-based clamping.
+pub const QUALITY_LR_CLAMP_MIN: f32 = 0.7;
+
+/// Maximum learning rate factor after quality-based clamping.
+pub const QUALITY_LR_CLAMP_MAX: f32 = 1.5;
+
+/// Exploration dampening factor when quality is low (multiplicative).
+pub const LOW_QUALITY_EXPLORATION_DAMPEN: f32 = 0.9;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ENTROPY LR MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum learning rate modifier from harmony entropy (at zero entropy).
+/// Science: broader value-space exploration → richer training signal.
+pub const ENTROPY_LR_MIN: f64 = 0.95;
+
+/// Range of entropy-based LR modulation. Full range: [MIN, MIN+RANGE].
+pub const ENTROPY_LR_RANGE: f64 = 0.10;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SOCIAL RELATIONAL DYNAMICS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Phi divergence threshold for triggering exploration boost.
+/// Science: Friston (2010) — high divergence = high epistemic value.
+pub const PHI_DIVERGENCE_THRESHOLD: f64 = 0.1;
+
+/// Maximum phi divergence considered for exploration scaling.
+pub const PHI_DIVERGENCE_MAX: f64 = 0.2;
+
+/// Exploration scale factor for phi divergence boost.
+pub const PHI_DIVERGENCE_SCALE: f64 = 0.15;
+
+/// Phi relational threshold for oxytocin production.
+/// Science: Feldman (2012) — relational coherence drives oxytocin release.
+pub const PHI_RELATIONAL_OXY_THRESHOLD: f64 = 0.3;
+
+/// Oxytocin production scale per unit of relational phi above threshold.
+pub const PHI_RELATIONAL_OXY_SCALE: f64 = 0.05;
+
+/// Midpoint for trust evolution from cycle coherence.
+/// Science: Bowlby (1969) — secure attachment requires consistent responsiveness.
+pub const TRUST_SIGNAL_MIDPOINT: f64 = 0.5;
+
+/// Rate of trust change per coherence unit above/below midpoint.
+pub const TRUST_SIGNAL_RATE: f64 = 0.01;
+
+/// Decay factor preventing runaway trust accumulation.
+pub const TRUST_DECAY_FACTOR: f64 = 0.999;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REST / DREAM MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Coherence weight during active rest (>1.0 = emphasize coherence).
+/// Science: Tononi & Cirelli (2006) — rest-state consciousness emphasizes integration.
+pub const REST_COHERENCE_WEIGHT: f32 = 1.2;
+
+/// Binding intensity dampen during active rest (<1.0 = reduce binding weight).
+pub const REST_BINDING_DAMPEN: f32 = 0.8;
+
+/// Fraction of rest modulation attributed to coherence component.
+pub const REST_MODULATION_COHERENCE_FRAC: f32 = 0.6;
+
+/// Fraction of rest modulation attributed to binding component.
+pub const REST_MODULATION_BINDING_FRAC: f32 = 0.4;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMPATHIC SPEECH MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minimum empathic tone adjustment magnitude to trigger speech rate modulation.
+/// Science: Porges (2011) — polyvagal theory links prosody to social engagement.
+pub const EMPATHIC_TONE_THRESHOLD: f32 = 0.1;
+
+/// Rate at which empathic tone modulates speech rate (multiplicative).
+pub const EMPATHIC_TONE_RATE_SCALE: f32 = 0.1;
+
+/// Minimum speech rate multiplier after empathic modulation.
+pub const SPEECH_RATE_CLAMP_MIN: f32 = 0.6;
+
+/// Maximum speech rate multiplier after empathic modulation.
+pub const SPEECH_RATE_CLAMP_MAX: f32 = 1.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1506,5 +1725,94 @@ mod tests {
         assert!(HYSTERESIS_RELAXATION_FLOOR > 0.0 && HYSTERESIS_RELAXATION_FLOOR < 1.0);
         // Agreement-confidence coupling
         assert!(AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD > 0.0);
+    }
+
+    #[test]
+    fn test_context_phi_modulation() {
+        assert!(CONTEXT_PHI_SCALE_BASE > 0.0 && CONTEXT_PHI_SCALE_BASE < 1.0);
+        assert!(CONTEXT_PHI_SCALE_RANGE > 0.0);
+        assert!(CONTEXT_PHI_SCALE_BASE + CONTEXT_PHI_SCALE_RANGE <= 1.5);
+    }
+
+    #[test]
+    fn test_love_resonance_params() {
+        assert!(LOVE_RESONANCE_THRESHOLD > 0.0 && LOVE_RESONANCE_THRESHOLD < 1.0);
+        assert!(LOVE_RESONANCE_CONFIDENCE_SCALE > 0.0);
+        assert!(LOVE_RESONANCE_LR_FRACTION > 0.0 && LOVE_RESONANCE_LR_FRACTION <= 1.0);
+    }
+
+    #[test]
+    fn test_reasoning_chain_params() {
+        assert!(REASONING_CHAIN_CONFIDENCE_THRESHOLD > 0.5);
+        assert!(REASONING_CHAIN_BOOST_SCALE > 0.0 && REASONING_CHAIN_BOOST_SCALE < 0.5);
+    }
+
+    #[test]
+    fn test_social_learning_params() {
+        assert!(SOCIAL_LR_BASE > 0.0 && SOCIAL_LR_BASE < 1.0);
+        assert!(SOCIAL_LR_BASE + SOCIAL_LR_RANGE > 1.0);
+        assert!(TOM_ACCURACY_HIGH > TOM_ACCURACY_LOW);
+        assert!(TOM_ACCURACY_SCALE > 0.0 && TOM_ACCURACY_SCALE < 0.5);
+    }
+
+    #[test]
+    fn test_agreement_action_params() {
+        assert!(AGREEMENT_HIGH_CONFIDENCE_SCALE > 0.0);
+        assert!(AGREEMENT_LOW_CONFIDENCE_SCALE > 0.0);
+        assert!(AGREEMENT_LOW_EXPLORATION_SCALE > 0.0);
+        assert!(AGREEMENT_CRITICAL_THRESHOLD < CROSS_MODULE_AGREEMENT_LOW);
+        assert!(AGREEMENT_CRITICAL_CAUTION_SCALE > 1.0);
+        assert!(AGREEMENT_EMA_DECAY > 0.0 && AGREEMENT_EMA_DECAY < 1.0);
+        assert!(CROSS_MODULE_VARIANCE_AMPLIFICATION > 1.0);
+    }
+
+    #[test]
+    fn test_compound_instability_params() {
+        assert!(COMPOUND_INSTABILITY_VELOCITY < 0.0);
+        assert!(COMPOUND_INSTABILITY_ERROR_SLOPE > 0.0);
+        assert!(COMPOUND_INSTABILITY_LR_SCALE > 0.5 && COMPOUND_INSTABILITY_LR_SCALE < 1.0);
+        assert!(AGREEMENT_VELOCITY_DROP_THRESHOLD < COMPOUND_INSTABILITY_VELOCITY);
+        assert!(AGREEMENT_VELOCITY_DROP_LR > COMPOUND_INSTABILITY_LR_SCALE);
+    }
+
+    #[test]
+    fn test_quality_gating_params() {
+        assert!(QUALITY_EMA_DECAY > 0.0 && QUALITY_EMA_DECAY < 1.0);
+        assert!(QUALITY_HIGH_LR_SCALE > 0.0);
+        assert!(QUALITY_LR_CLAMP_MIN < 1.0);
+        assert!(QUALITY_LR_CLAMP_MAX > 1.0);
+    }
+
+    #[test]
+    fn test_entropy_lr_params() {
+        assert!(ENTROPY_LR_MIN > 0.0 && ENTROPY_LR_MIN < 1.0);
+        assert!(ENTROPY_LR_MIN + ENTROPY_LR_RANGE > 1.0);
+    }
+
+    #[test]
+    fn test_social_relational_params() {
+        assert!(PHI_DIVERGENCE_THRESHOLD > 0.0 && PHI_DIVERGENCE_THRESHOLD < 1.0);
+        assert!(PHI_DIVERGENCE_MAX > PHI_DIVERGENCE_THRESHOLD);
+        assert!(PHI_DIVERGENCE_SCALE > 0.0);
+        assert!(PHI_RELATIONAL_OXY_THRESHOLD > 0.0 && PHI_RELATIONAL_OXY_THRESHOLD < 1.0);
+        assert!(PHI_RELATIONAL_OXY_SCALE > 0.0);
+        assert!(TRUST_SIGNAL_MIDPOINT > 0.0 && TRUST_SIGNAL_MIDPOINT < 1.0);
+        assert!(TRUST_SIGNAL_RATE > 0.0 && TRUST_SIGNAL_RATE < 0.1);
+        assert!(TRUST_DECAY_FACTOR > 0.9 && TRUST_DECAY_FACTOR < 1.0);
+    }
+
+    #[test]
+    fn test_rest_modulation_params() {
+        assert!(REST_COHERENCE_WEIGHT > 1.0);
+        assert!(REST_BINDING_DAMPEN < 1.0);
+        assert!((REST_MODULATION_COHERENCE_FRAC + REST_MODULATION_BINDING_FRAC - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_empathic_speech_params() {
+        assert!(EMPATHIC_TONE_THRESHOLD > 0.0);
+        assert!(EMPATHIC_TONE_RATE_SCALE > 0.0);
+        assert!(SPEECH_RATE_CLAMP_MIN < 1.0);
+        assert!(SPEECH_RATE_CLAMP_MAX > 1.0);
     }
 }
