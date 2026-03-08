@@ -12,6 +12,9 @@
     "test:identity": "vitest run --testPathPattern identity",
     "typecheck": "tsc --noEmit"
   },
+  "overrides": {
+    "esbuild": ">=0.25.0"
+  },
   "devDependencies": {
     "@holochain/client": "^0.20.0",
     "@holochain/tryorama": "^0.19.0",

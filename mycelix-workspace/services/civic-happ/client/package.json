@@ -30,6 +30,7 @@
     "@holochain/client": "^0.20.2"
   },
   "overrides": {
+    "esbuild": ">=0.25.0",
     "rollup": ">=4.31.0"
   },
   "devDependencies": {

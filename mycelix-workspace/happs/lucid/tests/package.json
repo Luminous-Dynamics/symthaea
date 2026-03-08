@@ -11,6 +11,9 @@
     "typecheck": "tsc --noEmit",
     "postinstall": "node -e \"const fs=require('fs');const p='node_modules/libsodium-wrappers/dist/modules-esm/libsodium.mjs';if(!fs.existsSync(p)){fs.symlinkSync('../../../libsodium/dist/modules-esm/libsodium.mjs',p)}\""
   },
+  "overrides": {
+    "esbuild": ">=0.25.0"
+  },
   "devDependencies": {
     "@holochain/client": "^0.20.0",
     "@holochain/tryorama": "^0.19.0",
