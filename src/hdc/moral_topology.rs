@@ -1081,7 +1081,7 @@ impl MoralTopology {
         // Feed observation to adaptive state if enabled
         if ac.adaptive_enabled {
             self.adaptive_state
-                .observe(drift, current_summary.moral_free_energy, ac);
+                .observe(drift, current_summary.moral_free_energy, &ac);
         }
 
         MoralAnomalyReport {
