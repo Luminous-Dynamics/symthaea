@@ -152,7 +152,9 @@ impl CognitiveLoopService {
         // PHASE 1.4: Foveation Dispatch (dorsal surprise → ventral recognition)
         // ═══════════════════════════════════════════════════════════════════════
         #[cfg(feature = "foveation")]
-        let fov_results: Vec<symthaea_foveation::FoveationResult> = {
+        let fov_results: Vec<symthaea_foveation::FoveationResult> = if !self.config.enable_foveation {
+            Vec::new()
+        } else {
             let mut collected = Vec::new();
             if let Some(ref fov_mutex) = self.foveation_manager {
                 if let Ok(mut fov) = fov_mutex.lock() {
@@ -195,6 +197,17 @@ impl CognitiveLoopService {
                     let now_us = self.start_time.elapsed().as_micros() as u64;
                     fov.tick(now_us);
                     collected = fov.drain_results();
+                    // Attention budget: cap dispatches per cycle
+                    let max = self.config.foveation_max_dispatches as usize;
+                    if collected.len() > max {
+                        // Keep the highest-confidence results
+                        collected.sort_by(|a, b| {
+                            b.confidence
+                                .partial_cmp(&a.confidence)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        });
+                        collected.truncate(max);
+                    }
                     for result in &collected {
                         tracing::debug!(
                             target: "cognitive_loop::foveation",

@@ -800,6 +800,12 @@ pub struct CycleMetadata {
     /// Mean trust across all tracked relationships (0.0–1.0).
     #[serde(default = "default_half_f32")]
     pub social_mean_trust: f32,
+    /// ToM prediction mismatch EMA (1 - accuracy, smoothed).
+    #[serde(default)]
+    pub tom_prediction_mismatch: f32,
+    /// Whether ToM mismatch triggered exploration this cycle.
+    #[serde(default)]
+    pub tom_exploration_triggered: bool,
 
     // ── Vision Manifold Telemetry ───────────────────────────────────────
     /// Vision manifold telemetry (None when vision-manifold feature disabled or not active).
@@ -911,6 +917,33 @@ pub struct CycleMetadata {
     /// MCE social embedding factor Soc (0.0–1.0).
     #[serde(default)]
     pub mce_social: f64,
+
+    // ── Session 9: Advanced Feedback Intelligence ────────────────────────
+    /// PE variance (E[X²]-E[X]²) used for confidence modulation.
+    /// High variance = unstable errors = extra dampening.
+    /// Science: Yu & Dayan (2005) — expected vs unexpected uncertainty.
+    #[serde(default)]
+    pub pe_variance: f32,
+    /// Whether feedback integration was frozen this cycle (dampening streak ≥3).
+    /// Science: Turrigiano (2008) — homeostatic synaptic silencing.
+    #[serde(default)]
+    pub feedback_frozen: bool,
+    /// Dominant source proposal concentration (fraction of total, 0.0–1.0).
+    #[serde(default)]
+    pub dominant_source_concentration: f32,
+    /// Whether compound instability was detected (agreement drop + rising errors).
+    /// Science: Friston (2010) — cascading precision failures.
+    #[serde(default)]
+    pub compound_instability: bool,
+    /// Whether flow-state feedback relaxation is active (wider dampening threshold).
+    /// Science: Csikszentmihalyi (1990) — reduced self-monitoring during flow.
+    #[serde(default)]
+    pub flow_feedback_relaxed: bool,
+    /// Homeostasis pull efficiency: ratio of post/pre distance to target.
+    /// <1.0 = pulls working, >1.0 = overcorrecting.
+    /// Science: Cannon (1929) — homeostatic regulation monitoring.
+    #[serde(default = "default_one_f32")]
+    pub homeostasis_efficiency: f32,
 }
 
 fn default_response_profile() -> String {
@@ -1033,6 +1066,15 @@ pub struct BrocaGenerationTelemetry {
     pub generation_time_us: u64,
     /// Whether generation was skipped due to low consciousness.
     pub consciousness_gated: bool,
+    /// Composite generation quality (0.0–1.0).
+    #[serde(default)]
+    pub quality: f32,
+    /// Long-window coherence from Mamba temporal context.
+    #[serde(default)]
+    pub long_coherence: f32,
+    /// Semantic prediction error (reconstruction accuracy).
+    #[serde(default)]
+    pub semantic_pe: f32,
 }
 
 /// Memory-resonator subsystem telemetry: dreams, codebook, replay.

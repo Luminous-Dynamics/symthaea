@@ -461,6 +461,9 @@ impl CognitiveLoopService {
         metadata.social_prediction_accuracy = self.social_mgr.social.social_prediction_accuracy;
         metadata.social_models_count = self.social_mgr.social.social_models_count;
         metadata.social_mean_trust = self.social_mgr.social.social_mean_trust;
+        metadata.tom_prediction_mismatch = self.stats.tom_prediction_mismatch_ema;
+        metadata.tom_exploration_triggered = self.stats.tom_prediction_mismatch_ema > 0.4
+            && self.stats.total_cycles > 10;
 
         // ── MCE factor telemetry (from consciousness carryover cache) ──
         metadata.mce_bottleneck = self.carryover.consciousness.mce_bottleneck_name.clone();
@@ -468,6 +471,20 @@ impl CognitiveLoopService {
         metadata.mce_weighted_sum = self.carryover.consciousness.mce_weighted_sum;
         metadata.mce_narrative = self.carryover.consciousness.mce_narrative;
         metadata.mce_social = self.carryover.consciousness.mce_social;
+
+        // ── Session 9: Advanced feedback intelligence telemetry (part 1) ──
+        metadata.pe_variance = {
+            let v = self.stats.avg_prediction_error_sq
+                - self.stats.avg_prediction_error * self.stats.avg_prediction_error;
+            v.max(0.0)
+        };
+        metadata.feedback_frozen = self.carryover.quality.consecutive_full_dampen >= 3;
+        metadata.compound_instability = feedback.quality.cross_module_agreement < 0.5
+            && perception.urgency.error_slope > 0.02
+            && self.stats.total_cycles > 30;
+        metadata.flow_feedback_relaxed = self.flow_state.in_flow
+            && self.flow_state.intensity > 0.5;
+        metadata.homeostasis_efficiency = self.carryover.quality.homeostasis_efficiency;
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
@@ -724,13 +741,61 @@ impl CognitiveLoopService {
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 
+        // Session 9 Item 3: Dominant source concentration → targeted dampening.
+        // If one subsystem contributes >60% of all proposals, dampen ALL channels
+        // by 20% toward cycle-start to prevent single-subsystem monopoly.
+        // Dehaene (2014): GWT prevents single-module monopoly via ignition competition.
+        let dominant_concentration = self.feedback_state.dominant_source_concentration();
+        if dominant_concentration > 0.6 && self.feedback_state.total_proposals() > 4 {
+            // Apply a mild Scale(0.97) to all channels from "anti_monopoly" source
+            self.feedback_state.confidence.propose("anti_monopoly", super::feedback_state::FeedbackProposal::Scale(0.97));
+            self.feedback_state.learning_rate.propose("anti_monopoly", super::feedback_state::FeedbackProposal::Scale(0.97));
+            self.feedback_state.exploration.propose("anti_monopoly", super::feedback_state::FeedbackProposal::Scale(0.97));
+            self.feedback_state.threshold.propose("anti_monopoly", super::feedback_state::FeedbackProposal::Scale(0.97));
+        }
+
+        // Session 9 telemetry (part 2 — after dominant_concentration computed)
+        metadata.dominant_source_concentration = dominant_concentration;
+
         // ── Phase 2.2: End feedback proposal collection ──────────────────
-        let feedback_consensus = self.feedback_state.end_cycle(
+        // Session 9: Pass dampening streak + flow state for adaptive integration.
+        let feedback_consensus = self.feedback_state.end_cycle_ext(
             self.prediction_confidence,
             self.fep.lr_boost,
             self.curiosity_drive.exploration_urge,
             self.carryover.learning.adaptive_threshold_scale,
+            self.carryover.quality.consecutive_full_dampen,
+            self.flow_state.in_flow,
+            self.flow_state.intensity,
         );
+        // Track dampening streak for next cycle
+        if self.feedback_state.feedback_dampened_count == 4 {
+            self.carryover.quality.consecutive_full_dampen += 1;
+        } else {
+            self.carryover.quality.consecutive_full_dampen = 0;
+        }
+
+        // Session 9 Item 8: Substrate tau → feedback integration rate.
+        // Fast substrates (tau < 1.0) apply consensus more aggressively;
+        // slow substrates (tau > 1.0) blend more gently with cycle-start values.
+        let feedback_consensus = if (self.substrate_manager.tau_factor - 1.0).abs() > 0.05 {
+            let tau = self.substrate_manager.tau_factor;
+            // Integration strength: tau=0.5 → 100% consensus, tau=2.0 → 50% consensus
+            let integration_rate = (1.0 / tau).clamp(0.5, 1.0) as f64;
+            let cs = &self.feedback_state;
+            super::feedback_state::ConsensusResult {
+                consensus_confidence: cs.cycle_start_confidence() * (1.0 - integration_rate)
+                    + feedback_consensus.consensus_confidence * integration_rate,
+                consensus_lr: cs.cycle_start_lr() * (1.0 - integration_rate)
+                    + feedback_consensus.consensus_lr * integration_rate,
+                consensus_exploration: cs.cycle_start_exploration() * (1.0 - integration_rate)
+                    + feedback_consensus.consensus_exploration * integration_rate,
+                consensus_threshold: cs.cycle_start_threshold() * (1.0 - integration_rate)
+                    + feedback_consensus.consensus_threshold * integration_rate,
+            }
+        } else {
+            feedback_consensus
+        };
 
         // Store consensus-smoothed values for application at the next cycle start.
         // Applied via helpers at next cycle start by `apply_pending_consensus`.

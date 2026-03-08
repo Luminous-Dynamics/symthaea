@@ -287,12 +287,19 @@ impl FeedbackState {
     ///
     /// Returns consensus-integrated values (averaged adds, geometric mean scales)
     /// for all 4 feedback variables.
-    pub fn end_cycle(
+    ///
+    /// `consecutive_full_dampen`: count from carryover (for streak-based freeze).
+    /// `in_flow`: whether the system is in flow state (for dampening relaxation).
+    /// `flow_intensity`: flow intensity (0.0–1.0) for threshold widening.
+    pub fn end_cycle_ext(
         &mut self,
         _current_confidence: f64,
         _current_lr: f64,
         _current_exploration: f64,
         _current_threshold: f64,
+        consecutive_full_dampen: u32,
+        in_flow: bool,
+        flow_intensity: f32,
     ) -> ConsensusResult {
         let base_confidence = self.cycle_start_confidence;
         let base_lr = self.cycle_start_lr;
@@ -322,14 +329,40 @@ impl FeedbackState {
         self.last_exploration_integration = Some(explore_result);
         self.last_threshold_integration = Some(thresh_result);
 
+        // Session 9 Item 2: Dampening streak freeze — if all 4 channels were dampened
+        // for 3+ consecutive cycles, freeze feedback to cycle-start values for 1 cycle.
+        // Science: Turrigiano (2008) — homeostatic plasticity includes brief synaptic silencing.
+        if consecutive_full_dampen >= 3 {
+            self.feedback_dampened_count = 0; // Reset streak by not dampening
+            self.last_consensus = Some(ConsensusResult {
+                consensus_confidence: base_confidence,
+                consensus_lr: base_lr,
+                consensus_exploration: base_exploration,
+                consensus_threshold: base_threshold,
+            });
+            return ConsensusResult {
+                consensus_confidence: base_confidence,
+                consensus_lr: base_lr,
+                consensus_exploration: base_exploration,
+                consensus_threshold: base_threshold,
+            };
+        }
+
         // Adaptive dampening: if consensus diverges too much from cycle-start on any
-        // channel, dampen toward cycle-start by 50%. Prevents feedback runaway.
+        // channel, dampen toward cycle-start. Prevents feedback runaway.
         // Kelso (1995): metastable dynamics resist abrupt transitions.
         //
-        // Item 3: If most channels were dampened last cycle (>2), tighten threshold
-        // from 30% to 20% — self-tightening prevents sustained runaway.
-        let divergence_threshold = if self.feedback_dampened_count > 2 { 0.2 } else { 0.3 };
-        // Item 2: Low signal diversity → extra dampening blend (60% toward start).
+        // Self-tightening: if most channels were dampened last cycle (>2), tighten threshold.
+        // Session 9 Item 5: Flow relaxation — during flow, widen threshold to 50%.
+        // Csikszentmihalyi (1990): flow requires reduced self-monitoring overhead.
+        let divergence_threshold = if in_flow && flow_intensity > 0.5 {
+            0.5 // Flow: trust the system's momentum
+        } else if self.feedback_dampened_count > 2 {
+            0.2 // Self-tightening after heavy dampening
+        } else {
+            0.3
+        };
+        // Low signal diversity → extra dampening blend (60% toward start).
         let diversity = self.signal_diversity();
         let blend_toward_start = if diversity < 0.3 { 0.6 } else { 0.5 };
         let mut dampened_count = 0u32;
@@ -338,10 +371,10 @@ impl FeedbackState {
                 return consensus_val;
             }
             let ratio = (consensus_val - start_val).abs() / start_val.abs().max(0.1);
-            if ratio > divergence_threshold as f64 {
+            if ratio > divergence_threshold {
                 *count += 1;
-                consensus_val * (1.0 - blend_toward_start as f64)
-                    + start_val * blend_toward_start as f64
+                consensus_val * (1.0 - blend_toward_start)
+                    + start_val * blend_toward_start
             } else {
                 consensus_val
             }
@@ -357,6 +390,31 @@ impl FeedbackState {
         self.last_consensus = Some(consensus);
 
         consensus
+    }
+
+    /// Cycle-start confidence snapshot.
+    pub fn cycle_start_confidence(&self) -> f64 { self.cycle_start_confidence }
+    /// Cycle-start LR snapshot.
+    pub fn cycle_start_lr(&self) -> f64 { self.cycle_start_lr }
+    /// Cycle-start exploration snapshot.
+    pub fn cycle_start_exploration(&self) -> f64 { self.cycle_start_exploration }
+    /// Cycle-start threshold snapshot.
+    pub fn cycle_start_threshold(&self) -> f64 { self.cycle_start_threshold }
+
+    /// Backwards-compatible `end_cycle` for tests — delegates to `end_cycle_ext`
+    /// with no streak/flow context.
+    #[cfg(test)]
+    pub fn end_cycle(
+        &mut self,
+        current_confidence: f64,
+        current_lr: f64,
+        current_exploration: f64,
+        current_threshold: f64,
+    ) -> ConsensusResult {
+        self.end_cycle_ext(
+            current_confidence, current_lr, current_exploration, current_threshold,
+            0, false, 0.0,
+        )
     }
 
     /// Record cycle-start values for consensus computation.
@@ -425,6 +483,27 @@ impl FeedbackState {
             }
         }
         counts.iter().max_by_key(|(_, c)| *c).map(|(s, _)| *s).unwrap_or("")
+    }
+
+    /// Fraction of total proposals contributed by the dominant source.
+    /// Returns (concentration, source_name). 0.0 if no proposals.
+    pub fn dominant_source_concentration(&self) -> f32 {
+        let total = self.total_proposals();
+        if total == 0 {
+            return 0.0;
+        }
+        let mut counts: Vec<(&'static str, usize)> = Vec::new();
+        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+            for ap in collector.proposals() {
+                if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == ap.source) {
+                    entry.1 += 1;
+                } else {
+                    counts.push((ap.source, 1));
+                }
+            }
+        }
+        let max_count = counts.iter().map(|(_, c)| *c).max().unwrap_or(0);
+        max_count as f32 / total as f32
     }
 
     /// Feedback signal diversity: unique sources / total proposals.
