@@ -66,7 +66,7 @@ fn main() {
         crisis: bool,
     }
 
-    let segments = [
+    let drone_segments = [
         Segment {
             filename: "s01_intro.wav",
             text: "Two drones. Same physics. Different minds.",
@@ -123,8 +123,49 @@ fn main() {
         },
     ];
 
+    // Dashboard narration segments (hero video 21s-41s, NOT muxed into drone video)
+    let dashboard_segments = [
+        Segment {
+            filename: "s07_dashboard_intro.wav",
+            text: "Consciousness emerges from the math. Watch it rise.",
+            valence: 0.1,
+            arousal: 0.3,
+            consciousness: 0.75,
+            delay_ms: 0, // Not used for drone video mux
+            crisis: false,
+        },
+        Segment {
+            filename: "s08_dashboard_stress.wav",
+            text: "Moral stress fractures unity. The neuromodulators respond.",
+            valence: -0.3,
+            arousal: 0.6,
+            consciousness: 0.85,
+            delay_ms: 0,
+            crisis: true,
+        },
+        Segment {
+            filename: "s09_dashboard_peak.wav",
+            text: "Consciousness peaks. Not programmed. Measured.",
+            valence: 0.2,
+            arousal: 0.5,
+            consciousness: 0.9,
+            delay_ms: 0,
+            crisis: false,
+        },
+        Segment {
+            filename: "s10_dashboard_recovery.wav",
+            text: "Recovery. The system returns to baseline. Ready for the next crisis.",
+            valence: 0.3,
+            arousal: 0.2,
+            consciousness: 0.7,
+            delay_ms: 0,
+            crisis: false,
+        },
+    ];
+
     // ── Synthesize each segment ─────────────────────────────────
-    for seg in &segments {
+    // Synthesize ALL segments (drone + dashboard), but only drone segments get muxed
+    for seg in drone_segments.iter().chain(dashboard_segments.iter()) {
         voice.set_cognitive_state(VoiceCognitiveState {
             emotional_valence: seg.valence,
             emotional_arousal: seg.arousal,
@@ -191,8 +232,10 @@ fn main() {
     let heartbeat_status = Command::new("ffmpeg")
         .arg("-y")
         .args([
-            "-f", "lavfi",
-            "-i", &format!("aevalsrc='{heartbeat_expr}':s=44100:d={video_duration_s}"),
+            "-f",
+            "lavfi",
+            "-i",
+            &format!("aevalsrc='{heartbeat_expr}':s=44100:d={video_duration_s}"),
             heartbeat_path.to_string_lossy().as_ref(),
         ])
         .output();
@@ -225,7 +268,7 @@ fn main() {
     let mut filter_parts = Vec::new();
     let mut valid_count = 0;
 
-    for seg in &segments {
+    for seg in &drone_segments {
         let path = audio_dir.join(seg.filename);
         if path.exists() {
             inputs.push("-i".to_string());
@@ -358,6 +401,7 @@ fn main() {
         }
     }
 
+    println!("Dashboard narration segments also generated (for hero video).");
     println!();
     println!("Narration segments preserved in: {}", audio_dir.display());
 }
