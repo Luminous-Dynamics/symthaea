@@ -1083,4 +1083,148 @@ mod tests {
         assert_eq!(app.memory_history.len(), 1);
         assert!((app.memory_history[0] - 55.0).abs() < 1e-6);
     }
+
+    #[test]
+    fn test_apply_daemon_snapshot_alerts_populated() {
+        let mut app = App::new(true);
+        let snap = DaemonSnapshot {
+            version: ipc::SNAPSHOT_VERSION,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            alerts: vec![ipc::AlertEntry {
+                metric: "disk_used_pct".into(),
+                current_value: 85.0,
+                predicted_value: 95.0,
+                hours_ahead: 6.0,
+                threshold: 90.0,
+                confidence: 0.8,
+                recommended_action: Some("nix-collect-garbage -d".into()),
+                severity: ipc::AlertSeverity::Warning,
+                first_seen: 1700000000,
+                last_seen: 1700000100,
+                consecutive_cycles: 3,
+                prev_predicted_value: Some(93.0),
+                journal_context: vec!["disk nearly full".into()],
+            }],
+            support_status: Some("Warning".into()),
+            recommendation_count: 2,
+            watchdog_status: Some("monitoring".into()),
+            prediction_accuracy: Some(4.5),
+            ..DaemonSnapshot::test_default()
+        };
+
+        app.apply_daemon_snapshot(&snap);
+
+        // Alerts should be populated from snapshot
+        assert_eq!(app.alerts.active_alerts.len(), 1);
+        assert_eq!(app.alerts.active_alerts[0].metric, "disk_used_pct");
+        assert_eq!(app.alerts.support_status.as_deref(), Some("Warning"));
+        assert_eq!(app.alerts.recommendation_count, 2);
+        assert_eq!(app.alerts.watchdog_status.as_deref(), Some("monitoring"));
+        assert_eq!(app.alerts.prediction_accuracy, Some(4.5));
+    }
+
+    #[test]
+    fn test_apply_daemon_snapshot_mae_history_tracks() {
+        let mut app = App::new(true);
+
+        // Apply 3 snapshots with different MAE values
+        for mae in [5.0, 4.0, 3.0] {
+            let snap = DaemonSnapshot {
+                prediction_accuracy: Some(mae),
+                ..DaemonSnapshot::test_default()
+            };
+            app.apply_daemon_snapshot(&snap);
+        }
+
+        assert_eq!(app.mae_history.len(), 3);
+        assert!((app.mae_history[0] - 5.0).abs() < 1e-6);
+        assert!((app.mae_history[2] - 3.0).abs() < 1e-6);
+        assert_eq!(app.alerts.prediction_mae_history.len(), 3);
+    }
+
+    #[test]
+    fn test_apply_daemon_snapshot_mae_history_bounded() {
+        let mut app = App::new(true);
+
+        // Apply 25 snapshots — history should be capped at 20
+        for i in 0..25 {
+            let snap = DaemonSnapshot {
+                prediction_accuracy: Some(i as f64),
+                ..DaemonSnapshot::test_default()
+            };
+            app.apply_daemon_snapshot(&snap);
+        }
+
+        assert_eq!(app.mae_history.len(), 20);
+        // Oldest entries should have been dropped
+        assert!((app.mae_history[0] - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_apply_daemon_snapshot_causal_edges_and_anomalies() {
+        let mut app = App::new(true);
+        let snap = DaemonSnapshot {
+            top_causal_edges: vec![ipc::CausalEdgeEntry {
+                from: "services.nginx".into(),
+                to: "networking.firewall".into(),
+                confidence: 0.85,
+            }],
+            recent_anomalies: vec![ipc::AnomalyEntry {
+                score: 0.7,
+                reason: "Service crashed".into(),
+                unit: "myapp.service".into(),
+                error_type: Some("crash".into()),
+                suggestion: Some("Restart myapp".into()),
+            }],
+            ..DaemonSnapshot::test_default()
+        };
+
+        app.apply_daemon_snapshot(&snap);
+
+        // Should have causal edge + anomaly appended
+        assert_eq!(app.causal_links.len(), 2);
+        assert_eq!(app.causal_links[0].from, "services.nginx");
+        assert_eq!(app.causal_links[0].relationship, "causal");
+        assert_eq!(app.causal_links[1].from, "myapp.service");
+        assert_eq!(app.causal_links[1].relationship, "anomaly");
+        assert_eq!(app.causal_links[1].suggestion.as_deref(), Some("Restart myapp"));
+    }
+
+    #[test]
+    fn test_apply_daemon_snapshot_health_fields() {
+        let mut app = App::new(true);
+        let snap = DaemonSnapshot {
+            anomaly_count: 3,
+            memory_used_percent: Some(72.5),
+            load_average_1m: Some(2.1),
+            swap_used_percent: Some(15.0),
+            ..DaemonSnapshot::test_default()
+        };
+
+        app.apply_daemon_snapshot(&snap);
+
+        assert_eq!(app.health.services_failed, 3);
+        assert_eq!(app.health.memory_used_percent, Some(72.5));
+        assert_eq!(app.health.load_average_1m, Some(2.1));
+        assert_eq!(app.health.swap_used_percent, Some(15.0));
+    }
+
+    #[test]
+    fn test_apply_daemon_snapshot_fe_history_tracks() {
+        let mut app = App::new(true);
+
+        for fe in [0.1, 0.3, 0.5] {
+            let snap = DaemonSnapshot {
+                free_energy: fe,
+                ..DaemonSnapshot::test_default()
+            };
+            app.apply_daemon_snapshot(&snap);
+        }
+
+        assert_eq!(app.fe_history.len(), 3);
+        assert!((app.fe_history[2] - 0.5).abs() < 1e-6);
+    }
 }

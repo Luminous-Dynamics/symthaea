@@ -18,6 +18,7 @@ use symthaea_nix::ipc::{
     default_snapshot_path, AlertEntry, AlertSeverity, AnomalyEntry, CausalEdgeEntry, ConcernEntry,
     DaemonConfig, DaemonSnapshot,
 };
+use symthaea_nix::mind::active_inference::NixActiveInference;
 use symthaea_nix::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
 use symthaea_nix::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
 use symthaea_nix::mind::ollama_bridge::{OllamaBridge, OllamaBridgeConfig};
@@ -25,11 +26,10 @@ use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
 use symthaea_nix::mind::{JournalAnomalyDetector, NixWorldModel};
 use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::observe::SystemObserver;
+use symthaea_nix::plugin::domain_plugin::NixOsPlugin;
 use symthaea_nix::support::health_check::{HealthAssessor, HealthStatus};
 use symthaea_nix::support::knowledge::{DynamicKnowledgeArticle, KnowledgeBase, KnowledgeCategory};
 use symthaea_nix::support::poml::{PomlContext, PomlProcessor, PomlValue};
-use symthaea_nix::mind::active_inference::NixActiveInference;
-use symthaea_nix::plugin::domain_plugin::NixOsPlugin;
 use symthaea_nix::support::predictive::{
     AlertThresholds, PredictiveMonitor, SavedPredictiveState, SystemTelemetry,
 };
@@ -136,12 +136,7 @@ impl DaemonState {
     }
 
     /// Learn from a resolved anomaly by creating a dynamic knowledge article.
-    fn learn_from_resolution(
-        &mut self,
-        symptom: &str,
-        resolution: &str,
-        commands: Vec<String>,
-    ) {
+    fn learn_from_resolution(&mut self, symptom: &str, resolution: &str, commands: Vec<String>) {
         let kb = match self.knowledge_base.as_mut() {
             Some(kb) => kb,
             None => return,
@@ -235,7 +230,10 @@ impl DaemonState {
         for (key, from, to) in recoveries {
             self.learn_from_resolution(
                 &format!("{} service failure", key),
-                &format!("Service {} recovered automatically ({} → {})", key, from, to),
+                &format!(
+                    "Service {} recovered automatically ({} → {})",
+                    key, from, to
+                ),
                 vec![format!("systemctl status {}", key)],
             );
         }
@@ -271,11 +269,7 @@ impl DaemonState {
         let telemetry = Self::build_telemetry(hw.as_ref(), &snapshot);
         let mem_pct = telemetry.memory_used_pct;
         self.predictive_monitor.ingest(telemetry);
-        self.last_memory_pct = if mem_pct > 0.0 {
-            Some(mem_pct)
-        } else {
-            None
-        };
+        self.last_memory_pct = if mem_pct > 0.0 { Some(mem_pct) } else { None };
 
         // Feed the state to the active inference engine
         self.active_inference.observe_state(state_hv.clone());
@@ -572,7 +566,8 @@ impl DaemonState {
 
         // Record predictions for accuracy tracking (AP)
         let predictions_for_tracking = self.predictive_monitor.predict_all_horizons();
-        self.predictive_monitor.record_predictions(&predictions_for_tracking);
+        self.predictive_monitor
+            .record_predictions(&predictions_for_tracking);
 
         // Active inference: formulate maintenance goals (AO)
         self.run_active_inference_plans(&alerts);
@@ -597,9 +592,10 @@ impl DaemonState {
             hierarchy_errors,
             free_energy: self.world_model.free_energy(),
             is_surprised: self.world_model.free_energy() > 0.3,
-            drift_similarity: self.prev_state_hv.as_ref().map_or(1.0, |prev| {
-                self.world_model.system_state().similarity(prev)
-            }),
+            drift_similarity: self
+                .prev_state_hv
+                .as_ref()
+                .map_or(1.0, |prev| self.world_model.system_state().similarity(prev)),
             causal_edge_count: self.causal_graph.edge_count(),
             episodic_count: self.episodic_memory.len(),
             concerns,
@@ -652,8 +648,8 @@ fn detect_transitions(
     for (name, after_state) in &after.services {
         if let Some(before_state) = before_services.get(name.as_str()) {
             if *before_state != after_state {
-                let is_recovery = **before_state == ServiceState::Failed
-                    && *after_state != ServiceState::Failed;
+                let is_recovery =
+                    **before_state == ServiceState::Failed && *after_state != ServiceState::Failed;
                 transitions.push(StateTransition {
                     key: name.clone(),
                     from: format!("{:?}", before_state),
@@ -720,10 +716,7 @@ fn anomaly_matches_metric(anomaly: &AnomalyEntry, metric: &str) -> bool {
                 || reason_lower.contains("cpu")
                 || reason_lower.contains("overload")
         }
-        "swap_used_pct" => {
-            reason_lower.contains("swap")
-                || reason_lower.contains("paging")
-        }
+        "swap_used_pct" => reason_lower.contains("swap") || reason_lower.contains("paging"),
         _ => false,
     }
 }
@@ -757,8 +750,7 @@ fn build_anomaly_prompt(unit: &str, reason: &str, message: &str) -> String {
         .is_ok()
     {
         let mut ctx = PomlContext::default();
-        ctx.variables
-            .insert("unit".into(), PomlValue::from(unit));
+        ctx.variables.insert("unit".into(), PomlValue::from(unit));
         ctx.variables
             .insert("reason".into(), PomlValue::from(reason));
         ctx.variables
@@ -859,7 +851,11 @@ fn main() -> ! {
         let available = ollama.check_available();
         eprintln!(
             "  Ollama: {} (endpoint: {}, model: {})",
-            if available { "available" } else { "unavailable" },
+            if available {
+                "available"
+            } else {
+                "unavailable"
+            },
             config.ollama_endpoint,
             config.ollama_model,
         );
@@ -1053,7 +1049,10 @@ mod tests {
 
         // Second call should have higher consecutive_cycles
         for a2 in &alerts2 {
-            if let Some(a1) = alerts1.iter().find(|a| a.metric == a2.metric && a.hours_ahead == a2.hours_ahead) {
+            if let Some(a1) = alerts1
+                .iter()
+                .find(|a| a.metric == a2.metric && a.hours_ahead == a2.hours_ahead)
+            {
                 assert!(
                     a2.consecutive_cycles >= a1.consecutive_cycles,
                     "Consecutive cycles should increase"
@@ -1085,7 +1084,10 @@ mod tests {
             journal_context: vec![],
         }];
         state.run_active_inference_plans(&alerts);
-        assert_eq!(state.maintenance_plan_count, 0, "1-cycle alert should not trigger plan");
+        assert_eq!(
+            state.maintenance_plan_count, 0,
+            "1-cycle alert should not trigger plan"
+        );
     }
 
     #[test]
@@ -1144,7 +1146,10 @@ mod tests {
             error_type: None,
             suggestion: None,
         };
-        assert!(anomaly_matches_metric(&service_anomaly, "failed_unit_count"));
+        assert!(anomaly_matches_metric(
+            &service_anomaly,
+            "failed_unit_count"
+        ));
     }
 
     #[test]
