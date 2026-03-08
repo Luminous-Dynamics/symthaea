@@ -506,6 +506,20 @@ impl FeedbackState {
         max_count as f32 / total as f32
     }
 
+    /// Count distinct source names across all 4 channels.
+    /// Science: Dehaene (2014) — healthy cognition requires multi-source consensus.
+    pub fn distinct_source_count(&self) -> usize {
+        let mut seen: Vec<&'static str> = Vec::with_capacity(16);
+        for collector in [&self.confidence, &self.learning_rate, &self.exploration, &self.threshold] {
+            for ap in collector.proposals() {
+                if !seen.contains(&ap.source) {
+                    seen.push(ap.source);
+                }
+            }
+        }
+        seen.len()
+    }
+
     /// Feedback signal diversity: unique sources / total proposals.
     /// High diversity (>0.7) = many subsystems contributing = healthy.
     /// Low diversity (<0.3) = few subsystems dominating = potential bias.

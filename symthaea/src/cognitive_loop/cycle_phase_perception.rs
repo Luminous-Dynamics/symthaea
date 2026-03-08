@@ -198,7 +198,11 @@ impl CognitiveLoopService {
                     fov.tick(now_us);
                     collected = fov.drain_results();
                     // Attention budget: cap dispatches per cycle
-                    let max = self.config.foveation_max_dispatches as usize;
+                    // Substrate speed scaling: faster substrates afford more dispatches
+                    let tau_scale = self.substrate_manager.tau_factor.max(0.5);
+                    let max = ((self.config.foveation_max_dispatches as f32) * tau_scale)
+                        .round()
+                        .max(1.0) as usize;
                     if collected.len() > max {
                         // Keep the highest-confidence results
                         collected.sort_by(|a, b| {
