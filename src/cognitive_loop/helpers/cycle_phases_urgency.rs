@@ -353,6 +353,47 @@ impl CognitiveLoopService {
             self.scale_lr("error_oscillation", osc_dampen.max(0.9));
         }
 
+        // Session 10 Item 5: Error pattern → predictive learning rate.
+        // Rising errors → increase LR (faster adaptation needed);
+        // Falling → slow down (converging); Oscillating → dampen (meta-uncertainty).
+        // Science: Schultz (2016) — error trend direction predicts optimal plasticity level.
+        {
+            use super::super::thresholds::{
+                ERROR_PATTERN_RISING_LR, ERROR_PATTERN_FALLING_LR, ERROR_PATTERN_OSCILLATING_LR,
+            };
+            match error_pattern {
+                "Rising" | "Spike" => {
+                    self.scale_lr("error_pattern_rising", ERROR_PATTERN_RISING_LR);
+                }
+                "Falling" => {
+                    self.scale_lr("error_pattern_falling", ERROR_PATTERN_FALLING_LR);
+                }
+                "Oscillating" => {
+                    self.scale_lr("error_pattern_oscillating", ERROR_PATTERN_OSCILLATING_LR);
+                }
+                _ => {} // Stable / Warmup — no change
+            }
+        }
+
+        // Session 10 Item 7: Mode stability → adaptive hysteresis relaxation.
+        // After sustained stability (>20 cycles in same mode), gradually relax hysteresis
+        // toward baseline, permitting smoother future transitions.
+        // Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
+        {
+            use super::super::thresholds::{
+                HYSTERESIS_RELAXATION_THRESHOLD, HYSTERESIS_RELAXATION_RATE,
+                HYSTERESIS_RELAXATION_FLOOR,
+            };
+            if self.carryover.urgency.mode_stability_counter > HYSTERESIS_RELAXATION_THRESHOLD {
+                self.carryover.quality.hysteresis_factor = (self.carryover.quality.hysteresis_factor
+                    * HYSTERESIS_RELAXATION_RATE)
+                    .max(HYSTERESIS_RELAXATION_FLOOR);
+            } else if self.carryover.urgency.mode_stability_counter == 0 {
+                // Mode just changed — reset hysteresis to full
+                self.carryover.quality.hysteresis_factor = 1.0;
+            }
+        }
+
         UrgencyResult {
             urgency,
             error_pattern,

@@ -211,6 +211,7 @@ pub(super) struct FbQuality {
     pub(super) dissipative_entropy_rate: f64,
     pub(super) dissipative_lr_factor: f32,
     pub(super) coherence_velocity: f32,
+    pub(super) agreement_confidence_coupling: bool,
 }
 
 /// Consciousness engine and pipeline metrics.
