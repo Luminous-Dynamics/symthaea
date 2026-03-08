@@ -100,6 +100,7 @@
 //! | Full learn cycle | ~1ms | Including Φ measurement |
 
 pub mod assessment;
+pub mod code_curriculum;
 pub mod curriculum;
 #[cfg(feature = "web_research_module")]
 pub mod curriculum_extender;
