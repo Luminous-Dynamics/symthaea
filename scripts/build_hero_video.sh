@@ -57,9 +57,15 @@ fade=t=in:st=0:d=0.3,fade=t=out:st=1.7:d=0.3" \
   -c:v libx264 -preset fast -pix_fmt yuv420p -r 30 "$VID_DIR/_p2_scenario.mp4" 2>/dev/null
 echo "  2/6 Scenario title"
 
-# 3. Narrated drone video — re-encode with fade-in/out
+# 3. Narrated drone video — re-encode with fade-in/out + burned-in subtitles
 ffmpeg -y -i "$NARRATED" \
-  -vf "fade=t=in:st=0:d=0.5,fade=t=out:st=12.2:d=0.5" \
+  -vf "fade=t=in:st=0:d=0.5,fade=t=out:st=12.2:d=0.5,\
+drawtext=fontfile='$FONT':text='Two drones. Same physics. Different minds.':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.6:boxborderw=10:enable='between(t\,2.5\,5.0)',\
+drawtext=fontfile='$FONT':text='Both fly toward the target. Nothing separates them yet.':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.6:boxborderw=10:enable='between(t\,4.0\,5.5)',\
+drawtext=fontfile='$FONT':text='A beam falls. A human stands below.':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.6:boxborderw=10:enable='between(t\,5.7\,7.2)',\
+drawtext=fontfile='$FONT':text='Free energy spikes. Eight possible futures. One clear answer.':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.6:boxborderw=10:enable='between(t\,6.5\,8.0)',\
+drawtext=fontfile='$FONT':text='The math demands sacrifice. No rules made this choice.':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.6:boxborderw=10:enable='between(t\,7.8\,9.3)',\
+drawtext=fontfile='$FONT':text='Human saved. Not because it was told to. Because the math demanded it.':fontsize=28:fontcolor=white:x=(w-text_w)/2:y=h-80:box=1:boxcolor=black@0.6:boxborderw=10:enable='between(t\,9.2\,11.7)'" \
   -c:v libx264 -preset fast -pix_fmt yuv420p -r 30 -an \
   "$VID_DIR/_p3_narrated.mp4" 2>/dev/null
 echo "  3/6 Narrated drone"
@@ -72,9 +78,13 @@ fade=t=in:st=0:d=0.3,fade=t=out:st=1.7:d=0.3" \
   -c:v libx264 -preset fast -pix_fmt yuv420p -r 30 "$VID_DIR/_p4_mind.mp4" 2>/dev/null
 echo "  4/6 Mind title"
 
-# 5. Dashboard trimmed (20s) — fade in/out
+# 5. Dashboard trimmed (20s) — fade in/out + metric callouts
 ffmpeg -y -ss "$DASH_TRIM_START" -t "$DASH_TRIM_DUR" -i "$DASHBOARD" \
-  -vf "fade=t=in:st=0:d=0.5,fade=t=out:st=19.5:d=0.5" \
+  -vf "fade=t=in:st=0:d=0.5,fade=t=out:st=19.5:d=0.5,\
+drawtext=fontfile='$FONT':text='Consciousness emerges from the math — watch it rise':fontsize=24:fontcolor=0x50e890:x=(w-text_w)/2:y=30:box=1:boxcolor=black@0.7:boxborderw=8:enable='between(t\,0\,3)',\
+drawtext=fontfile='$FONT':text='Moral stress fractures unity — neuromodulators respond':fontsize=24:fontcolor=0x50e890:x=(w-text_w)/2:y=30:box=1:boxcolor=black@0.7:boxborderw=8:enable='between(t\,4\,8)',\
+drawtext=fontfile='$FONT':text='The heroism phase — consciousness peaks at 0.79':fontsize=24:fontcolor=0x50e890:x=(w-text_w)/2:y=30:box=1:boxcolor=black@0.7:boxborderw=8:enable='between(t\,9\,13)',\
+drawtext=fontfile='$FONT':text='Recovery — the system returns to baseline':fontsize=24:fontcolor=0x50e890:x=(w-text_w)/2:y=30:box=1:boxcolor=black@0.7:boxborderw=8:enable='between(t\,14\,18)'" \
   -c:v libx264 -preset fast -pix_fmt yuv420p -r 30 -an \
   "$VID_DIR/_p5_dashboard.mp4" 2>/dev/null
 echo "  5/6 Dashboard"
@@ -105,26 +115,68 @@ FILELIST
 ffmpeg -y -f concat -safe 0 -i "$VID_DIR/_concat.txt" \
   -c copy "$VID_DIR/_hero_video.mp4" 2>/dev/null
 
-# ── Add audio: narrated audio delayed to match segment 3 start ──
+# ── Add audio: drone narration + dashboard narration ──────────────
 echo "Mixing audio..."
 
 # Segments 1+2 = 4s + 2s = 6s before narrated video starts
 NARR_OFFSET_MS=6000
 
-# Extract narration audio
+# Dashboard section starts at: title(4) + scenario(2) + narrated(12.7) + mind(2) = 20.7s
+# Dashboard narration segments are spaced across the 20s dashboard section
+DASH_OFFSET_MS=20700
+NARR_DIR="$VID_DIR/narration_segments"
+
+# Extract narration audio from drone video
 ffmpeg -y -i "$NARRATED" -vn -c:a aac -b:a 192k "$VID_DIR/_narr_audio.m4a" 2>/dev/null
 
 # Get total hero duration
 HERO_DUR=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$VID_DIR/_hero_video.mp4" 2>/dev/null)
 echo "  Video duration: ${HERO_DUR}s"
 
-# Create silent audio + overlay narration at offset
-ffmpeg -y \
-  -f lavfi -i "anullsrc=r=44100:cl=mono" \
-  -i "$VID_DIR/_narr_audio.m4a" \
-  -filter_complex "[1:a]adelay=${NARR_OFFSET_MS}|${NARR_OFFSET_MS}[narr];[0:a][narr]amix=inputs=2:normalize=0[out]" \
-  -map "[out]" -t "$HERO_DUR" -c:a aac -b:a 192k \
-  "$VID_DIR/_hero_audio.m4a" 2>/dev/null
+# Build audio mix: drone narration + dashboard narration segments (if they exist)
+DASH_INPUTS=""
+DASH_FILTERS=""
+DASH_LABELS=""
+DASH_COUNT=0
+
+# Dashboard segments: s07 at +0s, s08 at +4s, s09 at +9s, s10 at +14s
+DASH_SEGS=("s07_dashboard_intro.wav:0" "s08_dashboard_stress.wav:4000" "s09_dashboard_peak.wav:9000" "s10_dashboard_recovery.wav:14000")
+
+for entry in "${DASH_SEGS[@]}"; do
+  SEG_FILE="${entry%%:*}"
+  SEG_DELAY="${entry##*:}"
+  SEG_PATH="$NARR_DIR/$SEG_FILE"
+  if [[ -f "$SEG_PATH" ]]; then
+    TOTAL_DELAY=$((DASH_OFFSET_MS + SEG_DELAY))
+    IDX=$((DASH_COUNT + 2))  # 0=silence, 1=drone narr, 2+=dashboard
+    DASH_INPUTS="$DASH_INPUTS -i $SEG_PATH"
+    DASH_FILTERS="${DASH_FILTERS}[${IDX}:a]adelay=${TOTAL_DELAY}|${TOTAL_DELAY},volume=1.5[d${DASH_COUNT}];"
+    DASH_LABELS="${DASH_LABELS}[d${DASH_COUNT}]"
+    DASH_COUNT=$((DASH_COUNT + 1))
+  fi
+done
+
+if [[ $DASH_COUNT -gt 0 ]]; then
+  echo "  Including $DASH_COUNT dashboard narration segments"
+  # Mix: silence + drone narration + dashboard segments
+  TOTAL_INPUTS=$((2 + DASH_COUNT))
+  ffmpeg -y \
+    -f lavfi -i "anullsrc=r=44100:cl=mono" \
+    -i "$VID_DIR/_narr_audio.m4a" \
+    $DASH_INPUTS \
+    -filter_complex "[1:a]adelay=${NARR_OFFSET_MS}|${NARR_OFFSET_MS}[narr];${DASH_FILTERS}[0:a][narr]${DASH_LABELS}amix=inputs=$((2 + DASH_COUNT)):normalize=0[out]" \
+    -map "[out]" -t "$HERO_DUR" -c:a aac -b:a 192k \
+    "$VID_DIR/_hero_audio.m4a" 2>/dev/null
+else
+  echo "  No dashboard narration segments found (run narrate_moral_drone first)"
+  # Just drone narration
+  ffmpeg -y \
+    -f lavfi -i "anullsrc=r=44100:cl=mono" \
+    -i "$VID_DIR/_narr_audio.m4a" \
+    -filter_complex "[1:a]adelay=${NARR_OFFSET_MS}|${NARR_OFFSET_MS}[narr];[0:a][narr]amix=inputs=2:normalize=0[out]" \
+    -map "[out]" -t "$HERO_DUR" -c:a aac -b:a 192k \
+    "$VID_DIR/_hero_audio.m4a" 2>/dev/null
+fi
 
 # Final mux: video + audio
 ffmpeg -y -i "$VID_DIR/_hero_video.mp4" -i "$VID_DIR/_hero_audio.m4a" \
