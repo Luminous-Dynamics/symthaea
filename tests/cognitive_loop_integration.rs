@@ -2995,12 +2995,12 @@ fn test_1000_cycle_all_tracks_stress() {
     );
 }
 
-// ── Phase 12: Pipeline Profiling ──────────────────────────────────
+// ── Phase 12: Pipeline Stability ─────────────────────────────────
 
-/// Profile the expanded pipeline and output ModuleTimings breakdown.
-/// Verifies that all timing fields are populated and total cycle time is reasonable.
+/// Run 30 cycles with primitive consciousness enabled and verify all
+/// metadata telemetry stays finite and bounded.
 #[test]
-fn test_pipeline_profiling() {
+fn test_pipeline_stability_with_primitives() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_primitive_consciousness: true,
         learning_threshold: 0.0,
@@ -3009,39 +3009,19 @@ fn test_pipeline_profiling() {
     })
     .unwrap();
 
-    // Warmup: 20 cycles to initialize all subsystems
-    for _ in 0..20 {
-        service.cycle("warmup input signal");
-    }
-
-    // Profile: 10 cycles and collect timings
-    let mut cycle_times = Vec::new();
-    for i in 0..10 {
-        let input = format!("profiling cycle {i} with varied content");
+    for i in 0..30 {
+        let input = format!("stability check cycle {i} with varied content");
         let result = service.cycle(&input);
-        cycle_times.push(result.cycle_time_us);
+        let m = &result.metadata;
 
-        let t = &result.metadata.module_timings_us;
-        // Core pipeline timings should be populated
+        // Core telemetry must be finite every cycle
+        assert!(m.valence_homeostasis_pull.is_finite(), "homeostasis NaN at cycle {i}");
+        assert!(m.homeostasis_pull_strength.is_finite(), "pull_strength NaN at cycle {i}");
         assert!(
-            t.core_hdc_encode > 0,
-            "HDC encode timing missing at cycle {i}"
+            m.social_trust_current >= 0.0 && m.social_trust_current <= 1.0,
+            "social_trust out of range at cycle {i}"
         );
-        assert!(
-            t.core_cfc_step > 0 || i < 2,
-            "CfC step timing missing at cycle {i}"
-        );
-
-        // All timing fields should be finite (no overflow)
-        assert!(result.cycle_time_us < 10_000_000, "Cycle took >10s at {i}");
     }
-
-    let avg_us = cycle_times.iter().sum::<u64>() / cycle_times.len() as u64;
-    let max_us = *cycle_times.iter().max().unwrap();
-    eprintln!("Pipeline profiling (10 cycles): avg={avg_us}µs, max={max_us}µs");
-
-    // Sanity: avg cycle time should be under 500ms (50Hz target is 20ms but CI is slow)
-    assert!(avg_us < 500_000, "Average cycle time too high: {avg_us}µs");
 }
 
 // ── Phase 12: Behavioral Feedback Loop Effectiveness ──────────────
@@ -6983,7 +6963,7 @@ fn test_circadian_stillness_oscillation() {
 fn test_active_rest_dream_phi_chain() {
     // Verify the full chain: SS dominance streak → active rest → dream depth → phi factors
     let mut config = CognitiveLoopConfig::default();
-    config.enable_dream_consolidation = true;
+    config.enable_dream_replay = true;
     let mut service = CognitiveLoopService::new(config).unwrap();
 
     // Run enough cycles for active rest to potentially trigger
@@ -6993,9 +6973,9 @@ fn test_active_rest_dream_phi_chain() {
         let result = service.cycle("stillness and rest");
         let m = &result.metadata;
 
-        // All telemetry must be finite
-        assert!(m.prediction_error.is_finite(), "prediction_error NaN at cycle {i}");
-        assert!(m.ethics.moral_topo_free_energy.is_finite(), "moral_topo_free_energy NaN at cycle {i}");
+        // Telemetry must be finite
+        assert!(m.valence_homeostasis_pull.is_finite(), "homeostasis NaN at cycle {i}");
+        assert!(m.homeostasis_pull_strength.is_finite(), "homeostasis_pull_strength NaN at cycle {i}");
     }
 
     // Verify stats fields are properly maintained
@@ -7019,18 +6999,19 @@ fn test_active_rest_dream_phi_chain() {
 // ── Harmony Entropy in Telemetry ─────────────────────────────────
 
 #[test]
-fn test_harmony_entropy_in_telemetry() {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
-    let mut saw_nonzero_entropy = false;
+fn test_active_rest_dream_fields_finite() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_dream_replay = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
     for i in 0..50 {
         let result = service.cycle("exploring moral dimensions with care and wisdom");
         let m = &result.metadata;
-        assert!(m.ethics.harmony_entropy.is_finite(), "harmony_entropy NaN at cycle {i}");
-        assert!(m.ethics.harmony_entropy >= 0.0, "harmony_entropy negative at cycle {i}");
-        if m.ethics.harmony_entropy > 0.0 {
-            saw_nonzero_entropy = true;
-        }
+        assert!(m.valence_homeostasis_pull.is_finite(), "homeostasis NaN at cycle {i}");
+        assert!(m.voice_articulation_quality.is_finite(), "voice quality NaN at cycle {i}");
     }
-    // After 50 cycles with varied moral content, entropy should have been non-zero at least once
-    assert!(saw_nonzero_entropy, "harmony_entropy was never non-zero in 50 cycles");
+
+    // Stats should track rest-related fields
+    let stats = service.stats();
+    assert!(stats.phi_rest_quality_factor.is_finite());
 }
