@@ -232,6 +232,23 @@ impl CognitiveLoopService {
         self.substrate_manager.energy_throughput_multiplier
     }
 
+    /// Get feasibility for a specific cortical region (falls back to global).
+    pub fn region_feasibility(
+        &self,
+        region: symthaea_core::hdc::substrate_independence::CorticalRegion,
+    ) -> f32 {
+        self.substrate_manager.region_feasibility(region)
+    }
+
+    /// Assign a substrate type to a specific cortical region.
+    pub fn reconfigure_region(
+        &mut self,
+        region: symthaea_core::hdc::substrate_independence::CorticalRegion,
+        substrate: symthaea_core::hdc::substrate_independence::SubstrateType,
+    ) {
+        self.substrate_manager.reconfigure_region(region, substrate);
+    }
+
     /// Inject Pareto context from a GuidedDesignExplorer into the physics bridge.
     /// The context is drained into telemetry on the next cycle.
     #[cfg(feature = "physics-bridge")]
