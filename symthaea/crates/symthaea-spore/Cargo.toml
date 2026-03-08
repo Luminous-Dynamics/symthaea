@@ -1,0 +1,28 @@
+[package]
+name = "symthaea-spore"
+version = "0.1.0"
+edition = "2021"
+description = "Symthaea Spore: WASM consciousness kernel (~500KB) for browser, edge, and embedded"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core", default-features = false }
+symthaea-consciousness-equation = { path = "../symthaea-consciousness-equation" }
+symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
+symthaea-types = { path = "../symthaea-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# WASM bindings (optional — rlib builds skip this)
+wasm-bindgen = { version = "0.2", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+
+# getrandom WASM support
+getrandom = { version = "0.2", features = ["js"], optional = true }
+
+[features]
+default = []
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:getrandom"]
