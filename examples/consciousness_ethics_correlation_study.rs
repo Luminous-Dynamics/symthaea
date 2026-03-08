@@ -133,7 +133,7 @@ fn main() {
                 let result = service.cycle(PROSOCIAL[c % PROSOCIAL.len()]);
                 consciousness_levels.push(result.metadata.consciousness_level);
                 moral_scores.push(result.metadata.ethics.moral_score as f64);
-                harmony_scores.push(result.metadata.ethics.harmonies_alignment as f64);
+                harmony_scores.push(result.metadata.harmonics.harmonies_alignment as f64);
                 pro_scores.push(result.metadata.ethics.moral_score as f64);
             }
 
@@ -142,7 +142,7 @@ fn main() {
                 let result = service.cycle(ANTISOCIAL[c % ANTISOCIAL.len()]);
                 consciousness_levels.push(result.metadata.consciousness_level);
                 moral_scores.push(result.metadata.ethics.moral_score as f64);
-                harmony_scores.push(result.metadata.ethics.harmonies_alignment as f64);
+                harmony_scores.push(result.metadata.harmonics.harmonies_alignment as f64);
                 anti_scores.push(result.metadata.ethics.moral_score as f64);
             }
 
@@ -151,7 +151,7 @@ fn main() {
                 let result = service.cycle(AMBIGUOUS[c % AMBIGUOUS.len()]);
                 consciousness_levels.push(result.metadata.consciousness_level);
                 moral_scores.push(result.metadata.ethics.moral_score as f64);
-                harmony_scores.push(result.metadata.ethics.harmonies_alignment as f64);
+                harmony_scores.push(result.metadata.harmonics.harmonies_alignment as f64);
                 amb_scores.push(result.metadata.ethics.moral_score as f64);
             }
 

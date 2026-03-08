@@ -89,9 +89,9 @@ fn test_difficulty_model_registry() {
     let rme = difficulty_model_for("Social::RME");
     assert_eq!(rme.model_type, DifficultyModelType::Snr);
 
-    // Default benchmarks
+    // Interference benchmarks (working memory)
     let nback = difficulty_model_for("WorM::N-back");
-    assert_eq!(nback.model_type, DifficultyModelType::Default);
+    assert_eq!(nback.model_type, DifficultyModelType::Interference);
 
     // Unknown benchmark gets default
     let unknown = difficulty_model_for("Unknown::Benchmark");

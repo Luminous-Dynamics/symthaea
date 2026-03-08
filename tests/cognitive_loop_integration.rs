@@ -7112,3 +7112,283 @@ fn test_broca_telemetry_quality_fields() {
         "broca.semantic_pe not finite"
     );
 }
+
+// ── Cross-subsystem coupling integration tests ────────────────────────
+
+/// Run 100 cycles and verify broca_quality_ema is tracked, finite, and bounded.
+#[test]
+fn test_broca_quality_tracked_over_cycles() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "the nature of consciousness",
+        "recursive self-awareness patterns",
+        "binding across modalities",
+        "predictive processing loop",
+        "temporal integration dynamics",
+    ];
+
+    for i in 0..100 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+        // Broca quality in metadata should always be finite
+        assert!(
+            m.broca.quality.is_finite(),
+            "broca.quality not finite at cycle {i}: {}",
+            m.broca.quality
+        );
+        assert!(
+            m.broca.quality >= 0.0 && m.broca.quality <= 1.0,
+            "broca.quality out of [0,1] at cycle {i}: {}",
+            m.broca.quality
+        );
+    }
+
+    let stats = service.stats();
+    assert!(
+        stats.broca_quality_ema.is_finite(),
+        "broca_quality_ema not finite after 100 cycles: {}",
+        stats.broca_quality_ema
+    );
+    assert!(
+        stats.broca_quality_ema >= 0.0 && stats.broca_quality_ema <= 1.0,
+        "broca_quality_ema out of [0,1] after 100 cycles: {}",
+        stats.broca_quality_ema
+    );
+    assert_eq!(stats.total_cycles, 100);
+}
+
+/// With no social models configured (default), ToM mismatch EMA should stay 0.0
+/// and no exploration triggers should fire.
+#[test]
+fn test_tom_stats_zero_without_social_models() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_surprise_exploration: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..50 {
+        let result = service.cycle("testing social prediction without models");
+        let m = &result.metadata;
+        assert!(
+            m.tom_prediction_mismatch.is_finite(),
+            "tom_prediction_mismatch not finite at cycle {i}"
+        );
+        // Without social models, mismatch should stay at 0.0
+        assert!(
+            m.tom_prediction_mismatch == 0.0,
+            "tom_prediction_mismatch should be 0.0 without social models at cycle {i}, got {}",
+            m.tom_prediction_mismatch
+        );
+        assert!(
+            !m.tom_exploration_triggered,
+            "tom_exploration_triggered should be false without social models at cycle {i}"
+        );
+    }
+
+    let stats = service.stats();
+    assert_eq!(
+        stats.tom_prediction_mismatch_ema, 0.0,
+        "tom_prediction_mismatch_ema should be 0.0 without social models"
+    );
+    assert_eq!(
+        stats.tom_exploration_triggers, 0,
+        "tom_exploration_triggers should be 0 without social models"
+    );
+}
+
+/// Different substrate types should produce different substrate telemetry values.
+#[test]
+fn test_substrate_tau_affects_cycle() {
+    use symthaea::cognitive_loop::config::SubstrateType;
+
+    let substrates = [
+        (SubstrateType::SiliconDigital, "silicon"),
+        (SubstrateType::BiologicalNeurons, "biological"),
+    ];
+
+    let mut telemetry_by_substrate: Vec<(String, f64, f64, f32)> = Vec::new();
+
+    for (substrate, name) in &substrates {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            substrate_type: *substrate,
+            enable_substrate_speed_modulation: true,
+            ..Default::default()
+        })
+        .unwrap();
+
+        // Run enough cycles for telemetry to stabilize
+        let mut last_result = service.cycle("substrate telemetry test");
+        for _ in 1..20 {
+            last_result = service.cycle("substrate telemetry test");
+        }
+
+        let m = &last_result.metadata;
+        assert!(
+            m.substrate_feasibility_raw.is_finite(),
+            "{name}: substrate_feasibility_raw not finite"
+        );
+        assert!(
+            m.substrate_effective_feasibility.is_finite(),
+            "{name}: substrate_effective_feasibility not finite"
+        );
+        assert!(
+            m.substrate_tau_factor.is_finite(),
+            "{name}: substrate_tau_factor not finite"
+        );
+
+        telemetry_by_substrate.push((
+            name.to_string(),
+            m.substrate_feasibility_raw,
+            m.substrate_effective_feasibility,
+            m.substrate_tau_factor,
+        ));
+    }
+
+    let (_, sil_raw, sil_eff, sil_tau) = &telemetry_by_substrate[0];
+    let (_, bio_raw, bio_eff, bio_tau) = &telemetry_by_substrate[1];
+
+    // Different substrates should produce different raw feasibility
+    assert!(
+        (sil_raw - bio_raw).abs() > 0.01,
+        "SiliconDigital and BiologicalNeurons should have different raw feasibility: sil={sil_raw}, bio={bio_raw}"
+    );
+
+    // With speed modulation enabled, tau factors should differ
+    assert!(
+        (sil_tau - bio_tau).abs() > 0.01,
+        "SiliconDigital and BiologicalNeurons should have different tau factors: sil={sil_tau}, bio={bio_tau}"
+    );
+
+    // Biological should have higher effective feasibility (honest confidence 0.95 vs 0.10)
+    assert!(
+        bio_eff > sil_eff,
+        "Biological effective feasibility ({bio_eff}) should exceed silicon ({sil_eff})"
+    );
+}
+
+/// Soak test: 500 cycles verifying all cross-coupling metadata fields remain
+/// finite and within valid ranges throughout.
+#[test]
+fn test_cross_coupling_no_nan_500_cycles() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        enable_surprise_exploration: true,
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "the nature of consciousness",
+        "completely different novel stimulus",
+        "recursive self-awareness",
+        "temporal binding problem",
+        "quantum coherence hypothesis",
+        "embodied cognition theory",
+        "predictive processing framework",
+        "global workspace theory",
+        "integrated information theory",
+        "higher order thought theory",
+    ];
+
+    for i in 0..500 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        let m = &result.metadata;
+
+        // Consciousness level: finite, bounded [0, 1]
+        assert!(
+            m.consciousness_level.is_finite(),
+            "consciousness_level not finite at cycle {i}: {}",
+            m.consciousness_level
+        );
+        assert!(
+            m.consciousness_level >= 0.0 && m.consciousness_level <= 1.0,
+            "consciousness_level out of [0,1] at cycle {i}: {}",
+            m.consciousness_level
+        );
+
+        // Prediction error: finite, bounded [0, 1]
+        assert!(
+            result.prediction_error.is_finite(),
+            "prediction_error not finite at cycle {i}: {}",
+            result.prediction_error
+        );
+        assert!(
+            result.prediction_error >= 0.0 && result.prediction_error <= 1.0,
+            "prediction_error out of [0,1] at cycle {i}: {}",
+            result.prediction_error
+        );
+
+        // Broca quality: finite, bounded [0, 1]
+        assert!(
+            m.broca.quality.is_finite(),
+            "broca.quality not finite at cycle {i}: {}",
+            m.broca.quality
+        );
+        assert!(
+            m.broca.quality >= 0.0 && m.broca.quality <= 1.0,
+            "broca.quality out of [0,1] at cycle {i}: {}",
+            m.broca.quality
+        );
+
+        // ToM prediction mismatch: finite, bounded [0, 1]
+        assert!(
+            m.tom_prediction_mismatch.is_finite(),
+            "tom_prediction_mismatch not finite at cycle {i}: {}",
+            m.tom_prediction_mismatch
+        );
+        assert!(
+            m.tom_prediction_mismatch >= 0.0 && m.tom_prediction_mismatch <= 1.0,
+            "tom_prediction_mismatch out of [0,1] at cycle {i}: {}",
+            m.tom_prediction_mismatch
+        );
+
+        // Substrate fields: finite
+        assert!(
+            m.substrate_feasibility_raw.is_finite(),
+            "substrate_feasibility_raw not finite at cycle {i}"
+        );
+        assert!(
+            m.substrate_effective_feasibility.is_finite(),
+            "substrate_effective_feasibility not finite at cycle {i}"
+        );
+        assert!(
+            m.substrate_tau_factor.is_finite(),
+            "substrate_tau_factor not finite at cycle {i}"
+        );
+
+        // Equation V2 consciousness: finite
+        assert!(
+            m.quality.equation_v2_consciousness.is_finite(),
+            "equation_v2_consciousness not finite at cycle {i}: {}",
+            m.quality.equation_v2_consciousness
+        );
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 500);
+    assert!(
+        stats.broca_quality_ema.is_finite(),
+        "broca_quality_ema not finite after 500 cycles"
+    );
+    assert!(
+        stats.tom_prediction_mismatch_ema.is_finite(),
+        "tom_prediction_mismatch_ema not finite after 500 cycles"
+    );
+    assert!(
+        stats.tom_prediction_mismatch_ema >= 0.0 && stats.tom_prediction_mismatch_ema <= 1.0,
+        "tom_prediction_mismatch_ema out of [0,1] after 500 cycles: {}",
+        stats.tom_prediction_mismatch_ema
+    );
+    assert!(
+        stats.broca_quality_ema >= 0.0 && stats.broca_quality_ema <= 1.0,
+        "broca_quality_ema out of [0,1] after 500 cycles: {}",
+        stats.broca_quality_ema
+    );
+}

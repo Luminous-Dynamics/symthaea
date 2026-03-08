@@ -8,11 +8,11 @@ Based on comprehensive review of all subsystems (March 6, 2026).
 | Layer | Score | What Works | What's Missing |
 |-------|-------|-----------|----------------|
 | Code Perception | 7/10 | Tree-sitter (Rust/Python/Nix), CodeHDEncoder (16,384D), CodebaseMemory, NL intent extraction + signature inference | No dataflow/CFG, types are string labels |
-| Code Planning | 7/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine with 5 code actions, multi-entity detection, algorithm pattern templates (6 patterns, HDC-based) | No deep code reasoning yet |
-| Code Generation | 7/10 | ~55+ Rust + ~25 Python native patterns; LLM fallback; composition inference; auto-generated tests; multi-entity struct+impl+methods; import inference; real code modification (6 transform types); 59-case benchmark 100% | Complex algorithms still need LLM; no SSM distillation |
-| Code Verification | 7/10 | CodeVerifier, tree-sitter, CodeExecutor (compile+test), 3-attempt retry with semantic auto-fix + error feedback, test-first generation, LLM roundtrip verified, 59-case benchmark | No property-based test generation |
-| Language Output | 7/10 | LLM Organ translates StructuredThought; CodeContext populated in Phase 3.6; LLM completion verified via Ollama roundtrip | — |
-| Learning | 8/10 | FEP surprise → LR boost, School lookahead, episodic code cache (32 entries), HDC-similarity top-3 retrieval, error pattern memory (64-entry) | No SSM distillation yet |
+| Code Planning | 8/10 | CfCCodeSequencer, MCTS planner (2,118 LOC), reasoning engine with 5 code actions, multi-entity detection, algorithm pattern templates (6 patterns, HDC-based), algorithm constraint injection | No deep code reasoning yet |
+| Code Generation | 8/10 | ~55+ Rust + ~25 Python native patterns; LLM fallback with structured prompts; composition inference; property + example tests; multi-entity struct+impl+methods; import inference; real code modification (6 transform types); 59-case benchmark 100% | Complex algorithms still need LLM; no SSM distillation |
+| Code Verification | 8/10 | CodeVerifier, tree-sitter, CodeExecutor (compile+test), 3-attempt retry with semantic auto-fix + error feedback, test-first generation with property-based invariants, LLM roundtrip verified, 59-case benchmark | Property tests not yet used for proptest fuzzing |
+| Language Output | 8/10 | LLM Organ translates StructuredThought; CodeContext populated in Phase 3.6; structured prompt assembly (5 sections); LLM completion verified via Ollama roundtrip; enhanced explanation pipeline (3 depths) | — |
+| Learning | 8/10 | FEP surprise → LR boost, School lookahead + code curricula (2 tracks, 20+5 objectives), episodic code cache (32 entries), HDC-similarity top-3 retrieval, error pattern memory (64-entry) | No SSM distillation yet |
 
 ### Key Discovery: The Plumbing Exists
 
@@ -627,6 +627,54 @@ HDC-based algorithm pattern detection using ContinuousHV cosine similarity:
 - `benchmark_advanced_rust`: 9 advanced Rust patterns (Option/Result handling, closures, iterators, generics)
 - `benchmark_regression_summary`: Aggregate pass rate across all categories, asserts ≥80% overall
 - Total benchmark: 59 cases across 8 categories
+
+## Phase 3i: Property Tests + Explanation + Structured Prompts + Curriculum Wiring — DONE (2026-03-08)
+
+**Status**: COMPLETE. 4 improvements pushing toward 8/10 with deeper test coverage and better LLM integration.
+
+### 3i.1 Property-Based Test Generation
+
+**File**: `src/language/emitters.rs` — `generate_property_tests()`
+
+Generates algebraic invariant tests alongside example-based tests:
+- **Sorting**: idempotency (`sort(sort(v)) == sort(v)`) + length preservation
+- **Reverse**: involution (`reverse(reverse(x)) == x`) for strings and vectors
+- **Filter**: size reduction (`filter(v).len() <= v.len()`)
+- **Arithmetic**: commutativity (`f(a,b) == f(b,a)`) + identity elements (`f(x,0)==x`)
+- **Absolute value**: non-negativity + symmetry (`|x| == |-x|`)
+- **String case**: length preservation for uppercase/lowercase
+- **Map/transform**: length preservation for element-wise transforms
+
+Wired into `code_generator.rs:generate_tests_only()` as `test_property_N` tests alongside `test_auto_N`.
+6 unit tests verifying property generation.
+
+### 3i.2 Enhanced Code Explanation Pipeline
+
+**File**: `src/language/code_generator.rs` — `generate_explanation()` rewritten
+
+Three depth levels with real structural analysis:
+- **Brief**: one-liner entity description
+- **Standard**: structure + location + HDC similarity search for related patterns
+- **Detailed**: full breakdown with algorithm pattern detection (HDC-based), complexity hints by entity kind (Function/Struct/Trait/TraitImpl/Enum), related pattern count, Phi integration score
+
+### 3i.3 Curriculum Wiring
+
+**File**: `src/school/curriculum.rs` — `CurriculumType::CodeGeneration` and `CurriculumType::CodeGenerationAdvanced`
+
+Added two new curriculum types to the School system's `CurriculumType` enum. `Curriculum::builtin()` dispatches to `code_generation_curriculum()` (20 objectives across 4 tiers) and `code_generation_advanced_curriculum()` from `code_curriculum.rs`. 16 existing curriculum tests pass.
+
+### 3i.4 Structured LLM Prompt Assembly
+
+**File**: `src/symthaea.rs` — Phase 3.6 notes assembly
+
+When `needs_llm` is true, notes are organized into clear labeled sections:
+1. **CONSTRAINTS** — from spec + algorithm detection
+2. **ERROR_AVOIDANCE** — learned from past compilation failures
+3. **SIMILAR_EXAMPLE** — best HDC cosine match from generation cache
+4. **EXPECTED_TESTS** — behavioral oracle from test-first generation
+5. **OUTPUT_FORMAT** — explicit instructions for LLM (replace `todo!()`, preserve signature, minimal code)
+
+Non-LLM path gets flat `AVOID_ERROR` notes only.
 
 ---
 

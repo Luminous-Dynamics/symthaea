@@ -94,7 +94,7 @@ impl MeshBridgeHandle {
         let alive = Arc::new(AtomicBool::new(true));
 
         #[cfg(feature = "mesh-encryption")]
-        let shared_key: SharedEncryptionKey = Arc::new(std::sync::Mutex::new(None));
+        let shared_key: SharedEncryptionKey = Arc::new(parking_lot::Mutex::new(None));
         #[cfg(feature = "mesh-encryption")]
         let shared_epoch: SharedEpoch = Arc::new(std::sync::atomic::AtomicU8::new(0));
         #[cfg(feature = "mesh-encryption")]

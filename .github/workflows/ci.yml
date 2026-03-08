@@ -418,6 +418,34 @@ jobs:
       - name: Check feature combination ${{ matrix.features }}
         run: cargo check --features "${{ matrix.features }}"
 
+  wasm-compat:
+    name: WASM Compatibility (Spore)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain + wasm32 target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+
+      - name: Check symthaea-core compiles for wasm32 (no parallel)
+        run: cargo check -p symthaea-core --target wasm32-unknown-unknown --no-default-features --features simd
+
+      - name: Check symthaea-spore compiles for wasm32
+        run: cargo check -p symthaea-spore --target wasm32-unknown-unknown
+
   deny:
     name: Dependency Audit (cargo-deny)
     runs-on: ubuntu-latest
@@ -523,6 +551,7 @@ jobs:
           - symthaea-sensorimotor
           - symthaea-factor-graph
           - symthaea-exploration
+          - symthaea-spore
     steps:
       - uses: actions/checkout@v4
 

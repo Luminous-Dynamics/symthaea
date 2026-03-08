@@ -212,7 +212,7 @@ fn main() {
         pareto_ctx.best_analogy_score * 100.0,
     );
 
-    // Inject into cognitive loop (if you have one)
+    // Inject into cognitive loop
     let mut config = symthaea::cognitive_loop::CognitiveLoopConfig::default();
     config.enable_physics_bridge = true;
     config.physics_bridge_query_interval = 5;
