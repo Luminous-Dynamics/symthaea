@@ -533,7 +533,7 @@ impl CodeHealthScanner {
     fn generate_suggestions(
         &self,
         issues: &[HealthIssue],
-        factors: &HealthFactors,
+        _factors: &HealthFactors,
     ) -> Vec<HealthSuggestion> {
         let mut suggestions = Vec::new();
 
