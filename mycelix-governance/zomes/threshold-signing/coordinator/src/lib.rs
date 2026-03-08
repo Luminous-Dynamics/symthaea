@@ -2426,6 +2426,8 @@ mod tests {
 
         // Verify EK sizes match what the integrity zome validates (1184 bytes)
         assert_eq!(kp1.encapsulation_key_bytes().len(), 1184);
+        assert_eq!(kp2.encapsulation_key_bytes().len(), 1184);
+        assert_eq!(kp3.encapsulation_key_bytes().len(), 1184);
 
         // Generate a real deal
         let dealer = Dealer::new(ParticipantId(1), 2, 3, &mut OsRng).unwrap();
