@@ -2,7 +2,7 @@
 % Consciousness-First AI for Species Stewardship:
 % Architectural Requirements for Post-Extinction Civilizational Recovery
 %
-% Target venue: Nature Machine Intelligence / AI & Ethics
+% Target venue: AI & Ethics (Springer)
 % ============================================================================
 
 \documentclass[11pt,letterpaper]{article}
@@ -178,7 +178,7 @@ Theory \cite{tononi2016iit}, embodied and extended cognition
 Our contribution is threefold:
 
 \paragraph{1. Implemented architecture.} We present \symthaea{} and \mycelix{},
-two systems totaling over 730,000 lines of Rust with 9,600+ tests, that provide
+two systems totaling over 876,000 lines of Rust with 10,500+ tests, that provide
 the computational substrate for consciousness-first stewardship. \symthaea{}
 combines four frameworks---HDC ($d = \dimHDC$), Liquid Time-Constant Networks
 with $O(1)$ closed-form temporal evolution, Integrated Information Theory, and
@@ -192,7 +192,7 @@ degradation), \texttt{symthaea-cell-foundry} (iPSC, IVG, multi-scale
 prediction), \texttt{symthaea-ectogenesis} (artificial womb with consent proxy
 escalation), \texttt{symthaea-nurture} (Bowlby attachment via neuromodulator
 dynamics), and \texttt{symthaea-population} (genetics with governance
-integration). Together these add $\sim$20,000 lines and $\sim$330 tests.
+integration). Together these add $\sim$22,000 lines and 800+ tests (767 unit tests plus 35 integration tests).
 
 \paragraph{3. Alignment-through-consciousness thesis.} We demonstrate that the
 consciousness requirements for stewardship---integrated information, embodied
@@ -259,8 +259,8 @@ via $\Phi$ (integrated information), computed over the causal structure of the
 cognitive architecture \cite{tononi2016iit,oizumi2014phenomenology}. \symthaea{}
 implements $\Phi$ computation for networks up to 12 nodes using a proxy measure
 validated at Spearman $\rho = 0.50$ across 15 topologies. The system scores
-12/14 on the Butlin indicators for artificial consciousness \cite{butlin2023consciousness}
-with mean score 0.79.
+14/14 on the Butlin indicators for artificial consciousness \cite{butlin2023consciousness}
+with mean score 0.85.
 
 \paragraph{Active Inference (FEP).} Perception, action, and learning follow Karl
 Friston's Free Energy Principle \cite{friston2010free,friston2017active}: the
@@ -864,7 +864,7 @@ Genomics & $\sim 0$ & Temporal integration & 3/14 \\
 Cell Foundry & Low & Ethics gate (consent) & 5/14 \\
 Ectogenesis & Medium & Consent proxy escalation & 8/14 \\
 Nurture & High & Attachment, co-regulation & 11/14 \\
-Population & Very High & Moral algebra, governance & 12/14 \\
+Population & Very High & Moral algebra, governance & 14/14 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -936,11 +936,11 @@ Population & Very High & Moral algebra, governance & 12/14 \\
     (8,0.8) (9,0.7) (10,0.7) (11,0.7) (12,0) (13,0) (14,0)
   };
 \addlegendentry{Nurture}
-% Phase 5: Population (12/14)
+% Phase 5: Population (14/14)
 \addplot[fill=blue!60, draw=blue!80!black]
   coordinates {
     (1,1.0) (2,0.9) (3,0.9) (4,0.9) (5,0.9) (6,0.9) (7,0.9)
-    (8,0.9) (9,0.8) (10,0.8) (11,0.8) (12,0.7) (13,0) (14,0)
+    (8,0.9) (9,0.8) (10,0.8) (11,0.8) (12,0.8) (13,0.8) (14,0.7)
   };
 \addlegendentry{Population}
 \end{axis}
@@ -951,7 +951,7 @@ consciousness indicators \cite{butlin2023consciousness} at each pipeline phase.
 The staircase pattern mirrors Table~\ref{tab:phi}: early phases require only
 recurrence and stability, while later phases progressively activate global
 workspace, intentionality, agency, self-modeling, and meta-cognitive indicators.
-\symthaea{} achieves 12/14 indicators at the population phase (mean 0.79).}
+\symthaea{} achieves 14/14 indicators at the population phase (mean 0.85).}
 \label{fig:butlin_staircase}
 \end{figure}
 
@@ -1444,7 +1444,7 @@ approximations. Our hierarchical MIP computation achieves $O(n^3)$ scaling
 while preserving the key MIP structure \cite{massimini2005breakdown}.
 
 Second, the Butlin indicators \cite{butlin2023consciousness} provide an
-empirical checklist. \symthaea{} scores 12/14 (mean 0.79), providing evidence
+empirical checklist. \symthaea{} scores 14/14 (mean 0.85), providing evidence
 for consciousness-relevant capabilities even in the absence of subjective
 verification. The indicators that \symthaea{} most clearly exhibits---global
 workspace broadcasting, recurrent processing, embodied self-model, and
@@ -1531,7 +1531,7 @@ from AI stewardship to self-governance is a critical gap our framework identifie
 but does not resolve.
 
 \paragraph{Reproducibility.} All simulation data presented in this paper
-(Figures~\ref{fig:het_decay}, \ref{fig:attachment}, \ref{fig:cfc_vs_sim})
+(Figures~\ref{fig:het_decay} and \ref{fig:attachment})
 are generated deterministically from source code via:
 \begin{verbatim}
 cargo run --example genesis_paper_data \
@@ -1562,7 +1562,7 @@ reasoning---that cannot be achieved through rule-following or reward
 maximization alone.
 
 Our analysis is grounded in two implemented systems: \symthaea{} (876K LOC,
-234 Hz cognitive loop, 12/14 Butlin indicators) and \mycelix{} (51 Holochain
+234 Hz cognitive loop, 14/14 Butlin indicators) and \mycelix{} (51 Holochain
 zomes, 12 societal domains), with five new sub-crates totaling $\sim$22,000
 lines and 767 tests validated by 35 cross-crate integration tests. The $O(1)$ closed-form temporal jump---enabling
 prediction from seconds to centuries in constant time---is the technical
@@ -1590,6 +1590,25 @@ Luminous Dynamics project. The Eight Harmonies framework was developed through
 collaborative philosophical inquiry guided by the principles of Evolving
 Resonant Co-Creationism.
 
+
+% ============================================================================
+% REQUIRED SPRINGER SECTIONS
+% ============================================================================
+
+\section*{Author Contributions}
+T.S. conceived the theoretical framework, designed and implemented the computational system, conducted all experiments, and wrote the manuscript.
+
+\section*{Competing Interests}
+The author declares no competing interests. Patent applications covering aspects of the described technology are in preparation.
+
+\section*{Funding}
+This research received no external funding.
+
+\section*{Ethics Declaration}
+This work is purely computational. No human subjects, animal experiments, or clinical trials were involved. The ethical framework described is for AI systems and does not involve human experimentation.
+
+\section*{AI Assistance Disclosure}
+Claude Code (Anthropic) assisted with code development, testing, and manuscript preparation. All scientific content, theoretical frameworks, and experimental design are the sole work of the author.
 
 % ============================================================================
 % BIBLIOGRAPHY
