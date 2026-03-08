@@ -151,6 +151,7 @@ impl StrategicFepAgent {
         self.reference_state = reference;
     }
 
+    /// Compute free energy between observed state and reference.
     pub fn compute_free_energy(&self, observed: &ContinuousHV) -> f64 {
         let sim = observed.similarity(&self.reference_state) as f64;
         if !sim.is_finite() {
@@ -159,6 +160,7 @@ impl StrategicFepAgent {
         (1.0 - sim).max(0.0)
     }
 
+    /// Select strategic action based on observed free energy.
     pub fn select_action(&self, observed: &ContinuousHV) -> StrategicFepAction {
         let fe = self.compute_free_energy(observed);
         if fe > 0.7 {

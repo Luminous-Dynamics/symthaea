@@ -134,10 +134,7 @@ impl BSPNode {
         let (mut f, mut b, mut c) = (Vec::new(), Vec::new(), Vec::new());
         for tri in &tris {
             let s = plane.classify_tri(tri);
-            let (hf, hb) = (
-                s.iter().any(|x| *x == Side::Front),
-                s.iter().any(|x| *x == Side::Back),
-            );
+            let (hf, hb) = (s.contains(&Side::Front), s.contains(&Side::Back));
             if !hf && !hb {
                 c.push(tri.clone());
             } else if !hb {
@@ -166,10 +163,7 @@ impl BSPNode {
                 let (mut ft, mut bt) = (Vec::new(), Vec::new());
                 for tri in tris {
                     let s = plane.classify_tri(tri);
-                    let (hf, hb) = (
-                        s.iter().any(|x| *x == Side::Front),
-                        s.iter().any(|x| *x == Side::Back),
-                    );
+                    let (hf, hb) = (s.contains(&Side::Front), s.contains(&Side::Back));
                     if !hf && !hb {
                         ft.push(tri.clone());
                         bt.push(tri.clone());
