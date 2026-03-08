@@ -258,7 +258,7 @@ impl EthicsEngine {
                 ..Default::default()
             },
             shared_basis.clone(),
-            anomaly_config,
+            anomaly_config.clone(),
         );
 
         // Share basis with HarmoniesIntegrator only when dimensions match.
@@ -273,6 +273,7 @@ impl EthicsEngine {
 
         let interaction_matrix = HarmonyInteractionMatrix::from_basis(&shared_basis);
 
+        let initial_cadence = anomaly_config.initial_cadence;
         Self {
             moral_parser,
             moral_algebra,
@@ -282,6 +283,7 @@ impl EthicsEngine {
             interaction_matrix,
             cache: EthicsEngineCache {
                 last_harmonies_approved: true,
+                topology_cadence: initial_cadence,
                 ..Default::default()
             },
         }
