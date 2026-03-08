@@ -23,11 +23,11 @@
 
 | ID | Short Name | Status | IDD Path | Lines | Claims | Priority Date | Provisional # | Utility # | Notes |
 |----|-----------|--------|----------|-------|--------|---------------|---------------|-----------|-------|
-| P-001 | HDC-LTC Unified Neuron | IDD_COMPLETE | `tier-1/P-001_hdc-ltc-neuron/IDD.md` | 469 | 15 | -- | -- | -- | Strongest patent. File before Liquid AI publishes similar work. |
-| P-002 | Moral Algebra | IDD_COMPLETE | `tier-1/P-002_moral-algebra/IDD.md` | 563 | 15 | -- | -- | -- | High commercial demand (AI safety). File before HAI paper. |
-| P-003 | LTC Vocal Tract Synthesis | IDD_COMPLETE | `tier-1/P-003_ltc-vocal-tract/IDD.md` | 586 | 15 | -- | -- | -- | Real-time TTS market. LS refinement algorithm is key claim. |
-| P-004 | Consciousness Equation V2 | IDD_COMPLETE | `tier-1/P-004_consciousness-equation/IDD.md` | 513 | 13 | -- | -- | -- | Multi-theory unification. File before PLoS paper. |
-| P-005 | Consciousness-Aware FL | IDD_COMPLETE | `tier-1/P-005_consciousness-fl/IDD.md` | 471 | 14 | -- | -- | -- | Byzantine tolerance results. File before Mycelix production. |
+| P-001 | HDC-LTC Unified Neuron | IDD_COMPLETE | `tier-1/P-001_hdc-ltc-neuron/IDD.md` | 476 | 17 | -- | -- | -- | Strongest patent. Broad claims 16-17 (D≥100, no SIMD). Grace: 2027-02-05. |
+| P-002 | Moral Algebra | IDD_COMPLETE | `tier-1/P-002_moral-algebra/IDD.md` | 574 | 16 | -- | -- | -- | AI safety demand. Broad claim 16 (role-count agnostic). Grace: 2027-02-07. |
+| P-003 | LTC Vocal Tract Synthesis | IDD_COMPLETE | `tier-1/P-003_ltc-vocal-tract/IDD.md` | 607 | 17 | -- | -- | -- | Domain-agnostic LS refinement claim. MCD clarified. Grace: 2027-02-23. |
+| P-004 | Consciousness Equation V2 | IDD_COMPLETE | `tier-1/P-004_consciousness-equation/IDD.md` | 535 | 16 | -- | -- | -- | Theory-agnostic + AV/healthcare embodiments for 101 defense. Grace: 2027-02-05. |
+| P-005 | Consciousness-Aware FL | IDD_COMPLETE | `tier-1/P-005_consciousness-fl/IDD.md` | 491 | 16 | -- | -- | -- | Quality-aware FL + adaptive detection. Grace: 2027-02-05. |
 
 ## Tier 2: File Within 6 Months
 
@@ -72,7 +72,11 @@
 ## Key Dates
 | Event | Date | Impact |
 |-------|------|--------|
-| IDDs drafted | 2026-03-05 | All 5 Tier 1 IDDs complete (2,602 lines, 72 claims total) |
+| IDDs drafted | 2026-03-05 | All 5 Tier 1 IDDs complete |
+| IDDs hardened | 2026-03-08 | Disclosure dates, broader claims, corrections (82 claims total) |
+| **Grace period expires** | **2027-02-05** | **P-001, P-004, P-005 — MUST FILE BEFORE THIS DATE** |
+| Grace period expires | 2027-02-07 | P-002 |
+| Grace period expires | 2027-02-23 | P-003 |
 | HAI paper submission | TBD | Must file before this |
 | PLoS paper submission | TBD | Must file before this |
 | Mycelix production | TBD | Must file P-005 before this |
