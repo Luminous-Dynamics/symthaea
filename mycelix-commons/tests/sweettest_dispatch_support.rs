@@ -125,11 +125,22 @@ pub enum PlotStatus {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum PlotType {
+    Garden,
+    FoodForest,
+    Orchard,
+    Greenhouse,
+    Raised,
+    Rooftop,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Plot {
     pub id: String,
     pub name: String,
     pub area_sqm: f64,
     pub soil_type: SoilType,
+    pub plot_type: PlotType,
     pub location_lat: f64,
     pub location_lon: f64,
     pub steward: AgentPubKey,
@@ -148,6 +159,19 @@ pub enum VehicleType {
     Bus,
     Cargo,
     ElectricScooter,
+    Helicopter,
+    EVTOL,
+    AirTaxi,
+    Ferry,
+    Boat,
+    Train,
+    Tram,
+    Skateboard,
+    Wheelchair,
+    Segway,
+    AutonomousVehicle,
+    Drone,
+    Other(String),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -394,6 +418,7 @@ async fn test_cross_domain_food_dispatches_water_quality_check() {
         name: "Riverside Garden".to_string(),
         area_sqm: 300.0,
         soil_type: SoilType::Loam,
+        plot_type: PlotType::Garden,
         location_lat: 32.9483,
         location_lon: -96.7299,
         steward: agent.clone(),
@@ -686,6 +711,7 @@ async fn test_cross_domain_water_dispatches_food_irrigation_credit_check() {
         name: "Riverside Farm".to_string(),
         area_sqm: 5000.0,
         soil_type: SoilType::Silt,
+        plot_type: PlotType::Garden,
         location_lat: 33.0100,
         location_lon: -96.7500,
         steward: agent.clone(),
