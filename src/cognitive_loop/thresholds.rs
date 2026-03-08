@@ -975,6 +975,12 @@ pub const FEP_LEARNING_PLASTICITY_THRESHOLD: f32 = 0.5;
 /// Science: Tononi & Cirelli (2006) — sustained rest duration determines consolidation depth.
 pub const ACTIVE_REST_THRESHOLD: u16 = 10;
 
+/// Cycles a pending calibration can wait without sleep before forced application.
+/// Science: McEwen (1998) — allostatic load accumulates when corrective actions are
+/// deferred indefinitely. Systems that never sleep still need calibration maintenance.
+/// At 50Hz, 2000 cycles ≈ 40 seconds of continuous wakefulness.
+pub const ALWAYS_AWAKE_STALE_CYCLES: u64 = 2000;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // EMOTIONAL HOMEOSTASIS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -998,6 +1004,264 @@ pub const HOMEOSTASIS_AROUSAL_TARGET: f32 = 0.3;
 
 /// Fraction of attention budget at which predictive gating activates (80%).
 pub const PREDICTIVE_BUDGET_GATING_RATIO: f64 = 0.8;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SELF-MODEL ACCURACY COMPOSITION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence error weight in self-model accuracy composite.
+/// Basis: Friston (2010) — precision estimation dominates self-model.
+pub const SELF_MODEL_CONFIDENCE_WEIGHT: f32 = 0.7;
+
+/// Urgency match weight in self-model accuracy composite.
+pub const SELF_MODEL_URGENCY_WEIGHT: f32 = 0.3;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PE VARIANCE → CONFIDENCE MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// PE variance threshold below which no dampening occurs.
+/// Basis: Yu & Dayan (2005) — expected uncertainty is tolerated.
+pub const PE_VARIANCE_THRESHOLD: f32 = 0.01;
+
+/// Maximum PE variance effect (above threshold + this = full dampen).
+pub const PE_VARIANCE_MAX_EFFECT: f32 = 0.05;
+
+/// PE variance → confidence dampen multiplier.
+pub const PE_VARIANCE_DAMPEN_SCALE: f32 = 2.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CFC TAU FACTOR MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Arousal deadzone around neutral (0.5) — no tau modulation within this band.
+/// Basis: Yerkes-Dodson (1908) — moderate arousal has no effect on processing speed.
+pub const AROUSAL_TAU_DEADZONE: f32 = 0.1;
+
+/// Arousal → tau sensitivity (per-unit deviation from 0.5).
+/// Basis: Aston-Jones & Cohen (2005) — arousal modulates LC-NE → processing tempo.
+pub const AROUSAL_TAU_SENSITIVITY: f32 = 0.1;
+
+/// Codebook (resonator) similarity threshold for "familiar" → tau speedup.
+/// Basis: Buzsáki (2006) — familiar patterns processed faster.
+pub const CODEBOOK_FAMILIAR_THRESHOLD: f32 = 0.5;
+
+/// Codebook familiar → tau scale (negative = faster processing).
+pub const CODEBOOK_FAMILIAR_TAU_SCALE: f32 = 0.1;
+
+/// Codebook similarity threshold for "novel" → tau slowdown.
+pub const CODEBOOK_NOVEL_THRESHOLD: f32 = 0.2;
+
+/// Codebook novel → tau scale (positive = slower processing).
+pub const CODEBOOK_NOVEL_TAU_SCALE: f32 = 0.15;
+
+/// Arousal recovery → tau scale (slows processing to allow recovery).
+/// Basis: Lövdén (2010) — cognitive recovery requires reduced processing demands.
+pub const AROUSAL_RECOVERY_TAU_SCALE: f32 = 0.2;
+
+/// FEP surprise → tau scale (high surprise = faster inference).
+/// Basis: Friston (2010) — surprise accelerates inference dynamics.
+pub const FEP_SURPRISE_TAU_SCALE: f32 = 0.2;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOMEOSTASIS EFFICIENCY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// EMA alpha for homeostasis efficiency tracking.
+/// Basis: Cannon (1929)/Ashby (1960) — homeostatic regulation monitoring.
+pub const HOMEOSTASIS_EFFICIENCY_EMA: f32 = 0.2;
+
+/// Transition cost threshold above which homeostasis is strengthened.
+/// Basis: Kelso (1995) — costly transitions increase attractor persistence.
+pub const TRANSITION_COST_THRESHOLD: f32 = 0.1;
+
+/// Maximum transition cost effect on homeostasis strength.
+pub const TRANSITION_COST_MAX_EFFECT: f32 = 0.2;
+
+/// Transition cost → homeostasis strength scaling.
+pub const TRANSITION_COST_STRENGTH_SCALE: f32 = 1.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISTEMIC → SEMANTIC LR MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Epistemic confidence threshold for semantic LR caution.
+/// Basis: Friston (2017) — low epistemic confidence → cautious learning.
+pub const EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD: f32 = 0.4;
+
+/// Epistemic confidence threshold for semantic LR boost.
+pub const EPISTEMIC_SEMANTIC_BOOST_THRESHOLD: f32 = 0.8;
+
+/// Base caution factor applied when epistemic confidence is low.
+pub const EPISTEMIC_SEMANTIC_CAUTION_BASE: f32 = 0.8;
+
+/// Caution scaling from epistemic confidence (additive).
+pub const EPISTEMIC_SEMANTIC_CAUTION_SCALE: f32 = 0.5;
+
+/// Boost scaling from epistemic confidence (multiplicative on excess).
+pub const EPISTEMIC_SEMANTIC_BOOST_SCALE: f32 = 1.0;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EPISTEMIC UNCERTAINTY → EXPLORATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Epistemic uncertainty threshold for exploration boost.
+/// Basis: Depeweg et al. (2018) — model uncertainty drives active learning.
+pub const EPISTEMIC_EXPLORE_THRESHOLD: f32 = 0.4;
+
+/// Epistemic uncertainty → exploration scale.
+pub const EPISTEMIC_EXPLORE_SCALE: f32 = 0.1;
+
+/// Low epistemic uncertainty threshold for exploration dampening.
+pub const EPISTEMIC_LOW_THRESHOLD: f32 = 0.15;
+
+/// Low epistemic → exploration dampen amount.
+pub const EPISTEMIC_LOW_DAMPEN: f32 = 0.02;
+
+/// Oscillation ratio threshold for compound uncertainty multiplier.
+/// Basis: Doya (2002) — compound uncertainty warrants aggressive search.
+pub const EPISTEMIC_OSCILLATION_THRESHOLD: f32 = 0.5;
+
+/// Oscillation × uncertainty exploration multiplier.
+pub const EPISTEMIC_OSCILLATION_MULTIPLIER: f32 = 1.5;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MCTS PLAN EFFECTIVENESS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// MCTS effectiveness threshold for confidence boost.
+/// Basis: Silver et al. (2016) — effective planning reinforces confidence.
+pub const MCTS_EFFECTIVENESS_HIGH: f32 = 0.6;
+
+/// MCTS effectiveness threshold for exploration trigger.
+pub const MCTS_EFFECTIVENESS_LOW: f32 = 0.3;
+
+/// MCTS effective → confidence scale.
+pub const MCTS_EFFECTIVENESS_CONFIDENCE_SCALE: f32 = 0.03;
+
+/// MCTS poor plan → exploration scale.
+pub const MCTS_EFFECTIVENESS_EXPLORE_SCALE: f32 = 0.02;
+
+/// MCTS effectiveness EMA decay.
+pub const MCTS_EFFECTIVENESS_EMA: f32 = 0.9;
+
+/// MCTS plan confidence threshold for application.
+pub const MCTS_PLAN_CONFIDENCE_THRESHOLD: f32 = 0.7;
+
+/// MCTS plan → action weight scale.
+pub const MCTS_PLAN_WEIGHT_SCALE: f32 = 0.4;
+
+/// MCTS exploit → LR scale per unit plan weight.
+pub const MCTS_EXPLOIT_LR_SCALE: f32 = 0.1;
+
+/// MCTS consolidate → confidence scale per unit plan weight.
+pub const MCTS_CONSOLIDATE_CONFIDENCE_SCALE: f32 = 0.05;
+
+/// MCTS explore → exploration scale per unit plan weight.
+pub const MCTS_EXPLORE_SCALE: f32 = 0.08;
+
+/// Dominance confidence threshold (prediction confidence → dominant feeling).
+pub const DOMINANCE_CONFIDENCE_THRESHOLD: f64 = 0.6;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// UNCERTAINTY DEFAULTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Default epistemic uncertainty when insufficient prediction data.
+/// Basis: Maximum entropy principle — default to moderate uncertainty.
+pub const EPISTEMIC_UNCERTAINTY_DEFAULT: f32 = 0.5;
+
+/// Default aleatoric uncertainty when insufficient prediction data.
+pub const ALEATORIC_UNCERTAINTY_DEFAULT: f32 = 0.1;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SESSION 10: ADAPTIVE FEEDBACK INTELLIGENCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Confidence crash threshold: >30% drop in 1 cycle triggers emergency stabilization.
+/// Science: Cools et al. (2008) — rapid serotonergic dip from confidence collapse.
+pub const CONFIDENCE_CRASH_THRESHOLD: f64 = 0.30;
+
+/// Number of cycles to freeze LR after a confidence crash.
+/// Science: Turrigiano (2008) — transient plasticity shutdown for homeostatic recovery.
+pub const CONFIDENCE_CRASH_FREEZE_CYCLES: u32 = 3;
+
+/// Exploration boost applied during crash recovery.
+/// Science: Daw et al. (2006) — uncertainty-triggered shift to model-free exploration.
+pub const CONFIDENCE_CRASH_EXPLORATION_BOOST: f32 = 0.04;
+
+/// Self-model accuracy threshold above which self-model gets +5% proposal weight.
+/// Science: Friston (2010) — high self-model accuracy justifies increased self-trust.
+pub const SELF_MODEL_WEIGHT_HIGH_THRESHOLD: f32 = 0.7;
+
+/// Self-model accuracy threshold below which self-model gets -10% proposal weight.
+pub const SELF_MODEL_WEIGHT_LOW_THRESHOLD: f32 = 0.3;
+
+/// Self-model high accuracy → confidence weight bonus.
+pub const SELF_MODEL_WEIGHT_BONUS: f64 = 0.05;
+
+/// Self-model low accuracy → confidence weight penalty (multiplicative).
+pub const SELF_MODEL_WEIGHT_PENALTY: f64 = 0.90;
+
+/// Coherence velocity → CfC tau modulation: rising coherence factor.
+/// Science: Buzsáki (2006) — coherent oscillations slow integration (stability).
+pub const COHERENCE_VELOCITY_TAU_BOOST: f32 = 1.05;
+
+/// Coherence velocity → CfC tau modulation: falling coherence factor.
+/// Falling coherence → faster integration to explore corrections.
+pub const COHERENCE_VELOCITY_TAU_DAMPEN: f32 = 0.95;
+
+/// Minimum coherence velocity to trigger tau modulation.
+pub const COHERENCE_VELOCITY_TAU_THRESHOLD: f32 = 0.02;
+
+/// Homeostasis efficiency high threshold → reduce pull strength 15%.
+/// Science: Ashby (1960) — efficient regulation should self-attenuate.
+pub const HOMEOSTASIS_EFFICIENCY_HIGH: f32 = 1.2;
+
+/// Homeostasis efficiency low threshold → increase pull strength 10%.
+pub const HOMEOSTASIS_EFFICIENCY_LOW: f32 = 0.8;
+
+/// Pull reduction factor when efficiency is high (multiplicative).
+pub const HOMEOSTASIS_PULL_REDUCTION: f32 = 0.85;
+
+/// Pull increase factor when efficiency is low (multiplicative).
+pub const HOMEOSTASIS_PULL_INCREASE: f32 = 1.10;
+
+/// Error pattern → predictive LR scale for Rising pattern.
+/// Science: Schultz (2016) — increasing errors demand faster adaptation.
+pub const ERROR_PATTERN_RISING_LR: f32 = 1.05;
+
+/// Error pattern → predictive LR scale for Falling pattern.
+pub const ERROR_PATTERN_FALLING_LR: f32 = 0.97;
+
+/// Error pattern → predictive LR scale for Oscillating pattern.
+/// Science: Doya (2002) — oscillating errors indicate meta-uncertainty.
+pub const ERROR_PATTERN_OSCILLATING_LR: f32 = 0.90;
+
+/// Minimum distinct proposal sources after warmup (for diversity metric).
+/// Science: Dehaene (2014) — GWT requires multi-source consensus.
+pub const PROPOSAL_DIVERSITY_MIN_SOURCES: usize = 3;
+
+/// Warmup cycles before diversity check applies.
+pub const PROPOSAL_DIVERSITY_WARMUP: usize = 30;
+
+/// Exploration boost when proposal diversity is too low.
+pub const PROPOSAL_DIVERSITY_EXPLORATION_BOOST: f32 = 0.02;
+
+/// Mode stability counter threshold for hysteresis relaxation.
+/// Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
+pub const HYSTERESIS_RELAXATION_THRESHOLD: u32 = 20;
+
+/// Rate at which hysteresis relaxes toward baseline per cycle (multiplicative).
+pub const HYSTERESIS_RELAXATION_RATE: f32 = 0.98;
+
+/// Minimum hysteresis factor after relaxation (prevents collapse).
+pub const HYSTERESIS_RELAXATION_FLOOR: f32 = 0.5;
+
+/// Cross-module agreement velocity threshold for confidence velocity coupling.
+/// Science: Tononi (2004) — agreement rise with confidence fall indicates
+/// subsystems converging but output not reflecting it → needs gentle correction.
+pub const AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD: f32 = 0.05;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -1131,6 +1395,66 @@ mod tests {
     }
 
     #[test]
+    fn test_cfc_tau_modulation_params() {
+        assert!(AROUSAL_TAU_DEADZONE > 0.0);
+        assert!(AROUSAL_TAU_SENSITIVITY > 0.0 && AROUSAL_TAU_SENSITIVITY <= 0.5);
+        assert!(CODEBOOK_FAMILIAR_THRESHOLD > CODEBOOK_NOVEL_THRESHOLD);
+        assert!(CODEBOOK_FAMILIAR_TAU_SCALE > 0.0);
+        assert!(CODEBOOK_NOVEL_TAU_SCALE > 0.0);
+        assert!(AROUSAL_RECOVERY_TAU_SCALE > 0.0 && AROUSAL_RECOVERY_TAU_SCALE <= 0.5);
+        assert!(FEP_SURPRISE_TAU_SCALE > 0.0 && FEP_SURPRISE_TAU_SCALE <= 0.5);
+    }
+
+    #[test]
+    fn test_pe_variance_params() {
+        assert!(PE_VARIANCE_THRESHOLD > 0.0);
+        assert!(PE_VARIANCE_MAX_EFFECT > PE_VARIANCE_THRESHOLD);
+        assert!(PE_VARIANCE_DAMPEN_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_homeostasis_efficiency_params() {
+        assert!(HOMEOSTASIS_EFFICIENCY_EMA > 0.0 && HOMEOSTASIS_EFFICIENCY_EMA < 1.0);
+        assert!(TRANSITION_COST_THRESHOLD > 0.0);
+        assert!(TRANSITION_COST_MAX_EFFECT > 0.0);
+        assert!(TRANSITION_COST_STRENGTH_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_epistemic_semantic_params() {
+        assert!(EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD > 0.0);
+        assert!(EPISTEMIC_SEMANTIC_BOOST_THRESHOLD > EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD);
+        assert!(EPISTEMIC_SEMANTIC_CAUTION_BASE > 0.0);
+        assert!(EPISTEMIC_SEMANTIC_CAUTION_SCALE > 0.0);
+        assert!(EPISTEMIC_SEMANTIC_BOOST_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_epistemic_exploration_params() {
+        assert!(EPISTEMIC_EXPLORE_THRESHOLD > 0.0);
+        assert!(EPISTEMIC_EXPLORE_SCALE > 0.0);
+        assert!(EPISTEMIC_LOW_THRESHOLD > 0.0 && EPISTEMIC_LOW_THRESHOLD < EPISTEMIC_EXPLORE_THRESHOLD);
+        assert!(EPISTEMIC_LOW_DAMPEN > 0.0);
+        assert!(EPISTEMIC_OSCILLATION_THRESHOLD > 0.0);
+        assert!(EPISTEMIC_OSCILLATION_MULTIPLIER > 1.0);
+    }
+
+    #[test]
+    fn test_mcts_effectiveness_params() {
+        assert!(MCTS_EFFECTIVENESS_HIGH > MCTS_EFFECTIVENESS_LOW);
+        assert!(MCTS_EFFECTIVENESS_CONFIDENCE_SCALE > 0.0);
+        assert!(MCTS_EFFECTIVENESS_EXPLORE_SCALE > 0.0);
+        assert!(MCTS_EFFECTIVENESS_EMA > 0.0 && MCTS_EFFECTIVENESS_EMA < 1.0);
+        assert!(MCTS_PLAN_CONFIDENCE_THRESHOLD > 0.0);
+        assert!(MCTS_PLAN_WEIGHT_SCALE > 0.0);
+    }
+
+    #[test]
+    fn test_self_model_accuracy_weights() {
+        assert!((SELF_MODEL_CONFIDENCE_WEIGHT + SELF_MODEL_URGENCY_WEIGHT - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
     fn test_theta_and_horizon_params() {
         assert!(THETA_PHASE_ADVANCE > 0.0);
         assert!(THETA_PHASE_ADVANCE < std::f64::consts::PI); // less than half-cycle per step
@@ -1145,5 +1469,40 @@ mod tests {
         assert!(LOW_COHERENCE_EXPLORATION_THRESHOLD > 0);
         assert!(LOW_COHERENCE_EXPLORATION_BOOST > 0.0);
         assert!(LOW_COHERENCE_EXPLORATION_BOOST < 0.1); // don't over-explore
+    }
+
+    #[test]
+    fn test_session10_params() {
+        // Confidence crash
+        assert!(CONFIDENCE_CRASH_THRESHOLD > 0.0 && CONFIDENCE_CRASH_THRESHOLD < 1.0);
+        assert!(CONFIDENCE_CRASH_FREEZE_CYCLES > 0 && CONFIDENCE_CRASH_FREEZE_CYCLES <= 10);
+        assert!(CONFIDENCE_CRASH_EXPLORATION_BOOST > 0.0);
+        // Self-model weighting
+        assert!(SELF_MODEL_WEIGHT_HIGH_THRESHOLD > SELF_MODEL_WEIGHT_LOW_THRESHOLD);
+        assert!(SELF_MODEL_WEIGHT_BONUS > 0.0 && SELF_MODEL_WEIGHT_BONUS < 0.5);
+        assert!(SELF_MODEL_WEIGHT_PENALTY > 0.5 && SELF_MODEL_WEIGHT_PENALTY < 1.0);
+        // Coherence velocity tau
+        assert!(COHERENCE_VELOCITY_TAU_BOOST > 1.0);
+        assert!(COHERENCE_VELOCITY_TAU_DAMPEN < 1.0 && COHERENCE_VELOCITY_TAU_DAMPEN > 0.0);
+        assert!(COHERENCE_VELOCITY_TAU_THRESHOLD > 0.0);
+        // Homeostasis efficiency adaptation
+        assert!(HOMEOSTASIS_EFFICIENCY_HIGH > 1.0);
+        assert!(HOMEOSTASIS_EFFICIENCY_LOW < 1.0 && HOMEOSTASIS_EFFICIENCY_LOW > 0.0);
+        assert!(HOMEOSTASIS_PULL_REDUCTION < 1.0);
+        assert!(HOMEOSTASIS_PULL_INCREASE > 1.0);
+        // Error pattern LR
+        assert!(ERROR_PATTERN_RISING_LR > 1.0);
+        assert!(ERROR_PATTERN_FALLING_LR < 1.0);
+        assert!(ERROR_PATTERN_OSCILLATING_LR < ERROR_PATTERN_FALLING_LR);
+        // Proposal diversity
+        assert!(PROPOSAL_DIVERSITY_MIN_SOURCES >= 2);
+        assert!(PROPOSAL_DIVERSITY_WARMUP > 0);
+        assert!(PROPOSAL_DIVERSITY_EXPLORATION_BOOST > 0.0);
+        // Hysteresis relaxation
+        assert!(HYSTERESIS_RELAXATION_THRESHOLD > 0);
+        assert!(HYSTERESIS_RELAXATION_RATE > 0.0 && HYSTERESIS_RELAXATION_RATE < 1.0);
+        assert!(HYSTERESIS_RELAXATION_FLOOR > 0.0 && HYSTERESIS_RELAXATION_FLOOR < 1.0);
+        // Agreement-confidence coupling
+        assert!(AGREEMENT_CONFIDENCE_COUPLING_THRESHOLD > 0.0);
     }
 }
