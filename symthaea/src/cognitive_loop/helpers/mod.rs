@@ -710,12 +710,39 @@ impl CognitiveLoopService {
         }
     }
 
-    /// Prefrontal working memory utilization (0.0-1.0). Returns 0.5 (neutral)
+    /// Prefrontal working memory capability (0.0-1.0). Returns 0.5 (neutral)
     /// when the prefrontal cortex is not enabled.
+    ///
+    /// Raw `avg_memory_utilization` (len/capacity) is a poor consciousness
+    /// proxy: an empty WM has low utilization but HIGH available capacity.
+    /// Blend utilization (active use) with graduation quality (items that
+    /// integrated well enough to persist to episodic memory) for a signal
+    /// that reflects how well WM *serves* consciousness.
+    /// Science: Baddeley (2003) — WM capacity correlates with consciousness
+    /// through both active maintenance and successful episodic transfer.
     pub(super) fn prefrontal_utilization(&self) -> f64 {
         self.prefrontal
             .as_ref()
-            .map(|p| p.stats().avg_memory_utilization as f64)
+            .map(|p| {
+                let stats = p.stats();
+                let utilization = stats.avg_memory_utilization as f64;
+                // Graduation rate: fraction of processed items that graduated
+                // to episodic memory (vs being dropped). High graduation = WM
+                // is doing its job of filtering and consolidating.
+                let graduation_quality = if stats.items_processed > 0 {
+                    let total_exits = stats.graduations + stats.evictions_dropped;
+                    if total_exits > 0 {
+                        stats.graduations as f64 / total_exits as f64
+                    } else {
+                        0.5 // No exits yet — neutral
+                    }
+                } else {
+                    0.5 // No items yet — neutral
+                };
+                // Blend: 40% utilization (active use) + 40% graduation quality
+                // + 20% floor (WM exists and is available, even if idle).
+                (utilization * 0.4 + graduation_quality * 0.4 + 0.2).clamp(0.0, 1.0)
+            })
             .unwrap_or(0.5)
     }
 

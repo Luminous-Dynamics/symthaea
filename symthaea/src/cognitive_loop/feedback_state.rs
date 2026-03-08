@@ -102,6 +102,26 @@ impl ProposalCollector {
             .collect()
     }
 
+    /// Compute the conflict ratio among Add proposals.
+    /// Returns fraction of proposals that disagree in sign with the majority.
+    /// 0.0 = unanimous, 0.5 = maximally conflicted, 1.0 only if single contrary.
+    /// Science: conflicting proposals = subsystems disagree about direction.
+    pub fn conflict_ratio(&self) -> f32 {
+        let adds: Vec<f64> = self.proposals.iter()
+            .filter_map(|ap| match ap.proposal {
+                FeedbackProposal::Add(d) => Some(d),
+                _ => None,
+            })
+            .collect();
+        if adds.len() < 2 {
+            return 0.0;
+        }
+        let positive = adds.iter().filter(|&&d| d > 0.0).count();
+        let negative = adds.iter().filter(|&&d| d < 0.0).count();
+        let minority = positive.min(negative);
+        minority as f32 / adds.len() as f32
+    }
+
     /// Integrate all proposals using consensus mode.
     ///
     /// Consensus integration strategy:
@@ -504,6 +524,19 @@ impl FeedbackState {
         }
         let max_count = counts.iter().map(|(_, c)| *c).max().unwrap_or(0);
         max_count as f32 / total as f32
+    }
+
+    /// Average conflict ratio across all 4 channels.
+    /// High conflict (>0.3) = subsystems disagree about direction.
+    /// Science: Dayan & Daw (2008) — model-based/model-free disagreement signals meta-uncertainty.
+    pub fn avg_conflict_ratio(&self) -> f32 {
+        let ratios = [
+            self.confidence.conflict_ratio(),
+            self.learning_rate.conflict_ratio(),
+            self.exploration.conflict_ratio(),
+            self.threshold.conflict_ratio(),
+        ];
+        ratios.iter().sum::<f32>() / 4.0
     }
 
     /// Count distinct source names across all 4 channels.

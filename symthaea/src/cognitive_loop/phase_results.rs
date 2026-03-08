@@ -193,6 +193,9 @@ pub(super) struct DynamicsPhaseResult {
     pub(super) fep_tau_factor: f32,
     pub(super) causal_world_model_edges: usize,
     pub(super) epistemic_budget_scale: f32,
+    // Session 11: crash detector telemetry
+    pub(super) confidence_crash_detected: bool,
+    pub(super) lr_frozen: bool,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

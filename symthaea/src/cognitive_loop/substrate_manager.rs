@@ -369,25 +369,44 @@ impl SubstrateManager {
         }
     }
 
-    /// Binding capability [0,1] of the current substrate.
+    /// Binding capability [0,1] of the substrate running sensory processing.
+    /// Uses per-region substrate (Sensory) when configured, else global.
     /// Modulates Phi binding computation — substrates with poor binding
     /// (e.g. biochemical) produce lower integrated information.
     pub(crate) fn binding_capability(&self, config: &CognitiveLoopConfig) -> f64 {
-        Self::requirements_for(&config.substrate_type).binding_capability
+        let substrate = self.substrate_for_region(config, CorticalRegion::Sensory);
+        Self::requirements_for(&substrate).binding_capability
     }
 
-    /// Workspace capability [0,1] of the current substrate.
+    /// Workspace capability [0,1] of the substrate running prefrontal processing.
+    /// Uses per-region substrate (Prefrontal) when configured, else global.
     /// Modulates GWT broadcast — substrates with poor workspace support
     /// (e.g. exotic) require higher activation for conscious broadcast.
     pub(crate) fn workspace_capability(&self, config: &CognitiveLoopConfig) -> f64 {
-        Self::requirements_for(&config.substrate_type).workspace_capability
+        let substrate = self.substrate_for_region(config, CorticalRegion::Prefrontal);
+        Self::requirements_for(&substrate).workspace_capability
     }
 
-    /// Attention capability [0,1] of the current substrate.
+    /// Attention capability [0,1] of the substrate running prefrontal processing.
+    /// Uses per-region substrate (Prefrontal) when configured, else global.
     /// Modulates phi-attention gate gain — substrates with poor attention
     /// (e.g. biochemical) produce weaker selective amplification.
     pub(crate) fn attention_capability(&self, config: &CognitiveLoopConfig) -> f64 {
-        Self::requirements_for(&config.substrate_type).attention_capability
+        let substrate = self.substrate_for_region(config, CorticalRegion::Prefrontal);
+        Self::requirements_for(&substrate).attention_capability
+    }
+
+    /// Get the substrate type for a specific cortical region.
+    /// Falls back to global substrate_type when per-region is not configured.
+    fn substrate_for_region(
+        &self,
+        config: &CognitiveLoopConfig,
+        region: CorticalRegion,
+    ) -> SubstrateType {
+        self.per_region_substrates
+            .as_ref()
+            .and_then(|m| m.get(&region).copied())
+            .unwrap_or(config.substrate_type)
     }
 }
 

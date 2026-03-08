@@ -859,6 +859,12 @@ impl CognitiveLoopService {
                 "cross_module_disagree",
                 (CROSS_MODULE_AGREEMENT_LOW - cross_module_agreement) * 0.15,
             );
+            // Session 11 Item 7: Very low agreement → raise threshold for urgency escalation.
+            // Subsystems disagree about error magnitude → require stronger signal before reacting.
+            // Science: Tononi (2004) — incoherent integration requires cautious interpretation.
+            if cross_module_agreement < 0.2 && self.stats.total_cycles > 20 {
+                self.scale_threshold("low_agreement_caution", 1.2);
+            }
         }
         self.stats.avg_cross_module_agreement =
             self.stats.avg_cross_module_agreement * 0.95 + cross_module_agreement * 0.05;

@@ -232,24 +232,44 @@ impl CognitiveLoopService {
         // Session 10 Item 1: Confidence crash detector → emergency stabilization.
         // >30% confidence drop in 1 cycle → freeze LR for 3 cycles, boost exploration.
         // Science: Cools et al. (2008) — rapid confidence collapse triggers serotonergic dip.
+        // Session 11 Fix: Use Set proposal to pin LR at cycle-start value during freeze.
         let confidence_crash_detected;
+        let lr_frozen;
         {
             let prev_conf = self.carryover.quality.prev_confidence_for_crash;
             let current_conf = self.prediction_confidence;
             let drop = prev_conf - current_conf;
-            confidence_crash_detected = drop > prev_conf * CONFIDENCE_CRASH_THRESHOLD
+            // Session 11 Item 4: Flow state raises crash threshold (×1.5).
+            // Flow = committed mode, transient dips are normal.
+            // Science: Csikszentmihalyi (1990) — flow tolerates transient perturbation.
+            let effective_crash_threshold = if self.flow_state.in_flow {
+                CONFIDENCE_CRASH_THRESHOLD * 1.5
+            } else {
+                CONFIDENCE_CRASH_THRESHOLD
+            };
+            confidence_crash_detected = drop > prev_conf * effective_crash_threshold
                 && prev_conf > 0.15
                 && self.stats.total_cycles > 10;
             if confidence_crash_detected {
-                self.carryover.quality.crash_freeze_remaining = CONFIDENCE_CRASH_FREEZE_CYCLES;
+                // Session 11 Item 5: Grace period — lighter freeze after recent mode transition.
+                // Post-transition confidence drops are expected, not emergencies.
+                let freeze_duration = if self.carryover.urgency.mode_stability_counter < 3 {
+                    1 // Light freeze: mode just changed, drop is expected
+                } else {
+                    CONFIDENCE_CRASH_FREEZE_CYCLES // Full freeze
+                };
+                self.carryover.quality.crash_freeze_remaining = freeze_duration;
                 self.adjust_exploration("confidence_crash", CONFIDENCE_CRASH_EXPLORATION_BOOST);
                 tracing::debug!(
                     "Confidence crash detected: {prev_conf:.3} → {current_conf:.3} (drop={drop:.3}), \
-                     freezing LR for {CONFIDENCE_CRASH_FREEZE_CYCLES} cycles"
+                     freezing LR for {freeze_duration} cycles"
                 );
             }
-            if self.carryover.quality.crash_freeze_remaining > 0 {
-                self.scale_lr("crash_freeze", 1.0);
+            // Session 11 Fix: Pin LR to cycle-start value with Set (overrides all other proposals).
+            lr_frozen = self.carryover.quality.crash_freeze_remaining > 0;
+            if lr_frozen {
+                let frozen_lr = self.feedback_state.cycle_start_lr() as f32;
+                self.set_lr("crash_freeze", frozen_lr);
                 self.carryover.quality.crash_freeze_remaining -= 1;
             }
         }
@@ -707,11 +727,12 @@ impl CognitiveLoopService {
         };
 
         // Session 10 Item 3: Coherence velocity tau factor.
+        // Session 11 Item 3: Gate behind cycle > 5 to avoid spurious velocity from default init.
         let coherence_velocity_tau_factor = {
             let cv = self.carryover.quality.coherence_velocity;
-            if cv > COHERENCE_VELOCITY_TAU_THRESHOLD {
+            if self.stats.total_cycles > 5 && cv > COHERENCE_VELOCITY_TAU_THRESHOLD {
                 COHERENCE_VELOCITY_TAU_BOOST
-            } else if cv < -COHERENCE_VELOCITY_TAU_THRESHOLD {
+            } else if self.stats.total_cycles > 5 && cv < -COHERENCE_VELOCITY_TAU_THRESHOLD {
                 COHERENCE_VELOCITY_TAU_DAMPEN
             } else {
                 1.0
@@ -2171,6 +2192,8 @@ impl CognitiveLoopService {
                 0
             },
             epistemic_budget_scale,
+            confidence_crash_detected,
+            lr_frozen,
         }
     }
 
