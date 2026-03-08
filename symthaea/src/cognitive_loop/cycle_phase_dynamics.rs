@@ -59,6 +59,35 @@ use super::thresholds::{
     WORLD_MODEL_STIFFNESS_THRESHOLD, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
     FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_THRESHOLD,
     FEP_TD_ERROR_DISCOVERY_THRESHOLD, FEP_LEARNING_PLASTICITY_THRESHOLD,
+    SELF_MODEL_CONFIDENCE_WEIGHT, SELF_MODEL_URGENCY_WEIGHT,
+    PE_VARIANCE_THRESHOLD, PE_VARIANCE_MAX_EFFECT, PE_VARIANCE_DAMPEN_SCALE,
+    AROUSAL_TAU_DEADZONE, AROUSAL_TAU_SENSITIVITY,
+    CODEBOOK_FAMILIAR_THRESHOLD, CODEBOOK_FAMILIAR_TAU_SCALE,
+    CODEBOOK_NOVEL_THRESHOLD, CODEBOOK_NOVEL_TAU_SCALE,
+    AROUSAL_RECOVERY_TAU_SCALE, FEP_SURPRISE_TAU_SCALE,
+    HOMEOSTASIS_EFFICIENCY_EMA, TRANSITION_COST_THRESHOLD,
+    TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE,
+    EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD, EPISTEMIC_SEMANTIC_BOOST_THRESHOLD,
+    EPISTEMIC_SEMANTIC_CAUTION_BASE, EPISTEMIC_SEMANTIC_CAUTION_SCALE,
+    EPISTEMIC_SEMANTIC_BOOST_SCALE,
+    EPISTEMIC_EXPLORE_THRESHOLD, EPISTEMIC_EXPLORE_SCALE,
+    EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_LOW_DAMPEN,
+    EPISTEMIC_OSCILLATION_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER,
+    MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW,
+    MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EXPLORE_SCALE,
+    MCTS_EFFECTIVENESS_EMA, MCTS_PLAN_CONFIDENCE_THRESHOLD,
+    MCTS_PLAN_WEIGHT_SCALE, MCTS_EXPLOIT_LR_SCALE,
+    MCTS_CONSOLIDATE_CONFIDENCE_SCALE, MCTS_EXPLORE_SCALE,
+    DOMINANCE_CONFIDENCE_THRESHOLD,
+    EPISTEMIC_UNCERTAINTY_DEFAULT, ALEATORIC_UNCERTAINTY_DEFAULT,
+    CONFIDENCE_CRASH_THRESHOLD, CONFIDENCE_CRASH_FREEZE_CYCLES,
+    CONFIDENCE_CRASH_EXPLORATION_BOOST,
+    SELF_MODEL_WEIGHT_HIGH_THRESHOLD, SELF_MODEL_WEIGHT_LOW_THRESHOLD,
+    SELF_MODEL_WEIGHT_BONUS, SELF_MODEL_WEIGHT_PENALTY,
+    COHERENCE_VELOCITY_TAU_BOOST, COHERENCE_VELOCITY_TAU_DAMPEN,
+    COHERENCE_VELOCITY_TAU_THRESHOLD,
+    HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW,
+    HOMEOSTASIS_PULL_REDUCTION, HOMEOSTASIS_PULL_INCREASE,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -159,7 +188,8 @@ impl CognitiveLoopService {
             if self.stats.total_cycles >= made_at + 5 {
                 let confidence_error = (self.prediction_confidence - pred_confidence).abs() as f32;
                 let urgency_match = if urgency == pred_urgency { 1.0f32 } else { 0.0 };
-                let accuracy = (1.0 - confidence_error) * 0.7 + urgency_match * 0.3;
+                let accuracy = (1.0 - confidence_error) * SELF_MODEL_CONFIDENCE_WEIGHT
+                    + urgency_match * SELF_MODEL_URGENCY_WEIGHT;
                 self.carryover.learning.self_model_accuracy =
                     self.carryover.learning.self_model_accuracy * SELF_MODEL_ACCURACY_EMA
                         + accuracy * (1.0 - SELF_MODEL_ACCURACY_EMA);
@@ -190,15 +220,51 @@ impl CognitiveLoopService {
             self.stats.self_model_predictions_made += 1;
         }
 
+        // Session 10 Item 2: Self-model accuracy → proposal weighting.
+        // Accurate self-model → boost self-model confidence proposals; inaccurate → dampen.
+        // Science: Friston (2010) — interoceptive accuracy modulates self-model trust.
+        if self_model_accuracy > SELF_MODEL_WEIGHT_HIGH_THRESHOLD {
+            self.scale_confidence("self_model_weight_hi", (1.0 + SELF_MODEL_WEIGHT_BONUS) as f32);
+        } else if self_model_accuracy < SELF_MODEL_WEIGHT_LOW_THRESHOLD {
+            self.scale_confidence("self_model_weight_lo", SELF_MODEL_WEIGHT_PENALTY as f32);
+        }
+
+        // Session 10 Item 1: Confidence crash detector → emergency stabilization.
+        // >30% confidence drop in 1 cycle → freeze LR for 3 cycles, boost exploration.
+        // Science: Cools et al. (2008) — rapid confidence collapse triggers serotonergic dip.
+        let confidence_crash_detected;
+        {
+            let prev_conf = self.carryover.quality.prev_confidence_for_crash;
+            let current_conf = self.prediction_confidence;
+            let drop = prev_conf - current_conf;
+            confidence_crash_detected = drop > prev_conf * CONFIDENCE_CRASH_THRESHOLD as f64
+                && prev_conf > 0.15
+                && self.stats.total_cycles > 10;
+            if confidence_crash_detected {
+                self.carryover.quality.crash_freeze_remaining = CONFIDENCE_CRASH_FREEZE_CYCLES;
+                self.adjust_exploration("confidence_crash", CONFIDENCE_CRASH_EXPLORATION_BOOST);
+                tracing::debug!(
+                    "Confidence crash detected: {prev_conf:.3} → {current_conf:.3} (drop={drop:.3}), \
+                     freezing LR for {CONFIDENCE_CRASH_FREEZE_CYCLES} cycles"
+                );
+            }
+            if self.carryover.quality.crash_freeze_remaining > 0 {
+                self.scale_lr("crash_freeze", 1.0);
+                self.carryover.quality.crash_freeze_remaining -= 1;
+            }
+        }
+
         // Session 9 Item 1: PE variance → confidence modulation.
         // High error variance (unstable PE) should dampen confidence more than steady errors.
         // Yu & Dayan (2005): expected vs unexpected uncertainty differentially modulate ACh/NE.
         let pe_variance = self.stats.avg_prediction_error_sq
             - self.stats.avg_prediction_error * self.stats.avg_prediction_error;
         let pe_variance = pe_variance.max(0.0); // Clamp numerical noise
-        if pe_variance > 0.01 && self.stats.total_cycles > 20 {
+        if pe_variance > PE_VARIANCE_THRESHOLD && self.stats.total_cycles > 20 {
             // High variance = unstable errors → dampen confidence proportionally
-            let variance_dampen = 1.0 - (pe_variance - 0.01).min(0.05) * 2.0; // 0.90–1.0
+            let variance_dampen = 1.0
+                - (pe_variance - PE_VARIANCE_THRESHOLD).min(PE_VARIANCE_MAX_EFFECT)
+                    * PE_VARIANCE_DAMPEN_SCALE; // 0.90–1.0
             self.scale_confidence("pe_variance", variance_dampen);
         }
 
@@ -490,13 +556,32 @@ impl CognitiveLoopService {
         let cycle_efficiency = post_dist / pre_dist;
         // EMA smooth (alpha=0.2)
         self.carryover.quality.homeostasis_efficiency =
-            self.carryover.quality.homeostasis_efficiency * 0.8 + cycle_efficiency * 0.2;
+            self.carryover.quality.homeostasis_efficiency * (1.0 - HOMEOSTASIS_EFFICIENCY_EMA)
+                + cycle_efficiency * HOMEOSTASIS_EFFICIENCY_EMA;
 
         // High transition cost → strengthen homeostasis to resist unnecessary mode changes.
         // Kelso (1995): costly transitions increase the system's tendency to stay in current attractor.
-        if self.stats.avg_transition_cost > 0.1 {
-            homeostasis_pull_strength *= 1.0 + (self.stats.avg_transition_cost - 0.1).min(0.2) * 1.5;
+        if self.stats.avg_transition_cost > TRANSITION_COST_THRESHOLD {
+            homeostasis_pull_strength *= 1.0
+                + (self.stats.avg_transition_cost - TRANSITION_COST_THRESHOLD)
+                    .min(TRANSITION_COST_MAX_EFFECT)
+                    * TRANSITION_COST_STRENGTH_SCALE;
         }
+
+        // Session 10 Item 4: Homeostasis efficiency → pull strength adaptation.
+        // Efficient regulation → reduce pull (self-attenuate); inefficient → increase.
+        // Science: Ashby (1960) — good regulation requires less intervention over time.
+        let eff = self.carryover.quality.homeostasis_efficiency;
+        if eff > HOMEOSTASIS_EFFICIENCY_HIGH {
+            homeostasis_pull_strength *= HOMEOSTASIS_PULL_REDUCTION;
+        } else if eff < HOMEOSTASIS_EFFICIENCY_LOW && eff > 0.0 {
+            homeostasis_pull_strength *= HOMEOSTASIS_PULL_INCREASE;
+        }
+
+        // Session 10 Item 3: Coherence velocity → CfC tau modulation.
+        // Rising coherence → slow down (stabilize); falling → speed up (explore corrections).
+        // Science: Buzsáki (2006) — coherent oscillations modulate integration timescale.
+        // (Applied below in delta_t product chain as coherence_velocity_tau_factor.)
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1c. Update Unified Emotional Bridge (VAD-based)
@@ -505,7 +590,7 @@ impl CognitiveLoopService {
         let simple_arousal = self.emotion_contagion.prosody_arousal() as f64;
         let dominance = if self.flow_state.in_flow {
             DOMINANCE_FLOW_BASE + DOMINANCE_FLOW_SCALE * self.flow_state.intensity as f64
-        } else if self.prediction_confidence > 0.6 {
+        } else if self.prediction_confidence > DOMINANCE_CONFIDENCE_THRESHOLD {
             DOMINANCE_CONFIDENT
         } else {
             DOMINANCE_DEFAULT
@@ -537,13 +622,18 @@ impl CognitiveLoopService {
 
         // ── Phase 20: Epistemic gate → semantic memory LR bidirectionality ───
         let prev_epistemic = self.carryover.quality.last_epistemic_confidence;
-        let epistemic_semantic_lr_mod: f32 = if prev_epistemic < 0.4 && prev_epistemic > 0.0 {
-            let caution = 0.8_f32 + prev_epistemic * 0.5;
+        let epistemic_semantic_lr_mod: f32 = if prev_epistemic < EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD
+            && prev_epistemic > 0.0
+        {
+            let caution =
+                EPISTEMIC_SEMANTIC_CAUTION_BASE + prev_epistemic * EPISTEMIC_SEMANTIC_CAUTION_SCALE;
             semantic_lr_factor *= caution;
             self.stats.epistemic_semantic_mod_count += 1;
             caution - 1.0
-        } else if prev_epistemic > 0.8 {
-            let boost = 1.0_f32 + (prev_epistemic - 0.8) * 1.0;
+        } else if prev_epistemic > EPISTEMIC_SEMANTIC_BOOST_THRESHOLD {
+            let boost = 1.0_f32
+                + (prev_epistemic - EPISTEMIC_SEMANTIC_BOOST_THRESHOLD)
+                    * EPISTEMIC_SEMANTIC_BOOST_SCALE;
             semantic_lr_factor *= boost;
             self.stats.epistemic_semantic_mod_count += 1;
             boost - 1.0
@@ -579,15 +669,16 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
-        let arousal_tau_factor = if (self.carryover.history.body_arousal - 0.5).abs() > 0.1 {
-            1.0 + (self.carryover.history.body_arousal - 0.5) * 0.1
-        } else {
-            1.0
-        };
-        let codebook_tau_factor = if resonator_best_sim > 0.5 {
-            1.0 - (resonator_best_sim - 0.5) * 0.1
-        } else if resonator_best_sim > 0.0 && resonator_best_sim < 0.2 {
-            1.0 + (0.2 - resonator_best_sim) * 0.15
+        let arousal_tau_factor =
+            if (self.carryover.history.body_arousal - 0.5).abs() > AROUSAL_TAU_DEADZONE {
+                1.0 + (self.carryover.history.body_arousal - 0.5) * AROUSAL_TAU_SENSITIVITY
+            } else {
+                1.0
+            };
+        let codebook_tau_factor = if resonator_best_sim > CODEBOOK_FAMILIAR_THRESHOLD {
+            1.0 - (resonator_best_sim - CODEBOOK_FAMILIAR_THRESHOLD) * CODEBOOK_FAMILIAR_TAU_SCALE
+        } else if resonator_best_sim > 0.0 && resonator_best_sim < CODEBOOK_NOVEL_THRESHOLD {
+            1.0 + (CODEBOOK_NOVEL_THRESHOLD - resonator_best_sim) * CODEBOOK_NOVEL_TAU_SCALE
         } else {
             1.0
         };
@@ -597,7 +688,7 @@ impl CognitiveLoopService {
             && self.carryover.urgency.arousal_trap_counter <= 10
         {
             let recovery_intensity = (self.carryover.urgency.arousal_trap_counter - 5) as f32 / 5.0;
-            arousal_recovery_tau_factor = 1.0 + recovery_intensity * 0.2;
+            arousal_recovery_tau_factor = 1.0 + recovery_intensity * AROUSAL_RECOVERY_TAU_SCALE;
             arousal_recovery_active = true;
         } else {
             arousal_recovery_tau_factor = 1.0;
@@ -610,9 +701,21 @@ impl CognitiveLoopService {
         // Factor: [0.8, 1.2] — moderate modulation to prevent instability.
         let fep_tau_factor = if let Some(ref fe) = self.fep.agent.last_fe_components {
             let surprise_norm = (fe.surprise as f32).clamp(0.0, 2.0) / 2.0; // [0, 1]
-            1.0 - surprise_norm * 0.2 // high surprise → 0.8 (faster), low → 1.0
+            1.0 - surprise_norm * FEP_SURPRISE_TAU_SCALE // high surprise → 0.8 (faster), low → 1.0
         } else {
             1.0
+        };
+
+        // Session 10 Item 3: Coherence velocity tau factor.
+        let coherence_velocity_tau_factor = {
+            let cv = self.carryover.quality.coherence_velocity;
+            if cv > COHERENCE_VELOCITY_TAU_THRESHOLD {
+                COHERENCE_VELOCITY_TAU_BOOST
+            } else if cv < -COHERENCE_VELOCITY_TAU_THRESHOLD {
+                COHERENCE_VELOCITY_TAU_DAMPEN
+            } else {
+                1.0
+            }
         };
 
         let delta_t = self.config.cfc_config.delta_t
@@ -621,6 +724,7 @@ impl CognitiveLoopService {
             * codebook_tau_factor
             * arousal_recovery_tau_factor
             * fep_tau_factor
+            * coherence_velocity_tau_factor
             * self
                 .somatic_bridge
                 .to_interoceptive_signals()
@@ -675,7 +779,7 @@ impl CognitiveLoopService {
             let aleatoric = (mean_var / dim as f32).sqrt().clamp(0.0, 1.0);
             (epistemic, aleatoric)
         } else {
-            (0.5, 0.1) // defaults when insufficient data
+            (EPISTEMIC_UNCERTAINTY_DEFAULT, ALEATORIC_UNCERTAINTY_DEFAULT) // defaults when insufficient data
         };
 
         // Only epistemic uncertainty drives exploration (aleatoric is irreducible noise).
@@ -683,17 +787,19 @@ impl CognitiveLoopService {
         // Depeweg et al. (2018): decomposing uncertainty for active learning.
         let smoothed_eu = self.carryover.quality.smoothed_epistemic_uncertainty;
         let eu_for_exploration = if smoothed_eu > 0.0 { smoothed_eu } else { epistemic_uncertainty };
-        if eu_for_exploration > 0.4 && self.stats.total_cycles % 7 == 0 {
-            let mut epistemic_explore = (eu_for_exploration - 0.4) * 0.1;
+        if eu_for_exploration > EPISTEMIC_EXPLORE_THRESHOLD && self.stats.total_cycles % 7 == 0 {
+            let mut epistemic_explore =
+                (eu_for_exploration - EPISTEMIC_EXPLORE_THRESHOLD) * EPISTEMIC_EXPLORE_SCALE;
             // Oscillation + high uncertainty = confused AND unstable → stronger exploration.
             // Doya (2002) + Schmidhuber (2010): compound uncertainty warrants aggressive search.
-            if perception.urgency.oscillation_ratio > 0.5 {
-                epistemic_explore *= 1.5;
+            if perception.urgency.oscillation_ratio > EPISTEMIC_OSCILLATION_THRESHOLD {
+                epistemic_explore *= EPISTEMIC_OSCILLATION_MULTIPLIER;
             }
             self.adjust_exploration("epistemic_uncertainty", epistemic_explore);
-        } else if eu_for_exploration < 0.15 && self.stats.total_cycles % 7 == 0 {
+        } else if eu_for_exploration < EPISTEMIC_LOW_THRESHOLD && self.stats.total_cycles % 7 == 0
+        {
             // Low epistemic uncertainty → dampen exploration (model is confident).
-            self.adjust_exploration("epistemic_low", -0.02);
+            self.adjust_exploration("epistemic_low", -EPISTEMIC_LOW_DAMPEN);
         }
 
         // 6. Get current CfC state as output
@@ -885,13 +991,24 @@ impl CognitiveLoopService {
                     0.0
                 };
                 let effectiveness = (raw_effectiveness * 0.5 + 0.5).clamp(0.0, 1.0);
-                if effectiveness > 0.6 {
-                    self.adjust_confidence("mcts_effective", (effectiveness - 0.6) * 0.03);
-                } else if effectiveness < 0.3 {
-                    self.adjust_exploration("mcts_poor_plan", (0.3 - effectiveness) * 0.02);
+                if effectiveness > MCTS_EFFECTIVENESS_HIGH {
+                    self.adjust_confidence(
+                        "mcts_effective",
+                        (effectiveness - MCTS_EFFECTIVENESS_HIGH)
+                            * MCTS_EFFECTIVENESS_CONFIDENCE_SCALE,
+                    );
+                } else if effectiveness < MCTS_EFFECTIVENESS_LOW {
+                    self.adjust_exploration(
+                        "mcts_poor_plan",
+                        (MCTS_EFFECTIVENESS_LOW - effectiveness)
+                            * MCTS_EFFECTIVENESS_EXPLORE_SCALE,
+                    );
                 }
-                self.stats.avg_mcts_plan_effectiveness =
-                    self.stats.avg_mcts_plan_effectiveness * 0.9 + effectiveness * 0.1;
+                self.stats.avg_mcts_plan_effectiveness = self
+                    .stats
+                    .avg_mcts_plan_effectiveness
+                    * MCTS_EFFECTIVENESS_EMA
+                    + effectiveness * (1.0 - MCTS_EFFECTIVENESS_EMA);
                 effectiveness
             } else {
                 0.0
@@ -899,19 +1016,25 @@ impl CognitiveLoopService {
 
         // ── Apply previous cycle's MCTS plan ──────────────
         if let Some((plan_action, plan_confidence)) = self.carryover.history.mcts_plan.take() {
-            if plan_confidence > 0.7 && plan_action != fep_action_idx {
+            if plan_confidence > MCTS_PLAN_CONFIDENCE_THRESHOLD && plan_action != fep_action_idx {
                 self.carryover.history.mcts_plan_applied =
                     Some((plan_action, plan_confidence, prediction_error));
-                let plan_weight = plan_confidence * 0.4;
+                let plan_weight = plan_confidence * MCTS_PLAN_WEIGHT_SCALE;
                 match plan_action {
                     0 => {
-                        self.scale_lr("mcts_exploit", 1.0 - plan_weight * 0.1);
+                        self.scale_lr("mcts_exploit", 1.0 - plan_weight * MCTS_EXPLOIT_LR_SCALE);
                     }
                     1 => {
-                        self.adjust_confidence("mcts_consolidate", plan_weight * 0.05);
+                        self.adjust_confidence(
+                            "mcts_consolidate",
+                            plan_weight * MCTS_CONSOLIDATE_CONFIDENCE_SCALE,
+                        );
                     }
                     2 => {
-                        self.adjust_exploration("plan_explore_directive", plan_weight * 0.08);
+                        self.adjust_exploration(
+                            "plan_explore_directive",
+                            plan_weight * MCTS_EXPLORE_SCALE,
+                        );
                     }
                     _ => {}
                 }
@@ -1746,9 +1869,15 @@ impl CognitiveLoopService {
             let broca_psi = self.unification_engine.psi as f32;
             let broca_novelty = prediction_error > self.config.learning_threshold
                 || surprise_triggered;
+            // Adaptive cadence: poor user model → generate more (probe to refine)
+            let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
+                5 // more frequent when user model is inaccurate
+            } else {
+                7 // default spacing
+            };
             let broca_should_generate = broca_psi > 0.4
                 && broca_novelty
-                && self.stats.total_cycles % 7 != 0; // min spacing
+                && self.stats.total_cycles % broca_min_spacing != 0;
             if broca_should_generate {
                 if let Some(ref mut broca) = self.broca_manager {
                     let signals = super::broca_bridge::BrocaConsciousnessSignals {
@@ -1845,6 +1974,13 @@ impl CognitiveLoopService {
                         broca.last_telemetry.quality = broca_quality;
                         broca.last_telemetry.long_coherence = result.long_coherence;
                         broca.last_telemetry.semantic_pe = result.semantic_pe;
+                    }
+
+                    // Broca quality → attention budget: successful articulation
+                    // reduces sensory search need (Levelt 1989 — monitoring loop).
+                    if self.stats.broca_quality_ema > 0.7 {
+                        let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15; // [0.955, 1.0]
+                        self.scale_confidence("broca_attention_contract", contraction);
                     }
                 }
             }
