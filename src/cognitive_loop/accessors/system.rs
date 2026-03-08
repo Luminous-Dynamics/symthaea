@@ -162,8 +162,14 @@ impl CognitiveLoopService {
         &mut self,
         substrate: symthaea_core::hdc::substrate_independence::SubstrateType,
     ) -> (f64, f64) {
-        self.substrate_manager
-            .reconfigure_substrate(&mut self.config, substrate)
+        let result = self
+            .substrate_manager
+            .reconfigure_substrate(&mut self.config, substrate);
+        // Update integrity temporal tolerance for new substrate speed (#3)
+        #[cfg(feature = "integrity")]
+        self.integrity_manager
+            .set_substrate_tau_factor(self.substrate_manager.tau_factor);
+        result
     }
 
     /// Get the current substrate feasibility score.

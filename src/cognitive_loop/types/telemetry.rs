@@ -525,6 +525,11 @@ pub struct CycleMetadata {
     #[serde(default)]
     pub substrate: super::SubstrateTelemetry,
 
+    /// Integrity telemetry snapshot (from IntegrityManager).
+    /// Reports tamper detection: attestation, temporal, canaries.
+    #[serde(default)]
+    pub integrity: super::IntegrityTelemetry,
+
     /// Weight convergence state label (Initializing/Converging/Converged/Oscillating).
     pub weight_convergence_state: String,
     /// Cycle at which weights converged (0 if not yet).

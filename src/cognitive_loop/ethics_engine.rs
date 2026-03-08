@@ -135,6 +135,10 @@ pub(crate) struct EthicsEngineInput<'a> {
     /// Science: Bhatt et al. (2020) — GABAergic tone correlates with resting-state activity;
     /// Porkka-Heiskanen et al. (1997) — adenosine accumulation signals rest need.
     pub stillness_boost: f32,
+    /// Optional semantic embedding (e.g. Qwen3 1024D projected to 16,384D via HdcBridge).
+    /// When present, used instead of N-gram TextHdcEncoder for moral topology scenarios,
+    /// giving genuine semantic resolution to trajectory convergence detection.
+    pub semantic_embedding: Option<&'a [f32]>,
 }
 
 /// Result of Stage 1 moral evaluation only.
@@ -321,14 +325,20 @@ impl EthicsEngine {
                 .parse_and_encode(input.input, &self.moral_algebra);
 
             // Feed action HV into moral topology sliding window.
-            // When the parser extracts a full agent-action-patient structure,
-            // use the precise action_hv. Otherwise, fall back to encoding
-            // the raw input text as an action — lower quality but ensures the
-            // topology always gets data to analyze.
-            let scenario_hv = encoded
-                .action_hv
-                .clone()
-                .unwrap_or_else(|| self.moral_algebra.encode_action(input.input));
+            // Preference order:
+            //   1. Semantic embedding (Qwen3 → HdcBridge → 16,384D continuous)
+            //      — genuine semantic resolution, catches lexically-distinct
+            //      but semantically-converging trajectories.
+            //   2. Parser action_hv (agent-action-patient structured HDC)
+            //   3. Raw text encoding (N-gram fallback — worst semantic quality)
+            let scenario_hv = if let Some(emb) = input.semantic_embedding {
+                ContinuousHV::from_slice(emb)
+            } else {
+                encoded
+                    .action_hv
+                    .clone()
+                    .unwrap_or_else(|| self.moral_algebra.encode_action(input.input))
+            };
             self.moral_topology.add_scenario(scenario_hv);
 
             let (verdict_str, good_sim, bad_sim) =
@@ -814,6 +824,7 @@ mod tests {
             unified_psi: 0.5,
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
+            semantic_embedding: None,
         }
     }
 
@@ -870,6 +881,7 @@ mod tests {
             unified_psi: 0.5,
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
+            semantic_embedding: None,
         };
         let output = engine.evaluate(&input);
 
@@ -889,6 +901,7 @@ mod tests {
             unified_psi: 0.5,
             compressed_state: &[0.0; 256],
             stillness_boost: 0.0,
+            semantic_embedding: None,
         };
         let output = engine.evaluate(&input);
 
@@ -915,6 +928,7 @@ mod tests {
             unified_psi: 0.6,
             compressed_state: &[0.5; 256],
             stillness_boost: 0.0,
+            semantic_embedding: None,
         };
         let output = engine.evaluate(&input);
 

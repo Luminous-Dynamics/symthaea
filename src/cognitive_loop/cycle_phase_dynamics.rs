@@ -106,7 +106,6 @@ impl CognitiveLoopService {
         let phi_attention_weight = perception.encoding.phi_attention_weight;
         let surprise_triggered = perception.exploration.surprise_triggered;
         let moral_concern_detected = perception.moral.moral_concern_detected;
-        let _input_memoized = perception.encoding.input_memoized;
         let selected_strategy = perception.strategy.selected_strategy;
 
         // Cache moral_score for neuromod feedback (consumed in helpers/cycle_phases.rs)
@@ -537,6 +536,16 @@ impl CognitiveLoopService {
                 + (resonator_best_sim - 0.5) as f64 * 0.1)
                 .min(2.0);
         }
+        // Session 12 Item 8: Resonator similarity → semantic memory LR.
+        // High similarity (familiar pattern) → consolidate (slow LR).
+        // Low similarity (novel) → learn fast (boost LR).
+        // Science: McClelland et al. (1995) — complementary learning systems:
+        // familiar → hippocampal consolidation (slow); novel → fast encoding.
+        if resonator_best_sim > 0.8 && self.stats.total_cycles > 10 {
+            self.scale_lr("resonator_familiar", 0.95);
+        } else if resonator_best_sim < 0.3 && resonator_best_sim > 0.0 && self.stats.total_cycles > 10 {
+            self.scale_lr("resonator_novel", 1.05);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1a.2. Goal System: Apply attention bias from active goals
@@ -545,7 +554,12 @@ impl CognitiveLoopService {
 
         if let Some(top) = self.fep.goal_system.top_goal() {
             let goal_priority = top.priority;
-            if goal_priority > 0.5 {
+            // Session 12 Item 2: Skip goal LR boost during Critical urgency.
+            // Critical = recovery mode; goal-chasing works against stability.
+            // Science: Yerkes-Dodson (1908) — high arousal impairs goal-directed learning.
+            if goal_priority > 0.5
+                && !matches!(urgency, super::CycleUrgency::Critical)
+            {
                 let goal_lr_boost = (goal_priority - 0.5) * 0.1;
                 self.scale_lr("goal_priority", 1.0 + goal_lr_boost);
             }

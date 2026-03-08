@@ -706,8 +706,14 @@ impl CognitiveLoopService {
             // Science: Only conscious moments produce durable memories. Scale episodic
             // consolidation by consciousness level — low consciousness → skip storage,
             // high consciousness → prioritize memory encoding.
-            if level > 0.5 {
-                // Trigger demand-driven consolidation at high consciousness
+            // Adaptive threshold: consolidate when consciousness exceeds its own rolling
+            // average minus a margin. This ensures consolidation fires during relatively
+            // "aware" moments regardless of absolute consciousness range.
+            let ema = &mut self.carryover.history.consciousness_ema;
+            *ema = *ema * 0.95 + level * 0.05; // EMA α=0.05, ~20-cycle half-life
+            let consolidation_threshold = (*ema - 0.1).max(0.2); // floor at 0.2
+            if level > consolidation_threshold {
+                // Trigger demand-driven consolidation at above-average consciousness
                 self.fep.episodic_memory.consolidate_recent();
             }
             // Scale learning signal by consciousness quality (gradual, not on/off)

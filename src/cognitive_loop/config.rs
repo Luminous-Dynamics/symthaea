@@ -556,7 +556,7 @@ pub struct CognitiveLoopConfig {
     /// Timezone offset in hours from UTC (e.g., -5.0 for CDT, +9.0 for JST).
     /// Biorhythm stores time in UTC internally; this offset is applied via
     /// `effective_hour()` for circadian phase computation.
-    /// Default: 0.0 (UTC).
+    /// Default: 0.0 (UTC). Set to `auto_detect_timezone()` for system locale.
     #[serde(default)]
     pub timezone_offset_hours: f64,
 }
@@ -679,6 +679,15 @@ impl CognitiveLoopConfig {
             temporal_backend: TemporalBackend::CfC,
             ..Default::default()
         }
+    }
+
+    /// Auto-detect timezone from the system locale and apply it.
+    ///
+    /// Call once at startup. The detected offset is stored as explicit state;
+    /// subsequent timezone changes should go through `CognitiveLoopService::set_timezone()`.
+    pub fn with_system_timezone(mut self) -> Self {
+        self.timezone_offset_hours = crate::chronobiology::Biorhythm::detect_system_timezone();
+        self
     }
 
     /// Create configuration with HdcLtcUnified backend

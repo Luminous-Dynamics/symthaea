@@ -390,6 +390,12 @@ pub struct CognitiveLoopService {
         Option<std::sync::mpsc::Receiver<symthaea_embeddings::channel::EmbedResponse>>,
     >,
 
+    /// Last semantic embedding projected to continuous HDC space (16,384D).
+    /// Fed to the ethics engine for moral topology trajectory analysis,
+    /// giving genuine semantic resolution vs N-gram fallback.
+    #[cfg(feature = "semantic-encoder")]
+    last_semantic_continuous: Option<Vec<f32>>,
+
     /// Background training thread handle (when `config.async_training` is true
     /// and the backend is CfC).  `None` for synchronous training or HdcLtc backend.
     async_trainer: Option<AsyncTrainerHandle>,
@@ -722,6 +728,11 @@ pub struct CognitiveLoopService {
     /// Perception Manager: attention budget, coherence tracking, Yerkes-Dodson regulation.
     /// Implements CognitiveSubsystem — proposals fed into OutputCollector.
     perception_manager: managers::PerceptionManager,
+
+    /// Integrity Manager: BLAKE3 attestation, temporal consistency, behavioral canaries.
+    /// Runs tamper detection at co-prime intervals. Feature-gated behind `integrity`.
+    #[cfg(feature = "integrity")]
+    integrity_manager: crate::integrity::IntegrityManager,
 }
 
 // MetricsProvider impl is in metrics_provider.rs
