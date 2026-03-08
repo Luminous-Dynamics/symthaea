@@ -72,6 +72,7 @@ pub fn generate_keypair() -> MlKemKeyPair {
 }
 
 /// Derive a 32-byte AES-256 key from the KEM shared secret via SHA-256.
+#[allow(deprecated)] // generic-array 0.x from_slice; upstream dep
 fn derive_aes_key(shared_secret: &[u8]) -> Key<Aes256Gcm> {
     let hash = Sha256::digest(shared_secret);
     *Key::<Aes256Gcm>::from_slice(&hash)
@@ -120,6 +121,7 @@ pub fn ml_kem_encrypt_fn(
         // Generate random 12-byte nonce
         let mut nonce_bytes = [0u8; 12];
         getrandom::fill(&mut nonce_bytes).map_err(|e| format!("RNG failure: {e}"))?;
+        #[allow(deprecated)] // generic-array 0.x
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // Encrypt with AES-256-GCM (ciphertext includes 16-byte auth tag)
@@ -164,6 +166,7 @@ pub fn ml_kem_decrypt_fn(
         let cipher = Aes256Gcm::new(&aes_key);
 
         // Parse nonce (must be 12 bytes)
+        #[allow(deprecated)] // generic-array 0.x
         let nonce = Nonce::from_slice(nonce_bytes);
 
         // Decrypt and authenticate with AES-256-GCM

@@ -194,7 +194,7 @@ impl HashCommitmentSet {
 }
 
 /// Commitment scheme selector
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommitmentScheme {
     /// Classical Feldman commitments (C_i = g^{a_i})
     /// Fast, homomorphic verification, but quantum-vulnerable
@@ -203,13 +203,8 @@ pub enum CommitmentScheme {
     /// Quantum-resistant, but requires reveal phase
     HashBased,
     /// Both: Feldman for efficient verification + hash for quantum safety
+    #[default]
     Hybrid,
-}
-
-impl Default for CommitmentScheme {
-    fn default() -> Self {
-        Self::Hybrid
-    }
 }
 
 #[cfg(test)]

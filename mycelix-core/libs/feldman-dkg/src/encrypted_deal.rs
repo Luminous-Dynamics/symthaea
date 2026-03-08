@@ -64,7 +64,7 @@ impl EncryptedDeal {
         for share in &deal.shares {
             let plaintext = share.value.to_bytes();
             let result = encrypt_fn(share.index, &plaintext)
-                .map_err(|e| DkgError::EncryptionError(e))?;
+                .map_err(DkgError::EncryptionError)?;
 
             encrypted_shares.push(EncryptedSharePayload {
                 recipient: share.index,
@@ -108,10 +108,10 @@ impl EncryptedDeal {
             &payload.nonce,
             &payload.ciphertext,
         )
-        .map_err(|e| DkgError::DecryptionError(e))?;
+        .map_err(DkgError::DecryptionError)?;
 
         let arr: [u8; 32] = plaintext.try_into().map_err(|_| {
-            DkgError::DecryptionError(format!("Expected 32 bytes, got different length"))
+            DkgError::DecryptionError("Expected 32 bytes, got different length".to_string())
         })?;
         let value = crate::scalar::Scalar::from_bytes(&arr)?;
 
@@ -150,10 +150,10 @@ impl EncryptedDeal {
                 &payload.nonce,
                 &payload.ciphertext,
             )
-            .map_err(|e| DkgError::DecryptionError(e))?;
+            .map_err(DkgError::DecryptionError)?;
 
             let arr: [u8; 32] = plaintext.try_into().map_err(|_| {
-            DkgError::DecryptionError(format!("Expected 32 bytes, got different length"))
+            DkgError::DecryptionError("Expected 32 bytes, got different length".to_string())
         })?;
         let value = crate::scalar::Scalar::from_bytes(&arr)?;
             shares.push(Share::new(payload.recipient, self.dealer.0, value));

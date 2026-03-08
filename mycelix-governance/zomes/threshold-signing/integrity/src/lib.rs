@@ -18,20 +18,15 @@ pub struct Anchor(pub String);
 /// Threshold signature algorithm selection
 ///
 /// Supports classical ECDSA, post-quantum ML-DSA-65, or hybrid (both).
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
 pub enum ThresholdSignatureAlgorithm {
     /// Classical ECDSA (secp256k1)
+    #[default]
     Ecdsa,
     /// Post-quantum ML-DSA-65 (FIPS 204)
     MlDsa65,
     /// Hybrid: both ECDSA and ML-DSA-65 (defense-in-depth)
     HybridEcdsaMlDsa65,
-}
-
-impl Default for ThresholdSignatureAlgorithm {
-    fn default() -> Self {
-        Self::Ecdsa
-    }
 }
 
 /// A signing committee formed through DKG
