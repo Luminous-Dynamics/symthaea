@@ -28,13 +28,13 @@ use crate::consciousness::unified_value_evaluator::{
     Decision, EvaluationContext, UnifiedValueEvaluator,
 };
 use crate::hdc::harmony_basis::{HarmonyBasis, HarmonyInteractionMatrix, MoralFreeEnergy};
-use symthaea_types::N_HARMONIES;
 use crate::hdc::moral_algebra::{DeontologicalVerdict, MoralAlgebra, MoralVerdict};
 use crate::hdc::moral_parser::MoralParser;
 use crate::hdc::moral_topology::{
     MoralAnomalyConfig, MoralAnomalyReport, MoralTopology, MoralTopologyConfig,
     MoralTopologySummary,
 };
+use symthaea_types::N_HARMONIES;
 
 /// Unified output from the ethics engine.
 #[derive(Debug, Clone)]

@@ -62,6 +62,7 @@ fn main() {
         consciousness: f32,
         delay_ms: u64,
         /// Whether this segment is part of the crisis arc (for ambient audio mixing)
+        #[allow(dead_code)]
         crisis: bool,
     }
 
@@ -178,29 +179,20 @@ fn main() {
     //    Normal: ~60 BPM (1Hz), Crisis: ~120 BPM (2Hz)
     //    Use a low sine pulse at 50Hz, amplitude-modulated
     let heartbeat_path = audio_dir.join("ambient_heartbeat.wav");
-    let heartbeat_filter = format!(
-        concat!(
-            "anoisesrc=d={dur}:c=pink:r=44100:a=0.0001,", // near-silent carrier
-            "aevalsrc='",
-            // Heartbeat as amplitude-modulated 50Hz sine pulse
-            // Envelope: pulse every 1s normally, every 0.5s during crisis window (5.5-8.5s)
-            "0.4*sin(2*PI*50*t)*",
-            // Pulse envelope: sharp attack, fast decay
-            "(exp(-20*mod(t*(1+1.5*(gt(t,5.5)*lt(t,8.5))),1)))",
-            // Fade in/out
-            "*(0.5+0.5*tanh(3*(t-0.5)))",
-            "*(0.5+0.5*tanh(3*({dur}-t-0.5)))",
-            "':s=44100:d={dur}",
-        ),
+    // Heartbeat as amplitude-modulated 50Hz sine pulse
+    // Accelerates from 60 BPM to 120 BPM during crisis window (5.5-8.5s)
+    let heartbeat_expr = format!(
+        "0.4*sin(2*PI*50*t)\
+         *(exp(-20*mod(t*(1+1.5*(gt(t,5.5)*lt(t,8.5))),1)))\
+         *(0.5+0.5*tanh(3*(t-0.5)))\
+         *(0.5+0.5*tanh(3*({dur}-t-0.5)))",
         dur = video_duration_s,
     );
     let heartbeat_status = Command::new("ffmpeg")
         .arg("-y")
         .args([
-            "-f",
-            "lavfi",
-            "-i",
-            &heartbeat_filter,
+            "-f", "lavfi",
+            "-i", &format!("aevalsrc='{heartbeat_expr}':s=44100:d={video_duration_s}"),
             heartbeat_path.to_string_lossy().as_ref(),
         ])
         .output();
@@ -285,7 +277,7 @@ fn main() {
         .unwrap_or(false);
 
     // Build the mix: narration segments + ambient + optional original audio
-    let narr_inputs: String = (1..=valid_count)
+    let _narr_inputs: String = (1..=valid_count)
         .map(|i| format!("[s{i}]"))
         .collect::<Vec<_>>()
         .join("");

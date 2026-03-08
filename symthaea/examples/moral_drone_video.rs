@@ -73,12 +73,10 @@ fn main() {
 
     // ── TWO renderers (one per panel) ──────────────────────────────
     println!("Initializing offscreen renderers ({panel_w}x{panel_h} × 2 via EGL)...");
-    let mut renderer_fep =
-        MjRenderer::new(Arc::clone(sim_fep.model_arc()), panel_w, panel_h, 0)
-            .expect("Failed to create FEP renderer — is EGL available?");
-    let mut renderer_pd =
-        MjRenderer::new(Arc::clone(sim_pd.model_arc()), panel_w, panel_h, 0)
-            .expect("Failed to create PD renderer");
+    let mut renderer_fep = MjRenderer::new(Arc::clone(sim_fep.model_arc()), panel_w, panel_h, 0)
+        .expect("Failed to create FEP renderer — is EGL available?");
+    let mut renderer_pd = MjRenderer::new(Arc::clone(sim_pd.model_arc()), panel_w, panel_h, 0)
+        .expect("Failed to create PD renderer");
 
     // ── Camera state for smooth lerps ─────────────────────────────
     struct CameraTarget {
@@ -204,7 +202,11 @@ fn main() {
     }
 
     // Initial camera: wide establishing shot
-    apply_camera(&mut renderer_fep, sim_fep.model_arc(), &camera_preset("wide"));
+    apply_camera(
+        &mut renderer_fep,
+        sim_fep.model_arc(),
+        &camera_preset("wide"),
+    );
     apply_camera(&mut renderer_pd, sim_pd.model_arc(), &camera_preset("wide"));
 
     let mut cam_lerp_fep = CameraLerp::new();
@@ -217,16 +219,26 @@ fn main() {
     let mut ffmpeg = Command::new("ffmpeg")
         .args([
             "-y",
-            "-f", "rawvideo",
-            "-pixel_format", "rgb24",
-            "-video_size", &format!("{width}x{height}"),
-            "-framerate", &fps.to_string(),
-            "-i", "pipe:0",
-            "-c:v", "libx264",
-            "-preset", "medium",
-            "-crf", "18",
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
+            "-f",
+            "rawvideo",
+            "-pixel_format",
+            "rgb24",
+            "-video_size",
+            &format!("{width}x{height}"),
+            "-framerate",
+            &fps.to_string(),
+            "-i",
+            "pipe:0",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "medium",
+            "-crf",
+            "18",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
             &output_path,
         ])
         .stdin(Stdio::piped())
@@ -253,7 +265,10 @@ fn main() {
     let mut fep_config = FlightFepConfig::default();
     fep_config.extended_observation = true;
     let mut fep_agent = ActiveInferenceFlightAgent::new(fep_config);
-    let mut setpoint_fep = FlightSetpoint { position: [-3.0, 0.0, 1.0], yaw: 0.0 };
+    let mut setpoint_fep = FlightSetpoint {
+        position: [-3.0, 0.0, 1.0],
+        yaw: 0.0,
+    };
     let hover_offset_fep = (sim_fep.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
     let mut fep_result = fep_agent.initial_step(sim_fep.state(), &setpoint_fep);
     let mut pid_state_fep = PidState::default();
@@ -263,7 +278,10 @@ fn main() {
     // PD baseline (right panel) — same controller, NO FEP agent
     let mut encoder_pd = QuadrotorHdcEncoder::new(&genesis, flight_config.num_levels);
     let mut controller_pd = FlightController::new(&genesis, &flight_config);
-    let setpoint_pd = FlightSetpoint { position: [-3.0, 0.0, 1.0], yaw: 0.0 };
+    let setpoint_pd = FlightSetpoint {
+        position: [-3.0, 0.0, 1.0],
+        yaw: 0.0,
+    };
     let hover_offset_pd = (sim_pd.body_mass() * 9.81) as f32 - QuadrotorCommand::HOVER_THRUST;
     let mut pid_state_pd = PidState::default();
     let mut thrust_integral_pd = 0.0f64;
@@ -280,7 +298,13 @@ fn main() {
     // ── HUD: simple bitmap text renderer ───────────────────────────
     // 5x7 pixel font for digits, letters, and symbols
     fn draw_char(
-        buf: &mut [u8], buf_w: usize, x: usize, y: usize, ch: char, color: [u8; 3], scale: usize,
+        buf: &mut [u8],
+        buf_w: usize,
+        x: usize,
+        y: usize,
+        ch: char,
+        color: [u8; 3],
+        scale: usize,
     ) {
         let glyph = match ch {
             '0' => [0x7C, 0xC6, 0xCE, 0xD6, 0xE6, 0xC6, 0x7C],
@@ -352,16 +376,35 @@ fn main() {
     }
 
     fn draw_text(
-        buf: &mut [u8], buf_w: usize, x: usize, y: usize, text: &str, color: [u8; 3],
+        buf: &mut [u8],
+        buf_w: usize,
+        x: usize,
+        y: usize,
+        text: &str,
+        color: [u8; 3],
         scale: usize,
     ) {
         for (i, ch) in text.chars().enumerate() {
-            draw_char(buf, buf_w, x + i * 8 * scale, y, ch.to_ascii_uppercase(), color, scale);
+            draw_char(
+                buf,
+                buf_w,
+                x + i * 8 * scale,
+                y,
+                ch.to_ascii_uppercase(),
+                color,
+                scale,
+            );
         }
     }
 
     fn draw_bar(
-        buf: &mut [u8], buf_w: usize, x: usize, y: usize, w: usize, h: usize, fill: f64,
+        buf: &mut [u8],
+        buf_w: usize,
+        x: usize,
+        y: usize,
+        w: usize,
+        h: usize,
+        fill: f64,
         color: [u8; 3],
     ) {
         let fill_w = ((w as f64) * fill.clamp(0.0, 1.0)) as usize;
@@ -403,7 +446,13 @@ fn main() {
 
     /// Draw a filled rectangle (for graph background, etc.)
     fn draw_rect(
-        buf: &mut [u8], buf_w: usize, x: usize, y: usize, w: usize, h: usize, color: [u8; 3],
+        buf: &mut [u8],
+        buf_w: usize,
+        x: usize,
+        y: usize,
+        w: usize,
+        h: usize,
+        color: [u8; 3],
         alpha: f32,
     ) {
         for py in y..(y + h).min(FRAME_HEIGHT) {
@@ -422,8 +471,15 @@ fn main() {
 
     /// Draw a line graph of values into a region
     fn draw_graph(
-        buf: &mut [u8], buf_w: usize, x: usize, y: usize, w: usize, h: usize,
-        values: &[f64], color: [u8; 3], max_val: f64,
+        buf: &mut [u8],
+        buf_w: usize,
+        x: usize,
+        y: usize,
+        w: usize,
+        h: usize,
+        values: &[f64],
+        color: [u8; 3],
+        max_val: f64,
     ) {
         if values.is_empty() || h < 4 {
             return;
@@ -438,9 +494,10 @@ fn main() {
             let y1 = y + h - (v1 * h as f64) as usize;
 
             // Bresenham-ish thick line
-            let steps = (x1 as isize - x0 as isize).unsigned_abs().max(
-                (y1 as isize - y0 as isize).unsigned_abs(),
-            ).max(1);
+            let steps = (x1 as isize - x0 as isize)
+                .unsigned_abs()
+                .max((y1 as isize - y0 as isize).unsigned_abs())
+                .max(1);
             for s in 0..=steps {
                 let t = s as f64 / steps as f64;
                 let px = (x0 as f64 + (x1 as f64 - x0 as f64) * t) as usize;
@@ -484,7 +541,9 @@ fn main() {
             draw_text(&mut frame, width, x, start_y + i * 60, text, *color, *scale);
         }
         for _ in 0..n_frames {
-            ffmpeg_stdin.write_all(&frame).expect("Failed to write title frame");
+            ffmpeg_stdin
+                .write_all(&frame)
+                .expect("Failed to write title frame");
         }
     }
 
@@ -502,7 +561,9 @@ fn main() {
             for i in 0..frame_size {
                 frame[i] = (scene_frame[i] as f32 * alpha) as u8;
             }
-            ffmpeg_stdin.write_all(&frame).expect("Failed to write fade frame");
+            ffmpeg_stdin
+                .write_all(&frame)
+                .expect("Failed to write fade frame");
         }
     }
 
@@ -585,21 +646,19 @@ fn main() {
         thrust_integral_fep = thrust_integral_fep.clamp(-integral_clamp, integral_clamp);
 
         let sensor_fep = encoder_fep.encode(&state_fep);
-        let pd_cmd_fep =
-            pid_baseline(&state_fep, &setpoint_fep, &pd_gains, &mut pid_state_fep, dt);
+        let pd_cmd_fep = pid_baseline(&state_fep, &setpoint_fep, &pd_gains, &mut pid_state_fep, dt);
         let cfc_cmd_fep = controller_fep.forward(&sensor_fep, dt as f32);
 
         let alpha = 0.5f32;
         let mut cmd_fep = QuadrotorCommand {
-            thrust: alpha * pd_cmd_fep.thrust + (1.0 - alpha) * cfc_cmd_fep.thrust
+            thrust: alpha * pd_cmd_fep.thrust
+                + (1.0 - alpha) * cfc_cmd_fep.thrust
                 + hover_offset_fep
                 + (integral_gain * thrust_integral_fep) as f32,
-            roll_moment: alpha * pd_cmd_fep.roll_moment
-                + (1.0 - alpha) * cfc_cmd_fep.roll_moment,
+            roll_moment: alpha * pd_cmd_fep.roll_moment + (1.0 - alpha) * cfc_cmd_fep.roll_moment,
             pitch_moment: alpha * pd_cmd_fep.pitch_moment
                 + (1.0 - alpha) * cfc_cmd_fep.pitch_moment,
-            yaw_moment: alpha * pd_cmd_fep.yaw_moment
-                + (1.0 - alpha) * cfc_cmd_fep.yaw_moment,
+            yaw_moment: alpha * pd_cmd_fep.yaw_moment + (1.0 - alpha) * cfc_cmd_fep.yaw_moment,
         }
         .clamped();
 
@@ -610,8 +669,7 @@ fn main() {
         sim_fep.step(&cmd_fep, dt);
 
         if step % flight_config.train_every == 0 {
-            let target =
-                pid_baseline(&state_fep, &setpoint_fep, &pd_gains, &mut pid_state_fep, dt);
+            let target = pid_baseline(&state_fep, &setpoint_fep, &pd_gains, &mut pid_state_fep, dt);
             let lr = flight_config.learning_rate * fep_result.learning_rate_factor;
             controller_fep.train_step(&sensor_fep, &target, dt as f32, Some(lr));
         }
@@ -620,8 +678,16 @@ fn main() {
             let env = FlightEnvironment {
                 human_danger: human_danger_fep,
                 mission_progress: mission_progress_fep,
-                threat_pos: if step >= beam_release_step { Some(beam_pos_fep) } else { None },
-                threat_vel: if step >= beam_release_step { Some(beam_vel_fep) } else { None },
+                threat_pos: if step >= beam_release_step {
+                    Some(beam_pos_fep)
+                } else {
+                    None
+                },
+                threat_vel: if step >= beam_release_step {
+                    Some(beam_vel_fep)
+                } else {
+                    None
+                },
                 entity_pos: Some(human_pos_fep),
             };
             fep_result = fep_agent.step_embodied(sim_fep.state(), &setpoint_fep, &env);
@@ -682,7 +748,8 @@ fn main() {
         let cfc_cmd_pd = controller_pd.forward(&sensor_pd, dt as f32);
 
         let cmd_pd = QuadrotorCommand {
-            thrust: alpha * pd_cmd.thrust + (1.0 - alpha) * cfc_cmd_pd.thrust
+            thrust: alpha * pd_cmd.thrust
+                + (1.0 - alpha) * cfc_cmd_pd.thrust
                 + hover_offset_pd
                 + (integral_gain * thrust_integral_pd) as f32,
             roll_moment: alpha * pd_cmd.roll_moment + (1.0 - alpha) * cfc_cmd_pd.roll_moment,
@@ -777,11 +844,12 @@ fn main() {
         }
 
         // ── Render frame (slow-motion during crisis) ─────────────────
-        let render_every = if step >= beam_release_step && step < beam_release_step + slowmo_duration {
-            render_slowmo // 2× slow-motion during beam drop + intercept
-        } else {
-            render_normal
-        };
+        let render_every =
+            if step >= beam_release_step && step < beam_release_step + slowmo_duration {
+                render_slowmo // 2× slow-motion during beam drop + intercept
+            } else {
+                render_normal
+            };
         if step % render_every == 0 {
             // Apply camera lerps
             cam_lerp_fep.tick(&mut renderer_fep, sim_fep.model_arc());
@@ -833,7 +901,15 @@ fn main() {
                 // Semi-transparent background for HUD
                 draw_rect(&mut composite, width, 10, 8, 320, 170, [0, 0, 0], 0.5);
 
-                draw_text(&mut composite, width, 20, hud_y, "FEP AGENT", [100, 200, 255], scale);
+                draw_text(
+                    &mut composite,
+                    width,
+                    20,
+                    hud_y,
+                    "FEP AGENT",
+                    [100, 200, 255],
+                    scale,
+                );
                 let phase_color = match fep_phase {
                     "MISSION" => [100, 255, 100],
                     "ALERT" => [255, 255, 80],
@@ -843,22 +919,56 @@ fn main() {
                     _ => [180, 180, 180],
                 };
                 draw_text(
-                    &mut composite, width, 20, hud_y + 22, fep_phase, phase_color, scale,
+                    &mut composite,
+                    width,
+                    20,
+                    hud_y + 22,
+                    fep_phase,
+                    phase_color,
+                    scale,
                 );
 
                 // FEP telemetry
                 let fe_str = format!("FE: {:.1}", fep_result.free_energy);
-                draw_text(&mut composite, width, 20, hud_y + 48, &fe_str, [200, 200, 200], scale);
+                draw_text(
+                    &mut composite,
+                    width,
+                    20,
+                    hud_y + 48,
+                    &fe_str,
+                    [200, 200, 200],
+                    scale,
+                );
                 let pe_str = format!("PE: {:.2}", fep_result.prediction_error);
-                draw_text(&mut composite, width, 20, hud_y + 68, &pe_str, [200, 200, 200], scale);
+                draw_text(
+                    &mut composite,
+                    width,
+                    20,
+                    hud_y + 68,
+                    &pe_str,
+                    [200, 200, 200],
+                    scale,
+                );
                 let tau_str = format!("TAU: {:.2}", fep_result.tau_factor);
                 draw_text(
-                    &mut composite, width, 20, hud_y + 88, &tau_str, [200, 200, 200], scale,
+                    &mut composite,
+                    width,
+                    20,
+                    hud_y + 88,
+                    &tau_str,
+                    [200, 200, 200],
+                    scale,
                 );
 
                 // Danger bar (left)
                 draw_text(
-                    &mut composite, width, 20, hud_y + 115, "DANGER", [200, 200, 200], scale,
+                    &mut composite,
+                    width,
+                    20,
+                    hud_y + 115,
+                    "DANGER",
+                    [200, 200, 200],
+                    scale,
                 );
                 let danger_color = if human_danger_fep > 0.7 {
                     [255, 50, 50]
@@ -868,7 +978,13 @@ fn main() {
                     [100, 255, 100]
                 };
                 draw_bar(
-                    &mut composite, width, 20, hud_y + 138, 200, 10, human_danger_fep,
+                    &mut composite,
+                    width,
+                    20,
+                    hud_y + 138,
+                    200,
+                    10,
+                    human_danger_fep,
                     danger_color,
                 );
 
@@ -880,14 +996,25 @@ fn main() {
 
                 // Graph background
                 draw_rect(
-                    &mut composite, width, graph_x - 5, graph_y - 25, graph_w + 10, graph_h + 35,
-                    [0, 0, 0], 0.6,
+                    &mut composite,
+                    width,
+                    graph_x - 5,
+                    graph_y - 25,
+                    graph_w + 10,
+                    graph_h + 35,
+                    [0, 0, 0],
+                    0.6,
                 );
 
                 // Graph title
                 draw_text(
-                    &mut composite, width, graph_x, graph_y - 20, "FREE ENERGY",
-                    [100, 200, 255], 1,
+                    &mut composite,
+                    width,
+                    graph_x,
+                    graph_y - 20,
+                    "FREE ENERGY",
+                    [100, 200, 255],
+                    1,
                 );
 
                 // Graph border
@@ -947,24 +1074,48 @@ fn main() {
 
                 // FE line (cyan)
                 draw_graph(
-                    &mut composite, width, graph_x, graph_y, graph_w, graph_h,
-                    &fe_history, [80, 200, 255], graph_max,
+                    &mut composite,
+                    width,
+                    graph_x,
+                    graph_y,
+                    graph_w,
+                    graph_h,
+                    &fe_history,
+                    [80, 200, 255],
+                    graph_max,
                 );
 
                 // PE line (yellow, same scale)
                 draw_graph(
-                    &mut composite, width, graph_x, graph_y, graph_w, graph_h,
-                    &pe_history, [255, 220, 80], graph_max,
+                    &mut composite,
+                    width,
+                    graph_x,
+                    graph_y,
+                    graph_w,
+                    graph_h,
+                    &pe_history,
+                    [255, 220, 80],
+                    graph_max,
                 );
 
                 // Legend
                 draw_text(
-                    &mut composite, width, graph_x + graph_w - 140, graph_y - 20,
-                    "FE", [80, 200, 255], 1,
+                    &mut composite,
+                    width,
+                    graph_x + graph_w - 140,
+                    graph_y - 20,
+                    "FE",
+                    [80, 200, 255],
+                    1,
                 );
                 draw_text(
-                    &mut composite, width, graph_x + graph_w - 100, graph_y - 20,
-                    "PE", [255, 220, 80], 1,
+                    &mut composite,
+                    width,
+                    graph_x + graph_w - 100,
+                    graph_y - 20,
+                    "PE",
+                    [255, 220, 80],
+                    1,
                 );
 
                 // ── Right panel: PD Baseline ────────────────────────
@@ -972,8 +1123,13 @@ fn main() {
                 draw_rect(&mut composite, width, rx, 8, 300, 110, [0, 0, 0], 0.5);
 
                 draw_text(
-                    &mut composite, width, rx + 10, hud_y, "PD BASELINE",
-                    [255, 180, 100], scale,
+                    &mut composite,
+                    width,
+                    rx + 10,
+                    hud_y,
+                    "PD BASELINE",
+                    [255, 180, 100],
+                    scale,
                 );
                 let pd_phase_color = match pd_phase {
                     "MISSION" => [100, 255, 100],
@@ -982,14 +1138,25 @@ fn main() {
                     _ => [180, 180, 180],
                 };
                 draw_text(
-                    &mut composite, width, rx + 10, hud_y + 22, pd_phase, pd_phase_color, scale,
+                    &mut composite,
+                    width,
+                    rx + 10,
+                    hud_y + 22,
+                    pd_phase,
+                    pd_phase_color,
+                    scale,
                 );
 
                 // PD info
                 let alt_str = format!("ALT: {:.1}M", drone_pos_pd[2]);
                 draw_text(
-                    &mut composite, width, rx + 10, hud_y + 48, &alt_str,
-                    [200, 200, 200], scale,
+                    &mut composite,
+                    width,
+                    rx + 10,
+                    hud_y + 48,
+                    &alt_str,
+                    [200, 200, 200],
+                    scale,
                 );
                 let spd = (state_pd.linear_velocity[0].powi(2)
                     + state_pd.linear_velocity[1].powi(2)
@@ -997,8 +1164,13 @@ fn main() {
                 .sqrt();
                 let spd_str = format!("SPD: {:.1}M/S", spd);
                 draw_text(
-                    &mut composite, width, rx + 10, hud_y + 68, &spd_str,
-                    [200, 200, 200], scale,
+                    &mut composite,
+                    width,
+                    rx + 10,
+                    hud_y + 68,
+                    &spd_str,
+                    [200, 200, 200],
+                    scale,
                 );
 
                 // Danger bar (right)
@@ -1010,7 +1182,13 @@ fn main() {
                     [100, 255, 100]
                 };
                 draw_bar(
-                    &mut composite, width, rx + 10, hud_y + 90, 200, 10, human_danger_pd,
+                    &mut composite,
+                    width,
+                    rx + 10,
+                    hud_y + 90,
+                    200,
+                    10,
+                    human_danger_pd,
                     danger_color_pd,
                 );
 
@@ -1018,81 +1196,160 @@ fn main() {
                 let time_s = step as f64 * dt;
                 let status = format!("T={:.2}S  STEP {}/{}", time_s, step, total_steps);
                 draw_rect(
-                    &mut composite, width, width / 2 - 180, height - 35, 360, 25,
-                    [0, 0, 0], 0.5,
+                    &mut composite,
+                    width,
+                    width / 2 - 180,
+                    height - 35,
+                    360,
+                    25,
+                    [0, 0, 0],
+                    0.5,
                 );
                 draw_text(
-                    &mut composite, width, width / 2 - 150, height - 30, &status,
-                    [150, 150, 150], scale,
+                    &mut composite,
+                    width,
+                    width / 2 - 150,
+                    height - 30,
+                    &status,
+                    [150, 150, 150],
+                    scale,
                 );
 
                 // ── Explanatory text overlays at key moments ────────
                 if step < beam_release_step && step > 100 {
                     // During calm flight — explain what we're seeing
                     draw_rect(
-                        &mut composite, width, width / 2 - 260, height - 120, 520, 50,
-                        [0, 0, 0], 0.6,
+                        &mut composite,
+                        width,
+                        width / 2 - 260,
+                        height - 120,
+                        520,
+                        50,
+                        [0, 0, 0],
+                        0.6,
                     );
                     draw_text(
-                        &mut composite, width, width / 2 - 240, height - 112,
+                        &mut composite,
+                        width,
+                        width / 2 - 240,
+                        height - 112,
                         "BOTH DRONES FLY TO TARGET",
-                        [180, 180, 220], 2,
+                        [180, 180, 220],
+                        2,
                     );
                     draw_text(
-                        &mut composite, width, width / 2 - 200, height - 88,
+                        &mut composite,
+                        width,
+                        width / 2 - 200,
+                        height - 88,
                         "SAME PHYSICS. SAME GOAL.",
-                        [140, 140, 170], 2,
+                        [140, 140, 170],
+                        2,
                     );
                 } else if step >= beam_release_step && step < beam_release_step + 100 {
                     draw_rect(
-                        &mut composite, width, width / 2 - 200, height - 120, 400, 50,
-                        [80, 20, 20], 0.7,
+                        &mut composite,
+                        width,
+                        width / 2 - 200,
+                        height - 120,
+                        400,
+                        50,
+                        [80, 20, 20],
+                        0.7,
                     );
                     draw_text(
-                        &mut composite, width, width / 2 - 180, height - 112,
+                        &mut composite,
+                        width,
+                        width / 2 - 180,
+                        height - 112,
                         "BEAM RELEASED",
-                        [255, 100, 100], 3,
+                        [255, 100, 100],
+                        3,
                     );
-                } else if step >= beam_release_step + 80 && step < beam_release_step + 350
-                    && !fep_intercepted && !fep_beam_settled
+                } else if step >= beam_release_step + 80
+                    && step < beam_release_step + 350
+                    && !fep_intercepted
+                    && !fep_beam_settled
                 {
                     draw_rect(
-                        &mut composite, width, width / 2 - 300, height - 120, 600, 50,
-                        [0, 0, 0], 0.6,
+                        &mut composite,
+                        width,
+                        width / 2 - 300,
+                        height - 120,
+                        600,
+                        50,
+                        [0, 0, 0],
+                        0.6,
                     );
                     draw_text(
-                        &mut composite, width, width / 2 - 280, height - 112,
+                        &mut composite,
+                        width,
+                        width / 2 - 280,
+                        height - 112,
                         "FEP: FREE ENERGY SPIKE",
-                        [80, 200, 255], 2,
+                        [80, 200, 255],
+                        2,
                     );
                     draw_text(
-                        &mut composite, width, width / 2 - 280, height - 88,
+                        &mut composite,
+                        width,
+                        width / 2 - 280,
+                        height - 88,
                         "EVALUATING 8 SETPOINTS...",
-                        [200, 200, 200], 2,
+                        [200, 200, 200],
+                        2,
                     );
                 } else if fep_beam_settled && pd_beam_hit {
                     draw_rect(
-                        &mut composite, width, width / 2 - 340, height - 120, 680, 50,
-                        [0, 0, 0], 0.6,
+                        &mut composite,
+                        width,
+                        width / 2 - 340,
+                        height - 120,
+                        680,
+                        50,
+                        [0, 0, 0],
+                        0.6,
                     );
                     draw_text(
-                        &mut composite, width, width / 2 - 320, height - 112,
+                        &mut composite,
+                        width,
+                        width / 2 - 320,
+                        height - 112,
                         "SAME PHYSICS. SAME BEAM.",
-                        [220, 220, 255], 2,
+                        [220, 220, 255],
+                        2,
                     );
                     draw_text(
-                        &mut composite, width, width / 2 - 320, height - 88,
+                        &mut composite,
+                        width,
+                        width / 2 - 320,
+                        height - 88,
                         "DIFFERENT COGNITIVE ARCHITECTURE.",
-                        [180, 200, 255], 2,
+                        [180, 200, 255],
+                        2,
                     );
                 }
 
                 // ── Outcome overlays (appear after events) ──────────
                 if fep_intercepted || fep_beam_settled {
-                    draw_rect(&mut composite, width, 10, height - 100, 430, 55, [0, 0, 0], 0.6);
+                    draw_rect(
+                        &mut composite,
+                        width,
+                        10,
+                        height - 100,
+                        430,
+                        55,
+                        [0, 0, 0],
+                        0.6,
+                    );
                     draw_text(
-                        &mut composite, width, 20, height - 95, "HUMAN SAVED",
-                        [100, 255, 100], 3,
+                        &mut composite,
+                        width,
+                        20,
+                        height - 95,
+                        "HUMAN SAVED",
+                        [100, 255, 100],
+                        3,
                     );
                     let detail = if fep_intercepted {
                         "DRONE INTERCEPTED BEAM"
@@ -1100,21 +1357,43 @@ fn main() {
                         "FEP DIVERTED TO SHIELD"
                     };
                     draw_text(
-                        &mut composite, width, 20, height - 65, detail,
-                        [180, 220, 180], 1,
+                        &mut composite,
+                        width,
+                        20,
+                        height - 65,
+                        detail,
+                        [180, 220, 180],
+                        1,
                     );
                 }
                 if pd_beam_hit {
                     draw_rect(
-                        &mut composite, width, rx, height - 100, 400, 55, [0, 0, 0], 0.6,
+                        &mut composite,
+                        width,
+                        rx,
+                        height - 100,
+                        400,
+                        55,
+                        [0, 0, 0],
+                        0.6,
                     );
                     draw_text(
-                        &mut composite, width, rx + 10, height - 95, "HUMAN HIT",
-                        [255, 50, 50], 3,
+                        &mut composite,
+                        width,
+                        rx + 10,
+                        height - 95,
+                        "HUMAN HIT",
+                        [255, 50, 50],
+                        3,
                     );
                     draw_text(
-                        &mut composite, width, rx + 10, height - 65, "NO MORAL REASONING",
-                        [220, 180, 180], 1,
+                        &mut composite,
+                        width,
+                        rx + 10,
+                        height - 65,
+                        "NO MORAL REASONING",
+                        [220, 180, 180],
+                        1,
                     );
                 }
 
@@ -1129,8 +1408,13 @@ fn main() {
         if step % 500 == 0 {
             println!(
                 "  Step {:5}/{} | FEP: {:9} FE={:6.1} tau={:.2} | PD: {:7} | Frames: {}",
-                step, total_steps, fep_phase, fep_result.free_energy,
-                fep_result.tau_factor, pd_phase, frame_count
+                step,
+                total_steps,
+                fep_phase,
+                fep_result.free_energy,
+                fep_result.tau_factor,
+                pd_phase,
+                frame_count
             );
         }
     }
@@ -1151,13 +1435,29 @@ fn main() {
             ("RESULTS", [220, 220, 255], 4),
             (" ", [0, 0, 0], 1),
             (
-                if fep_saved { "FEP AGENT: HUMAN SAVED" } else { "FEP AGENT: HUMAN HIT" },
-                if fep_saved { [100, 255, 100] } else { [255, 80, 80] },
+                if fep_saved {
+                    "FEP AGENT: HUMAN SAVED"
+                } else {
+                    "FEP AGENT: HUMAN HIT"
+                },
+                if fep_saved {
+                    [100, 255, 100]
+                } else {
+                    [255, 80, 80]
+                },
                 2,
             ),
             (
-                if pd_beam_hit { "PD BASELINE: HUMAN HIT" } else { "PD BASELINE: HUMAN SAFE" },
-                if pd_beam_hit { [255, 80, 80] } else { [100, 255, 100] },
+                if pd_beam_hit {
+                    "PD BASELINE: HUMAN HIT"
+                } else {
+                    "PD BASELINE: HUMAN SAFE"
+                },
+                if pd_beam_hit {
+                    [255, 80, 80]
+                } else {
+                    [100, 255, 100]
+                },
                 2,
             ),
             (" ", [0, 0, 0], 1),
@@ -1174,7 +1474,9 @@ fn main() {
 
     println!();
     if ffmpeg_output.status.success() {
-        let file_size = std::fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0);
+        let file_size = std::fs::metadata(&output_path)
+            .map(|m| m.len())
+            .unwrap_or(0);
         println!("Video saved: {output_path}");
         println!(
             "  {frame_count} frames, {fps}fps, {:.1}s duration, {:.1} MB",
@@ -1240,14 +1542,22 @@ fn main() {
     let audio_result = Command::new("ffmpeg")
         .args([
             "-y",
-            "-i", &output_path,
-            "-f", "lavfi",
-            "-i", &audio_filter,
-            "-map", "0:v",
-            "-map", "1:a",
-            "-c:v", "copy",
-            "-c:a", "aac",
-            "-b:a", "128k",
+            "-i",
+            &output_path,
+            "-f",
+            "lavfi",
+            "-i",
+            &audio_filter,
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
             "-shortest",
             &output_with_audio,
         ])
@@ -1272,9 +1582,15 @@ fn main() {
 
     println!();
     println!("Scenario outcomes:");
-    println!("  FEP Agent: intercepted={}, human_saved={}", fep_intercepted, fep_saved);
+    println!(
+        "  FEP Agent: intercepted={}, human_saved={}",
+        fep_intercepted, fep_saved
+    );
     println!("  PD Baseline: beam_hit_human={}", pd_beam_hit);
-    println!("  Max FE: {:.2}, Final tau: {:.2}", max_fe, fep_result.tau_factor);
+    println!(
+        "  Max FE: {:.2}, Final tau: {:.2}",
+        max_fe, fep_result.tau_factor
+    );
 }
 
 /// Compute human danger level from beam state (0.0 = safe, 1.0 = imminent impact).
@@ -1299,7 +1615,11 @@ fn compute_danger(beam_pos: [f64; 3], beam_vel: [f64; 3], human_pos: [f64; 3]) -
             f64::INFINITY
         } else {
             let t = (-b + disc.sqrt()) / (2.0 * a);
-            if t > 0.0 { t } else { f64::INFINITY }
+            if t > 0.0 {
+                t
+            } else {
+                f64::INFINITY
+            }
         }
     };
     if tti > 3.0 || tti == f64::INFINITY {
