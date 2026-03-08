@@ -84,8 +84,8 @@ impl CognitiveLoopService {
         // Chronobiology: refresh biorhythm every 97 cycles (co-prime amortization)
         self.biorhythm_mgr.refresh_counter += 1;
         if self.biorhythm_mgr.refresh_counter >= super::super::thresholds::BIORHYTHM_INTERVAL {
-            self.biorhythm_mgr.rhythm = crate::chronobiology::Biorhythm::current();
-            // #14: Use effective_hour (with phase offset) for circadian modulation
+            self.biorhythm_mgr.refresh();
+            // #14: Use effective_hour (with phase offset + timezone) for circadian modulation
             let effective_hour = self.biorhythm_mgr.rhythm.effective_hour();
             self.neuromod
                 .bath
@@ -102,7 +102,6 @@ impl CognitiveLoopService {
                 self.neuromod.bath.engage_anomaly_recovery();
                 self.carryover.urgency.anomaly_drift_recovery = 50;
             }
-            self.biorhythm_mgr.refresh_counter = 0;
         }
         // #4: Countdown and disengage drift recovery
         if self.carryover.urgency.anomaly_drift_recovery > 0 {

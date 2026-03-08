@@ -24,6 +24,10 @@ pub struct MindConfig {
     pub min_consciousness: f64,
     /// Enable social coherence (theory of mind for multi-agent)
     pub enable_social_coherence: bool,
+    /// Timezone offset in hours from UTC (e.g., -5.0 for CDT, +9.0 for JST).
+    /// Used by `ContinuousMind::tick()` for timezone-aware biorhythm.
+    #[serde(default)]
+    pub timezone_offset_hours: f64,
 }
 
 impl Default for MindConfig {
@@ -37,6 +41,7 @@ impl Default for MindConfig {
             learning_rate: 0.01,
             min_consciousness: 0.1,
             enable_social_coherence: false,
+            timezone_offset_hours: 0.0,
         }
     }
 }

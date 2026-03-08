@@ -20,7 +20,7 @@ impl ContinuousMind {
         self.stats.total_ticks += 1;
 
         // Update Chronobiology
-        let bio = Biorhythm::current();
+        let bio = Biorhythm::current_with_tz(self.config.timezone_offset_hours);
         self.state.biorhythm = Some(bio.clone());
         self.state.arousal = bio.arousal_mod as f32;
 

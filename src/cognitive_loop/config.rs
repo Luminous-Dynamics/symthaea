@@ -551,6 +551,14 @@ pub struct CognitiveLoopConfig {
     /// Prevents over-allocation of ventral pipeline resources. Default: 3.
     #[cfg(feature = "foveation")]
     pub foveation_max_dispatches: u8,
+
+    // ── Chronobiology ──────────────────────────────────────────────────
+    /// Timezone offset in hours from UTC (e.g., -5.0 for CDT, +9.0 for JST).
+    /// Biorhythm stores time in UTC internally; this offset is applied via
+    /// `effective_hour()` for circadian phase computation.
+    /// Default: 0.0 (UTC).
+    #[serde(default)]
+    pub timezone_offset_hours: f64,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -659,6 +667,7 @@ impl Default for CognitiveLoopConfig {
             enable_foveation: false,
             #[cfg(feature = "foveation")]
             foveation_max_dispatches: 3,
+            timezone_offset_hours: 0.0,
         }
     }
 }
