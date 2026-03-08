@@ -27,6 +27,22 @@ fn rng_range(seed: &mut u64, lo: u64, hi: u64) -> u64 {
     lo + simple_rng(seed) % (hi - lo + 1)
 }
 
+/// Standard valid MintedCurrencyParams for testing.
+fn valid_minted_params() -> MintedCurrencyParams {
+    MintedCurrencyParams {
+        name: "TestCoin".into(),
+        symbol: "TC".into(),
+        description: "A test currency".into(),
+        credit_limit: 40,
+        demurrage_rate: 0.02,
+        max_service_hours: 8,
+        min_service_minutes: 15,
+        requires_confirmation: false,
+        confirmation_timeout_hours: 0,
+        max_exchanges_per_day: 0,
+    }
+}
+
 // =============================================================================
 // Section 1: Demurrage Stress Tests
 // =============================================================================
@@ -1176,10 +1192,7 @@ fn test_minted_rate_limit_boundary() {
 
     // One above boundary
     base.max_exchanges_per_day = MINTED_MAX_EXCHANGES_PER_DAY_MAX + 1;
-    assert!(
-        base.validate().is_err(),
-        "Above max should be invalid"
-    );
+    assert!(base.validate().is_err(), "Above max should be invalid");
 
     // u8::MAX
     base.max_exchanges_per_day = u8::MAX;
@@ -1188,36 +1201,34 @@ fn test_minted_rate_limit_boundary() {
     // All valid values 1..=MAX
     for v in 1..=MINTED_MAX_EXCHANGES_PER_DAY_MAX {
         base.max_exchanges_per_day = v;
-        assert!(
-            base.validate().is_ok(),
-            "Value {} should be valid",
-            v
-        );
+        assert!(base.validate().is_ok(), "Value {} should be valid", v);
     }
 }
 
 /// Stress test: confirmation_timeout_hours boundary.
-/// When requires_confirmation is true, timeout must be > 0.
-/// When false, timeout is ignored.
+/// Valid range: 0..=MINTED_CONFIRMATION_TIMEOUT_MAX.
 #[test]
 fn test_minted_confirmation_timeout_boundary() {
+    use mycelix_finance_types::MINTED_CONFIRMATION_TIMEOUT_MAX;
+
     let mut p = valid_minted_params();
 
-    // No confirmation required: timeout doesn't matter
-    p.requires_confirmation = false;
+    // Zero timeout is valid (no confirmation or instant)
     p.confirmation_timeout_hours = 0;
     assert!(p.validate().is_ok());
 
-    // Confirmation required: timeout must be > 0
-    p.requires_confirmation = true;
-    p.confirmation_timeout_hours = 0;
-    assert!(
-        p.validate().is_err(),
-        "Confirmation required but timeout=0 should fail"
-    );
+    // Exact boundary
+    p.confirmation_timeout_hours = MINTED_CONFIRMATION_TIMEOUT_MAX;
+    assert!(p.validate().is_ok(), "Max timeout should be valid");
 
-    p.confirmation_timeout_hours = 1;
-    assert!(p.validate().is_ok(), "timeout=1 with confirmation should pass");
+    // One above boundary
+    p.confirmation_timeout_hours = MINTED_CONFIRMATION_TIMEOUT_MAX + 1;
+    assert!(p.validate().is_err(), "Above max timeout should be invalid");
+
+    // With confirmation enabled, same boundaries apply
+    p.requires_confirmation = true;
+    p.confirmation_timeout_hours = 48;
+    assert!(p.validate().is_ok(), "48h with confirmation should pass");
 
     p.confirmation_timeout_hours = 168; // 1 week
     assert!(p.validate().is_ok(), "1-week timeout should pass");

@@ -1442,10 +1442,9 @@ pub fn open_minted_dispute(input: OpenDisputeInput) -> ExternResult<MintedDisput
 pub fn resolve_minted_dispute(input: ResolveDisputeInput) -> ExternResult<MintedDispute> {
     let (exchange, _) = find_minted_exchange(&input.exchange_id)?;
 
-    let (dispute_record, dispute) =
-        find_dispute_record(&input.exchange_id)?.ok_or(wasm_error!(WasmErrorInner::Guest(
-            "No dispute found for this exchange".into()
-        )))?;
+    let (dispute_record, dispute) = find_dispute_record(&input.exchange_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("No dispute found for this exchange".into())
+    ))?;
 
     if dispute.resolved.is_some() {
         return Err(wasm_error!(WasmErrorInner::Guest(
