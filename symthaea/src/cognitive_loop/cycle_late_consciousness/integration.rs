@@ -525,22 +525,28 @@ impl CognitiveLoopService {
         // Attention, Recurrence, Embodiment, Knowledge, Synchrony.
         // Urgency-adaptive: Critical=every 5th, Normal=every 10th, Cruise=every 20th
         let consciousness_level = if ctx.urgency.should_run(self.stats.total_cycles, 5, 10, 20) {
-            // Wire embodiment factor from cognitive loop signals
-            // Science: Friston (2010) — low PE = good embodied prediction (sensorimotor accuracy)
-            // Science: Barrett (2017) — interoceptive coherence from allostatic regulation
+            // Wire embodiment factor with genuine prediction error signals.
+            // Previously predicted==actual always → no real error signal.
+            //
+            // Sensorimotor: predicted = confidence (what we expect to achieve),
+            // actual = 1-PE (what we actually achieved). The gap between
+            // confidence and outcome IS the sensorimotor prediction error.
+            // Science: Friston (2010) — embodied cognition from prediction accuracy.
             self.master_equation.embodiment_factor.record_prediction(
-                1.0 - ctx.prediction_error as f64,
-                1.0 - ctx.prediction_error as f64,
+                self.prediction_confidence.clamp(0.0, 1.0),    // predicted outcome
+                (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0), // actual outcome
             );
-            // Fix 3a: Use allostatic load as direct interoceptive coherence signal.
-            // Low allostatic load = high body coherence (expected ≈ actual).
-            // Science: Barrett (2017) — interoceptive accuracy tracks allostatic regulation
+            // Interoceptive: expected = homeostatic target (arousal ~0.3),
+            // actual = current body arousal. The mismatch captures how well
+            // the system predicts its own bodily state.
+            // Science: Barrett (2017) — interoceptive accuracy is prediction
+            // of internal states, not just current state readout.
             {
-                let allostatic = self.neuromod.bath.allostatic_load;
-                let coherence = 1.0 - allostatic as f64;
+                let expected_arousal = 0.3_f64; // homeostatic arousal target
+                let actual_arousal = late.body_arousal as f64;
                 self.master_equation.embodiment_factor.update_interoceptive(
-                    coherence, // expected = current body model
-                    coherence, // actual matches expected when body is coherent
+                    expected_arousal,
+                    actual_arousal,
                 );
             }
 

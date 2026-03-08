@@ -1233,3 +1233,52 @@ proptest! {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 29. Session 10: Adaptive feedback intelligence invariants
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
+    /// Verify Session 10 invariants under fuzzed inputs:
+    /// - Confidence never crashes below 0.0 (crash detector floor)
+    /// - Crash freeze remaining bounded [0, 3]
+    /// - Homeostasis pull adaptation doesn't cause efficiency to go negative
+    /// - Hysteresis factor bounded [0.5, 1.0]
+    /// - Proposal source count bounded and finite
+    #[test]
+    fn prop_session10_stability_invariants(inputs in fuzz_input_sequence(50, 80)) {
+        let mut service = feedback_service();
+        for (i, input) in inputs.iter().enumerate() {
+            let result = service.cycle(input);
+            let m = &result.metadata;
+            let conf = service.prediction_confidence();
+
+            // Confidence must always be in [0.0, 1.0] (crash detector must not undershoot)
+            prop_assert!(conf >= 0.0 && conf <= 1.0,
+                "confidence out of bounds after crash detector: {conf} at cycle {i}");
+
+            // Crash freeze remaining must be bounded [0, 3]
+            prop_assert!(m.crash_freeze_remaining <= 3,
+                "crash_freeze_remaining too high: {} at cycle {i}", m.crash_freeze_remaining);
+
+            // Homeostasis efficiency must remain finite and non-negative
+            assert_finite_f32(m.homeostasis_efficiency,
+                &format!("homeostasis_efficiency@cycle{i}"))?;
+            prop_assert!(m.homeostasis_efficiency >= 0.0,
+                "homeostasis_efficiency negative: {} at cycle {i}", m.homeostasis_efficiency);
+
+            // Hysteresis factor must be [FLOOR, 1.0]
+            assert_finite_f32(m.hysteresis_factor,
+                &format!("hysteresis_factor@cycle{i}"))?;
+            prop_assert!(m.hysteresis_factor >= 0.5 && m.hysteresis_factor <= 1.0,
+                "hysteresis_factor out of bounds: {} at cycle {i}", m.hysteresis_factor);
+
+            // Proposal source count must be reasonable
+            prop_assert!(m.proposal_source_count < 200,
+                "proposal_source_count unreasonably high: {} at cycle {i}",
+                m.proposal_source_count);
+        }
+    }
+}

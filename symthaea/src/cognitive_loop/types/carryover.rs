@@ -221,6 +221,12 @@ pub(crate) struct QualityMetrics {
     /// Homeostasis pull efficiency EMA (ratio of post/pre distance, alpha=0.2).
     /// <1.0 = pulls working, >1.0 = overcorrecting.
     pub(crate) homeostasis_efficiency: f32,
+    /// Remaining cycles of LR freeze after a confidence crash (0 = not active).
+    /// Science: Cools et al. (2008) — rapid confidence collapse triggers protective freeze.
+    pub(crate) crash_freeze_remaining: u32,
+    /// Hysteresis relaxation factor (1.0 = full, decays toward HYSTERESIS_RELAXATION_FLOOR).
+    /// Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
+    pub(crate) hysteresis_factor: f32,
 }
 
 impl Default for QualityMetrics {
@@ -254,6 +260,8 @@ impl Default for QualityMetrics {
             prev_cross_module_agreement: 0.5,
             consecutive_full_dampen: 0,
             homeostasis_efficiency: 1.0,
+            crash_freeze_remaining: 0,
+            hysteresis_factor: 1.0,
         }
     }
 }
