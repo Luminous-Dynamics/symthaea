@@ -83,13 +83,13 @@ Risks are scored using: **Likelihood** (1-5) x **Impact** (1-5) = **Risk Score**
 
 | Field | Value |
 |-------|-------|
-| **Description** | Continuous FEP-driven learning gradually shifts moral and value evaluation parameters away from intended Seven Harmonies alignment |
+| **Description** | Continuous FEP-driven learning gradually shifts moral and value evaluation parameters away from intended Eight Harmonies alignment |
 | **Likelihood** | 3 (Moderate — FEP learning modulates Q-learning rate via plasticity factor [0.5, 2.0]; no explicit value lock) |
 | **Impact** | 4 (High — silent value drift could change system behavior without triggering alerts) |
 | **Risk Score** | **12 (High)** |
 | **Existing Controls** | Plasticity clamped to [0.5, 2.0]; moral topology tracks trajectory completeness/circularity/unity; SelfAssessmentMonitor 200-cycle warmup + 500-cycle cooldown; CalibrationHistory sliding window (20 entries) with systematic drift detection |
 | **Residual Risk** | Medium |
-| **Mitigation** | (a) Periodic moral topology regression tests against baseline; (b) Seven Harmonies alignment score as CI gate; (c) Value snapshot checkpoints at configurable intervals |
+| **Mitigation** | (a) Periodic moral topology regression tests against baseline; (b) Eight Harmonies alignment score as CI gate; (c) Value snapshot checkpoints at configurable intervals |
 | **Evidence** | `src/cognitive_loop/helpers/parallel.rs` (plasticity modulation), `src/cognitive_loop/calibration/` (61 tests) |
 
 ### R-2.3: Consent Violation False Negatives

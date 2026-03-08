@@ -3,8 +3,8 @@
 use super::super::contextual_weights::{
     ActionDomain, ContextualWeights, DomainClassifier, HarmonyWeightProfile,
 };
+use super::super::eight_harmonies::{AlignmentResult, EightHarmonies, Harmony};
 use super::super::semantic_value_embedder::{EmbedderConfig, SemanticValueEmbedder};
-use super::super::eight_harmonies::{AlignmentResult, Harmony, EightHarmonies};
 use super::super::value_feedback_loop::{
     FeedbackLoopConfig, FeedbackLoopSummary, ValueFeedbackLoop,
 };

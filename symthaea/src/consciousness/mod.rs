@@ -100,9 +100,9 @@ pub use primitives::stability_regime;
 // ============================================================================
 pub mod values;
 pub use values::contextual_weights;
+pub use values::eight_harmonies;
 pub use values::harmonies_integration;
 pub use values::semantic_value_embedder;
-pub use values::eight_harmonies;
 pub use values::value_feedback_loop;
 
 // ============================================================================
@@ -467,6 +467,7 @@ pub use cross_modal_binding::{BindingResult, CrossModalBinder};
 pub use dream::{
     DreamEngine, DreamEngineConfig, DreamEngineStats, DreamEvent, DreamResult, Wisdom,
 };
+pub use eight_harmonies::{AlignmentResult, EightHarmonies, Harmony, HarmonyAlignment};
 pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
 pub use fep_active_inference::{
     ActionSelectionResult, ActiveInferenceAgent, ActiveInferenceAgentConfig,
@@ -508,9 +509,6 @@ pub use primitive_reasoning::{
     TaskType, TierAwareConfig, TransformationType,
 };
 pub use primitive_reasoning::{PrimitiveReasoner, ReasoningResult};
-pub use eight_harmonies::{
-    AlignmentResult, EightHarmonies, Harmony, HarmonyAlignment,
-};
 pub use stability_regime::{
     CfCPrimitive, RegimeParams, StabilityRegimeConfig, StabilityRegimeProcessor,
     StabilityRegimeType,

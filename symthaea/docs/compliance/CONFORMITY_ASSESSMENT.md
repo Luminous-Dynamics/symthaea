@@ -50,7 +50,7 @@ Pursue **internal control (Annex VI)** initially, as Symthaea does not fall unde
 | ISO/IEC 42001:2023 | Published | AI Management System — primary framework for organizational AI governance |
 | ISO/IEC 23894:2023 | Published | AI Risk Management — alignment with our risk register and FRIA methodology |
 | ISO/IEC 42005:2025 | Published | AI Impact Assessment — methodology for Fundamental Rights Impact Assessment |
-| IEEE 7000-2021 | Published | Value-Based Design — direct alignment with Symthaea's Seven Harmonies framework |
+| IEEE 7000-2021 | Published | Value-Based Design — direct alignment with Symthaea's Eight Harmonies framework |
 | ISO/IEC 25059 | Published | AI Quality Model — quality metrics for AI system evaluation |
 | CEN-CENELEC JTC 21 | In progress | EU AI Act harmonized standards (expected 2025-2026) |
 

@@ -8,7 +8,7 @@ Review Cadence: Annual (next review: 2027-03-06)
 
 ## 1. AI Policy Statement
 
-Luminous Dynamics develops consciousness-aware AI infrastructure guided by the Seven Harmonies: Reciprocity, Flourishing, Compassion, Autonomy, Justice, Creativity, and Stewardship. These values are not aspirational -- they are mathematically encoded in the Ethics Engine and traced through code.
+Luminous Dynamics develops consciousness-aware AI infrastructure guided by the Eight Harmonies: Reciprocity, Flourishing, Compassion, Autonomy, Justice, Creativity, and Stewardship. These values are not aspirational -- they are mathematically encoded in the Ethics Engine and traced through code.
 
 ### 1.1 Commitments
 
@@ -245,9 +245,9 @@ Current implementation: `GateAuditInput` in `consciousness_profile.rs` with `sho
 
 ## 6. Ethical Principles Governance
 
-### 6.1 Seven Harmonies as Governance Framework
+### 6.1 Eight Harmonies as Governance Framework
 
-The Seven Harmonies are not abstract values -- they are computationally evaluated in the Ethics Engine:
+The Eight Harmonies are not abstract values -- they are computationally evaluated in the Ethics Engine:
 
 | Harmony | Computation | Governance Application |
 |---------|-------------|----------------------|
@@ -307,7 +307,7 @@ Changes to this charter follow the Class A change procedure (Section 3.2), inclu
 | **Cognitive loop** | The core processing pipeline that runs at 50Hz (234Hz release): perception -> dynamics -> feedback -> output. |
 | **Safety-critical parameter** | Any constant, threshold, or configuration value that directly affects safety monitoring, ethical evaluation, consciousness scoring, or governance permissions. |
 | **Consciousness credential** | A time-limited (24h TTL) verifiable credential issued by the Mycelix identity bridge that encodes an agent's 4D consciousness profile and governance tier. |
-| **Seven Harmonies** | The value framework (Reciprocity, Flourishing, Compassion, Autonomy, Justice, Creativity, Stewardship) that guides all system design and ethical evaluation. |
+| **Eight Harmonies** | The value framework (Reciprocity, Flourishing, Compassion, Autonomy, Justice, Creativity, Stewardship) that guides all system design and ethical evaluation. |
 | **Precautionary threshold** | Phi > 0.3, above which the system extends moral patient protections per Appendix P. |
 
 ---

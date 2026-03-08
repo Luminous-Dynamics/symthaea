@@ -99,12 +99,12 @@ All data export uses structured formats (JSON, Markdown). There is no automatic 
 | Attribute | Detail |
 |-----------|--------|
 | **What** | `MoralJudgment` and `EnsembleJudgment` — verdicts (permit/deny/abstain), similarity scores, violation lists, harmony evaluations across seven moral dimensions |
-| **Source** | `EthicsEngine` (moral parser, moral algebra, value evaluator, Seven Harmonies framework) |
+| **Source** | `EthicsEngine` (moral parser, moral algebra, value evaluator, Eight Harmonies framework) |
 | **Storage** | Returned from the ethics evaluation pipeline; not stored long-term within the engine |
 | **Retention** | Transient — exists only for the duration of the cycle in which it was computed |
 | **Sensitivity** | **High** — contains moral evaluations that could be contested and may have implications for system behavior |
 
-**Collection Purpose**: Real-time moral evaluation of proposed actions to ensure alignment with the Seven Harmonies framework. Supports the EU AI Act requirement for human oversight of AI decision-making.
+**Collection Purpose**: Real-time moral evaluation of proposed actions to ensure alignment with the Eight Harmonies framework. Supports the EU AI Act requirement for human oversight of AI decision-making.
 
 **Legal Basis**: Legitimate interest in ethical AI operation and compliance with AI ethics frameworks.
 
@@ -274,7 +274,7 @@ Each data category has a clear, traceable origin:
 |----------|--------------|-------------------|
 | Consciousness Metrics | `consciousness_engine.rs` | HDC encode -> CfC evolve -> SpectralMIP Phi -> ConsciousnessEquationV2 |
 | Safety Assessments | `safety_agent.rs` | Consciousness metrics -> threshold comparison -> SafetyAssessment |
-| Moral Reasoning | `ethics_engine.rs` | Input -> MoralParser -> MoralAlgebra -> Seven Harmonies -> verdict |
+| Moral Reasoning | `ethics_engine.rs` | Input -> MoralParser -> MoralAlgebra -> Eight Harmonies -> verdict |
 | Neuromodulator State | `symthaea-neuromodulators` | Transmitter dynamics -> receptor binding -> tolerance/withdrawal |
 | Calibration Data | `calibration/` | Psych-bench z-scores -> receptor sensitivity adjustments |
 | Substrate Telemetry | `substrate_manager.rs` | SubstrateType -> requirements -> feasibility -> validation overlay |
@@ -347,7 +347,7 @@ If a data governance violation is detected (unauthorized access, unintended pers
 | Art. 10(1) Data governance practices | This document (Sections 2-4) |
 | Art. 10(2) Data quality criteria | Section 4.1 |
 | Art. 10(3) Training/validation/test datasets | Section 4 (Training Data Provenance) — synthetic psych-bench tasks, hand-crafted moral prototypes, literature-derived substrate profiles |
-| Art. 10(4) Bias examination | Not applicable for internal cognitive state data. Moral reasoning bias is addressed by the Seven Harmonies framework and ensemble judgment |
+| Art. 10(4) Bias examination | Not applicable for internal cognitive state data. Moral reasoning bias is addressed by the Eight Harmonies framework and ensemble judgment |
 | Art. 10(5) Personal data | Section 2.2 — no PII processed |
 
 ### 6.3 NIST AI RMF Measure Function

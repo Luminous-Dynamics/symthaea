@@ -184,7 +184,6 @@ pub struct EightHarmonies {
     pub stillness: HarmonicState,
 }
 
-
 impl Default for EightHarmonies {
     fn default() -> Self {
         Self {

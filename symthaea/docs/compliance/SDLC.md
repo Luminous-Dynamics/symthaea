@@ -18,7 +18,7 @@ This document formalizes Symthaea's software development lifecycle for complianc
 
 - **Architecture Decision Records (ADRs)**: Significant design changes are documented in `docs/compliance/adr/` using the ADR template. Each ADR captures context, decision, consequences, and alternatives considered.
 - **Risk assessment**: Changes to safety-critical modules (Class A) require risk review against `AI_RISK_REGISTER.md` before implementation.
-- **Value alignment**: Changes are evaluated against the Seven Harmonies framework (IEEE 7000-2021 traceability).
+- **Value alignment**: Changes are evaluated against the Eight Harmonies framework (IEEE 7000-2021 traceability).
 
 ### 1.2 Implementation
 
