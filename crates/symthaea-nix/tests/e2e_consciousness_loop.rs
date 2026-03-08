@@ -422,6 +422,10 @@ fn test_daemon_ipc_snapshot_roundtrip() {
         memory_used_percent: None,
         watchdog_status: None,
         degraded: false,
+        prediction_accuracy: None,
+        maintenance_plan_count: 0,
+        load_average_1m: None,
+        swap_used_percent: None,
     };
 
     // Write atomically
@@ -588,6 +592,10 @@ fn test_cognitive_to_ipc_pipeline() {
         memory_used_percent: None,
         watchdog_status: None,
         degraded: false,
+        prediction_accuracy: None,
+        maintenance_plan_count: 0,
+        load_average_1m: None,
+        swap_used_percent: None,
     };
 
     // 6. Write to disk and read back
@@ -646,6 +654,10 @@ fn test_stale_snapshot_detection() {
         memory_used_percent: None,
         watchdog_status: None,
         degraded: false,
+        prediction_accuracy: None,
+        maintenance_plan_count: 0,
+        load_average_1m: None,
+        swap_used_percent: None,
     };
 
     assert!(

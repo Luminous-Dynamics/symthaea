@@ -204,6 +204,9 @@ mod tests {
                 total_bytes,
                 used_bytes,
             }],
+            load_average: [0.5, 0.4, 0.3],
+            swap_total_mb: 8192,
+            swap_used_mb: 0,
         }
     }
 

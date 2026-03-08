@@ -123,7 +123,7 @@ impl<'a> UserInputEncoder<'a> {
     ///
     /// Maps natural language names like "vscode" → "nixpkgs.vscode",
     /// "chrome" → "nixpkgs.google-chrome", etc. using the 600+ alias table.
-    fn resolve_aliases<'t>(&self, tokens: &[&'t str]) -> Vec<String> {
+    fn resolve_aliases(&self, tokens: &[&str]) -> Vec<String> {
         tokens
             .iter()
             .map(|&t| {

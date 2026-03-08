@@ -16,6 +16,12 @@ pub struct TimelineEntry {
     pub number: u32,
     pub date: String,
     pub current: bool,
+    /// Size change from previous generation in bytes (positive = grew).
+    pub size_delta_bytes: Option<i64>,
+    /// Build status indicator (e.g. "ok", "failed", "building").
+    pub status: Option<String>,
+    /// Hours since this generation was built.
+    pub age_hours: Option<f64>,
 }
 
 /// Generation timeline widget.
@@ -66,24 +72,47 @@ impl Widget for GenerationTimeline<'_> {
                 break;
             }
 
-            let style = if entry.current {
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::DarkGray)
+            let status_indicator = match entry.status.as_deref() {
+                Some("failed") => ("!", Color::Red),
+                Some("building") => ("~", Color::Yellow),
+                _ => {
+                    if entry.current {
+                        ("*", Color::Green)
+                    } else {
+                        (" ", Color::DarkGray)
+                    }
+                }
             };
 
+            let style = Style::default()
+                .fg(status_indicator.1)
+                .add_modifier(if entry.current {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                });
+
             let marker = if entry.current { ">" } else { " " };
-            let label = format!("{}#{}", marker, entry.number);
+            let label = format!("{}{}#{}", marker, status_indicator.0, entry.number);
             buf.set_string(x, bar_y, &label, style);
 
-            // Date below
+            // Date + size delta below
             if inner.height > 1 {
                 let date_short = if entry.date.len() > 5 {
                     &entry.date[5..entry.date.len().min(10)]
                 } else {
                     &entry.date
+                };
+                let delta_str = match entry.size_delta_bytes {
+                    Some(d) if d > 1_000_000 => format!(" +{}M", d / 1_000_000),
+                    Some(d) if d < -1_000_000 => format!(" {}M", d / 1_000_000),
+                    Some(d) if d != 0 => format!(" {}K", d / 1_000),
+                    _ => String::new(),
+                };
+                let delta_color = match entry.size_delta_bytes {
+                    Some(d) if d > 50_000_000 => Color::Red,
+                    Some(d) if d < -10_000_000 => Color::Green,
+                    _ => Color::DarkGray,
                 };
                 buf.set_string(
                     x,
@@ -91,6 +120,14 @@ impl Widget for GenerationTimeline<'_> {
                     date_short,
                     Style::default().fg(Color::DarkGray),
                 );
+                if !delta_str.is_empty() && x + date_short.len() as u16 + delta_str.len() as u16 + 1 < inner.x + inner.width {
+                    buf.set_string(
+                        x + date_short.len() as u16,
+                        bar_y + 1,
+                        &delta_str,
+                        Style::default().fg(delta_color),
+                    );
+                }
             }
 
             // Arrow connector
@@ -131,16 +168,25 @@ mod tests {
                 number: 42,
                 date: "2025-01-05".into(),
                 current: false,
+                size_delta_bytes: None,
+                status: None,
+                age_hours: Some(240.0),
             },
             TimelineEntry {
                 number: 43,
                 date: "2025-01-10".into(),
                 current: false,
+                size_delta_bytes: Some(50_000_000),
+                status: None,
+                age_hours: Some(120.0),
             },
             TimelineEntry {
                 number: 44,
                 date: "2025-01-15".into(),
                 current: true,
+                size_delta_bytes: Some(-5_000_000),
+                status: Some("ok".into()),
+                age_hours: Some(0.5),
             },
         ];
         let widget = GenerationTimeline::new(entries)

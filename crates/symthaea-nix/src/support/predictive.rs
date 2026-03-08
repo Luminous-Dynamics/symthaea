@@ -73,6 +73,19 @@ pub struct Prediction {
     pub confidence: f32,
 }
 
+/// A stored prediction awaiting verification against actuals.
+#[derive(Debug, Clone)]
+struct PendingPrediction {
+    /// When the prediction was made (unix secs).
+    made_at: u64,
+    /// Hours ahead the prediction targets.
+    hours_ahead: f64,
+    /// The predicted value.
+    predicted_value: f64,
+    /// Which metric this prediction is for.
+    metric: &'static str,
+}
+
 /// Predictive monitor using LTC temporal evolution.
 pub struct PredictiveMonitor {
     neuron: HdcLtcUnifiedNeuron,
@@ -81,6 +94,16 @@ pub struct PredictiveMonitor {
     thresholds: AlertThresholds,
     codebook: NixCodebook,
     max_history: usize,
+    /// Pending predictions awaiting verification.
+    pending_predictions: Vec<PendingPrediction>,
+    /// Rolling MAE buffer (most recent absolute errors).
+    mae_buffer: Vec<f64>,
+    /// Maximum MAE buffer size.
+    max_mae_buffer: usize,
+    /// Confidence damping factor applied when MAE is too high (1.0 = no damping).
+    confidence_damping: f32,
+    /// Number of self-calibration events that have occurred.
+    calibration_events: u32,
 }
 
 impl PredictiveMonitor {
@@ -98,6 +121,11 @@ impl PredictiveMonitor {
             thresholds,
             codebook: NixCodebook::new(),
             max_history: 1000,
+            pending_predictions: Vec::new(),
+            mae_buffer: Vec::new(),
+            max_mae_buffer: 100,
+            confidence_damping: 1.0,
+            calibration_events: 0,
         }
     }
 
@@ -107,6 +135,9 @@ impl PredictiveMonitor {
     }
 
     /// Ingest a new telemetry sample. The neuron evolves its internal state.
+    ///
+    /// Also verifies any pending predictions whose target time has arrived,
+    /// computing absolute error and feeding the rolling MAE buffer.
     pub fn ingest(&mut self, telemetry: SystemTelemetry) {
         let input_hv = self.encode_telemetry(&telemetry);
 
@@ -124,6 +155,10 @@ impl PredictiveMonitor {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or(0);
+
+        // Verify pending predictions that have matured
+        self.verify_predictions(now_secs, &telemetry);
+
         self.history.push((Instant::now(), now_secs, telemetry));
         if self.history.len() > self.max_history {
             self.history.remove(0);
@@ -304,6 +339,112 @@ impl PredictiveMonitor {
         predictions
     }
 
+    /// Store predictions from the most recent predict call for later verification.
+    pub fn record_predictions(&mut self, predictions: &[Prediction]) {
+        let now_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        // Only record the 1h horizon predictions (shortest, most verifiable)
+        for p in predictions.iter().filter(|p| (p.hours_ahead - 1.0).abs() < 0.01) {
+            self.pending_predictions.push(PendingPrediction {
+                made_at: now_secs,
+                hours_ahead: p.hours_ahead,
+                predicted_value: p.predicted_value,
+                metric: p.metric,
+            });
+        }
+
+        // Cap pending predictions to avoid unbounded growth
+        if self.pending_predictions.len() > 500 {
+            let excess = self.pending_predictions.len() - 500;
+            self.pending_predictions.drain(..excess);
+        }
+    }
+
+    /// Verify matured predictions against actual telemetry values.
+    fn verify_predictions(&mut self, now_secs: u64, actual: &SystemTelemetry) {
+        let mut errors = Vec::new();
+        let mut retained = Vec::new();
+
+        for pred in self.pending_predictions.drain(..) {
+            let target_time = pred.made_at + (pred.hours_ahead * 3600.0) as u64;
+            if now_secs >= target_time {
+                // Prediction has matured — compare against actual
+                let actual_value = match pred.metric {
+                    "disk_used_pct" => actual.disk_used_pct,
+                    "memory_used_pct" => actual.memory_used_pct,
+                    "store_path_count" => actual.store_path_count as f64,
+                    "failed_unit_count" => actual.failed_unit_count as f64,
+                    _ => continue,
+                };
+                let abs_error = (pred.predicted_value - actual_value).abs();
+                errors.push(abs_error);
+            } else {
+                retained.push(pred);
+            }
+        }
+        self.pending_predictions = retained;
+
+        // Feed errors into MAE buffer
+        for e in errors {
+            self.mae_buffer.push(e);
+            if self.mae_buffer.len() > self.max_mae_buffer {
+                self.mae_buffer.remove(0);
+            }
+        }
+
+        // Self-calibration (AT): if MAE is too high, dampen confidence
+        self.self_calibrate();
+    }
+
+    /// Self-calibrate: when rolling MAE drifts above threshold, dampen confidence.
+    fn self_calibrate(&mut self) {
+        const MAE_HIGH_THRESHOLD: f64 = 10.0;
+        const MAE_LOW_THRESHOLD: f64 = 5.0;
+        const MIN_SAMPLES: usize = 10;
+
+        if self.mae_buffer.len() < MIN_SAMPLES {
+            return;
+        }
+
+        let mae = self.rolling_mae().unwrap_or(0.0);
+
+        if mae > MAE_HIGH_THRESHOLD && self.confidence_damping > 0.5 {
+            self.confidence_damping *= 0.9;
+            self.calibration_events += 1;
+            eprintln!(
+                "nix-mind: prediction self-calibration — MAE={:.1}, damping confidence to {:.2}",
+                mae, self.confidence_damping
+            );
+        } else if mae < MAE_LOW_THRESHOLD && self.confidence_damping < 1.0 {
+            // Gradually restore confidence when predictions improve
+            self.confidence_damping = (self.confidence_damping * 1.05).min(1.0);
+        }
+    }
+
+    /// Rolling mean absolute error across verified predictions.
+    ///
+    /// Returns `None` if no predictions have been verified yet.
+    pub fn rolling_mae(&self) -> Option<f64> {
+        if self.mae_buffer.is_empty() {
+            return None;
+        }
+        let sum: f64 = self.mae_buffer.iter().sum();
+        Some(sum / self.mae_buffer.len() as f64)
+    }
+
+    /// Number of self-calibration events that have occurred.
+    pub fn calibration_event_count(&self) -> u32 {
+        self.calibration_events
+    }
+
+    /// Current confidence damping factor (1.0 = full confidence).
+    pub fn confidence_damping(&self) -> f32 {
+        self.confidence_damping
+    }
+
     /// Number of telemetry samples ingested.
     pub fn sample_count(&self) -> usize {
         self.history.len()
@@ -366,6 +507,11 @@ impl PredictiveMonitor {
             thresholds,
             codebook: NixCodebook::new(),
             max_history: 1000,
+            pending_predictions: Vec::new(),
+            mae_buffer: Vec::new(),
+            max_mae_buffer: 100,
+            confidence_damping: 1.0,
+            calibration_events: 0,
         }
     }
 
@@ -415,15 +561,16 @@ impl PredictiveMonitor {
         }
     }
 
-    /// Compute confidence based on history depth and neuron state.
+    /// Compute confidence based on history depth, neuron state, and calibration.
     fn compute_confidence(&self) -> f32 {
         // More history = higher confidence, up to a cap
         let history_factor = (self.history.len() as f32 / 100.0).min(1.0);
         // Neuron state norm with smooth saturation: norm/(norm+1) maps [0,∞) → [0,1)
         let norm = self.neuron.state().norm();
         let state_factor = norm / (norm + 1.0);
-        // Combine
-        (history_factor * 0.7 + state_factor * 0.3).clamp(0.0, 1.0)
+        // Combine, then apply self-calibration damping
+        let base = history_factor * 0.7 + state_factor * 0.3;
+        (base * self.confidence_damping).clamp(0.0, 1.0)
     }
 }
 
@@ -690,6 +837,52 @@ mod tests {
         let mut restored = PredictiveMonitor::load(saved, AlertThresholds::default());
         let predictions = restored.predict(24.0);
         assert!(!predictions.is_empty());
+    }
+
+    #[test]
+    fn test_rolling_mae_empty() {
+        let monitor = PredictiveMonitor::with_defaults();
+        assert!(monitor.rolling_mae().is_none());
+    }
+
+    #[test]
+    fn test_record_and_verify_predictions() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        // Ingest a few samples to establish state
+        for _ in 0..5 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+
+        // Record predictions (only 1h horizon gets stored)
+        let predictions = monitor.predict(1.0);
+        monitor.record_predictions(&predictions);
+        assert!(!monitor.pending_predictions.is_empty());
+    }
+
+    #[test]
+    fn test_confidence_damping_default() {
+        let monitor = PredictiveMonitor::with_defaults();
+        assert!((monitor.confidence_damping() - 1.0).abs() < 1e-6);
+        assert_eq!(monitor.calibration_event_count(), 0);
+    }
+
+    #[test]
+    fn test_mae_buffer_capped() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        // Manually fill MAE buffer to exactly the limit
+        for i in 0..100 {
+            monitor.mae_buffer.push(i as f64);
+        }
+        assert_eq!(monitor.mae_buffer.len(), 100);
+        // Verify rolling MAE works on full buffer
+        let mae = monitor.rolling_mae().unwrap();
+        assert!(mae.is_finite());
+        // One more push should evict the oldest
+        monitor.mae_buffer.push(999.0);
+        if monitor.mae_buffer.len() > monitor.max_mae_buffer {
+            monitor.mae_buffer.remove(0);
+        }
+        assert_eq!(monitor.mae_buffer.len(), 100);
     }
 
     #[test]
