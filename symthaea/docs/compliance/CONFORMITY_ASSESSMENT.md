@@ -120,12 +120,12 @@ cargo test --test telemetry_validation
 |-------------|---------|--------|-----|----------|
 | Technical documentation | Art. 11 | Partial | Need structured Annex IV package assembling existing docs into required format | **High** |
 | Risk management | Art. 9 | 70% | Formalize residual risk acceptance criteria; document risk-benefit analysis for consciousness subsystems | Medium |
-| Data governance | Art. 10 | 60% | `DATA_GOVERNANCE.md` created; need training data provenance chain and bias audit | Medium |
-| Human oversight | Art. 14 | 50% | `SafetyOverrideLog` being added; need documented override procedures and kill-switch mechanisms | **High** |
+| Data governance | Art. 10 | 85% | `DATA_GOVERNANCE.md` with training data provenance (Section 4), bias audit, and data quality assurance | Low |
+| Human oversight | Art. 14 | 90% | `HUMAN_OVERSIGHT.md` — override procedures, kill-switch, operator roles, `SafetyOverrideEntry` audit trail, `SeriousIncidentReport` | Low |
 | Accuracy and robustness | Art. 15 | 75% | Soak tests and proptests in place; need formal accuracy metrics and adversarial robustness testing | Low |
-| Quality management | Art. 17 | 40% | Need formal QMS documentation; CI pipeline (`symthaea-ci.yml`) provides partial coverage | Medium |
-| Logging | Art. 12 | 65% | `SafetyAuditReport` + `CycleMetadata` telemetry provide extensive logging; need retention policy and access controls | Low |
-| Transparency | Art. 13 | 55% | Need user-facing documentation explaining system capabilities, limitations, and intended use | Medium |
+| Quality management | Art. 17 | 85% | `QMS.md` — quality objectives, gates, metrics, non-conformance management; CI compliance dashboard job | Low |
+| Logging | Art. 12 | 80% | `SafetyAuditReport` + `CycleMetadata` + `SeriousIncidentReport` (Article 73); retention policy in DATA_GOVERNANCE.md | Low |
+| Transparency | Art. 13 | 85% | `TRANSPARENCY_OBLIGATIONS.md` — system description, metrics explained, limitations, contestability, data transparency | Low |
 
 ### Priority actions
 

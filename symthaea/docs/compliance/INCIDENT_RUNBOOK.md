@@ -3,7 +3,7 @@
 Classification: Internal | Version: 1.0 | Date: 2026-03-06
 Owner: Tristan Stoltz, Luminous Dynamics
 Parent Document: GOVERNANCE_CHARTER.md (Section 4)
-Regulatory References: EU AI Act Article 62 (serious incident reporting), ISO 42001 A.6.2.6 (AI system incident management)
+Regulatory References: EU AI Act Article 73 (serious incident reporting), ISO 42001 A.6.2.6 (AI system incident management)
 
 ---
 
@@ -114,7 +114,7 @@ Preserve all of the following before any system restart or code change:
 2. **ADR** — File retroactive ADR within 48 hours (required for all Class A emergency changes)
 3. **Risk register** — Update `AI_RISK_REGISTER.md` within 7 days
 4. **Post-incident review** — Conduct within 7 days with all available stakeholders
-5. **EU AI Act Article 62** — If the system is deployed and the incident constitutes a "serious incident" (risk to health, safety, fundamental rights), file notification with the relevant market surveillance authority without undue delay and no later than 15 days after establishing the causal link. Document the notification in the incident report.
+5. **EU AI Act Article 73** — If the system is deployed and the incident constitutes a "serious incident" (risk to health, safety, fundamental rights), file notification with the relevant market surveillance authority without undue delay and no later than 15 days after establishing the causal link. Generate the report via `SafetyAgent::serious_incident_report()` and document the notification in the incident report.
 6. **ISO 42001 A.6.2.6** — Record the incident in the AI system incident log, including root cause, corrective action, and preventive measures.
 
 ---
@@ -365,21 +365,21 @@ Before returning the system to normal operation after any SEV-1 or SEV-2 inciden
 - [ ] **Incident report filed** (SEV-1: within 24 hours; SEV-2: within 72 hours)
 - [ ] **ADR created** if Class A or Class B change was made
 - [ ] **Risk register updated** if new risk identified
-- [ ] **EU AI Act Article 62 notification** assessed (SEV-1 only: is this a "serious incident" requiring authority notification within 15 days?)
+- [ ] **EU AI Act Article 73 notification** assessed (SEV-1 only: is this a "serious incident" requiring authority notification within 15 days? Generate via `SafetyAgent::serious_incident_report()`)
 - [ ] **ISO 42001 incident log** updated
 
 ---
 
 ## Regulatory Compliance Notes
 
-### EU AI Act Article 62 -- Serious Incident Reporting
+### EU AI Act Article 73 -- Serious Incident Reporting
 
-Article 62 requires providers of high-risk AI systems to report serious incidents to market surveillance authorities. A "serious incident" is one that directly or indirectly leads to or could reasonably lead to:
+Article 73 requires providers of high-risk AI systems to report serious incidents to market surveillance authorities. A "serious incident" is one that directly or indirectly leads to or could reasonably lead to:
 - Death or serious damage to health
 - Serious and irreversible disruption of critical infrastructure
 - Breach of fundamental rights obligations
 
-**Applicability to Symthaea**: As a research system not currently deployed in production affecting natural persons, Article 62 reporting is not yet triggered. This runbook includes the reporting step proactively so the process is in place before any deployment that brings the system into scope.
+**Applicability to Symthaea**: As a research system not currently deployed in production affecting natural persons, Article 73 reporting is not yet triggered. This runbook includes the reporting step proactively so the process is in place before any deployment that brings the system into scope.
 
 **When triggered**: Notify the relevant market surveillance authority without undue delay, and no later than 15 days after the provider establishes the causal link between the AI system and the serious incident. Include: system identification, incident description, corrective measures taken, contact information.
 

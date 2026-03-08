@@ -13,12 +13,12 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 
 | Framework | Coverage | Status | Notes |
 |-----------|----------|--------|-------|
-| **ISO/IEC 42001:2023** (AI Management System) | 85% | Strong | SDLC (A.3.3) + risk treatment (A.4.3) + explainability (A.8.3) added; QMS docs pending |
+| **ISO/IEC 42001:2023** (AI Management System) | 90% | Strong | QMS.md + SDLC + risk treatment + explainability + data provenance + post-market monitoring |
 | **ISO/IEC 23894** (AI Risk Management) | 90% | Strong | Risk register + ADR process + incident runbook + risk treatment plan (top 5) |
 | **ISO/IEC 42005** (AI Impact Assessment) | 80% | Strong | FRIA complete; ongoing monitoring via SafetyAgent + CalibrationHistory |
-| **IEEE 7000-2021** (Value-Based Design) | 85% | Strong | Seven Harmonies mathematically traced; consent detection hardened (R-2.3 fix) |
-| **EU AI Act** (High-Risk) | 75% | In Progress | Classification + FRIA + technical dossier + conformity assessment + Art. 14 override audit trail |
-| **NIST AI RMF 1.0** | 75% | In Progress | Map/Measure strong; Manage improved with risk treatment plan; Govern partial |
+| **IEEE 7000-2021** (Value-Based Design) | 85% | Strong | Eight Harmonies mathematically traced; consent detection hardened (R-2.3 fix) |
+| **EU AI Act** (High-Risk) | 85% | Strong | Art. 13 transparency + Art. 14 human oversight + Art. 73 incident reporting + Art. 72 post-market monitoring |
+| **NIST AI RMF 1.0** | 80% | Strong | Map/Measure strong; Manage improved with risk treatment plan; Govern improved with QMS |
 
 ---
 
@@ -239,19 +239,26 @@ Example constants and their compliance relevance:
 - ~~Risk treatment plan~~ — `RISK_TREATMENT_PLAN.md` (top 5 risks, treatment strategies, residual risk, acceptance criteria)
 - ~~Explainability framework~~ — `EXPLAINABILITY_FRAMEWORK.md` (ISO 42001 A.8.3, per-stage explanations, transparency of limitations)
 - ~~SafetyAuditReport override wiring~~ — `from_assessments_and_overrides()` includes Article 14 override log in audit exports
+- ~~QMS documentation~~ — `QMS.md` (ISO 42001 A.3.3/A.4.5/A.6.3, quality objectives, gates, metrics, non-conformance management)
+- ~~Post-market monitoring plan~~ — `POST_MARKET_MONITORING.md` (EU AI Act Article 72, NRC-style monitoring, drift detection, incident reporting)
+- ~~Article 13 transparency~~ — `TRANSPARENCY_OBLIGATIONS.md` (system description, metrics explained, limitations, contestability, data transparency)
+- ~~Human oversight procedures~~ — `HUMAN_OVERSIGHT.md` (EU AI Act Article 14, override procedures, emergency shutdown, kill-switch, operator roles)
+- ~~Serious incident reporting~~ — `SeriousIncidentReport` struct in SafetyAgent (EU AI Act Article 73, structured regulatory reports)
+- ~~Training data provenance~~ — DATA_GOVERNANCE.md Section 4 (ISO 42001 A.7.4, bias audit, data quality assurance)
+- ~~Article 62→73 references~~ — INCIDENT_RUNBOOK.md corrected to reference Article 73 (serious incidents)
+- ~~Compliance dashboard in CI~~ — `ci.yml` compliance job runs dashboard and verifies all suites pass
 
 ### Priority 1 (Complete by Q2 2026)
-1. Formal QMS documentation for ISO 42001 quality management
+1. Formal third-party AI component assessment for ISO 42001 A.7.2
+2. Annex IV technical documentation package assembly
 
 ### Priority 2 (Complete by Q3 2026)
-2. Formal third-party AI component assessment for ISO 42001 A.7.2
 3. External stakeholder feedback mechanism for NIST GOV-6
-4. User-facing transparency documentation for EU AI Act Article 13
+4. Value drift regression baseline artifact
 
 ### Priority 3 (Ongoing)
-8. Quarterly compliance matrix review and update
-9. Annual psych-bench regression for NIST MEA-2
-10. Post-market monitoring plan before EU deployment
+5. Quarterly compliance matrix review and update
+6. Annual psych-bench regression for NIST MEA-2
 
 ---
 
