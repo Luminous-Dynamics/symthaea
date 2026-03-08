@@ -136,6 +136,28 @@ impl CognitiveLoopService {
             false
         };
 
+        // ── ToM prediction mismatch → exploration boost (Frith & Frith 2006) ──
+        // When our mental model of the user is inaccurate (high mismatch),
+        // boost exploration to gather more data and refine the model.
+        {
+            let accuracy = self.social_mgr.social.social_prediction_accuracy;
+            let mismatch = 1.0 - accuracy;
+            // Update EMA (alpha = 0.1)
+            self.stats.tom_prediction_mismatch_ema = if self.stats.total_cycles < 5 {
+                mismatch
+            } else {
+                self.stats.tom_prediction_mismatch_ema * 0.9 + mismatch * 0.1
+            };
+            // Trigger exploration when mismatch is high (> 0.4) and sustained
+            if self.stats.tom_prediction_mismatch_ema > 0.4
+                && self.stats.total_cycles > 10
+            {
+                let boost = (self.stats.tom_prediction_mismatch_ema - 0.4) * 0.1; // [0, 0.06]
+                self.adjust_exploration("tom_mismatch", boost);
+                self.stats.tom_exploration_triggers += 1;
+            }
+        }
+
         self.apply_strategy_modulation(selected_strategy);
 
         // ── Phase 21: Embodied agency → strategy modulation ──────────────

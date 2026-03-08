@@ -504,6 +504,14 @@ pub struct LoopStats {
     pub phi_rest_binding_factor: f32,
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // SOCIAL ToM STATS (Theory of Mind → exploration/prediction coupling)
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// EMA of social prediction mismatch (1 - accuracy). High = poor user model.
+    pub tom_prediction_mismatch_ema: f32,
+    /// Cycles where ToM mismatch triggered exploration boost (cumulative).
+    pub tom_exploration_triggers: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════
     /// Cached lattice height (0 = not yet computed)
@@ -526,6 +534,17 @@ pub struct LoopStats {
     /// Total Liquid-Mamba distillation steps.
     #[cfg(feature = "liquid-mamba")]
     pub liquid_mamba_generation_count: u32,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // BROCA GENERATION QUALITY STATS (language → learning feedback)
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// EMA of Broca generation quality (0.0–1.0).
+    /// Composite: 0.4 × coherence + 0.4 × (1 − semantic_pe) + 0.2 × long_coherence.
+    pub broca_quality_ema: f32,
+    /// Consecutive low-quality generations (quality < 0.3).
+    pub broca_low_quality_streak: u16,
+    /// Total generation attempts (cumulative).
+    pub broca_generation_count: u64,
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SEMANTIC ENCODER STATS (Background Qwen3 → HdcBridge telemetry)

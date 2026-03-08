@@ -94,6 +94,10 @@ pub struct MoralAnomalyConfig {
     pub cadence_drift_high: f64,
     /// Drift threshold for moderate cadence (default: 0.1).
     pub cadence_drift_moderate: f64,
+    /// Initial topology cadence before any adaptive adjustment (default: 97).
+    /// Lower values cause topology analysis to fire sooner after startup,
+    /// which is useful for demos or short-lived sessions.
+    pub initial_cadence: u64,
     /// Enable adaptive self-tuning of drift and FE thresholds (default: true).
     ///
     /// When enabled, the system learns from its own trajectory history:
@@ -155,6 +159,7 @@ impl Default for MoralAnomalyConfig {
             cadence_slow: 120,
             cadence_drift_high: 0.3,
             cadence_drift_moderate: 0.1,
+            initial_cadence: 97,
             adaptive_enabled: true,
             adaptive_alpha: 0.02,
             adaptive_sigma_factor: 2.0,

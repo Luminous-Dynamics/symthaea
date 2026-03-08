@@ -540,6 +540,17 @@ pub struct CognitiveLoopConfig {
     /// Enable cross-manifold predictor (vision→cognitive Hebbian mapping, default false).
     #[cfg(feature = "vision-manifold")]
     pub enable_cross_manifold_predictor: bool,
+
+    // ── Foveation Dispatch ──────────────────────────────────────────────
+    /// Enable foveation attention dispatch (requires vision-manifold feature).
+    /// When true AND the `foveation` feature is compiled, foveation dispatch
+    /// runs in the perception phase. Default: false.
+    #[cfg(feature = "foveation")]
+    pub enable_foveation: bool,
+    /// Maximum foveation dispatches per cycle (attention budget).
+    /// Prevents over-allocation of ventral pipeline resources. Default: 3.
+    #[cfg(feature = "foveation")]
+    pub foveation_max_dispatches: u8,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -643,6 +654,10 @@ impl Default for CognitiveLoopConfig {
             scene_memory_dampen_factor: 0.5,
             #[cfg(feature = "vision-manifold")]
             enable_cross_manifold_predictor: false,
+            #[cfg(feature = "foveation")]
+            enable_foveation: false,
+            #[cfg(feature = "foveation")]
+            foveation_max_dispatches: 3,
         }
     }
 }
@@ -759,6 +774,10 @@ impl ConsciousnessProfile {
         #[cfg(feature = "ssm_language")]
         {
             config.enable_broca_language = false;
+        }
+        #[cfg(feature = "foveation")]
+        {
+            config.enable_foveation = false;
         }
 
         match self {
@@ -939,6 +958,16 @@ impl CognitiveLoopConfig {
             warnings.push(
                 "enable_dream_replay without enable_surprise_exploration: \
                  dream replay will only use prediction error, not surprise events"
+                    .into(),
+            );
+        }
+
+        // foveation dispatch requires vision-manifold for frame/saliency data
+        #[cfg(all(feature = "foveation", feature = "vision-manifold"))]
+        if self.enable_foveation && !self.enable_vision_manifold {
+            warnings.push(
+                "enable_foveation without enable_vision_manifold: \
+                 foveation dispatch requires vision bridge for frame and saliency data"
                     .into(),
             );
         }

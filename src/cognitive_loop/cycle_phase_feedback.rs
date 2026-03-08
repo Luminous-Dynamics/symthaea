@@ -254,6 +254,20 @@ impl CognitiveLoopService {
             self.scale_lr("social_trust", social_learning_rate_factor);
         }
 
+        // ── ToM accuracy → prediction confidence modulation (Frith & Frith 2006) ──
+        // High social prediction accuracy → boost prediction confidence (we understand the user).
+        // Low accuracy → dampen confidence (our model is unreliable).
+        {
+            let tom_accuracy = self.social_mgr.social.social_prediction_accuracy;
+            if tom_accuracy > 0.7 {
+                let boost = (tom_accuracy - 0.7) * 0.05; // [0, 0.015]
+                self.adjust_confidence("tom_accurate", boost);
+            } else if tom_accuracy < 0.3 && self.stats.total_cycles > 10 {
+                let dampen = 1.0 - (0.3 - tom_accuracy) * 0.05; // [0.985, 1.0]
+                self.scale_confidence("tom_inaccurate", dampen);
+            }
+        }
+
         // ── Phase 20: Causal relations density → urgency gating ──────────────
         let causal_urgency_gated = causal_relations_count > 10
             && causal_avg_confidence > 0.6
@@ -848,8 +862,19 @@ impl CognitiveLoopService {
         let agreement_velocity = cross_module_agreement
             - self.carryover.quality.prev_cross_module_agreement;
         self.carryover.quality.prev_cross_module_agreement = cross_module_agreement;
-        if agreement_velocity < -0.15 && self.stats.total_cycles > 30 {
-            // Rapid agreement drop → dampen LR, boost exploration preemptively.
+        // Session 9 Item 4: Compound instability detector.
+        // When agreement drops AND errors are rising simultaneously → cascading failure.
+        // Friston (2010): cascading precision failures require active recovery.
+        let error_slope = perception.urgency.error_slope;
+        let compound_instability = agreement_velocity < -0.10
+            && error_slope > 0.02
+            && self.stats.total_cycles > 30;
+        if compound_instability {
+            // Stronger protective response than either alone
+            self.scale_lr("compound_instability", 0.93);
+            self.adjust_exploration("compound_instability", 0.025);
+        } else if agreement_velocity < -0.15 && self.stats.total_cycles > 30 {
+            // Rapid agreement drop alone → dampen LR, boost exploration preemptively.
             // Science: desynchronization across subsystems means conflicting learning signals.
             self.scale_lr("agreement_vel_drop", 0.97);
             self.adjust_exploration("agreement_vel_drop", 0.015);

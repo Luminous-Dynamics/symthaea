@@ -190,6 +190,18 @@ impl CognitiveLoopService {
             self.stats.self_model_predictions_made += 1;
         }
 
+        // Session 9 Item 1: PE variance → confidence modulation.
+        // High error variance (unstable PE) should dampen confidence more than steady errors.
+        // Yu & Dayan (2005): expected vs unexpected uncertainty differentially modulate ACh/NE.
+        let pe_variance = self.stats.avg_prediction_error_sq
+            - self.stats.avg_prediction_error * self.stats.avg_prediction_error;
+        let pe_variance = pe_variance.max(0.0); // Clamp numerical noise
+        if pe_variance > 0.01 && self.stats.total_cycles > 20 {
+            // High variance = unstable errors → dampen confidence proportionally
+            let variance_dampen = 1.0 - (pe_variance - 0.01).min(0.05) * 2.0; // 0.90–1.0
+            self.scale_confidence("pe_variance", variance_dampen);
+        }
+
         // FEEDBACK: Quantum coherence boosts exploration (prev cycle)
         if self.carryover.consciousness.quantum_coherence > QUANTUM_COHERENCE_THRESHOLD {
             let coherence_boost = (self.carryover.consciousness.quantum_coherence
@@ -464,8 +476,21 @@ impl CognitiveLoopService {
         self.emotion_contagion.analyze(input);
 
         // ── Phase 15+18: Emotional homeostasis ──
+        // Session 9 Item 7: Track pre-pull valence distance for efficiency computation.
+        let pre_pull_valence = self.emotion_contagion.valence;
         let (valence_homeostasis_pull, arousal_homeostasis_pull, mut homeostasis_pull_strength) =
             self.apply_emotional_homeostasis();
+
+        // Compute homeostasis efficiency: ratio of post/pre distance to target (0.0).
+        // <1.0 = pulls working, >1.0 = overcorrecting.
+        // Cannon (1929)/Ashby (1960): homeostatic regulation must be monitored for overshoot.
+        let post_pull_valence = self.emotion_contagion.valence;
+        let pre_dist = pre_pull_valence.abs().max(0.01);
+        let post_dist = post_pull_valence.abs();
+        let cycle_efficiency = post_dist / pre_dist;
+        // EMA smooth (alpha=0.2)
+        self.carryover.quality.homeostasis_efficiency =
+            self.carryover.quality.homeostasis_efficiency * 0.8 + cycle_efficiency * 0.2;
 
         // High transition cost → strengthen homeostasis to resist unnecessary mode changes.
         // Kelso (1995): costly transitions increase the system's tendency to stay in current attractor.
@@ -1740,6 +1765,29 @@ impl CognitiveLoopService {
                         if !result.text.is_empty() {
                             self.last_broca_text = Some(result.text.clone());
                         }
+
+                        // ── Composite quality metric ──
+                        let broca_quality = result.final_coherence * 0.4
+                            + (1.0 - result.semantic_pe.min(1.0)) * 0.4
+                            + result.long_coherence * 0.2;
+                        let broca_quality = broca_quality.clamp(0.0, 1.0);
+
+                        // Update quality EMA (alpha = 0.15)
+                        self.stats.broca_quality_ema = if self.stats.broca_generation_count == 0 {
+                            broca_quality
+                        } else {
+                            self.stats.broca_quality_ema * 0.85 + broca_quality * 0.15
+                        };
+                        self.stats.broca_generation_count += 1;
+
+                        // Track low-quality streak for adaptive gating
+                        if broca_quality < 0.3 {
+                            self.stats.broca_low_quality_streak =
+                                self.stats.broca_low_quality_streak.saturating_add(1);
+                        } else {
+                            self.stats.broca_low_quality_streak = 0;
+                        }
+
                         // Coherence feedback: high Broca coherence → confidence boost
                         if result.final_coherence > 0.7 {
                             self.adjust_confidence(
@@ -1752,10 +1800,34 @@ impl CognitiveLoopService {
                                 1.0 - (0.3 - result.final_coherence) * 0.05,
                             );
                         }
+
+                        // Quality-driven LR modulation: high quality → slight LR boost
+                        // Science: successful articulation reinforces associated representations
+                        if broca_quality > 0.6 {
+                            let lr_boost = 1.0 + (broca_quality - 0.6) * 0.1; // [1.0, 1.04]
+                            self.scale_lr("broca_quality", lr_boost);
+                        }
+
+                        // Adaptive consciousness gating: raise threshold after
+                        // sustained low quality (3+ consecutive poor generations).
+                        // Science: Hickok & Poeppel (2007) — speech production
+                        // requires sufficient consciousness; poor output → raise bar.
+                        if self.stats.broca_low_quality_streak >= 3 {
+                            broca.consciousness_threshold =
+                                (broca.consciousness_threshold + 0.05).min(0.5);
+                        } else if self.stats.broca_quality_ema > 0.7
+                            && broca.consciousness_threshold > 0.1
+                        {
+                            // Relax threshold when quality is consistently high
+                            broca.consciousness_threshold =
+                                (broca.consciousness_threshold - 0.02).max(0.1);
+                        }
+
                         // Veto feedback: triggered veto → dampen exploration
                         if result.veto_triggered {
                             self.scale_exploration("broca_veto", 0.95);
                         }
+
                         // Semantic PE → FEP: language reconstruction error as
                         // additional surprise signal (closes language-perception loop).
                         #[cfg(feature = "liquid-mamba")]
@@ -1768,6 +1840,11 @@ impl CognitiveLoopService {
                             );
                             self.fep.agent.perceive(&sem_obs);
                         }
+
+                        // Populate telemetry
+                        broca.last_telemetry.quality = broca_quality;
+                        broca.last_telemetry.long_coherence = result.long_coherence;
+                        broca.last_telemetry.semantic_pe = result.semantic_pe;
                     }
                 }
             }

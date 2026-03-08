@@ -35,9 +35,9 @@ pub use super::types::BrocaGenerationTelemetry;
 #[cfg(feature = "ssm_language")]
 pub struct BrocaManager {
     generator: BrocaGenerator,
-    last_telemetry: BrocaGenerationTelemetry,
+    pub(crate) last_telemetry: BrocaGenerationTelemetry,
     /// Minimum consciousness level required to generate (default 0.1).
-    consciousness_threshold: f32,
+    pub(crate) consciousness_threshold: f32,
 }
 
 #[cfg(feature = "ssm_language")]
@@ -143,6 +143,7 @@ impl BrocaManager {
             veto_triggered: result.veto_triggered,
             generation_time_us: elapsed.as_micros() as u64,
             consciousness_gated: false,
+            ..Default::default()
         };
 
         Some(result)

@@ -215,6 +215,12 @@ pub(crate) struct QualityMetrics {
     pub(crate) smoothed_epistemic_uncertainty: f32,
     /// Previous cycle's cross-module agreement (for velocity computation).
     pub(crate) prev_cross_module_agreement: f32,
+    /// Consecutive cycles where all 4 feedback channels were dampened.
+    /// Science: Turrigiano (2008) — sustained dampening triggers synaptic silencing.
+    pub(crate) consecutive_full_dampen: u32,
+    /// Homeostasis pull efficiency EMA (ratio of post/pre distance, alpha=0.2).
+    /// <1.0 = pulls working, >1.0 = overcorrecting.
+    pub(crate) homeostasis_efficiency: f32,
 }
 
 impl Default for QualityMetrics {
@@ -246,6 +252,8 @@ impl Default for QualityMetrics {
             last_moral_score: 0.0,
             smoothed_epistemic_uncertainty: 0.0,
             prev_cross_module_agreement: 0.5,
+            consecutive_full_dampen: 0,
+            homeostasis_efficiency: 1.0,
         }
     }
 }

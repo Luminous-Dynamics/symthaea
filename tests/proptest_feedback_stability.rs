@@ -1189,3 +1189,47 @@ proptest! {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 28. Session 9: Homeostasis efficiency bounded and finite
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
+    /// Verify that homeostasis efficiency stays finite and non-negative,
+    /// and that PE variance is always non-negative.
+    /// Also checks that dominant_source_concentration is [0.0, 1.0].
+    #[test]
+    fn prop_session9_telemetry_bounded(inputs in fuzz_input_sequence(40, 80)) {
+        let mut service = feedback_service();
+        for (i, input) in inputs.iter().enumerate() {
+            let result = service.cycle(input);
+            let m = &result.metadata;
+
+            // Homeostasis efficiency must be finite and non-negative
+            assert_finite_f32(m.homeostasis_efficiency,
+                &format!("homeostasis_efficiency@cycle{i}"))?;
+            prop_assert!(m.homeostasis_efficiency >= 0.0,
+                "homeostasis_efficiency negative: {} at cycle {i}", m.homeostasis_efficiency);
+
+            // PE variance must be finite and non-negative
+            assert_finite_f32(m.pe_variance,
+                &format!("pe_variance@cycle{i}"))?;
+            prop_assert!(m.pe_variance >= 0.0,
+                "pe_variance negative: {} at cycle {i}", m.pe_variance);
+
+            // Dominant source concentration [0.0, 1.0]
+            assert_finite_f32(m.dominant_source_concentration,
+                &format!("dominant_source_concentration@cycle{i}"))?;
+            prop_assert!(m.dominant_source_concentration >= 0.0
+                && m.dominant_source_concentration <= 1.0,
+                "dominant_source_concentration out of bounds: {} at cycle {i}",
+                m.dominant_source_concentration);
+
+            // Feedback dampened count must still be [0, 4]
+            prop_assert!(m.feedback_dampened_count <= 4,
+                "feedback_dampened_count > 4: {} at cycle {i}", m.feedback_dampened_count);
+        }
+    }
+}

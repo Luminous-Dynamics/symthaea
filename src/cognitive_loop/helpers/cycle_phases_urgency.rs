@@ -164,7 +164,16 @@ impl CognitiveLoopService {
         } else {
             1.0
         };
-        let hysteresis_threshold = base_hysteresis * pattern_mod * coherence_mod * transition_cost_mod;
+        // Session 9 Item 6: Consolidation → urgency de-escalation bias.
+        // During memory consolidation, bias toward lower urgency for reduced interference.
+        // Born & Wilhelm (2012): memory consolidation during rest requires reduced interference.
+        let consolidation_mod = if self.is_consolidating {
+            1.15 // Raise threshold by 15% → harder to escalate
+        } else {
+            1.0
+        };
+        let hysteresis_threshold = base_hysteresis * pattern_mod * coherence_mod
+            * transition_cost_mod * consolidation_mod;
         let error_urgency = super::super::CycleUrgency::from_state(
             smoothed_urgency_error,
             hysteresis_threshold,
