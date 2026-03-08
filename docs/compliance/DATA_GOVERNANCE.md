@@ -204,9 +204,60 @@ All data export uses structured formats (JSON, Markdown). There is no automatic 
 
 ---
 
-## 4. Cross-Cutting Governance Controls
+## 4. Training and Input Data Provenance (ISO 42001 A.7.4, A.10.3)
 
-### 4.1 Data Quality (ISO 42001 A.10.2, EU AI Act Art. 10(2))
+### 4.1 Overview
+
+Symthaea does not train on external datasets at runtime. However, several data sources inform its cognitive parameters, moral reasoning, and calibration baselines. This section documents the provenance of each source for ISO 42001 A.7.4 compliance.
+
+### 4.2 Data Sources
+
+| Source | Type | Origin | Used For | Bias Considerations |
+|--------|------|--------|----------|---------------------|
+| **Psych-bench scenarios** | Synthetic cognitive tasks | Generated internally from cognitive psychology literature (Stroop, Flanker, N-back, StopSignal, CPT, PVT, DualTask, UG, RME) | Neuromodulator calibration via z-score mapping | Tasks derived from Western cognitive psychology; cross-cultural validation not yet performed |
+| **Moral prototypes** | Hand-crafted ethical scenarios | Authored by Tristan Stoltz based on ethical philosophy literature | EthicsEngine prototype matching and consent detection | English-language, Western ethical frameworks dominant; Eight Harmonies framework mitigates single-framework bias |
+| **Harmony basis keywords** | Curated keyword lists | Selected from philosophical and ethical texts | HDC harmony encoding (harmony_basis.rs) | Keyword selection reflects author's philosophical training; community review planned |
+| **HDC encoding dictionaries** | Vocabulary mappings | Derived from standard English word lists | Text-to-hypervector encoding | English-centric; multilingual encoding not yet implemented |
+| **Substrate profiles** | Scientific literature values | Neuroscience and computing literature (operation speed, energy costs, integration capacity) | SubstrateType requirement profiles | Based on published research; exotic substrates are speculative |
+| **Safety thresholds** | Engineering judgment | Set by developer based on testing and IIT/GWT literature | SafetyAgent Green/Yellow/Orange/Red levels | Conservative by design; may need adjustment for deployment contexts |
+
+### 4.3 Data Quality Assurance
+
+| Source | Quality Mechanism | Validation |
+|--------|-------------------|------------|
+| Psych-bench scenarios | Peer-reviewed cognitive task designs | Psych-bench regression suite (weekly CI) |
+| Moral prototypes | Adversarial test suite (26 tests) | `adversarial_moral_algebra` test |
+| Harmony keywords | Manual review + HDC encoding tests | `harmony_basis` unit tests |
+| Safety thresholds | Soak tests (15 scenarios, 1000 cycles each) | `safety_agent_escalation_soak` |
+| Substrate profiles | Literature cross-referencing | `substrate_independence` + `substrate_validation` tests |
+
+### 4.4 Bias Audit
+
+| Dimension | Status | Finding | Mitigation |
+|-----------|--------|---------|------------|
+| Cultural bias | Acknowledged | Moral prototypes and psych-bench tasks reflect Western cognitive/ethical norms | Eight Harmonies framework provides multi-dimensional evaluation; cross-cultural expansion planned |
+| Language bias | Acknowledged | English-only input processing | Multilingual HDC encoding planned for future release |
+| Gender bias | Not applicable | No gender-related data in cognitive state modeling | N/A |
+| Racial bias | Not applicable | No race-related data in cognitive state modeling | N/A |
+| Substrate bias | Acknowledged | Biological neurons scored highest due to most evidence | Validation framework explicitly scores honest confidence; silicon/quantum marked as "Theoretical" evidence |
+
+### 4.5 Data Lineage
+
+All data sources are version-controlled in the git repository:
+
+- Moral prototypes: `src/cognitive_loop/ethics_engine.rs` (moral_algebra module)
+- Harmony keywords: `src/hdc/harmony_basis.rs`
+- Safety thresholds: `src/cognitive_loop/thresholds.rs`
+- Substrate profiles: `symthaea-core/src/hdc/substrate_independence.rs`
+- Psych-bench tasks: `crates/symthaea-psych-bench/src/benchmarks/`
+
+Changes to any of these files require CI gate passage and, for safety-critical files, Class A change procedure (see `SDLC.md`).
+
+---
+
+## 5. Cross-Cutting Governance Controls
+
+### 5.1 Data Quality (ISO 42001 A.10.2, EU AI Act Art. 10(2))
 
 All consciousness metrics are computed from deterministic mathematical operations (HDC encoding, CfC evolution, spectral Phi computation, FEP free energy). Data quality is ensured by:
 
@@ -215,7 +266,7 @@ All consciousness metrics are computed from deterministic mathematical operation
 - **Property testing**: Proptest suites verify metric stability under perturbed inputs (`proptest_feedback_stability.rs`, `proptest_threshold_sensitivity.rs`).
 - **Calibration**: Psych-bench battery provides external validation against cognitive psychology benchmarks.
 
-### 4.2 Data Provenance (ISO 42001 A.10.3)
+### 5.2 Data Provenance (ISO 42001 A.10.3)
 
 Each data category has a clear, traceable origin:
 
@@ -228,7 +279,7 @@ Each data category has a clear, traceable origin:
 | Calibration Data | `calibration/` | Psych-bench z-scores -> receptor sensitivity adjustments |
 | Substrate Telemetry | `substrate_manager.rs` | SubstrateType -> requirements -> feasibility -> validation overlay |
 
-### 4.3 Access Control Summary
+### 5.3 Access Control Summary
 
 | Category | Sensitivity | Internal Access | Export Mechanism | Automatic External Transmission |
 |----------|-------------|-----------------|------------------|---------------------------------|
@@ -241,7 +292,7 @@ Each data category has a clear, traceable origin:
 
 No data category has automatic external transmission. All exports require explicit programmatic action.
 
-### 4.4 Retention Summary
+### 5.4 Retention Summary
 
 | Category | In-Memory Retention | Default Persistence | Recommended Archive (if persisted) |
 |----------|--------------------|--------------------|-------------------------------------|
@@ -252,7 +303,7 @@ No data category has automatic external transmission. All exports require explic
 | Calibration Data | 20 entries | None | 1 year |
 | Substrate Telemetry | Current cycle | None | 90 days |
 
-### 4.5 Deletion Procedures
+### 5.5 Deletion Procedures
 
 For in-memory data (all categories by default):
 1. Process termination clears all in-memory state.
@@ -265,7 +316,7 @@ For persisted data (deployment-operator responsibility):
 4. For safety assessment data: deletion requires approval from the designated safety officer.
 5. Verify deletion completeness — ensure no copies remain in backups, caches, or replicated stores.
 
-### 4.6 Incident Response
+### 5.6 Incident Response
 
 If a data governance violation is detected (unauthorized access, unintended persistence, data corruption):
 
@@ -277,9 +328,9 @@ If a data governance violation is detected (unauthorized access, unintended pers
 
 ---
 
-## 5. Regulatory Alignment
+## 6. Regulatory Alignment
 
-### 5.1 ISO 42001 A.10 (Data for AI Systems)
+### 6.1 ISO 42001 A.10 (Data for AI Systems)
 
 | Requirement | Addressed In |
 |-------------|-------------|
@@ -289,17 +340,17 @@ If a data governance violation is detected (unauthorized access, unintended pers
 | A.10.4 Data integrity | Section 2.3 (append-only safety trail), Section 4.1 (bounded outputs) |
 | A.10.5 Data incident management | Section 4.6 |
 
-### 5.2 EU AI Act Article 10 (Data and Data Governance)
+### 6.2 EU AI Act Article 10 (Data and Data Governance)
 
 | Requirement | Addressed In |
 |-------------|-------------|
 | Art. 10(1) Data governance practices | This document (Sections 2-4) |
 | Art. 10(2) Data quality criteria | Section 4.1 |
-| Art. 10(3) Training/validation/test datasets | Not applicable — Symthaea does not train on external datasets at runtime. Psych-bench calibration uses synthetic cognitive tasks |
+| Art. 10(3) Training/validation/test datasets | Section 4 (Training Data Provenance) — synthetic psych-bench tasks, hand-crafted moral prototypes, literature-derived substrate profiles |
 | Art. 10(4) Bias examination | Not applicable for internal cognitive state data. Moral reasoning bias is addressed by the Seven Harmonies framework and ensemble judgment |
 | Art. 10(5) Personal data | Section 2.2 — no PII processed |
 
-### 5.3 NIST AI RMF Measure Function
+### 6.3 NIST AI RMF Measure Function
 
 | Measure Activity | Addressed In |
 |-----------------|-------------|
@@ -310,7 +361,7 @@ If a data governance violation is detected (unauthorized access, unintended pers
 
 ---
 
-## 6. Review and Maintenance
+## 7. Review and Maintenance
 
 This document shall be reviewed:
 - **Annually**, or

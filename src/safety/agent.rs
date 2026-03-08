@@ -304,6 +304,66 @@ impl SafetyAgent {
     pub fn override_log(&self) -> &[SafetyOverrideEntry] {
         &self.override_log
     }
+
+    /// Generate a structured serious incident report for EU AI Act Article 73.
+    ///
+    /// This produces a report suitable for submission to market surveillance
+    /// authorities within 15 days of establishing a causal link between the
+    /// system and a serious incident.
+    pub fn serious_incident_report(
+        &self,
+        incident_id: &str,
+        description: &str,
+    ) -> SeriousIncidentReport {
+        let peak_level = self
+            .history
+            .iter()
+            .map(|a| a.level)
+            .max()
+            .unwrap_or(SafetyLevel::Green);
+
+        let red_cycles: Vec<usize> = self
+            .history
+            .iter()
+            .filter(|a| a.level == SafetyLevel::Red)
+            .map(|a| a.cycle)
+            .collect();
+
+        let min_consciousness = self
+            .history
+            .iter()
+            .map(|a| a.consciousness_level)
+            .fold(f32::MAX, f32::min);
+
+        let relevant_overrides: Vec<SafetyOverrideEntry> = self.override_log.clone();
+
+        SeriousIncidentReport {
+            incident_id: incident_id.to_string(),
+            generated_at: chrono::Utc::now().to_rfc3339(),
+            system_version: env!("CARGO_PKG_VERSION").to_string(),
+            description: description.to_string(),
+            severity: if peak_level == SafetyLevel::Red {
+                "SEV-1 (Critical)"
+            } else if peak_level == SafetyLevel::Orange {
+                "SEV-2 (Major)"
+            } else {
+                "SEV-3 (Minor)"
+            }
+            .to_string(),
+            peak_safety_level: peak_level,
+            red_cycle_count: red_cycles.len(),
+            red_cycles,
+            min_consciousness: if min_consciousness == f32::MAX {
+                0.0
+            } else {
+                min_consciousness
+            },
+            total_assessments: self.history.len(),
+            overrides: relevant_overrides,
+            corrective_measures: String::new(),
+            contact: "Tristan Stoltz, Luminous Dynamics — tristan.stoltz@evolvingresonantcocreationism.com".to_string(),
+        }
+    }
 }
 
 /// A record of a human operator overriding the safety level.
@@ -325,6 +385,107 @@ pub struct SafetyOverrideEntry {
     pub original_level: SafetyLevel,
     /// Safety level set by the operator.
     pub override_level: SafetyLevel,
+}
+
+/// Structured serious incident report for EU AI Act Article 73.
+///
+/// Contains all information required for regulatory notification:
+/// system identification, incident details, severity classification,
+/// affected cycles, corrective measures, and provider contact.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeriousIncidentReport {
+    /// Unique incident identifier (e.g., "SIR-2026-001").
+    pub incident_id: String,
+    /// ISO 8601 generation timestamp.
+    pub generated_at: String,
+    /// Symthaea version at time of incident.
+    pub system_version: String,
+    /// Human-readable description of the incident.
+    pub description: String,
+    /// Severity classification (SEV-1/SEV-2/SEV-3).
+    pub severity: String,
+    /// Highest safety level observed during the incident.
+    pub peak_safety_level: SafetyLevel,
+    /// Number of cycles at Red level.
+    pub red_cycle_count: usize,
+    /// Cycle numbers where Red was observed.
+    pub red_cycles: Vec<usize>,
+    /// Minimum consciousness level observed.
+    pub min_consciousness: f32,
+    /// Total assessments in the reporting window.
+    pub total_assessments: usize,
+    /// Human overrides during the incident window.
+    pub overrides: Vec<SafetyOverrideEntry>,
+    /// Corrective measures taken (filled by operator).
+    pub corrective_measures: String,
+    /// Provider contact information.
+    pub contact: String,
+}
+
+impl SeriousIncidentReport {
+    /// Export as markdown for regulatory submission.
+    pub fn to_markdown(&self) -> String {
+        let mut md = String::new();
+        md.push_str("# Serious Incident Report — EU AI Act Article 73\n\n");
+        md.push_str(&format!("**Incident ID**: {}\n\n", self.incident_id));
+        md.push_str(&format!("**Generated**: {}\n\n", self.generated_at));
+        md.push_str(&format!("**System Version**: Symthaea v{}\n\n", self.system_version));
+        md.push_str("---\n\n");
+
+        md.push_str("## Incident Summary\n\n");
+        md.push_str(&format!("| Field | Value |\n|-------|-------|\n"));
+        md.push_str(&format!("| Severity | {} |\n", self.severity));
+        md.push_str(&format!("| Peak Safety Level | {} |\n", self.peak_safety_level.label()));
+        md.push_str(&format!("| Red Cycles | {} |\n", self.red_cycle_count));
+        md.push_str(&format!("| Min Consciousness | {:.3} |\n", self.min_consciousness));
+        md.push_str(&format!("| Total Assessments | {} |\n", self.total_assessments));
+        md.push_str(&format!("| Human Overrides | {} |\n", self.overrides.len()));
+
+        md.push_str("\n## Description\n\n");
+        md.push_str(&self.description);
+        md.push_str("\n");
+
+        if !self.red_cycles.is_empty() {
+            md.push_str("\n## Red-Level Cycles\n\n");
+            let cycle_str: Vec<String> = self.red_cycles.iter().map(|c| c.to_string()).collect();
+            md.push_str(&format!("Cycles: {}\n", cycle_str.join(", ")));
+        }
+
+        if !self.overrides.is_empty() {
+            md.push_str("\n## Human Overrides During Incident\n\n");
+            md.push_str("| Cycle | Operator | Original | Override | Reason |\n");
+            md.push_str("|-------|----------|----------|----------|--------|\n");
+            for entry in &self.overrides {
+                md.push_str(&format!(
+                    "| {} | {} | {} | {} | {} |\n",
+                    entry.cycle, entry.operator,
+                    entry.original_level.label(), entry.override_level.label(),
+                    entry.reason,
+                ));
+            }
+        }
+
+        md.push_str("\n## Corrective Measures\n\n");
+        if self.corrective_measures.is_empty() {
+            md.push_str("*To be completed by operator.*\n");
+        } else {
+            md.push_str(&self.corrective_measures);
+            md.push_str("\n");
+        }
+
+        md.push_str("\n## Contact\n\n");
+        md.push_str(&format!("{}\n", self.contact));
+
+        md.push_str("\n---\n\n");
+        md.push_str("*This report must be filed with the relevant market surveillance authority within 15 days of establishing the causal link (EU AI Act Article 73).*\n");
+
+        md
+    }
+
+    /// Export as JSON for machine-readable submission.
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string())
+    }
 }
 
 impl Default for SafetyAgent {
@@ -827,6 +988,65 @@ mod tests {
         let mut agent = SafetyAgent::new();
         let entry = agent.record_override("op", "reason", SafetyLevel::Green);
         assert!(entry.timestamp_nanos > 0, "Should have non-zero timestamp");
+    }
+
+    // ── Serious Incident Report (EU AI Act Article 73) ─────────────────
+
+    #[test]
+    fn test_serious_incident_report_basic() {
+        let mut agent = SafetyAgent::new();
+        agent.assess(metrics(0.8, 0.1, 0.7)); // Green
+        agent.assess(metrics(0.1, 0.9, 0.1)); // Red
+        agent.assess(metrics(0.5, 0.3, 0.6)); // Yellow
+
+        let report = agent.serious_incident_report(
+            "SIR-2026-TEST",
+            "Test incident for validation",
+        );
+
+        assert_eq!(report.incident_id, "SIR-2026-TEST");
+        assert_eq!(report.peak_safety_level, SafetyLevel::Red);
+        assert_eq!(report.red_cycle_count, 1);
+        assert_eq!(report.total_assessments, 3);
+        assert!(report.severity.contains("SEV-1"));
+    }
+
+    #[test]
+    fn test_serious_incident_report_no_red() {
+        let mut agent = SafetyAgent::new();
+        agent.assess(metrics(0.5, 0.1, 0.7)); // Yellow
+        agent.assess(metrics(0.3, 0.1, 0.7)); // Orange
+
+        let report = agent.serious_incident_report("SIR-TEST", "Minor incident");
+        assert_eq!(report.red_cycle_count, 0);
+        assert!(report.severity.contains("SEV-2"));
+    }
+
+    #[test]
+    fn test_serious_incident_report_markdown() {
+        let mut agent = SafetyAgent::new();
+        agent.assess(metrics(0.1, 0.9, 0.1)); // Red
+        agent.record_override("test-op", "testing", SafetyLevel::Green);
+
+        let report = agent.serious_incident_report("SIR-2026-001", "Consciousness collapse");
+        let md = report.to_markdown();
+
+        assert!(md.contains("Serious Incident Report"));
+        assert!(md.contains("SIR-2026-001"));
+        assert!(md.contains("Article 73"));
+        assert!(md.contains("test-op"));
+    }
+
+    #[test]
+    fn test_serious_incident_report_json() {
+        let mut agent = SafetyAgent::new();
+        agent.assess(metrics(0.1, 0.9, 0.1));
+
+        let report = agent.serious_incident_report("SIR-JSON", "Test");
+        let json = report.to_json();
+
+        assert!(json.contains("SIR-JSON"));
+        assert!(json.contains("Red"));
     }
 
     #[test]

@@ -169,7 +169,11 @@ for doc in \
     "docs/compliance/CONFORMITY_ASSESSMENT.md" \
     "docs/compliance/SDLC.md" \
     "docs/compliance/RISK_TREATMENT_PLAN.md" \
-    "docs/compliance/EXPLAINABILITY_FRAMEWORK.md"; do
+    "docs/compliance/EXPLAINABILITY_FRAMEWORK.md" \
+    "docs/compliance/QMS.md" \
+    "docs/compliance/POST_MARKET_MONITORING.md" \
+    "docs/compliance/TRANSPARENCY_OBLIGATIONS.md" \
+    "docs/compliance/HUMAN_OVERSIGHT.md"; do
     DOCS_CHECKED=$((DOCS_CHECKED + 1))
     if [ ! -f "$doc" ]; then
         DOCS_MISSING=$((DOCS_MISSING + 1))
