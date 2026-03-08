@@ -12,6 +12,7 @@ use symthaea_core::hdc::ContinuousHV;
 
 use crate::action::executor::{NixOSCommand, SafetyLevel};
 use crate::encoding::NixCodebook;
+use crate::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
 use crate::mind::{ActionCategory, ActionPlan, NixActiveInference};
 
 // =============================================================================
@@ -178,6 +179,8 @@ pub struct NixPipelineProcessor {
     knowledge_base: Option<crate::support::knowledge::KnowledgeBase>,
     /// Ollama bridge for LLM fallback when HDC + knowledge base can't answer.
     ollama_bridge: Option<crate::mind::OllamaBridge>,
+    /// Causal graph for learning package/service dependency relationships.
+    causal_graph: NixCausalGraph,
 }
 
 impl NixPipelineProcessor {
@@ -185,6 +188,11 @@ impl NixPipelineProcessor {
     pub fn new() -> Self {
         let mut codebook = NixCodebook::new();
         let knowledge_base = Some(crate::support::knowledge::KnowledgeBase::new(&mut codebook));
+        let mut causal_graph = NixCausalGraph::new(42);
+        // Bootstrap with known NixOS causal patterns
+        for (cause, effect, _) in NixOSCausalPatterns::known_patterns() {
+            causal_graph.add_structural_edge(cause, effect, 0.5);
+        }
         Self {
             engine: NixActiveInference::new(),
             codebook,
@@ -192,6 +200,7 @@ impl NixPipelineProcessor {
             skip_observe: false,
             knowledge_base,
             ollama_bridge: None,
+            causal_graph,
         }
     }
 
@@ -332,6 +341,10 @@ impl NixPipelineProcessor {
     }
 
     /// Record outcome and learn from it.
+    ///
+    /// Updates three learning systems:
+    /// 1. Active inference engine — transition model + episodic memory
+    /// 2. Causal graph — Hebbian edge updates from observed action→effect pairs
     pub fn learn(&mut self, action: &str, success: bool, state_after: ContinuousHV) {
         let outcome = if success {
             crate::mind::EpisodeOutcome::Success
@@ -340,8 +353,44 @@ impl NixPipelineProcessor {
         };
         let state_before = self.engine.world_model().system_state().clone();
         let action_cat = ActionCategory::from_command(action);
+
+        // 1. Learn in the active inference engine (transition model + episodic memory)
         self.engine
             .learn_from_outcome(&state_before, action_cat, &state_after, outcome, 0.5);
+
+        // 2. Update the causal graph: the action caused the observed effects.
+        //    We model the action command as the cause node, and the success/failure
+        //    outcome as observed effects. This accumulates causal knowledge about
+        //    which actions lead to which outcomes over many cycles.
+        let action_key = format!("action:{}", action);
+        let outcome_key = if success {
+            format!("outcome:success:{}", action)
+        } else {
+            format!("outcome:failure:{}", action)
+        };
+        let predicted_effects = vec![
+            format!("outcome:success:{}", action),
+            format!("outcome:failure:{}", action),
+        ];
+        let predicted_refs: Vec<&str> = predicted_effects.iter().map(|s| s.as_str()).collect();
+        let observed_refs: Vec<&str> = vec![outcome_key.as_str()];
+        self.causal_graph
+            .observe_outcome(&action_key, &observed_refs, &predicted_refs);
+
+        // Also record a numeric observation for the action (1.0 = success, 0.0 = failure)
+        // so discover_structure() can find correlations after enough data.
+        self.causal_graph
+            .observe(&action_key, if success { 1.0 } else { 0.0 });
+    }
+
+    /// Access the causal graph (read-only).
+    pub fn causal_graph(&self) -> &NixCausalGraph {
+        &self.causal_graph
+    }
+
+    /// Access the causal graph (mutable).
+    pub fn causal_graph_mut(&mut self) -> &mut NixCausalGraph {
+        &mut self.causal_graph
     }
 
     /// Access the underlying engine.
@@ -450,5 +499,82 @@ mod tests {
         let state_after = ContinuousHV::random(dim, 1);
         proc.learn("install firefox", true, state_after);
         assert_eq!(proc.engine().episode_count(), 1);
+    }
+
+    #[test]
+    fn test_causal_graph_bootstrapped() {
+        let proc = NixPipelineProcessor::new();
+        // The causal graph should be bootstrapped with known NixOS patterns
+        assert!(
+            proc.causal_graph().edge_count() > 100,
+            "Causal graph should have >100 structural edges from NixOS patterns, got {}",
+            proc.causal_graph().edge_count(),
+        );
+    }
+
+    #[test]
+    fn test_learn_updates_causal_graph() {
+        let mut proc = NixPipelineProcessor::new();
+        let initial_edges = proc.causal_graph().edge_count();
+
+        let dim = proc.engine().world_model().system_state().dim();
+
+        // Learn from multiple outcomes — causal graph should accumulate edges
+        for i in 0..5 {
+            let state_after = ContinuousHV::random(dim, i + 100);
+            proc.learn("install nginx", i % 2 == 0, state_after);
+        }
+
+        assert!(
+            proc.causal_graph().edge_count() > initial_edges,
+            "Causal graph should have new edges after learning (before={}, after={})",
+            initial_edges,
+            proc.causal_graph().edge_count(),
+        );
+
+        // The action→outcome edge should exist
+        let conf = proc
+            .causal_graph()
+            .edge_confidence("action:install nginx", "outcome:success:install nginx");
+        assert!(
+            conf.is_some(),
+            "Should have a causal edge from install action to success outcome"
+        );
+    }
+
+    #[test]
+    fn test_causal_graph_learns_relationships_over_cycles() {
+        let mut proc = NixPipelineProcessor::new();
+        let dim = proc.engine().world_model().system_state().dim();
+
+        // Simulate 20 cycles of learning
+        for i in 0..20 {
+            let state_after = ContinuousHV::random(dim, i * 10);
+            // Rebuilds mostly succeed
+            proc.learn("rebuild switch", true, state_after.clone());
+            // GC operations always succeed
+            proc.learn("nix-collect-garbage", true, state_after);
+        }
+
+        // Verify edges have been strengthened
+        let rebuild_conf = proc
+            .causal_graph()
+            .edge_confidence("action:rebuild switch", "outcome:success:rebuild switch")
+            .unwrap_or(0.0);
+        assert!(
+            rebuild_conf > 0.5,
+            "Rebuild→success edge should be strengthened after 20 cycles (got {:.3})",
+            rebuild_conf,
+        );
+
+        let gc_conf = proc
+            .causal_graph()
+            .edge_confidence("action:nix-collect-garbage", "outcome:success:nix-collect-garbage")
+            .unwrap_or(0.0);
+        assert!(
+            gc_conf > 0.5,
+            "GC→success edge should be strengthened after 20 cycles (got {:.3})",
+            gc_conf,
+        );
     }
 }

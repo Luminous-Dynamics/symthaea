@@ -19,6 +19,8 @@ pub struct CausalLink {
     pub to: String,
     pub confidence: f64,
     pub relationship: String,
+    /// Structured suggestion from anomaly diagnosis (if available).
+    pub suggestion: Option<String>,
 }
 
 /// Causal explorer widget.
@@ -133,6 +135,18 @@ impl Widget for CausalExplorer<'_> {
                 ),
             ]);
             buf.set_line(inner.x + 1, y, &line, inner.width.saturating_sub(1));
+
+            // Show suggestion if present and space allows
+            if let Some(ref suggestion) = link.suggestion {
+                let sy = inner.y + 2 + i as u16;
+                if sy < inner.y + inner.height {
+                    let sug_line = Line::from(Span::styled(
+                        format!("    -> {}", suggestion),
+                        Style::default().fg(Color::Cyan),
+                    ));
+                    buf.set_line(inner.x + 1, sy, &sug_line, inner.width.saturating_sub(1));
+                }
+            }
         }
     }
 }
@@ -149,12 +163,14 @@ mod tests {
                 to: "hardware.nvidia.package".into(),
                 confidence: 0.85,
                 relationship: "determines".into(),
+                suggestion: None,
             },
             CausalLink {
                 from: "services.xserver.enable".into(),
                 to: "services.displayManager".into(),
                 confidence: 0.92,
                 relationship: "requires".into(),
+                suggestion: Some("Enable display manager first".into()),
             },
         ];
         let widget = CausalExplorer::new(links)
@@ -180,6 +196,7 @@ mod tests {
                 to: format!("to.{}", i),
                 confidence: 0.5 + (i as f64) * 0.02,
                 relationship: "affects".into(),
+                suggestion: None,
             })
             .collect();
         let widget = CausalExplorer::new(links).scroll(5);

@@ -66,6 +66,9 @@ fn test_health_check_drives_knowledge_search() {
             total_bytes: 500_000_000_000,
             used_bytes: 475_000_000_000, // 95% full
         }],
+        load_average: [0.5, 0.4, 0.3],
+        swap_total_mb: 8192,
+        swap_used_mb: 0,
     };
 
     let snapshot = SystemStateSnapshot {
@@ -119,11 +122,13 @@ fn test_predictive_monitor_with_rising_disk() {
             memory_used_pct: 50.0,
             store_path_count: 50_000 + i * 1000,
             failed_unit_count: 0,
+            load_average_1m: 0.5,
+            swap_used_pct: 5.0,
         });
     }
 
     let predictions = monitor.predict_all_horizons();
-    assert_eq!(predictions.len(), 16); // 4 metrics × 4 horizons
+    assert_eq!(predictions.len(), 24); // 6 metrics × 4 horizons
 
     // 7-day disk prediction should be at or above the latest value (79.5)
     // Note: since samples are ingested nearly simultaneously, the time delta
@@ -152,6 +157,8 @@ fn test_predictive_monitor_stable_system_no_alerts() {
             memory_used_pct: 40.0,
             store_path_count: 50_000,
             failed_unit_count: 0,
+            load_average_1m: 0.5,
+            swap_used_pct: 5.0,
         });
     }
 
@@ -257,6 +264,9 @@ fn test_full_support_pipeline() {
             total_bytes: 500_000_000_000,
             used_bytes: 420_000_000_000, // 84% used
         }],
+        load_average: [1.5, 1.0, 0.8],
+        swap_total_mb: 8192,
+        swap_used_mb: 1024,
     };
 
     // 2. Health assessment
@@ -287,6 +297,8 @@ fn test_full_support_pipeline() {
         memory_used_pct: 81.0,
         store_path_count: 120_000,
         failed_unit_count: 1,
+        load_average_1m: 1.5,
+        swap_used_pct: 20.0,
     });
 
     let predictions = monitor.predict(24.0);

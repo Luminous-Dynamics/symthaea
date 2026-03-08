@@ -32,6 +32,10 @@ pub struct WorldModelSnapshot {
     pub drift_similarity: f32,
     /// Number of episodes in episodic memory.
     pub episodic_count: usize,
+    /// Rolling MAE of predictions (lower = more accurate).
+    pub prediction_accuracy: Option<f64>,
+    /// Number of active inference maintenance plans (dry-run).
+    pub maintenance_plan_count: u32,
 }
 
 impl Default for WorldModelSnapshot {
@@ -46,6 +50,8 @@ impl Default for WorldModelSnapshot {
             is_surprised: false,
             drift_similarity: 1.0,
             episodic_count: 0,
+            prediction_accuracy: None,
+            maintenance_plan_count: 0,
         }
     }
 }
@@ -175,6 +181,32 @@ impl Widget for WorldModelView<'_> {
             ]);
             buf.set_line(x, y, &drift_line, inner.width.saturating_sub(1));
             y += 1;
+        }
+
+        // Prediction accuracy + maintenance plans
+        if y < inner.y + inner.height {
+            let mut spans = Vec::new();
+            if let Some(mae) = self.snapshot.prediction_accuracy {
+                let mae_color = if mae > 10.0 {
+                    Color::Red
+                } else if mae > 5.0 {
+                    Color::Yellow
+                } else {
+                    Color::Green
+                };
+                spans.push(Span::raw("MAE: "));
+                spans.push(Span::styled(format!("{:.1}", mae), Style::default().fg(mae_color)));
+            }
+            if self.snapshot.maintenance_plan_count > 0 {
+                if !spans.is_empty() {
+                    spans.push(Span::raw("  "));
+                }
+                spans.push(Span::raw(format!("Plans: {}", self.snapshot.maintenance_plan_count)));
+            }
+            if !spans.is_empty() {
+                buf.set_line(x, y, &Line::from(spans), inner.width.saturating_sub(1));
+                y += 1;
+            }
         }
 
         // Working memory

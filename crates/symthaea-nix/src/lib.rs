@@ -58,6 +58,10 @@ pub mod cli;
 #[cfg(feature = "tui")]
 pub mod tui;
 
+/// Production observability: Prometheus metrics, structured logging, /metrics endpoint
+#[cfg(feature = "observability")]
+pub mod observability;
+
 // Re-export key types at crate root
 pub use action::executor::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel};
 pub use parser::nix_code_parser::NixCodeParser;

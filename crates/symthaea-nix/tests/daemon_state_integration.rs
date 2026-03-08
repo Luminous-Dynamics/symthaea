@@ -124,6 +124,8 @@ fn test_predictive_monitor_generates_alerts() {
             memory_used_pct: 40.0,
             store_path_count: 50_000,
             failed_unit_count: 0,
+            load_average_1m: 0.5,
+            swap_used_pct: 5.0,
         });
     }
 
@@ -177,19 +179,13 @@ fn test_causal_graph_top_edges_empty() {
 #[test]
 fn test_snapshot_write_read_roundtrip_with_alerts() {
     let snap = DaemonSnapshot {
-        version: SNAPSHOT_VERSION,
-        timestamp: 1700000000,
         observation_count: 1,
         anomaly_count: 0,
         hierarchy_errors: [0.0; 4],
         free_energy: 0.1,
-        is_surprised: false,
         drift_similarity: 0.99,
         causal_edge_count: 0,
         episodic_count: 0,
-        concerns: vec![],
-        recent_anomalies: vec![],
-        daemon_running: true,
         daemon_pid: 1,
         support_status: Some("Critical".into()),
         recommendation_count: 3,
@@ -227,6 +223,7 @@ fn test_snapshot_write_read_roundtrip_with_alerts() {
         maintenance_plan_count: 2,
         load_average_1m: Some(1.5),
         swap_used_percent: Some(25.0),
+        ..DaemonSnapshot::test_default()
     };
 
     let dir = std::env::temp_dir().join("nix-mind-daemon-integration-test");

@@ -494,8 +494,28 @@ fn cmd_doctor(format: OutputFormat) {
     let mut codebook = symthaea_nix::encoding::NixCodebook::new();
     let mut assessor = symthaea_nix::support::SupportAssessor::new(&mut codebook);
 
-    // Create a predictive monitor with a single sample for baseline predictions
-    let mut monitor = symthaea_nix::support::PredictiveMonitor::with_defaults();
+    // Load persisted predictive history for trend-aware predictions (BC)
+    let snapshot_path = symthaea_nix::ipc::default_snapshot_path();
+    let pred_path = snapshot_path.with_file_name("predictive_history.json");
+    let mut monitor = if let Ok(json) = std::fs::read_to_string(&pred_path) {
+        if let Ok(saved) =
+            serde_json::from_str::<symthaea_nix::support::predictive::SavedPredictiveState>(&json)
+        {
+            let sample_count = saved.samples.len();
+            eprintln!(
+                "nix-mind doctor: loaded {} historical samples for trend analysis",
+                sample_count
+            );
+            symthaea_nix::support::PredictiveMonitor::load(
+                saved,
+                symthaea_nix::support::predictive::AlertThresholds::default(),
+            )
+        } else {
+            symthaea_nix::support::PredictiveMonitor::with_defaults()
+        }
+    } else {
+        symthaea_nix::support::PredictiveMonitor::with_defaults()
+    };
     let telemetry = symthaea_nix::support::SystemTelemetry {
         disk_used_pct: hw.as_ref().map_or(0.0, |h| {
             h.disks.first().map_or(0.0, |d| {
@@ -520,6 +540,14 @@ fn cmd_doctor(format: OutputFormat) {
             .iter()
             .filter(|(_, s)| *s == symthaea_nix::encoding::ServiceState::Failed)
             .count() as u32,
+        load_average_1m: hw.as_ref().map_or(0.0, |h| h.load_average[0]),
+        swap_used_pct: hw.as_ref().map_or(0.0, |h| {
+            if h.swap_total_mb > 0 {
+                h.swap_used_mb as f64 / h.swap_total_mb as f64 * 100.0
+            } else {
+                0.0
+            }
+        }),
     };
     monitor.ingest(telemetry);
 
@@ -1031,6 +1059,14 @@ fn cmd_predict(horizons_str: &str, format: OutputFormat) {
             .iter()
             .filter(|(_, s)| *s == ServiceState::Failed)
             .count() as u32,
+        load_average_1m: hw.as_ref().map_or(0.0, |h| h.load_average[0]),
+        swap_used_pct: hw.as_ref().map_or(0.0, |h| {
+            if h.swap_total_mb > 0 {
+                h.swap_used_mb as f64 / h.swap_total_mb as f64 * 100.0
+            } else {
+                0.0
+            }
+        }),
     };
 
     // Try to load persisted history from daemon for richer predictions
