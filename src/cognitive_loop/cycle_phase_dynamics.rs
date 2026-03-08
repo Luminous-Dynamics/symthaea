@@ -237,7 +237,7 @@ impl CognitiveLoopService {
             let prev_conf = self.carryover.quality.prev_confidence_for_crash;
             let current_conf = self.prediction_confidence;
             let drop = prev_conf - current_conf;
-            confidence_crash_detected = drop > prev_conf * CONFIDENCE_CRASH_THRESHOLD as f64
+            confidence_crash_detected = drop > prev_conf * CONFIDENCE_CRASH_THRESHOLD
                 && prev_conf > 0.15
                 && self.stats.total_cycles > 10;
             if confidence_crash_detected {
