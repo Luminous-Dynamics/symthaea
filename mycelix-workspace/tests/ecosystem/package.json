@@ -1,0 +1,22 @@
+{
+  "name": "@mycelix/ecosystem-tests",
+  "version": "0.1.0",
+  "description": "Mycelix Ecosystem E2E Tests with Tryorama",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:commons": "vitest run --testPathPattern commons",
+    "test:finance": "vitest run --testPathPattern finance",
+    "test:identity": "vitest run --testPathPattern identity",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@holochain/client": "^0.20.0",
+    "@holochain/tryorama": "^0.19.0",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}

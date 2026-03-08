@@ -27,6 +27,7 @@ description: |
   - Attribution (OPEN): Dependency registry, usage receipts, reciprocity pledges
   - Finance (ECONOMY): Payments (SAP/TEND/MYCEL), treasury, staking, recognition, currency-mint
   - Governance (DEMOCRACY): Proposals, voting, DKG, councils, constitution, execution
+  - Health (SOVEREIGN): Patient, provider, records, prescriptions, consent (standalone DNA)
   Enables cross-cluster calls between all tiers via OtherRole dispatch.
   Commons split into two sub-cluster DNAs to fit under Holochain's 16MB limit.
   Note: "HEARTH" in the finance hApp refers to commons pool governance;
@@ -127,6 +128,17 @@ roles:
       deferred: false
     dna:
       path: ./governance/dna/mycelix_governance.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: health
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./health/dna/health.dna
       modifiers:
         network_seed: ~
         properties: ~
