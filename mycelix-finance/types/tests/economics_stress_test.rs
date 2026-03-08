@@ -1277,7 +1277,10 @@ fn test_demurrage_special_float_values() {
 
     // Max i32 balance
     let d = compute_minted_demurrage(i32::MAX, 0.05, 31_536_000);
-    assert!(d >= 0 && d <= i32::MAX, "Max balance should not overflow");
+    assert!(
+        (0..=i32::MAX).contains(&d),
+        "Max balance should not overflow"
+    );
 }
 
 /// Stress test: all valid MintedCurrencyParams field combinations at boundaries.
@@ -1300,7 +1303,7 @@ fn test_minted_params_boundary_matrix() {
         let mut p = base.clone();
         p.credit_limit = cl;
         let result = p.validate();
-        if cl >= MINTED_CREDIT_LIMIT_MIN && cl <= MINTED_CREDIT_LIMIT_MAX {
+        if (MINTED_CREDIT_LIMIT_MIN..=MINTED_CREDIT_LIMIT_MAX).contains(&cl) {
             assert!(result.is_ok(), "credit_limit {} should be valid", cl);
         } else {
             assert!(result.is_err(), "credit_limit {} should be invalid", cl);
@@ -1379,12 +1382,8 @@ fn test_demurrage_zero_sum_100_members() {
     assert!(compost > 0, "Compost should have accumulated demurrage");
 
     // Negative balances should be unchanged
-    for i in 50..100 {
-        assert!(
-            balances[i] < 0,
-            "Negative balance should remain negative: {}",
-            balances[i]
-        );
+    for bal in &balances[50..100] {
+        assert!(*bal < 0, "Negative balance should remain negative: {}", bal);
     }
 
     println!(
@@ -1417,7 +1416,7 @@ fn test_demurrage_zero_sum_multi_year_interleaved() {
         // Simulate exchanges with larger amounts to ensure demurrage produces
         // non-zero deductions (small balances floor to 0 with continuous decay).
         // member[0] provides year*20 hours to member[1]
-        let hours = year as i32 * 20;
+        let hours = year * 20;
         balances[0] += hours;
         balances[1] -= hours;
         check_zero_sum(&balances, compost, &format!("year {} after exchange", year));
