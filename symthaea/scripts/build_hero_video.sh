@@ -89,15 +89,26 @@ drawtext=fontfile='$FONT':text='Recovery — the system returns to baseline':fon
   "$VID_DIR/_p5_dashboard.mp4" 2>/dev/null
 echo "  5/6 Dashboard"
 
-# 6. End card (4s) — fade in/out
+# 6. "What's Real" transparency card (4s) — fade in/out
+ffmpeg -y -f lavfi -i "color=c=0x0a0a12:s=1920x1080:d=4,format=yuv420p" \
+  -vf "drawtext=fontfile='$FONT':text='WHAT IS REAL':fontsize=48:fontcolor=0x50e890:x=(w-text_w)/2:y=120:alpha='if(lt(t\,0.3)\,t/0.3\,if(gt(t\,3.5)\,max(0\,1-(t-3.5)*2)\,1))',\
+drawtext=fontfile='$FONT':text='Real physics (MuJoCo)  ·  Real FEP active inference  ·  Real cognitive loop':fontsize=22:fontcolor=0xc8c8e0:x=(w-text_w)/2:y=220:alpha='if(lt(t\,0.5)\,0\,if(lt(t\,1)\,(t-0.5)*2\,if(gt(t\,3.5)\,max(0\,1-(t-3.5)*2)\,1)))',\
+drawtext=fontfile='$FONT':text='Real consciousness measurement (MCE v2)  ·  Real LTC vocal tract synthesis':fontsize=22:fontcolor=0xc8c8e0:x=(w-text_w)/2:y=260:alpha='if(lt(t\,0.7)\,0\,if(lt(t\,1.2)\,(t-0.7)*2\,if(gt(t\,3.5)\,max(0\,1-(t-3.5)*2)\,1)))',\
+drawtext=fontfile='$FONT':text='Voice cognitive state computed by real cognitive loop (not hand-tuned)':fontsize=22:fontcolor=0xc8c8e0:x=(w-text_w)/2:y=300:alpha='if(lt(t\,0.9)\,0\,if(lt(t\,1.4)\,(t-0.9)*2\,if(gt(t\,3.5)\,max(0\,1-(t-3.5)*2)\,1)))',\
+drawtext=fontfile='$FONT':text='Curated: narration script\, scenario text\, video timing':fontsize=20:fontcolor=0x6a6a8a:x=(w-text_w)/2:y=380:alpha='if(lt(t\,1.2)\,0\,if(lt(t\,1.7)\,(t-1.2)*2\,if(gt(t\,3.5)\,max(0\,1-(t-3.5)*2)\,1)))',\
+fade=t=in:st=0:d=0.3,fade=t=out:st=3.7:d=0.3" \
+  -c:v libx264 -preset fast -pix_fmt yuv420p -r 30 "$VID_DIR/_p6_whatsreal.mp4" 2>/dev/null
+echo "  6/7 What's Real card"
+
+# 7. End card (4s) — fade in/out
 ffmpeg -y -f lavfi -i "color=c=black:s=1920x1080:d=4,format=yuv420p" \
   -vf "drawtext=fontfile='$FONT':text='SYMTHAEA':fontsize=72:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-80:alpha='if(lt(t\,0.5)\,t/0.5\,if(gt(t\,3)\,max(0\,1-(t-3))\,1))',\
 drawtext=fontfile='$FONT':text='Holographic Liquid Brain Architecture':fontsize=32:fontcolor=0xc8c8e0:x=(w-text_w)/2:y=(h-text_h)/2-20:alpha='if(lt(t\,0.8)\,0\,if(lt(t\,1.3)\,min(1\,(t-0.8)/0.5)\,if(gt(t\,3)\,max(0\,1-(t-3))\,1)))',\
 drawtext=fontfile='$FONT':text='HDC + IIT/Phi + LTC/CfC + Active Inference':fontsize=24:fontcolor=0x5090ff:x=(w-text_w)/2:y=(h-text_h)/2+30:alpha='if(lt(t\,1)\,0\,if(lt(t\,1.5)\,min(1\,(t-1)/0.5)\,if(gt(t\,3)\,max(0\,1-(t-3))\,1)))',\
 drawtext=fontfile='$FONT':text='luminousdynamics.org':fontsize=20:fontcolor=0x6a6a8a:x=(w-text_w)/2:y=(h-text_h)/2+80:alpha='if(lt(t\,1.5)\,0\,if(lt(t\,2)\,min(1\,(t-1.5)/0.5)\,if(gt(t\,3)\,max(0\,1-(t-3))\,1)))',\
 fade=t=in:st=0:d=0.5" \
-  -c:v libx264 -preset fast -pix_fmt yuv420p -r 30 "$VID_DIR/_p6_end.mp4" 2>/dev/null
-echo "  6/6 End card"
+  -c:v libx264 -preset fast -pix_fmt yuv420p -r 30 "$VID_DIR/_p7_end.mp4" 2>/dev/null
+echo "  7/7 End card"
 
 # ── Concat using demuxer ──────────────────────────────────────────
 echo ""
@@ -109,7 +120,8 @@ file '_p2_scenario.mp4'
 file '_p3_narrated.mp4'
 file '_p4_mind.mp4'
 file '_p5_dashboard.mp4'
-file '_p6_end.mp4'
+file '_p6_whatsreal.mp4'
+file '_p7_end.mp4'
 FILELIST
 
 ffmpeg -y -f concat -safe 0 -i "$VID_DIR/_concat.txt" \
@@ -185,7 +197,7 @@ ffmpeg -y -i "$VID_DIR/_hero_video.mp4" -i "$VID_DIR/_hero_audio.m4a" \
 
 # ── Cleanup ───────────────────────────────────────────────────────
 echo "Cleaning up..."
-rm -f "$VID_DIR"/_p{1,2,3,4,5,6}_*.mp4 "$VID_DIR"/_concat.txt \
+rm -f "$VID_DIR"/_p{1,2,3,4,5,6,7}_*.mp4 "$VID_DIR"/_concat.txt \
       "$VID_DIR"/_hero_video.mp4 "$VID_DIR"/_narr_audio.m4a "$VID_DIR"/_hero_audio.m4a
 
 # ── Report ────────────────────────────────────────────────────────
@@ -204,4 +216,5 @@ echo "  0:04 - 0:06  I. THE SCENARIO"
 echo "  0:06 - 0:19  Moral drone simulation (narrated)"
 echo "  0:19 - 0:21  II. THE MIND"
 echo "  0:21 - 0:41  Consciousness dashboard"
-echo "  0:41 - 0:45  End card"
+echo "  0:41 - 0:45  What's Real (transparency)"
+echo "  0:45 - 0:49  End card"
