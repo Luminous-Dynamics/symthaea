@@ -2283,4 +2283,156 @@ mod tests {
         assert!(!result.eligible);
         assert!(result.reasons.iter().any(|r| r.contains("Identity")));
     }
+
+    // ========================================================================
+    // Property-based tests (proptest)
+    // ========================================================================
+
+    use proptest::prelude::*;
+
+    /// Strategy for generating valid profile dimension values in [0.0, 1.0].
+    fn dimension() -> impl Strategy<Value = f64> {
+        0.0..=1.0_f64
+    }
+
+    /// Strategy for generating a valid ConsciousnessProfile.
+    fn profile_strategy() -> impl Strategy<Value = ConsciousnessProfile> {
+        (dimension(), dimension(), dimension(), dimension()).prop_map(
+            |(identity, reputation, community, engagement)| ConsciousnessProfile {
+                identity,
+                reputation,
+                community,
+                engagement,
+            },
+        )
+    }
+
+    proptest! {
+        /// Higher profile scores always produce equal or higher tiers.
+        ///
+        /// If every dimension of profile B is >= the corresponding dimension
+        /// of profile A, then B's tier must be >= A's tier.
+        #[test]
+        fn test_tier_progression_monotonic(
+            id_lo in dimension(),
+            rep_lo in dimension(),
+            com_lo in dimension(),
+            eng_lo in dimension(),
+            id_delta in 0.0..=1.0_f64,
+            rep_delta in 0.0..=1.0_f64,
+            com_delta in 0.0..=1.0_f64,
+            eng_delta in 0.0..=1.0_f64,
+        ) {
+            let lo = ConsciousnessProfile {
+                identity: id_lo,
+                reputation: rep_lo,
+                community: com_lo,
+                engagement: eng_lo,
+            };
+            let hi = ConsciousnessProfile {
+                identity: (id_lo + id_delta).min(1.0),
+                reputation: (rep_lo + rep_delta).min(1.0),
+                community: (com_lo + com_delta).min(1.0),
+                engagement: (eng_lo + eng_delta).min(1.0),
+            };
+            prop_assert!(hi.tier() >= lo.tier(),
+                "Higher profile {:?} (tier {:?}) should be >= lower profile {:?} (tier {:?})",
+                hi, hi.tier(), lo, lo.tier());
+        }
+
+        /// Higher tiers always have equal or higher vote weights.
+        #[test]
+        fn test_vote_weight_monotonic_with_tier(
+            a in profile_strategy(),
+            b in profile_strategy(),
+        ) {
+            let tier_a = a.tier();
+            let tier_b = b.tier();
+            if tier_a <= tier_b {
+                prop_assert!(tier_a.vote_weight_bp() <= tier_b.vote_weight_bp(),
+                    "Tier {:?} (weight {}) should have <= weight than {:?} (weight {})",
+                    tier_a, tier_a.vote_weight_bp(), tier_b, tier_b.vote_weight_bp());
+            }
+        }
+
+        /// A profile with all zeros is always Observer tier.
+        #[test]
+        fn test_all_zero_profile_is_observer(_seed in 0u32..100) {
+            let p = ConsciousnessProfile::zero();
+            prop_assert_eq!(p.tier(), ConsciousnessTier::Observer);
+            prop_assert_eq!(p.combined_score(), 0.0);
+            prop_assert_eq!(p.tier().vote_weight_bp(), 0);
+        }
+
+        /// Max values (all 1.0) never panic and produce Guardian tier.
+        #[test]
+        fn test_all_max_profile_no_panic(_seed in 0u32..100) {
+            let p = ConsciousnessProfile {
+                identity: 1.0,
+                reputation: 1.0,
+                community: 1.0,
+                engagement: 1.0,
+            };
+            let tier = p.tier();
+            let score = p.combined_score();
+            let weight = tier.vote_weight_bp();
+            prop_assert_eq!(tier, ConsciousnessTier::Guardian);
+            prop_assert!((score - 1.0).abs() < 1e-10);
+            prop_assert_eq!(weight, 10000);
+        }
+
+        /// Any credential created via from_unified_consciousness has
+        /// expires_at > issued_at (expiry is always in the future relative
+        /// to issuance).
+        #[test]
+        fn test_credential_expiry_in_future(
+            c_unified in dimension(),
+            identity in dimension(),
+            reputation in dimension(),
+            community in dimension(),
+            now_us in 0u64..=u64::MAX / 2,
+        ) {
+            let cred = ConsciousnessCredential::from_unified_consciousness(
+                "did:test:prop".into(),
+                c_unified,
+                identity,
+                reputation,
+                community,
+                "did:test:issuer".into(),
+                now_us,
+            );
+            prop_assert!(cred.expires_at > cred.issued_at,
+                "expires_at ({}) must be > issued_at ({})",
+                cred.expires_at, cred.issued_at);
+            prop_assert_eq!(cred.expires_at, now_us + ConsciousnessCredential::DEFAULT_TTL_US);
+        }
+
+        /// Computed combined_score is always in [0.0, 1.0] for any
+        /// valid (clamped) profile.
+        #[test]
+        fn test_profile_scores_bounded(
+            identity in -10.0..=10.0_f64,
+            reputation in -10.0..=10.0_f64,
+            community in -10.0..=10.0_f64,
+            engagement in -10.0..=10.0_f64,
+        ) {
+            let raw = ConsciousnessProfile { identity, reputation, community, engagement };
+            let clamped = raw.clamped();
+
+            // All clamped dimensions in [0, 1]
+            prop_assert!(clamped.identity >= 0.0 && clamped.identity <= 1.0);
+            prop_assert!(clamped.reputation >= 0.0 && clamped.reputation <= 1.0);
+            prop_assert!(clamped.community >= 0.0 && clamped.community <= 1.0);
+            prop_assert!(clamped.engagement >= 0.0 && clamped.engagement <= 1.0);
+
+            // Combined score of clamped profile in [0, 1]
+            let score = clamped.combined_score();
+            prop_assert!(score >= 0.0 && score <= 1.0,
+                "Combined score {} out of bounds for clamped profile {:?}",
+                score, clamped);
+
+            // Tier is always valid (no panic)
+            let _tier = clamped.tier();
+        }
+    }
 }

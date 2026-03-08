@@ -341,6 +341,15 @@ pub fn check_register_member_input(input: &RegisterMemberInput) -> Result<(), St
     if input.trust_score < 0.0 || input.trust_score > 1.0 {
         return Err("Trust score must be between 0.0 and 1.0".into());
     }
+    // ML-KEM-768 encapsulation key must be exactly 1,184 bytes when present
+    if let Some(ref ek) = input.ml_kem_encapsulation_key {
+        if ek.len() != 1184 {
+            return Err(format!(
+                "ML-KEM encapsulation key must be exactly 1184 bytes, got {}",
+                ek.len()
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -350,6 +359,8 @@ pub fn check_register_member_input(input: &RegisterMemberInput) -> Result<(), St
 #[hdk_extern]
 pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
     // Phase guard: reject deals on already-completed committees
+    // Also capture pq_required to enforce encrypted shares
+    let mut committee_pq_required = false;
     if let Some(committee_record) = get_committee(input.committee_id.clone())? {
         if let Some(committee) = committee_record
             .entry()
@@ -362,6 +373,7 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
                     "Cannot submit deals on an already-completed committee".into()
                 )));
             }
+            committee_pq_required = committee.pq_required;
         }
     }
 
@@ -421,6 +433,13 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(
                 format!("Invalid encrypted shares: {}", e)
             )))?;
+    } else if committee_pq_required {
+        // PQ-required committees MUST use encrypted deals
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Committee requires post-quantum security (pq_required=true): \
+             encrypted_shares must be provided. Use ML-KEM-768 to encrypt \
+             deal shares for each recipient.".into()
+        )));
     }
 
     // Update member with deal info

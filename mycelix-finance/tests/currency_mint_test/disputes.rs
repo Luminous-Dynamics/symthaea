@@ -1,9 +1,10 @@
 //! Dispute and parameter amendment tests.
 //!
 //! Coverage:
-//!   open_minted_dispute    → test_open_dispute (8.1), test_duplicate_dispute_rejected (E19)
+//!   open_minted_dispute    → test_open_dispute (8.1), test_duplicate_dispute_rejected (E19),
+//!                            test_dispute_on_unconfirmed_rejected (E21)
 //!   get_dispute            → test_get_and_resolve_dispute (8.2)
-//!   resolve_minted_dispute → test_get_and_resolve_dispute (8.2)
+//!   resolve_minted_dispute → test_get_and_resolve_dispute (8.2), test_double_resolution_rejected (E22)
 //!   amend_currency_params  → test_amend_currency_params (9.1), test_amend_guards (E10),
 //!                            test_amend_suspended_rejected_then_reactivate (E12)
 //!   (retired guard)        → test_dispute_on_retired_currency (E3)
@@ -631,4 +632,188 @@ async fn test_duplicate_dispute_rejected() {
     println!("  - Duplicate dispute correctly rejected");
 
     println!("Test E19 PASSED");
+}
+
+/// Test E21: Dispute on unconfirmed exchange is rejected
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_dispute_on_unconfirmed_rejected() {
+    println!("Test E21: Dispute on Unconfirmed Exchange Rejected");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 2).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create currency with requires_confirmation (exchanges start unconfirmed)
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:unconf-dispute".into(),
+                params: test_params_with_confirmation("UnconfDispute", "UD"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+
+    // Record exchange — unconfirmed
+    let exchange: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: bob_did.clone(),
+                hours: 2.0,
+                service_description: "Unconfirmed service".into(),
+            },
+        )
+        .await;
+    assert!(!exchange.confirmed);
+    println!("  - Unconfirmed exchange recorded");
+
+    // Try to dispute — should fail
+    let result: Result<MintedDispute, _> = conductor
+        .call_fallible(
+            &zome_a,
+            "open_minted_dispute",
+            OpenDisputeInput {
+                exchange_id: exchange.id.clone(),
+                reason: "Trying to dispute unconfirmed".into(),
+            },
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "Dispute on unconfirmed exchange should be rejected"
+    );
+    println!("  - Dispute on unconfirmed exchange correctly rejected");
+
+    println!("Test E21 PASSED");
+}
+
+/// Test E22: Resolving an already-resolved dispute is rejected
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_double_resolution_rejected() {
+    println!("Test E22: Double Resolution Rejected");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 2).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let receiver_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create, activate, exchange (auto-confirmed)
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:dbl-resolve".into(),
+                params: test_params("DblResolve", "DR"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+    let exchange: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: receiver_did.clone(),
+                hours: 2.0,
+                service_description: "Service for resolution test".into(),
+            },
+        )
+        .await;
+    assert!(exchange.confirmed);
+
+    // Open dispute
+    let _: MintedDispute = conductor
+        .call(
+            &zome_a,
+            "open_minted_dispute",
+            OpenDisputeInput {
+                exchange_id: exchange.id.clone(),
+                reason: "Dispute for double resolution test".into(),
+            },
+        )
+        .await;
+    println!("  - Dispute opened");
+
+    // First resolution — should succeed
+    let resolved: MintedDispute = conductor
+        .call(
+            &zome_a,
+            "resolve_minted_dispute",
+            ResolveDisputeInput {
+                exchange_id: exchange.id.clone(),
+                accept: false,
+                resolution_reason: "Rejected — service was provided".into(),
+            },
+        )
+        .await;
+    assert_eq!(resolved.resolved, Some(false));
+    println!("  - First resolution succeeded (rejected dispute)");
+
+    // Second resolution — should fail
+    let result: Result<MintedDispute, _> = conductor
+        .call_fallible(
+            &zome_a,
+            "resolve_minted_dispute",
+            ResolveDisputeInput {
+                exchange_id: exchange.id.clone(),
+                accept: true,
+                resolution_reason: "Trying to re-resolve".into(),
+            },
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "Second resolution on same dispute should be rejected"
+    );
+    println!("  - Double resolution correctly rejected");
+
+    println!("Test E22 PASSED");
 }

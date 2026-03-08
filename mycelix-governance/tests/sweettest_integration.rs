@@ -13,6 +13,79 @@
 //! # Run tests (require DNA bundle)
 //! cargo test --test sweettest_integration -- --ignored
 //! ```
+//!
+//! ## Ignored Test Status (audited 2026-03-08)
+//!
+//! ALL 41 async tests in this file require `SweetConductor` + a pre-built
+//! governance DNA bundle (`hc dna pack dna/`). None can run without Holochain
+//! infrastructure. The 12 `unit_tests` (serialization round-trips) run without
+//! any infrastructure.
+//!
+//! ### Category (a): Needs conductor + single-DNA setup (30 tests)
+//!
+//! These test single-zome CRUD operations against one governance DNA.
+//! They are fully implemented and will pass once the DNA is built:
+//!
+//! - `proposal_tests`: create_and_get_proposal, get_active_proposals,
+//!   get_proposals_by_author (3 tests)
+//! - `discussion_tests`: add_contribution_to_proposal, get_discussion,
+//!   reflect_on_discussion (3 tests)
+//! - `voting_tests`: cast_vote, get_votes_for_proposal, tally_votes (3 tests)
+//! - `integration_tests`: complete_governance_flow (1 test)
+//! - `execution_tests` (Phase 5): create_signing_committee,
+//!   register_committee_member, mark_timelock_ready,
+//!   update_parameter_preserves_type, proposal_status_requires_draft,
+//!   get_all_committees, threshold_signing_e2e_flow (7 tests)
+//! - `constitution_tests`: create_and_get_charter, propose_amendment,
+//!   set_and_get_parameter (3 tests)
+//! - `council_tests`: create_council, join_council_and_get_members,
+//!   get_all_councils (3 tests)
+//! - `execution_tests` (Phase 4): create_timelock, get_proposal_timelock (2 tests)
+//! - `threshold_signing_dkg_tests`: combine_signatures_with_ecdsa,
+//!   key_rotation_full_flow, invalid_vss_commitment_rejected,
+//!   double_finalize_prevented, signature_shares_flow (5 tests)
+//!
+//! ### Category (a+): Needs conductor + multi-agent setup (6 tests)
+//!
+//! These test multi-agent flows (multiple SweetConductor apps):
+//!
+//! - `lifecycle_e2e_tests`: full_proposal_to_execution_lifecycle (1 test)
+//! - `threshold_signing_dkg_tests`: full_dkg_ceremony_multi_agent (1 test)
+//! - `veto_fund_tests`: veto_timelock_lifecycle, fund_locking_lifecycle,
+//!   get_pending_timelocks (3 tests)
+//! - `quadratic_voting_tests`: quadratic_voting_lifecycle (1 test)
+//!
+//! ### Category (a++): Needs conductor + unified hApp (multi-role) (7 tests)
+//!
+//! These need the full unified hApp with governance + identity roles:
+//!
+//! - `council_decision_tests`: council_decision_and_reflection (1 test)
+//! - `governance_identity_tests`: verify_voter_did, get_voter_matl_score,
+//!   check_voter_trust (3 tests -- stub implementations, print-only)
+//! - `governance_identity_tests` (PQ): create_hybrid_signing_committee,
+//!   report_dkg_violation, violation_penalty_bars_registration,
+//!   committee_default_algorithm_is_ecdsa (4 tests)
+//!
+//! ### Category (b): Timing-dependent -- none
+//!
+//! ### Category (c): Incomplete implementation -- 3 tests
+//!
+//! - `test_governance_verify_voter_did` -- stub (prints "compiled OK")
+//! - `test_governance_get_voter_matl_score` -- stub (prints "compiled OK")
+//! - `test_governance_check_voter_trust` -- stub (prints "compiled OK")
+//!
+//! ### Category (d): Actually runnable without infrastructure -- 0 async tests
+//!
+//! All async tests require the Holochain conductor and DNA bundle.
+//! Only the 12 `unit_tests` (synchronous serde round-trips) run standalone.
+//!
+//! ### Note: 7 tests in execution_tests (Phase 5) were missing #[ignore]
+//!
+//! Fixed in this audit: test_create_signing_committee,
+//! test_register_committee_member, test_mark_timelock_ready,
+//! test_update_parameter_preserves_type, test_proposal_status_requires_draft,
+//! test_get_all_committees, test_threshold_signing_e2e_flow.
+//! These use load_dna().await and will panic without the DNA bundle.
 
 use holochain::sweettest::*;
 use holochain::prelude::*;
@@ -2236,6 +2309,7 @@ mod execution_tests {
     // ========================================================================
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires DNA bundle — run: hc dna pack dna/ first"]
     async fn test_create_signing_committee() {
         println!("=== test_create_signing_committee ===");
 
@@ -2275,6 +2349,7 @@ mod execution_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires DNA bundle — run: hc dna pack dna/ first"]
     async fn test_register_committee_member() {
         println!("=== test_register_committee_member ===");
 
@@ -2321,6 +2396,7 @@ mod execution_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires DNA bundle — run: hc dna pack dna/ first"]
     async fn test_mark_timelock_ready() {
         println!("=== test_mark_timelock_ready ===");
 
@@ -2369,6 +2445,7 @@ mod execution_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires DNA bundle — run: hc dna pack dna/ first"]
     async fn test_update_parameter_preserves_type() {
         println!("=== test_update_parameter_preserves_type ===");
 
@@ -2414,6 +2491,7 @@ mod execution_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires DNA bundle — run: hc dna pack dna/ first"]
     async fn test_proposal_status_requires_draft() {
         println!("=== test_proposal_status_requires_draft ===");
 
@@ -2441,6 +2519,7 @@ mod execution_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires DNA bundle — run: hc dna pack dna/ first"]
     async fn test_get_all_committees() {
         println!("=== test_get_all_committees ===");
 
@@ -2477,6 +2556,7 @@ mod execution_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires DNA bundle — run: hc dna pack dna/ first"]
     async fn test_threshold_signing_e2e_flow() {
         println!("=== test_threshold_signing_e2e_flow ===");
 

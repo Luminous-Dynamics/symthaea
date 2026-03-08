@@ -1,8 +1,10 @@
 //! Demurrage, compost accumulation, and redistribution tests.
 //!
 //! Coverage:
-//!   apply_minted_demurrage → test_demurrage_and_compost (16.1), test_demurrage_zero_balance_noop (E7)
-//!   apply_demurrage_all    → test_batch_demurrage_and_report (18.1), test_batch_demurrage_member_coverage (E9)
+//!   apply_minted_demurrage → test_demurrage_and_compost (16.1), test_demurrage_zero_balance_noop (E7),
+//!                            test_demurrage_on_non_active_rejected (E23)
+//!   apply_demurrage_all    → test_batch_demurrage_and_report (18.1), test_batch_demurrage_member_coverage (E9),
+//!                            test_demurrage_on_non_active_rejected (E23)
 //!   get_demurrage_report   → test_demurrage_and_compost (16.1), test_batch_demurrage_and_report (18.1)
 //!   get_compost_balance    → test_compost_zero_sum (6.1), test_demurrage_and_compost (16.1)
 //!   redistribute_compost   → test_redistribute_compost (16.2), test_redistribute_compost_idempotent (E8)
@@ -660,4 +662,120 @@ async fn test_batch_demurrage_member_coverage() {
     println!("  - Zero-sum preserved");
 
     println!("Test E9 PASSED");
+}
+
+/// Test E23: Demurrage on non-Active currency is rejected
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn test_demurrage_on_non_active_rejected() {
+    println!("Test E23: Demurrage on Non-Active Currency Rejected");
+
+    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path)
+        .await
+        .expect("Load DNA");
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let agents = SweetAgents::get(conductor.keystore(), 2).await;
+    let apps = conductor
+        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+        .await
+        .expect("Install app");
+
+    let cell_a = &apps[0].cells()[0];
+    let zome_a = cell_a.zome("currency_mint");
+    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+
+    // Create, activate, do an exchange to create a positive balance
+    let def: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "create_currency",
+            CreateCurrencyInput {
+                dao_did: "did:mycelix:dao:demurrage-guard".into(),
+                params: test_params("DemGuard", "DG"),
+                governance_proposal_id: None,
+            },
+        )
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(
+            &zome_a,
+            "activate_currency",
+            ActivateCurrencyInput {
+                currency_id: def.id.clone(),
+            },
+        )
+        .await;
+    let _: MintedExchange = conductor
+        .call(
+            &zome_a,
+            "record_minted_exchange",
+            RecordMintedExchangeInput {
+                currency_id: def.id.clone(),
+                receiver_did: bob_did.clone(),
+                hours: 3.0,
+                service_description: "Service before suspension".into(),
+            },
+        )
+        .await;
+    let alice_did = format!("did:mycelix:{}", agents[0].to_raw_36());
+    println!("  - Exchange recorded, provider has positive balance");
+
+    // Suspend the currency
+    let _: CurrencyDefinition = conductor
+        .call(&zome_a, "suspend_currency", def.id.clone())
+        .await;
+
+    // apply_minted_demurrage on Suspended — should fail
+    let result: Result<DemurrageResult, _> = conductor
+        .call_fallible(
+            &zome_a,
+            "apply_minted_demurrage",
+            ApplyDemurrageInput {
+                currency_id: def.id.clone(),
+                member_did: alice_did.clone(),
+            },
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "Demurrage should be rejected on Suspended currency"
+    );
+    println!("  - apply_minted_demurrage on Suspended: rejected");
+
+    // apply_demurrage_all on Suspended — should also fail
+    let result: Result<Vec<DemurrageResult>, _> = conductor
+        .call_fallible(&zome_a, "apply_demurrage_all", def.id.clone())
+        .await;
+    assert!(
+        result.is_err(),
+        "Batch demurrage should be rejected on Suspended currency"
+    );
+    println!("  - apply_demurrage_all on Suspended: rejected");
+
+    // Retire and try again
+    let _: CurrencyDefinition = conductor
+        .call(&zome_a, "reactivate_currency", def.id.clone())
+        .await;
+    let _: CurrencyDefinition = conductor
+        .call(&zome_a, "retire_currency", def.id.clone())
+        .await;
+
+    let result: Result<DemurrageResult, _> = conductor
+        .call_fallible(
+            &zome_a,
+            "apply_minted_demurrage",
+            ApplyDemurrageInput {
+                currency_id: def.id.clone(),
+                member_did: alice_did,
+            },
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "Demurrage should be rejected on Retired currency"
+    );
+    println!("  - apply_minted_demurrage on Retired: rejected");
+
+    println!("Test E23 PASSED");
 }
