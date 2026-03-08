@@ -326,6 +326,15 @@ impl LiveVoice {
         *self.cognitive_state.lock() = state;
     }
 
+    /// Modulate the LTC controller's time constant for speech rate control.
+    ///
+    /// `factor > 1.0` → slower, more deliberate formant transitions (max 3.0).
+    /// `factor < 1.0` → faster, more agile transitions.
+    /// `factor = 1.0` → default rate.
+    pub fn modulate_tau(&mut self, factor: f32) {
+        self.streaming.pipeline.controller.modulate_tau(factor);
+    }
+
     /// Run additional training epochs on the formant database.
     pub fn train(&mut self, epochs: usize) {
         train_controller_on_phoneme_db(
