@@ -182,6 +182,9 @@ impl CognitiveLoopService {
             None
         };
 
+        // Extract timezone offset before config is moved
+        let timezone_offset_hours = config.timezone_offset_hours;
+
         // Build optional surprise exploration bridge
         let surprise_bridge = if config.enable_surprise_exploration {
             Some(SurpriseExplorationBridge::new())
@@ -772,10 +775,9 @@ impl CognitiveLoopService {
             },
             #[cfg(feature = "full_consciousness")]
             enactive: EnactiveCognition::new(),
-            biorhythm_mgr: super::biorhythm_manager::BiorhythmManager {
-                rhythm: crate::chronobiology::Biorhythm::current(),
-                refresh_counter: 0,
-            },
+            biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(
+                timezone_offset_hours,
+            ),
             phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),

@@ -112,6 +112,7 @@ impl CognitiveLoopService {
             neuromod_learning_fatigue: self.neuromod.bath.learning_fatigue_factor(),
             circadian_phase_offset: self.biorhythm_mgr.rhythm.phase_offset as f32,
             circadian_effective_hour: self.biorhythm_mgr.rhythm.effective_hour() as f32,
+            circadian_timezone_offset: self.biorhythm_mgr.timezone_offset_hours as f32,
             // Phase 5: advanced neuroendocrine dynamics
             neuromod_adenosine_effective: self.neuromod.bath.adenosine.effective(),
             neuromod_sleep_pressure: self.neuromod.bath.sleep_pressure(),
@@ -176,6 +177,17 @@ impl CognitiveLoopService {
     /// The phase offset gradually returns to 0 via entrainment each cycle.
     pub fn shift_circadian_phase(&mut self, hours: f64) {
         self.biorhythm_mgr.rhythm.shift_phase(hours);
+    }
+
+    /// Set the timezone offset (hours from UTC), routing the delta through
+    /// `shift_phase()` for gradual entrainment (jet lag model).
+    pub fn set_timezone(&mut self, offset_hours: f64) {
+        self.biorhythm_mgr.set_timezone(offset_hours);
+    }
+
+    /// Current timezone offset in hours from UTC.
+    pub fn timezone_offset_hours(&self) -> f64 {
+        self.biorhythm_mgr.timezone_offset_hours
     }
 
     /// Ingest psych-bench calibration data for deferred application.

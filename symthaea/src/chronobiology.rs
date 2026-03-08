@@ -5,7 +5,7 @@
 //!
 //! "To everything there is a season, and a time to every purpose under the heaven."
 
-use chrono::{Local, Timelike};
+use chrono::{Timelike, Utc};
 use std::f64::consts::PI;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -23,7 +23,11 @@ pub struct Biorhythm {
     pub plasticity_mod: f64, // Multiplier for learning rate
     pub creativity_mod: f64, // Multiplier for randomness (temperature)
     /// Fractional hour (0.0–24.0) for continuous waveform computation.
+    /// Stored in UTC — use `effective_hour()` for local-time-aware hour.
     pub hour: f64,
+    /// Timezone offset in hours from UTC (e.g., -5.0 for CDT, +9.0 for JST).
+    /// Range: [-12.0, 14.0]. Applied via `effective_hour()`, not by mutating `hour`.
+    pub timezone_offset_hours: f64,
     /// Phase offset in hours (jet lag / zeitgeber shift). Range: [-12.0, 12.0].
     /// Science: Czeisler et al. (1999) — circadian phase-shifting via bright light.
     pub phase_offset: f64,
@@ -47,16 +51,32 @@ impl CircadianPhase {
 }
 
 impl Biorhythm {
-    /// Calculate the current biorhythm based on local time
+    /// Calculate the current biorhythm based on UTC time (timezone offset = 0).
+    ///
+    /// For timezone-aware biorhythm, use `current_with_tz()`.
     pub fn current() -> Self {
-        let now = Local::now();
-        let hour = now.hour() as f64 + (now.minute() as f64 / 60.0);
-        Self::for_hour(hour)
+        Self::current_with_tz(0.0)
+    }
+
+    /// Calculate the current biorhythm with an explicit timezone offset.
+    ///
+    /// The internal `hour` is stored in UTC. Timezone offset is applied
+    /// via `effective_hour()` for circadian phase computation, NOT by
+    /// mutating the stored hour. This prevents instant circadian phase
+    /// jumps when the system crosses timezones.
+    pub fn current_with_tz(timezone_offset_hours: f64) -> Self {
+        let now = Utc::now();
+        let utc_hour = now.hour() as f64 + (now.minute() as f64 / 60.0);
+        let mut bio = Self::for_hour(utc_hour);
+        bio.hour = utc_hour; // store raw UTC
+        bio.timezone_offset_hours = timezone_offset_hours;
+        bio
     }
 
     /// Calculate biorhythm for a given fractional hour (0.0–24.0).
     ///
     /// This is the deterministic core extracted from `current()` for testability.
+    /// The hour is treated as-is (no timezone applied).
     pub fn for_hour(hour: f64) -> Self {
         // Circadian cycle (24h sine wave)
         // Peak at 14:00 (2pm), Trough at 02:00 (2am)
@@ -89,6 +109,7 @@ impl Biorhythm {
             plasticity_mod: plasticity,
             creativity_mod: creativity,
             hour,
+            timezone_offset_hours: 0.0,
             phase_offset: 0.0,
             entrainment_rate: 1.0,
         }
@@ -100,9 +121,24 @@ impl Biorhythm {
         self.phase_offset = (self.phase_offset + hours).clamp(-12.0, 12.0);
     }
 
-    /// Effective hour incorporating phase offset (wraps 0–24).
+    /// Set timezone, routing the delta through `shift_phase()` for gradual entrainment.
+    ///
+    /// A timezone change does NOT instantly shift the circadian clock. Instead,
+    /// the delta feeds into `phase_offset` and recovers via `entrain()`, modeling
+    /// jet lag (Czeisler et al. 1999).
+    pub fn set_timezone(&mut self, new_tz_offset: f64) {
+        let delta = new_tz_offset - self.timezone_offset_hours;
+        self.timezone_offset_hours = new_tz_offset.clamp(-12.0, 14.0);
+        if delta.abs() > 0.01 {
+            self.shift_phase(delta);
+        }
+    }
+
+    /// Effective hour incorporating timezone and phase offset (wraps 0–24).
+    ///
+    /// Formula: `(utc_hour + timezone + phase_offset) mod 24`
     pub fn effective_hour(&self) -> f64 {
-        ((self.hour + self.phase_offset) % 24.0 + 24.0) % 24.0
+        ((self.hour + self.timezone_offset_hours + self.phase_offset) % 24.0 + 24.0) % 24.0
     }
 
     /// Pull phase_offset toward 0 (entrainment to local zeitgeber).
@@ -221,6 +257,82 @@ mod tests {
             "night arousal should be < 0.5, got {}",
             bio.arousal_mod
         );
+    }
+
+    // ── UTC Internals + Timezone ───────────────────────────────────────
+
+    #[test]
+    fn test_current_uses_utc() {
+        let bio = Biorhythm::current();
+        let utc_hour = Utc::now().hour() as f64 + (Utc::now().minute() as f64 / 60.0);
+        assert!(
+            (bio.hour - utc_hour).abs() < 0.1,
+            "current() should store UTC hour: bio={}, utc={}",
+            bio.hour,
+            utc_hour
+        );
+    }
+
+    #[test]
+    fn test_current_with_tz() {
+        let bio = Biorhythm::current_with_tz(-5.0);
+        assert!((bio.timezone_offset_hours - (-5.0)).abs() < 0.01);
+        // hour should be UTC, not local
+        let utc_hour = Utc::now().hour() as f64 + (Utc::now().minute() as f64 / 60.0);
+        assert!(
+            (bio.hour - utc_hour).abs() < 0.1,
+            "should store UTC: bio={}, utc={}",
+            bio.hour,
+            utc_hour
+        );
+    }
+
+    #[test]
+    fn test_effective_hour_includes_timezone() {
+        let mut bio = Biorhythm::for_hour(10.0);
+        bio.timezone_offset_hours = -5.0;
+        assert!(
+            (bio.effective_hour() - 5.0).abs() < 0.01,
+            "10 UTC - 5h = 5: {}",
+            bio.effective_hour()
+        );
+    }
+
+    #[test]
+    fn test_effective_hour_timezone_wraps() {
+        let mut bio = Biorhythm::for_hour(2.0);
+        bio.timezone_offset_hours = -5.0;
+        // 2 - 5 = -3 → wraps to 21
+        assert!(
+            (bio.effective_hour() - 21.0).abs() < 0.01,
+            "2 UTC - 5h wraps to 21: {}",
+            bio.effective_hour()
+        );
+    }
+
+    #[test]
+    fn test_set_timezone_routes_through_shift_phase() {
+        let mut bio = Biorhythm::for_hour(12.0);
+        bio.set_timezone(5.0);
+        assert!((bio.timezone_offset_hours - 5.0).abs() < 0.01);
+        assert!(
+            (bio.phase_offset - 5.0).abs() < 0.01,
+            "delta should route through shift_phase: {}",
+            bio.phase_offset
+        );
+    }
+
+    #[test]
+    fn test_set_timezone_clamps_range() {
+        let mut bio = Biorhythm::for_hour(12.0);
+        bio.set_timezone(20.0); // exceeds +14
+        assert!((bio.timezone_offset_hours - 14.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_for_hour_defaults_timezone_to_zero() {
+        let bio = Biorhythm::for_hour(12.0);
+        assert!((bio.timezone_offset_hours).abs() < 0.001);
     }
 
     // ── Phase 4: Circadian Phase Shifting ────────────────────────────

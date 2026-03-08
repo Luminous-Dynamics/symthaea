@@ -52,6 +52,7 @@ members = [
     "crates/symthaea-foveation",
     "crates/symthaea-phi-oracle",
     "crates/symthaea-pulse",
+    "crates/symthaea-spore",
 ]
 
 
@@ -398,6 +399,7 @@ vision-manifold = ["dep:symthaea-vision-manifold"]    # Patch-based HDC video en
 vision-manifold-camera = ["vision-manifold", "symthaea-vision-manifold/camera"]  # Vision manifold with real camera capture via V4L2
 foveation = ["dep:symthaea-foveation", "vision-manifold"]  # Foveation bridge for active vision (dorsal→ventral dispatch)
 foveation-perception = ["foveation", "symthaea-foveation/perception"]  # Foveation with real SigLIP/OCR/Moondream models
+integrity = []  # Hardware integrity / tamper detection framework (attestation, temporal checks, canaries)
 semantic-encoder = ["symthaea-embeddings/embed-channel"]  # Background Qwen3 embedding channel for cognitive loop telemetry
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]

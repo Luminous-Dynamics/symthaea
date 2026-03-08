@@ -94,8 +94,10 @@ pub struct NeuromodTelemetry {
     pub neuromod_learning_fatigue: f32,
     /// Circadian phase offset in hours (-12.0–12.0).
     pub circadian_phase_offset: f32,
-    /// Effective circadian hour after phase offset (0.0–24.0).
+    /// Effective circadian hour after phase offset + timezone (0.0–24.0).
     pub circadian_effective_hour: f32,
+    /// Timezone offset in hours from UTC (e.g., -5.0 for CDT).
+    pub circadian_timezone_offset: f32,
 
     // ── Phase 5: Advanced Neuroendocrine Telemetry ────────────────────────
     /// Adenosine effective level (sleep pressure signal, 0.0–2.0).
@@ -968,6 +970,23 @@ pub struct CycleMetadata {
     /// Whether high conflict triggered epistemic exploration boost.
     #[serde(default)]
     pub conflict_exploration_boost: bool,
+
+    // ── Session 12: Wiring + Binding Intelligence ───────────────────────
+    /// Whether epistemic conflict drove exploration boost (>2 conflicts).
+    #[serde(default)]
+    pub epistemic_conflict_exploration: bool,
+    /// Whether phenomenal fragmentation triggered confidence dampening.
+    #[serde(default)]
+    pub phenomenal_fragmentation_recovery: bool,
+    /// Whether temporal discontinuity triggered LR dampening.
+    #[serde(default)]
+    pub temporal_discontinuity_recovery: bool,
+    /// Whether cross-modal binding modulated attention sensitivity.
+    #[serde(default)]
+    pub binding_attention_modulated: bool,
+    /// Whether resonator similarity modulated semantic LR.
+    #[serde(default)]
+    pub resonator_semantic_lr_mod: bool,
 }
 
 fn default_response_profile() -> String {

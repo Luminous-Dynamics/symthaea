@@ -385,6 +385,10 @@ pub mod causal;
 #[cfg(feature = "identity")]
 pub mod identity;
 
+// Integrity: Hardware integrity & tamper detection (attestation, temporal checks, canaries)
+#[cfg(feature = "integrity")]
+pub mod integrity;
+
 // GUI bridge — only needed by symthaea-gui binary
 #[cfg(feature = "gui")]
 pub mod gui_bridge;
