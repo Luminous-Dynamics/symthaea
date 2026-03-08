@@ -169,6 +169,13 @@ enum SubCluster {
     Care,
 }
 
+/// DNA properties struct for sub-cluster detection.
+#[derive(Debug, serde::Deserialize, Default)]
+struct DnaProperties {
+    #[serde(default)]
+    sub_cluster: Option<String>,
+}
+
 /// Detect which sub-cluster DNA we are running in by reading DNA properties.
 ///
 /// The DNA YAML sets `properties.sub_cluster` to either "land" or "care".
@@ -176,11 +183,10 @@ enum SubCluster {
 /// the legacy single-DNA configuration for backward compatibility).
 fn detect_sub_cluster() -> SubCluster {
     if let Ok(info) = dna_info() {
-        // Properties are serialized YAML; try to parse as JSON value
-        if let Ok(props) = serde_json::from_slice::<serde_json::Value>(
-            info.modifiers.properties.bytes()
-        ) {
-            if let Some(sc) = props.get("sub_cluster").and_then(|v| v.as_str()) {
+        // Properties are msgpack-encoded SerializedBytes — wrap bytes in ExternIO to decode
+        let extern_io = ExternIO(info.modifiers.properties.bytes().to_vec());
+        if let Ok(props) = extern_io.decode::<DnaProperties>() {
+            if let Some(sc) = props.sub_cluster.as_deref() {
                 return match sc {
                     "care" => SubCluster::Care,
                     _ => SubCluster::Land,

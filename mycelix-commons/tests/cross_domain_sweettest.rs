@@ -1,3 +1,5 @@
+// Cross-cluster civic types are only used when civic_cluster feature is enabled
+#![allow(dead_code)]
 //! Cross-Domain Integration Sweettest
 //!
 //! Proves that zomes within the Commons DNA can call each other directly
@@ -256,7 +258,7 @@ async fn test_bridge_health_check() {
         .await;
 
     assert!(health.healthy);
-    assert_eq!(health.domains.len(), 7);
+    assert_eq!(health.domains.len(), 9);
     assert!(health.domains.contains(&"property".to_string()));
     assert!(health.domains.contains(&"housing".to_string()));
     assert!(health.domains.contains(&"care".to_string()));
@@ -264,6 +266,8 @@ async fn test_bridge_health_check() {
     assert!(health.domains.contains(&"water".to_string()));
     assert!(health.domains.contains(&"food".to_string()));
     assert!(health.domains.contains(&"transport".to_string()));
+    assert!(health.domains.contains(&"support".to_string()));
+    assert!(health.domains.contains(&"space".to_string()));
 }
 
 /// Test: Cross-domain dispatch from bridge to property-registry
@@ -353,8 +357,8 @@ async fn test_housing_queries_property_via_bridge() {
     // Now use bridge to query properties from housing context
     let dispatch = DispatchInput {
         zome: "property_registry".to_string(),
-        fn_name: "get_all_properties".to_string(),
-        payload: ExternIO::encode(()).unwrap().0,
+        fn_name: "get_owner_properties".to_string(),
+        payload: ExternIO::encode("did:test:trust".to_string()).unwrap().0,
     };
 
     let result: DispatchResult = conductor
@@ -475,7 +479,7 @@ async fn test_cross_domain_dispatch_transport_routes() {
         .call(&cell.zome("commons_bridge"), "dispatch_call", dispatch)
         .await;
 
-    assert!(result.success, "Transport routes dispatch should succeed");
+    assert!(result.success, "Transport routes dispatch should succeed. Error: {:?}", result.error);
     assert!(result.response.is_some(), "Should have response payload");
 }
 
@@ -607,6 +611,7 @@ async fn test_transport_queries_via_bridge() {
 //      control rejection.
 
 // -- Cross-cluster mirror types (Civic side) --
+// Only used by cfg-gated cross-cluster tests (civic_cluster feature)
 
 /// Mirror of CrossClusterDispatchInput from mycelix_bridge_common.
 /// Used by both `dispatch_commons_call` (civic_bridge) and
@@ -954,6 +959,8 @@ async fn setup_civic_conductor() -> (SweetConductor, SweetApp, SweetCell) {
 /// to the commons `property_transfer` zome to issue a freeze advisory.
 /// This exercises the civic_bridge → commons path and verifies that
 /// `property_transfer` is in the ALLOWED_COMMONS_ZOMES allowlist.
+/// NOTE: cfg-gated because this test requires the civic DNA installed as a separate role
+#[cfg(feature = "civic_cluster")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires conductor"]
 async fn test_cross_cluster_justice_enforcement_freezes_property_transfer() {
@@ -1067,6 +1074,8 @@ async fn test_cross_cluster_justice_enforcement_freezes_property_transfer() {
 /// dispatches to the commons `mutualaid_resources` zome to request
 /// available mutual aid resources (food, blankets, generators) for
 /// deployment to affected zones.
+/// NOTE: cfg-gated because this test requires the civic DNA installed as a separate role
+#[cfg(feature = "civic_cluster")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires conductor"]
 async fn test_cross_cluster_emergency_requests_mutualaid_resources() {
@@ -1186,6 +1195,8 @@ async fn test_cross_cluster_emergency_requests_mutualaid_resources() {
 /// A fact-checker dispatches to the commons `water_purity` zome to retrieve
 /// actual water quality readings as primary-source evidence for their
 /// fact-check verdict.
+/// NOTE: cfg-gated because this test requires the civic DNA installed as a separate role
+#[cfg(feature = "civic_cluster")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires conductor"]
 async fn test_cross_cluster_media_factcheck_references_water_purity() {
@@ -1331,6 +1342,8 @@ async fn test_cross_cluster_media_factcheck_references_water_purity() {
 /// resolve the dispute internally, so it dispatches to the civic
 /// `justice_cases` zome to file a formal case for adjudication.  This
 /// exercises the commons_bridge → civic path.
+/// NOTE: cfg-gated because this test requires the civic DNA installed as a separate role
+#[cfg(feature = "civic_cluster")]
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires conductor"]
 async fn test_cross_cluster_housing_governance_escalates_to_justice() {
@@ -1552,6 +1565,7 @@ enum UrgencyLevel {
 // -- Mutual Aid Requests mirror types --
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum RequestType {
     Financial,
     Housing,
@@ -1564,6 +1578,7 @@ enum RequestType {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum Urgency {
     Critical,
     High,
@@ -1580,6 +1595,7 @@ struct CreateRequestInput {
     location: Option<String>,
     amount_needed: Option<u64>,
 }
+
 
 // -- Mutual Aid Pools mirror types --
 
@@ -1752,7 +1768,7 @@ async fn test_cross_domain_dispatch_care_needs() {
     // Use bridge to query care matching (may be empty, but dispatch should succeed)
     let dispatch = DispatchInput {
         zome: "care_matching".to_string(),
-        fn_name: "get_all_matches".to_string(),
+        fn_name: "get_my_provider_matches".to_string(),
         payload: ExternIO::encode(()).unwrap().0,
     };
 
@@ -1782,14 +1798,16 @@ async fn test_cross_domain_dispatch_mutualaid_requests() {
         amount_needed: Some(350),
     };
 
-    // Call mutualaid_requests directly first
-    let _record: Record = conductor
-        .call(
-            &cell.zome("mutualaid_requests"),
-            "create_request",
-            request_input.clone(),
-        )
+    // Call mutualaid_requests via bridge dispatch (returns RequestWithHash, not Record)
+    let create_dispatch = DispatchInput {
+        zome: "mutualaid_requests".to_string(),
+        fn_name: "create_request".to_string(),
+        payload: ExternIO::encode(request_input.clone()).unwrap().0,
+    };
+    let create_result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", create_dispatch)
         .await;
+    assert!(create_result.success, "create_request via bridge should succeed");
 
     // Now dispatch through the bridge
     let payload = ExternIO::encode(request_input).unwrap().0;
@@ -1823,7 +1841,7 @@ async fn test_cross_domain_dispatch_mutualaid_pools() {
             cooldown_days: 7,
         }),
         disbursement_rules: Some(DisbursementRule {
-            min_approvals: 2,
+            min_approvals: 1,
             approval_threshold_percent: 60,
             max_disbursement: 1000,
             allow_emergency_bypass: true,
@@ -1831,13 +1849,16 @@ async fn test_cross_domain_dispatch_mutualaid_pools() {
     };
 
     // Call mutualaid_pools directly first
-    let _record: Record = conductor
-        .call(
-            &cell.zome("mutualaid_pools"),
-            "create_pool",
-            pool_input.clone(),
-        )
+    // Create pool via bridge dispatch (returns PoolWithHash, not Record)
+    let create_dispatch = DispatchInput {
+        zome: "mutualaid_pools".to_string(),
+        fn_name: "create_pool".to_string(),
+        payload: ExternIO::encode(pool_input.clone()).unwrap().0,
+    };
+    let create_result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", create_dispatch)
         .await;
+    assert!(create_result.success, "create_pool via bridge should succeed");
 
     // Now dispatch through the bridge
     let payload = ExternIO::encode(pool_input).unwrap().0;
@@ -2006,7 +2027,7 @@ async fn test_care_queries_via_bridge() {
     // Query care matching via bridge (may be empty)
     let dispatch_matching = DispatchInput {
         zome: "care_matching".to_string(),
-        fn_name: "get_all_matches".to_string(),
+        fn_name: "get_my_provider_matches".to_string(),
         payload: ExternIO::encode(()).unwrap().0,
     };
 
@@ -2040,13 +2061,16 @@ async fn test_mutualaid_queries_via_bridge() {
         amount_needed: Some(150),
     };
 
-    let _record: Record = conductor
-        .call(
-            &cell.zome("mutualaid_requests"),
-            "create_request",
-            request_input,
-        )
+    // Create request via bridge dispatch (returns RequestWithHash, not Record)
+    let create_dispatch = DispatchInput {
+        zome: "mutualaid_requests".to_string(),
+        fn_name: "create_request".to_string(),
+        payload: ExternIO::encode(request_input).unwrap().0,
+    };
+    let create_result: DispatchResult = conductor
+        .call(&cell.zome("commons_bridge"), "dispatch_call", create_dispatch)
         .await;
+    assert!(create_result.success, "create_request via bridge should succeed");
 
     // Query open requests via bridge
     let dispatch_requests = DispatchInput {
