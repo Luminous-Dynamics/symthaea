@@ -167,6 +167,9 @@ pub struct NixPipelineHookImpl {
     world_model: HdcWorldModel,
     /// Last action processed (for Hebbian edge tracking)
     last_action: Option<String>,
+    /// Causal surprise from the last `post_execute` call.
+    /// 0.0 = outcome matched causal predictions, 1.0 = completely unexpected.
+    last_causal_surprise: f32,
 }
 
 impl NixPipelineHookImpl {
@@ -192,6 +195,7 @@ impl NixPipelineHookImpl {
             causal_graph,
             world_model: HdcWorldModel::default(),
             last_action: None,
+            last_causal_surprise: 0.0,
         }
     }
 
@@ -241,6 +245,13 @@ impl NixPipelineHookImpl {
     pub fn world_model(&self) -> &HdcWorldModel {
         &self.world_model
     }
+
+    /// Return the causal surprise from the last `post_execute` call.
+    ///
+    /// 0.0 = outcome was expected by the causal model, 1.0 = completely unexpected.
+    pub fn causal_surprise(&self) -> f32 {
+        self.last_causal_surprise
+    }
 }
 
 impl NixPipelineHook for NixPipelineHookImpl {
@@ -267,9 +278,8 @@ impl NixPipelineHook for NixPipelineHookImpl {
 
         // Hebbian causal learning: predict side effects, compare with observations
         if let Some(ref last_action) = self.last_action {
-            let predicted: Vec<String> = self
-                .causal_graph
-                .predict_side_effects(last_action)
+            let predictions = self.causal_graph.predict_side_effects(last_action);
+            let predicted: Vec<String> = predictions
                 .iter()
                 .map(|e| e.affected_variable.clone())
                 .collect();
@@ -280,8 +290,41 @@ impl NixPipelineHook for NixPipelineHookImpl {
             if success {
                 observed.push("success");
             }
+
+            // Compute causal surprise: how much did predictions diverge from reality?
+            if predictions.is_empty() {
+                // No predictions — moderately surprising (model has no opinion)
+                self.last_causal_surprise = 0.3;
+            } else {
+                let high_conf_predictions: Vec<&str> = predictions
+                    .iter()
+                    .filter(|p| p.confidence > 0.5)
+                    .map(|p| p.affected_variable.as_str())
+                    .collect();
+
+                if high_conf_predictions.is_empty() {
+                    // Only low-confidence predictions — low surprise
+                    self.last_causal_surprise = 0.1;
+                } else {
+                    let hits = high_conf_predictions
+                        .iter()
+                        .filter(|p| observed.contains(p))
+                        .count();
+                    let miss_ratio =
+                        1.0 - (hits as f32 / high_conf_predictions.len() as f32);
+                    // Factor in whether success/failure was expected
+                    let outcome_predicted = predicted_refs.contains(&"success") == success;
+                    let outcome_surprise = if outcome_predicted { 0.0f32 } else { 0.5 };
+                    self.last_causal_surprise =
+                        (miss_ratio * 0.5 + outcome_surprise).clamp(0.0, 1.0);
+                }
+            }
+
             self.causal_graph
                 .observe_outcome(last_action, &observed, &predicted_refs);
+        } else {
+            // First action ever — no prior causal context, no surprise
+            self.last_causal_surprise = 0.0;
         }
         self.last_action = Some(action.to_string());
 
@@ -330,6 +373,14 @@ impl NixPipelineHook for NixPipelineHookImpl {
             // If mostly positive, lower threshold (allow more); if mostly negative, raise it
             self.current_phi = 0.3 + (1.0 - ratio) * 0.4;
         }
+    }
+
+    fn causal_surprise(&self) -> f32 {
+        self.last_causal_surprise
+    }
+
+    fn causal_edge_count(&self) -> usize {
+        self.causal_graph.edge_count()
     }
 }
 
@@ -525,5 +576,66 @@ mod tests {
             // After 3 interactions, consolidation should have been triggered and counter reset
             assert_eq!(hook.interactions_since_consolidation(), 0);
         });
+    }
+
+    #[test]
+    fn test_causal_surprise_zero_for_first_action() {
+        // The very first post_execute has no prior action context, so surprise = 0.0
+        let hippo = Arc::new(Mutex::new(HippocampusActor::new(1000)));
+        let bridge = Arc::new(NixHippocampusBridge::new(hippo));
+        let processor = NixPipelineProcessor::new().with_skip_observe(true);
+        let mut hook = NixPipelineHookImpl::new(processor, bridge);
+
+        assert_eq!(hook.causal_surprise(), 0.0, "Initial surprise should be 0.0");
+        hook.post_execute("nix-env -iA firefox", true, "installed");
+        assert_eq!(
+            hook.causal_surprise(),
+            0.0,
+            "First action has no prior causal context, surprise should be 0.0"
+        );
+    }
+
+    #[test]
+    fn test_causal_surprise_nonzero_for_unexpected_outcome() {
+        // When the causal model has predictions but the outcome doesn't match,
+        // surprise should be > 0.0
+        let hippo = Arc::new(Mutex::new(HippocampusActor::new(1000)));
+        let bridge = Arc::new(NixHippocampusBridge::new(hippo));
+        let processor = NixPipelineProcessor::new().with_skip_observe(true);
+        let mut hook = NixPipelineHookImpl::new(processor, bridge);
+
+        // Add a strong structural edge so the causal model has expectations
+        hook.causal_graph
+            .add_structural_edge("install_firefox", "success", 0.9);
+
+        // First action sets up last_action
+        hook.post_execute("install_firefox", true, "installed");
+        // Second action: the causal model for "install_firefox" predicted "success"
+        // but now we fail an unrelated action — surprise should be nonzero
+        hook.post_execute("unrelated_action", false, "failed");
+        assert!(
+            hook.causal_surprise() > 0.0,
+            "Surprise should be > 0.0 when outcome diverges from causal predictions, got {}",
+            hook.causal_surprise()
+        );
+    }
+
+    #[test]
+    fn test_causal_edge_count_accessor() {
+        let hippo = Arc::new(Mutex::new(HippocampusActor::new(1000)));
+        let bridge = Arc::new(NixHippocampusBridge::new(hippo));
+        let processor = NixPipelineProcessor::new().with_skip_observe(true);
+        let hook = NixPipelineHookImpl::new(processor, bridge);
+
+        // Should have edges from the bootstrapped known NixOS patterns
+        assert!(
+            hook.causal_edge_count() > 0,
+            "Should have bootstrapped causal edges"
+        );
+        // Verify the trait accessor matches the direct graph accessor
+        assert_eq!(
+            NixPipelineHook::causal_edge_count(&hook),
+            hook.causal_graph().edge_count()
+        );
     }
 }
