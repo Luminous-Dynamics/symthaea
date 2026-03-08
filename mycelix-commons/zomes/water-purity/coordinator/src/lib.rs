@@ -2,11 +2,11 @@
 //! Business logic for water quality monitoring, alerts, and remediation
 
 use hdk::prelude::*;
-use water_purity_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use water_purity_integrity::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -922,7 +922,10 @@ mod tests {
         alert.contaminant = "   \t  ".to_string();
         let json = serde_json::to_string(&alert).unwrap();
         let decoded: ContaminationAlert = serde_json::from_str(&json).unwrap();
-        assert!(decoded.contaminant.trim().is_empty(), "Whitespace-only contaminant must be caught by trim()");
+        assert!(
+            decoded.contaminant.trim().is_empty(),
+            "Whitespace-only contaminant must be caught by trim()"
+        );
     }
 
     /// Negative measured contamination value should be rejected.
@@ -942,6 +945,9 @@ mod tests {
         rem.method = "  \n\t  ".to_string();
         let json = serde_json::to_string(&rem).unwrap();
         let decoded: Remediation = serde_json::from_str(&json).unwrap();
-        assert!(decoded.method.trim().is_empty(), "Whitespace-only method must be caught by trim()");
+        assert!(
+            decoded.method.trim().is_empty(),
+            "Whitespace-only method must be caught by trim()"
+        );
     }
 }

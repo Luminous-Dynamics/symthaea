@@ -172,82 +172,80 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::ShardedArticles => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ShardedArticles link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::ShardedArticles => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ShardedArticles link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::CategoryToArticle => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "CategoryToArticle link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::TagToArticle => {
-                    if tag.0.len() > 512 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "TagToArticle link tag too long (max 512 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToArticle => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToArticle link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::ArticleToResolution => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ArticleToResolution link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::ArticleToFlag => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ArticleToFlag link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToReputation => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToReputation link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::ArticleToTickets => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ArticleToTickets link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::TicketToArticles => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "TicketToArticles link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::CategoryToArticle => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CategoryToArticle link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TagToArticle => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TagToArticle link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToArticle => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToArticle link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ArticleToResolution => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ArticleToResolution link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ArticleToFlag => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ArticleToFlag link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToReputation => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToReputation link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ArticleToTickets => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ArticleToTickets link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TicketToArticles => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TicketToArticles link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -405,7 +403,8 @@ mod tests {
             article_hash: test_action_hash(),
             flagger: test_agent(),
             reason: FlagReason::Outdated,
-            description: "This article references Holochain 0.1 which is no longer supported".into(),
+            description: "This article references Holochain 0.1 which is no longer supported"
+                .into(),
             created_at: test_timestamp(),
         }
     }
@@ -503,7 +502,10 @@ mod tests {
         let back: KnowledgeArticle = serde_json::from_str(&json).unwrap();
         assert_eq!(back, a);
         assert!(back.deprecated);
-        assert_eq!(back.deprecation_reason, Some("Superseded by new article".into()));
+        assert_eq!(
+            back.deprecation_reason,
+            Some("Superseded by new article".into())
+        );
     }
 
     #[test]
@@ -642,7 +644,11 @@ mod tests {
 
     #[test]
     fn article_all_sources_valid() {
-        for source in [ArticleSource::Community, ArticleSource::PreSeeded, ArticleSource::SymthaeaGenerated] {
+        for source in [
+            ArticleSource::Community,
+            ArticleSource::PreSeeded,
+            ArticleSource::SymthaeaGenerated,
+        ] {
             let mut a = valid_article();
             a.source = source;
             assert_valid(validate_article(a));
@@ -651,7 +657,11 @@ mod tests {
 
     #[test]
     fn article_all_difficulty_levels_valid() {
-        for level in [DifficultyLevel::Beginner, DifficultyLevel::Intermediate, DifficultyLevel::Advanced] {
+        for level in [
+            DifficultyLevel::Beginner,
+            DifficultyLevel::Intermediate,
+            DifficultyLevel::Advanced,
+        ] {
             let mut a = valid_article();
             a.difficulty_level = level;
             assert_valid(validate_article(a));
@@ -661,8 +671,12 @@ mod tests {
     #[test]
     fn article_all_categories_valid() {
         for cat in [
-            SupportCategory::Network, SupportCategory::Hardware, SupportCategory::Software,
-            SupportCategory::Holochain, SupportCategory::Mycelix, SupportCategory::Security,
+            SupportCategory::Network,
+            SupportCategory::Hardware,
+            SupportCategory::Software,
+            SupportCategory::Holochain,
+            SupportCategory::Mycelix,
+            SupportCategory::Security,
             SupportCategory::General,
         ] {
             let mut a = valid_article();
@@ -693,7 +707,10 @@ mod tests {
     fn resolution_empty_steps_rejected() {
         let mut r = valid_resolution();
         r.steps = vec![];
-        assert_invalid(validate_resolution(r), "Resolution must have at least one step");
+        assert_invalid(
+            validate_resolution(r),
+            "Resolution must have at least one step",
+        );
     }
 
     #[test]
@@ -737,21 +754,30 @@ mod tests {
     fn resolution_rating_0_rejected() {
         let mut r = valid_resolution();
         r.effectiveness_rating = Some(0);
-        assert_invalid(validate_resolution(r), "Effectiveness rating must be between 1 and 5");
+        assert_invalid(
+            validate_resolution(r),
+            "Effectiveness rating must be between 1 and 5",
+        );
     }
 
     #[test]
     fn resolution_rating_6_rejected() {
         let mut r = valid_resolution();
         r.effectiveness_rating = Some(6);
-        assert_invalid(validate_resolution(r), "Effectiveness rating must be between 1 and 5");
+        assert_invalid(
+            validate_resolution(r),
+            "Effectiveness rating must be between 1 and 5",
+        );
     }
 
     #[test]
     fn resolution_rating_255_rejected() {
         let mut r = valid_resolution();
         r.effectiveness_rating = Some(255);
-        assert_invalid(validate_resolution(r), "Effectiveness rating must be between 1 and 5");
+        assert_invalid(
+            validate_resolution(r),
+            "Effectiveness rating must be between 1 and 5",
+        );
     }
 
     // ── validate_resolution: combined invalid ───────────────────────────
@@ -761,7 +787,10 @@ mod tests {
         let mut r = valid_resolution();
         r.steps = vec![];
         r.effectiveness_rating = Some(0);
-        assert_invalid(validate_resolution(r), "Resolution must have at least one step");
+        assert_invalid(
+            validate_resolution(r),
+            "Resolution must have at least one step",
+        );
     }
 
     // ── validate_resolution: optional fields ────────────────────────────
@@ -806,7 +835,10 @@ mod tests {
     fn flag_short_description_rejected() {
         let mut f = valid_flag();
         f.description = "Too short".into(); // 9 chars
-        assert_invalid(validate_flag(f), "Flag description must be at least 10 characters");
+        assert_invalid(
+            validate_flag(f),
+            "Flag description must be at least 10 characters",
+        );
     }
 
     #[test]
@@ -820,14 +852,20 @@ mod tests {
     fn flag_9_chars_rejected() {
         let mut f = valid_flag();
         f.description = "012345678".into(); // 9 chars
-        assert_invalid(validate_flag(f), "Flag description must be at least 10 characters");
+        assert_invalid(
+            validate_flag(f),
+            "Flag description must be at least 10 characters",
+        );
     }
 
     #[test]
     fn flag_empty_description_rejected() {
         let mut f = valid_flag();
         f.description = String::new();
-        assert_invalid(validate_flag(f), "Flag description must be at least 10 characters");
+        assert_invalid(
+            validate_flag(f),
+            "Flag description must be at least 10 characters",
+        );
     }
 
     #[test]
@@ -841,7 +879,12 @@ mod tests {
 
     #[test]
     fn flag_all_reasons_valid() {
-        for reason in [FlagReason::Harmful, FlagReason::Incorrect, FlagReason::Outdated, FlagReason::Spam] {
+        for reason in [
+            FlagReason::Harmful,
+            FlagReason::Incorrect,
+            FlagReason::Outdated,
+            FlagReason::Spam,
+        ] {
             let mut f = valid_flag();
             f.reason = reason;
             assert_valid(validate_flag(f));
@@ -886,21 +929,30 @@ mod tests {
     fn update_resolution_empty_steps_rejected() {
         let mut r = valid_resolution();
         r.steps = vec![];
-        assert_invalid(validate_resolution(r), "Resolution must have at least one step");
+        assert_invalid(
+            validate_resolution(r),
+            "Resolution must have at least one step",
+        );
     }
 
     #[test]
     fn update_resolution_bad_rating_rejected() {
         let mut r = valid_resolution();
         r.effectiveness_rating = Some(0);
-        assert_invalid(validate_resolution(r), "Effectiveness rating must be between 1 and 5");
+        assert_invalid(
+            validate_resolution(r),
+            "Effectiveness rating must be between 1 and 5",
+        );
     }
 
     #[test]
     fn update_flag_short_description_rejected() {
         let mut f = valid_flag();
         f.description = "short".into();
-        assert_invalid(validate_flag(f), "Flag description must be at least 10 characters");
+        assert_invalid(
+            validate_flag(f),
+            "Flag description must be at least 10 characters",
+        );
     }
 
     // ── Link tag length validation tests ────────────────────────────────
@@ -930,9 +982,10 @@ mod tests {
             LinkTypes::TicketToArticles => "TicketToArticles",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }

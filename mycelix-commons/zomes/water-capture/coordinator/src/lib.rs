@@ -1,12 +1,12 @@
 //! Capture Coordinator Zome
 //! Business logic for water harvesting, storage, and aquifer recharge
 
-use water_capture_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use water_capture_integrity::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -288,7 +288,8 @@ pub fn get_harvest_history(system_hash: ActionHash) -> ExternResult<Vec<Record>>
 /// Register a new aquifer recharge project
 #[hdk_extern]
 pub fn register_recharge_project(project: RechargeProject) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "register_recharge_project")?;
+    let _eligibility =
+        require_consciousness(&requirement_for_basic(), "register_recharge_project")?;
     if project.id.trim().is_empty() || project.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Project ID must be 1-256 non-whitespace characters".into()
@@ -709,7 +710,10 @@ mod tests {
         };
         let json = serde_json::to_string(&sys).unwrap();
         let decoded: HarvestSystem = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.name, "\u{96E8}\u{6C34}\u{6536}\u{96C6}\u{7CFB}\u{7EDF}");
+        assert_eq!(
+            decoded.name,
+            "\u{96E8}\u{6C34}\u{6536}\u{96C6}\u{7CFB}\u{7EDF}"
+        );
     }
 
     #[test]

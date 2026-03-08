@@ -102,42 +102,36 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::Endorsement(endorsement) => {
-                        validate_create_endorsement(EntryCreationAction::Create(action), endorsement)
-                    }
-                    EntryTypes::Collection(collection) => {
-                        validate_create_collection(EntryCreationAction::Create(action), collection)
-                    }
-                    EntryTypes::QualityScore(score) => {
-                        validate_create_quality_score(EntryCreationAction::Create(action), score)
-                    }
-                    EntryTypes::FeaturedContent(featured) => {
-                        validate_create_featured_content(EntryCreationAction::Create(action), featured)
-                    }
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::Endorsement(endorsement) => {
+                    validate_create_endorsement(EntryCreationAction::Create(action), endorsement)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::Endorsement(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Endorsements cannot be updated".into(),
-                        ))
-                    }
-                    EntryTypes::Collection(collection) => {
-                        validate_update_collection(action, collection)
-                    }
-                    EntryTypes::QualityScore(score) => {
-                        validate_update_quality_score(action, score)
-                    }
-                    EntryTypes::FeaturedContent(featured) => {
-                        validate_update_featured_content(action, featured)
-                    }
+                EntryTypes::Collection(collection) => {
+                    validate_create_collection(EntryCreationAction::Create(action), collection)
                 }
-            }
+                EntryTypes::QualityScore(score) => {
+                    validate_create_quality_score(EntryCreationAction::Create(action), score)
+                }
+                EntryTypes::FeaturedContent(featured) => {
+                    validate_create_featured_content(EntryCreationAction::Create(action), featured)
+                }
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::Endorsement(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Endorsements cannot be updated".into(),
+                )),
+                EntryTypes::Collection(collection) => {
+                    validate_update_collection(action, collection)
+                }
+                EntryTypes::QualityScore(score) => validate_update_quality_score(action, score),
+                EntryTypes::FeaturedContent(featured) => {
+                    validate_update_featured_content(action, featured)
+                }
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
@@ -191,26 +185,40 @@ fn validate_create_endorsement(
     endorsement: Endorsement,
 ) -> ExternResult<ValidateCallbackResult> {
     if endorsement.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Endorsement ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Endorsement ID cannot be empty".into(),
+        ));
     }
     if endorsement.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Endorsement ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Endorsement ID too long (max 256 chars)".into(),
+        ));
     }
     if endorsement.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Endorsement publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Endorsement publication_id cannot be empty".into(),
+        ));
     }
     if endorsement.publication_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Endorsement publication_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Endorsement publication_id too long (max 256 chars)".into(),
+        ));
     }
     if !endorsement.endorser_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Endorser must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Endorser must be a valid DID".into(),
+        ));
     }
     if endorsement.endorser_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Endorser DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Endorser DID too long (max 256 chars)".into(),
+        ));
     }
     if let Some(ref comment) = endorsement.comment {
         if comment.len() > 4096 {
-            return Ok(ValidateCallbackResult::Invalid("Comment too long (max 4096 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Comment too long (max 4096 chars)".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -221,32 +229,50 @@ fn validate_create_collection(
     collection: Collection,
 ) -> ExternResult<ValidateCallbackResult> {
     if collection.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Collection ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collection ID cannot be empty".into(),
+        ));
     }
     if collection.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Collection ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collection ID too long (max 256 chars)".into(),
+        ));
     }
     if !collection.curator_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Curator must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Curator must be a valid DID".into(),
+        ));
     }
     if collection.curator_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Curator DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Curator DID too long (max 256 chars)".into(),
+        ));
     }
     if collection.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Collection name required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collection name required".into(),
+        ));
     }
     if collection.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Collection name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collection name too long (max 256 chars)".into(),
+        ));
     }
     if collection.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Collection description too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collection description too long (max 4096 chars)".into(),
+        ));
     }
     if collection.publication_ids.len() > 100 {
-        return Ok(ValidateCallbackResult::Invalid("Too many publication IDs (max 100)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many publication IDs (max 100)".into(),
+        ));
     }
     for pid in &collection.publication_ids {
         if pid.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Publication ID entry too long (max 256 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Publication ID entry too long (max 256 chars)".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -257,7 +283,9 @@ fn validate_update_collection(
     collection: Collection,
 ) -> ExternResult<ValidateCallbackResult> {
     if collection.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Collection name required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collection name required".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -267,25 +295,37 @@ fn validate_create_quality_score(
     score: QualityScore,
 ) -> ExternResult<ValidateCallbackResult> {
     if score.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("QualityScore publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "QualityScore publication_id cannot be empty".into(),
+        ));
     }
     if !score.score.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("score must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "score must be a finite number".into(),
+        ));
     }
     if score.score < 0.0 || score.score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Score must be 0-1".into()));
     }
     if !score.fact_check_score.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("fact_check_score must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "fact_check_score must be a finite number".into(),
+        ));
     }
     if score.fact_check_score < 0.0 || score.fact_check_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Fact check score must be 0-1".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fact check score must be 0-1".into(),
+        ));
     }
     if !score.author_reputation.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("author_reputation must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "author_reputation must be a finite number".into(),
+        ));
     }
     if score.author_reputation < 0.0 || score.author_reputation > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Author reputation must be 0-1".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Author reputation must be 0-1".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -295,7 +335,9 @@ fn validate_update_quality_score(
     score: QualityScore,
 ) -> ExternResult<ValidateCallbackResult> {
     if !score.score.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("score must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "score must be a finite number".into(),
+        ));
     }
     if score.score < 0.0 || score.score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Score must be 0-1".into()));
@@ -308,28 +350,44 @@ fn validate_create_featured_content(
     featured: FeaturedContent,
 ) -> ExternResult<ValidateCallbackResult> {
     if featured.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("FeaturedContent ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "FeaturedContent ID cannot be empty".into(),
+        ));
     }
     if featured.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("FeaturedContent ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "FeaturedContent ID too long (max 256 chars)".into(),
+        ));
     }
     if featured.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("FeaturedContent publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "FeaturedContent publication_id cannot be empty".into(),
+        ));
     }
     if featured.publication_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("FeaturedContent publication_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "FeaturedContent publication_id too long (max 256 chars)".into(),
+        ));
     }
     if !featured.featured_by.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Featured by must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Featured by must be a valid DID".into(),
+        ));
     }
     if featured.featured_by.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Featured by DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Featured by DID too long (max 256 chars)".into(),
+        ));
     }
     if featured.reason.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Featured reason cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Featured reason cannot be empty".into(),
+        ));
     }
     if featured.reason.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Featured reason too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Featured reason too long (max 4096 chars)".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -463,8 +521,7 @@ mod tests {
 
     #[test]
     fn valid_endorsement_passes() {
-        let result =
-            validate_create_endorsement(fake_entry_creation_action(), make_endorsement());
+        let result = validate_create_endorsement(fake_entry_creation_action(), make_endorsement());
         assert!(is_valid(&result));
     }
 
@@ -517,8 +574,7 @@ mod tests {
         for variant in variants {
             let mut e = make_endorsement();
             e.endorsement_type = variant;
-            let result =
-                validate_create_endorsement(fake_entry_creation_action(), e);
+            let result = validate_create_endorsement(fake_entry_creation_action(), e);
             assert!(is_valid(&result));
         }
     }
@@ -563,7 +619,10 @@ mod tests {
         e.publication_id = "".into();
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Endorsement publication_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "Endorsement publication_id cannot be empty"
+        );
     }
 
     #[test]
@@ -572,7 +631,10 @@ mod tests {
         e.publication_id = "  \t ".into();
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Endorsement publication_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "Endorsement publication_id cannot be empty"
+        );
     }
 
     // ========================================================================
@@ -581,8 +643,7 @@ mod tests {
 
     #[test]
     fn valid_collection_passes() {
-        let result =
-            validate_create_collection(fake_entry_creation_action(), make_collection());
+        let result = validate_create_collection(fake_entry_creation_action(), make_collection());
         assert!(is_valid(&result));
     }
 
@@ -687,12 +748,15 @@ mod tests {
 
     #[test]
     fn collection_every_visibility_variant_passes() {
-        let variants = vec![Visibility::Public, Visibility::Private, Visibility::Unlisted];
+        let variants = vec![
+            Visibility::Public,
+            Visibility::Private,
+            Visibility::Unlisted,
+        ];
         for v in variants {
             let mut c = make_collection();
             c.visibility = v;
-            let result =
-                validate_create_collection(fake_entry_creation_action(), c);
+            let result = validate_create_collection(fake_entry_creation_action(), c);
             assert!(is_valid(&result));
         }
     }
@@ -834,7 +898,11 @@ mod tests {
             let mut qs = make_quality_score();
             qs.fact_check_score = val;
             let result = validate_create_quality_score(fake_entry_creation_action(), qs);
-            assert!(is_valid(&result), "fact_check_score={} should be valid", val);
+            assert!(
+                is_valid(&result),
+                "fact_check_score={} should be valid",
+                val
+            );
         }
     }
 
@@ -862,7 +930,11 @@ mod tests {
             let mut qs = make_quality_score();
             qs.author_reputation = val;
             let result = validate_create_quality_score(fake_entry_creation_action(), qs);
-            assert!(is_valid(&result), "author_reputation={} should be valid", val);
+            assert!(
+                is_valid(&result),
+                "author_reputation={} should be valid",
+                val
+            );
         }
     }
 
@@ -872,7 +944,10 @@ mod tests {
         qs.publication_id = "".into();
         let result = validate_create_quality_score(fake_entry_creation_action(), qs);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "QualityScore publication_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "QualityScore publication_id cannot be empty"
+        );
     }
 
     #[test]
@@ -881,7 +956,10 @@ mod tests {
         qs.publication_id = "   ".into();
         let result = validate_create_quality_score(fake_entry_creation_action(), qs);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "QualityScore publication_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "QualityScore publication_id cannot be empty"
+        );
     }
 
     // ========================================================================
@@ -955,7 +1033,10 @@ mod tests {
         c.id = "c".repeat(257);
         let result = validate_create_collection(fake_entry_creation_action(), c);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Collection ID too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Collection ID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -972,7 +1053,10 @@ mod tests {
         c.name = "n".repeat(257);
         let result = validate_create_collection(fake_entry_creation_action(), c);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Collection name too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Collection name too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -989,7 +1073,10 @@ mod tests {
         c.description = "d".repeat(4097);
         let result = validate_create_collection(fake_entry_creation_action(), c);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Collection description too long (max 4096 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Collection description too long (max 4096 chars)"
+        );
     }
 
     #[test]
@@ -1041,7 +1128,10 @@ mod tests {
         c.publication_ids = vec!["p".repeat(257)];
         let result = validate_create_collection(fake_entry_creation_action(), c);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Publication ID entry too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Publication ID entry too long (max 256 chars)"
+        );
     }
 
     // ========================================================================
@@ -1062,7 +1152,10 @@ mod tests {
         e.id = "e".repeat(257);
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Endorsement ID too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Endorsement ID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1079,7 +1172,10 @@ mod tests {
         e.publication_id = "p".repeat(257);
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Endorsement publication_id too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Endorsement publication_id too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1097,7 +1193,10 @@ mod tests {
         e.endorser_did = format!("did:{}", "x".repeat(253));
         let result = validate_create_endorsement(fake_entry_creation_action(), e);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Endorser DID too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Endorser DID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1123,10 +1222,8 @@ mod tests {
 
     #[test]
     fn valid_featured_content_passes() {
-        let result = validate_create_featured_content(
-            fake_entry_creation_action(),
-            make_featured_content(),
-        );
+        let result =
+            validate_create_featured_content(fake_entry_creation_action(), make_featured_content());
         assert!(is_valid(&result));
     }
 
@@ -1136,10 +1233,7 @@ mod tests {
         f.featured_by = "not-a-did".into();
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Featured by must be a valid DID"
-        );
+        assert_eq!(invalid_msg(&result), "Featured by must be a valid DID");
     }
 
     #[test]
@@ -1148,10 +1242,7 @@ mod tests {
         f.featured_by = "".into();
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Featured by must be a valid DID"
-        );
+        assert_eq!(invalid_msg(&result), "Featured by must be a valid DID");
     }
 
     #[test]
@@ -1168,10 +1259,7 @@ mod tests {
         f.featured_by = "DID:example:editor".into();
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Featured by must be a valid DID"
-        );
+        assert_eq!(invalid_msg(&result), "Featured by must be a valid DID");
     }
 
     #[test]
@@ -1224,7 +1312,10 @@ mod tests {
         f.publication_id = "".into();
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FeaturedContent publication_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "FeaturedContent publication_id cannot be empty"
+        );
     }
 
     #[test]
@@ -1233,7 +1324,10 @@ mod tests {
         f.publication_id = "   ".into();
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FeaturedContent publication_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "FeaturedContent publication_id cannot be empty"
+        );
     }
 
     // ========================================================================
@@ -1254,7 +1348,10 @@ mod tests {
         f.id = "f".repeat(257);
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FeaturedContent ID too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "FeaturedContent ID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1271,7 +1368,10 @@ mod tests {
         f.publication_id = "p".repeat(257);
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FeaturedContent publication_id too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "FeaturedContent publication_id too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1289,7 +1389,10 @@ mod tests {
         f.featured_by = format!("did:{}", "x".repeat(253));
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Featured by DID too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Featured by DID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1306,7 +1409,10 @@ mod tests {
         f.reason = "r".repeat(4097);
         let result = validate_create_featured_content(fake_entry_creation_action(), f);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Featured reason too long (max 4096 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Featured reason too long (max 4096 chars)"
+        );
     }
 
     // ========================================================================
@@ -1315,8 +1421,7 @@ mod tests {
 
     #[test]
     fn update_featured_content_always_passes() {
-        let result =
-            validate_update_featured_content(fake_update(), make_featured_content());
+        let result = validate_update_featured_content(fake_update(), make_featured_content());
         assert!(is_valid(&result));
     }
 
@@ -1369,8 +1474,7 @@ mod tests {
     fn featured_content_serde_roundtrip() {
         let original = make_featured_content();
         let json = serde_json::to_string(&original).expect("serialize");
-        let restored: FeaturedContent =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: FeaturedContent = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(original, restored);
     }
 
@@ -1385,15 +1489,18 @@ mod tests {
         ];
         for original in variants {
             let json = serde_json::to_string(&original).expect("serialize");
-            let restored: EndorsementType =
-                serde_json::from_str(&json).expect("deserialize");
+            let restored: EndorsementType = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(original, restored);
         }
     }
 
     #[test]
     fn visibility_serde_roundtrip() {
-        let variants = vec![Visibility::Public, Visibility::Private, Visibility::Unlisted];
+        let variants = vec![
+            Visibility::Public,
+            Visibility::Private,
+            Visibility::Unlisted,
+        ];
         for original in variants {
             let json = serde_json::to_string(&original).expect("serialize");
             let restored: Visibility = serde_json::from_str(&json).expect("deserialize");
@@ -1423,8 +1530,7 @@ mod tests {
         let mut original = make_featured_content();
         original.featured_until = Some(Timestamp::from_micros(1_000_000));
         let json = serde_json::to_string(&original).expect("serialize");
-        let restored: FeaturedContent =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: FeaturedContent = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(original, restored);
     }
 

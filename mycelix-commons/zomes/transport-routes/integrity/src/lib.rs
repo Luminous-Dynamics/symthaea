@@ -204,66 +204,64 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::AllVehicles => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllVehicles link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AllVehicles => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllVehicles link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::AllRoutes => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllRoutes link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::OwnerToVehicle => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "OwnerToVehicle link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::RouteToStop => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "RouteToStop link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::VehicleToRoute => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "VehicleToRoute link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::VehicleToMaintenance => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "VehicleToMaintenance link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::VehicleToFeatures => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "VehicleToFeatures link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::AllRoutes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllRoutes link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OwnerToVehicle => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OwnerToVehicle link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RouteToStop => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RouteToStop link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VehicleToRoute => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VehicleToRoute link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VehicleToMaintenance => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VehicleToMaintenance link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VehicleToFeatures => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VehicleToFeatures link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -274,105 +272,163 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_vehicle(v: Vehicle) -> ExternResult<ValidateCallbackResult> {
     if v.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Vehicle ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Vehicle ID cannot be empty".into(),
+        ));
     }
     if v.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Vehicle ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Vehicle ID too long (max 256 chars)".into(),
+        ));
     }
     if !v.capacity_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("capacity_kg must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "capacity_kg must be a finite number".into(),
+        ));
     }
     if v.capacity_kg < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Capacity cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Capacity cannot be negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_route(r: Route) -> ExternResult<ValidateCallbackResult> {
     if r.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Route ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Route ID cannot be empty".into(),
+        ));
     }
     if r.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Route ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Route ID too long (max 256 chars)".into(),
+        ));
     }
     if r.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Route name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Route name cannot be empty".into(),
+        ));
     }
     if r.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Route name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Route name too long (max 256 chars)".into(),
+        ));
     }
     if r.waypoints.len() < 2 {
-        return Ok(ValidateCallbackResult::Invalid("Route must have at least 2 waypoints".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Route must have at least 2 waypoints".into(),
+        ));
     }
     for wp in &r.waypoints {
         if !wp.lat.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("Waypoint lat must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Waypoint lat must be a finite number".into(),
+            ));
         }
         if !wp.lon.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("Waypoint lon must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Waypoint lon must be a finite number".into(),
+            ));
         }
         if wp.lat < -90.0 || wp.lat > 90.0 {
-            return Ok(ValidateCallbackResult::Invalid("Waypoint latitude must be between -90 and 90".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Waypoint latitude must be between -90 and 90".into(),
+            ));
         }
         if wp.lon < -180.0 || wp.lon > 180.0 {
-            return Ok(ValidateCallbackResult::Invalid("Waypoint longitude must be between -180 and 180".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Waypoint longitude must be between -180 and 180".into(),
+            ));
         }
     }
     if !r.distance_km.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("distance_km must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "distance_km must be a finite number".into(),
+        ));
     }
     if r.distance_km <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Distance must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Distance must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_stop(s: Stop) -> ExternResult<ValidateCallbackResult> {
     if s.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Stop name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Stop name cannot be empty".into(),
+        ));
     }
     if s.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Stop name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Stop name too long (max 256 chars)".into(),
+        ));
     }
     if !s.location_lat.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("location_lat must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "location_lat must be a finite number".into(),
+        ));
     }
     if !s.location_lon.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("location_lon must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "location_lon must be a finite number".into(),
+        ));
     }
     if s.location_lat < -90.0 || s.location_lat > 90.0 {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
     }
     if s.location_lon < -180.0 || s.location_lon > 180.0 {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_maintenance(m: MaintenanceRecord) -> ExternResult<ValidateCallbackResult> {
     if m.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Maintenance ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Maintenance ID cannot be empty".into(),
+        ));
     }
     if m.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Maintenance ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Maintenance ID too long (max 256 chars)".into(),
+        ));
     }
     if m.description.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description cannot be empty".into(),
+        ));
     }
     if m.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description too long (max 4096 chars)".into(),
+        ));
     }
     if !m.cost.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("cost must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "cost must be a finite number".into(),
+        ));
     }
     if m.cost < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Cost cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cost cannot be negative".into(),
+        ));
     }
     if m.mechanic_notes.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Mechanic notes cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Mechanic notes cannot be empty".into(),
+        ));
     }
     if m.mechanic_notes.len() > 8192 {
-        return Ok(ValidateCallbackResult::Invalid("Mechanic notes too long (max 8192 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Mechanic notes too long (max 8192 chars)".into(),
+        ));
     }
     if let Some(next_due) = m.next_due {
         if next_due <= m.completed_at {
@@ -413,8 +469,16 @@ mod tests {
             id: "r-1".into(),
             name: "Downtown Loop".into(),
             waypoints: vec![
-                Waypoint { lat: 32.95, lon: -96.73, label: Some("Start".into()) },
-                Waypoint { lat: 32.96, lon: -96.74, label: Some("End".into()) },
+                Waypoint {
+                    lat: 32.95,
+                    lon: -96.73,
+                    label: Some("Start".into()),
+                },
+                Waypoint {
+                    lat: 32.96,
+                    lon: -96.74,
+                    label: Some("End".into()),
+                },
             ],
             distance_km: 3.5,
             estimated_minutes: 15,
@@ -463,13 +527,24 @@ mod tests {
     #[test]
     fn serde_roundtrip_vehicle_type() {
         let types = vec![
-            VehicleType::Car, VehicleType::Van, VehicleType::Bike,
-            VehicleType::Bus, VehicleType::Cargo, VehicleType::ElectricScooter,
-            VehicleType::Helicopter, VehicleType::EVTOL, VehicleType::AirTaxi,
-            VehicleType::Ferry, VehicleType::Boat,
-            VehicleType::Train, VehicleType::Tram,
-            VehicleType::Skateboard, VehicleType::Wheelchair, VehicleType::Segway,
-            VehicleType::AutonomousVehicle, VehicleType::Drone,
+            VehicleType::Car,
+            VehicleType::Van,
+            VehicleType::Bike,
+            VehicleType::Bus,
+            VehicleType::Cargo,
+            VehicleType::ElectricScooter,
+            VehicleType::Helicopter,
+            VehicleType::EVTOL,
+            VehicleType::AirTaxi,
+            VehicleType::Ferry,
+            VehicleType::Boat,
+            VehicleType::Train,
+            VehicleType::Tram,
+            VehicleType::Skateboard,
+            VehicleType::Wheelchair,
+            VehicleType::Segway,
+            VehicleType::AutonomousVehicle,
+            VehicleType::Drone,
         ];
         for t in &types {
             let json = serde_json::to_string(t).unwrap();
@@ -481,8 +556,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_vehicle_status() {
         let statuses = vec![
-            VehicleStatus::Available, VehicleStatus::InUse,
-            VehicleStatus::Maintenance, VehicleStatus::Retired,
+            VehicleStatus::Available,
+            VehicleStatus::InUse,
+            VehicleStatus::Maintenance,
+            VehicleStatus::Retired,
         ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
@@ -494,10 +571,16 @@ mod tests {
     #[test]
     fn serde_roundtrip_transport_mode() {
         let modes = vec![
-            TransportMode::Driving, TransportMode::Cycling,
-            TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed,
-            TransportMode::Flying, TransportMode::Water, TransportMode::Rail,
-            TransportMode::Micromobility, TransportMode::Autonomous,
+            TransportMode::Driving,
+            TransportMode::Cycling,
+            TransportMode::Walking,
+            TransportMode::Transit,
+            TransportMode::Mixed,
+            TransportMode::Flying,
+            TransportMode::Water,
+            TransportMode::Rail,
+            TransportMode::Micromobility,
+            TransportMode::Autonomous,
         ];
         for m in &modes {
             let json = serde_json::to_string(m).unwrap();
@@ -518,7 +601,11 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_waypoint() {
-        let wp = Waypoint { lat: 32.95, lon: -96.73, label: Some("Home".into()) };
+        let wp = Waypoint {
+            lat: 32.95,
+            lon: -96.73,
+            label: Some("Home".into()),
+        };
         let json = serde_json::to_string(&wp).unwrap();
         let back: Waypoint = serde_json::from_str(&json).unwrap();
         assert_eq!(back, wp);
@@ -526,7 +613,11 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_waypoint_no_label() {
-        let wp = Waypoint { lat: 0.0, lon: 0.0, label: None };
+        let wp = Waypoint {
+            lat: 0.0,
+            lon: 0.0,
+            label: None,
+        };
         let json = serde_json::to_string(&wp).unwrap();
         let back: Waypoint = serde_json::from_str(&json).unwrap();
         assert_eq!(back, wp);
@@ -627,13 +718,26 @@ mod tests {
 
     #[test]
     fn all_vehicle_types_valid() {
-        for vt in [VehicleType::Car, VehicleType::Van, VehicleType::Bike,
-                    VehicleType::Bus, VehicleType::Cargo, VehicleType::ElectricScooter,
-                    VehicleType::Helicopter, VehicleType::EVTOL, VehicleType::AirTaxi,
-                    VehicleType::Ferry, VehicleType::Boat,
-                    VehicleType::Train, VehicleType::Tram,
-                    VehicleType::Skateboard, VehicleType::Wheelchair, VehicleType::Segway,
-                    VehicleType::AutonomousVehicle, VehicleType::Drone] {
+        for vt in [
+            VehicleType::Car,
+            VehicleType::Van,
+            VehicleType::Bike,
+            VehicleType::Bus,
+            VehicleType::Cargo,
+            VehicleType::ElectricScooter,
+            VehicleType::Helicopter,
+            VehicleType::EVTOL,
+            VehicleType::AirTaxi,
+            VehicleType::Ferry,
+            VehicleType::Boat,
+            VehicleType::Train,
+            VehicleType::Tram,
+            VehicleType::Skateboard,
+            VehicleType::Wheelchair,
+            VehicleType::Segway,
+            VehicleType::AutonomousVehicle,
+            VehicleType::Drone,
+        ] {
             let mut v = valid_vehicle();
             v.vehicle_type = vt;
             assert_valid(validate_vehicle(v));
@@ -644,8 +748,12 @@ mod tests {
 
     #[test]
     fn all_vehicle_statuses_valid() {
-        for status in [VehicleStatus::Available, VehicleStatus::InUse,
-                       VehicleStatus::Maintenance, VehicleStatus::Retired] {
+        for status in [
+            VehicleStatus::Available,
+            VehicleStatus::InUse,
+            VehicleStatus::Maintenance,
+            VehicleStatus::Retired,
+        ] {
             let mut v = valid_vehicle();
             v.status = status;
             assert_valid(validate_vehicle(v));
@@ -752,7 +860,11 @@ mod tests {
     #[test]
     fn route_single_waypoint_rejected() {
         let mut r = valid_route();
-        r.waypoints = vec![Waypoint { lat: 32.95, lon: -96.73, label: None }];
+        r.waypoints = vec![Waypoint {
+            lat: 32.95,
+            lon: -96.73,
+            label: None,
+        }];
         assert_invalid(validate_route(r), "Route must have at least 2 waypoints");
     }
 
@@ -760,8 +872,16 @@ mod tests {
     fn route_two_waypoints_valid() {
         let mut r = valid_route();
         r.waypoints = vec![
-            Waypoint { lat: 32.95, lon: -96.73, label: None },
-            Waypoint { lat: 32.96, lon: -96.74, label: None },
+            Waypoint {
+                lat: 32.95,
+                lon: -96.73,
+                label: None,
+            },
+            Waypoint {
+                lat: 32.96,
+                lon: -96.74,
+                label: None,
+            },
         ];
         assert_valid(validate_route(r));
     }
@@ -769,11 +889,13 @@ mod tests {
     #[test]
     fn route_many_waypoints_valid() {
         let mut r = valid_route();
-        r.waypoints = (0..100).map(|i| Waypoint {
-            lat: 32.0 + (i as f64) * 0.01,
-            lon: -96.0 + (i as f64) * 0.01,
-            label: Some(format!("wp_{i}")),
-        }).collect();
+        r.waypoints = (0..100)
+            .map(|i| Waypoint {
+                lat: 32.0 + (i as f64) * 0.01,
+                lon: -96.0 + (i as f64) * 0.01,
+                label: Some(format!("wp_{i}")),
+            })
+            .collect();
         assert_valid(validate_route(r));
     }
 
@@ -811,10 +933,18 @@ mod tests {
 
     #[test]
     fn route_all_transport_modes_valid() {
-        for mode in [TransportMode::Driving, TransportMode::Cycling,
-                     TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed,
-                     TransportMode::Flying, TransportMode::Water, TransportMode::Rail,
-                     TransportMode::Micromobility, TransportMode::Autonomous] {
+        for mode in [
+            TransportMode::Driving,
+            TransportMode::Cycling,
+            TransportMode::Walking,
+            TransportMode::Transit,
+            TransportMode::Mixed,
+            TransportMode::Flying,
+            TransportMode::Water,
+            TransportMode::Rail,
+            TransportMode::Micromobility,
+            TransportMode::Autonomous,
+        ] {
             let mut r = valid_route();
             r.mode = mode;
             assert_valid(validate_route(r));
@@ -844,7 +974,11 @@ mod tests {
     fn route_empty_name_rejects_before_single_waypoint() {
         let mut r = valid_route();
         r.name = String::new();
-        r.waypoints = vec![Waypoint { lat: 0.0, lon: 0.0, label: None }];
+        r.waypoints = vec![Waypoint {
+            lat: 0.0,
+            lon: 0.0,
+            label: None,
+        }];
         assert_invalid(validate_route(r), "Route name cannot be empty");
     }
 
@@ -1030,9 +1164,10 @@ mod tests {
             LinkTypes::VehicleToFeatures => "VehicleToFeatures",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }
@@ -1126,7 +1261,11 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_maintenance_type() {
-        let types = vec![MaintenanceType::Scheduled, MaintenanceType::Repair, MaintenanceType::Inspection];
+        let types = vec![
+            MaintenanceType::Scheduled,
+            MaintenanceType::Repair,
+            MaintenanceType::Inspection,
+        ];
         for t in &types {
             let json = serde_json::to_string(t).unwrap();
             let back: MaintenanceType = serde_json::from_str(&json).unwrap();
@@ -1205,7 +1344,10 @@ mod tests {
     fn maintenance_id_too_long_rejected() {
         let mut m = valid_maintenance();
         m.id = "x".repeat(257);
-        assert_invalid(validate_maintenance(m), "Maintenance ID too long (max 256 chars)");
+        assert_invalid(
+            validate_maintenance(m),
+            "Maintenance ID too long (max 256 chars)",
+        );
     }
 
     #[test]
@@ -1275,7 +1417,10 @@ mod tests {
     fn maintenance_mechanic_notes_too_long_rejected() {
         let mut m = valid_maintenance();
         m.mechanic_notes = "x".repeat(8193);
-        assert_invalid(validate_maintenance(m), "Mechanic notes too long (max 8192 chars)");
+        assert_invalid(
+            validate_maintenance(m),
+            "Mechanic notes too long (max 8192 chars)",
+        );
     }
 
     #[test]
@@ -1290,7 +1435,10 @@ mod tests {
         let mut m = valid_maintenance();
         m.completed_at = 1700000000;
         m.next_due = Some(1699999999);
-        assert_invalid(validate_maintenance(m), "Next due date must be after completed date");
+        assert_invalid(
+            validate_maintenance(m),
+            "Next due date must be after completed date",
+        );
     }
 
     #[test]
@@ -1298,7 +1446,10 @@ mod tests {
         let mut m = valid_maintenance();
         m.completed_at = 1700000000;
         m.next_due = Some(1700000000);
-        assert_invalid(validate_maintenance(m), "Next due date must be after completed date");
+        assert_invalid(
+            validate_maintenance(m),
+            "Next due date must be after completed date",
+        );
     }
 
     #[test]
@@ -1318,7 +1469,11 @@ mod tests {
 
     #[test]
     fn maintenance_all_types_valid() {
-        for mt in [MaintenanceType::Scheduled, MaintenanceType::Repair, MaintenanceType::Inspection] {
+        for mt in [
+            MaintenanceType::Scheduled,
+            MaintenanceType::Repair,
+            MaintenanceType::Inspection,
+        ] {
             let mut m = valid_maintenance();
             m.maintenance_type = mt;
             assert_valid(validate_maintenance(m));
@@ -1380,14 +1535,20 @@ mod tests {
     fn route_waypoint_lat_out_of_range_rejected() {
         let mut r = valid_route();
         r.waypoints[0].lat = 91.0;
-        assert_invalid(validate_route(r), "Waypoint latitude must be between -90 and 90");
+        assert_invalid(
+            validate_route(r),
+            "Waypoint latitude must be between -90 and 90",
+        );
     }
 
     #[test]
     fn route_waypoint_lon_out_of_range_rejected() {
         let mut r = valid_route();
         r.waypoints[0].lon = -181.0;
-        assert_invalid(validate_route(r), "Waypoint longitude must be between -180 and 180");
+        assert_invalid(
+            validate_route(r),
+            "Waypoint longitude must be between -180 and 180",
+        );
     }
 
     #[test]

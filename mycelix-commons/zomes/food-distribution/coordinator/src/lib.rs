@@ -4,8 +4,8 @@
 use food_distribution_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 // ============================================================================
@@ -71,10 +71,16 @@ pub fn create_market(market: Market) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Market(market.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_markets".to_string())))?;
-    create_link(anchor_hash("all_markets")?, action_hash.clone(), LinkTypes::AllMarkets, ())?;
+    create_link(
+        anchor_hash("all_markets")?,
+        action_hash.clone(),
+        LinkTypes::AllMarkets,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created market".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created market".into()
+    )))
 }
 
 #[hdk_extern]
@@ -93,15 +99,27 @@ pub fn get_all_markets(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn list_product(listing: Listing) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "list_product")?;
-    let _market = get(listing.market_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Market not found".into())))?;
+    let _market = get(listing.market_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Market not found".into())
+    ))?;
 
     let action_hash = create_entry(&EntryTypes::Listing(listing.clone()))?;
-    create_link(listing.market_hash, action_hash.clone(), LinkTypes::MarketToListing, ())?;
-    create_link(listing.producer, action_hash.clone(), LinkTypes::ProducerToListing, ())?;
+    create_link(
+        listing.market_hash,
+        action_hash.clone(),
+        LinkTypes::MarketToListing,
+        (),
+    )?;
+    create_link(
+        listing.producer,
+        action_hash.clone(),
+        LinkTypes::ProducerToListing,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created listing".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created listing".into()
+    )))
 }
 
 #[hdk_extern]
@@ -130,20 +148,33 @@ pub fn get_producer_listings(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn place_order(order: Order) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "place_order")?;
-    let listing_record = get(order.listing_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Listing not found".into())))?;
+    let listing_record = get(order.listing_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Listing not found".into())),
+    )?;
 
     let action_hash = create_entry(&EntryTypes::Order(order.clone()))?;
-    create_link(order.listing_hash.clone(), action_hash.clone(), LinkTypes::ListingToOrder, ())?;
-    create_link(order.buyer, action_hash.clone(), LinkTypes::BuyerToOrder, ())?;
+    create_link(
+        order.listing_hash.clone(),
+        action_hash.clone(),
+        LinkTypes::ListingToOrder,
+        (),
+    )?;
+    create_link(
+        order.buyer,
+        action_hash.clone(),
+        LinkTypes::BuyerToOrder,
+        (),
+    )?;
 
     // Cross-domain: if the listing's market is a FoodBank, notify mutualaid
-    let listing: Option<Listing> = listing_record.entry()
+    let listing: Option<Listing> = listing_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
     if let Some(listing) = listing {
         if let Some(market_record) = get(listing.market_hash, GetOptions::default())? {
-            let market: Option<Market> = market_record.entry()
+            let market: Option<Market> = market_record
+                .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
             if let Some(market) = market {
@@ -165,8 +196,9 @@ pub fn place_order(order: Order) -> ExternResult<Record> {
         }
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created order".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created order".into()
+    )))
 }
 
 /// Best-effort cross-domain call to mutualaid_needs to check for matching needs.
@@ -183,9 +215,7 @@ fn check_mutualaid_matching_needs() -> Option<Vec<Record>> {
         (),
     );
     match response {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            extern_io.decode::<Vec<Record>>().ok()
-        }
+        Ok(ZomeCallResponse::Ok(extern_io)) => extern_io.decode::<Vec<Record>>().ok(),
         _ => None,
     }
 }
@@ -207,15 +237,19 @@ pub fn fulfill_order(input: UpdateOrderStatusInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "fulfill_order")?;
     let record = get(input.order_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Order not found".into())))?;
-    let mut order: Order = record.entry()
+    let mut order: Order = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid order entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid order entry".into()
+        )))?;
 
     order.status = OrderStatus::Fulfilled;
     let new_hash = update_entry(record.action_address().clone(), &EntryTypes::Order(order))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated order".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated order".into()
+    )))
 }
 
 #[hdk_extern]
@@ -223,15 +257,19 @@ pub fn cancel_order(order_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "cancel_order")?;
     let record = get(order_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Order not found".into())))?;
-    let mut order: Order = record.entry()
+    let mut order: Order = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid order entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid order entry".into()
+        )))?;
 
     order.status = OrderStatus::Cancelled;
     let new_hash = update_entry(record.action_address().clone(), &EntryTypes::Order(order))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated order".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated order".into()
+    )))
 }
 
 #[hdk_extern]
@@ -251,14 +289,21 @@ pub fn search_allergen_safe(input: AllergenSearchInput) -> ExternResult<Vec<Reco
         GetStrategy::default(),
     )?;
     let all_records = records_from_links(links)?;
-    let exclude_lower: Vec<String> = input.exclude_allergens.iter()
-        .map(|a| a.to_lowercase()).collect();
+    let exclude_lower: Vec<String> = input
+        .exclude_allergens
+        .iter()
+        .map(|a| a.to_lowercase())
+        .collect();
     let mut safe = Vec::new();
     for record in all_records {
-        let listing: Option<Listing> = record.entry().to_app_option()
+        let listing: Option<Listing> = record
+            .entry()
+            .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
         if let Some(listing) = listing {
-            let has_excluded = listing.allergen_flags.iter()
+            let has_excluded = listing
+                .allergen_flags
+                .iter()
                 .any(|f| exclude_lower.contains(&f.to_lowercase()));
             if !has_excluded {
                 safe.push(record);
@@ -383,7 +428,12 @@ mod tests {
 
     #[test]
     fn market_serde_all_types() {
-        for mt in [MarketType::Farmers, MarketType::CSA, MarketType::FoodBank, MarketType::CoOp] {
+        for mt in [
+            MarketType::Farmers,
+            MarketType::CSA,
+            MarketType::FoodBank,
+            MarketType::CoOp,
+        ] {
             let market = Market {
                 id: "mkt-types".to_string(),
                 name: "Test Market".to_string(),

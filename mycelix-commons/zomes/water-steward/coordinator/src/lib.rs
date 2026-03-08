@@ -2,11 +2,11 @@
 //! Business logic for watershed governance, water rights, transfers, and disputes
 
 use hdk::prelude::*;
-use water_steward_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_proposal, requirement_for_voting, requirement_for_constitutional,
+    gate_consciousness, requirement_for_constitutional, requirement_for_proposal,
+    requirement_for_voting, GovernanceEligibility, GovernanceRequirement,
 };
+use water_steward_integrity::*;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -74,12 +74,14 @@ pub fn define_watershed(watershed: Watershed) -> ExternResult<Record> {
         )));
     }
     for (lat, lon) in &watershed.boundary {
-        if !lat.is_finite() || !lon.is_finite()
+        if !lat.is_finite()
+            || !lon.is_finite()
             || !(-90.0..=90.0).contains(lat)
             || !(-180.0..=180.0).contains(lon)
         {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Boundary coordinates must be finite with lat in [-90,90] and lon in [-180,180]".into()
+                "Boundary coordinates must be finite with lat in [-90,90] and lon in [-180,180]"
+                    .into()
             )));
         }
     }
@@ -422,7 +424,9 @@ pub struct PropertyCheckResult {
 /// and has clear title. This prevents registering water rights for
 /// non-existent or encumbered properties.
 #[hdk_extern]
-pub fn check_property_for_water_right(input: CheckPropertyForWaterRightInput) -> ExternResult<PropertyCheckResult> {
+pub fn check_property_for_water_right(
+    input: CheckPropertyForWaterRightInput,
+) -> ExternResult<PropertyCheckResult> {
     // 1. Check if property exists
     let get_response = call(
         CallTargetCell::Local,
@@ -434,8 +438,9 @@ pub fn check_property_for_water_right(input: CheckPropertyForWaterRightInput) ->
 
     let property_exists = match &get_response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let record: Option<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let record: Option<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             record.is_some()
         }
         _ => false,
@@ -446,7 +451,10 @@ pub fn check_property_for_water_right(input: CheckPropertyForWaterRightInput) ->
             property_exists: false,
             has_clear_title: false,
             owner_matches: false,
-            error: Some(format!("Property '{}' not found in registry", input.property_id)),
+            error: Some(format!(
+                "Property '{}' not found in registry",
+                input.property_id
+            )),
         });
     }
 
@@ -460,9 +468,7 @@ pub fn check_property_for_water_right(input: CheckPropertyForWaterRightInput) ->
     );
 
     let has_clear_title = match &title_response {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            extern_io.decode::<bool>().unwrap_or(false)
-        }
+        Ok(ZomeCallResponse::Ok(extern_io)) => extern_io.decode::<bool>().unwrap_or(false),
         _ => false,
     };
 
@@ -476,13 +482,12 @@ pub fn check_property_for_water_right(input: CheckPropertyForWaterRightInput) ->
             serde_json::json!({
                 "property_id": input.property_id,
                 "expected_owner": expected,
-            }).to_string(),
+            })
+            .to_string(),
         );
 
         match &verify_response {
-            Ok(ZomeCallResponse::Ok(extern_io)) => {
-                extern_io.decode::<bool>().unwrap_or(false)
-            }
+            Ok(ZomeCallResponse::Ok(extern_io)) => extern_io.decode::<bool>().unwrap_or(false),
             _ => false,
         }
     } else {
@@ -939,7 +944,10 @@ mod tests {
         };
         let json = serde_json::to_string(&ws).unwrap();
         let decoded: Watershed = serde_json::from_str(&json).unwrap();
-        assert!(decoded.id.trim().is_empty(), "Whitespace-only ID must be caught by trim()");
+        assert!(
+            decoded.id.trim().is_empty(),
+            "Whitespace-only ID must be caught by trim()"
+        );
     }
 
     /// Whitespace-only watershed name should be rejected.
@@ -957,7 +965,10 @@ mod tests {
         };
         let json = serde_json::to_string(&ws).unwrap();
         let decoded: Watershed = serde_json::from_str(&json).unwrap();
-        assert!(decoded.name.trim().is_empty(), "Whitespace-only name must be caught by trim()");
+        assert!(
+            decoded.name.trim().is_empty(),
+            "Whitespace-only name must be caught by trim()"
+        );
     }
 
     /// Whitespace-only dispute description should be rejected.
@@ -975,7 +986,10 @@ mod tests {
         };
         let json = serde_json::to_string(&dispute).unwrap();
         let decoded: WaterDispute = serde_json::from_str(&json).unwrap();
-        assert!(decoded.description.trim().is_empty(), "Whitespace-only description must be caught by trim()");
+        assert!(
+            decoded.description.trim().is_empty(),
+            "Whitespace-only description must be caught by trim()"
+        );
     }
 
     /// Zero-volume transfer right should be rejected.
@@ -990,7 +1004,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: TransferRightInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.volume_liters, 0, "Zero volume preserved in struct for coordinator rejection");
+        assert_eq!(
+            decoded.volume_liters, 0,
+            "Zero volume preserved in struct for coordinator rejection"
+        );
     }
 
     /// Whitespace-only resolution text should be rejected.
@@ -1003,7 +1020,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: ResolveDisputeInput = serde_json::from_str(&json).unwrap();
-        assert!(decoded.resolution_text.trim().is_empty(), "Whitespace-only resolution must be caught by trim()");
+        assert!(
+            decoded.resolution_text.trim().is_empty(),
+            "Whitespace-only resolution must be caught by trim()"
+        );
     }
 
     // ========================================================================
@@ -1059,14 +1079,20 @@ mod tests {
     #[test]
     fn watershed_boundary_nan_coordinate_detected() {
         let boundary = vec![(f64::NAN, -122.6), (45.6, -122.5)];
-        assert!(!boundary[0].0.is_finite(), "NaN coordinate should fail is_finite()");
+        assert!(
+            !boundary[0].0.is_finite(),
+            "NaN coordinate should fail is_finite()"
+        );
     }
 
     #[test]
     fn watershed_boundary_out_of_range_detected() {
         // Latitude > 90 should be rejected
         let lat = 91.0;
-        assert!(!(-90.0..=90.0).contains(&lat), "Latitude > 90 should be out of range");
+        assert!(
+            !(-90.0..=90.0).contains(&lat),
+            "Latitude > 90 should be out of range"
+        );
     }
 
     #[test]

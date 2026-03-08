@@ -132,33 +132,33 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::Property(property) => {
-                        validate_create_property(EntryCreationAction::Create(action), property)
-                    }
-                    EntryTypes::TitleDeed(deed) => {
-                        validate_create_title_deed(EntryCreationAction::Create(action), deed)
-                    }
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::Property(property) => {
+                    validate_create_property(EntryCreationAction::Create(action), property)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::Property(property) => {
-                        validate_update_property(action, property)
-                    }
-                    EntryTypes::TitleDeed(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Title deeds cannot be updated".into(),
-                        ))
-                    }
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::TitleDeed(deed) => {
+                    validate_create_title_deed(EntryCreationAction::Create(action), deed)
                 }
-            }
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::Property(property) => validate_update_property(action, property),
+                EntryTypes::TitleDeed(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Title deeds cannot be updated".into(),
+                )),
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, base_address: _, target_address: _, tag, action: _ } => {
+        FlatOp::RegisterCreateLink {
+            link_type,
+            base_address: _,
+            target_address: _,
+            tag,
+            action: _,
+        } => {
             match link_type {
                 LinkTypes::OwnerToProperties => {
                     if tag.0.len() > 256 {
@@ -195,7 +195,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
             }
         }
-        FlatOp::RegisterDeleteLink { link_type, original_action: _, base_address: _, target_address: _, tag, action } => {
+        FlatOp::RegisterDeleteLink {
+            link_type,
+            original_action: _,
+            base_address: _,
+            target_address: _,
+            tag,
+            action,
+        } => {
             let original_action = must_get_action(action.link_add_address.clone())?;
             let original_author = original_action.action().author().clone();
             if action.author != original_author {
@@ -231,7 +238,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::PropertyToEncumbrances => {
                     if tag.0.len() > 256 {
                         return Ok(ValidateCallbackResult::Invalid(
-                            "PropertyToEncumbrances delete link tag too long (max 256 bytes)".into(),
+                            "PropertyToEncumbrances delete link tag too long (max 256 bytes)"
+                                .into(),
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -259,118 +267,178 @@ fn validate_create_property(
     property: Property,
 ) -> ExternResult<ValidateCallbackResult> {
     if property.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Property ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Property ID cannot be empty".into(),
+        ));
     }
     if property.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Property ID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Property ID must be 256 characters or fewer".into(),
+        ));
     }
     if property.title.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Property title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Property title cannot be empty".into(),
+        ));
     }
     if property.title.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Property title must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Property title must be 256 characters or fewer".into(),
+        ));
     }
     if property.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Property description must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Property description must be 4096 characters or fewer".into(),
+        ));
     }
     if !property.owner_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Owner must be a valid DID".into(),
+        ));
     }
     if property.owner_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Owner DID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Owner DID must be 256 characters or fewer".into(),
+        ));
     }
     // Vec limits
     if property.co_owners.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 co-owners".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 co-owners".into(),
+        ));
     }
     if property.metadata.attachments.len() > 20 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 20 attachments".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 20 attachments".into(),
+        ));
     }
     // Address string limits
     if let Some(ref addr) = property.address {
         if addr.street.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Street must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Street must be 256 characters or fewer".into(),
+            ));
         }
         if addr.city.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("City must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "City must be 256 characters or fewer".into(),
+            ));
         }
         if addr.region.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Region must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Region must be 256 characters or fewer".into(),
+            ));
         }
         if addr.country.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Country must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Country must be 256 characters or fewer".into(),
+            ));
         }
         if let Some(ref pc) = addr.postal_code {
             if pc.len() > 256 {
-                return Ok(ValidateCallbackResult::Invalid("Postal code must be 256 characters or fewer".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Postal code must be 256 characters or fewer".into(),
+                ));
             }
         }
     }
     // Metadata string limits
     if let Some(ref ld) = property.metadata.legal_description {
         if ld.len() > 4096 {
-            return Ok(ValidateCallbackResult::Invalid("Legal description must be 4096 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Legal description must be 4096 characters or fewer".into(),
+            ));
         }
     }
     if let Some(ref pn) = property.metadata.parcel_number {
         if pn.len() > 128 {
-            return Ok(ValidateCallbackResult::Invalid("Parcel number must be 128 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Parcel number must be 128 characters or fewer".into(),
+            ));
         }
     }
     // Geolocation validation
     if let Some(ref geo) = property.geolocation {
         if !geo.latitude.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("Latitude must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Latitude must be a finite number".into(),
+            ));
         }
         if geo.latitude < -90.0 || geo.latitude > 90.0 {
-            return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Latitude must be between -90 and 90".into(),
+            ));
         }
         if !geo.longitude.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("Longitude must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Longitude must be a finite number".into(),
+            ));
         }
         if geo.longitude < -180.0 || geo.longitude > 180.0 {
-            return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Longitude must be between -180 and 180".into(),
+            ));
         }
         if let Some(ref boundaries) = geo.boundaries {
             if boundaries.len() > 1000 {
-                return Ok(ValidateCallbackResult::Invalid("Cannot have more than 1000 boundary points".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Cannot have more than 1000 boundary points".into(),
+                ));
             }
         }
         if let Some(area) = geo.area_sqm {
             if !area.is_finite() {
-                return Ok(ValidateCallbackResult::Invalid("Area must be a finite number".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Area must be a finite number".into(),
+                ));
             }
             if area <= 0.0 {
-                return Ok(ValidateCallbackResult::Invalid("Area must be positive".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Area must be positive".into(),
+                ));
             }
         }
     }
     if let Some(ref meta) = property.metadata.appraised_value {
         if !meta.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("Appraised value must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Appraised value must be a finite number".into(),
+            ));
         }
         if *meta < 0.0 {
-            return Ok(ValidateCallbackResult::Invalid("Appraised value cannot be negative".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Appraised value cannot be negative".into(),
+            ));
         }
     }
     let mut total_share = 100.0;
     for co_owner in &property.co_owners {
         if !co_owner.did.starts_with("did:") {
-            return Ok(ValidateCallbackResult::Invalid("Co-owner must be a valid DID".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Co-owner must be a valid DID".into(),
+            ));
         }
         if co_owner.did.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Co-owner DID must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Co-owner DID must be 256 characters or fewer".into(),
+            ));
         }
         if !co_owner.share_percentage.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("Share percentage must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Share percentage must be a finite number".into(),
+            ));
         }
         if co_owner.share_percentage <= 0.0 || co_owner.share_percentage > 100.0 {
-            return Ok(ValidateCallbackResult::Invalid("Share must be between 0 and 100".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Share must be between 0 and 100".into(),
+            ));
         }
         total_share -= co_owner.share_percentage;
     }
     if total_share < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Total shares exceed 100%".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Total shares exceed 100%".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -380,62 +448,92 @@ fn validate_update_property(
     property: Property,
 ) -> ExternResult<ValidateCallbackResult> {
     if property.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Property ID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Property ID must be 256 characters or fewer".into(),
+        ));
     }
     if property.title.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Property title must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Property title must be 256 characters or fewer".into(),
+        ));
     }
     if property.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Property description must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Property description must be 4096 characters or fewer".into(),
+        ));
     }
     if property.owner_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Owner DID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Owner DID must be 256 characters or fewer".into(),
+        ));
     }
     if property.co_owners.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 co-owners".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 co-owners".into(),
+        ));
     }
     if property.metadata.attachments.len() > 20 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 20 attachments".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 20 attachments".into(),
+        ));
     }
     if let Some(ref addr) = property.address {
         if addr.street.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Street must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Street must be 256 characters or fewer".into(),
+            ));
         }
         if addr.city.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("City must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "City must be 256 characters or fewer".into(),
+            ));
         }
         if addr.region.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Region must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Region must be 256 characters or fewer".into(),
+            ));
         }
         if addr.country.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Country must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Country must be 256 characters or fewer".into(),
+            ));
         }
         if let Some(ref pc) = addr.postal_code {
             if pc.len() > 256 {
-                return Ok(ValidateCallbackResult::Invalid("Postal code must be 256 characters or fewer".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Postal code must be 256 characters or fewer".into(),
+                ));
             }
         }
     }
     if let Some(ref ld) = property.metadata.legal_description {
         if ld.len() > 4096 {
-            return Ok(ValidateCallbackResult::Invalid("Legal description must be 4096 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Legal description must be 4096 characters or fewer".into(),
+            ));
         }
     }
     if let Some(ref pn) = property.metadata.parcel_number {
         if pn.len() > 128 {
-            return Ok(ValidateCallbackResult::Invalid("Parcel number must be 128 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Parcel number must be 128 characters or fewer".into(),
+            ));
         }
     }
     if let Some(ref geo) = property.geolocation {
         if let Some(ref boundaries) = geo.boundaries {
             if boundaries.len() > 1000 {
-                return Ok(ValidateCallbackResult::Invalid("Cannot have more than 1000 boundary points".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Cannot have more than 1000 boundary points".into(),
+                ));
             }
         }
     }
     for co_owner in &property.co_owners {
         if co_owner.did.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Co-owner DID must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Co-owner DID must be 256 characters or fewer".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -446,41 +544,63 @@ fn validate_create_title_deed(
     deed: TitleDeed,
 ) -> ExternResult<ValidateCallbackResult> {
     if deed.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Deed ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Deed ID cannot be empty".into(),
+        ));
     }
     if deed.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Deed ID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Deed ID must be 256 characters or fewer".into(),
+        ));
     }
     if deed.property_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Deed property_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Deed property_id cannot be empty".into(),
+        ));
     }
     if deed.property_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Deed property_id must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Deed property_id must be 256 characters or fewer".into(),
+        ));
     }
     if !deed.owner_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Owner must be a valid DID".into(),
+        ));
     }
     if deed.owner_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Owner DID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Owner DID must be 256 characters or fewer".into(),
+        ));
     }
     if let Some(ref prev) = deed.previous_deed_id {
         if prev.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Previous deed ID must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Previous deed ID must be 256 characters or fewer".into(),
+            ));
         }
     }
     if deed.encumbrances.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 encumbrances".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 encumbrances".into(),
+        ));
     }
     for enc in &deed.encumbrances {
         if !enc.holder_did.starts_with("did:") {
-            return Ok(ValidateCallbackResult::Invalid("Encumbrance holder must be a valid DID".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Encumbrance holder must be a valid DID".into(),
+            ));
         }
         if enc.holder_did.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Encumbrance holder DID must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Encumbrance holder DID must be 256 characters or fewer".into(),
+            ));
         }
         if let Some(amount) = enc.amount {
             if amount < 0.0 {
-                return Ok(ValidateCallbackResult::Invalid("Encumbrance amount cannot be negative".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Encumbrance amount cannot be negative".into(),
+                ));
             }
         }
     }
@@ -1762,7 +1882,10 @@ mod tests {
 
     /// Helper: build a FlatOp::RegisterCreateLink with the given link type and tag,
     /// then run it through the validate dispatch. Returns the result.
-    fn validate_create_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let base = AnyLinkableHash::from(fake_entry_hash());
         let target = AnyLinkableHash::from(fake_entry_hash());
         let tag = LinkTag(tag_bytes);
@@ -1806,7 +1929,10 @@ mod tests {
         }
     }
 
-    fn validate_delete_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_delete_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
             LinkTypes::OwnerToProperties => {

@@ -2,11 +2,11 @@
 //! Business logic for land trusts, ground leases, resale calculations,
 //! and affordability reporting.
 
-use housing_clt_integrity::*;
 use hdk::prelude::*;
+use housing_clt_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -95,7 +95,10 @@ pub struct UpdateLandTrustInput {
 #[hdk_extern]
 pub fn update_land_trust(input: UpdateLandTrustInput) -> ExternResult<ActionHash> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "update_land_trust")?;
-    update_entry(input.original_action_hash, &EntryTypes::LandTrust(input.updated_entry))
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::LandTrust(input.updated_entry),
+    )
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -108,7 +111,10 @@ pub struct UpdateGroundLeaseInput {
 #[hdk_extern]
 pub fn update_ground_lease(input: UpdateGroundLeaseInput) -> ExternResult<ActionHash> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "update_ground_lease")?;
-    update_entry(input.original_action_hash, &EntryTypes::GroundLease(input.updated_entry))
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::GroundLease(input.updated_entry),
+    )
 }
 
 // ============================================================================
@@ -120,7 +126,9 @@ pub fn update_ground_lease(input: UpdateGroundLeaseInput) -> ExternResult<Action
 /// This is a concrete cross-domain call example: housing-clt queries
 /// property-registry directly using `call(CallTargetCell::Local, ...)`.
 #[hdk_extern]
-pub fn verify_property_for_lease(input: VerifyPropertyForLeaseInput) -> ExternResult<PropertyVerificationResult> {
+pub fn verify_property_for_lease(
+    input: VerifyPropertyForLeaseInput,
+) -> ExternResult<PropertyVerificationResult> {
     // 1. Check if property exists in the registry
     let get_response = call(
         CallTargetCell::Local,
@@ -133,8 +141,9 @@ pub fn verify_property_for_lease(input: VerifyPropertyForLeaseInput) -> ExternRe
     let property_exists = match &get_response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
             // Decode as Option<Record> — None means not found
-            let record: Option<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let record: Option<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             record.is_some()
         }
         _ => false,
@@ -145,7 +154,10 @@ pub fn verify_property_for_lease(input: VerifyPropertyForLeaseInput) -> ExternRe
             verified: false,
             owner_did: None,
             has_clear_title: false,
-            error: Some(format!("Property '{}' not found in registry", input.property_id)),
+            error: Some(format!(
+                "Property '{}' not found in registry",
+                input.property_id
+            )),
         });
     }
 
@@ -159,9 +171,7 @@ pub fn verify_property_for_lease(input: VerifyPropertyForLeaseInput) -> ExternRe
     );
 
     let has_clear_title = match &title_response {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            extern_io.decode::<bool>().unwrap_or(false)
-        }
+        Ok(ZomeCallResponse::Ok(extern_io)) => extern_io.decode::<bool>().unwrap_or(false),
         _ => false,
     };
 
@@ -178,7 +188,8 @@ pub fn verify_property_for_lease(input: VerifyPropertyForLeaseInput) -> ExternRe
             serde_json::json!({
                 "property_id": input.property_id,
                 "expected_owner": expected,
-            }).to_string(),
+            })
+            .to_string(),
         );
 
         match &verify_response {
@@ -264,7 +275,8 @@ pub struct CalculateResaleInput {
 /// - Hybrid: min(appreciation_cap_result, ami_result)
 #[hdk_extern]
 pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "calculate_max_resale_price")?;
+    let _eligibility =
+        require_consciousness(&requirement_for_basic(), "calculate_max_resale_price")?;
     let lease_record = get(input.lease_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Lease not found".into())))?;
 
@@ -414,7 +426,8 @@ pub struct GenerateAffordabilityInput {
 /// Generate an affordability report for a trust
 #[hdk_extern]
 pub fn generate_affordability_report(input: GenerateAffordabilityInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_basic(), "generate_affordability_report")?;
+    let _eligibility =
+        require_consciousness(&requirement_for_basic(), "generate_affordability_report")?;
     let now = sys_time()?;
 
     // Affordability ratio = (average monthly cost * 12) / median annual income
@@ -621,7 +634,10 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let decoded: VerifyPropertyForLeaseInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.property_id, "PROP-123");
-        assert_eq!(decoded.expected_owner_did, Some("did:key:z6Mk...".to_string()));
+        assert_eq!(
+            decoded.expected_owner_did,
+            Some("did:key:z6Mk...".to_string())
+        );
     }
 
     #[test]
@@ -791,7 +807,9 @@ mod tests {
             verified: false,
             owner_did: Some("did:key:z6MkOwner".to_string()),
             has_clear_title: false,
-            error: Some("Property has encumbrances \u{2014} clear title required for CLT lease".to_string()),
+            error: Some(
+                "Property has encumbrances \u{2014} clear title required for CLT lease".to_string(),
+            ),
         };
         let json = serde_json::to_string(&result).unwrap();
         let decoded: PropertyVerificationResult = serde_json::from_str(&json).unwrap();
@@ -880,8 +898,14 @@ mod tests {
         let json = serde_json::to_string(&lease).unwrap();
         let decoded: GroundLease = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.ground_rent_monthly_cents, 0);
-        assert_eq!(decoded.resale_formula.formula_type, FormulaType::ConsumerPriceIndex);
-        assert!(decoded.resale_formula.max_appreciation_percent_annual.is_none());
+        assert_eq!(
+            decoded.resale_formula.formula_type,
+            FormulaType::ConsumerPriceIndex
+        );
+        assert!(decoded
+            .resale_formula
+            .max_appreciation_percent_annual
+            .is_none());
     }
 
     // ── Land trust with all optional fields ─────────────────────────
@@ -1097,7 +1121,10 @@ mod tests {
                 created_at: Timestamp::from_micros(1000),
             },
         };
-        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            input.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(input.updated_entry.name, "Updated Trust");
         assert_eq!(input.updated_entry.affordability_target_ami_percent, 60);
     }
@@ -1166,7 +1193,10 @@ mod tests {
                 expires_at: Timestamp::from_micros(3000000),
             },
         };
-        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            input.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(input.updated_entry.ground_rent_monthly_cents, 60000);
         assert_eq!(input.updated_entry.lease_term_years, 99);
     }
@@ -1195,7 +1225,10 @@ mod tests {
         let decoded: UpdateGroundLeaseInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.original_action_hash, input.original_action_hash);
         assert_eq!(decoded.updated_entry.lease_term_years, 50);
-        assert_eq!(decoded.updated_entry.resale_formula.formula_type, FormulaType::Hybrid);
+        assert_eq!(
+            decoded.updated_entry.resale_formula.formula_type,
+            FormulaType::Hybrid
+        );
     }
 
     #[test]

@@ -524,7 +524,10 @@ mod tests {
                     msg
                 );
             }
-            other => panic!("Expected Invalid result containing '{}', got {:?}", substring, other),
+            other => panic!(
+                "Expected Invalid result containing '{}', got {:?}",
+                substring, other
+            ),
         }
     }
 
@@ -699,7 +702,10 @@ mod tests {
         let locs = vec![
             LocationConstraint::Remote,
             LocationConstraint::FixedLocation("123 Main St".into()),
-            LocationConstraint::WithinRadius { geohash: "u4pru".into(), radius_km: 5.0 },
+            LocationConstraint::WithinRadius {
+                geohash: "u4pru".into(),
+                radius_km: 5.0,
+            },
             LocationConstraint::AtRequester,
             LocationConstraint::AtProvider,
             LocationConstraint::ToBeArranged,
@@ -1010,7 +1016,10 @@ mod tests {
         let mut o = valid_offer();
         o.min_duration_hours = 5.0;
         o.max_duration_hours = Some(2.0);
-        assert_invalid_contains(&validate_service_offer(o), "Maximum duration cannot be less than minimum");
+        assert_invalid_contains(
+            &validate_service_offer(o),
+            "Maximum duration cannot be less than minimum",
+        );
     }
 
     #[test]
@@ -1160,7 +1169,10 @@ mod tests {
     fn request_description_over_5000_error_message() {
         let mut r = valid_request();
         r.description = "x".repeat(5001);
-        assert_invalid_contains(&validate_service_request(r), "description cannot exceed 5000");
+        assert_invalid_contains(
+            &validate_service_request(r),
+            "description cannot exceed 5000",
+        );
     }
 
     #[test]
@@ -1181,7 +1193,10 @@ mod tests {
     fn request_zero_hours_error_message() {
         let mut r = valid_request();
         r.estimated_hours = 0.0;
-        assert_invalid_contains(&validate_service_request(r), "Estimated hours must be positive");
+        assert_invalid_contains(
+            &validate_service_request(r),
+            "Estimated hours must be positive",
+        );
     }
 
     #[test]
@@ -1305,7 +1320,10 @@ mod tests {
     fn exchange_zero_hours_error_message() {
         let mut e = valid_exchange();
         e.hours = 0.0;
-        assert_invalid_contains(&validate_time_exchange(e), "Exchange hours must be positive");
+        assert_invalid_contains(
+            &validate_time_exchange(e),
+            "Exchange hours must be positive",
+        );
     }
 
     #[test]
@@ -1354,7 +1372,10 @@ mod tests {
     fn exchange_same_agents_error_message() {
         let mut e = valid_exchange();
         e.recipient = agent_a();
-        assert_invalid_contains(&validate_time_exchange(e), "Provider and recipient must be different");
+        assert_invalid_contains(
+            &validate_time_exchange(e),
+            "Provider and recipient must be different",
+        );
     }
 
     #[test]
@@ -1368,7 +1389,10 @@ mod tests {
     fn exchange_empty_description_error_message() {
         let mut e = valid_exchange();
         e.description = "".into();
-        assert_invalid_contains(&validate_time_exchange(e), "Exchange description cannot be empty");
+        assert_invalid_contains(
+            &validate_time_exchange(e),
+            "Exchange description cannot be empty",
+        );
     }
 
     #[test]
@@ -1382,7 +1406,10 @@ mod tests {
     fn exchange_rating_score_0_error_message() {
         let mut e = valid_exchange();
         e.provider_rating = Some(make_rating(0));
-        assert_invalid_contains(&validate_time_exchange(e), "Rating score must be between 1 and 5");
+        assert_invalid_contains(
+            &validate_time_exchange(e),
+            "Rating score must be between 1 and 5",
+        );
     }
 
     #[test]
@@ -1430,7 +1457,11 @@ mod tests {
             let mut e = valid_exchange();
             e.provider_rating = Some(make_rating(score));
             e.recipient_rating = Some(make_rating(score));
-            assert!(is_valid(&validate_time_exchange(e)), "score={} should be valid", score);
+            assert!(
+                is_valid(&validate_time_exchange(e)),
+                "score={} should be valid",
+                score
+            );
         }
     }
 
@@ -1584,7 +1615,10 @@ mod tests {
     fn credit_same_earner_debtor_error_message() {
         let mut c = valid_credit();
         c.debtor = agent_a();
-        assert_invalid_contains(&validate_time_credit(c), "Earner and debtor must be different");
+        assert_invalid_contains(
+            &validate_time_credit(c),
+            "Earner and debtor must be different",
+        );
     }
 
     #[test]
@@ -1598,7 +1632,10 @@ mod tests {
     fn credit_empty_description_error_message() {
         let mut c = valid_credit();
         c.description = "".into();
-        assert_invalid_contains(&validate_time_credit(c), "Credit description cannot be empty");
+        assert_invalid_contains(
+            &validate_time_credit(c),
+            "Credit description cannot be empty",
+        );
     }
 
     #[test]
@@ -1934,7 +1971,10 @@ mod tests {
         let mut e = valid_exchange();
         e.hours = 0.0;
         e.recipient = agent_a();
-        assert_invalid_contains(&validate_time_exchange(e), "Exchange hours must be positive");
+        assert_invalid_contains(
+            &validate_time_exchange(e),
+            "Exchange hours must be positive",
+        );
     }
 
     #[test]
@@ -1954,7 +1994,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 256]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::AgentToOffers, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::AgentToOffers,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -1962,7 +2007,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 257]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::AgentToOffers, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::AgentToOffers,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -1970,7 +2020,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 256]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::AgentToRequests, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::AgentToRequests,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -1978,7 +2033,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 257]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::AgentToRequests, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::AgentToRequests,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -1986,7 +2046,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 512]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::AgentToExchanges, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::AgentToExchanges,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -1994,7 +2059,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 513]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::AgentToExchanges, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::AgentToExchanges,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2002,7 +2072,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 512]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::CategoryToOffers, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::CategoryToOffers,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2010,7 +2085,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 513]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::CategoryToOffers, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::CategoryToOffers,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2018,7 +2098,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 512]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::CategoryToRequests, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::CategoryToRequests,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2026,7 +2111,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 513]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::CategoryToRequests, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::CategoryToRequests,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2034,7 +2124,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 256]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::OfferToExchange, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::OfferToExchange,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2042,7 +2137,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 257]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::OfferToExchange, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::OfferToExchange,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2050,7 +2150,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 256]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::RequestToExchange, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::RequestToExchange,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2058,7 +2163,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 257]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::RequestToExchange, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::RequestToExchange,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2066,7 +2176,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 256]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::AllOffers, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::AllOffers,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2074,7 +2189,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 257]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::AllOffers, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::AllOffers,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2082,7 +2202,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 256]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::AllRequests, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::AllRequests,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2090,7 +2215,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 257]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::AllRequests, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::AllRequests,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2098,7 +2228,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 256]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_valid(&validate_create_link(LinkTypes::AgentToCredits, base, target, tag)));
+        assert!(is_valid(&validate_create_link(
+            LinkTypes::AgentToCredits,
+            base,
+            target,
+            tag
+        )));
     }
 
     #[test]
@@ -2106,7 +2241,12 @@ mod tests {
         let tag = LinkTag(vec![0u8; 257]);
         let base = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
         let target = AnyLinkableHash::from(ActionHash::from_raw_36(vec![0u8; 36]));
-        assert!(is_invalid(&validate_create_link(LinkTypes::AgentToCredits, base, target, tag)));
+        assert!(is_invalid(&validate_create_link(
+            LinkTypes::AgentToCredits,
+            base,
+            target,
+            tag
+        )));
     }
 
     // =========================================================================

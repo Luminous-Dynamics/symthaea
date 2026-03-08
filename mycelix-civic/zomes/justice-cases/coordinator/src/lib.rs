@@ -6,8 +6,7 @@
 use hdk::prelude::*;
 use justice_cases_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_proposal,
+    gate_consciousness, requirement_for_proposal, GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -42,8 +41,9 @@ pub fn file_case(case: Case) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "file_case")?;
 
     let action_hash = create_entry(&EntryTypes::Case(case.clone()))?;
-    let record = get_latest_record(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created case".into())))?;
+    let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not get created case".into())
+    ))?;
 
     // Link from complainant
     let complainant_path = Path::from(format!("users/{}/cases", case.complainant));
@@ -87,10 +87,13 @@ pub fn update_case_phase(input: UpdatePhaseInput) -> ExternResult<Record> {
     let record = get(input.case_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Case not found".into())))?;
 
-    let mut case: Case = record.entry()
+    let mut case: Case = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid case entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid case entry".into()
+        )))?;
 
     case.phase = input.new_phase;
     case.updated_at = sys_time()?;
@@ -98,8 +101,9 @@ pub fn update_case_phase(input: UpdatePhaseInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.case_hash, &case)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated case".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated case".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -115,18 +119,22 @@ pub fn update_case_status(input: UpdateStatusInput) -> ExternResult<Record> {
     let record = get(input.case_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Case not found".into())))?;
 
-    let mut case: Case = record.entry()
+    let mut case: Case = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid case entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid case entry".into()
+        )))?;
 
     case.status = input.new_status;
     case.updated_at = sys_time()?;
 
     let action_hash = update_entry(input.case_hash, &case)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated case".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated case".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -141,10 +149,13 @@ pub fn add_party(input: AddPartyInput) -> ExternResult<Record> {
     let record = get(input.case_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Case not found".into())))?;
 
-    let mut case: Case = record.entry()
+    let mut case: Case = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid case entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid case entry".into()
+        )))?;
 
     let party = CaseParty {
         did: input.party_did,
@@ -157,8 +168,9 @@ pub fn add_party(input: AddPartyInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.case_hash, &case)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated case".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated case".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -174,8 +186,9 @@ pub fn submit_evidence(evidence: Evidence) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "submit_evidence")?;
 
     let action_hash = create_entry(&EntryTypes::Evidence(evidence.clone()))?;
-    let record = get_latest_record(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created evidence".into())))?;
+    let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not get created evidence".into())
+    ))?;
 
     // Link from case
     let case_path = Path::from(format!("cases/{}/evidence", evidence.case_id));
@@ -195,7 +208,7 @@ pub fn get_case_evidence(case_id: String) -> ExternResult<Vec<Record>> {
     let case_path = Path::from(format!("cases/{}/evidence", case_id));
     let links = get_links(
         LinkQuery::try_new(case_path.path_entry_hash()?, LinkTypes::CaseToEvidence)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -214,8 +227,9 @@ pub fn get_case_evidence(case_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn initiate_mediation(mediation: Mediation) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Mediation(mediation.clone()))?;
-    let record = get_latest_record(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created mediation".into())))?;
+    let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not get created mediation".into())
+    ))?;
 
     // Link from case
     let case_path = Path::from(format!("cases/{}/mediation", mediation.case_id));
@@ -235,7 +249,7 @@ pub fn get_my_cases(did: String) -> ExternResult<Vec<Record>> {
     let user_path = Path::from(format!("users/{}/cases", did));
     let links = get_links(
         LinkQuery::try_new(user_path.path_entry_hash()?, LinkTypes::ComplainantToCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -250,14 +264,17 @@ pub fn get_my_cases(did: String) -> ExternResult<Vec<Record>> {
     // Also get cases where user is respondent
     let respondent_links = get_links(
         LinkQuery::try_new(user_path.path_entry_hash()?, LinkTypes::RespondentToCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     for link in respondent_links {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get_latest_record(action_hash)? {
                 // Avoid duplicates
-                if !records.iter().any(|r| r.action_address() == record.action_address()) {
+                if !records
+                    .iter()
+                    .any(|r| r.action_address() == record.action_address())
+                {
                     records.push(record);
                 }
             }
@@ -273,7 +290,7 @@ pub fn get_all_cases(_: ()) -> ExternResult<Vec<Record>> {
     let all_path = Path::from("cases/all");
     let links = get_links(
         LinkQuery::try_new(all_path.path_entry_hash()?, LinkTypes::AllCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -535,7 +552,9 @@ mod tests {
             CaseType::GovernanceDispute,
             CaseType::IdentityDispute,
             CaseType::IPDispute,
-            CaseType::Other { category: "Custom".to_string() },
+            CaseType::Other {
+                category: "Custom".to_string(),
+            },
         ];
         for variant in variants {
             let json = serde_json::to_string(&variant).unwrap();
@@ -546,7 +565,9 @@ mod tests {
 
     #[test]
     fn case_type_other_empty_category() {
-        let ct = CaseType::Other { category: String::new() };
+        let ct = CaseType::Other {
+            category: String::new(),
+        };
         let json = serde_json::to_string(&ct).unwrap();
         let decoded: CaseType = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, ct);
@@ -554,7 +575,9 @@ mod tests {
 
     #[test]
     fn case_type_other_unicode_category() {
-        let ct = CaseType::Other { category: "\u{1F3E0} Housing".to_string() };
+        let ct = CaseType::Other {
+            category: "\u{1F3E0} Housing".to_string(),
+        };
         let json = serde_json::to_string(&ct).unwrap();
         let decoded: CaseType = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, ct);

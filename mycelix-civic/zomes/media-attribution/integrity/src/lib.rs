@@ -102,36 +102,30 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::Attribution(attribution) => {
-                        validate_create_attribution(EntryCreationAction::Create(action), attribution)
-                    }
-                    EntryTypes::RoyaltyRule(rule) => {
-                        validate_create_royalty_rule(EntryCreationAction::Create(action), rule)
-                    }
-                    EntryTypes::UsageRecord(record) => {
-                        validate_create_usage_record(EntryCreationAction::Create(action), record)
-                    }
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::Attribution(attribution) => {
+                    validate_create_attribution(EntryCreationAction::Create(action), attribution)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::Attribution(attribution) => {
-                        validate_update_attribution(action, attribution)
-                    }
-                    EntryTypes::RoyaltyRule(rule) => {
-                        validate_update_royalty_rule(action, rule)
-                    }
-                    EntryTypes::UsageRecord(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Usage records cannot be updated".into(),
-                        ))
-                    }
+                EntryTypes::RoyaltyRule(rule) => {
+                    validate_create_royalty_rule(EntryCreationAction::Create(action), rule)
                 }
-            }
+                EntryTypes::UsageRecord(record) => {
+                    validate_create_usage_record(EntryCreationAction::Create(action), record)
+                }
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::Attribution(attribution) => {
+                    validate_update_attribution(action, attribution)
+                }
+                EntryTypes::RoyaltyRule(rule) => validate_update_royalty_rule(action, rule),
+                EntryTypes::UsageRecord(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Usage records cannot be updated".into(),
+                )),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
@@ -199,28 +193,44 @@ fn validate_create_attribution(
     attribution: Attribution,
 ) -> ExternResult<ValidateCallbackResult> {
     if attribution.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Attribution ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Attribution ID cannot be empty".into(),
+        ));
     }
     if attribution.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Attribution ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Attribution ID too long (max 256 chars)".into(),
+        ));
     }
     if attribution.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Attribution publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Attribution publication_id cannot be empty".into(),
+        ));
     }
     if attribution.publication_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Attribution publication_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Attribution publication_id too long (max 256 chars)".into(),
+        ));
     }
     if !attribution.contributor_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Contributor must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contributor must be a valid DID".into(),
+        ));
     }
     if attribution.contributor_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Contributor DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contributor DID too long (max 256 chars)".into(),
+        ));
     }
     if !attribution.share_percentage.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("share_percentage must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "share_percentage must be a finite number".into(),
+        ));
     }
     if attribution.share_percentage < 0.0 || attribution.share_percentage > 100.0 {
-        return Ok(ValidateCallbackResult::Invalid("Share must be 0-100%".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Share must be 0-100%".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -230,10 +240,14 @@ fn validate_update_attribution(
     attribution: Attribution,
 ) -> ExternResult<ValidateCallbackResult> {
     if !attribution.share_percentage.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("share_percentage must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "share_percentage must be a finite number".into(),
+        ));
     }
     if attribution.share_percentage < 0.0 || attribution.share_percentage > 100.0 {
-        return Ok(ValidateCallbackResult::Invalid("Share must be 0-100%".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Share must be 0-100%".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -243,32 +257,50 @@ fn validate_create_royalty_rule(
     rule: RoyaltyRule,
 ) -> ExternResult<ValidateCallbackResult> {
     if rule.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "RoyaltyRule ID cannot be empty".into(),
+        ));
     }
     if rule.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "RoyaltyRule ID too long (max 256 chars)".into(),
+        ));
     }
     if rule.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "RoyaltyRule publication_id cannot be empty".into(),
+        ));
     }
     if rule.publication_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("RoyaltyRule publication_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "RoyaltyRule publication_id too long (max 256 chars)".into(),
+        ));
     }
     if rule.currency.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Currency cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency cannot be empty".into(),
+        ));
     }
     if rule.currency.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Currency too long (max 128 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency too long (max 128 chars)".into(),
+        ));
     }
     if !rule.percentage.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("percentage must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "percentage must be a finite number".into(),
+        ));
     }
     if rule.percentage < 0.0 || rule.percentage > 100.0 {
-        return Ok(ValidateCallbackResult::Invalid("Percentage must be 0-100".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Percentage must be 0-100".into(),
+        ));
     }
     if let Some(min) = rule.minimum_amount {
         if !min.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("minimum_amount must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "minimum_amount must be a finite number".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -279,14 +311,20 @@ fn validate_update_royalty_rule(
     rule: RoyaltyRule,
 ) -> ExternResult<ValidateCallbackResult> {
     if !rule.percentage.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("percentage must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "percentage must be a finite number".into(),
+        ));
     }
     if rule.percentage < 0.0 || rule.percentage > 100.0 {
-        return Ok(ValidateCallbackResult::Invalid("Percentage must be 0-100".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Percentage must be 0-100".into(),
+        ));
     }
     if let Some(min) = rule.minimum_amount {
         if !min.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("minimum_amount must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "minimum_amount must be a finite number".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -297,28 +335,42 @@ fn validate_create_usage_record(
     record: UsageRecord,
 ) -> ExternResult<ValidateCallbackResult> {
     if record.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Usage record ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Usage record ID cannot be empty".into(),
+        ));
     }
     if record.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Usage record ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Usage record ID too long (max 256 chars)".into(),
+        ));
     }
     if record.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Usage record publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Usage record publication_id cannot be empty".into(),
+        ));
     }
     if record.publication_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Usage record publication_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Usage record publication_id too long (max 256 chars)".into(),
+        ));
     }
     if let Some(ref did) = record.user_did {
         if !did.trim().is_empty() && !did.starts_with("did:") {
-            return Ok(ValidateCallbackResult::Invalid("User DID must be a valid DID".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "User DID must be a valid DID".into(),
+            ));
         }
     }
     if let Some(paid) = record.royalty_paid {
         if !paid.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("royalty_paid must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "royalty_paid must be a finite number".into(),
+            ));
         }
         if paid < 0.0 {
-            return Ok(ValidateCallbackResult::Invalid("Royalty paid cannot be negative".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Royalty paid cannot be negative".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -882,11 +934,7 @@ mod tests {
             let mut record = valid_usage_record();
             record.usage_type = usage_type.clone();
             let result = validate_create_usage_record(create_action(), record);
-            assert!(
-                is_valid(&result),
-                "Failed for usage_type: {:?}",
-                usage_type
-            );
+            assert!(is_valid(&result), "Failed for usage_type: {:?}", usage_type);
         }
     }
 
@@ -1065,7 +1113,10 @@ mod tests {
         attr.id = "a".repeat(10_000);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Attribution ID too long (max 256 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "Attribution ID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1082,7 +1133,10 @@ mod tests {
         attr.id = "a".repeat(257);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Attribution ID too long (max 256 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "Attribution ID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1100,7 +1154,10 @@ mod tests {
         attr.publication_id = "".into();
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Attribution publication_id cannot be empty");
+        assert_eq!(
+            get_invalid_reason(result),
+            "Attribution publication_id cannot be empty"
+        );
     }
 
     #[test]
@@ -1117,7 +1174,10 @@ mod tests {
         attr.publication_id = "p".repeat(257);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Attribution publication_id too long (max 256 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "Attribution publication_id too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1136,7 +1196,10 @@ mod tests {
         assert_eq!(attr.contributor_did.len(), 257);
         let result = validate_create_attribution(create_action(), attr);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Contributor DID too long (max 256 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "Contributor DID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1145,7 +1208,10 @@ mod tests {
         rule.publication_id = "x".repeat(10_000);
         let result = validate_create_royalty_rule(create_action(), rule);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "RoyaltyRule publication_id too long (max 256 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "RoyaltyRule publication_id too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1162,7 +1228,10 @@ mod tests {
         rule.id = "r".repeat(257);
         let result = validate_create_royalty_rule(create_action(), rule);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "RoyaltyRule ID too long (max 256 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "RoyaltyRule ID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1180,7 +1249,10 @@ mod tests {
         rule.publication_id = "".into();
         let result = validate_create_royalty_rule(create_action(), rule);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "RoyaltyRule publication_id cannot be empty");
+        assert_eq!(
+            get_invalid_reason(result),
+            "RoyaltyRule publication_id cannot be empty"
+        );
     }
 
     #[test]
@@ -1197,7 +1269,10 @@ mod tests {
         rule.currency = "C".repeat(129);
         let result = validate_create_royalty_rule(create_action(), rule);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Currency too long (max 128 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "Currency too long (max 128 chars)"
+        );
     }
 
     #[test]
@@ -1214,7 +1289,10 @@ mod tests {
         record.id = "u".repeat(257);
         let result = validate_create_usage_record(create_action(), record);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Usage record ID too long (max 256 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "Usage record ID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1231,7 +1309,10 @@ mod tests {
         record.publication_id = "p".repeat(257);
         let result = validate_create_usage_record(create_action(), record);
         assert!(is_invalid(&result));
-        assert_eq!(get_invalid_reason(result), "Usage record publication_id too long (max 256 chars)");
+        assert_eq!(
+            get_invalid_reason(result),
+            "Usage record publication_id too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1367,10 +1448,7 @@ mod tests {
         attr.id = "".into();
         attr.contributor_did = "invalid".into();
         let result = validate_create_attribution(create_action(), attr);
-        assert_eq!(
-            get_invalid_reason(result),
-            "Attribution ID cannot be empty"
-        );
+        assert_eq!(get_invalid_reason(result), "Attribution ID cannot be empty");
     }
 
     #[test]

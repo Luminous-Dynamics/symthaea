@@ -1,12 +1,11 @@
 //! Finances Coordinator Zome
 //! Business logic for charges, payments, reserves, and budgets.
 
-use housing_finances_integrity::*;
 use hdk::prelude::*;
+use housing_finances_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal, requirement_for_voting,
-    requirement_for_constitutional,
+    gate_consciousness, requirement_for_basic, requirement_for_constitutional,
+    requirement_for_proposal, requirement_for_voting, GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -60,7 +59,10 @@ fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
 
 #[hdk_extern]
 pub fn generate_monthly_charges(input: GenerateChargesInput) -> ExternResult<Vec<Record>> {
-    let _eligibility = require_consciousness(&requirement_for_constitutional(), "generate_monthly_charges")?;
+    let _eligibility = require_consciousness(
+        &requirement_for_constitutional(),
+        "generate_monthly_charges",
+    )?;
     let period_anchor = format!("period:{}:{:02}", input.period_year, input.period_month);
     create_entry(&EntryTypes::Anchor(Anchor(period_anchor.clone())))?;
 

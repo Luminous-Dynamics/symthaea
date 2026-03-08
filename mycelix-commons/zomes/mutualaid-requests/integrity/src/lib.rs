@@ -199,7 +199,7 @@ fn validate_aid_request(request: &AidRequest) -> ExternResult<ValidateCallbackRe
     // DID length limit
     if request.requester_did.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Requester DID exceeds 256 character limit".into()
+            "Requester DID exceeds 256 character limit".into(),
         ));
     }
 
@@ -209,21 +209,21 @@ fn validate_aid_request(request: &AidRequest) -> ExternResult<ValidateCallbackRe
     // ID length limit
     if request.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Request ID exceeds 256 character limit".into()
+            "Request ID exceeds 256 character limit".into(),
         ));
     }
 
     // Validate description is not empty
     if request.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            RequestsError::EmptyDescription.to_string()
+            RequestsError::EmptyDescription.to_string(),
         ));
     }
 
     // Description length limit
     if request.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Description exceeds 4096 character limit".into()
+            "Description exceeds 4096 character limit".into(),
         ));
     }
 
@@ -231,7 +231,7 @@ fn validate_aid_request(request: &AidRequest) -> ExternResult<ValidateCallbackRe
     if let Some(ref loc) = request.location {
         if loc.len() > 256 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Location exceeds 256 character limit".into()
+                "Location exceeds 256 character limit".into(),
             ));
         }
     }
@@ -240,12 +240,12 @@ fn validate_aid_request(request: &AidRequest) -> ExternResult<ValidateCallbackRe
     if let RequestType::Other(ref s) = request.request_type {
         if s.trim().is_empty() {
             return Ok(ValidateCallbackResult::Invalid(
-                "Custom request type cannot be empty".into()
+                "Custom request type cannot be empty".into(),
             ));
         }
         if s.len() > 128 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Custom request type exceeds 128 character limit".into()
+                "Custom request type exceeds 128 character limit".into(),
             ));
         }
     }
@@ -254,7 +254,7 @@ fn validate_aid_request(request: &AidRequest) -> ExternResult<ValidateCallbackRe
     if let Some(needed) = request.amount_needed {
         if request.fulfilled_amount > needed {
             return Ok(ValidateCallbackResult::Invalid(
-                RequestsError::FulfilledExceedsNeeded.to_string()
+                RequestsError::FulfilledExceedsNeeded.to_string(),
             ));
         }
     }
@@ -270,7 +270,7 @@ fn validate_aid_offer(offer: &AidOffer) -> ExternResult<ValidateCallbackResult> 
     // DID length limit
     if offer.offerer_did.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Offerer DID exceeds 256 character limit".into()
+            "Offerer DID exceeds 256 character limit".into(),
         ));
     }
 
@@ -281,12 +281,12 @@ fn validate_aid_offer(offer: &AidOffer) -> ExternResult<ValidateCallbackResult> 
     // ID length limits
     if offer.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Offer ID exceeds 256 character limit".into()
+            "Offer ID exceeds 256 character limit".into(),
         ));
     }
     if offer.request_id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Request ID exceeds 256 character limit".into()
+            "Request ID exceeds 256 character limit".into(),
         ));
     }
 
@@ -294,7 +294,7 @@ fn validate_aid_offer(offer: &AidOffer) -> ExternResult<ValidateCallbackResult> 
     if let Some(amount) = offer.amount {
         if amount == 0 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Offer amount must be greater than zero".into()
+                "Offer amount must be greater than zero".into(),
             ));
         }
     }
@@ -302,7 +302,7 @@ fn validate_aid_offer(offer: &AidOffer) -> ExternResult<ValidateCallbackResult> 
     // Validate message is not excessively long
     if offer.message.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Offer message must be 4096 characters or fewer".into()
+            "Offer message must be 4096 characters or fewer".into(),
         ));
     }
 
@@ -700,7 +700,10 @@ mod tests {
         let result = validate_aid_offer(&offer);
         assert!(result.is_ok());
         // Zero amount is now rejected as part of hardening
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // Enum Serde Tests
@@ -1026,7 +1029,10 @@ mod tests {
         request.description = "a".repeat(10000);
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     #[test]
@@ -1040,18 +1046,25 @@ mod tests {
 
     // ── Link tag validation tests ──────────────────────────────────────
 
-    fn check_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn check_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
             LinkTypes::TypeToRequest => {
                 if tag.0.len() > 512 {
-                    return Ok(ValidateCallbackResult::Invalid("TypeToRequest link tag too long (max 512 bytes)".into()));
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TypeToRequest link tag too long (max 512 bytes)".into(),
+                    ));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
             _ => {
                 if tag.0.len() > 256 {
-                    return Ok(ValidateCallbackResult::Invalid("link tag too long (max 256 bytes)".into()));
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "link tag too long (max 256 bytes)".into(),
+                    ));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
@@ -1208,7 +1221,11 @@ mod tests {
         let result = validate_aid_offer(&offer);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
         if let Ok(ValidateCallbackResult::Invalid(msg)) = result {
-            assert!(msg.contains("Offer amount must be greater than zero"), "Got: {}", msg);
+            assert!(
+                msg.contains("Offer amount must be greater than zero"),
+                "Got: {}",
+                msg
+            );
         }
     }
 
@@ -1353,7 +1370,10 @@ mod tests {
         request.id = "a".repeat(257);
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // ── AidRequest requester_did (max 256) ─────────────────────────────
@@ -1380,7 +1400,10 @@ mod tests {
         assert_eq!(request.requester_did.len(), 257);
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // ── AidRequest description (max 4096) ──────────────────────────────
@@ -1400,7 +1423,10 @@ mod tests {
         request.description = "d".repeat(4097);
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // ── AidRequest location (max 256) ──────────────────────────────────
@@ -1420,7 +1446,10 @@ mod tests {
         request.location = Some("L".repeat(257));
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // ── AidRequest RequestType::Other (max 128) ────────────────────────
@@ -1440,7 +1469,10 @@ mod tests {
         request.request_type = RequestType::Other("c".repeat(129));
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     #[test]
@@ -1449,7 +1481,10 @@ mod tests {
         request.request_type = RequestType::Other("".to_string());
         let result = validate_aid_request(&request);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // ── AidOffer ID (max 64) ───────────────────────────────────────────
@@ -1469,7 +1504,10 @@ mod tests {
         offer.id = "a".repeat(257);
         let result = validate_aid_offer(&offer);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // ── AidOffer request_id (max 64) ───────────────────────────────────
@@ -1489,7 +1527,10 @@ mod tests {
         offer.request_id = "r".repeat(257);
         let result = validate_aid_offer(&offer);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // ── AidOffer offerer_did (max 256) ─────────────────────────────────
@@ -1515,6 +1556,9 @@ mod tests {
         assert_eq!(offer.offerer_did.len(), 257);
         let result = validate_aid_offer(&offer);
         assert!(result.is_ok());
-        assert!(matches!(result.unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            result.unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 }

@@ -744,7 +744,10 @@ mod tests {
         BoardMeeting {
             cooperative_hash: None,
             title: "Monthly Board Meeting".to_string(),
-            agenda: vec!["Budget review".to_string(), "Maintenance discussion".to_string()],
+            agenda: vec![
+                "Budget review".to_string(),
+                "Maintenance discussion".to_string(),
+            ],
             scheduled_at: Timestamp::from_micros(1000000),
             location: "Community Room".to_string(),
             meeting_type: MeetingType::Regular,
@@ -1057,7 +1060,10 @@ mod tests {
 
     #[test]
     fn create_resolution_valid() {
-        assert_valid(validate_create_resolution(fake_create(), valid_resolution()));
+        assert_valid(validate_create_resolution(
+            fake_create(),
+            valid_resolution(),
+        ));
     }
 
     #[test]
@@ -1744,11 +1750,13 @@ mod tests {
     fn create_election_candidates_at_max_count() {
         let mut e = valid_election();
         e.positions = vec!["President".to_string()];
-        e.candidates = (0..50).map(|_| CandidateEntry {
-            agent: agent_a(),
-            position: "President".to_string(),
-            statement: "I will serve.".to_string(),
-        }).collect();
+        e.candidates = (0..50)
+            .map(|_| CandidateEntry {
+                agent: agent_a(),
+                position: "President".to_string(),
+                statement: "I will serve.".to_string(),
+            })
+            .collect();
         assert_valid(validate_create_election(fake_create(), e));
     }
 
@@ -1756,11 +1764,13 @@ mod tests {
     fn create_election_candidates_over_max_count() {
         let mut e = valid_election();
         e.positions = vec!["President".to_string()];
-        e.candidates = (0..51).map(|_| CandidateEntry {
-            agent: agent_a(),
-            position: "President".to_string(),
-            statement: "I will serve.".to_string(),
-        }).collect();
+        e.candidates = (0..51)
+            .map(|_| CandidateEntry {
+                agent: agent_a(),
+                position: "President".to_string(),
+                statement: "I will serve.".to_string(),
+            })
+            .collect();
         assert_invalid(
             validate_create_election(fake_create(), e),
             "Cannot have more than 50 candidates",
@@ -1770,20 +1780,24 @@ mod tests {
     #[test]
     fn create_ballot_votes_at_max_count() {
         let mut b = valid_ballot();
-        b.votes = (0..50).map(|i| BallotVote {
-            position: format!("Position {i}"),
-            candidate: agent_a(),
-        }).collect();
+        b.votes = (0..50)
+            .map(|i| BallotVote {
+                position: format!("Position {i}"),
+                candidate: agent_a(),
+            })
+            .collect();
         assert_valid(validate_create_ballot(fake_create(), b));
     }
 
     #[test]
     fn create_ballot_votes_over_max_count() {
         let mut b = valid_ballot();
-        b.votes = (0..51).map(|i| BallotVote {
-            position: format!("Position {i}"),
-            candidate: agent_a(),
-        }).collect();
+        b.votes = (0..51)
+            .map(|i| BallotVote {
+                position: format!("Position {i}"),
+                candidate: agent_a(),
+            })
+            .collect();
         assert_invalid(
             validate_create_ballot(fake_create(), b),
             "Cannot have more than 50 votes",
@@ -2006,35 +2020,50 @@ mod tests {
     fn update_meeting_title_too_long() {
         let mut m = valid_meeting();
         m.title = "x".repeat(513);
-        assert_invalid(validate_update_meeting(m), "Meeting title must be at most 512 characters");
+        assert_invalid(
+            validate_update_meeting(m),
+            "Meeting title must be at most 512 characters",
+        );
     }
 
     #[test]
     fn update_meeting_agenda_over_max() {
         let mut m = valid_meeting();
         m.agenda = (0..51).map(|i| format!("Item {i}")).collect();
-        assert_invalid(validate_update_meeting(m), "Cannot have more than 50 agenda items");
+        assert_invalid(
+            validate_update_meeting(m),
+            "Cannot have more than 50 agenda items",
+        );
     }
 
     #[test]
     fn update_meeting_attendees_over_max() {
         let mut m = valid_meeting();
         m.attendees = (0..101).map(|_| agent_a()).collect();
-        assert_invalid(validate_update_meeting(m), "Cannot have more than 100 attendees");
+        assert_invalid(
+            validate_update_meeting(m),
+            "Cannot have more than 100 attendees",
+        );
     }
 
     #[test]
     fn update_meeting_location_too_long() {
         let mut m = valid_meeting();
         m.location = "x".repeat(257);
-        assert_invalid(validate_update_meeting(m), "Meeting location must be 256 characters or fewer");
+        assert_invalid(
+            validate_update_meeting(m),
+            "Meeting location must be 256 characters or fewer",
+        );
     }
 
     #[test]
     fn update_meeting_minutes_too_long() {
         let mut m = valid_meeting();
         m.minutes = Some("x".repeat(4097));
-        assert_invalid(validate_update_meeting(m), "Meeting minutes must be 4096 characters or fewer");
+        assert_invalid(
+            validate_update_meeting(m),
+            "Meeting minutes must be 4096 characters or fewer",
+        );
     }
 
     #[test]
@@ -2046,14 +2075,20 @@ mod tests {
     fn update_resolution_title_too_long() {
         let mut r = valid_resolution();
         r.title = "x".repeat(513);
-        assert_invalid(validate_update_resolution(r), "Resolution title must be 512 characters or fewer");
+        assert_invalid(
+            validate_update_resolution(r),
+            "Resolution title must be 512 characters or fewer",
+        );
     }
 
     #[test]
     fn update_resolution_description_too_long() {
         let mut r = valid_resolution();
         r.description = "x".repeat(4097);
-        assert_invalid(validate_update_resolution(r), "Resolution description must be 4096 characters or fewer");
+        assert_invalid(
+            validate_update_resolution(r),
+            "Resolution description must be 4096 characters or fewer",
+        );
     }
 
     #[test]
@@ -2065,21 +2100,30 @@ mod tests {
     fn update_bylaw_id_too_long() {
         let mut b = valid_bylaw();
         b.id = "x".repeat(257);
-        assert_invalid(validate_update_bylaw(b), "ByLaw ID must be 256 characters or fewer");
+        assert_invalid(
+            validate_update_bylaw(b),
+            "ByLaw ID must be 256 characters or fewer",
+        );
     }
 
     #[test]
     fn update_bylaw_title_too_long() {
         let mut b = valid_bylaw();
         b.title = "x".repeat(513);
-        assert_invalid(validate_update_bylaw(b), "ByLaw title must be 512 characters or fewer");
+        assert_invalid(
+            validate_update_bylaw(b),
+            "ByLaw title must be 512 characters or fewer",
+        );
     }
 
     #[test]
     fn update_bylaw_content_too_long() {
         let mut b = valid_bylaw();
         b.content = "x".repeat(4097);
-        assert_invalid(validate_update_bylaw(b), "ByLaw content must be 4096 characters or fewer");
+        assert_invalid(
+            validate_update_bylaw(b),
+            "ByLaw content must be 4096 characters or fewer",
+        );
     }
 
     #[test]
@@ -2091,7 +2135,10 @@ mod tests {
     fn update_election_title_too_long() {
         let mut e = valid_election();
         e.title = "x".repeat(513);
-        assert_invalid(validate_update_election(e), "Election title must be 512 characters or fewer");
+        assert_invalid(
+            validate_update_election(e),
+            "Election title must be 512 characters or fewer",
+        );
     }
 
     #[test]
@@ -2099,18 +2146,26 @@ mod tests {
         let mut e = valid_election();
         e.positions = (0..21).map(|i| format!("Pos {i}")).collect();
         e.candidates = vec![];
-        assert_invalid(validate_update_election(e), "Cannot have more than 20 positions");
+        assert_invalid(
+            validate_update_election(e),
+            "Cannot have more than 20 positions",
+        );
     }
 
     #[test]
     fn update_election_candidates_over_max() {
         let mut e = valid_election();
-        e.candidates = (0..51).map(|_| CandidateEntry {
-            agent: agent_a(),
-            position: "President".to_string(),
-            statement: "Serve.".to_string(),
-        }).collect();
-        assert_invalid(validate_update_election(e), "Cannot have more than 50 candidates");
+        e.candidates = (0..51)
+            .map(|_| CandidateEntry {
+                agent: agent_a(),
+                position: "President".to_string(),
+                statement: "Serve.".to_string(),
+            })
+            .collect();
+        assert_invalid(
+            validate_update_election(e),
+            "Cannot have more than 50 candidates",
+        );
     }
 
     #[test]
@@ -2121,13 +2176,19 @@ mod tests {
             position: "President".to_string(),
             statement: "x".repeat(2049),
         }];
-        assert_invalid(validate_update_election(e), "Candidate statement must be 2048 characters or fewer");
+        assert_invalid(
+            validate_update_election(e),
+            "Candidate statement must be 2048 characters or fewer",
+        );
     }
 
     // ── Link tag validation tests ───────────────────────────────────────
 
     /// Helper to simulate the create link tag validation logic (same as in validate()).
-    fn validate_create_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
             LinkTypes::AllMeetings => {
@@ -2197,7 +2258,10 @@ mod tests {
         }
     }
 
-    fn validate_delete_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_delete_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
             LinkTypes::AllMeetings => {
@@ -2271,7 +2335,10 @@ mod tests {
 
     #[test]
     fn test_link_all_meetings_valid_tag() {
-        assert_valid(validate_create_link_tag(LinkTypes::AllMeetings, vec![0u8; 64]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::AllMeetings,
+            vec![0u8; 64],
+        ));
     }
 
     #[test]
@@ -2281,7 +2348,10 @@ mod tests {
 
     #[test]
     fn test_link_all_meetings_tag_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::AllMeetings, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::AllMeetings,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -2296,12 +2366,18 @@ mod tests {
 
     #[test]
     fn test_link_meeting_to_resolution_valid_tag() {
-        assert_valid(validate_create_link_tag(LinkTypes::MeetingToResolution, vec![0u8; 100]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::MeetingToResolution,
+            vec![0u8; 100],
+        ));
     }
 
     #[test]
     fn test_link_meeting_to_resolution_tag_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::MeetingToResolution, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::MeetingToResolution,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -2316,7 +2392,10 @@ mod tests {
 
     #[test]
     fn test_link_all_bylaws_valid_tag() {
-        assert_valid(validate_create_link_tag(LinkTypes::AllByLaws, vec![0u8; 128]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::AllByLaws,
+            vec![0u8; 128],
+        ));
     }
 
     #[test]
@@ -2331,7 +2410,10 @@ mod tests {
 
     #[test]
     fn test_link_bylaw_supersedes_valid_tag() {
-        assert_valid(validate_create_link_tag(LinkTypes::ByLawSupersedes, vec![0u8; 64]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::ByLawSupersedes,
+            vec![0u8; 64],
+        ));
     }
 
     #[test]
@@ -2346,12 +2428,18 @@ mod tests {
 
     #[test]
     fn test_link_election_to_ballot_valid_tag() {
-        assert_valid(validate_create_link_tag(LinkTypes::ElectionToBallot, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::ElectionToBallot,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
     fn test_link_election_to_ballot_tag_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::ElectionToBallot, vec![0u8; 512]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::ElectionToBallot,
+            vec![0u8; 512],
+        ));
     }
 
     #[test]
@@ -2366,7 +2454,10 @@ mod tests {
 
     #[test]
     fn test_link_voter_to_ballot_valid_tag() {
-        assert_valid(validate_create_link_tag(LinkTypes::VoterToBallot, vec![0u8; 128]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::VoterToBallot,
+            vec![0u8; 128],
+        ));
     }
 
     #[test]
@@ -2381,7 +2472,10 @@ mod tests {
 
     #[test]
     fn test_link_proposer_to_resolution_valid_tag() {
-        assert_valid(validate_create_link_tag(LinkTypes::ProposerToResolution, vec![0u8; 128]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::ProposerToResolution,
+            vec![0u8; 128],
+        ));
     }
 
     #[test]
@@ -2396,7 +2490,10 @@ mod tests {
 
     #[test]
     fn test_delete_link_all_meetings_valid_tag() {
-        assert_valid(validate_delete_link_tag(LinkTypes::AllMeetings, vec![0u8; 256]));
+        assert_valid(validate_delete_link_tag(
+            LinkTypes::AllMeetings,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -2409,7 +2506,10 @@ mod tests {
 
     #[test]
     fn test_delete_link_election_to_ballot_valid_tag() {
-        assert_valid(validate_delete_link_tag(LinkTypes::ElectionToBallot, vec![0u8; 512]));
+        assert_valid(validate_delete_link_tag(
+            LinkTypes::ElectionToBallot,
+            vec![0u8; 512],
+        ));
     }
 
     #[test]

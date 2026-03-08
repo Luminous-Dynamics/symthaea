@@ -17,9 +17,9 @@ use mycelix_sdk::agentic::lifecycle::{
 use mycelix_sdk::agentic::{
     calculate_kredit_from_trust, check_coherence_for_action, compute_trust_score,
     update_kvector_from_behavior, ActionOutcome, AgentClass, AgentConstraints, AgentId,
-    AgentOutput, AgentStatus, BehaviorLogEntry, CoherenceState, EpistemicStats, EscalationRequest,
-    GamingDetectionConfig, GamingDetector, InstrumentalActor, KVectorBridgeConfig,
-    MoralActionGuidance, MoralUncertainty, MoralUncertaintyType, CoherenceMeasurementConfig,
+    AgentOutput, AgentStatus, BehaviorLogEntry, CoherenceMeasurementConfig, CoherenceState,
+    EpistemicStats, EscalationRequest, GamingDetectionConfig, GamingDetector, InstrumentalActor,
+    KVectorBridgeConfig, MoralActionGuidance, MoralUncertainty, MoralUncertaintyType,
     UncertaintyCalibration,
 };
 use mycelix_sdk::matl::KVector;

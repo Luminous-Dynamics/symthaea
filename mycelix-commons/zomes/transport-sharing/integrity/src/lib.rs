@@ -167,74 +167,72 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::AllOffers => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllOffers link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AllOffers => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllOffers link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::AllRequests => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllRequests link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::DriverToOffer => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "DriverToOffer link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::RequesterToRequest => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "RequesterToRequest link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::OfferToMatch => {
-                    if tag.0.len() > 512 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "OfferToMatch link tag too long (max 512 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::RequestToMatch => {
-                    if tag.0.len() > 512 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "RequestToMatch link tag too long (max 512 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::MatchToReviews => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "MatchToReviews link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToReviews => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToReviews link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::AllRequests => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllRequests link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::DriverToOffer => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "DriverToOffer link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RequesterToRequest => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RequesterToRequest link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::OfferToMatch => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "OfferToMatch link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::RequestToMatch => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "RequestToMatch link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MatchToReviews => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MatchToReviews link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToReviews => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToReviews link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -245,73 +243,127 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_ride_offer(o: RideOffer) -> ExternResult<ValidateCallbackResult> {
     if o.seats_available == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Must offer at least 1 seat".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Must offer at least 1 seat".into(),
+        ));
     }
     if !o.price_per_seat.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("price_per_seat must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "price_per_seat must be a finite number".into(),
+        ));
     }
     if o.price_per_seat < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Price cannot be negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_ride_request(r: RideRequest) -> ExternResult<ValidateCallbackResult> {
     if r.passengers == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Must request at least 1 passenger".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Must request at least 1 passenger".into(),
+        ));
     }
     if !r.origin_lat.is_finite() || !r.destination_lat.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("origin_lat/destination_lat must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "origin_lat/destination_lat must be a finite number".into(),
+        ));
     }
     if !r.origin_lon.is_finite() || !r.destination_lon.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("origin_lon/destination_lon must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "origin_lon/destination_lon must be a finite number".into(),
+        ));
     }
-    if r.origin_lat < -90.0 || r.origin_lat > 90.0 || r.destination_lat < -90.0 || r.destination_lat > 90.0 {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+    if r.origin_lat < -90.0
+        || r.origin_lat > 90.0
+        || r.destination_lat < -90.0
+        || r.destination_lat > 90.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
     }
-    if r.origin_lon < -180.0 || r.origin_lon > 180.0 || r.destination_lon < -180.0 || r.destination_lon > 180.0 {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+    if r.origin_lon < -180.0
+        || r.origin_lon > 180.0
+        || r.destination_lon < -180.0
+        || r.destination_lon > 180.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_ride_review(rev: RideReview) -> ExternResult<ValidateCallbackResult> {
     if rev.rating < 1 || rev.rating > 5 {
-        return Ok(ValidateCallbackResult::Invalid("Rating must be between 1 and 5".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rating must be between 1 and 5".into(),
+        ));
     }
     if rev.comment.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Comment cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Comment cannot be empty".into(),
+        ));
     }
     if rev.comment.len() > 2048 {
-        return Ok(ValidateCallbackResult::Invalid("Comment too long (max 2048 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Comment too long (max 2048 chars)".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_cargo_offer(c: CargoOffer) -> ExternResult<ValidateCallbackResult> {
     if !c.capacity_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("capacity_kg must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "capacity_kg must be a finite number".into(),
+        ));
     }
     if c.capacity_kg <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Cargo capacity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cargo capacity must be positive".into(),
+        ));
     }
     if !c.price_per_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("price_per_kg must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "price_per_kg must be a finite number".into(),
+        ));
     }
     if c.price_per_kg < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Price cannot be negative".into(),
+        ));
     }
     if !c.origin_lat.is_finite() || !c.destination_lat.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("origin_lat/destination_lat must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "origin_lat/destination_lat must be a finite number".into(),
+        ));
     }
     if !c.origin_lon.is_finite() || !c.destination_lon.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("origin_lon/destination_lon must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "origin_lon/destination_lon must be a finite number".into(),
+        ));
     }
-    if c.origin_lat < -90.0 || c.origin_lat > 90.0 || c.destination_lat < -90.0 || c.destination_lat > 90.0 {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+    if c.origin_lat < -90.0
+        || c.origin_lat > 90.0
+        || c.destination_lat < -90.0
+        || c.destination_lat > 90.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
     }
-    if c.origin_lon < -180.0 || c.origin_lon > 180.0 || c.destination_lon < -180.0 || c.destination_lon > 180.0 {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+    if c.origin_lon < -180.0
+        || c.origin_lon > 180.0
+        || c.destination_lon < -180.0
+        || c.destination_lon > 180.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -397,8 +449,11 @@ mod tests {
     #[test]
     fn serde_roundtrip_offer_status() {
         let statuses = vec![
-            OfferStatus::Open, OfferStatus::Full, OfferStatus::InProgress,
-            OfferStatus::Completed, OfferStatus::Cancelled,
+            OfferStatus::Open,
+            OfferStatus::Full,
+            OfferStatus::InProgress,
+            OfferStatus::Completed,
+            OfferStatus::Cancelled,
         ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
@@ -409,7 +464,11 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_request_status() {
-        let statuses = vec![RequestStatus::Open, RequestStatus::Matched, RequestStatus::Cancelled];
+        let statuses = vec![
+            RequestStatus::Open,
+            RequestStatus::Matched,
+            RequestStatus::Cancelled,
+        ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
             let back: RequestStatus = serde_json::from_str(&json).unwrap();
@@ -420,8 +479,11 @@ mod tests {
     #[test]
     fn serde_roundtrip_match_status() {
         let statuses = vec![
-            MatchStatus::Pending, MatchStatus::Confirmed, MatchStatus::InProgress,
-            MatchStatus::Completed, MatchStatus::Cancelled,
+            MatchStatus::Pending,
+            MatchStatus::Confirmed,
+            MatchStatus::InProgress,
+            MatchStatus::Completed,
+            MatchStatus::Cancelled,
         ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
@@ -529,8 +591,13 @@ mod tests {
 
     #[test]
     fn ride_offer_all_statuses_valid() {
-        for status in [OfferStatus::Open, OfferStatus::Full, OfferStatus::InProgress,
-                       OfferStatus::Completed, OfferStatus::Cancelled] {
+        for status in [
+            OfferStatus::Open,
+            OfferStatus::Full,
+            OfferStatus::InProgress,
+            OfferStatus::Completed,
+            OfferStatus::Cancelled,
+        ] {
             let mut o = valid_ride_offer();
             o.status = status;
             assert_valid(validate_ride_offer(o));
@@ -567,7 +634,10 @@ mod tests {
     fn ride_request_zero_passengers_rejected() {
         let mut r = valid_ride_request();
         r.passengers = 0;
-        assert_invalid(validate_ride_request(r), "Must request at least 1 passenger");
+        assert_invalid(
+            validate_ride_request(r),
+            "Must request at least 1 passenger",
+        );
     }
 
     #[test]
@@ -590,28 +660,40 @@ mod tests {
     fn ride_request_origin_lat_too_low_rejected() {
         let mut r = valid_ride_request();
         r.origin_lat = -91.0;
-        assert_invalid(validate_ride_request(r), "Latitude must be between -90 and 90");
+        assert_invalid(
+            validate_ride_request(r),
+            "Latitude must be between -90 and 90",
+        );
     }
 
     #[test]
     fn ride_request_origin_lat_too_high_rejected() {
         let mut r = valid_ride_request();
         r.origin_lat = 91.0;
-        assert_invalid(validate_ride_request(r), "Latitude must be between -90 and 90");
+        assert_invalid(
+            validate_ride_request(r),
+            "Latitude must be between -90 and 90",
+        );
     }
 
     #[test]
     fn ride_request_dest_lat_too_low_rejected() {
         let mut r = valid_ride_request();
         r.destination_lat = -91.0;
-        assert_invalid(validate_ride_request(r), "Latitude must be between -90 and 90");
+        assert_invalid(
+            validate_ride_request(r),
+            "Latitude must be between -90 and 90",
+        );
     }
 
     #[test]
     fn ride_request_dest_lat_too_high_rejected() {
         let mut r = valid_ride_request();
         r.destination_lat = 90.5;
-        assert_invalid(validate_ride_request(r), "Latitude must be between -90 and 90");
+        assert_invalid(
+            validate_ride_request(r),
+            "Latitude must be between -90 and 90",
+        );
     }
 
     #[test]
@@ -648,28 +730,40 @@ mod tests {
     fn ride_request_origin_lon_too_low_rejected() {
         let mut r = valid_ride_request();
         r.origin_lon = -181.0;
-        assert_invalid(validate_ride_request(r), "Longitude must be between -180 and 180");
+        assert_invalid(
+            validate_ride_request(r),
+            "Longitude must be between -180 and 180",
+        );
     }
 
     #[test]
     fn ride_request_origin_lon_too_high_rejected() {
         let mut r = valid_ride_request();
         r.origin_lon = 181.0;
-        assert_invalid(validate_ride_request(r), "Longitude must be between -180 and 180");
+        assert_invalid(
+            validate_ride_request(r),
+            "Longitude must be between -180 and 180",
+        );
     }
 
     #[test]
     fn ride_request_dest_lon_too_low_rejected() {
         let mut r = valid_ride_request();
         r.destination_lon = -181.0;
-        assert_invalid(validate_ride_request(r), "Longitude must be between -180 and 180");
+        assert_invalid(
+            validate_ride_request(r),
+            "Longitude must be between -180 and 180",
+        );
     }
 
     #[test]
     fn ride_request_dest_lon_too_high_rejected() {
         let mut r = valid_ride_request();
         r.destination_lon = 180.5;
-        assert_invalid(validate_ride_request(r), "Longitude must be between -180 and 180");
+        assert_invalid(
+            validate_ride_request(r),
+            "Longitude must be between -180 and 180",
+        );
     }
 
     #[test]
@@ -704,7 +798,11 @@ mod tests {
 
     #[test]
     fn ride_request_all_statuses_valid() {
-        for status in [RequestStatus::Open, RequestStatus::Matched, RequestStatus::Cancelled] {
+        for status in [
+            RequestStatus::Open,
+            RequestStatus::Matched,
+            RequestStatus::Cancelled,
+        ] {
             let mut r = valid_ride_request();
             r.status = status;
             assert_valid(validate_ride_request(r));
@@ -718,7 +816,10 @@ mod tests {
         let mut r = valid_ride_request();
         r.passengers = 0;
         r.origin_lat = -91.0;
-        assert_invalid(validate_ride_request(r), "Must request at least 1 passenger");
+        assert_invalid(
+            validate_ride_request(r),
+            "Must request at least 1 passenger",
+        );
     }
 
     // ── validate_cargo_offer: capacity_kg ───────────────────────────────
@@ -802,28 +903,40 @@ mod tests {
     fn cargo_origin_lat_too_low_rejected() {
         let mut c = valid_cargo_offer();
         c.origin_lat = -91.0;
-        assert_invalid(validate_cargo_offer(c), "Latitude must be between -90 and 90");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "Latitude must be between -90 and 90",
+        );
     }
 
     #[test]
     fn cargo_origin_lat_too_high_rejected() {
         let mut c = valid_cargo_offer();
         c.origin_lat = 91.0;
-        assert_invalid(validate_cargo_offer(c), "Latitude must be between -90 and 90");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "Latitude must be between -90 and 90",
+        );
     }
 
     #[test]
     fn cargo_dest_lat_too_low_rejected() {
         let mut c = valid_cargo_offer();
         c.destination_lat = -91.0;
-        assert_invalid(validate_cargo_offer(c), "Latitude must be between -90 and 90");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "Latitude must be between -90 and 90",
+        );
     }
 
     #[test]
     fn cargo_dest_lat_too_high_rejected() {
         let mut c = valid_cargo_offer();
         c.destination_lat = 91.0;
-        assert_invalid(validate_cargo_offer(c), "Latitude must be between -90 and 90");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "Latitude must be between -90 and 90",
+        );
     }
 
     #[test]
@@ -860,28 +973,40 @@ mod tests {
     fn cargo_origin_lon_too_low_rejected() {
         let mut c = valid_cargo_offer();
         c.origin_lon = -181.0;
-        assert_invalid(validate_cargo_offer(c), "Longitude must be between -180 and 180");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "Longitude must be between -180 and 180",
+        );
     }
 
     #[test]
     fn cargo_origin_lon_too_high_rejected() {
         let mut c = valid_cargo_offer();
         c.origin_lon = 181.0;
-        assert_invalid(validate_cargo_offer(c), "Longitude must be between -180 and 180");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "Longitude must be between -180 and 180",
+        );
     }
 
     #[test]
     fn cargo_dest_lon_too_low_rejected() {
         let mut c = valid_cargo_offer();
         c.destination_lon = -181.0;
-        assert_invalid(validate_cargo_offer(c), "Longitude must be between -180 and 180");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "Longitude must be between -180 and 180",
+        );
     }
 
     #[test]
     fn cargo_dest_lon_too_high_rejected() {
         let mut c = valid_cargo_offer();
         c.destination_lon = 181.0;
-        assert_invalid(validate_cargo_offer(c), "Longitude must be between -180 and 180");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "Longitude must be between -180 and 180",
+        );
     }
 
     #[test]
@@ -951,8 +1076,7 @@ mod tests {
             | LinkTypes::RequesterToRequest
             | LinkTypes::MatchToReviews
             | LinkTypes::AgentToReviews => 256,
-            LinkTypes::OfferToMatch
-            | LinkTypes::RequestToMatch => 512,
+            LinkTypes::OfferToMatch | LinkTypes::RequestToMatch => 512,
         };
         let name = match link_type {
             LinkTypes::AllOffers => "AllOffers",
@@ -965,9 +1089,10 @@ mod tests {
             LinkTypes::AgentToReviews => "AgentToReviews",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }
@@ -1186,21 +1311,30 @@ mod tests {
     fn ride_offer_nan_price_rejected() {
         let mut o = valid_ride_offer();
         o.price_per_seat = f64::NAN;
-        assert_invalid(validate_ride_offer(o), "price_per_seat must be a finite number");
+        assert_invalid(
+            validate_ride_offer(o),
+            "price_per_seat must be a finite number",
+        );
     }
 
     #[test]
     fn ride_offer_infinity_price_rejected() {
         let mut o = valid_ride_offer();
         o.price_per_seat = f64::INFINITY;
-        assert_invalid(validate_ride_offer(o), "price_per_seat must be a finite number");
+        assert_invalid(
+            validate_ride_offer(o),
+            "price_per_seat must be a finite number",
+        );
     }
 
     #[test]
     fn ride_offer_neg_infinity_price_rejected() {
         let mut o = valid_ride_offer();
         o.price_per_seat = f64::NEG_INFINITY;
-        assert_invalid(validate_ride_offer(o), "price_per_seat must be a finite number");
+        assert_invalid(
+            validate_ride_offer(o),
+            "price_per_seat must be a finite number",
+        );
     }
 
     #[test]
@@ -1235,28 +1369,40 @@ mod tests {
     fn cargo_offer_nan_capacity_rejected() {
         let mut c = valid_cargo_offer();
         c.capacity_kg = f64::NAN;
-        assert_invalid(validate_cargo_offer(c), "capacity_kg must be a finite number");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "capacity_kg must be a finite number",
+        );
     }
 
     #[test]
     fn cargo_offer_infinity_capacity_rejected() {
         let mut c = valid_cargo_offer();
         c.capacity_kg = f64::INFINITY;
-        assert_invalid(validate_cargo_offer(c), "capacity_kg must be a finite number");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "capacity_kg must be a finite number",
+        );
     }
 
     #[test]
     fn cargo_offer_nan_price_rejected() {
         let mut c = valid_cargo_offer();
         c.price_per_kg = f64::NAN;
-        assert_invalid(validate_cargo_offer(c), "price_per_kg must be a finite number");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "price_per_kg must be a finite number",
+        );
     }
 
     #[test]
     fn cargo_offer_infinity_price_rejected() {
         let mut c = valid_cargo_offer();
         c.price_per_kg = f64::INFINITY;
-        assert_invalid(validate_cargo_offer(c), "price_per_kg must be a finite number");
+        assert_invalid(
+            validate_cargo_offer(c),
+            "price_per_kg must be a finite number",
+        );
     }
 
     #[test]

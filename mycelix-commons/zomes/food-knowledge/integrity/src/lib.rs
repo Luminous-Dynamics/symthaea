@@ -190,106 +190,104 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::AllSeeds => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllSeeds link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AllSeeds => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllSeeds link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::AllPractices => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllPractices link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AllRecipes => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllRecipes link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::SpeciesToSeed => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "SpeciesToSeed link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::CategoryToPractice => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "CategoryToPractice link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::TagToRecipe => {
-                    if tag.0.len() > 512 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "TagToRecipe link tag too long (max 512 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToRecipe => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToRecipe link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::VarietyToStocks => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "VarietyToStocks link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AllSeedRequests => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllSeedRequests link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::CropToNutrients => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "CropToNutrients link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::ExchangeToRatings => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ExchangeToRatings link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::GrowerToRatings => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "GrowerToRatings link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::AllPractices => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllPractices link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllRecipes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllRecipes link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::SpeciesToSeed => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "SpeciesToSeed link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CategoryToPractice => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CategoryToPractice link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TagToRecipe => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TagToRecipe link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToRecipe => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToRecipe link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VarietyToStocks => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VarietyToStocks link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllSeedRequests => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllSeedRequests link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CropToNutrients => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CropToNutrients link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ExchangeToRatings => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ExchangeToRatings link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::GrowerToRatings => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "GrowerToRatings link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -300,85 +298,129 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_seed(s: SeedVariety) -> ExternResult<ValidateCallbackResult> {
     if s.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Seed name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Seed name cannot be empty".into(),
+        ));
     }
     if s.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Seed name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Seed name too long (max 256 chars)".into(),
+        ));
     }
     if s.species.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Species cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Species cannot be empty".into(),
+        ));
     }
     if s.species.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Species too long (max 128 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Species too long (max 128 chars)".into(),
+        ));
     }
     if s.days_to_maturity == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Days to maturity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Days to maturity must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_practice(p: TraditionalPractice) -> ExternResult<ValidateCallbackResult> {
     if p.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Practice name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Practice name cannot be empty".into(),
+        ));
     }
     if p.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Practice name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Practice name too long (max 256 chars)".into(),
+        ));
     }
     if p.description.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description cannot be empty".into(),
+        ));
     }
     if p.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description too long (max 4096 chars)".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_recipe(r: Recipe) -> ExternResult<ValidateCallbackResult> {
     if r.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Recipe name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recipe name cannot be empty".into(),
+        ));
     }
     if r.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Recipe name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recipe name too long (max 256 chars)".into(),
+        ));
     }
     if r.ingredients.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Must have at least one ingredient".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Must have at least one ingredient".into(),
+        ));
     }
     if r.instructions.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Instructions cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Instructions cannot be empty".into(),
+        ));
     }
     if r.instructions.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Instructions too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Instructions too long (max 4096 chars)".into(),
+        ));
     }
     if r.servings == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Servings must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Servings must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_seed_stock(s: SeedStock) -> ExternResult<ValidateCallbackResult> {
     if !s.quantity_grams.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite number".into(),
+        ));
     }
     if s.quantity_grams <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("SeedStock quantity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SeedStock quantity must be positive".into(),
+        ));
     }
     if s.location.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("SeedStock location cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SeedStock location cannot be empty".into(),
+        ));
     }
     if s.location.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("SeedStock location too long (max 512 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SeedStock location too long (max 512 chars)".into(),
+        ));
     }
     if let Some(rate) = s.germination_rate_pct {
         if !rate.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("Germination rate must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Germination rate must be a finite number".into(),
+            ));
         }
         if !(0.0..=100.0).contains(&rate) {
-            return Ok(ValidateCallbackResult::Invalid("Germination rate must be between 0 and 100".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Germination rate must be between 0 and 100".into(),
+            ));
         }
     }
     if let Some(ref notes) = s.notes {
         if notes.len() > 2048 {
-            return Ok(ValidateCallbackResult::Invalid("SeedStock notes too long (max 2048 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "SeedStock notes too long (max 2048 chars)".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -386,35 +428,51 @@ fn validate_seed_stock(s: SeedStock) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_seed_request(r: SeedRequest) -> ExternResult<ValidateCallbackResult> {
     if r.wanted_variety.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("SeedRequest wanted_variety cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SeedRequest wanted_variety cannot be empty".into(),
+        ));
     }
     if r.wanted_variety.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("SeedRequest wanted_variety too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SeedRequest wanted_variety too long (max 256 chars)".into(),
+        ));
     }
     if !r.quantity_grams.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite number".into(),
+        ));
     }
     if r.quantity_grams <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("SeedRequest quantity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SeedRequest quantity must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_seed_quality_rating(r: SeedQualityRating) -> ExternResult<ValidateCallbackResult> {
     if r.rating < 1 || r.rating > 5 {
-        return Ok(ValidateCallbackResult::Invalid("Rating must be between 1 and 5".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rating must be between 1 and 5".into(),
+        ));
     }
     if r.rated_at == 0 {
-        return Ok(ValidateCallbackResult::Invalid("SeedQualityRating rated_at cannot be zero".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SeedQualityRating rated_at cannot be zero".into(),
+        ));
     }
     if let Some(pct) = r.germination_observed_pct {
         if !(0.0..=100.0).contains(&pct) {
-            return Ok(ValidateCallbackResult::Invalid("Observed germination rate must be between 0 and 100".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Observed germination rate must be between 0 and 100".into(),
+            ));
         }
     }
     if let Some(ref comment) = r.comment {
         if comment.len() > 2048 {
-            return Ok(ValidateCallbackResult::Invalid("Rating comment too long (max 2048 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Rating comment too long (max 2048 chars)".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -422,40 +480,64 @@ fn validate_seed_quality_rating(r: SeedQualityRating) -> ExternResult<ValidateCa
 
 fn validate_nutrient_profile(n: NutrientProfile) -> ExternResult<ValidateCallbackResult> {
     if n.crop_name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("NutrientProfile crop_name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "NutrientProfile crop_name cannot be empty".into(),
+        ));
     }
     if n.crop_name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("NutrientProfile crop_name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "NutrientProfile crop_name too long (max 256 chars)".into(),
+        ));
     }
     if !n.calories_per_100g.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Calories must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Calories must be a finite number".into(),
+        ));
     }
     if n.calories_per_100g < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Calories cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Calories cannot be negative".into(),
+        ));
     }
     if !n.protein_g.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Protein must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Protein must be a finite number".into(),
+        ));
     }
     if n.protein_g < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Protein cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Protein cannot be negative".into(),
+        ));
     }
     if !n.carbs_g.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Carbs must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Carbs must be a finite number".into(),
+        ));
     }
     if n.carbs_g < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Carbs cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Carbs cannot be negative".into(),
+        ));
     }
     if !n.fat_g.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Fat must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fat must be a finite number".into(),
+        ));
     }
     if n.fat_g < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Fat cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fat cannot be negative".into(),
+        ));
     }
     if !n.fiber_g.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Fiber must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fiber must be a finite number".into(),
+        ));
     }
     if n.fiber_g < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Fiber cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fiber cannot be negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -530,8 +612,11 @@ mod tests {
     #[test]
     fn serde_roundtrip_practice_category() {
         let cats = vec![
-            PracticeCategory::Planting, PracticeCategory::Harvest,
-            PracticeCategory::Soil, PracticeCategory::Pest, PracticeCategory::Water,
+            PracticeCategory::Planting,
+            PracticeCategory::Harvest,
+            PracticeCategory::Soil,
+            PracticeCategory::Pest,
+            PracticeCategory::Water,
         ];
         for c in &cats {
             let json = serde_json::to_string(c).unwrap();
@@ -784,7 +869,10 @@ mod tests {
     fn practice_name_too_long_rejected() {
         let mut p = valid_practice();
         p.name = "x".repeat(257);
-        assert_invalid(validate_practice(p), "Practice name too long (max 256 chars)");
+        assert_invalid(
+            validate_practice(p),
+            "Practice name too long (max 256 chars)",
+        );
     }
 
     #[test]
@@ -816,7 +904,10 @@ mod tests {
     fn practice_description_too_long_rejected() {
         let mut p = valid_practice();
         p.description = "x".repeat(4097);
-        assert_invalid(validate_practice(p), "Description too long (max 4096 chars)");
+        assert_invalid(
+            validate_practice(p),
+            "Description too long (max 4096 chars)",
+        );
     }
 
     #[test]
@@ -830,8 +921,13 @@ mod tests {
 
     #[test]
     fn all_practice_categories_valid() {
-        for cat in [PracticeCategory::Planting, PracticeCategory::Harvest,
-                     PracticeCategory::Soil, PracticeCategory::Pest, PracticeCategory::Water] {
+        for cat in [
+            PracticeCategory::Planting,
+            PracticeCategory::Harvest,
+            PracticeCategory::Soil,
+            PracticeCategory::Pest,
+            PracticeCategory::Water,
+        ] {
             let mut p = valid_practice();
             p.category = cat;
             assert_valid(validate_practice(p));
@@ -1141,9 +1237,10 @@ mod tests {
             LinkTypes::GrowerToRatings => "GrowerToRatings",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }
@@ -1379,14 +1476,20 @@ mod tests {
     fn seed_stock_zero_quantity_rejected() {
         let mut s = valid_seed_stock();
         s.quantity_grams = 0.0;
-        assert_invalid(validate_seed_stock(s), "SeedStock quantity must be positive");
+        assert_invalid(
+            validate_seed_stock(s),
+            "SeedStock quantity must be positive",
+        );
     }
 
     #[test]
     fn seed_stock_negative_quantity_rejected() {
         let mut s = valid_seed_stock();
         s.quantity_grams = -1.0;
-        assert_invalid(validate_seed_stock(s), "SeedStock quantity must be positive");
+        assert_invalid(
+            validate_seed_stock(s),
+            "SeedStock quantity must be positive",
+        );
     }
 
     #[test]
@@ -1407,7 +1510,10 @@ mod tests {
     fn seed_stock_location_too_long_rejected() {
         let mut s = valid_seed_stock();
         s.location = "x".repeat(513);
-        assert_invalid(validate_seed_stock(s), "SeedStock location too long (max 512 chars)");
+        assert_invalid(
+            validate_seed_stock(s),
+            "SeedStock location too long (max 512 chars)",
+        );
     }
 
     #[test]
@@ -1421,14 +1527,20 @@ mod tests {
     fn seed_stock_germination_negative_rejected() {
         let mut s = valid_seed_stock();
         s.germination_rate_pct = Some(-0.1);
-        assert_invalid(validate_seed_stock(s), "Germination rate must be between 0 and 100");
+        assert_invalid(
+            validate_seed_stock(s),
+            "Germination rate must be between 0 and 100",
+        );
     }
 
     #[test]
     fn seed_stock_germination_over_100_rejected() {
         let mut s = valid_seed_stock();
         s.germination_rate_pct = Some(100.1);
-        assert_invalid(validate_seed_stock(s), "Germination rate must be between 0 and 100");
+        assert_invalid(
+            validate_seed_stock(s),
+            "Germination rate must be between 0 and 100",
+        );
     }
 
     #[test]
@@ -1456,7 +1568,10 @@ mod tests {
     fn seed_stock_notes_too_long_rejected() {
         let mut s = valid_seed_stock();
         s.notes = Some("x".repeat(2049));
-        assert_invalid(validate_seed_stock(s), "SeedStock notes too long (max 2048 chars)");
+        assert_invalid(
+            validate_seed_stock(s),
+            "SeedStock notes too long (max 2048 chars)",
+        );
     }
 
     #[test]
@@ -1491,21 +1606,30 @@ mod tests {
     fn seed_request_empty_variety_rejected() {
         let mut r = valid_seed_request();
         r.wanted_variety = String::new();
-        assert_invalid(validate_seed_request(r), "SeedRequest wanted_variety cannot be empty");
+        assert_invalid(
+            validate_seed_request(r),
+            "SeedRequest wanted_variety cannot be empty",
+        );
     }
 
     #[test]
     fn seed_request_whitespace_variety_rejected() {
         let mut r = valid_seed_request();
         r.wanted_variety = "  ".into();
-        assert_invalid(validate_seed_request(r), "SeedRequest wanted_variety cannot be empty");
+        assert_invalid(
+            validate_seed_request(r),
+            "SeedRequest wanted_variety cannot be empty",
+        );
     }
 
     #[test]
     fn seed_request_variety_too_long_rejected() {
         let mut r = valid_seed_request();
         r.wanted_variety = "x".repeat(257);
-        assert_invalid(validate_seed_request(r), "SeedRequest wanted_variety too long (max 256 chars)");
+        assert_invalid(
+            validate_seed_request(r),
+            "SeedRequest wanted_variety too long (max 256 chars)",
+        );
     }
 
     #[test]
@@ -1519,14 +1643,20 @@ mod tests {
     fn seed_request_zero_quantity_rejected() {
         let mut r = valid_seed_request();
         r.quantity_grams = 0.0;
-        assert_invalid(validate_seed_request(r), "SeedRequest quantity must be positive");
+        assert_invalid(
+            validate_seed_request(r),
+            "SeedRequest quantity must be positive",
+        );
     }
 
     #[test]
     fn seed_request_negative_quantity_rejected() {
         let mut r = valid_seed_request();
         r.quantity_grams = -5.0;
-        assert_invalid(validate_seed_request(r), "SeedRequest quantity must be positive");
+        assert_invalid(
+            validate_seed_request(r),
+            "SeedRequest quantity must be positive",
+        );
     }
 
     #[test]
@@ -1538,7 +1668,11 @@ mod tests {
 
     #[test]
     fn seed_request_all_statuses_valid() {
-        for status in [SeedRequestStatus::Open, SeedRequestStatus::Matched, SeedRequestStatus::Fulfilled] {
+        for status in [
+            SeedRequestStatus::Open,
+            SeedRequestStatus::Matched,
+            SeedRequestStatus::Fulfilled,
+        ] {
             let mut r = valid_seed_request();
             r.status = status;
             assert_valid(validate_seed_request(r));
@@ -1556,21 +1690,30 @@ mod tests {
     fn nutrient_profile_empty_crop_name_rejected() {
         let mut n = valid_nutrient_profile();
         n.crop_name = String::new();
-        assert_invalid(validate_nutrient_profile(n), "NutrientProfile crop_name cannot be empty");
+        assert_invalid(
+            validate_nutrient_profile(n),
+            "NutrientProfile crop_name cannot be empty",
+        );
     }
 
     #[test]
     fn nutrient_profile_whitespace_crop_name_rejected() {
         let mut n = valid_nutrient_profile();
         n.crop_name = "  ".into();
-        assert_invalid(validate_nutrient_profile(n), "NutrientProfile crop_name cannot be empty");
+        assert_invalid(
+            validate_nutrient_profile(n),
+            "NutrientProfile crop_name cannot be empty",
+        );
     }
 
     #[test]
     fn nutrient_profile_crop_name_too_long_rejected() {
         let mut n = valid_nutrient_profile();
         n.crop_name = "x".repeat(257);
-        assert_invalid(validate_nutrient_profile(n), "NutrientProfile crop_name too long (max 256 chars)");
+        assert_invalid(
+            validate_nutrient_profile(n),
+            "NutrientProfile crop_name too long (max 256 chars)",
+        );
     }
 
     #[test]
@@ -1657,14 +1800,20 @@ mod tests {
     fn seed_stock_nan_germination_rejected() {
         let mut s = valid_seed_stock();
         s.germination_rate_pct = Some(f64::NAN);
-        assert_invalid(validate_seed_stock(s), "Germination rate must be a finite number");
+        assert_invalid(
+            validate_seed_stock(s),
+            "Germination rate must be a finite number",
+        );
     }
 
     #[test]
     fn seed_stock_infinity_germination_rejected() {
         let mut s = valid_seed_stock();
         s.germination_rate_pct = Some(f64::INFINITY);
-        assert_invalid(validate_seed_stock(s), "Germination rate must be a finite number");
+        assert_invalid(
+            validate_seed_stock(s),
+            "Germination rate must be a finite number",
+        );
     }
 
     #[test]
@@ -1685,28 +1834,40 @@ mod tests {
     fn nutrient_profile_nan_calories_rejected() {
         let mut n = valid_nutrient_profile();
         n.calories_per_100g = f64::NAN;
-        assert_invalid(validate_nutrient_profile(n), "Calories must be a finite number");
+        assert_invalid(
+            validate_nutrient_profile(n),
+            "Calories must be a finite number",
+        );
     }
 
     #[test]
     fn nutrient_profile_infinity_calories_rejected() {
         let mut n = valid_nutrient_profile();
         n.calories_per_100g = f64::INFINITY;
-        assert_invalid(validate_nutrient_profile(n), "Calories must be a finite number");
+        assert_invalid(
+            validate_nutrient_profile(n),
+            "Calories must be a finite number",
+        );
     }
 
     #[test]
     fn nutrient_profile_nan_protein_rejected() {
         let mut n = valid_nutrient_profile();
         n.protein_g = f64::NAN;
-        assert_invalid(validate_nutrient_profile(n), "Protein must be a finite number");
+        assert_invalid(
+            validate_nutrient_profile(n),
+            "Protein must be a finite number",
+        );
     }
 
     #[test]
     fn nutrient_profile_nan_carbs_rejected() {
         let mut n = valid_nutrient_profile();
         n.carbs_g = f64::NAN;
-        assert_invalid(validate_nutrient_profile(n), "Carbs must be a finite number");
+        assert_invalid(
+            validate_nutrient_profile(n),
+            "Carbs must be a finite number",
+        );
     }
 
     #[test]
@@ -1720,7 +1881,10 @@ mod tests {
     fn nutrient_profile_nan_fiber_rejected() {
         let mut n = valid_nutrient_profile();
         n.fiber_g = f64::NAN;
-        assert_invalid(validate_nutrient_profile(n), "Fiber must be a finite number");
+        assert_invalid(
+            validate_nutrient_profile(n),
+            "Fiber must be a finite number",
+        );
     }
 
     #[test]
@@ -1842,14 +2006,20 @@ mod tests {
     fn seed_quality_rating_zero_rejected() {
         let mut r = valid_seed_quality_rating();
         r.rating = 0;
-        assert_invalid(validate_seed_quality_rating(r), "Rating must be between 1 and 5");
+        assert_invalid(
+            validate_seed_quality_rating(r),
+            "Rating must be between 1 and 5",
+        );
     }
 
     #[test]
     fn seed_quality_rating_six_rejected() {
         let mut r = valid_seed_quality_rating();
         r.rating = 6;
-        assert_invalid(validate_seed_quality_rating(r), "Rating must be between 1 and 5");
+        assert_invalid(
+            validate_seed_quality_rating(r),
+            "Rating must be between 1 and 5",
+        );
     }
 
     #[test]
@@ -1870,21 +2040,30 @@ mod tests {
     fn seed_quality_rating_zero_rated_at_rejected() {
         let mut r = valid_seed_quality_rating();
         r.rated_at = 0;
-        assert_invalid(validate_seed_quality_rating(r), "SeedQualityRating rated_at cannot be zero");
+        assert_invalid(
+            validate_seed_quality_rating(r),
+            "SeedQualityRating rated_at cannot be zero",
+        );
     }
 
     #[test]
     fn seed_quality_rating_negative_germination_rejected() {
         let mut r = valid_seed_quality_rating();
         r.germination_observed_pct = Some(-0.1);
-        assert_invalid(validate_seed_quality_rating(r), "Observed germination rate must be between 0 and 100");
+        assert_invalid(
+            validate_seed_quality_rating(r),
+            "Observed germination rate must be between 0 and 100",
+        );
     }
 
     #[test]
     fn seed_quality_rating_germination_over_100_rejected() {
         let mut r = valid_seed_quality_rating();
         r.germination_observed_pct = Some(100.1);
-        assert_invalid(validate_seed_quality_rating(r), "Observed germination rate must be between 0 and 100");
+        assert_invalid(
+            validate_seed_quality_rating(r),
+            "Observed germination rate must be between 0 and 100",
+        );
     }
 
     #[test]
@@ -1912,7 +2091,10 @@ mod tests {
     fn seed_quality_rating_comment_too_long_rejected() {
         let mut r = valid_seed_quality_rating();
         r.comment = Some("x".repeat(2049));
-        assert_invalid(validate_seed_quality_rating(r), "Rating comment too long (max 2048 chars)");
+        assert_invalid(
+            validate_seed_quality_rating(r),
+            "Rating comment too long (max 2048 chars)",
+        );
     }
 
     #[test]

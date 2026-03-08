@@ -42,7 +42,11 @@ pub fn batch_get_records(
     let total = hashes.len();
     let mut result = BatchGetResult::new(total);
 
-    let limit = if options.limit == 0 { total } else { options.limit.min(total) };
+    let limit = if options.limit == 0 {
+        total
+    } else {
+        options.limit.min(total)
+    };
 
     for hash in hashes.into_iter().take(limit) {
         match get(hash.clone(), GetOptions::default()) {
@@ -79,7 +83,9 @@ pub fn links_to_records(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 }
 
 /// Extract and decode entries from records
-pub fn extract_entries<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(records: &[Record]) -> Vec<T> {
+pub fn extract_entries<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
+    records: &[Record],
+) -> Vec<T> {
     records
         .iter()
         .filter_map(|r| r.entry().to_app_option::<T>().ok().flatten())

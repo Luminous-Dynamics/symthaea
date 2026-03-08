@@ -941,7 +941,9 @@ mod tests {
     #[test]
     fn test_inspection_large_findings_valid() {
         let mut inspection = valid_inspection();
-        inspection.findings = (0..50).map(|i| format!("Finding {}: {}", i, "x".repeat(500))).collect();
+        inspection.findings = (0..50)
+            .map(|i| format!("Finding {}: {}", i, "x".repeat(500)))
+            .collect();
         let result = validate_create_inspection(test_create_action(), inspection);
         assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
     }
@@ -1064,13 +1066,17 @@ mod tests {
     ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
-            LinkTypes::OpenRequests | LinkTypes::BuildingToRequest |
-            LinkTypes::RequestToWorkOrder | LinkTypes::BuildingToInspection |
-            LinkTypes::ReporterToRequest | LinkTypes::CompletedRequests => {
+            LinkTypes::OpenRequests
+            | LinkTypes::BuildingToRequest
+            | LinkTypes::RequestToWorkOrder
+            | LinkTypes::BuildingToInspection
+            | LinkTypes::ReporterToRequest
+            | LinkTypes::CompletedRequests => {
                 if tag.0.len() > 256 {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        format!("{:?} link tag too long (max 256 bytes)", link_type),
-                    ));
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
@@ -1091,25 +1097,29 @@ mod tests {
 
     #[test]
     fn test_link_tag_building_to_request_at_limit() {
-        let result = validate_create_link_tag(LinkTypes::BuildingToRequest, vec![0u8; 256]).unwrap();
+        let result =
+            validate_create_link_tag(LinkTypes::BuildingToRequest, vec![0u8; 256]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
     fn test_link_tag_building_to_request_over_limit() {
-        let result = validate_create_link_tag(LinkTypes::BuildingToRequest, vec![0u8; 257]).unwrap();
+        let result =
+            validate_create_link_tag(LinkTypes::BuildingToRequest, vec![0u8; 257]).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_link_tag_completed_requests_at_limit() {
-        let result = validate_create_link_tag(LinkTypes::CompletedRequests, vec![0u8; 256]).unwrap();
+        let result =
+            validate_create_link_tag(LinkTypes::CompletedRequests, vec![0u8; 256]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
     fn test_link_tag_completed_requests_over_limit() {
-        let result = validate_create_link_tag(LinkTypes::CompletedRequests, vec![0u8; 257]).unwrap();
+        let result =
+            validate_create_link_tag(LinkTypes::CompletedRequests, vec![0u8; 257]).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 

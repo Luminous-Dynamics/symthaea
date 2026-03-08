@@ -681,7 +681,11 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_privacy_preference_all_tiers() {
-        for tier in [SharingTier::LocalOnly, SharingTier::Anonymized, SharingTier::Full] {
+        for tier in [
+            SharingTier::LocalOnly,
+            SharingTier::Anonymized,
+            SharingTier::Full,
+        ] {
             let mut pref = make_privacy_preference();
             pref.sharing_tier = tier.clone();
             let json = serde_json::to_string(&pref).unwrap();
@@ -808,11 +812,8 @@ mod tests {
 
     #[test]
     fn diagnostic_result_update_valid() {
-        let result = validate_update_diagnostic(
-            fake_update(),
-            make_diagnostic_result(),
-            fake_action_hash(),
-        );
+        let result =
+            validate_update_diagnostic(fake_update(), make_diagnostic_result(), fake_action_hash());
         assert_valid(&result);
     }
 
@@ -932,10 +933,7 @@ mod tests {
         cu.phi = f64::NAN;
         let result = validate_create_cognitive_update(fake_create(), cu);
         assert_invalid(&result);
-        assert_eq!(
-            invalid_msg(&result),
-            "CognitiveUpdate phi must be finite"
-        );
+        assert_eq!(invalid_msg(&result), "CognitiveUpdate phi must be finite");
     }
 
     #[test]
@@ -944,10 +942,7 @@ mod tests {
         cu.phi = f64::INFINITY;
         let result = validate_create_cognitive_update(fake_create(), cu);
         assert_invalid(&result);
-        assert_eq!(
-            invalid_msg(&result),
-            "CognitiveUpdate phi must be finite"
-        );
+        assert_eq!(invalid_msg(&result), "CognitiveUpdate phi must be finite");
     }
 
     #[test]
@@ -956,10 +951,7 @@ mod tests {
         cu.phi = f64::NEG_INFINITY;
         let result = validate_create_cognitive_update(fake_create(), cu);
         assert_invalid(&result);
-        assert_eq!(
-            invalid_msg(&result),
-            "CognitiveUpdate phi must be finite"
-        );
+        assert_eq!(invalid_msg(&result), "CognitiveUpdate phi must be finite");
     }
 
     #[test]

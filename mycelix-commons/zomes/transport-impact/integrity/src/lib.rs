@@ -118,50 +118,48 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::AllTrips => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllTrips link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AllTrips => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllTrips link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::AgentToTrip => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToTrip link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToCredit => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToCredit link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::VehicleToTrip => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "VehicleToTrip link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToRedemptions => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToRedemptions link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::AgentToTrip => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToTrip link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToCredit => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToCredit link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::VehicleToTrip => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VehicleToTrip link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToRedemptions => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToRedemptions link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -172,45 +170,67 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_trip(t: TripLog) -> ExternResult<ValidateCallbackResult> {
     if !t.distance_km.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("distance_km must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "distance_km must be a finite number".into(),
+        ));
     }
     if t.distance_km <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Distance must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Distance must be positive".into(),
+        ));
     }
     if !t.cargo_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("cargo_kg must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "cargo_kg must be a finite number".into(),
+        ));
     }
     if !t.emissions_kg_co2.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("emissions_kg_co2 must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "emissions_kg_co2 must be a finite number".into(),
+        ));
     }
     if t.emissions_kg_co2 < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Emissions cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Emissions cannot be negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_credit(c: CarbonCredit) -> ExternResult<ValidateCallbackResult> {
     if !c.credits_kg_co2.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("credits_kg_co2 must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "credits_kg_co2 must be a finite number".into(),
+        ));
     }
     if c.credits_kg_co2 <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Credits must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Credits must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_redemption(r: CreditRedemption) -> ExternResult<ValidateCallbackResult> {
     if !r.credits_redeemed.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("credits_redeemed must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "credits_redeemed must be a finite number".into(),
+        ));
     }
     if r.credits_redeemed <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Credits redeemed must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Credits redeemed must be positive".into(),
+        ));
     }
     if r.redeemed_for.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Redeemed-for description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Redeemed-for description cannot be empty".into(),
+        ));
     }
     if r.redeemed_for.len() > 1024 {
-        return Ok(ValidateCallbackResult::Invalid("Redeemed-for description too long (max 1024 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Redeemed-for description too long (max 1024 chars)".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -277,10 +297,17 @@ mod tests {
     #[test]
     fn serde_roundtrip_trip_mode() {
         let modes = vec![
-            TripMode::Driving, TripMode::Cycling, TripMode::Walking,
-            TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle,
-            TripMode::Flying, TripMode::Water, TripMode::Rail,
-            TripMode::Micromobility, TripMode::Autonomous,
+            TripMode::Driving,
+            TripMode::Cycling,
+            TripMode::Walking,
+            TripMode::Transit,
+            TripMode::Carpool,
+            TripMode::ElectricVehicle,
+            TripMode::Flying,
+            TripMode::Water,
+            TripMode::Rail,
+            TripMode::Micromobility,
+            TripMode::Autonomous,
         ];
         for mode in &modes {
             let json = serde_json::to_string(mode).unwrap();
@@ -292,8 +319,11 @@ mod tests {
     #[test]
     fn serde_roundtrip_credit_source() {
         let sources = vec![
-            CreditSource::Cycling, CreditSource::Transit, CreditSource::Carpool,
-            CreditSource::ElectricVehicle, CreditSource::Walking,
+            CreditSource::Cycling,
+            CreditSource::Transit,
+            CreditSource::Carpool,
+            CreditSource::ElectricVehicle,
+            CreditSource::Walking,
         ];
         for src in &sources {
             let json = serde_json::to_string(src).unwrap();
@@ -404,10 +434,19 @@ mod tests {
 
     #[test]
     fn all_trip_modes_valid() {
-        for mode in [TripMode::Driving, TripMode::Cycling, TripMode::Walking,
-                      TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle,
-                      TripMode::Flying, TripMode::Water, TripMode::Rail,
-                      TripMode::Micromobility, TripMode::Autonomous] {
+        for mode in [
+            TripMode::Driving,
+            TripMode::Cycling,
+            TripMode::Walking,
+            TripMode::Transit,
+            TripMode::Carpool,
+            TripMode::ElectricVehicle,
+            TripMode::Flying,
+            TripMode::Water,
+            TripMode::Rail,
+            TripMode::Micromobility,
+            TripMode::Autonomous,
+        ] {
             let mut t = valid_trip();
             t.mode = mode;
             assert_valid(validate_trip(t));
@@ -525,8 +564,13 @@ mod tests {
 
     #[test]
     fn all_credit_sources_valid() {
-        for src in [CreditSource::Cycling, CreditSource::Transit, CreditSource::Carpool,
-                     CreditSource::ElectricVehicle, CreditSource::Walking] {
+        for src in [
+            CreditSource::Cycling,
+            CreditSource::Transit,
+            CreditSource::Carpool,
+            CreditSource::ElectricVehicle,
+            CreditSource::Walking,
+        ] {
             let mut c = valid_carbon_credit();
             c.earned_from = src;
             assert_valid(validate_credit(c));
@@ -609,9 +653,10 @@ mod tests {
             LinkTypes::AgentToRedemptions => "AgentToRedemptions",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }
@@ -728,14 +773,20 @@ mod tests {
     fn redemption_empty_redeemed_for_rejected() {
         let mut r = valid_redemption();
         r.redeemed_for = String::new();
-        assert_invalid(validate_redemption(r), "Redeemed-for description cannot be empty");
+        assert_invalid(
+            validate_redemption(r),
+            "Redeemed-for description cannot be empty",
+        );
     }
 
     #[test]
     fn redemption_whitespace_redeemed_for_rejected() {
         let mut r = valid_redemption();
         r.redeemed_for = "  ".into();
-        assert_invalid(validate_redemption(r), "Redeemed-for description cannot be empty");
+        assert_invalid(
+            validate_redemption(r),
+            "Redeemed-for description cannot be empty",
+        );
     }
 
     #[test]
@@ -828,20 +879,29 @@ mod tests {
     fn redemption_nan_credits_rejected() {
         let mut r = valid_redemption();
         r.credits_redeemed = f64::NAN;
-        assert_invalid(validate_redemption(r), "credits_redeemed must be a finite number");
+        assert_invalid(
+            validate_redemption(r),
+            "credits_redeemed must be a finite number",
+        );
     }
 
     #[test]
     fn redemption_infinity_credits_rejected() {
         let mut r = valid_redemption();
         r.credits_redeemed = f64::INFINITY;
-        assert_invalid(validate_redemption(r), "credits_redeemed must be a finite number");
+        assert_invalid(
+            validate_redemption(r),
+            "credits_redeemed must be a finite number",
+        );
     }
 
     #[test]
     fn redemption_neg_infinity_credits_rejected() {
         let mut r = valid_redemption();
         r.credits_redeemed = f64::NEG_INFINITY;
-        assert_invalid(validate_redemption(r), "credits_redeemed must be a finite number");
+        assert_invalid(
+            validate_redemption(r),
+            "credits_redeemed must be a finite number",
+        );
     }
 }

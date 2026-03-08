@@ -1779,13 +1779,16 @@ mod tests {
     ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
-            LinkTypes::MemberToCharge | LinkTypes::ChargeToPayment |
-            LinkTypes::MemberToPayment | LinkTypes::AllReserveFunds |
-            LinkTypes::YearToBudget => {
+            LinkTypes::MemberToCharge
+            | LinkTypes::ChargeToPayment
+            | LinkTypes::MemberToPayment
+            | LinkTypes::AllReserveFunds
+            | LinkTypes::YearToBudget => {
                 if tag.0.len() > 256 {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        format!("{:?} link tag too long (max 256 bytes)", link_type),
-                    ));
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }

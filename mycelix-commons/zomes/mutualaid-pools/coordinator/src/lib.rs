@@ -5,13 +5,13 @@
 
 use hdk::prelude::*;
 use mutualaid_pools_integrity::{
-    Anchor as PoolsAnchor, Contribution, ContributionRule, Disbursement,
-    DisbursementRule, DisbursementStatus, EntryTypes, LinkTypes, MemberRole,
-    MutualAidPool, PoolMembership, PoolStatus,
+    Anchor as PoolsAnchor, Contribution, ContributionRule, Disbursement, DisbursementRule,
+    DisbursementStatus, EntryTypes, LinkTypes, MemberRole, MutualAidPool, PoolMembership,
+    PoolStatus,
 };
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_proposal, requirement_for_voting,
+    gate_consciousness, requirement_for_proposal, requirement_for_voting, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -129,7 +129,12 @@ fn generate_id(prefix: &str) -> ExternResult<String> {
     // Create unique ID from timestamp and agent pubkey truncated hash
     let agent_str = format!("{:?}", agent);
     let short_hash = &agent_str[agent_str.len().saturating_sub(8)..];
-    Ok(format!("{}_{:x}_{}", prefix, now.as_micros() as u64, short_hash))
+    Ok(format!(
+        "{}_{:x}_{}",
+        prefix,
+        now.as_micros() as u64,
+        short_hash
+    ))
 }
 
 /// Get or create the main pools anchor
@@ -264,7 +269,9 @@ pub fn get_pool(action_hash: ActionHash) -> ExternResult<Option<PoolWithHash>> {
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No MutualAidPool found".to_string())))?;
+                .ok_or_else(|| {
+                    wasm_error!(WasmErrorInner::Guest("No MutualAidPool found".to_string()))
+                })?;
             Ok(Some(PoolWithHash {
                 hash: action_hash,
                 pool,
@@ -279,10 +286,7 @@ pub fn get_pool(action_hash: ActionHash) -> ExternResult<Option<PoolWithHash>> {
 pub fn get_all_pools(_: ()) -> ExternResult<Vec<PoolWithHash>> {
     let pools_anchor = get_pools_anchor()?;
     let links = get_links(
-        LinkQuery::try_new(
-            pools_anchor,
-            LinkTypes::AnchorToPool,
-        )?,
+        LinkQuery::try_new(pools_anchor, LinkTypes::AnchorToPool)?,
         GetStrategy::default(),
     )?;
 
@@ -318,7 +322,9 @@ pub fn add_member(input: AddMemberInput) -> ExternResult<MembershipWithHash> {
 
     // Check if member is already in pool
     if pool.members.contains(&input.member_did) {
-        return Err(wasm_error!(WasmErrorInner::Guest("Member already in pool".to_string())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member already in pool".to_string()
+        )));
     }
 
     // Add member to pool
@@ -398,7 +404,9 @@ pub fn contribute(input: ContributeInput) -> ExternResult<ContributionWithHash> 
 
     // Verify member is in pool
     if !pool.members.contains(&input.member_did) {
-        return Err(wasm_error!(WasmErrorInner::Guest("Not a member of this pool".to_string())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Not a member of this pool".to_string()
+        )));
     }
 
     // Update pool balance
@@ -476,17 +484,23 @@ pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<Dis
 
     // Verify recipient is in pool
     if !pool.members.contains(&input.recipient_did) {
-        return Err(wasm_error!(WasmErrorInner::Guest("Not a member of this pool".to_string())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Not a member of this pool".to_string()
+        )));
     }
 
     // Check if amount exceeds balance
     if input.amount > pool.balance {
-        return Err(wasm_error!(WasmErrorInner::Guest("Insufficient pool balance".to_string())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Insufficient pool balance".to_string()
+        )));
     }
 
     // Check max disbursement rule
     if input.amount > pool.disbursement_rules.max_disbursement {
-        return Err(wasm_error!(WasmErrorInner::Guest("Amount exceeds maximum disbursement".to_string())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Amount exceeds maximum disbursement".to_string()
+        )));
     }
 
     // Create disbursement request
@@ -552,14 +566,19 @@ pub fn vote_disbursement(input: VoteDisbursementInput) -> ExternResult<Disbursem
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No Disbursement found".to_string())))?;
 
     // Check if already voted
-    if disbursement.approved_by.contains(&input.voter_did) ||
-       disbursement.rejected_by.contains(&input.voter_did) {
-        return Err(wasm_error!(WasmErrorInner::Guest("Already voted on this disbursement".to_string())));
+    if disbursement.approved_by.contains(&input.voter_did)
+        || disbursement.rejected_by.contains(&input.voter_did)
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Already voted on this disbursement".to_string()
+        )));
     }
 
     // Check if still pending
     if disbursement.status != DisbursementStatus::Pending {
-        return Err(wasm_error!(WasmErrorInner::Guest("Disbursement is no longer pending".to_string())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Disbursement is no longer pending".to_string()
+        )));
     }
 
     // Record vote
@@ -570,7 +589,10 @@ pub fn vote_disbursement(input: VoteDisbursementInput) -> ExternResult<Disbursem
     }
 
     // Update entry
-    let new_hash = update_entry(input.disbursement_hash.clone(), EntryTypes::Disbursement(disbursement.clone()))?;
+    let new_hash = update_entry(
+        input.disbursement_hash.clone(),
+        EntryTypes::Disbursement(disbursement.clone()),
+    )?;
 
     Ok(DisbursementWithHash {
         hash: new_hash,
@@ -595,7 +617,9 @@ pub fn process_disbursement(disbursement_hash: ActionHash) -> ExternResult<Disbu
 
     // Must be pending
     if disbursement.status != DisbursementStatus::Pending {
-        return Err(wasm_error!(WasmErrorInner::Guest("Disbursement is not pending".to_string())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Disbursement is not pending".to_string()
+        )));
     }
 
     // Note: In a full implementation, we would:
@@ -607,7 +631,10 @@ pub fn process_disbursement(disbursement_hash: ActionHash) -> ExternResult<Disbu
     disbursement.status = DisbursementStatus::Completed;
     disbursement.processed_at = Some(now);
 
-    let new_hash = update_entry(disbursement_hash, EntryTypes::Disbursement(disbursement.clone()))?;
+    let new_hash = update_entry(
+        disbursement_hash,
+        EntryTypes::Disbursement(disbursement.clone()),
+    )?;
 
     Ok(DisbursementWithHash {
         hash: new_hash,
@@ -619,10 +646,7 @@ pub fn process_disbursement(disbursement_hash: ActionHash) -> ExternResult<Disbu
 #[hdk_extern]
 pub fn get_pool_contributions(pool_hash: ActionHash) -> ExternResult<Vec<ContributionWithHash>> {
     let links = get_links(
-        LinkQuery::try_new(
-            pool_hash,
-            LinkTypes::PoolToContribution,
-        )?,
+        LinkQuery::try_new(pool_hash, LinkTypes::PoolToContribution)?,
         GetStrategy::default(),
     )?;
 
@@ -647,10 +671,7 @@ pub fn get_pool_contributions(pool_hash: ActionHash) -> ExternResult<Vec<Contrib
 #[hdk_extern]
 pub fn get_pool_disbursements(pool_hash: ActionHash) -> ExternResult<Vec<DisbursementWithHash>> {
     let links = get_links(
-        LinkQuery::try_new(
-            pool_hash,
-            LinkTypes::PoolToDisbursement,
-        )?,
+        LinkQuery::try_new(pool_hash, LinkTypes::PoolToDisbursement)?,
         GetStrategy::default(),
     )?;
 
@@ -675,10 +696,7 @@ pub fn get_pool_disbursements(pool_hash: ActionHash) -> ExternResult<Vec<Disburs
 #[hdk_extern]
 pub fn get_pending_disbursements(pool_hash: ActionHash) -> ExternResult<Vec<DisbursementWithHash>> {
     let links = get_links(
-        LinkQuery::try_new(
-            pool_hash,
-            LinkTypes::PoolToPendingDisbursement,
-        )?,
+        LinkQuery::try_new(pool_hash, LinkTypes::PoolToPendingDisbursement)?,
         GetStrategy::default(),
     )?;
 
@@ -706,10 +724,7 @@ pub fn get_pending_disbursements(pool_hash: ActionHash) -> ExternResult<Vec<Disb
 pub fn get_member_pools(member_did: String) -> ExternResult<Vec<PoolWithHash>> {
     let member_anchor = get_member_anchor(&member_did)?;
     let links = get_links(
-        LinkQuery::try_new(
-            member_anchor,
-            LinkTypes::MemberToMembership,
-        )?,
+        LinkQuery::try_new(member_anchor, LinkTypes::MemberToMembership)?,
         GetStrategy::default(),
     )?;
 
@@ -821,7 +836,14 @@ mod tests {
         assert_eq!(decoded.name, "Neighborhood Fund");
         assert_eq!(decoded.creator_did, "did:mycelix:alice123");
         assert_eq!(decoded.contribution_rules.as_ref().unwrap().min_monthly, 50);
-        assert_eq!(decoded.disbursement_rules.as_ref().unwrap().allow_emergency_bypass, true);
+        assert_eq!(
+            decoded
+                .disbursement_rules
+                .as_ref()
+                .unwrap()
+                .allow_emergency_bypass,
+            true
+        );
     }
 
     #[test]
@@ -854,7 +876,10 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let decoded: UpdatePoolRulesInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.pool_hash, pool_hash);
-        assert_eq!(decoded.contribution_rules.as_ref().unwrap().cooldown_days, 14);
+        assert_eq!(
+            decoded.contribution_rules.as_ref().unwrap().cooldown_days,
+            14
+        );
         assert_eq!(decoded.disbursement_rules, None);
     }
 
@@ -1020,11 +1045,7 @@ mod tests {
 
     #[test]
     fn pool_status_all_variants_serde() {
-        let variants = vec![
-            PoolStatus::Active,
-            PoolStatus::Paused,
-            PoolStatus::Closed,
-        ];
+        let variants = vec![PoolStatus::Active, PoolStatus::Paused, PoolStatus::Closed];
         for variant in &variants {
             let json = serde_json::to_string(variant).unwrap();
             let decoded: PoolStatus = serde_json::from_str(&json).unwrap();
@@ -1050,11 +1071,7 @@ mod tests {
 
     #[test]
     fn member_role_all_variants_serde() {
-        let variants = vec![
-            MemberRole::Admin,
-            MemberRole::Member,
-            MemberRole::Observer,
-        ];
+        let variants = vec![MemberRole::Admin, MemberRole::Member, MemberRole::Observer];
         for variant in &variants {
             let json = serde_json::to_string(variant).unwrap();
             let decoded: MemberRole = serde_json::from_str(&json).unwrap();
@@ -1120,7 +1137,10 @@ mod tests {
             contribution_rules: None,
             disbursement_rules: None,
         };
-        assert!(input.name.trim().is_empty(), "Whitespace-only name should be detected");
+        assert!(
+            input.name.trim().is_empty(),
+            "Whitespace-only name should be detected"
+        );
     }
 
     #[test]
@@ -1132,7 +1152,10 @@ mod tests {
             contribution_rules: None,
             disbursement_rules: None,
         };
-        assert!(input.name.trim().is_empty(), "Empty name should be detected");
+        assert!(
+            input.name.trim().is_empty(),
+            "Empty name should be detected"
+        );
     }
 
     #[test]
@@ -1144,7 +1167,10 @@ mod tests {
             contribution_rules: None,
             disbursement_rules: None,
         };
-        assert!(input.description.trim().is_empty(), "Whitespace-only description should be detected");
+        assert!(
+            input.description.trim().is_empty(),
+            "Whitespace-only description should be detected"
+        );
     }
 
     #[test]
@@ -1156,7 +1182,10 @@ mod tests {
             contribution_rules: None,
             disbursement_rules: None,
         };
-        assert!(input.creator_did.trim().is_empty(), "Whitespace-only DID should be detected");
+        assert!(
+            input.creator_did.trim().is_empty(),
+            "Whitespace-only DID should be detected"
+        );
     }
 
     #[test]
@@ -1168,8 +1197,14 @@ mod tests {
             contribution_rules: None,
             disbursement_rules: None,
         };
-        assert!(!input.name.trim().is_empty(), "Valid name should not be rejected");
-        assert!(!input.description.trim().is_empty(), "Valid description should not be rejected");
+        assert!(
+            !input.name.trim().is_empty(),
+            "Valid name should not be rejected"
+        );
+        assert!(
+            !input.description.trim().is_empty(),
+            "Valid description should not be rejected"
+        );
     }
 
     #[test]
@@ -1209,7 +1244,10 @@ mod tests {
             reason: "Valid reason".to_string(),
             is_emergency: false,
         };
-        assert_eq!(input.amount, 0, "Zero disbursement amount should be detected");
+        assert_eq!(
+            input.amount, 0,
+            "Zero disbursement amount should be detected"
+        );
     }
 
     #[test]
@@ -1223,7 +1261,10 @@ mod tests {
             reason: "   \n\t  ".to_string(),
             is_emergency: false,
         };
-        assert!(input.reason.trim().is_empty(), "Whitespace-only reason should be detected");
+        assert!(
+            input.reason.trim().is_empty(),
+            "Whitespace-only reason should be detected"
+        );
     }
 
     #[test]

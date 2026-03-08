@@ -778,10 +778,8 @@ mod tests {
     #[test]
     fn test_unit_with_accessibility_features() {
         let mut unit = valid_unit();
-        unit.accessibility_features = vec![
-            AccessFeature::WheelchairAccessible,
-            AccessFeature::GrabBars,
-        ];
+        unit.accessibility_features =
+            vec![AccessFeature::WheelchairAccessible, AccessFeature::GrabBars];
         let result = validate_create_unit(mock_create_action(), unit);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
@@ -1167,12 +1165,15 @@ mod tests {
     ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
-            LinkTypes::AllBuildings | LinkTypes::BuildingToUnit |
-            LinkTypes::AvailableUnits | LinkTypes::OccupantToUnit => {
+            LinkTypes::AllBuildings
+            | LinkTypes::BuildingToUnit
+            | LinkTypes::AvailableUnits
+            | LinkTypes::OccupantToUnit => {
                 if tag.0.len() > 256 {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        format!("{:?} link tag too long (max 256 bytes)", link_type),
-                    ));
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
@@ -1201,13 +1202,15 @@ mod tests {
 
     #[test]
     fn test_link_tag_building_type_to_building_at_limit() {
-        let result = validate_create_link_tag(LinkTypes::BuildingTypeToBuilding, vec![0u8; 512]).unwrap();
+        let result =
+            validate_create_link_tag(LinkTypes::BuildingTypeToBuilding, vec![0u8; 512]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
     fn test_link_tag_building_type_to_building_over_limit() {
-        let result = validate_create_link_tag(LinkTypes::BuildingTypeToBuilding, vec![0u8; 513]).unwrap();
+        let result =
+            validate_create_link_tag(LinkTypes::BuildingTypeToBuilding, vec![0u8; 513]).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 

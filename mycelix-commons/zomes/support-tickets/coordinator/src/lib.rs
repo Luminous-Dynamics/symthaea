@@ -3,23 +3,23 @@
 //! undo operations, and preemptive alerts.
 
 use hdk::prelude::*;
-use support_tickets_integrity::*;
-use support_types::{
-    TicketStatus,
-    sharded_anchor,
-};
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use support_tickets_integrity::*;
+use support_types::{sharded_anchor, TicketStatus};
 
-fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
     gate_consciousness("commons_bridge", requirement, action_name)
 }
 #[cfg(test)]
-use support_types::{SupportCategory, TicketPriority, AutonomyLevel};
-#[cfg(test)]
 use support_tickets_integrity::{EscalationLevel, SatisfactionSurvey};
+#[cfg(test)]
+use support_types::{AutonomyLevel, SupportCategory, TicketPriority};
 
 // ============================================================================
 // BRIDGE SIGNAL (for cross-domain UI notification)
@@ -168,10 +168,9 @@ pub fn create_ticket(ticket: SupportTicket) -> ExternResult<Record> {
         payload: format!(r#"{{"ticket_hash":"{}"}}"#, action_hash),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created ticket".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created ticket".into()
+    )))
 }
 
 #[hdk_extern]
@@ -181,10 +180,9 @@ pub fn update_ticket(input: UpdateTicketInput) -> ExternResult<Record> {
         input.original_hash,
         &EntryTypes::SupportTicket(input.updated),
     )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated ticket".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated ticket".into()
+    )))
 }
 
 #[hdk_extern]
@@ -216,17 +214,15 @@ pub fn list_my_tickets(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn close_ticket(action_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "close_ticket")?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Ticket not found".into()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Ticket not found".into())
+    ))?;
     let mut ticket = extract_ticket(&record)?;
     ticket.status = TicketStatus::Closed;
     let new_hash = update_entry(action_hash, &EntryTypes::SupportTicket(ticket))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find closed ticket".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find closed ticket".into()
+    )))
 }
 
 // ============================================================================
@@ -253,10 +249,9 @@ pub fn add_comment(comment: TicketComment) -> ExternResult<Record> {
         ),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created comment".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created comment".into()
+    )))
 }
 
 #[hdk_extern]
@@ -292,58 +287,51 @@ pub fn propose_action(action: AutonomousAction) -> ExternResult<Record> {
         ),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created action".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created action".into()
+    )))
 }
 
 #[hdk_extern]
 pub fn approve_action(action_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "approve_action")?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Action not found".into()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Action not found".into())
+    ))?;
     let mut action = extract_autonomous_action(&record)?;
     action.approved = true;
     let new_hash = update_entry(action_hash, &EntryTypes::AutonomousAction(action))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find approved action".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find approved action".into()
+    )))
 }
 
 #[hdk_extern]
 pub fn execute_action(action_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "execute_action")?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Action not found".into()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Action not found".into())
+    ))?;
     let mut action = extract_autonomous_action(&record)?;
     action.executed = true;
     let new_hash = update_entry(action_hash, &EntryTypes::AutonomousAction(action))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find executed action".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find executed action".into()
+    )))
 }
 
 #[hdk_extern]
 pub fn rollback_action(action_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "rollback_action")?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Action not found".into()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Action not found".into())
+    ))?;
     let mut action = extract_autonomous_action(&record)?;
     action.rolled_back = true;
     let new_hash = update_entry(action_hash, &EntryTypes::AutonomousAction(action))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find rolled-back action".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find rolled-back action".into()
+    )))
 }
 
 // ============================================================================
@@ -360,10 +348,9 @@ pub fn create_undo(undo: UndoAction) -> ExternResult<Record> {
         LinkTypes::ActionToUndo,
         (),
     )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created undo action".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created undo action".into()
+    )))
 }
 
 // ============================================================================
@@ -375,12 +362,7 @@ pub fn create_preemptive_alert(alert: PreemptiveAlert) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "create_preemptive_alert")?;
     let agent = agent_info()?.agent_initial_pubkey;
     let action_hash = create_entry(&EntryTypes::PreemptiveAlert(alert.clone()))?;
-    create_link(
-        agent,
-        action_hash.clone(),
-        LinkTypes::AgentToAlert,
-        (),
-    )?;
+    create_link(agent, action_hash.clone(), LinkTypes::AgentToAlert, ())?;
 
     let _ = emit_signal(&BridgeEventSignal {
         event_type: "preemptive_alert".to_string(),
@@ -391,10 +373,9 @@ pub fn create_preemptive_alert(alert: PreemptiveAlert) -> ExternResult<Record> {
         ),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created alert".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created alert".into()
+    )))
 }
 
 #[hdk_extern]
@@ -412,9 +393,7 @@ pub fn promote_alert_to_ticket(input: PromoteAlertInput) -> ExternResult<Record>
     require_consciousness(&requirement_for_proposal(), "promote_alert_to_ticket")?;
     // Verify alert exists
     let _alert = get(input.alert_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Alert not found".into()
-        )))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Alert not found".into())))?;
 
     // Create the ticket (reuses create_ticket logic inline for linking)
     let mut ticket = input.ticket;
@@ -469,10 +448,9 @@ pub fn promote_alert_to_ticket(input: PromoteAlertInput) -> ExternResult<Record>
         ),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find promoted ticket".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find promoted ticket".into()
+    )))
 }
 
 // ============================================================================
@@ -482,8 +460,9 @@ pub fn promote_alert_to_ticket(input: PromoteAlertInput) -> ExternResult<Record>
 #[hdk_extern]
 pub fn escalate_ticket(input: EscalateInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "escalate_ticket")?;
-    let _ticket = get(input.ticket_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Ticket not found".into())))?;
+    let _ticket = get(input.ticket_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Ticket not found".into())
+    ))?;
     let agent = agent_info()?.agent_initial_pubkey;
     let escalation = Escalation {
         ticket_hash: input.ticket_hash.clone(),
@@ -494,9 +473,15 @@ pub fn escalate_ticket(input: EscalateInput) -> ExternResult<Record> {
         escalated_at: sys_time()?,
     };
     let action_hash = create_entry(&EntryTypes::Escalation(escalation))?;
-    create_link(input.ticket_hash, action_hash.clone(), LinkTypes::TicketToEscalations, ())?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created escalation".into())))
+    create_link(
+        input.ticket_hash,
+        action_hash.clone(),
+        LinkTypes::TicketToEscalations,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created escalation".into()
+    )))
 }
 
 #[hdk_extern]
@@ -516,9 +501,15 @@ pub fn get_escalation_history(ticket_hash: ActionHash) -> ExternResult<Vec<Recor
 pub fn submit_satisfaction(survey: SatisfactionSurvey) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "submit_satisfaction")?;
     let action_hash = create_entry(&EntryTypes::SatisfactionSurvey(survey.clone()))?;
-    create_link(survey.ticket_hash, action_hash.clone(), LinkTypes::TicketToSurvey, ())?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created satisfaction survey".into())))
+    create_link(
+        survey.ticket_hash,
+        action_hash.clone(),
+        LinkTypes::TicketToSurvey,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created satisfaction survey".into()
+    )))
 }
 
 #[hdk_extern]

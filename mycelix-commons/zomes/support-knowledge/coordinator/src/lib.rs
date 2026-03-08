@@ -1,15 +1,18 @@
 //! Support Knowledge Coordinator Zome
 //! Business logic for knowledge articles, resolutions, flags, and reputation.
 
-use support_knowledge_integrity::*;
-use support_types::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use support_knowledge_integrity::*;
+use support_types::*;
 
-fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
     gate_consciousness("commons_bridge", requirement, action_name)
 }
 
@@ -93,9 +96,13 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 }
 
 fn extract_article(record: &Record) -> ExternResult<KnowledgeArticle> {
-    record.entry().to_app_option::<KnowledgeArticle>()
+    record
+        .entry()
+        .to_app_option::<KnowledgeArticle>()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a KnowledgeArticle".into())))
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a KnowledgeArticle".into()
+        )))
 }
 
 // ============================================================================
@@ -111,22 +118,42 @@ pub fn create_article(article: KnowledgeArticle) -> ExternResult<Record> {
     let entry_hash = hash_entry(&EntryTypes::KnowledgeArticle(article.clone()))?;
     let shard_anchor = hash_sharded_anchor("support", "articles", &entry_hash);
     create_entry(&EntryTypes::Anchor(Anchor(shard_anchor.clone())))?;
-    create_link(anchor_hash(&shard_anchor)?, action_hash.clone(), LinkTypes::ShardedArticles, ())?;
+    create_link(
+        anchor_hash(&shard_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ShardedArticles,
+        (),
+    )?;
 
     // Category anchor
     let category_str = format!("support:category:{:?}", article.category);
     create_entry(&EntryTypes::Anchor(Anchor(category_str.clone())))?;
-    create_link(anchor_hash(&category_str)?, action_hash.clone(), LinkTypes::CategoryToArticle, ())?;
+    create_link(
+        anchor_hash(&category_str)?,
+        action_hash.clone(),
+        LinkTypes::CategoryToArticle,
+        (),
+    )?;
 
     // Tag anchors
     for tag in &article.tags {
         let tag_anchor = format!("support:tag:{}", tag);
         create_entry(&EntryTypes::Anchor(Anchor(tag_anchor.clone())))?;
-        create_link(anchor_hash(&tag_anchor)?, action_hash.clone(), LinkTypes::TagToArticle, ())?;
+        create_link(
+            anchor_hash(&tag_anchor)?,
+            action_hash.clone(),
+            LinkTypes::TagToArticle,
+            (),
+        )?;
     }
 
     // Agent anchor
-    create_link(article.author, action_hash.clone(), LinkTypes::AgentToArticle, ())?;
+    create_link(
+        article.author,
+        action_hash.clone(),
+        LinkTypes::AgentToArticle,
+        (),
+    )?;
 
     // Emit bridge signal
     let _ = emit_signal(&BridgeEventSignal {
@@ -138,27 +165,34 @@ pub fn create_article(article: KnowledgeArticle) -> ExternResult<Record> {
         ),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created article".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created article".into()
+    )))
 }
 
 #[hdk_extern]
 pub fn update_article(input: UpdateArticleInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "update_article")?;
-    let _original = get(input.original_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Original article not found".into())))?;
+    let _original = get(input.original_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Original article not found".into())
+    ))?;
 
-    let action_hash = update_entry(input.original_hash, &EntryTypes::KnowledgeArticle(input.updated))?;
+    let action_hash = update_entry(
+        input.original_hash,
+        &EntryTypes::KnowledgeArticle(input.updated),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated article".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated article".into()
+    )))
 }
 
 #[hdk_extern]
 pub fn deprecate_article(input: DeprecateInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "deprecate_article")?;
-    let original = get(input.article_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Article not found".into())))?;
+    let original = get(input.article_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Article not found".into())
+    ))?;
 
     let mut article = extract_article(&original)?;
     article.deprecated = true;
@@ -166,8 +200,9 @@ pub fn deprecate_article(input: DeprecateInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.article_hash, &EntryTypes::KnowledgeArticle(article))?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find deprecated article".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find deprecated article".into()
+    )))
 }
 
 #[hdk_extern]
@@ -214,31 +249,35 @@ pub fn list_recent_articles(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn upvote_article(action_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "upvote_article")?;
-    let original = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Article not found".into())))?;
+    let original = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Article not found".into())
+    ))?;
 
     let mut article = extract_article(&original)?;
     article.upvotes += 1;
 
     let new_hash = update_entry(action_hash, &EntryTypes::KnowledgeArticle(article))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find upvoted article".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find upvoted article".into()
+    )))
 }
 
 #[hdk_extern]
 pub fn verify_article(action_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "verify_article")?;
-    let original = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Article not found".into())))?;
+    let original = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Article not found".into())
+    ))?;
 
     let mut article = extract_article(&original)?;
     article.verified = true;
 
     let new_hash = update_entry(action_hash, &EntryTypes::KnowledgeArticle(article))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find verified article".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find verified article".into()
+    )))
 }
 
 // ============================================================================
@@ -256,8 +295,9 @@ pub fn create_resolution(resolution: Resolution) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created resolution".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created resolution".into()
+    )))
 }
 
 // ============================================================================
@@ -275,8 +315,9 @@ pub fn flag_article(flag: ArticleFlag) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created flag".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created flag".into()
+    )))
 }
 
 #[hdk_extern]
@@ -317,10 +358,21 @@ pub fn link_article_to_ticket(input: LinkArticleInput) -> ExternResult<Record> {
         created_at: sys_time()?,
     };
     let action_hash = create_entry(&EntryTypes::ArticleTicketLink(link))?;
-    create_link(input.article_hash, action_hash.clone(), LinkTypes::ArticleToTickets, ())?;
-    create_link(input.ticket_hash, action_hash.clone(), LinkTypes::TicketToArticles, ())?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created article-ticket link".into())))
+    create_link(
+        input.article_hash,
+        action_hash.clone(),
+        LinkTypes::ArticleToTickets,
+        (),
+    )?;
+    create_link(
+        input.ticket_hash,
+        action_hash.clone(),
+        LinkTypes::TicketToArticles,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created article-ticket link".into()
+    )))
 }
 
 #[hdk_extern]
@@ -457,7 +509,10 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let decoded: UpdateArticleInput = serde_json::from_str(&json).unwrap();
         assert!(decoded.updated.deprecated);
-        assert_eq!(decoded.updated.deprecation_reason, Some("Replaced by v2".into()));
+        assert_eq!(
+            decoded.updated.deprecation_reason,
+            Some("Replaced by v2".into())
+        );
     }
 
     #[test]
@@ -468,7 +523,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: DeprecateInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.reason, "Superseded by newer article on the same topic");
+        assert_eq!(
+            decoded.reason,
+            "Superseded by newer article on the same topic"
+        );
     }
 
     #[test]

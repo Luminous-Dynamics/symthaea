@@ -80,10 +80,10 @@ pub mod bridge;
 pub mod credentials;
 pub mod economics;
 pub mod epistemic;
-pub mod finance;
 pub mod error;
 #[cfg(feature = "ts-export")]
 mod export_bindings;
+pub mod finance;
 pub mod hyperfeel;
 pub mod identity;
 pub mod intentions;
@@ -151,6 +151,7 @@ pub use agentic::{
     ApiResult,
     BehaviorLogEntry,
     CoherenceCheckResult,
+    CoherenceMeasurementConfig,
     // Coherence (Phi) measurement
     CoherenceState,
     CreateAgentRequest,
@@ -168,7 +169,6 @@ pub use agentic::{
     // GIS integration (Graceful Ignorance System)
     MoralUncertainty,
     MoralUncertaintyType,
-    CoherenceMeasurementConfig,
     // Quarantine
     QuarantineManager,
     QuarantineReason,

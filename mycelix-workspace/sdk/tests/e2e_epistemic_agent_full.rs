@@ -12,6 +12,10 @@
 //! verifiable "epistemic fingerprints" - trust profiles that prove
 //! reliability without revealing internal state.
 
+use mycelix_sdk::agentic::coherence_bridge::{
+    check_coherence_for_action, measure_coherence, CoherenceCheckResult, CoherenceHistory,
+    CoherenceMeasurementConfig, CoherenceState,
+};
 use mycelix_sdk::agentic::epistemic_classifier::{
     calculate_epistemic_weight, classify_output, create_classified_output, AgentOutput,
     AgreementScope, ClassificationHints, EpistemicStats, OutputContent, RelevanceDuration,
@@ -19,10 +23,6 @@ use mycelix_sdk::agentic::epistemic_classifier::{
 use mycelix_sdk::agentic::kvector_bridge::{
     analyze_behavior, calculate_kredit_from_trust, compute_kvector_update, record_and_maybe_update,
     KVectorBridgeConfig,
-};
-use mycelix_sdk::agentic::coherence_bridge::{
-    check_coherence_for_action, measure_coherence, CoherenceCheckResult, CoherenceHistory,
-    CoherenceState, CoherenceMeasurementConfig,
 };
 use mycelix_sdk::agentic::uncertainty::{
     maybe_escalate, MoralActionGuidance, MoralUncertainty, UncertainOutput, UncertaintyCalibration,
@@ -394,7 +394,10 @@ fn test_phi_coherence_measurement() {
     println!("  Coherence State: {:?}", phi_result.coherence_state);
     println!("  Sample Size: {}", phi_result.sample_size);
 
-    assert!(phi_result.coherence > 0.7, "Coherent agent should have high Phi");
+    assert!(
+        phi_result.coherence > 0.7,
+        "Coherent agent should have high Phi"
+    );
     assert_eq!(phi_result.coherence_state, CoherenceState::Coherent);
 
     // Check action gating
@@ -918,10 +921,10 @@ fn test_complete_integration_flow() {
 // - Phase 3: Phi Coherence Gating
 // - Phase 4: GIS Uncertainty Handling
 
+use mycelix_sdk::agentic::coherence_bridge::ZKOperationType;
 use mycelix_sdk::agentic::integration::{
     CombinedGatingRecommendation, ObservabilityExports, ZKIntegratedPipeline, ZKTrustConfig,
 };
-use mycelix_sdk::agentic::coherence_bridge::ZKOperationType;
 use mycelix_sdk::agentic::zk_trust::ProofStatement;
 
 /// Create a test agent with specific Phi coherence level

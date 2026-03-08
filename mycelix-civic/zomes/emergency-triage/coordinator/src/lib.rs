@@ -1,11 +1,11 @@
 //! Triage Coordinator Zome
 //! Mass casualty triage operations using START protocol
 
-use hdk::prelude::*;
 use emergency_triage_integrity::*;
+use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 /// Helper to get an anchor entry hash

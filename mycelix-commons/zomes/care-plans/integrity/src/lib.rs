@@ -453,7 +453,10 @@ mod tests {
             ended_at: valid_timestamp_end(),
             hours: 3.0,
             notes: "Session went well".to_string(),
-            tasks_completed: vec!["Morning medication".to_string(), "Breakfast assistance".to_string()],
+            tasks_completed: vec![
+                "Morning medication".to_string(),
+                "Breakfast assistance".to_string(),
+            ],
         }
     }
 
@@ -1235,29 +1238,25 @@ mod tests {
 
     #[test]
     fn test_link_tag_all_plans_at_limit() {
-        let result =
-            validate_create_link_tag(LinkTypes::AllPlans, vec![0u8; 256]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::AllPlans, vec![0u8; 256]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
     fn test_link_tag_all_plans_over_limit() {
-        let result =
-            validate_create_link_tag(LinkTypes::AllPlans, vec![0u8; 257]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::AllPlans, vec![0u8; 257]).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
     #[test]
     fn test_link_tag_type_to_plans_at_limit() {
-        let result =
-            validate_create_link_tag(LinkTypes::TypeToPlans, vec![0u8; 512]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::TypeToPlans, vec![0u8; 512]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
     fn test_link_tag_type_to_plans_over_limit() {
-        let result =
-            validate_create_link_tag(LinkTypes::TypeToPlans, vec![0u8; 513]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::TypeToPlans, vec![0u8; 513]).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1277,8 +1276,7 @@ mod tests {
 
     #[test]
     fn test_link_tag_empty_tag_valid() {
-        let result =
-            validate_create_link_tag(LinkTypes::AllPlans, vec![]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::AllPlans, vec![]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 

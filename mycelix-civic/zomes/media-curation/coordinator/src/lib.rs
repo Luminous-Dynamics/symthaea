@@ -2,9 +2,8 @@
 use hdk::prelude::*;
 use media_curation_integrity::*;
 use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, requirement_for_voting,
     GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_basic, requirement_for_proposal,
-    requirement_for_voting,
 };
 
 fn require_consciousness(
@@ -20,7 +19,6 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
     hash_entry(&anchor)
 }
-
 
 fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
     let Some(details) = get_details(action_hash, GetOptions::default())? else {
@@ -45,7 +43,12 @@ pub fn endorse(input: EndorseInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "endorse")?;
     let now = sys_time()?;
     let endorsement = Endorsement {
-        id: format!("endorse:{}:{}:{}", input.publication_id, input.endorser_did, now.as_micros()),
+        id: format!(
+            "endorse:{}:{}:{}",
+            input.publication_id,
+            input.endorser_did,
+            now.as_micros()
+        ),
         publication_id: input.publication_id.clone(),
         endorser_did: input.endorser_did.clone(),
         endorsement_type: input.endorsement_type,
@@ -54,8 +57,18 @@ pub fn endorse(input: EndorseInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Endorsement(endorsement))?;
-    create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToEndorsements, ())?;
-    create_link(anchor_hash(&input.endorser_did)?, action_hash.clone(), LinkTypes::EndorserToEndorsements, ())?;
+    create_link(
+        anchor_hash(&input.publication_id)?,
+        action_hash.clone(),
+        LinkTypes::PublicationToEndorsements,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&input.endorser_did)?,
+        action_hash.clone(),
+        LinkTypes::EndorserToEndorsements,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -83,10 +96,20 @@ pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Collection(collection))?;
-    create_link(anchor_hash(&input.curator_did)?, action_hash.clone(), LinkTypes::CuratorToCollections, ())?;
+    create_link(
+        anchor_hash(&input.curator_did)?,
+        action_hash.clone(),
+        LinkTypes::CuratorToCollections,
+        (),
+    )?;
 
     for pub_id in input.publication_ids {
-        create_link(action_hash.clone(), anchor_hash(&pub_id)?, LinkTypes::CollectionToPublications, ())?;
+        create_link(
+            action_hash.clone(),
+            anchor_hash(&pub_id)?,
+            LinkTypes::CollectionToPublications,
+            (),
+        )?;
     }
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
@@ -106,7 +129,13 @@ pub fn calculate_quality_score(publication_id: String) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Count endorsements
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToEndorsements as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(
+            0.into(),
+            (LinkTypes::PublicationToEndorsements as u8).into(),
+        ),
+    );
     let endorsement_count = get_links(query, GetStrategy::default())?.len() as u32;
 
     // Simplified scoring
@@ -123,7 +152,12 @@ pub fn calculate_quality_score(publication_id: String) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::QualityScore(score))?;
-    create_link(anchor_hash(&publication_id)?, action_hash.clone(), LinkTypes::PublicationToQuality, ())?;
+    create_link(
+        anchor_hash(&publication_id)?,
+        action_hash.clone(),
+        LinkTypes::PublicationToQuality,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -141,7 +175,12 @@ pub fn feature_content(input: FeatureInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::FeaturedContent(featured))?;
-    create_link(anchor_hash("featured_content")?, action_hash.clone(), LinkTypes::FeaturedPublications, ())?;
+    create_link(
+        anchor_hash("featured_content")?,
+        action_hash.clone(),
+        LinkTypes::FeaturedPublications,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -156,9 +195,16 @@ pub struct FeatureInput {
 #[hdk_extern]
 pub fn get_featured_content(_: ()) -> ExternResult<Vec<Record>> {
     let mut featured = Vec::new();
-    let query = LinkQuery::new(anchor_hash("featured_content")?, LinkTypeFilter::single_type(0.into(), (LinkTypes::FeaturedPublications as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash("featured_content")?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::FeaturedPublications as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             featured.push(record);
         }
     }
@@ -168,9 +214,19 @@ pub fn get_featured_content(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_publication_endorsements(publication_id: String) -> ExternResult<Vec<Record>> {
     let mut endorsements = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToEndorsements as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(
+            0.into(),
+            (LinkTypes::PublicationToEndorsements as u8).into(),
+        ),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             endorsements.push(record);
         }
     }
@@ -181,9 +237,16 @@ pub fn get_publication_endorsements(publication_id: String) -> ExternResult<Vec<
 #[hdk_extern]
 pub fn get_endorser_history(endorser_did: String) -> ExternResult<Vec<Record>> {
     let mut endorsements = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&endorser_did)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::EndorserToEndorsements as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&endorser_did)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::EndorserToEndorsements as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             endorsements.push(record);
         }
     }
@@ -194,9 +257,16 @@ pub fn get_endorser_history(endorser_did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_curator_collections(curator_did: String) -> ExternResult<Vec<Record>> {
     let mut collections = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&curator_did)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::CuratorToCollections as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&curator_did)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::CuratorToCollections as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             collections.push(record);
         }
     }
@@ -207,7 +277,9 @@ pub fn get_curator_collections(curator_did: String) -> ExternResult<Vec<Record>>
 #[hdk_extern]
 pub fn get_collection(collection_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Collection)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Collection,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -225,7 +297,9 @@ pub fn get_collection(collection_id: String) -> ExternResult<Option<Record>> {
 pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "add_to_collection")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Collection)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Collection,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -233,14 +307,21 @@ pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<Record> {
             if collection.id == input.collection_id {
                 // Only curator can add to collection
                 if collection.curator_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only curator can modify collection".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only curator can modify collection".into()
+                    )));
                 }
 
                 let now = sys_time()?;
                 let action_hash = record.action_address().clone();
 
                 // Create link to publication
-                create_link(action_hash.clone(), anchor_hash(&input.publication_id)?, LinkTypes::CollectionToPublications, ())?;
+                create_link(
+                    action_hash.clone(),
+                    anchor_hash(&input.publication_id)?,
+                    LinkTypes::CollectionToPublications,
+                    (),
+                )?;
 
                 let mut publication_ids = collection.publication_ids.clone();
                 publication_ids.push(input.publication_id);
@@ -251,11 +332,14 @@ pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<Record> {
                     ..collection
                 };
                 let new_hash = update_entry(action_hash, &EntryTypes::Collection(updated))?;
-                return get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(new_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Collection not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Collection not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -270,18 +354,24 @@ pub struct AddToCollectionInput {
 pub fn remove_from_collection(input: RemoveFromCollectionInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "remove_from_collection")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Collection)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Collection,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(collection) = record.entry().to_app_option::<Collection>().ok().flatten() {
             if collection.id == input.collection_id {
                 if collection.curator_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only curator can modify collection".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only curator can modify collection".into()
+                    )));
                 }
 
                 let now = sys_time()?;
-                let publication_ids: Vec<String> = collection.publication_ids.iter()
+                let publication_ids: Vec<String> = collection
+                    .publication_ids
+                    .iter()
                     .filter(|id| **id != input.publication_id)
                     .cloned()
                     .collect();
@@ -291,12 +381,18 @@ pub fn remove_from_collection(input: RemoveFromCollectionInput) -> ExternResult<
                     updated: now,
                     ..collection
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Collection(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Collection(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Collection not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Collection not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -311,14 +407,18 @@ pub struct RemoveFromCollectionInput {
 pub fn update_collection(input: UpdateCollectionInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "update_collection")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Collection)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Collection,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(collection) = record.entry().to_app_option::<Collection>().ok().flatten() {
             if collection.id == input.collection_id {
                 if collection.curator_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only curator can update collection".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only curator can update collection".into()
+                    )));
                 }
 
                 let now = sys_time()?;
@@ -329,12 +429,18 @@ pub fn update_collection(input: UpdateCollectionInput) -> ExternResult<Record> {
                     updated: now,
                     ..collection
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Collection(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Collection(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Collection not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Collection not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -383,7 +489,9 @@ pub struct UpdateQualityScoreInput {
 pub fn remove_endorsement(input: RemoveEndorsementInput) -> ExternResult<()> {
     require_consciousness(&requirement_for_basic(), "remove_endorsement")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Endorsement)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Endorsement,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -391,14 +499,18 @@ pub fn remove_endorsement(input: RemoveEndorsementInput) -> ExternResult<()> {
             if endorsement.id == input.endorsement_id {
                 // Only endorser can remove
                 if endorsement.endorser_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only endorser can remove endorsement".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only endorser can remove endorsement".into()
+                    )));
                 }
                 delete_entry(record.action_address().clone())?;
                 return Ok(());
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Endorsement not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Endorsement not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -412,18 +524,27 @@ pub struct RemoveEndorsementInput {
 pub fn unfeature_content(input: UnfeatureInput) -> ExternResult<()> {
     require_consciousness(&requirement_for_voting(), "unfeature_content")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FeaturedContent)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::FeaturedContent,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(featured) = record.entry().to_app_option::<FeaturedContent>().ok().flatten() {
+        if let Some(featured) = record
+            .entry()
+            .to_app_option::<FeaturedContent>()
+            .ok()
+            .flatten()
+        {
             if featured.id == input.featured_id {
                 delete_entry(record.action_address().clone())?;
                 return Ok(());
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Featured content not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Featured content not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -435,9 +556,16 @@ pub struct UnfeatureInput {
 #[hdk_extern]
 pub fn get_quality_score(publication_id: String) -> ExternResult<Option<Record>> {
     let mut scores = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToQuality as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToQuality as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             scores.push(record);
         }
     }
@@ -456,7 +584,9 @@ pub fn compute_quality_base_score(endorsement_count: u32) -> f64 {
 #[hdk_extern]
 pub fn get_public_collections(_: ()) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Collection)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Collection,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
@@ -481,49 +611,81 @@ mod tests {
     #[test]
     fn quality_score_zero_endorsements() {
         let score = compute_quality_base_score(0);
-        assert!((score - 0.0).abs() < 1e-10, "0 endorsements = 0.0, got {}", score);
+        assert!(
+            (score - 0.0).abs() < 1e-10,
+            "0 endorsements = 0.0, got {}",
+            score
+        );
     }
 
     #[test]
     fn quality_score_50_endorsements() {
         let score = compute_quality_base_score(50);
-        assert!((score - 0.5).abs() < 1e-10, "50 endorsements = 0.5, got {}", score);
+        assert!(
+            (score - 0.5).abs() < 1e-10,
+            "50 endorsements = 0.5, got {}",
+            score
+        );
     }
 
     #[test]
     fn quality_score_100_endorsements() {
         let score = compute_quality_base_score(100);
-        assert!((score - 1.0).abs() < 1e-10, "100 endorsements = 1.0, got {}", score);
+        assert!(
+            (score - 1.0).abs() < 1e-10,
+            "100 endorsements = 1.0, got {}",
+            score
+        );
     }
 
     #[test]
     fn quality_score_200_endorsements_clamped() {
         let score = compute_quality_base_score(200);
-        assert!((score - 1.0).abs() < 1e-10, "200 endorsements should clamp to 1.0, got {}", score);
+        assert!(
+            (score - 1.0).abs() < 1e-10,
+            "200 endorsements should clamp to 1.0, got {}",
+            score
+        );
     }
 
     #[test]
     fn quality_score_1_endorsement() {
         let score = compute_quality_base_score(1);
-        assert!((score - 0.01).abs() < 1e-10, "1 endorsement = 0.01, got {}", score);
+        assert!(
+            (score - 0.01).abs() < 1e-10,
+            "1 endorsement = 0.01, got {}",
+            score
+        );
     }
 
     #[test]
     fn quality_score_99_endorsements() {
         let score = compute_quality_base_score(99);
-        assert!((score - 0.99).abs() < 1e-10, "99 endorsements = 0.99, got {}", score);
+        assert!(
+            (score - 0.99).abs() < 1e-10,
+            "99 endorsements = 0.99, got {}",
+            score
+        );
     }
 
     #[test]
     fn quality_score_1000_endorsements_clamped() {
         let score = compute_quality_base_score(1000);
-        assert!((score - 1.0).abs() < 1e-10, "1000 endorsements should clamp to 1.0, got {}", score);
+        assert!(
+            (score - 1.0).abs() < 1e-10,
+            "1000 endorsements should clamp to 1.0, got {}",
+            score
+        );
     }
 
     #[test]
     fn quality_score_max_u32_clamped() {
         let score = compute_quality_base_score(u32::MAX);
-        assert!((score - 1.0).abs() < 1e-10, "u32::MAX endorsements should clamp to 1.0, got {}", score);
+        assert!(
+            (score - 1.0).abs() < 1e-10,
+            "u32::MAX endorsements should clamp to 1.0, got {}",
+            score
+        );
     }
 
     #[test]
@@ -531,7 +693,13 @@ mod tests {
         let mut prev = compute_quality_base_score(0);
         for i in 1..=100 {
             let current = compute_quality_base_score(i);
-            assert!(current >= prev, "Score should be non-decreasing: {} < {} at i={}", current, prev, i);
+            assert!(
+                current >= prev,
+                "Score should be non-decreasing: {} < {} at i={}",
+                current,
+                prev,
+                i
+            );
             prev = current;
         }
     }
@@ -678,9 +846,18 @@ mod tests {
         };
         let json = serde_json::to_string(&input).expect("serialize");
         let parsed: UpdateFeaturedContentInput = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(parsed.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
-        assert_eq!(parsed.updated_entry.reason, "Updated reason - exceptional depth");
-        assert_eq!(parsed.updated_entry.featured_until, Some(Timestamp::from_micros(9_999_999)));
+        assert_eq!(
+            parsed.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
+        assert_eq!(
+            parsed.updated_entry.reason,
+            "Updated reason - exceptional depth"
+        );
+        assert_eq!(
+            parsed.updated_entry.featured_until,
+            Some(Timestamp::from_micros(9_999_999))
+        );
     }
 
     #[test]
@@ -735,7 +912,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).expect("serialize");
         let parsed: UpdateQualityScoreInput = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(parsed.original_action_hash, ActionHash::from_raw_36(vec![0xcd; 36]));
+        assert_eq!(
+            parsed.original_action_hash,
+            ActionHash::from_raw_36(vec![0xcd; 36])
+        );
         assert!((parsed.updated_entry.score - 0.95).abs() < 1e-10);
         assert_eq!(parsed.updated_entry.endorsement_count, 95);
         assert_eq!(parsed.updated_entry.share_count, 50);
@@ -795,8 +975,14 @@ mod tests {
         };
         let json = serde_json::to_string(&input).expect("serialize");
         let parsed: EndorseInput = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(parsed.endorsement_type, EndorsementType::Award("Best Investigative Piece".into()));
-        assert_eq!(parsed.comment.as_deref(), Some("Exceptional depth of research"));
+        assert_eq!(
+            parsed.endorsement_type,
+            EndorsementType::Award("Best Investigative Piece".into())
+        );
+        assert_eq!(
+            parsed.comment.as_deref(),
+            Some("Exceptional depth of research")
+        );
     }
 
     #[test]
@@ -870,7 +1056,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).expect("serialize");
         let parsed: FeatureInput = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(parsed.featured_until, Some(Timestamp::from_micros(9_999_999)));
+        assert_eq!(
+            parsed.featured_until,
+            Some(Timestamp::from_micros(9_999_999))
+        );
     }
 
     #[test]

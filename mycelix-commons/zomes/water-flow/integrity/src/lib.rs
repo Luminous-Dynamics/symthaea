@@ -471,22 +471,18 @@ fn validate_create_water_share(
 fn validate_h2o_credit_fields(credit: &H2OCredit) -> ExternResult<ValidateCallbackResult> {
     // total_spent cannot exceed total_earned (no credit from nothing)
     if credit.total_spent > credit.total_earned {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "total_spent ({}) cannot exceed total_earned ({})",
-                credit.total_spent, credit.total_earned
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "total_spent ({}) cannot exceed total_earned ({})",
+            credit.total_spent, credit.total_earned
+        )));
     }
     // balance_liters must be consistent: earned - spent = balance (allow small overdraft via governance)
     // but balance cannot exceed total_earned (can't have more than ever earned)
     if credit.balance_liters > credit.total_earned as i64 {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "balance_liters ({}) cannot exceed total_earned ({})",
-                credit.balance_liters, credit.total_earned
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "balance_liters ({}) cannot exceed total_earned ({})",
+            credit.balance_liters, credit.total_earned
+        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -758,10 +754,7 @@ mod tests {
         src.id = "".into();
         let result = validate_create_water_source(fake_create(), src);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Water source ID cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Water source ID cannot be empty");
     }
 
     #[test]
@@ -770,10 +763,7 @@ mod tests {
         src.name = "".into();
         let result = validate_create_water_source(fake_create(), src);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Water source name cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Water source name cannot be empty");
     }
 
     #[test]
@@ -810,10 +800,7 @@ mod tests {
         src.location_lat = 90.001;
         let result = validate_create_water_source(fake_create(), src);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -822,10 +809,7 @@ mod tests {
         src.location_lat = -90.001;
         let result = validate_create_water_source(fake_create(), src);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -1244,10 +1228,7 @@ mod tests {
         tx.to_agent = tx.from_agent.clone();
         let result = validate_create_water_transaction(fake_create(), tx);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Cannot transfer credits to self"
-        );
+        assert_eq!(invalid_msg(&result), "Cannot transfer credits to self");
     }
 
     #[test]

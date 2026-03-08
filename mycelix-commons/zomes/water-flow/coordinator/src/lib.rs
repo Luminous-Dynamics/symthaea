@@ -1,12 +1,12 @@
 //! Flow Coordinator Zome
 //! Business logic for water allocation, H2O credits, and transactions
 
-use water_flow_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use water_flow_integrity::*;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -1113,11 +1113,17 @@ mod tests {
     fn source_status_invalid_variant_deser_fails() {
         let bad_json = r#""Frozen""#;
         let result = serde_json::from_str::<SourceStatus>(bad_json);
-        assert!(result.is_err(), "Unknown status variant should fail deserialization");
+        assert!(
+            result.is_err(),
+            "Unknown status variant should fail deserialization"
+        );
 
         let bad_json2 = r#""active""#; // lowercase
         let result2 = serde_json::from_str::<SourceStatus>(bad_json2);
-        assert!(result2.is_err(), "Lowercase variant should fail deserialization");
+        assert!(
+            result2.is_err(),
+            "Lowercase variant should fail deserialization"
+        );
 
         let bad_json3 = r#""""#; // empty string
         let result3 = serde_json::from_str::<SourceStatus>(bad_json3);
@@ -1158,7 +1164,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: TransferCreditsInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.liters, 0, "Zero liters must survive serde roundtrip");
+        assert_eq!(
+            decoded.liters, 0,
+            "Zero liters must survive serde roundtrip"
+        );
     }
 
     /// TransferCreditsInput: same agent as sender/receiver is rejected by
@@ -1298,7 +1307,10 @@ mod tests {
         };
         let json = serde_json::to_string(&tx).unwrap();
         let decoded: WaterTransaction = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.from_agent, decoded.to_agent, "Self-transfer agents must match after roundtrip");
+        assert_eq!(
+            decoded.from_agent, decoded.to_agent,
+            "Self-transfer agents must match after roundtrip"
+        );
         assert_eq!(decoded.liters, 100);
     }
 
@@ -1309,7 +1321,10 @@ mod tests {
         // Manually craft JSON with an invalid transaction type
         let bad_json = r#"{"to_agent":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"liters":100,"transaction_type":"Barter","source_hash":null}"#;
         let result = serde_json::from_str::<TransferCreditsInput>(bad_json);
-        assert!(result.is_err(), "Invalid transaction type 'Barter' should fail deserialization");
+        assert!(
+            result.is_err(),
+            "Invalid transaction type 'Barter' should fail deserialization"
+        );
     }
 
     /// RecordUsageInput: verify invalid JSON for the usage_category field
@@ -1318,7 +1333,10 @@ mod tests {
     fn record_usage_input_invalid_classification_deser_fails() {
         let bad_json = r#"{"source_hash":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"liters_used":50,"usage_category":"Sewage","meter_reference":null}"#;
         let result = serde_json::from_str::<RecordUsageInput>(bad_json);
-        assert!(result.is_err(), "Invalid classification 'Sewage' should fail deserialization");
+        assert!(
+            result.is_err(),
+            "Invalid classification 'Sewage' should fail deserialization"
+        );
     }
 
     // ========================================================================
@@ -1344,7 +1362,10 @@ mod tests {
         let decoded: WaterSource = serde_json::from_str(&json).unwrap();
         // The struct itself roundtrips faithfully; coordinator rejects at runtime
         assert_eq!(decoded.id, "   ");
-        assert!(decoded.id.trim().is_empty(), "Whitespace-only ID must be caught by trim().is_empty()");
+        assert!(
+            decoded.id.trim().is_empty(),
+            "Whitespace-only ID must be caught by trim().is_empty()"
+        );
     }
 
     /// Source name that is only whitespace should be rejected.
@@ -1363,7 +1384,10 @@ mod tests {
         };
         let json = serde_json::to_string(&source).unwrap();
         let decoded: WaterSource = serde_json::from_str(&json).unwrap();
-        assert!(decoded.name.trim().is_empty(), "Whitespace-only name must be caught by trim().is_empty()");
+        assert!(
+            decoded.name.trim().is_empty(),
+            "Whitespace-only name must be caught by trim().is_empty()"
+        );
     }
 
     /// RecordUsageInput with zero liters: the coordinator now rejects this
@@ -1376,6 +1400,9 @@ mod tests {
             usage_category: WaterClassification::Potable,
             meter_reference: None,
         };
-        assert_eq!(input.liters_used, 0, "Zero liters preserved in struct for coordinator rejection");
+        assert_eq!(
+            input.liters_used, 0,
+            "Zero liters preserved in struct for coordinator rejection"
+        );
     }
 }

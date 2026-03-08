@@ -870,15 +870,13 @@ mod tests {
 
     #[test]
     fn test_link_tag_request_to_match_at_limit() {
-        let result =
-            validate_create_link_tag(LinkTypes::RequestToMatch, vec![0u8; 256]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::RequestToMatch, vec![0u8; 256]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
     fn test_link_tag_request_to_match_over_limit() {
-        let result =
-            validate_create_link_tag(LinkTypes::RequestToMatch, vec![0u8; 257]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::RequestToMatch, vec![0u8; 257]).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -912,8 +910,7 @@ mod tests {
 
     #[test]
     fn test_link_tag_empty_tag_valid() {
-        let result =
-            validate_create_link_tag(LinkTypes::RequestToMatch, vec![]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::RequestToMatch, vec![]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 

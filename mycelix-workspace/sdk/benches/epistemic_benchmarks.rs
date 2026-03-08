@@ -12,8 +12,8 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use mycelix_sdk::agentic::{
     analyze_behavior, calculate_kredit_from_trust, compute_kvector_update, compute_trust_score,
     measure_coherence, ActionOutcome, AgentClass, AgentConstraints, AgentId, AgentOutput,
-    AgentOutputBuilder, AgentStatus, InstrumentalActor, KVectorBridgeConfig, OutputContent,
-    CoherenceMeasurementConfig,
+    AgentOutputBuilder, AgentStatus, CoherenceMeasurementConfig, InstrumentalActor,
+    KVectorBridgeConfig, OutputContent,
 };
 use mycelix_sdk::epistemic::{
     EmpiricalLevel, EpistemicClassification, HarmonicLevel, MaterialityLevel, NormativeLevel,

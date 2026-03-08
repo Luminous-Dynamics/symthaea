@@ -1,10 +1,10 @@
 //! Commons Management Coordinator Zome
 use hdk::prelude::*;
-use property_commons_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use property_commons_integrity::*;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -19,7 +19,6 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
     hash_entry(&anchor)
 }
-
 
 fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
     let Some(details) = get_details(action_hash, GetOptions::default())? else {
@@ -44,7 +43,11 @@ pub fn create_common_resource(input: CreateResourceInput) -> ExternResult<Record
     let _eligibility = require_consciousness(&requirement_for_basic(), "create_common_resource")?;
     let now = sys_time()?;
     let resource = CommonResource {
-        id: format!("commons:{}:{}", input.name.replace(' ', "_"), now.as_micros()),
+        id: format!(
+            "commons:{}:{}",
+            input.name.replace(' ', "_"),
+            now.as_micros()
+        ),
         name: input.name,
         description: input.description,
         resource_type: input.resource_type,
@@ -56,7 +59,12 @@ pub fn create_common_resource(input: CreateResourceInput) -> ExternResult<Record
 
     let action_hash = create_entry(&EntryTypes::CommonResource(resource))?;
     for steward in input.stewards {
-        create_link(anchor_hash(&steward)?, action_hash.clone(), LinkTypes::StewardToResource, ())?;
+        create_link(
+            anchor_hash(&steward)?,
+            action_hash.clone(),
+            LinkTypes::StewardToResource,
+            (),
+        )?;
     }
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
@@ -76,7 +84,12 @@ pub fn grant_usage_right(input: GrantRightInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "grant_usage_right")?;
     let now = sys_time()?;
     let right = UsageRight {
-        id: format!("right:{}:{}:{}", input.resource_id, input.holder_did, now.as_micros()),
+        id: format!(
+            "right:{}:{}:{}",
+            input.resource_id,
+            input.holder_did,
+            now.as_micros()
+        ),
         resource_id: input.resource_id.clone(),
         holder_did: input.holder_did.clone(),
         right_type: input.right_type,
@@ -87,8 +100,18 @@ pub fn grant_usage_right(input: GrantRightInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::UsageRight(right))?;
-    create_link(anchor_hash(&input.resource_id)?, action_hash.clone(), LinkTypes::ResourceToRights, ())?;
-    create_link(anchor_hash(&input.holder_did)?, action_hash.clone(), LinkTypes::HolderToRights, ())?;
+    create_link(
+        anchor_hash(&input.resource_id)?,
+        action_hash.clone(),
+        LinkTypes::ResourceToRights,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&input.holder_did)?,
+        action_hash.clone(),
+        LinkTypes::HolderToRights,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -106,7 +129,12 @@ pub fn log_usage(input: LogUsageInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "log_usage")?;
     let now = sys_time()?;
     let log = UsageLog {
-        id: format!("usage:{}:{}:{}", input.resource_id, input.user_did, now.as_micros()),
+        id: format!(
+            "usage:{}:{}:{}",
+            input.resource_id,
+            input.user_did,
+            now.as_micros()
+        ),
         resource_id: input.resource_id.clone(),
         user_did: input.user_did,
         usage_type: input.usage_type,
@@ -116,7 +144,12 @@ pub fn log_usage(input: LogUsageInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::UsageLog(log))?;
-    create_link(anchor_hash(&input.resource_id)?, action_hash.clone(), LinkTypes::ResourceToLogs, ())?;
+    create_link(
+        anchor_hash(&input.resource_id)?,
+        action_hash.clone(),
+        LinkTypes::ResourceToLogs,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -132,8 +165,15 @@ pub struct LogUsageInput {
 #[hdk_extern]
 pub fn get_resource_usage(resource_id: String) -> ExternResult<Vec<Record>> {
     let mut logs = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&resource_id)?, LinkTypes::ResourceToLogs)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&resource_id)?, LinkTypes::ResourceToLogs)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             logs.push(record);
         }
     }
@@ -143,10 +183,17 @@ pub fn get_resource_usage(resource_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn check_usage_quota(input: CheckQuotaInput) -> ExternResult<bool> {
     // Get user's rights for this resource
-    let rights_links = get_links(LinkQuery::try_new(anchor_hash(&input.user_did)?, LinkTypes::HolderToRights)?, GetStrategy::default())?;
+    let rights_links = get_links(
+        LinkQuery::try_new(anchor_hash(&input.user_did)?, LinkTypes::HolderToRights)?,
+        GetStrategy::default(),
+    )?;
 
     for link in rights_links {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             if let Some(right) = record.entry().to_app_option::<UsageRight>().ok().flatten() {
                 if right.resource_id == input.resource_id && right.active {
                     if let Some(quota) = right.quota {
@@ -154,7 +201,12 @@ pub fn check_usage_quota(input: CheckQuotaInput) -> ExternResult<bool> {
                         let usage_logs = get_resource_usage(input.resource_id.clone())?;
                         let mut total_usage = 0.0;
                         for log_record in usage_logs {
-                            if let Some(log) = log_record.entry().to_app_option::<UsageLog>().ok().flatten() {
+                            if let Some(log) = log_record
+                                .entry()
+                                .to_app_option::<UsageLog>()
+                                .ok()
+                                .flatten()
+                            {
                                 if log.user_did == input.user_did {
                                     total_usage += log.quantity;
                                 }
@@ -181,11 +233,18 @@ pub struct CheckQuotaInput {
 #[hdk_extern]
 pub fn get_resource(resource_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonResource)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::CommonResource,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(resource) = record.entry().to_app_option::<CommonResource>().ok().flatten() {
+        if let Some(resource) = record
+            .entry()
+            .to_app_option::<CommonResource>()
+            .ok()
+            .flatten()
+        {
             if resource.id == resource_id {
                 return Ok(Some(record));
             }
@@ -198,8 +257,15 @@ pub fn get_resource(resource_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_steward_resources(steward_did: String) -> ExternResult<Vec<Record>> {
     let mut resources = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&steward_did)?, LinkTypes::StewardToResource)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&steward_did)?, LinkTypes::StewardToResource)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             resources.push(record);
         }
     }
@@ -210,8 +276,15 @@ pub fn get_steward_resources(steward_did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_resource_rights(resource_id: String) -> ExternResult<Vec<Record>> {
     let mut rights = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&resource_id)?, LinkTypes::ResourceToRights)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&resource_id)?, LinkTypes::ResourceToRights)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             rights.push(record);
         }
     }
@@ -223,25 +296,43 @@ pub fn get_resource_rights(resource_id: String) -> ExternResult<Vec<Record>> {
 pub fn revoke_usage_right(input: RevokeRightInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "revoke_usage_right")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::UsageRight)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::UsageRight,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(right) = record.entry().to_app_option::<UsageRight>().ok().flatten() {
             if right.id == input.right_id {
                 // Verify revoker is a steward
-                let resource = get_resource(right.resource_id.clone())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".into())))?;
-                let resource_data = resource.entry().to_app_option::<CommonResource>().ok().flatten()
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid resource data".into())))?;
+                let resource = get_resource(right.resource_id.clone())?.ok_or(wasm_error!(
+                    WasmErrorInner::Guest("Resource not found".into())
+                ))?;
+                let resource_data = resource
+                    .entry()
+                    .to_app_option::<CommonResource>()
+                    .ok()
+                    .flatten()
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "Invalid resource data".into()
+                    )))?;
 
                 if !resource_data.stewards.contains(&input.revoker_did) {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only stewards can revoke rights".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only stewards can revoke rights".into()
+                    )));
                 }
 
-                let revoked = UsageRight { active: false, ..right };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::UsageRight(revoked))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let revoked = UsageRight {
+                    active: false,
+                    ..right
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::UsageRight(revoked),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -259,32 +350,57 @@ pub struct RevokeRightInput {
 pub fn add_steward(input: AddStewardInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "add_steward")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonResource)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::CommonResource,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(resource) = record.entry().to_app_option::<CommonResource>().ok().flatten() {
+        if let Some(resource) = record
+            .entry()
+            .to_app_option::<CommonResource>()
+            .ok()
+            .flatten()
+        {
             if resource.id == input.resource_id {
                 // Verify caller is a steward
                 if !resource.stewards.contains(&input.added_by_did) {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only stewards can add new stewards".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only stewards can add new stewards".into()
+                    )));
                 }
 
                 if resource.stewards.contains(&input.new_steward_did) {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Already a steward".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Already a steward".into()
+                    )));
                 }
 
                 let mut stewards = resource.stewards.clone();
                 stewards.push(input.new_steward_did.clone());
 
-                let updated = CommonResource { stewards, ..resource };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonResource(updated))?;
-                create_link(anchor_hash(&input.new_steward_did)?, action_hash.clone(), LinkTypes::StewardToResource, ())?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let updated = CommonResource {
+                    stewards,
+                    ..resource
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::CommonResource(updated),
+                )?;
+                create_link(
+                    anchor_hash(&input.new_steward_did)?,
+                    action_hash.clone(),
+                    LinkTypes::StewardToResource,
+                    (),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Resource not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Resource not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -299,37 +415,59 @@ pub struct AddStewardInput {
 pub fn remove_steward(input: RemoveStewardInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "remove_steward")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonResource)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::CommonResource,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(resource) = record.entry().to_app_option::<CommonResource>().ok().flatten() {
+        if let Some(resource) = record
+            .entry()
+            .to_app_option::<CommonResource>()
+            .ok()
+            .flatten()
+        {
             if resource.id == input.resource_id {
                 // Verify caller is a steward
                 if !resource.stewards.contains(&input.removed_by_did) {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only stewards can remove stewards".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only stewards can remove stewards".into()
+                    )));
                 }
 
                 if resource.stewards.len() <= 1 {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Cannot remove last steward".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Cannot remove last steward".into()
+                    )));
                 }
 
                 if !resource.stewards.contains(&input.steward_did) {
                     return Err(wasm_error!(WasmErrorInner::Guest("Not a steward".into())));
                 }
 
-                let stewards: Vec<String> = resource.stewards.iter()
+                let stewards: Vec<String> = resource
+                    .stewards
+                    .iter()
                     .filter(|s| *s != &input.steward_did)
                     .cloned()
                     .collect();
 
-                let updated = CommonResource { stewards, ..resource };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonResource(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let updated = CommonResource {
+                    stewards,
+                    ..resource
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::CommonResource(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Resource not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Resource not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -343,8 +481,15 @@ pub struct RemoveStewardInput {
 #[hdk_extern]
 pub fn get_holder_rights(holder_did: String) -> ExternResult<Vec<Record>> {
     let mut rights = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&holder_did)?, LinkTypes::HolderToRights)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&holder_did)?, LinkTypes::HolderToRights)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             rights.push(record);
         }
     }
@@ -354,26 +499,45 @@ pub fn get_holder_rights(holder_did: String) -> ExternResult<Vec<Record>> {
 /// Update governance rules for a resource
 #[hdk_extern]
 pub fn update_governance_rules(input: UpdateGovernanceInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_governance_rules")?;
+    let _eligibility =
+        require_consciousness(&requirement_for_proposal(), "update_governance_rules")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonResource)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::CommonResource,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(resource) = record.entry().to_app_option::<CommonResource>().ok().flatten() {
+        if let Some(resource) = record
+            .entry()
+            .to_app_option::<CommonResource>()
+            .ok()
+            .flatten()
+        {
             if resource.id == input.resource_id {
                 // Verify caller is a steward
                 if !resource.stewards.contains(&input.steward_did) {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only stewards can update governance".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only stewards can update governance".into()
+                    )));
                 }
 
-                let updated = CommonResource { governance_rules: input.new_rules, ..resource };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonResource(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let updated = CommonResource {
+                    governance_rules: input.new_rules,
+                    ..resource
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::CommonResource(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Resource not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Resource not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -387,12 +551,19 @@ pub struct UpdateGovernanceInput {
 #[hdk_extern]
 pub fn get_resources_by_type(resource_type: ResourceType) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonResource)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::CommonResource,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
     for record in query(filter)? {
-        if let Some(resource) = record.entry().to_app_option::<CommonResource>().ok().flatten() {
+        if let Some(resource) = record
+            .entry()
+            .to_app_option::<CommonResource>()
+            .ok()
+            .flatten()
+        {
             if resource.resource_type == resource_type {
                 results.push(record);
             }
@@ -405,7 +576,9 @@ pub fn get_resources_by_type(resource_type: ResourceType) -> ExternResult<Vec<Re
 #[hdk_extern]
 pub fn get_usage_right(right_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::UsageRight)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::UsageRight,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -424,7 +597,12 @@ pub fn get_user_usage(input: UserUsageInput) -> ExternResult<f64> {
     let logs = get_resource_usage(input.resource_id)?;
     let mut total = 0.0;
     for log_record in logs {
-        if let Some(log) = log_record.entry().to_app_option::<UsageLog>().ok().flatten() {
+        if let Some(log) = log_record
+            .entry()
+            .to_app_option::<UsageLog>()
+            .ok()
+            .flatten()
+        {
             if log.user_did == input.user_did {
                 total += log.quantity;
             }
@@ -444,25 +622,43 @@ pub struct UserUsageInput {
 pub fn update_right_quota(input: UpdateQuotaInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "update_right_quota")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::UsageRight)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::UsageRight,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(right) = record.entry().to_app_option::<UsageRight>().ok().flatten() {
             if right.id == input.right_id {
                 // Verify updater is a steward of the resource
-                let resource = get_resource(right.resource_id.clone())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".into())))?;
-                let resource_data = resource.entry().to_app_option::<CommonResource>().ok().flatten()
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid resource data".into())))?;
+                let resource = get_resource(right.resource_id.clone())?.ok_or(wasm_error!(
+                    WasmErrorInner::Guest("Resource not found".into())
+                ))?;
+                let resource_data = resource
+                    .entry()
+                    .to_app_option::<CommonResource>()
+                    .ok()
+                    .flatten()
+                    .ok_or(wasm_error!(WasmErrorInner::Guest(
+                        "Invalid resource data".into()
+                    )))?;
 
                 if !resource_data.stewards.contains(&input.steward_did) {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only stewards can update quotas".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only stewards can update quotas".into()
+                    )));
                 }
 
-                let updated = UsageRight { quota: input.new_quota, ..right };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::UsageRight(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let updated = UsageRight {
+                    quota: input.new_quota,
+                    ..right
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::UsageRight(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -490,7 +686,11 @@ mod tests {
             stewards: vec!["did:key:z6Mk001".to_string(), "did:key:z6Mk002".to_string()],
             governance_rules: GovernanceRules {
                 access_rules: vec!["Members only".to_string()],
-                usage_limits: vec![UsageLimit { limit_type: "water_liters".to_string(), max_per_period: 500.0, period_days: 7 }],
+                usage_limits: vec![UsageLimit {
+                    limit_type: "water_liters".to_string(),
+                    max_per_period: 500.0,
+                    period_days: 7,
+                }],
                 maintenance_rotation: true,
                 decision_method: DecisionMethod::Consensus,
                 penalty_for_violation: Some("Warning".to_string()),
@@ -712,10 +912,21 @@ mod tests {
     #[test]
     fn governance_rules_consensus_serde_roundtrip() {
         let rules = GovernanceRules {
-            access_rules: vec!["Open to all members".to_string(), "Must register".to_string()],
+            access_rules: vec![
+                "Open to all members".to_string(),
+                "Must register".to_string(),
+            ],
             usage_limits: vec![
-                UsageLimit { limit_type: "water_liters".to_string(), max_per_period: 500.0, period_days: 7 },
-                UsageLimit { limit_type: "harvest_kg".to_string(), max_per_period: 20.0, period_days: 30 },
+                UsageLimit {
+                    limit_type: "water_liters".to_string(),
+                    max_per_period: 500.0,
+                    period_days: 7,
+                },
+                UsageLimit {
+                    limit_type: "harvest_kg".to_string(),
+                    max_per_period: 20.0,
+                    period_days: 30,
+                },
             ],
             maintenance_rotation: true,
             decision_method: DecisionMethod::Consensus,
@@ -727,7 +938,11 @@ mod tests {
         assert_eq!(decoded.usage_limits.len(), 2);
         assert!(decoded.maintenance_rotation);
         assert_eq!(decoded.decision_method, DecisionMethod::Consensus);
-        assert!(decoded.penalty_for_violation.as_ref().unwrap().contains("warning"));
+        assert!(decoded
+            .penalty_for_violation
+            .as_ref()
+            .unwrap()
+            .contains("warning"));
     }
 
     #[test]
@@ -891,9 +1106,7 @@ mod tests {
 
     #[test]
     fn create_resource_input_many_stewards_serde() {
-        let stewards: Vec<String> = (0..50)
-            .map(|i| format!("did:key:z6Mk{:04}", i))
-            .collect();
+        let stewards: Vec<String> = (0..50).map(|i| format!("did:key:z6Mk{:04}", i)).collect();
         let input = CreateResourceInput {
             name: "Large Commons".to_string(),
             description: "A resource with 50 stewards".to_string(),

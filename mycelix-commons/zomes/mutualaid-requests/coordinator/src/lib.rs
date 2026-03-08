@@ -5,12 +5,12 @@
 
 use hdk::prelude::*;
 use mutualaid_requests_integrity::{
-    Anchor as RequestsAnchor, AidOffer, AidRequest, EntryTypes, LinkTypes,
-    OfferStatus, RequestStatus, RequestType, Urgency,
+    AidOffer, AidRequest, Anchor as RequestsAnchor, EntryTypes, LinkTypes, OfferStatus,
+    RequestStatus, RequestType, Urgency,
 };
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 /// Input for creating a new aid request
@@ -79,7 +79,12 @@ fn generate_id(prefix: &str) -> ExternResult<String> {
     // Create unique ID from timestamp and agent pubkey truncated hash
     let agent_str = format!("{:?}", agent);
     let short_hash = &agent_str[agent_str.len().saturating_sub(8)..];
-    Ok(format!("{}_{:x}_{}", prefix, now.as_micros() as u64, short_hash))
+    Ok(format!(
+        "{}_{:x}_{}",
+        prefix,
+        now.as_micros() as u64,
+        short_hash
+    ))
 }
 
 /// Get or create the main requests anchor
@@ -267,7 +272,9 @@ pub fn get_request(action_hash: ActionHash) -> ExternResult<Option<RequestWithHa
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No AidRequest found".to_string())))?;
+                .ok_or_else(|| {
+                    wasm_error!(WasmErrorInner::Guest("No AidRequest found".to_string()))
+                })?;
             Ok(Some(RequestWithHash {
                 hash: action_hash,
                 request,
@@ -301,17 +308,17 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
     request.updated_at = sys_time()?;
 
     // Update the entry
-    let new_hash = update_entry(input.request_hash.clone(), EntryTypes::AidRequest(request.clone()))?;
+    let new_hash = update_entry(
+        input.request_hash.clone(),
+        EntryTypes::AidRequest(request.clone()),
+    )?;
 
     // Update status links if status changed
     if old_status != input.status {
         // Get and delete old status links
         let old_status_anchor = get_status_anchor(&old_status)?;
         let old_links = get_links(
-            LinkQuery::try_new(
-                old_status_anchor,
-                LinkTypes::StatusToRequest,
-            )?,
+            LinkQuery::try_new(old_status_anchor, LinkTypes::StatusToRequest)?,
             GetStrategy::default(),
         )?;
         for link in old_links {
@@ -341,10 +348,7 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
 pub fn get_open_requests(_: ()) -> ExternResult<Vec<RequestWithHash>> {
     let status_anchor = get_status_anchor(&RequestStatus::Open)?;
     let links = get_links(
-        LinkQuery::try_new(
-            status_anchor,
-            LinkTypes::StatusToRequest,
-        )?,
+        LinkQuery::try_new(status_anchor, LinkTypes::StatusToRequest)?,
         GetStrategy::default(),
     )?;
 
@@ -365,10 +369,7 @@ pub fn get_open_requests(_: ()) -> ExternResult<Vec<RequestWithHash>> {
 pub fn get_requests_by_type(request_type: RequestType) -> ExternResult<Vec<RequestWithHash>> {
     let type_anchor = get_type_anchor(&request_type)?;
     let links = get_links(
-        LinkQuery::try_new(
-            type_anchor,
-            LinkTypes::TypeToRequest,
-        )?,
+        LinkQuery::try_new(type_anchor, LinkTypes::TypeToRequest)?,
         GetStrategy::default(),
     )?;
 
@@ -389,10 +390,7 @@ pub fn get_requests_by_type(request_type: RequestType) -> ExternResult<Vec<Reque
 pub fn get_requests_by_urgency(urgency: Urgency) -> ExternResult<Vec<RequestWithHash>> {
     let urgency_anchor = get_urgency_anchor(&urgency)?;
     let links = get_links(
-        LinkQuery::try_new(
-            urgency_anchor,
-            LinkTypes::UrgencyToRequest,
-        )?,
+        LinkQuery::try_new(urgency_anchor, LinkTypes::UrgencyToRequest)?,
         GetStrategy::default(),
     )?;
 
@@ -413,10 +411,7 @@ pub fn get_requests_by_urgency(urgency: Urgency) -> ExternResult<Vec<RequestWith
 pub fn get_requests_by_requester(requester_did: String) -> ExternResult<Vec<RequestWithHash>> {
     let requester_anchor = get_requester_anchor(&requester_did)?;
     let links = get_links(
-        LinkQuery::try_new(
-            requester_anchor,
-            LinkTypes::RequesterToRequest,
-        )?,
+        LinkQuery::try_new(requester_anchor, LinkTypes::RequesterToRequest)?,
         GetStrategy::default(),
     )?;
 
@@ -509,7 +504,9 @@ pub fn get_offer(action_hash: ActionHash) -> ExternResult<Option<OfferWithHash>>
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No AidOffer found".to_string())))?;
+                .ok_or_else(|| {
+                    wasm_error!(WasmErrorInner::Guest("No AidOffer found".to_string()))
+                })?;
             Ok(Some(OfferWithHash {
                 hash: action_hash,
                 offer,
@@ -550,10 +547,7 @@ pub fn update_offer_status(input: UpdateOfferStatusInput) -> ExternResult<OfferW
 #[hdk_extern]
 pub fn get_offers_for_request(request_hash: ActionHash) -> ExternResult<Vec<OfferWithHash>> {
     let links = get_links(
-        LinkQuery::try_new(
-            request_hash,
-            LinkTypes::RequestToOffer,
-        )?,
+        LinkQuery::try_new(request_hash, LinkTypes::RequestToOffer)?,
         GetStrategy::default(),
     )?;
 
@@ -574,10 +568,7 @@ pub fn get_offers_for_request(request_hash: ActionHash) -> ExternResult<Vec<Offe
 pub fn get_offers_by_offerer(offerer_did: String) -> ExternResult<Vec<OfferWithHash>> {
     let offerer_anchor = get_offerer_anchor(&offerer_did)?;
     let links = get_links(
-        LinkQuery::try_new(
-            offerer_anchor,
-            LinkTypes::OffererToOffer,
-        )?,
+        LinkQuery::try_new(offerer_anchor, LinkTypes::OffererToOffer)?,
         GetStrategy::default(),
     )?;
 
@@ -667,7 +658,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: CreateRequestInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.request_type, RequestType::Other("Emotional Support".to_string()));
+        assert_eq!(
+            decoded.request_type,
+            RequestType::Other("Emotional Support".to_string())
+        );
     }
 
     #[test]
@@ -759,7 +753,10 @@ mod tests {
         assert_eq!(decoded.request_type, Some(RequestType::Housing));
         assert_eq!(decoded.status, Some(RequestStatus::Open));
         assert_eq!(decoded.urgency, Some(Urgency::Critical));
-        assert_eq!(decoded.requester_did, Some("did:mycelix:searcher".to_string()));
+        assert_eq!(
+            decoded.requester_did,
+            Some("did:mycelix:searcher".to_string())
+        );
     }
 
     #[test]
@@ -1054,7 +1051,12 @@ mod tests {
 
     #[test]
     fn create_request_input_all_urgency_levels() {
-        for urgency in [Urgency::Critical, Urgency::High, Urgency::Medium, Urgency::Low] {
+        for urgency in [
+            Urgency::Critical,
+            Urgency::High,
+            Urgency::Medium,
+            Urgency::Low,
+        ] {
             let input = CreateRequestInput {
                 requester_did: "did:mycelix:test".to_string(),
                 request_type: RequestType::Financial,
@@ -1169,7 +1171,10 @@ mod tests {
             location: None,
             amount_needed: Some(100),
         };
-        assert!(input.description.trim().is_empty(), "Whitespace-only description should be detected");
+        assert!(
+            input.description.trim().is_empty(),
+            "Whitespace-only description should be detected"
+        );
     }
 
     #[test]
@@ -1182,7 +1187,10 @@ mod tests {
             location: None,
             amount_needed: None,
         };
-        assert!(input.description.trim().is_empty(), "Empty description should be detected");
+        assert!(
+            input.description.trim().is_empty(),
+            "Empty description should be detected"
+        );
     }
 
     #[test]
@@ -1195,7 +1203,10 @@ mod tests {
             location: None,
             amount_needed: None,
         };
-        assert!(input.requester_did.trim().is_empty(), "Whitespace-only DID should be detected");
+        assert!(
+            input.requester_did.trim().is_empty(),
+            "Whitespace-only DID should be detected"
+        );
     }
 
     #[test]
@@ -1208,7 +1219,11 @@ mod tests {
             location: None,
             amount_needed: Some(0),
         };
-        assert_eq!(input.amount_needed, Some(0), "Zero amount should be detected");
+        assert_eq!(
+            input.amount_needed,
+            Some(0),
+            "Zero amount should be detected"
+        );
     }
 
     #[test]
@@ -1221,8 +1236,14 @@ mod tests {
             location: Some("Downtown".to_string()),
             amount_needed: Some(500),
         };
-        assert!(!input.description.trim().is_empty(), "Valid description should pass");
-        assert!(!input.requester_did.trim().is_empty(), "Valid DID should pass");
+        assert!(
+            !input.description.trim().is_empty(),
+            "Valid description should pass"
+        );
+        assert!(
+            !input.requester_did.trim().is_empty(),
+            "Valid DID should pass"
+        );
         assert!(input.amount_needed.unwrap() > 0, "Valid amount should pass");
     }
 
@@ -1237,7 +1258,10 @@ mod tests {
             location: None,
             amount_needed: None,
         };
-        assert!(input.amount_needed.is_none(), "None amount should be accepted for non-financial requests");
+        assert!(
+            input.amount_needed.is_none(),
+            "None amount should be accepted for non-financial requests"
+        );
     }
 
     #[test]
@@ -1250,7 +1274,10 @@ mod tests {
             amount: Some(100),
             message: "   \t\n  ".to_string(),
         };
-        assert!(input.message.trim().is_empty(), "Whitespace-only message should be detected");
+        assert!(
+            input.message.trim().is_empty(),
+            "Whitespace-only message should be detected"
+        );
     }
 
     #[test]
@@ -1263,7 +1290,10 @@ mod tests {
             amount: None,
             message: "".to_string(),
         };
-        assert!(input.message.trim().is_empty(), "Empty message should be detected");
+        assert!(
+            input.message.trim().is_empty(),
+            "Empty message should be detected"
+        );
     }
 
     #[test]
@@ -1276,7 +1306,11 @@ mod tests {
             amount: Some(0),
             message: "I can help".to_string(),
         };
-        assert_eq!(input.amount, Some(0), "Zero offer amount should be detected");
+        assert_eq!(
+            input.amount,
+            Some(0),
+            "Zero offer amount should be detected"
+        );
     }
 
     #[test]
@@ -1289,7 +1323,10 @@ mod tests {
             amount: Some(50),
             message: "Offering help".to_string(),
         };
-        assert!(input.offerer_did.trim().is_empty(), "Whitespace-only offerer DID should be detected");
+        assert!(
+            input.offerer_did.trim().is_empty(),
+            "Whitespace-only offerer DID should be detected"
+        );
     }
 
     #[test]
@@ -1302,8 +1339,14 @@ mod tests {
             amount: Some(200),
             message: "Happy to help!".to_string(),
         };
-        assert!(!input.message.trim().is_empty(), "Valid message should pass");
-        assert!(!input.offerer_did.trim().is_empty(), "Valid DID should pass");
+        assert!(
+            !input.message.trim().is_empty(),
+            "Valid message should pass"
+        );
+        assert!(
+            !input.offerer_did.trim().is_empty(),
+            "Valid DID should pass"
+        );
         assert!(input.amount.unwrap() > 0, "Valid amount should pass");
     }
 }

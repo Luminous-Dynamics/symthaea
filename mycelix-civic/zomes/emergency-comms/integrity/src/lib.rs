@@ -723,10 +723,7 @@ mod tests {
         msg.location = Some((-90.1, 0.0));
         let result = validate_create_message(fake_create(), msg);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -735,10 +732,7 @@ mod tests {
         msg.location = Some((90.1, 0.0));
         let result = validate_create_message(fake_create(), msg);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -885,7 +879,8 @@ mod tests {
     #[test]
     fn create_channel_unicode_name_passes() {
         let mut ch = make_channel();
-        ch.name = "\u{7D27}\u{6025}\u{901A}\u{4FE1} \u{30C1}\u{30E3}\u{30F3}\u{30CD}\u{30EB}".into();
+        ch.name =
+            "\u{7D27}\u{6025}\u{901A}\u{4FE1} \u{30C1}\u{30E3}\u{30F3}\u{30CD}\u{30EB}".into();
         let result = validate_create_channel(fake_create(), ch);
         assert!(is_valid(&result));
     }
@@ -904,7 +899,10 @@ mod tests {
         ch.name = "A".repeat(257);
         let result = validate_create_channel(fake_create(), ch);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Channel name too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Channel name too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -913,7 +911,10 @@ mod tests {
         ch.name = "A".repeat(1000);
         let result = validate_create_channel(fake_create(), ch);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Channel name too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Channel name too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -930,7 +931,10 @@ mod tests {
         b.content = "c".repeat(4097);
         let result = validate_create_broadcast(fake_create(), b);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Broadcast content too long (max 4096 bytes)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Broadcast content too long (max 4096 bytes)"
+        );
     }
 
     // ========================================================================
@@ -1152,10 +1156,7 @@ mod tests {
         b.target_area = (0.0, 0.0, 0.0);
         let result = validate_create_broadcast(fake_create(), b);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Target area radius must be positive"
-        );
+        assert_eq!(invalid_msg(&result), "Target area radius must be positive");
     }
 
     #[test]
@@ -1164,10 +1165,7 @@ mod tests {
         b.target_area = (0.0, 0.0, -5.0);
         let result = validate_create_broadcast(fake_create(), b);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Target area radius must be positive"
-        );
+        assert_eq!(invalid_msg(&result), "Target area radius must be positive");
     }
 
     #[test]
@@ -1272,10 +1270,7 @@ mod tests {
         msg.location = Some((999.0, 999.0));
         let result = validate_create_message(fake_create(), msg);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     // ========================================================================
@@ -1319,7 +1314,10 @@ mod tests {
     // LINK TAG VALIDATION TESTS
     // ========================================================================
 
-    fn validate_create_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag_len = tag.len();
         match link_type {
             LinkTypes::DisasterToBroadcast => {
@@ -1409,12 +1407,30 @@ mod tests {
     #[test]
     fn massive_link_tag_rejected_all_types() {
         let huge_tag = vec![0xFFu8; 10_000];
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ChannelToMessage, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::DisasterToChannel, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::DisasterToBroadcast, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AgentToMessage, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::UnsyncedMessages, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ActiveBroadcasts, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::ChannelToMessage,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::DisasterToChannel,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::DisasterToBroadcast,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::AgentToMessage,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::UnsyncedMessages,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::ActiveBroadcasts,
+            huge_tag.clone()
+        )));
     }
 
     // -- Delete link tag tests --

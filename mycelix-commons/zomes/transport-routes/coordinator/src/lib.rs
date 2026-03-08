@@ -1,12 +1,12 @@
 //! Transport Routes Coordinator Zome
 //! Business logic for vehicle registration, route creation, and stop management.
 
-use transport_routes_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use transport_routes_integrity::*;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -60,11 +60,22 @@ pub fn register_vehicle(vehicle: Vehicle) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Vehicle(vehicle.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_vehicles".to_string())))?;
-    create_link(anchor_hash("all_vehicles")?, action_hash.clone(), LinkTypes::AllVehicles, ())?;
-    create_link(vehicle.owner, action_hash.clone(), LinkTypes::OwnerToVehicle, ())?;
+    create_link(
+        anchor_hash("all_vehicles")?,
+        action_hash.clone(),
+        LinkTypes::AllVehicles,
+        (),
+    )?;
+    create_link(
+        vehicle.owner,
+        action_hash.clone(),
+        LinkTypes::OwnerToVehicle,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created vehicle".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created vehicle".into()
+    )))
 }
 
 #[hdk_extern]
@@ -91,22 +102,32 @@ pub struct UpdateVehicleStatusInput {
 #[hdk_extern]
 pub fn update_vehicle_status(input: UpdateVehicleStatusInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "update_vehicle_status")?;
-    let record = get(input.vehicle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Vehicle not found".into())))?;
-    let mut vehicle: Vehicle = record.entry()
+    let record = get(input.vehicle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Vehicle not found".into())
+    ))?;
+    let mut vehicle: Vehicle = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid vehicle entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid vehicle entry".into()
+        )))?;
 
     let agent = agent_info()?.agent_initial_pubkey;
     if vehicle.owner != agent {
-        return Err(wasm_error!(WasmErrorInner::Guest("Only the owner can update vehicle status".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the owner can update vehicle status".into()
+        )));
     }
 
     vehicle.status = input.new_status;
-    let new_hash = update_entry(record.action_address().clone(), &EntryTypes::Vehicle(vehicle))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated vehicle".into())))
+    let new_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::Vehicle(vehicle),
+    )?;
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated vehicle".into()
+    )))
 }
 
 // ============================================================================
@@ -119,10 +140,16 @@ pub fn create_route(route: Route) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Route(route.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_routes".to_string())))?;
-    create_link(anchor_hash("all_routes")?, action_hash.clone(), LinkTypes::AllRoutes, ())?;
+    create_link(
+        anchor_hash("all_routes")?,
+        action_hash.clone(),
+        LinkTypes::AllRoutes,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created route".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created route".into()
+    )))
 }
 
 #[hdk_extern]
@@ -145,10 +172,16 @@ pub fn add_stop(stop: Stop) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Route not found".into())))?;
 
     let action_hash = create_entry(&EntryTypes::Stop(stop.clone()))?;
-    create_link(stop.route_hash, action_hash.clone(), LinkTypes::RouteToStop, ())?;
+    create_link(
+        stop.route_hash,
+        action_hash.clone(),
+        LinkTypes::RouteToStop,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created stop".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created stop".into()
+    )))
 }
 
 #[hdk_extern]
@@ -176,8 +209,9 @@ pub fn log_maintenance(record_entry: MaintenanceRecord) -> ExternResult<Record> 
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created maintenance record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created maintenance record".into()
+    )))
 }
 
 #[hdk_extern]
@@ -201,8 +235,9 @@ pub fn set_vehicle_features(features: VehicleFeatures) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created vehicle features".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created vehicle features".into()
+    )))
 }
 
 #[hdk_extern]
@@ -262,10 +297,13 @@ pub fn get_vehicles_needing_maintenance(current_time: u64) -> ExternResult<Vec<R
             let maint_hash = ActionHash::try_from(mlink.target)
                 .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
             if let Some(maint_record) = get(maint_hash, GetOptions::default())? {
-                if let Ok(Some(maintenance)) = maint_record.entry().to_app_option::<MaintenanceRecord>() {
+                if let Ok(Some(maintenance)) =
+                    maint_record.entry().to_app_option::<MaintenanceRecord>()
+                {
                     if let Some(next_due) = maintenance.next_due {
                         if next_due <= current_time {
-                            if let Some(record) = get(vehicle_hash.clone(), GetOptions::default())? {
+                            if let Some(record) = get(vehicle_hash.clone(), GetOptions::default())?
+                            {
                                 needing_maintenance.push(record);
                             }
                             break;
@@ -322,13 +360,24 @@ mod tests {
     #[test]
     fn vehicle_type_all_variants_serialize() {
         let types = vec![
-            VehicleType::Car, VehicleType::Van, VehicleType::Bike,
-            VehicleType::Bus, VehicleType::Cargo, VehicleType::ElectricScooter,
-            VehicleType::Helicopter, VehicleType::EVTOL, VehicleType::AirTaxi,
-            VehicleType::Ferry, VehicleType::Boat,
-            VehicleType::Train, VehicleType::Tram,
-            VehicleType::Skateboard, VehicleType::Wheelchair, VehicleType::Segway,
-            VehicleType::AutonomousVehicle, VehicleType::Drone,
+            VehicleType::Car,
+            VehicleType::Van,
+            VehicleType::Bike,
+            VehicleType::Bus,
+            VehicleType::Cargo,
+            VehicleType::ElectricScooter,
+            VehicleType::Helicopter,
+            VehicleType::EVTOL,
+            VehicleType::AirTaxi,
+            VehicleType::Ferry,
+            VehicleType::Boat,
+            VehicleType::Train,
+            VehicleType::Tram,
+            VehicleType::Skateboard,
+            VehicleType::Wheelchair,
+            VehicleType::Segway,
+            VehicleType::AutonomousVehicle,
+            VehicleType::Drone,
         ];
         for vt in types {
             let json = serde_json::to_string(&vt).unwrap();
@@ -344,10 +393,16 @@ mod tests {
     #[test]
     fn transport_mode_all_variants_serde_roundtrip() {
         let variants = vec![
-            TransportMode::Driving, TransportMode::Cycling,
-            TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed,
-            TransportMode::Flying, TransportMode::Water, TransportMode::Rail,
-            TransportMode::Micromobility, TransportMode::Autonomous,
+            TransportMode::Driving,
+            TransportMode::Cycling,
+            TransportMode::Walking,
+            TransportMode::Transit,
+            TransportMode::Mixed,
+            TransportMode::Flying,
+            TransportMode::Water,
+            TransportMode::Rail,
+            TransportMode::Micromobility,
+            TransportMode::Autonomous,
         ];
         for variant in variants {
             let json = serde_json::to_string(&variant).unwrap();
@@ -362,11 +417,7 @@ mod tests {
 
     #[test]
     fn stop_type_all_variants_serde_roundtrip() {
-        let variants = vec![
-            StopType::Pickup,
-            StopType::Dropoff,
-            StopType::Transfer,
-        ];
+        let variants = vec![StopType::Pickup, StopType::Dropoff, StopType::Transfer];
         for variant in variants {
             let json = serde_json::to_string(&variant).unwrap();
             let decoded: StopType = serde_json::from_str(&json).unwrap();
@@ -416,9 +467,21 @@ mod tests {
             id: "rt-42".to_string(),
             name: "Downtown Loop".to_string(),
             waypoints: vec![
-                Waypoint { lat: 32.95, lon: -96.73, label: Some("Start".to_string()) },
-                Waypoint { lat: 32.96, lon: -96.74, label: None },
-                Waypoint { lat: 32.97, lon: -96.75, label: Some("End".to_string()) },
+                Waypoint {
+                    lat: 32.95,
+                    lon: -96.73,
+                    label: Some("Start".to_string()),
+                },
+                Waypoint {
+                    lat: 32.96,
+                    lon: -96.74,
+                    label: None,
+                },
+                Waypoint {
+                    lat: 32.97,
+                    lon: -96.75,
+                    label: Some("End".to_string()),
+                },
             ],
             distance_km: 5.2,
             estimated_minutes: 20,
@@ -439,17 +502,31 @@ mod tests {
     #[test]
     fn route_serde_all_modes() {
         for mode in [
-            TransportMode::Driving, TransportMode::Cycling,
-            TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed,
-            TransportMode::Flying, TransportMode::Water, TransportMode::Rail,
-            TransportMode::Micromobility, TransportMode::Autonomous,
+            TransportMode::Driving,
+            TransportMode::Cycling,
+            TransportMode::Walking,
+            TransportMode::Transit,
+            TransportMode::Mixed,
+            TransportMode::Flying,
+            TransportMode::Water,
+            TransportMode::Rail,
+            TransportMode::Micromobility,
+            TransportMode::Autonomous,
         ] {
             let route = Route {
                 id: "rt-mode".to_string(),
                 name: "Mode Test".to_string(),
                 waypoints: vec![
-                    Waypoint { lat: 0.0, lon: 0.0, label: None },
-                    Waypoint { lat: 1.0, lon: 1.0, label: None },
+                    Waypoint {
+                        lat: 0.0,
+                        lon: 0.0,
+                        label: None,
+                    },
+                    Waypoint {
+                        lat: 1.0,
+                        lon: 1.0,
+                        label: None,
+                    },
                 ],
                 distance_km: 1.0,
                 estimated_minutes: 10,
@@ -467,8 +544,16 @@ mod tests {
             id: "rt-min".to_string(),
             name: "Short Route".to_string(),
             waypoints: vec![
-                Waypoint { lat: 32.95, lon: -96.73, label: None },
-                Waypoint { lat: 32.96, lon: -96.74, label: None },
+                Waypoint {
+                    lat: 32.95,
+                    lon: -96.73,
+                    label: None,
+                },
+                Waypoint {
+                    lat: 32.96,
+                    lon: -96.74,
+                    label: None,
+                },
             ],
             distance_km: 0.5,
             estimated_minutes: 3,
@@ -562,8 +647,16 @@ mod tests {
 
     #[test]
     fn vehicle_serde_all_types_and_statuses() {
-        let types = [VehicleType::Bike, VehicleType::Bus, VehicleType::ElectricScooter];
-        let statuses = [VehicleStatus::InUse, VehicleStatus::Maintenance, VehicleStatus::Retired];
+        let types = [
+            VehicleType::Bike,
+            VehicleType::Bus,
+            VehicleType::ElectricScooter,
+        ];
+        let statuses = [
+            VehicleStatus::InUse,
+            VehicleStatus::Maintenance,
+            VehicleStatus::Retired,
+        ];
         for (vt, vs) in types.iter().zip(statuses.iter()) {
             let vehicle = Vehicle {
                 id: "v-combo".to_string(),
@@ -652,11 +745,17 @@ mod tests {
 
     #[test]
     fn route_many_waypoints_serde_roundtrip() {
-        let waypoints: Vec<Waypoint> = (0..200).map(|i| Waypoint {
-            lat: -90.0 + (i as f64) * 0.9,
-            lon: -180.0 + (i as f64) * 1.8,
-            label: if i % 2 == 0 { Some(format!("wp-{}", i)) } else { None },
-        }).collect();
+        let waypoints: Vec<Waypoint> = (0..200)
+            .map(|i| Waypoint {
+                lat: -90.0 + (i as f64) * 0.9,
+                lon: -180.0 + (i as f64) * 1.8,
+                label: if i % 2 == 0 {
+                    Some(format!("wp-{}", i))
+                } else {
+                    None
+                },
+            })
+            .collect();
         let route = Route {
             id: "rt-long".to_string(),
             name: "Cross-Country".to_string(),
@@ -746,7 +845,11 @@ mod tests {
 
     #[test]
     fn maintenance_type_all_variants_serde() {
-        for mt in [MaintenanceType::Scheduled, MaintenanceType::Repair, MaintenanceType::Inspection] {
+        for mt in [
+            MaintenanceType::Scheduled,
+            MaintenanceType::Repair,
+            MaintenanceType::Inspection,
+        ] {
             let json = serde_json::to_string(&mt).unwrap();
             let decoded: MaintenanceType = serde_json::from_str(&json).unwrap();
             assert_eq!(decoded, mt);

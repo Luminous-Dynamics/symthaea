@@ -1,12 +1,11 @@
 //! Incidents Coordinator Zome
 //! Business logic for disaster declaration and lifecycle management
 
-use hdk::prelude::*;
 use emergency_incidents_integrity::*;
+use hdk::prelude::*;
 use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, requirement_for_voting,
     GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_basic, requirement_for_proposal,
-    requirement_for_voting,
 };
 
 fn require_consciousness(
@@ -878,5 +877,4 @@ mod tests {
         let decoded: AffectedArea = serde_json::from_str(&json).unwrap();
         assert!((decoded.radius_km - 20015.0).abs() < 1.0);
     }
-
 }

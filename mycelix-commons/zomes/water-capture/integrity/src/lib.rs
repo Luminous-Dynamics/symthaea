@@ -766,10 +766,7 @@ mod tests {
         sys.id = "".into();
         let result = validate_create_harvest_system(fake_create(), sys);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Harvest system ID cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Harvest system ID cannot be empty");
     }
 
     #[test]
@@ -778,10 +775,7 @@ mod tests {
         sys.name = "".into();
         let result = validate_create_harvest_system(fake_create(), sys);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Harvest system name cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Harvest system name cannot be empty");
     }
 
     #[test]
@@ -790,10 +784,7 @@ mod tests {
         sys.capacity_liters = 0;
         let result = validate_create_harvest_system(fake_create(), sys);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Capacity must be greater than zero"
-        );
+        assert_eq!(invalid_msg(&result), "Capacity must be greater than zero");
     }
 
     #[test]
@@ -826,10 +817,7 @@ mod tests {
         sys.efficiency_percent = 101;
         let result = validate_create_harvest_system(fake_create(), sys);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Efficiency percent cannot exceed 100"
-        );
+        assert_eq!(invalid_msg(&result), "Efficiency percent cannot exceed 100");
     }
 
     #[test]
@@ -838,10 +826,7 @@ mod tests {
         sys.efficiency_percent = 255;
         let result = validate_create_harvest_system(fake_create(), sys);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Efficiency percent cannot exceed 100"
-        );
+        assert_eq!(invalid_msg(&result), "Efficiency percent cannot exceed 100");
     }
 
     #[test]
@@ -858,10 +843,7 @@ mod tests {
         sys.location_lat = 90.001;
         let result = validate_create_harvest_system(fake_create(), sys);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -870,10 +852,7 @@ mod tests {
         sys.location_lat = -90.001;
         let result = validate_create_harvest_system(fake_create(), sys);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -1061,10 +1040,7 @@ mod tests {
         tank.current_level_liters = 1_001;
         let result = validate_create_storage_tank(fake_create(), tank);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Current level cannot exceed capacity"
-        );
+        assert_eq!(invalid_msg(&result), "Current level cannot exceed capacity");
     }
 
     #[test]
@@ -1090,10 +1066,7 @@ mod tests {
         tank.location_lat = 90.001;
         let result = validate_create_storage_tank(fake_create(), tank);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -1102,10 +1075,7 @@ mod tests {
         tank.location_lat = -90.001;
         let result = validate_create_storage_tank(fake_create(), tank);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -1325,10 +1295,7 @@ mod tests {
         proj.id = "".into();
         let result = validate_create_recharge_project(fake_create(), proj);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Recharge project ID cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Recharge project ID cannot be empty");
     }
 
     #[test]
@@ -1386,10 +1353,7 @@ mod tests {
         proj.location_lat = 90.001;
         let result = validate_create_recharge_project(fake_create(), proj);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -1398,10 +1362,7 @@ mod tests {
         proj.location_lat = -90.001;
         let result = validate_create_recharge_project(fake_create(), proj);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]

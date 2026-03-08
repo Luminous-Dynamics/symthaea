@@ -291,7 +291,7 @@ pub struct Mediation {
     /// Scheduled sessions
     pub sessions: Vec<MediationSession>,
     /// Proposed settlements
-    pub proposals: Vec<String>,  // Settlement IDs
+    pub proposals: Vec<String>, // Settlement IDs
     /// Created timestamp
     pub created_at: Timestamp,
     /// Deadline
@@ -1775,11 +1775,13 @@ mod tests {
     #[test]
     fn case_too_many_parties_rejected() {
         let mut case = make_case();
-        case.parties = (0..21).map(|i| CaseParty {
-            did: format!("did:example:party{}", i),
-            role: PartyRole::Witness,
-            joined_at: ts(),
-        }).collect();
+        case.parties = (0..21)
+            .map(|i| CaseParty {
+                did: format!("did:example:party{}", i),
+                role: PartyRole::Witness,
+                joined_at: ts(),
+            })
+            .collect();
         let result = validate_case(&case);
         assert!(is_invalid(&result));
         assert_eq!(invalid_msg(&result), "Too many parties (max 20)");
@@ -1799,7 +1801,10 @@ mod tests {
         ev.description = "d".repeat(4097);
         let result = validate_evidence(&ev);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Evidence description too long (max 4096)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Evidence description too long (max 4096)"
+        );
     }
 
     #[test]
@@ -1816,7 +1821,10 @@ mod tests {
         dec.reasoning = "r".repeat(16385);
         let result = validate_decision(&dec);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Decision reasoning too long (max 16384)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Decision reasoning too long (max 16384)"
+        );
     }
 
     #[test]
@@ -1839,22 +1847,29 @@ mod tests {
     #[test]
     fn enforcement_too_many_actions_rejected() {
         let mut enf = make_enforcement();
-        enf.actions = (0..101).map(|_| EnforcementAction {
-            action_type: EnforcementActionType::Notification,
-            target_happ: None,
-            target_entry: None,
-            executed_at: ts(),
-            result: "done".into(),
-        }).collect();
+        enf.actions = (0..101)
+            .map(|_| EnforcementAction {
+                action_type: EnforcementActionType::Notification,
+                target_happ: None,
+                target_entry: None,
+                executed_at: ts(),
+                result: "done".into(),
+            })
+            .collect();
         let result = validate_enforcement(&enf);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Too many enforcement actions (max 100)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Too many enforcement actions (max 100)"
+        );
     }
 
     #[test]
     fn restorative_too_many_participants_rejected() {
         let mut circle = make_restorative_circle();
-        circle.participants = (0..51).map(|i| make_circle_participant(&format!("did:example:p{}", i))).collect();
+        circle.participants = (0..51)
+            .map(|i| make_circle_participant(&format!("did:example:p{}", i)))
+            .collect();
         let result = validate_restorative(&circle);
         assert!(is_invalid(&result));
         assert_eq!(invalid_msg(&result), "Too many participants (max 50)");
@@ -1863,7 +1878,9 @@ mod tests {
     #[test]
     fn arbitration_too_many_arbitrators_rejected() {
         let arb = make_arbitration(
-            (0..11).map(|i| make_arbitrator(&format!("did:example:arb{}", i))).collect()
+            (0..11)
+                .map(|i| make_arbitrator(&format!("did:example:arb{}", i)))
+                .collect(),
         );
         let result = validate_arbitration(&arb);
         assert!(is_invalid(&result));
@@ -1884,7 +1901,9 @@ mod tests {
             CaseType::GovernanceDispute,
             CaseType::IdentityDispute,
             CaseType::IPDispute,
-            CaseType::Other { category: "custom".into() },
+            CaseType::Other {
+                category: "custom".into(),
+            },
         ];
         for v in variants {
             let json = serde_json::to_string(&v).unwrap();
@@ -2701,7 +2720,9 @@ mod tests {
             CaseType::GovernanceDispute,
             CaseType::IdentityDispute,
             CaseType::IPDispute,
-            CaseType::Other { category: "custom".into() },
+            CaseType::Other {
+                category: "custom".into(),
+            },
         ];
         for ct in types {
             let mut case = make_case();
@@ -2952,16 +2973,14 @@ mod tests {
     #[test]
     fn mediation_with_sessions_passes() {
         let mut med = make_mediation();
-        med.sessions = vec![
-            MediationSession {
-                session_number: 1,
-                scheduled_at: ts(),
-                actual_start: None,
-                actual_end: None,
-                notes: None,
-                outcome: None,
-            },
-        ];
+        med.sessions = vec![MediationSession {
+            session_number: 1,
+            scheduled_at: ts(),
+            actual_start: None,
+            actual_end: None,
+            notes: None,
+            outcome: None,
+        }];
         assert!(is_valid(&validate_mediation(&med)));
     }
 
@@ -3001,9 +3020,7 @@ mod tests {
 
     #[test]
     fn valid_arbitration_one_arbitrator_passes() {
-        let arb = make_arbitration(vec![
-            make_arbitrator("did:example:arb1"),
-        ]);
+        let arb = make_arbitration(vec![make_arbitrator("did:example:arb1")]);
         let result = validate_arbitration(&arb);
         assert!(is_valid(&result));
     }
@@ -3034,9 +3051,11 @@ mod tests {
 
     #[test]
     fn valid_arbitration_seven_arbitrators_passes() {
-        let arb = make_arbitration((1..=7)
-            .map(|i| make_arbitrator(&format!("did:example:a{}", i)))
-            .collect());
+        let arb = make_arbitration(
+            (1..=7)
+                .map(|i| make_arbitrator(&format!("did:example:a{}", i)))
+                .collect(),
+        );
         assert!(is_valid(&validate_arbitration(&arb)));
     }
 
@@ -3076,9 +3095,11 @@ mod tests {
 
     #[test]
     fn arbitration_six_arbitrators_rejected() {
-        let arb = make_arbitration((1..=6)
-            .map(|i| make_arbitrator(&format!("did:example:a{}", i)))
-            .collect());
+        let arb = make_arbitration(
+            (1..=6)
+                .map(|i| make_arbitrator(&format!("did:example:a{}", i)))
+                .collect(),
+        );
         assert!(is_invalid(&validate_arbitration(&arb)));
     }
 
@@ -3096,9 +3117,7 @@ mod tests {
 
     #[test]
     fn arbitration_empty_string_arbitrator_rejected() {
-        let arb = make_arbitration(vec![
-            make_arbitrator(""),
-        ]);
+        let arb = make_arbitration(vec![make_arbitrator("")]);
         let result = validate_arbitration(&arb);
         assert!(is_invalid(&result));
     }
@@ -3655,15 +3674,13 @@ mod tests {
     #[test]
     fn restorative_with_sessions_passes() {
         let mut circle = make_restorative_circle();
-        circle.sessions = vec![
-            CircleSession {
-                session_number: 1,
-                held_at: ts(),
-                attendees: vec!["did:a".into(), "did:b".into()],
-                summary: "Opening circle".into(),
-                next_steps: vec!["Follow up in 1 week".into()],
-            },
-        ];
+        circle.sessions = vec![CircleSession {
+            session_number: 1,
+            held_at: ts(),
+            attendees: vec!["did:a".into(), "did:b".into()],
+            summary: "Opening circle".into(),
+            next_steps: vec!["Follow up in 1 week".into()],
+        }];
         assert!(is_valid(&validate_restorative(&circle)));
     }
 
@@ -3716,14 +3733,16 @@ mod tests {
     #[test]
     fn evidence_unicode_description_passes() {
         let mut ev = make_evidence();
-        ev.description = "\u{6587}\u{4EF6}\u{8BC1}\u{636E} - \u{5408}\u{540C}\u{526F}\u{672C}".into();
+        ev.description =
+            "\u{6587}\u{4EF6}\u{8BC1}\u{636E} - \u{5408}\u{540C}\u{526F}\u{672C}".into();
         assert!(is_valid(&validate_evidence(&ev)));
     }
 
     #[test]
     fn decision_unicode_reasoning_passes() {
         let mut dec = make_decision();
-        dec.reasoning = "La evidencia apoya claramente al demandante. \u{00BF}Hay alguna duda?".into();
+        dec.reasoning =
+            "La evidencia apoya claramente al demandante. \u{00BF}Hay alguna duda?".into();
         assert!(is_valid(&validate_decision(&dec)));
     }
 
@@ -3854,7 +3873,9 @@ mod tests {
 
     #[test]
     fn case_type_other_empty_category_roundtrip() {
-        let ct = CaseType::Other { category: "".into() };
+        let ct = CaseType::Other {
+            category: "".into(),
+        };
         let json = serde_json::to_string(&ct).unwrap();
         let back: CaseType = serde_json::from_str(&json).unwrap();
         assert_eq!(ct, back);

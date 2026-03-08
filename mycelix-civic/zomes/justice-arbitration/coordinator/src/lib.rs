@@ -6,8 +6,8 @@
 use hdk::prelude::*;
 use justice_arbitration_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_proposal, requirement_for_voting,
+    gate_consciousness, requirement_for_proposal, requirement_for_voting, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -43,8 +43,9 @@ pub fn create_arbitration(arbitration: Arbitration) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "create_arbitration")?;
 
     let action_hash = create_entry(&EntryTypes::Arbitration(arbitration.clone()))?;
-    let record = get_latest_record(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created arbitration".into())))?;
+    let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not get created arbitration".into())
+    ))?;
 
     // Link from case
     let case_path = Path::from(format!("cases/{}/arbitration", arbitration.case_id));
@@ -75,7 +76,7 @@ pub fn get_case_arbitration(case_id: String) -> ExternResult<Option<Record>> {
     let case_path = Path::from(format!("cases/{}/arbitration", case_id));
     let links = get_links(
         LinkQuery::try_new(case_path.path_entry_hash()?, LinkTypes::CaseToArbitration)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     if let Some(link) = links.first() {
@@ -90,20 +91,25 @@ pub fn get_case_arbitration(case_id: String) -> ExternResult<Option<Record>> {
 /// Update arbitration status
 #[hdk_extern]
 pub fn update_arbitration_status(input: UpdateArbStatusInput) -> ExternResult<Record> {
-    let record = get(input.arbitration_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Arbitration not found".into())))?;
+    let record = get(input.arbitration_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Arbitration not found".into())
+    ))?;
 
-    let mut arb: Arbitration = record.entry()
+    let mut arb: Arbitration = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid arbitration entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid arbitration entry".into()
+        )))?;
 
     arb.status = input.new_status;
 
     let action_hash = update_entry(input.arbitration_hash, &arb)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated arbitration".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated arbitration".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -115,13 +121,17 @@ pub struct UpdateArbStatusInput {
 /// Record an arbitrator's acceptance or recusal
 #[hdk_extern]
 pub fn record_arbitrator_response(input: ArbitratorResponseInput) -> ExternResult<Record> {
-    let record = get(input.arbitration_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Arbitration not found".into())))?;
+    let record = get(input.arbitration_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Arbitration not found".into())
+    ))?;
 
-    let mut arb: Arbitration = record.entry()
+    let mut arb: Arbitration = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid arbitration entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid arbitration entry".into()
+        )))?;
 
     // Find and update the arbitrator
     for a in &mut arb.arbitrators {
@@ -134,8 +144,9 @@ pub fn record_arbitrator_response(input: ArbitratorResponseInput) -> ExternResul
 
     let action_hash = update_entry(input.arbitration_hash, &arb)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated arbitration".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated arbitration".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -154,8 +165,9 @@ pub fn render_decision(decision: Decision) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "render_decision")?;
 
     let action_hash = create_entry(&EntryTypes::Decision(decision.clone()))?;
-    let record = get_latest_record(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created decision".into())))?;
+    let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not get created decision".into())
+    ))?;
 
     // Link from case
     let case_path = Path::from(format!("cases/{}/decisions", decision.case_id));
@@ -175,7 +187,7 @@ pub fn get_case_decisions(case_id: String) -> ExternResult<Vec<Record>> {
     let case_path = Path::from(format!("cases/{}/decisions", case_id));
     let links = get_links(
         LinkQuery::try_new(case_path.path_entry_hash()?, LinkTypes::CaseToDecisions)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -197,8 +209,9 @@ pub fn file_appeal(appeal: Appeal) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "file_appeal")?;
 
     let action_hash = create_entry(&EntryTypes::Appeal(appeal.clone()))?;
-    let record = get_latest_record(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created appeal".into())))?;
+    let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not get created appeal".into())
+    ))?;
 
     // Link from decision
     let decision_path = Path::from(format!("decisions/{}/appeals", appeal.decision_id));
@@ -217,8 +230,11 @@ pub fn file_appeal(appeal: Appeal) -> ExternResult<Record> {
 pub fn get_decision_appeals(decision_id: String) -> ExternResult<Vec<Record>> {
     let decision_path = Path::from(format!("decisions/{}/appeals", decision_id));
     let links = get_links(
-        LinkQuery::try_new(decision_path.path_entry_hash()?, LinkTypes::DecisionToAppeals)?,
-        GetStrategy::default()
+        LinkQuery::try_new(
+            decision_path.path_entry_hash()?,
+            LinkTypes::DecisionToAppeals,
+        )?,
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -236,20 +252,25 @@ pub fn get_decision_appeals(decision_id: String) -> ExternResult<Vec<Record>> {
 /// Update appeal status
 #[hdk_extern]
 pub fn update_appeal_status(input: UpdateAppealStatusInput) -> ExternResult<Record> {
-    let record = get(input.appeal_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Appeal not found".into())))?;
+    let record = get(input.appeal_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Appeal not found".into())
+    ))?;
 
-    let mut appeal: Appeal = record.entry()
+    let mut appeal: Appeal = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid appeal entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid appeal entry".into()
+        )))?;
 
     appeal.status = input.new_status;
 
     let action_hash = update_entry(input.appeal_hash, &appeal)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated appeal".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated appeal".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -264,20 +285,25 @@ pub fn finalize_decision(input: FinalizeDecisionInput) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
     let _eligibility = require_consciousness(&requirement_for_voting(), "finalize_decision")?;
 
-    let record = get(input.decision_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Decision not found".into())))?;
+    let record = get(input.decision_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Decision not found".into())
+    ))?;
 
-    let mut decision: Decision = record.entry()
+    let mut decision: Decision = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid decision entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid decision entry".into()
+        )))?;
 
     decision.finalized = true;
 
     let action_hash = update_entry(input.decision_hash, &decision)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated decision".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated decision".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -291,7 +317,7 @@ pub fn get_arbitrator_cases(arbitrator_did: String) -> ExternResult<Vec<Record>>
     let arb_path = Path::from(format!("arbitrators/{}/cases", arbitrator_did));
     let links = get_links(
         LinkQuery::try_new(arb_path.path_entry_hash()?, LinkTypes::ArbitratorToCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -359,7 +385,10 @@ mod tests {
         let decoded: ArbitratorResponseInput = serde_json::from_str(&json).unwrap();
         assert!(!decoded.accepted);
         assert!(decoded.recused);
-        assert_eq!(decoded.recusal_reason, Some("Conflict of interest".to_string()));
+        assert_eq!(
+            decoded.recusal_reason,
+            Some("Conflict of interest".to_string())
+        );
     }
 
     #[test]
@@ -420,7 +449,10 @@ mod tests {
         let decoded: EmergencyContextResult = serde_json::from_str(&json).unwrap();
         assert!(decoded.has_active_emergencies);
         assert_eq!(decoded.active_emergency_count, 3);
-        assert_eq!(decoded.matching_disaster, Some("Hurricane Alpha".to_string()));
+        assert_eq!(
+            decoded.matching_disaster,
+            Some("Hurricane Alpha".to_string())
+        );
         assert!(decoded.error.is_none());
     }
 
@@ -548,7 +580,9 @@ mod tests {
             ArbitratorSelection::Random,
             ArbitratorSelection::MATLWeighted,
             ArbitratorSelection::PartyAgreed,
-            ArbitratorSelection::ExpertiseBased { domain: "Finance".to_string() },
+            ArbitratorSelection::ExpertiseBased {
+                domain: "Finance".to_string(),
+            },
         ];
         for variant in variants {
             let json = serde_json::to_string(&variant).unwrap();
@@ -655,9 +689,15 @@ mod tests {
         let decoded: EmergencyContextResult = serde_json::from_str(&json).unwrap();
         assert!(decoded.has_active_emergencies);
         assert_eq!(decoded.active_emergency_count, 5);
-        assert_eq!(decoded.matching_disaster.as_deref(), Some("Earthquake Omega"));
+        assert_eq!(
+            decoded.matching_disaster.as_deref(),
+            Some("Earthquake Omega")
+        );
         assert_eq!(decoded.matching_severity.as_deref(), Some("Level5"));
-        assert_eq!(decoded.recommendation.as_deref(), Some("Evacuate immediately"));
+        assert_eq!(
+            decoded.recommendation.as_deref(),
+            Some("Evacuate immediately")
+        );
         assert_eq!(decoded.error.as_deref(), Some("Partial data"));
     }
 
@@ -706,13 +746,27 @@ struct LocalDisaster {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum LocalDisasterType {
-    Hurricane, Earthquake, Wildfire, Flood, Tornado,
-    Pandemic, Industrial, MassCasualty, CyberAttack,
-    Infrastructure, Other(String),
+    Hurricane,
+    Earthquake,
+    Wildfire,
+    Flood,
+    Tornado,
+    Pandemic,
+    Industrial,
+    MassCasualty,
+    CyberAttack,
+    Infrastructure,
+    Other(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalSeverityLevel { Level1, Level2, Level3, Level4, Level5 }
+enum LocalSeverityLevel {
+    Level1,
+    Level2,
+    Level3,
+    Level4,
+    Level5,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct LocalAffectedArea {
@@ -733,13 +787,29 @@ struct LocalOperationalZone {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalZonePriority { Critical, High, Medium, Low }
+enum LocalZonePriority {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalZoneStatus { Unassessed, Active, Cleared, Hazardous, Evacuated }
+enum LocalZoneStatus {
+    Unassessed,
+    Active,
+    Cleared,
+    Hazardous,
+    Evacuated,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalDisasterStatus { Declared, Active, Recovery, Closed }
+enum LocalDisasterStatus {
+    Declared,
+    Active,
+    Recovery,
+    Closed,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CheckEmergencyContextInput {
@@ -766,7 +836,9 @@ pub struct EmergencyContextResult {
 /// context involves an active emergency. This adjusts urgency and
 /// may trigger expedited procedures.
 #[hdk_extern]
-pub fn check_emergency_context_for_case(input: CheckEmergencyContextInput) -> ExternResult<EmergencyContextResult> {
+pub fn check_emergency_context_for_case(
+    input: CheckEmergencyContextInput,
+) -> ExternResult<EmergencyContextResult> {
     let response = call(
         CallTargetCell::Local,
         ZomeName::from("emergency_incidents"),
@@ -777,8 +849,9 @@ pub fn check_emergency_context_for_case(input: CheckEmergencyContextInput) -> Ex
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
 
             let active_count = records.len() as u32;
 

@@ -201,15 +201,15 @@ impl WasmKVector {
 pub fn wasm_compute_trust_score(kvector: &WasmKVector) -> f64 {
     // Default weights
     let weights = [
-        (kvector.k_r, 0.20),    // Reputation
-        (kvector.k_a, 0.10),    // Activity
-        (kvector.k_i, 0.20),    // Integrity
-        (kvector.k_p, 0.15),    // Performance
-        (kvector.k_m, 0.10),    // Membership
-        (kvector.k_s, 0.05),    // Stake
-        (kvector.k_h, 0.10),    // Historical
-        (kvector.k_topo, 0.05), // Topology
-        (kvector.k_v, 0.025),   // Verification
+        (kvector.k_r, 0.20),          // Reputation
+        (kvector.k_a, 0.10),          // Activity
+        (kvector.k_i, 0.20),          // Integrity
+        (kvector.k_p, 0.15),          // Performance
+        (kvector.k_m, 0.10),          // Membership
+        (kvector.k_s, 0.05),          // Stake
+        (kvector.k_h, 0.10),          // Historical
+        (kvector.k_topo, 0.05),       // Topology
+        (kvector.k_v, 0.025),         // Verification
         (kvector.k_coherence, 0.025), // Coherence
     ];
 

@@ -1120,7 +1120,10 @@ mod tests {
         let conditions = vec![
             (ResourceCondition::Excellent, Some(ResourceCondition::Good)),
             (ResourceCondition::Good, Some(ResourceCondition::Fair)),
-            (ResourceCondition::Fair, Some(ResourceCondition::NeedsRepair)),
+            (
+                ResourceCondition::Fair,
+                Some(ResourceCondition::NeedsRepair),
+            ),
             (ResourceCondition::Good, None),
         ];
 

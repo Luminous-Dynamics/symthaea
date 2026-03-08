@@ -6,8 +6,8 @@
 use hdk::prelude::*;
 use justice_restorative_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -41,8 +41,9 @@ fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
 pub fn create_circle(circle: RestorativeCircle) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "create_circle")?;
     let action_hash = create_entry(&EntryTypes::RestorativeCircle(circle.clone()))?;
-    let record = get_latest_record(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created circle".into())))?;
+    let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not get created circle".into())
+    ))?;
 
     // Link from case
     let case_path = Path::from(format!("cases/{}/circles", circle.case_id));
@@ -79,8 +80,11 @@ pub fn create_circle(circle: RestorativeCircle) -> ExternResult<Record> {
 pub fn get_case_circle(case_id: String) -> ExternResult<Option<Record>> {
     let case_path = Path::from(format!("cases/{}/circles", case_id));
     let links = get_links(
-        LinkQuery::try_new(case_path.path_entry_hash()?, LinkTypes::CaseToRestorativeCircle)?,
-        GetStrategy::default()
+        LinkQuery::try_new(
+            case_path.path_entry_hash()?,
+            LinkTypes::CaseToRestorativeCircle,
+        )?,
+        GetStrategy::default(),
     )?;
 
     if let Some(link) = links.first() {
@@ -96,13 +100,17 @@ pub fn get_case_circle(case_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn record_consent(input: ConsentInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "record_consent")?;
-    let record = get(input.circle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
+    let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Circle not found".into())
+    ))?;
 
-    let mut circle: RestorativeCircle = record.entry()
+    let mut circle: RestorativeCircle = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid circle entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid circle entry".into()
+        )))?;
 
     // Update participant consent
     for p in &mut circle.participants {
@@ -119,8 +127,9 @@ pub fn record_consent(input: ConsentInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated circle".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -133,13 +142,17 @@ pub struct ConsentInput {
 #[hdk_extern]
 pub fn record_session(input: RecordSessionInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "record_session")?;
-    let record = get(input.circle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
+    let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Circle not found".into())
+    ))?;
 
-    let mut circle: RestorativeCircle = record.entry()
+    let mut circle: RestorativeCircle = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid circle entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid circle entry".into()
+        )))?;
 
     // Add the session
     circle.sessions.push(input.session);
@@ -156,8 +169,9 @@ pub fn record_session(input: RecordSessionInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated circle".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -171,20 +185,25 @@ pub struct RecordSessionInput {
 #[hdk_extern]
 pub fn add_agreement(input: AddAgreementInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "add_agreement")?;
-    let record = get(input.circle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
+    let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Circle not found".into())
+    ))?;
 
-    let mut circle: RestorativeCircle = record.entry()
+    let mut circle: RestorativeCircle = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid circle entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid circle entry".into()
+        )))?;
 
     circle.agreements.push(input.agreement);
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated circle".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -197,20 +216,25 @@ pub struct AddAgreementInput {
 #[hdk_extern]
 pub fn update_circle_status(input: UpdateCircleStatusInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "update_circle_status")?;
-    let record = get(input.circle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
+    let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Circle not found".into())
+    ))?;
 
-    let mut circle: RestorativeCircle = record.entry()
+    let mut circle: RestorativeCircle = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid circle entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid circle entry".into()
+        )))?;
 
     circle.status = input.new_status;
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated circle".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -223,13 +247,17 @@ pub struct UpdateCircleStatusInput {
 #[hdk_extern]
 pub fn complete_circle(input: CompleteCircleInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "complete_circle")?;
-    let record = get(input.circle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
+    let record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Circle not found".into())
+    ))?;
 
-    let mut circle: RestorativeCircle = record.entry()
+    let mut circle: RestorativeCircle = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid circle entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid circle entry".into()
+        )))?;
 
     circle.status = CircleStatus::Completed;
 
@@ -242,8 +270,9 @@ pub fn complete_circle(input: CompleteCircleInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(input.circle_hash, &circle)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated circle".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated circle".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -257,8 +286,11 @@ pub struct CompleteCircleInput {
 pub fn get_facilitator_circles(facilitator_did: String) -> ExternResult<Vec<Record>> {
     let facilitator_path = Path::from(format!("facilitators/{}/circles", facilitator_did));
     let links = get_links(
-        LinkQuery::try_new(facilitator_path.path_entry_hash()?, LinkTypes::CaseToRestorativeCircle)?,
-        GetStrategy::default()
+        LinkQuery::try_new(
+            facilitator_path.path_entry_hash()?,
+            LinkTypes::CaseToRestorativeCircle,
+        )?,
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -279,7 +311,7 @@ pub fn get_circles_by_status(status: CircleStatus) -> ExternResult<Vec<Record>> 
     let status_path = Path::from(format!("circles/status/{:?}", status));
     let links = get_links(
         LinkQuery::try_new(status_path.path_entry_hash()?, LinkTypes::AllCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -373,14 +405,20 @@ mod tests {
         let session = CircleSession {
             session_number: 1,
             held_at: ts(),
-            attendees: vec!["did:example:alice".to_string(), "did:example:bob".to_string()],
+            attendees: vec![
+                "did:example:alice".to_string(),
+                "did:example:bob".to_string(),
+            ],
             summary: "Initial hearing of all parties".to_string(),
             next_steps: vec!["Schedule follow-up".to_string()],
         };
         let input = RecordSessionInput {
             circle_hash: fake_hash(),
             session,
-            attendees: vec!["did:example:alice".to_string(), "did:example:bob".to_string()],
+            attendees: vec![
+                "did:example:alice".to_string(),
+                "did:example:bob".to_string(),
+            ],
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: RecordSessionInput = serde_json::from_str(&json).unwrap();
@@ -438,7 +476,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: AddAgreementInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.agreement, "Both parties agree to mediated settlement terms");
+        assert_eq!(
+            decoded.agreement,
+            "Both parties agree to mediated settlement terms"
+        );
     }
 
     #[test]
@@ -495,7 +536,10 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let decoded: CompleteCircleInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.final_agreements.len(), 2);
-        assert_eq!(decoded.final_agreements[0], "Restitution payment of 500 credits");
+        assert_eq!(
+            decoded.final_agreements[0],
+            "Restitution payment of 500 credits"
+        );
     }
 
     #[test]
@@ -692,7 +736,13 @@ mod tests {
     #[test]
     fn restorative_circle_many_participants() {
         let participants: Vec<CircleParticipant> = (0..100)
-            .map(|i| make_participant(&format!("did:{}", i), CircleRole::CommunityMember, i % 2 == 0))
+            .map(|i| {
+                make_participant(
+                    &format!("did:{}", i),
+                    CircleRole::CommunityMember,
+                    i % 2 == 0,
+                )
+            })
             .collect();
         let circle = RestorativeCircle {
             id: "large".to_string(),

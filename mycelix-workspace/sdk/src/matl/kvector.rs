@@ -326,16 +326,16 @@ impl KVector {
     /// Create a default K-Vector for new participants with baseline trust
     pub fn new_participant() -> Self {
         Self {
-            k_r: 0.5,    // Neutral reputation
-            k_a: 0.0,    // No activity yet
-            k_i: 1.0,    // Assume integrity until proven otherwise
-            k_p: 0.5,    // Unknown performance
-            k_m: 0.0,    // Just joined
-            k_s: 0.0,    // No stake yet
-            k_h: 0.5,    // No history
-            k_topo: 0.0, // Not connected yet
-            k_v: 0.0,    // Not verified yet
-            k_coherence: 0.5,  // Neutral coherence (not yet measured)
+            k_r: 0.5,         // Neutral reputation
+            k_a: 0.0,         // No activity yet
+            k_i: 1.0,         // Assume integrity until proven otherwise
+            k_p: 0.5,         // Unknown performance
+            k_m: 0.0,         // Just joined
+            k_s: 0.0,         // No stake yet
+            k_h: 0.5,         // No history
+            k_topo: 0.0,      // Not connected yet
+            k_v: 0.0,         // Not verified yet
+            k_coherence: 0.5, // Neutral coherence (not yet measured)
         }
     }
 

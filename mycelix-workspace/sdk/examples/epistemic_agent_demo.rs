@@ -119,7 +119,10 @@ fn demo_phase_1_agent_creation() {
             agent.k_vector.k_topo
         );
         println!("       ├─ k_v (verification):  {:.3}", agent.k_vector.k_v);
-        println!("       ├─ k_coherence (coherence):   {:.3}", agent.k_vector.k_coherence);
+        println!(
+            "       ├─ k_coherence (coherence):   {:.3}",
+            agent.k_vector.k_coherence
+        );
         println!(
             "       └─ Trust Score:         {:.3}",
             agent.k_vector.trust_score()
@@ -613,7 +616,10 @@ fn demo_phase_7_full_scenario() {
         .iter()
         .map(|a| a.k_vector.trust_score() as f64)
         .collect();
-    let phi_values: Vec<f64> = agents.iter().map(|a| a.k_vector.k_coherence as f64).collect();
+    let phi_values: Vec<f64> = agents
+        .iter()
+        .map(|a| a.k_vector.k_coherence as f64)
+        .collect();
 
     if let Ok(result) = analytics.analyze_and_display(&trust_scores, &phi_values, 0.1) {
         println!("  Private mean trust: {:.3}", result.distribution.mean);

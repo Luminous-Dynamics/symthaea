@@ -1,12 +1,12 @@
 //! Transport Sharing Coordinator Zome
 //! Business logic for ride offers, requests, matching, and cargo coordination.
 
-use transport_sharing_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use transport_sharing_integrity::*;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -60,11 +60,22 @@ pub fn post_ride_offer(offer: RideOffer) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::RideOffer(offer.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_offers".to_string())))?;
-    create_link(anchor_hash("all_offers")?, action_hash.clone(), LinkTypes::AllOffers, ())?;
-    create_link(offer.driver, action_hash.clone(), LinkTypes::DriverToOffer, ())?;
+    create_link(
+        anchor_hash("all_offers")?,
+        action_hash.clone(),
+        LinkTypes::AllOffers,
+        (),
+    )?;
+    create_link(
+        offer.driver,
+        action_hash.clone(),
+        LinkTypes::DriverToOffer,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created offer".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created offer".into()
+    )))
 }
 
 #[hdk_extern]
@@ -86,11 +97,22 @@ pub fn request_ride(request: RideRequest) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::RideRequest(request.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_requests".to_string())))?;
-    create_link(anchor_hash("all_requests")?, action_hash.clone(), LinkTypes::AllRequests, ())?;
-    create_link(request.requester, action_hash.clone(), LinkTypes::RequesterToRequest, ())?;
+    create_link(
+        anchor_hash("all_requests")?,
+        action_hash.clone(),
+        LinkTypes::AllRequests,
+        (),
+    )?;
+    create_link(
+        request.requester,
+        action_hash.clone(),
+        LinkTypes::RequesterToRequest,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created request".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created request".into()
+    )))
 }
 
 // ============================================================================
@@ -102,15 +124,27 @@ pub fn match_ride(ride_match: RideMatch) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "match_ride")?;
     let _offer = get(ride_match.offer_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".into())))?;
-    let _request = get(ride_match.request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
+    let _request = get(ride_match.request_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Request not found".into())),
+    )?;
 
     let action_hash = create_entry(&EntryTypes::RideMatch(ride_match.clone()))?;
-    create_link(ride_match.offer_hash, action_hash.clone(), LinkTypes::OfferToMatch, ())?;
-    create_link(ride_match.request_hash, action_hash.clone(), LinkTypes::RequestToMatch, ())?;
+    create_link(
+        ride_match.offer_hash,
+        action_hash.clone(),
+        LinkTypes::OfferToMatch,
+        (),
+    )?;
+    create_link(
+        ride_match.request_hash,
+        action_hash.clone(),
+        LinkTypes::RequestToMatch,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created match".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created match".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -125,16 +159,23 @@ pub fn confirm_match(input: UpdateMatchStatusInput) -> ExternResult<Record> {
     let now = sys_time()?.as_micros() / 1_000_000;
     let record = get(input.match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
-    let mut ride_match: RideMatch = record.entry()
+    let mut ride_match: RideMatch = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid match entry".into()
+        )))?;
 
     ride_match.status = MatchStatus::Confirmed;
     ride_match.confirmed_at = Some(now as u64);
-    let new_hash = update_entry(record.action_address().clone(), &EntryTypes::RideMatch(ride_match))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated match".into())))
+    let new_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::RideMatch(ride_match),
+    )?;
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated match".into()
+    )))
 }
 
 #[hdk_extern]
@@ -142,15 +183,22 @@ pub fn complete_ride(match_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "complete_ride")?;
     let record = get(match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
-    let mut ride_match: RideMatch = record.entry()
+    let mut ride_match: RideMatch = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid match entry".into()
+        )))?;
 
     ride_match.status = MatchStatus::Completed;
-    let new_hash = update_entry(record.action_address().clone(), &EntryTypes::RideMatch(ride_match))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated match".into())))
+    let new_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::RideMatch(ride_match),
+    )?;
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated match".into()
+    )))
 }
 
 #[hdk_extern]
@@ -158,15 +206,22 @@ pub fn cancel_ride(match_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "cancel_ride")?;
     let record = get(match_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".into())))?;
-    let mut ride_match: RideMatch = record.entry()
+    let mut ride_match: RideMatch = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid match entry".into()
+        )))?;
 
     ride_match.status = MatchStatus::Cancelled;
-    let new_hash = update_entry(record.action_address().clone(), &EntryTypes::RideMatch(ride_match))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated match".into())))
+    let new_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::RideMatch(ride_match),
+    )?;
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated match".into()
+    )))
 }
 
 // ============================================================================
@@ -176,16 +231,23 @@ pub fn cancel_ride(match_hash: ActionHash) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn post_cargo_offer(cargo: CargoOffer) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "post_cargo_offer")?;
-    let _vehicle = get(cargo.vehicle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Vehicle not found".into())))?;
+    let _vehicle = get(cargo.vehicle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Vehicle not found".into())
+    ))?;
 
     let action_hash = create_entry(&EntryTypes::CargoOffer(cargo))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_offers".to_string())))?;
-    create_link(anchor_hash("all_offers")?, action_hash.clone(), LinkTypes::AllOffers, ())?;
+    create_link(
+        anchor_hash("all_offers")?,
+        action_hash.clone(),
+        LinkTypes::AllOffers,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created cargo offer".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created cargo offer".into()
+    )))
 }
 
 // ============================================================================
@@ -197,11 +259,22 @@ pub fn review_ride(review: RideReview) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "review_ride")?;
     let action_hash = create_entry(&EntryTypes::RideReview(review.clone()))?;
 
-    create_link(review.match_hash, action_hash.clone(), LinkTypes::MatchToReviews, ())?;
-    create_link(review.reviewer, action_hash.clone(), LinkTypes::AgentToReviews, ())?;
+    create_link(
+        review.match_hash,
+        action_hash.clone(),
+        LinkTypes::MatchToReviews,
+        (),
+    )?;
+    create_link(
+        review.reviewer,
+        action_hash.clone(),
+        LinkTypes::AgentToReviews,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created review".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created review".into()
+    )))
 }
 
 #[hdk_extern]
@@ -240,7 +313,11 @@ pub fn get_driver_rating(agent: AgentPubKey) -> ExternResult<DriverRating> {
         }
     }
 
-    let average = if count > 0 { total as f64 / count as f64 } else { 0.0 };
+    let average = if count > 0 {
+        total as f64 / count as f64
+    } else {
+        0.0
+    };
     Ok(DriverRating {
         average_rating: average,
         total_reviews: count,
@@ -272,8 +349,10 @@ pub fn find_nearby_rides(input: FindNearbyInput) -> ExternResult<Vec<Record>> {
             // For CargoOffer, we can filter by origin coordinates.
             if let Ok(Some(cargo)) = record.entry().to_app_option::<CargoOffer>() {
                 let dist = haversine_km(
-                    input.origin_lat, input.origin_lon,
-                    cargo.origin_lat, cargo.origin_lon,
+                    input.origin_lat,
+                    input.origin_lon,
+                    cargo.origin_lat,
+                    cargo.origin_lon,
                 );
                 if dist <= input.radius_km {
                     nearby.push(record);

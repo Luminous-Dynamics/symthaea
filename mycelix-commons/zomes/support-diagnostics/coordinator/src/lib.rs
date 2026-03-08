@@ -3,14 +3,17 @@
 //! updates in the Mycelix support domain.
 
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
+};
 use support_diagnostics_integrity::*;
 use support_types::*;
-use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
-};
 
-fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
     gate_consciousness("commons_bridge", requirement, action_name)
 }
 
@@ -130,7 +133,10 @@ pub fn get_diagnostic(hash: ActionHash) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn list_diagnostics(_: ()) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("all_diagnostics")?, LinkTypes::ShardedDiagnostics)?,
+        LinkQuery::try_new(
+            anchor_hash("all_diagnostics")?,
+            LinkTypes::ShardedDiagnostics,
+        )?,
         GetStrategy::default(),
     )?;
     records_from_links(links)
@@ -268,24 +274,30 @@ pub fn register_helper(profile: HelperProfile) -> ExternResult<Record> {
         LinkTypes::AllHelpers,
         (),
     )?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created helper profile".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created helper profile".into()
+    )))
 }
 
 /// Update a helper's availability status.
 #[hdk_extern]
 pub fn update_availability(input: UpdateAvailInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "update_availability")?;
-    let record = get(input.helper_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Helper profile not found".into())))?;
-    let mut profile: HelperProfile = record.entry()
+    let record = get(input.helper_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Helper profile not found".into())
+    ))?;
+    let mut profile: HelperProfile = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a HelperProfile".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Not a HelperProfile".into()
+        )))?;
     profile.available = input.available;
     let new_hash = update_entry(input.helper_hash, &EntryTypes::HelperProfile(profile))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated helper profile".into())))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated helper profile".into()
+    )))
 }
 
 /// Get all available helpers, optionally filtered by support category.
@@ -298,7 +310,8 @@ pub fn get_available_helpers(category: Option<SupportCategory>) -> ExternResult<
     let all_records = records_from_links(links)?;
     let mut available = Vec::new();
     for record in all_records {
-        if let Some(profile) = record.entry()
+        if let Some(profile) = record
+            .entry()
             .to_app_option::<HelperProfile>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
@@ -330,7 +343,11 @@ pub fn publish_cognitive_update(update: CognitiveUpdate) -> ExternResult<Record>
 
     // Category-specific time-sharded link
     let cat_label = format!("{:?}", update.category).to_lowercase();
-    let cat_anchor = sharded_anchor("support", &format!("cognitive_{}", cat_label), &update.created_at);
+    let cat_anchor = sharded_anchor(
+        "support",
+        &format!("cognitive_{}", cat_label),
+        &update.created_at,
+    );
     create_entry(&EntryTypes::Anchor(Anchor(cat_anchor.clone())))?;
     create_link(
         anchor_hash(&cat_anchor)?,

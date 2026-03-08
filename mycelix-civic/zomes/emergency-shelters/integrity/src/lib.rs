@@ -548,10 +548,7 @@ mod tests {
         s.location_lat = -90.1;
         let result = validate_create_shelter(fake_create(), s);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -560,10 +557,7 @@ mod tests {
         s.location_lat = 90.1;
         let result = validate_create_shelter(fake_create(), s);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -616,10 +610,7 @@ mod tests {
         s.contact = "".into();
         let result = validate_create_shelter(fake_create(), s);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Contact information cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Contact information cannot be empty");
     }
 
     // ========================================================================
@@ -777,7 +768,10 @@ mod tests {
         s.name = "n".repeat(257);
         let result = validate_create_shelter(fake_create(), s);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Shelter name too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Shelter name too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -794,7 +788,10 @@ mod tests {
         s.address = "a".repeat(257);
         let result = validate_create_shelter(fake_create(), s);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Shelter address too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Shelter address too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -862,7 +859,10 @@ mod tests {
         reg.special_needs = vec!["n".repeat(257)];
         let result = validate_create_registration(fake_create(), reg);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Special need entry too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Special need entry too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -879,7 +879,10 @@ mod tests {
         reg.special_needs = (0..101).map(|i| format!("need-{}", i)).collect();
         let result = validate_create_registration(fake_create(), reg);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Too many special needs entries (max 100)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Too many special needs entries (max 100)"
+        );
     }
 
     #[test]

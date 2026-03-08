@@ -291,7 +291,7 @@ pub struct Mediation {
     /// Scheduled sessions
     pub sessions: Vec<MediationSession>,
     /// Proposed settlements
-    pub proposals: Vec<String>,  // Settlement IDs
+    pub proposals: Vec<String>, // Settlement IDs
     /// Created timestamp
     pub created_at: Timestamp,
     /// Deadline
@@ -876,7 +876,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
             }
         }
-        FlatOp::RegisterDeleteLink { link_type, tag, action, .. } => {
+        FlatOp::RegisterDeleteLink {
+            link_type,
+            tag,
+            action,
+            ..
+        } => {
             let original_action = must_get_action(action.link_add_address.clone())?;
             let original_author = original_action.action().author().clone();
             if action.author != original_author {
@@ -3145,9 +3150,7 @@ mod tests {
     #[test]
     fn appeal_too_many_grounds_rejected() {
         let mut appeal = make_appeal();
-        appeal.grounds = (0..11)
-            .map(|_| AppealGround::ProceduralError)
-            .collect();
+        appeal.grounds = (0..11).map(|_| AppealGround::ProceduralError).collect();
         let result = validate_appeal(&appeal);
         assert!(is_invalid(&result));
     }
@@ -3155,9 +3158,7 @@ mod tests {
     #[test]
     fn appeal_grounds_at_limit_accepted() {
         let mut appeal = make_appeal();
-        appeal.grounds = (0..10)
-            .map(|_| AppealGround::ProceduralError)
-            .collect();
+        appeal.grounds = (0..10).map(|_| AppealGround::ProceduralError).collect();
         let result = validate_appeal(&appeal);
         assert!(is_valid(&result));
     }
@@ -3672,7 +3673,10 @@ mod tests {
 
     /// Helper to test create-link tag validation for a given link type.
     /// Mirrors the logic in the validate() FlatOp::RegisterCreateLink arm.
-    fn validate_create_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag_len = tag.len();
         match link_type {
             LinkTypes::CaseToEvidence | LinkTypes::CaseToDecisions => {
@@ -3830,22 +3834,55 @@ mod tests {
     #[test]
     fn massive_link_tag_rejected_all_standard_types() {
         let huge_tag = vec![0xFFu8; 10_000];
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ComplainantToCases, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::RespondentToCases, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToMediation, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToArbitration, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::DecisionToAppeals, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::DecisionToEnforcement, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToRestorativeCircle, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ArbitratorToCases, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AllCases, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::ComplainantToCases,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::RespondentToCases,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::CaseToMediation,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::CaseToArbitration,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::DecisionToAppeals,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::DecisionToEnforcement,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::CaseToRestorativeCircle,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::ArbitratorToCases,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::AllCases,
+            huge_tag.clone()
+        )));
     }
 
     #[test]
     fn massive_link_tag_rejected_extended_types() {
         let huge_tag = vec![0xFFu8; 10_000];
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToEvidence, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::CaseToDecisions, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::CaseToEvidence,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::CaseToDecisions,
+            huge_tag.clone()
+        )));
     }
 
     // -- Delete link tag tests --

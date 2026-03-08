@@ -709,11 +709,7 @@ mod tests {
     #[test]
     fn create_trust_boundary_latitude_below_min() {
         let mut t = valid_land_trust();
-        t.boundary = vec![
-            (-90.1, -122.0),
-            (45.1, -122.0),
-            (45.1, -122.1),
-        ];
+        t.boundary = vec![(-90.1, -122.0), (45.1, -122.0), (45.1, -122.1)];
         assert_invalid(
             validate_create_trust(fake_create(), t),
             "Boundary latitude must be between -90 and 90",
@@ -723,11 +719,7 @@ mod tests {
     #[test]
     fn create_trust_boundary_latitude_above_max() {
         let mut t = valid_land_trust();
-        t.boundary = vec![
-            (45.0, -122.0),
-            (90.1, -122.0),
-            (45.1, -122.1),
-        ];
+        t.boundary = vec![(45.0, -122.0), (90.1, -122.0), (45.1, -122.1)];
         assert_invalid(
             validate_create_trust(fake_create(), t),
             "Boundary latitude must be between -90 and 90",
@@ -737,33 +729,21 @@ mod tests {
     #[test]
     fn create_trust_boundary_latitude_at_min() {
         let mut t = valid_land_trust();
-        t.boundary = vec![
-            (-90.0, -122.0),
-            (45.1, -122.0),
-            (45.1, -122.1),
-        ];
+        t.boundary = vec![(-90.0, -122.0), (45.1, -122.0), (45.1, -122.1)];
         assert_valid(validate_create_trust(fake_create(), t));
     }
 
     #[test]
     fn create_trust_boundary_latitude_at_max() {
         let mut t = valid_land_trust();
-        t.boundary = vec![
-            (90.0, -122.0),
-            (45.1, -122.0),
-            (45.1, -122.1),
-        ];
+        t.boundary = vec![(90.0, -122.0), (45.1, -122.0), (45.1, -122.1)];
         assert_valid(validate_create_trust(fake_create(), t));
     }
 
     #[test]
     fn create_trust_boundary_longitude_below_min() {
         let mut t = valid_land_trust();
-        t.boundary = vec![
-            (45.0, -180.1),
-            (45.1, -122.0),
-            (45.1, -122.1),
-        ];
+        t.boundary = vec![(45.0, -180.1), (45.1, -122.0), (45.1, -122.1)];
         assert_invalid(
             validate_create_trust(fake_create(), t),
             "Boundary longitude must be between -180 and 180",
@@ -773,11 +753,7 @@ mod tests {
     #[test]
     fn create_trust_boundary_longitude_above_max() {
         let mut t = valid_land_trust();
-        t.boundary = vec![
-            (45.0, -122.0),
-            (45.1, 180.1),
-            (45.1, -122.1),
-        ];
+        t.boundary = vec![(45.0, -122.0), (45.1, 180.1), (45.1, -122.1)];
         assert_invalid(
             validate_create_trust(fake_create(), t),
             "Boundary longitude must be between -180 and 180",
@@ -787,22 +763,14 @@ mod tests {
     #[test]
     fn create_trust_boundary_longitude_at_min() {
         let mut t = valid_land_trust();
-        t.boundary = vec![
-            (45.0, -180.0),
-            (45.1, -122.0),
-            (45.1, -122.1),
-        ];
+        t.boundary = vec![(45.0, -180.0), (45.1, -122.0), (45.1, -122.1)];
         assert_valid(validate_create_trust(fake_create(), t));
     }
 
     #[test]
     fn create_trust_boundary_longitude_at_max() {
         let mut t = valid_land_trust();
-        t.boundary = vec![
-            (45.0, 180.0),
-            (45.1, -122.0),
-            (45.1, -122.1),
-        ];
+        t.boundary = vec![(45.0, 180.0), (45.1, -122.0), (45.1, -122.1)];
         assert_valid(validate_create_trust(fake_create(), t));
     }
 
@@ -1065,7 +1033,10 @@ mod tests {
 
     #[test]
     fn create_resale_calc_valid() {
-        assert_valid(validate_resale_calc(fake_create(), valid_resale_calculation()));
+        assert_valid(validate_resale_calc(
+            fake_create(),
+            valid_resale_calculation(),
+        ));
     }
 
     #[test]
@@ -1123,7 +1094,10 @@ mod tests {
 
     #[test]
     fn create_affordability_report_valid() {
-        assert_valid(validate_affordability_report(fake_create(), valid_affordability_report()));
+        assert_valid(validate_affordability_report(
+            fake_create(),
+            valid_affordability_report(),
+        ));
     }
 
     #[test]
@@ -1287,7 +1261,9 @@ mod tests {
         let trust = LandTrust {
             id: "\u{4FE1}\u{8A17}".to_string(), // Chinese chars
             name: "Gemeinn\u{00FC}tziger Landtrust".to_string(), // German umlaut
-            mission: "\u{0421}\u{043E}\u{0434}\u{0435}\u{0439}\u{0441}\u{0442}\u{0432}\u{0438}\u{0435}".to_string(), // Russian
+            mission:
+                "\u{0421}\u{043E}\u{0434}\u{0435}\u{0439}\u{0441}\u{0442}\u{0432}\u{0438}\u{0435}"
+                    .to_string(), // Russian
             boundary: vec![(0.0, 0.0), (1.0, 0.0), (0.0, 1.0)],
             charter_hash: None,
             stewardship_board: vec![agent_a()],
@@ -1346,21 +1322,30 @@ mod tests {
     fn create_trust_whitespace_only_id_rejected() {
         let mut t = valid_land_trust();
         t.id = "   ".to_string();
-        assert_invalid(validate_create_trust(fake_create(), t), "Trust ID cannot be empty");
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust ID cannot be empty",
+        );
     }
 
     #[test]
     fn create_trust_whitespace_only_name_rejected() {
         let mut t = valid_land_trust();
         t.name = "\t\n".to_string();
-        assert_invalid(validate_create_trust(fake_create(), t), "Trust name cannot be empty");
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust name cannot be empty",
+        );
     }
 
     #[test]
     fn create_trust_whitespace_only_mission_rejected() {
         let mut t = valid_land_trust();
         t.mission = " ".to_string();
-        assert_invalid(validate_create_trust(fake_create(), t), "Trust mission cannot be empty");
+        assert_invalid(
+            validate_create_trust(fake_create(), t),
+            "Trust mission cannot be empty",
+        );
     }
 
     #[test]
@@ -1377,7 +1362,9 @@ mod tests {
     #[test]
     fn create_trust_many_boundary_points() {
         let mut t = valid_land_trust();
-        t.boundary = (0..1000).map(|i| (i as f64 * 0.01, i as f64 * 0.01)).collect();
+        t.boundary = (0..1000)
+            .map(|i| (i as f64 * 0.01, i as f64 * 0.01))
+            .collect();
         assert_valid(validate_create_trust(fake_create(), t));
     }
 
@@ -1905,13 +1892,17 @@ mod tests {
     ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
-            LinkTypes::AllTrusts | LinkTypes::TrustToLease |
-            LinkTypes::LeaseholderToLease | LinkTypes::LeaseToResaleCalc |
-            LinkTypes::TrustToReport | LinkTypes::UnitToLease => {
+            LinkTypes::AllTrusts
+            | LinkTypes::TrustToLease
+            | LinkTypes::LeaseholderToLease
+            | LinkTypes::LeaseToResaleCalc
+            | LinkTypes::TrustToReport
+            | LinkTypes::UnitToLease => {
                 if tag.0.len() > 256 {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        format!("{:?} link tag too long (max 256 bytes)", link_type),
-                    ));
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
@@ -1920,7 +1911,10 @@ mod tests {
 
     #[test]
     fn link_tag_all_trusts_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::AllTrusts, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::AllTrusts,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1931,7 +1925,10 @@ mod tests {
 
     #[test]
     fn link_tag_trust_to_lease_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::TrustToLease, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::TrustToLease,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1942,7 +1939,10 @@ mod tests {
 
     #[test]
     fn link_tag_unit_to_lease_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::UnitToLease, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::UnitToLease,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]

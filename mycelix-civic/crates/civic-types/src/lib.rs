@@ -6,12 +6,12 @@
 //! - Role-based authorization helpers
 //! - Bridge types for cross-domain communication
 
-pub mod evidence;
-pub mod status;
-pub mod roles;
 pub mod bridge_types;
+pub mod evidence;
+pub mod roles;
+pub mod status;
 
-pub use evidence::*;
-pub use status::*;
-pub use roles::*;
 pub use bridge_types::*;
+pub use evidence::*;
+pub use roles::*;
+pub use status::*;

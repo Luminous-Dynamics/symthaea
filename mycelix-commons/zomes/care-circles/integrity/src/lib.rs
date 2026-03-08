@@ -343,8 +343,8 @@ fn validate_create_membership(
 
 #[cfg(test)]
 mod tests {
-    use hdi::prelude::*;
     use super::*;
+    use hdi::prelude::*;
 
     // Factory functions
 
@@ -1080,7 +1080,10 @@ mod tests {
     }
 
     /// Helper to simulate the create link tag validation logic (same as in validate()).
-    fn validate_create_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
             LinkTypes::AllCircles => {
@@ -1126,7 +1129,10 @@ mod tests {
         }
     }
 
-    fn validate_delete_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_delete_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
             LinkTypes::AllCircles => {
@@ -1176,7 +1182,10 @@ mod tests {
 
     #[test]
     fn test_link_all_circles_valid_tag() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::AllCircles, vec![0u8; 64]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::AllCircles,
+            vec![0u8; 64],
+        ));
     }
 
     #[test]
@@ -1186,7 +1195,10 @@ mod tests {
 
     #[test]
     fn test_link_all_circles_tag_at_limit() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::AllCircles, vec![0u8; 256]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::AllCircles,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1201,12 +1213,18 @@ mod tests {
 
     #[test]
     fn test_link_type_to_circle_valid_tag() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::TypeToCircle, vec![0u8; 256]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::TypeToCircle,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
     fn test_link_type_to_circle_tag_at_limit() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::TypeToCircle, vec![0u8; 512]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::TypeToCircle,
+            vec![0u8; 512],
+        ));
     }
 
     #[test]
@@ -1221,12 +1239,18 @@ mod tests {
 
     #[test]
     fn test_link_circle_to_membership_valid_tag() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::CircleToMembership, vec![0u8; 100]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::CircleToMembership,
+            vec![0u8; 100],
+        ));
     }
 
     #[test]
     fn test_link_circle_to_membership_tag_at_limit() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::CircleToMembership, vec![0u8; 256]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::CircleToMembership,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1241,7 +1265,10 @@ mod tests {
 
     #[test]
     fn test_link_agent_to_membership_valid_tag() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::AgentToMembership, vec![0u8; 128]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::AgentToMembership,
+            vec![0u8; 128],
+        ));
     }
 
     #[test]
@@ -1256,12 +1283,18 @@ mod tests {
 
     #[test]
     fn test_link_agent_to_created_circle_valid_tag() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::AgentToCreatedCircle, vec![0u8; 128]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::AgentToCreatedCircle,
+            vec![0u8; 128],
+        ));
     }
 
     #[test]
     fn test_link_agent_to_created_circle_tag_at_limit() {
-        assert_valid_result(validate_create_link_tag(LinkTypes::AgentToCreatedCircle, vec![0u8; 256]));
+        assert_valid_result(validate_create_link_tag(
+            LinkTypes::AgentToCreatedCircle,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1276,7 +1309,10 @@ mod tests {
 
     #[test]
     fn test_delete_link_all_circles_valid_tag() {
-        assert_valid_result(validate_delete_link_tag(LinkTypes::AllCircles, vec![0u8; 256]));
+        assert_valid_result(validate_delete_link_tag(
+            LinkTypes::AllCircles,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1289,7 +1325,10 @@ mod tests {
 
     #[test]
     fn test_delete_link_type_to_circle_valid_tag() {
-        assert_valid_result(validate_delete_link_tag(LinkTypes::TypeToCircle, vec![0u8; 512]));
+        assert_valid_result(validate_delete_link_tag(
+            LinkTypes::TypeToCircle,
+            vec![0u8; 512],
+        ));
     }
 
     #[test]
@@ -1343,7 +1382,10 @@ mod tests {
         let result = validate_create_circle(action, circle).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Custom circle type label must be 128 characters or fewer");
+                assert_eq!(
+                    msg,
+                    "Custom circle type label must be 128 characters or fewer"
+                );
             }
             _ => panic!("Expected Invalid result"),
         }
@@ -1392,7 +1434,10 @@ mod tests {
         let result = validate_update_circle(circle).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(msg, "Custom circle type label must be 128 characters or fewer");
+                assert_eq!(
+                    msg,
+                    "Custom circle type label must be 128 characters or fewer"
+                );
             }
             _ => panic!("Expected Invalid result"),
         }

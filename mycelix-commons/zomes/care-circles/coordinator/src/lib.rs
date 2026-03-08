@@ -4,8 +4,7 @@
 use care_circles_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic,
+    gate_consciousness, requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(

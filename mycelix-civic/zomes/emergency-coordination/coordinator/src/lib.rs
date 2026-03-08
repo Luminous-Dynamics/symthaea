@@ -4,8 +4,8 @@
 use emergency_coordination_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 /// Summary of a single active disaster
@@ -411,16 +411,18 @@ pub fn get_disaster_context(_: ()) -> ExternResult<DisasterContextResult> {
     );
 
     let disaster_records: Vec<Record> = match &response {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?
-        }
+        Ok(ZomeCallResponse::Ok(extern_io)) => extern_io
+            .decode()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?,
         Ok(other) => {
             return Ok(DisasterContextResult {
                 active_disaster_count: 0,
                 disasters: vec![],
                 highest_severity: None,
-                error: Some(format!("Unexpected response from emergency_incidents: {:?}", other)),
+                error: Some(format!(
+                    "Unexpected response from emergency_incidents: {:?}",
+                    other
+                )),
             });
         }
         Err(e) => {
@@ -437,13 +439,30 @@ pub fn get_disaster_context(_: ()) -> ExternResult<DisasterContextResult> {
 
     for record in &disaster_records {
         if let Some(entry) = record.entry().as_option() {
-            let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone())
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e))))?;
+            let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone()).map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
+            })?;
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
-                let id = value.get("id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                let title = value.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let severity = value.get("severity").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
-                let disaster_type = value.get("disaster_type").and_then(|v| v.as_str()).unwrap_or("Unknown").to_string();
+                let id = value
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let title = value
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let severity = value
+                    .get("severity")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown")
+                    .to_string();
+                let disaster_type = value
+                    .get("disaster_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Unknown")
+                    .to_string();
 
                 summaries.push(DisasterSummary {
                     id,
@@ -1053,28 +1072,16 @@ mod tests {
     fn severity_determinism_with_unknowns_mixed() {
         let a = &["Unknown", "Advisory", "Moderate"];
         let b = &["Moderate", "Unknown", "Advisory"];
-        assert_eq!(
-            determine_highest_severity(a),
-            determine_highest_severity(b)
-        );
-        assert_eq!(
-            determine_highest_severity(a),
-            Some("Moderate".to_string())
-        );
+        assert_eq!(determine_highest_severity(a), determine_highest_severity(b));
+        assert_eq!(determine_highest_severity(a), Some("Moderate".to_string()));
     }
 
     #[test]
     fn severity_determinism_all_unknown() {
         let a = &["Foo", "Bar", "Baz"];
         let b = &["Baz", "Foo", "Bar"];
-        assert_eq!(
-            determine_highest_severity(a),
-            determine_highest_severity(b)
-        );
-        assert_eq!(
-            determine_highest_severity(a),
-            Some("Unknown".to_string())
-        );
+        assert_eq!(determine_highest_severity(a), determine_highest_severity(b));
+        assert_eq!(determine_highest_severity(a), Some("Unknown".to_string()));
     }
 
     // ========================================================================

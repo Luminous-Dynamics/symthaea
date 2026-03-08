@@ -118,74 +118,66 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::CommonResource(resource) => {
-                        validate_create_common_resource(EntryCreationAction::Create(action), resource)
-                    }
-                    EntryTypes::UsageRight(right) => {
-                        validate_create_usage_right(EntryCreationAction::Create(action), right)
-                    }
-                    EntryTypes::UsageLog(log) => {
-                        validate_create_usage_log(EntryCreationAction::Create(action), log)
-                    }
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::CommonResource(resource) => {
+                    validate_create_common_resource(EntryCreationAction::Create(action), resource)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::CommonResource(resource) => {
-                        validate_update_common_resource(action, resource)
-                    }
-                    EntryTypes::UsageRight(right) => {
-                        validate_update_usage_right(action, right)
-                    }
-                    EntryTypes::UsageLog(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Usage logs cannot be updated".into(),
-                        ))
-                    }
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::UsageRight(right) => {
+                    validate_create_usage_right(EntryCreationAction::Create(action), right)
                 }
-            }
+                EntryTypes::UsageLog(log) => {
+                    validate_create_usage_log(EntryCreationAction::Create(action), log)
+                }
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::CommonResource(resource) => {
+                    validate_update_common_resource(action, resource)
+                }
+                EntryTypes::UsageRight(right) => validate_update_usage_right(action, right),
+                EntryTypes::UsageLog(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Usage logs cannot be updated".into(),
+                )),
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::StewardToResource => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "StewardToResource link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::StewardToResource => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "StewardToResource link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::ResourceToRights => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ResourceToRights link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::HolderToRights => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "HolderToRights link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::ResourceToLogs => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ResourceToLogs link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::ResourceToRights => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ResourceToRights link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::HolderToRights => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "HolderToRights link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ResourceToLogs => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ResourceToLogs link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -200,36 +192,54 @@ fn validate_create_common_resource(
 ) -> ExternResult<ValidateCallbackResult> {
     // --- Empty string checks (required fields) ---
     if resource.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource id cannot be empty".into(),
+        ));
     }
     if resource.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource name cannot be empty".into(),
+        ));
     }
     if resource.description.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource description cannot be empty".into(),
+        ));
     }
     // --- String length limits ---
     if resource.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Resource id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource id too long (max 256 chars)".into(),
+        ));
     }
     if resource.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Resource name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource name too long (max 256 chars)".into(),
+        ));
     }
     if resource.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Resource description too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource description too long (max 4096 chars)".into(),
+        ));
     }
     // --- Existing validation ---
     if resource.stewards.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource must have at least one steward".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource must have at least one steward".into(),
+        ));
     }
     for steward in &resource.stewards {
         if !steward.starts_with("did:") {
-            return Ok(ValidateCallbackResult::Invalid("Stewards must be valid DIDs".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Stewards must be valid DIDs".into(),
+            ));
         }
     }
     for limit in &resource.governance_rules.usage_limits {
         if !limit.max_per_period.is_finite() {
-            return Ok(ValidateCallbackResult::Invalid("Usage limit max_per_period must be a finite number".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Usage limit max_per_period must be a finite number".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -249,21 +259,31 @@ fn validate_create_usage_right(
 ) -> ExternResult<ValidateCallbackResult> {
     // --- Empty string checks (required fields) ---
     if right.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("UsageRight id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageRight id cannot be empty".into(),
+        ));
     }
     if right.resource_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("UsageRight resource_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageRight resource_id cannot be empty".into(),
+        ));
     }
     // --- String length limits ---
     if right.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("UsageRight id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageRight id too long (max 256 chars)".into(),
+        ));
     }
     if right.resource_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("UsageRight resource_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageRight resource_id too long (max 256 chars)".into(),
+        ));
     }
     // --- Existing validation ---
     if !right.holder_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Holder must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Holder must be a valid DID".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -282,39 +302,61 @@ fn validate_create_usage_log(
 ) -> ExternResult<ValidateCallbackResult> {
     // --- Empty string checks (required fields) ---
     if log.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageLog id cannot be empty".into(),
+        ));
     }
     if log.resource_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog resource_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageLog resource_id cannot be empty".into(),
+        ));
     }
     if log.usage_type.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog usage_type cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageLog usage_type cannot be empty".into(),
+        ));
     }
     if log.unit.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog unit cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageLog unit cannot be empty".into(),
+        ));
     }
     // --- String length limits ---
     if log.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageLog id too long (max 256 chars)".into(),
+        ));
     }
     if log.resource_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog resource_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageLog resource_id too long (max 256 chars)".into(),
+        ));
     }
     if log.usage_type.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog usage_type too long (max 128 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageLog usage_type too long (max 128 chars)".into(),
+        ));
     }
     if log.unit.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("UsageLog unit too long (max 128 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "UsageLog unit too long (max 128 chars)".into(),
+        ));
     }
     // --- Existing validation ---
     if !log.user_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("User must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "User must be a valid DID".into(),
+        ));
     }
     if !log.quantity.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite number".into(),
+        ));
     }
     if log.quantity < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Quantity cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity cannot be negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -352,7 +394,10 @@ mod tests {
             description: "Shared water well in village square".to_string(),
             resource_type: ResourceType::Water,
             property_id: Some("property-123".to_string()),
-            stewards: vec!["did:key:steward1".to_string(), "did:key:steward2".to_string()],
+            stewards: vec![
+                "did:key:steward1".to_string(),
+                "did:key:steward2".to_string(),
+            ],
             governance_rules: create_governance_rules(),
             created: Timestamp::from_micros(1000000),
         }
@@ -964,7 +1009,8 @@ mod tests {
     #[test]
     fn test_steward_did_key_variant() {
         let mut resource = create_common_resource();
-        resource.stewards = vec!["did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK".to_string()];
+        resource.stewards =
+            vec!["did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK".to_string()];
         let action = create_entry_creation_action();
         let result = validate_create_common_resource(action, resource).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);

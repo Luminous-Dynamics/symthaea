@@ -839,11 +839,7 @@ mod tests {
     #[test]
     fn test_validate_create_disaster_with_boundary() {
         let mut disaster = valid_disaster();
-        disaster.affected_area.boundary = Some(vec![
-            (35.0, -80.0),
-            (35.5, -80.5),
-            (36.0, -81.0),
-        ]);
+        disaster.affected_area.boundary = Some(vec![(35.0, -80.0), (35.5, -80.5), (36.0, -81.0)]);
         let result = validate_create_disaster(fake_create(), disaster);
         assert!(is_valid(result));
     }
@@ -979,7 +975,11 @@ mod tests {
     #[test]
     fn test_disaster_boundary_too_many_points_rejected() {
         let mut disaster = valid_disaster();
-        disaster.affected_area.boundary = Some((0..2001).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect());
+        disaster.affected_area.boundary = Some(
+            (0..2001)
+                .map(|i| (35.0 + i as f64 * 0.001, -80.0))
+                .collect(),
+        );
         let result = validate_create_disaster(fake_create(), disaster);
         assert!(is_invalid(result));
     }
@@ -987,7 +987,11 @@ mod tests {
     #[test]
     fn test_disaster_boundary_at_limit_accepted() {
         let mut disaster = valid_disaster();
-        disaster.affected_area.boundary = Some((0..2000).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect());
+        disaster.affected_area.boundary = Some(
+            (0..2000)
+                .map(|i| (35.0 + i as f64 * 0.001, -80.0))
+                .collect(),
+        );
         let result = validate_create_disaster(fake_create(), disaster);
         assert!(is_valid(result));
     }
@@ -1214,7 +1218,11 @@ mod tests {
     #[test]
     fn test_update_disaster_boundary_too_many_points_rejected() {
         let mut disaster = valid_disaster();
-        disaster.affected_area.boundary = Some((0..2001).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect());
+        disaster.affected_area.boundary = Some(
+            (0..2001)
+                .map(|i| (35.0 + i as f64 * 0.001, -80.0))
+                .collect(),
+        );
         let result = validate_update_disaster(disaster);
         assert!(is_invalid(result));
     }
@@ -1222,7 +1230,11 @@ mod tests {
     #[test]
     fn test_update_disaster_boundary_at_limit_accepted() {
         let mut disaster = valid_disaster();
-        disaster.affected_area.boundary = Some((0..2000).map(|i| (35.0 + i as f64 * 0.001, -80.0)).collect());
+        disaster.affected_area.boundary = Some(
+            (0..2000)
+                .map(|i| (35.0 + i as f64 * 0.001, -80.0))
+                .collect(),
+        );
         let result = validate_update_disaster(disaster);
         assert!(is_valid(result));
     }
@@ -1413,7 +1425,10 @@ mod tests {
     // LINK TAG VALIDATION TESTS
     // ========================================================================
 
-    fn validate_create_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let base = AnyLinkableHash::from(EntryHash::from_raw_36(vec![0; 36]));
         let target = AnyLinkableHash::from(EntryHash::from_raw_36(vec![0; 36]));
         let link_tag = LinkTag(tag);
@@ -1464,7 +1479,10 @@ mod tests {
         }
     }
 
-    fn validate_delete_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_delete_link_tag(
+        link_type: LinkTypes,
+        tag: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag_len = tag.len();
         match link_type {
             LinkTypes::ActiveDisasters => {
@@ -1585,11 +1603,26 @@ mod tests {
     #[test]
     fn test_massive_link_tag_rejected_all_types() {
         let huge_tag = vec![0xFFu8; 10_000];
-        assert!(is_invalid(validate_create_link_tag(LinkTypes::AllDisasters, huge_tag.clone())));
-        assert!(is_invalid(validate_create_link_tag(LinkTypes::ActiveDisasters, huge_tag.clone())));
-        assert!(is_invalid(validate_create_link_tag(LinkTypes::DisasterByType, huge_tag.clone())));
-        assert!(is_invalid(validate_create_link_tag(LinkTypes::DisasterToUpdate, huge_tag.clone())));
-        assert!(is_invalid(validate_create_link_tag(LinkTypes::AgentToDisaster, huge_tag.clone())));
+        assert!(is_invalid(validate_create_link_tag(
+            LinkTypes::AllDisasters,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(validate_create_link_tag(
+            LinkTypes::ActiveDisasters,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(validate_create_link_tag(
+            LinkTypes::DisasterByType,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(validate_create_link_tag(
+            LinkTypes::DisasterToUpdate,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(validate_create_link_tag(
+            LinkTypes::AgentToDisaster,
+            huge_tag.clone()
+        )));
     }
 
     // -- Delete link tag tests --
@@ -1615,9 +1648,21 @@ mod tests {
     #[test]
     fn test_delete_link_tag_over_limit_all_types() {
         let big_tag = vec![0u8; 257];
-        assert!(is_invalid(validate_delete_link_tag(LinkTypes::AllDisasters, big_tag.clone())));
-        assert!(is_invalid(validate_delete_link_tag(LinkTypes::DisasterByType, big_tag.clone())));
-        assert!(is_invalid(validate_delete_link_tag(LinkTypes::DisasterToUpdate, big_tag.clone())));
-        assert!(is_invalid(validate_delete_link_tag(LinkTypes::AgentToDisaster, big_tag.clone())));
+        assert!(is_invalid(validate_delete_link_tag(
+            LinkTypes::AllDisasters,
+            big_tag.clone()
+        )));
+        assert!(is_invalid(validate_delete_link_tag(
+            LinkTypes::DisasterByType,
+            big_tag.clone()
+        )));
+        assert!(is_invalid(validate_delete_link_tag(
+            LinkTypes::DisasterToUpdate,
+            big_tag.clone()
+        )));
+        assert!(is_invalid(validate_delete_link_tag(
+            LinkTypes::AgentToDisaster,
+            big_tag.clone()
+        )));
     }
 }

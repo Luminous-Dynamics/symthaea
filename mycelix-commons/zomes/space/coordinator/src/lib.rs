@@ -8,13 +8,16 @@
 //! read/write within a space to approved members only.
 
 use hdk::prelude::*;
-use space_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use space_integrity::*;
 
-fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
     gate_consciousness("commons_bridge", requirement, action_name)
 }
 
@@ -194,10 +197,9 @@ pub fn invite_member(input: InviteMemberInput) -> ExternResult<Record> {
             (),
         )?;
 
-        get_latest_record(inv_hash)?
-            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                "Invitation not found".into()
-            )))
+        get_latest_record(inv_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invitation not found".into()
+        )))
     } else {
         // Direct add (no approval needed)
         add_member_directly(&input.space_id, &input.invitee, &caller, now)
@@ -243,10 +245,9 @@ pub fn grant_access(input: GrantAccessInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get_latest_record(cap_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Capability not found".into()
-        )))
+    get_latest_record(cap_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Capability not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -411,12 +412,7 @@ pub fn get_space(space_id: String) -> ExternResult<Option<Record>> {
             let ah = ActionHash::try_from(link.target)
                 .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
             if let Some(record) = get_latest_record(ah)? {
-                if let Some(space) = record
-                    .entry()
-                    .to_app_option::<Space>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(space) = record.entry().to_app_option::<Space>().ok().flatten() {
                     if space.id == space_id {
                         return Ok(Some(record));
                     }
@@ -438,10 +434,9 @@ pub fn approve_invitation(input: ApproveInvitationInput) -> ExternResult<Record>
     let caller = agent_info()?.agent_initial_pubkey;
 
     // Verify caller is an active member of the space
-    let record = get(input.invitation_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Invitation not found".into()
-        )))?;
+    let record = get(input.invitation_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Invitation not found".into())
+    ))?;
 
     let mut invitation: SpaceInvitation = record
         .entry()
@@ -494,10 +489,9 @@ pub fn approve_invitation(input: ApproveInvitationInput) -> ExternResult<Record>
         &EntryTypes::SpaceInvitation(invitation),
     )?;
 
-    get_latest_record(new_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not retrieve updated invitation".into()
-        )))
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not retrieve updated invitation".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -511,10 +505,9 @@ pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "reject_invitation")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
-    let record = get_latest_record(invitation_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Invitation not found".into()
-        )))?;
+    let record = get_latest_record(invitation_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Invitation not found".into())
+    ))?;
 
     let mut invitation: SpaceInvitation = record
         .entry()
@@ -533,15 +526,11 @@ pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
     verify_membership(&invitation.space_id, &caller, true)?;
 
     invitation.status = InvitationStatus::Rejected;
-    let new_hash = update_entry(
-        invitation_hash,
-        &EntryTypes::SpaceInvitation(invitation),
-    )?;
+    let new_hash = update_entry(invitation_hash, &EntryTypes::SpaceInvitation(invitation))?;
 
-    get_latest_record(new_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not retrieve updated invitation".into()
-        )))
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not retrieve updated invitation".into()
+    )))
 }
 
 /// Book a shared resource within a space
@@ -553,7 +542,12 @@ pub fn book_resource(input: BookResourceInput) -> ExternResult<Record> {
 
     verify_membership(&input.space_id, &caller, true)?;
 
-    let booking_id = format!("booking:{}:{}:{}", input.space_id, input.resource_name, now.as_micros());
+    let booking_id = format!(
+        "booking:{}:{}:{}",
+        input.space_id,
+        input.resource_name,
+        now.as_micros()
+    );
 
     let booking = ResourceBooking {
         id: booking_id,
@@ -586,10 +580,9 @@ pub fn book_resource(input: BookResourceInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get_latest_record(booking_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Booking not found".into()
-        )))
+    get_latest_record(booking_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Booking not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -607,10 +600,9 @@ pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "cancel_booking")?;
     let caller = agent_info()?.agent_initial_pubkey;
 
-    let record = get_latest_record(booking_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Booking not found".into()
-        )))?;
+    let record = get_latest_record(booking_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Booking not found".into())
+    ))?;
 
     let mut booking: ResourceBooking = record
         .entry()
@@ -634,10 +626,9 @@ pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
     booking.status = BookingStatus::Cancelled;
     let new_hash = update_entry(booking_hash, &EntryTypes::ResourceBooking(booking))?;
 
-    get_latest_record(new_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not retrieve updated booking".into()
-        )))
+    get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not retrieve updated booking".into()
+    )))
 }
 
 /// Get all bookings for a space
@@ -673,7 +664,12 @@ pub fn create_schedule(input: CreateScheduleInput) -> ExternResult<Record> {
 
     verify_membership(&input.space_id, &caller, true)?;
 
-    let schedule_id = format!("sched:{}:{}:{}", input.space_id, input.title, now.as_micros());
+    let schedule_id = format!(
+        "sched:{}:{}:{}",
+        input.space_id,
+        input.title,
+        now.as_micros()
+    );
 
     let schedule = SpaceSchedule {
         id: schedule_id,
@@ -698,10 +694,9 @@ pub fn create_schedule(input: CreateScheduleInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get_latest_record(sched_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Schedule not found".into()
-        )))
+    get_latest_record(sched_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Schedule not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -848,12 +843,7 @@ fn get_space_member_records(space_id: &str) -> ExternResult<Vec<(Record, Members
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get_latest_record(ah)? {
-            if let Some(membership) = record
-                .entry()
-                .to_app_option::<Membership>()
-                .ok()
-                .flatten()
-            {
+            if let Some(membership) = record.entry().to_app_option::<Membership>().ok().flatten() {
                 members.push((record, membership));
             }
         }
@@ -978,10 +968,9 @@ fn add_member_directly(
         }
     }
 
-    get_latest_record(member_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Member not found".into()
-        )))
+    get_latest_record(member_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Member not found".into()
+    )))
 }
 
 #[cfg(test)]

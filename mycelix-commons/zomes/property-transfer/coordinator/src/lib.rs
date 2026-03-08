@@ -1,10 +1,10 @@
 //! Property Transfer Coordinator Zome
 use hdk::prelude::*;
-use property_transfer_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_proposal, requirement_for_voting,
+    gate_consciousness, requirement_for_proposal, requirement_for_voting, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use property_transfer_integrity::*;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -19,7 +19,6 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
     hash_entry(&anchor)
 }
-
 
 fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
     let Some(details) = get_details(action_hash, GetOptions::default())? else {
@@ -59,9 +58,24 @@ pub fn initiate_transfer(input: InitiateTransferInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Transfer(transfer))?;
-    create_link(anchor_hash(&input.property_id)?, action_hash.clone(), LinkTypes::PropertyToTransfers, ())?;
-    create_link(anchor_hash(&input.from_did)?, action_hash.clone(), LinkTypes::SellerToTransfers, ())?;
-    create_link(anchor_hash(&input.to_did)?, action_hash.clone(), LinkTypes::BuyerToTransfers, ())?;
+    create_link(
+        anchor_hash(&input.property_id)?,
+        action_hash.clone(),
+        LinkTypes::PropertyToTransfers,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&input.from_did)?,
+        action_hash.clone(),
+        LinkTypes::SellerToTransfers,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&input.to_did)?,
+        action_hash.clone(),
+        LinkTypes::BuyerToTransfers,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -92,7 +106,12 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Escrow(escrow))?;
-    create_link(anchor_hash(&input.transfer_id)?, action_hash.clone(), LinkTypes::TransferToEscrow, ())?;
+    create_link(
+        anchor_hash(&input.transfer_id)?,
+        action_hash.clone(),
+        LinkTypes::TransferToEscrow,
+        (),
+    )?;
 
     // Update transfer status
     update_transfer_status(&input.transfer_id, TransferStatus::InEscrow)?;
@@ -110,17 +129,29 @@ pub struct CreateEscrowInput {
 }
 
 fn update_transfer_status(transfer_id: &str, new_status: TransferStatus) -> ExternResult<()> {
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
         if let Some(transfer) = record.entry().to_app_option::<Transfer>().ok().flatten() {
             if transfer.id == transfer_id {
-                let updated = Transfer { status: new_status, ..transfer };
-                update_entry(record.action_address().clone(), &EntryTypes::Transfer(updated))?;
+                let updated = Transfer {
+                    status: new_status,
+                    ..transfer
+                };
+                update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Transfer(updated),
+                )?;
                 return Ok(());
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Transfer not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Transfer not found".into()
+    )))
 }
 
 /// Complete a transfer and update ownership in the registry
@@ -134,14 +165,20 @@ fn update_transfer_status(transfer_id: &str, new_status: TransferStatus) -> Exte
 pub fn complete_transfer(transfer_id: String) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "complete_transfer")?;
 
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
         if let Some(transfer) = record.entry().to_app_option::<Transfer>().ok().flatten() {
             if transfer.id == transfer_id {
                 // Verify all conditions are satisfied
                 for condition in &transfer.conditions {
                     if !condition.satisfied {
-                        return Err(wasm_error!(WasmErrorInner::Guest("Not all conditions satisfied".into())));
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "Not all conditions satisfied".into()
+                        )));
                     }
                 }
 
@@ -173,9 +210,15 @@ pub fn complete_transfer(transfer_id: String) -> ExternResult<Record> {
                     registry_input,
                 )?;
                 let result: TransferOwnershipResult = match response {
-                    ZomeCallResponse::Ok(extern_io) => extern_io.decode()
-                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?,
-                    other => return Err(wasm_error!(WasmErrorInner::Guest(format!("Zome call failed: {:?}", other)))),
+                    ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+                    })?,
+                    other => {
+                        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                            "Zome call failed: {:?}",
+                            other
+                        ))))
+                    }
                 };
 
                 let now = sys_time()?;
@@ -184,7 +227,10 @@ pub fn complete_transfer(transfer_id: String) -> ExternResult<Record> {
                     completed: Some(now),
                     ..transfer.clone()
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(completed))?;
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Transfer(completed),
+                )?;
 
                 // Broadcast ownership change via bridge zome
                 let bridge_input = BroadcastOwnershipChangeInput {
@@ -204,11 +250,14 @@ pub fn complete_transfer(transfer_id: String) -> ExternResult<Record> {
                     bridge_input,
                 );
 
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Transfer not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Transfer not found".into()
+    )))
 }
 
 /// Input for cross-zome call to registry
@@ -243,7 +292,11 @@ struct BroadcastOwnershipChangeInput {
 
 #[hdk_extern]
 pub fn satisfy_condition(input: SatisfyConditionInput) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
         if let Some(mut transfer) = record.entry().to_app_option::<Transfer>().ok().flatten() {
             if transfer.id == input.transfer_id {
@@ -251,12 +304,18 @@ pub fn satisfy_condition(input: SatisfyConditionInput) -> ExternResult<Record> {
                     condition.satisfied = true;
                     condition.verified_by = Some(input.verifier_did);
                 }
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(transfer))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Transfer(transfer),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Transfer not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Transfer not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -270,7 +329,9 @@ pub struct SatisfyConditionInput {
 #[hdk_extern]
 pub fn get_transfer(transfer_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -287,8 +348,15 @@ pub fn get_transfer(transfer_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_seller_transfers(did: String) -> ExternResult<Vec<Record>> {
     let mut transfers = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::SellerToTransfers)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::SellerToTransfers)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             transfers.push(record);
         }
     }
@@ -299,8 +367,15 @@ pub fn get_seller_transfers(did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_buyer_transfers(did: String) -> ExternResult<Vec<Record>> {
     let mut transfers = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::BuyerToTransfers)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::BuyerToTransfers)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             transfers.push(record);
         }
     }
@@ -311,8 +386,15 @@ pub fn get_buyer_transfers(did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_property_transfers(property_id: String) -> ExternResult<Vec<Record>> {
     let mut transfers = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&property_id)?, LinkTypes::PropertyToTransfers)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&property_id)?, LinkTypes::PropertyToTransfers)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             transfers.push(record);
         }
     }
@@ -323,7 +405,9 @@ pub fn get_property_transfers(property_id: String) -> ExternResult<Vec<Record>> 
 #[hdk_extern]
 pub fn cancel_transfer(input: CancelTransferInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -331,24 +415,34 @@ pub fn cancel_transfer(input: CancelTransferInput) -> ExternResult<Record> {
             if transfer.id == input.transfer_id {
                 // Only seller can cancel
                 if transfer.from_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only seller can cancel transfer".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only seller can cancel transfer".into()
+                    )));
                 }
 
                 // Cannot cancel completed transfers
                 if transfer.status == TransferStatus::Completed {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Cannot cancel completed transfer".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Cannot cancel completed transfer".into()
+                    )));
                 }
 
                 let cancelled = Transfer {
                     status: TransferStatus::Cancelled,
                     ..transfer
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(cancelled))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Transfer(cancelled),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Transfer not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Transfer not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -361,7 +455,9 @@ pub struct CancelTransferInput {
 #[hdk_extern]
 pub fn accept_transfer(input: AcceptTransferInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -369,11 +465,17 @@ pub fn accept_transfer(input: AcceptTransferInput) -> ExternResult<Record> {
             if transfer.id == input.transfer_id {
                 // Only buyer can accept
                 if transfer.to_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only buyer can accept transfer".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only buyer can accept transfer".into()
+                    )));
                 }
 
-                if transfer.status != TransferStatus::Initiated && transfer.status != TransferStatus::AwaitingAcceptance {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Transfer not in acceptable state".into())));
+                if transfer.status != TransferStatus::Initiated
+                    && transfer.status != TransferStatus::AwaitingAcceptance
+                {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Transfer not in acceptable state".into()
+                    )));
                 }
 
                 let new_status = TransferStatus::ConditionsPending;
@@ -382,12 +484,18 @@ pub fn accept_transfer(input: AcceptTransferInput) -> ExternResult<Record> {
                     status: new_status,
                     ..transfer
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(accepted))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Transfer(accepted),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Transfer not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Transfer not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -400,57 +508,90 @@ pub struct AcceptTransferInput {
 #[hdk_extern]
 pub fn fund_escrow(escrow_id: String) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Escrow)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Escrow,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(escrow) = record.entry().to_app_option::<Escrow>().ok().flatten() {
             if escrow.id == escrow_id {
                 if escrow.funded {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Escrow already funded".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Escrow already funded".into()
+                    )));
                 }
 
-                let funded = Escrow { funded: true, ..escrow };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Escrow(funded))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let funded = Escrow {
+                    funded: true,
+                    ..escrow
+                };
+                let action_hash =
+                    update_entry(record.action_address().clone(), &EntryTypes::Escrow(funded))?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Escrow not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Escrow not found".into()
+    )))
 }
 
 /// Release escrow to seller
 #[hdk_extern]
 pub fn release_escrow(escrow_id: String) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Escrow)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Escrow,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(escrow) = record.entry().to_app_option::<Escrow>().ok().flatten() {
             if escrow.id == escrow_id {
                 if !escrow.funded {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Escrow not funded".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Escrow not funded".into()
+                    )));
                 }
                 if escrow.released.is_some() {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Escrow already released".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Escrow already released".into()
+                    )));
                 }
 
                 let now = sys_time()?;
-                let released = Escrow { released: Some(now), ..escrow };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Escrow(released))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let released = Escrow {
+                    released: Some(now),
+                    ..escrow
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Escrow(released),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Escrow not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Escrow not found".into()
+    )))
 }
 
 /// Get escrow for a transfer
 #[hdk_extern]
 pub fn get_transfer_escrow(transfer_id: String) -> ExternResult<Option<Record>> {
-    for link in get_links(LinkQuery::try_new(anchor_hash(&transfer_id)?, LinkTypes::TransferToEscrow)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&transfer_id)?, LinkTypes::TransferToEscrow)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             return Ok(Some(record));
         }
     }
@@ -461,31 +602,47 @@ pub fn get_transfer_escrow(transfer_id: String) -> ExternResult<Option<Record>> 
 #[hdk_extern]
 pub fn dispute_transfer(input: DisputeTransferInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(transfer) = record.entry().to_app_option::<Transfer>().ok().flatten() {
             if transfer.id == input.transfer_id {
                 // Either party can dispute
-                if transfer.from_did != input.requester_did && transfer.to_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only parties can dispute transfer".into())));
+                if transfer.from_did != input.requester_did
+                    && transfer.to_did != input.requester_did
+                {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only parties can dispute transfer".into()
+                    )));
                 }
 
-                if transfer.status == TransferStatus::Completed || transfer.status == TransferStatus::Cancelled {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Cannot dispute completed or cancelled transfer".into())));
+                if transfer.status == TransferStatus::Completed
+                    || transfer.status == TransferStatus::Cancelled
+                {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Cannot dispute completed or cancelled transfer".into()
+                    )));
                 }
 
                 let disputed = Transfer {
                     status: TransferStatus::Disputed,
                     ..transfer
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(disputed))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Transfer(disputed),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Transfer not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Transfer not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -498,14 +655,18 @@ pub struct DisputeTransferInput {
 #[hdk_extern]
 pub fn add_condition(input: AddConditionInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(transfer) = record.entry().to_app_option::<Transfer>().ok().flatten() {
             if transfer.id == input.transfer_id {
                 if transfer.status != TransferStatus::Initiated {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Can only add conditions before acceptance".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Can only add conditions before acceptance".into()
+                    )));
                 }
 
                 let new_condition = TransferCondition {
@@ -518,13 +679,22 @@ pub fn add_condition(input: AddConditionInput) -> ExternResult<Record> {
                 let mut conditions = transfer.conditions.clone();
                 conditions.push(new_condition);
 
-                let updated = Transfer { conditions, ..transfer };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Transfer(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let updated = Transfer {
+                    conditions,
+                    ..transfer
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Transfer(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Transfer not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Transfer not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -538,7 +708,9 @@ pub struct AddConditionInput {
 #[hdk_extern]
 pub fn get_transfers_by_status(status: TransferStatus) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Transfer,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
@@ -586,10 +758,22 @@ struct LocalWaterRight {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalRightType { Riparian, Appropriative, Prescriptive, Groundwater, Recycled }
+enum LocalRightType {
+    Riparian,
+    Appropriative,
+    Prescriptive,
+    Groundwater,
+    Recycled,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalRightStatus { Active, Suspended, Revoked, Transferred, Expired }
+enum LocalRightStatus {
+    Active,
+    Suspended,
+    Revoked,
+    Transferred,
+    Expired,
+}
 
 /// Check if a property's watershed has associated water rights before
 /// completing a transfer.
@@ -599,7 +783,9 @@ enum LocalRightStatus { Active, Suspended, Revoked, Transferred, Expired }
 /// the watershed. If water rights exist, the buyer should be informed
 /// that rights may need separate transfer.
 #[hdk_extern]
-pub fn check_water_rights_before_transfer(input: CheckWaterRightsInput) -> ExternResult<WaterRightsCheckResult> {
+pub fn check_water_rights_before_transfer(
+    input: CheckWaterRightsInput,
+) -> ExternResult<WaterRightsCheckResult> {
     let response = call(
         CallTargetCell::Local,
         ZomeName::from("water_steward"),
@@ -610,8 +796,9 @@ pub fn check_water_rights_before_transfer(input: CheckWaterRightsInput) -> Exter
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
 
             let count = records.len() as u32;
             let has_rights = count > 0;
@@ -957,7 +1144,10 @@ mod tests {
             (ConditionType::TitleClear, "Title search"),
             (ConditionType::DocumentsSigned, "All documents"),
             (ConditionType::TaxesPaid, "Property taxes current"),
-            (ConditionType::Custom("Environmental review".to_string()), "Environmental review"),
+            (
+                ConditionType::Custom("Environmental review".to_string()),
+                "Environmental review",
+            ),
         ];
         for (ct, desc) in types_and_descs {
             let condition = TransferCondition {
@@ -1039,14 +1229,12 @@ mod tests {
             transfer_type: TransferType::Exchange,
             price: Some(1.0),
             currency: Some("BTC".to_string()),
-            conditions: vec![
-                TransferCondition {
-                    condition_type: ConditionType::PaymentReceived,
-                    description: "Crypto transfer".to_string(),
-                    satisfied: false,
-                    verified_by: None,
-                },
-            ],
+            conditions: vec![TransferCondition {
+                condition_type: ConditionType::PaymentReceived,
+                description: "Crypto transfer".to_string(),
+                satisfied: false,
+                verified_by: None,
+            }],
             status: TransferStatus::Cancelled,
             initiated: Timestamp::from_micros(1000),
             completed: None,

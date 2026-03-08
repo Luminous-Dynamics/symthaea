@@ -215,7 +215,7 @@ pub fn compute_kvector_update(
         new_k_s,
         new_k_h,
         new_k_topo,
-        current.k_v,   // Preserve verification status
+        current.k_v,         // Preserve verification status
         current.k_coherence, // Preserve coherence (from Phi measurement)
     )
 }

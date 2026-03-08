@@ -2,11 +2,11 @@
 //! Democratic decision-making for mutual aid circles.
 
 use hdk::prelude::*;
-use mutualaid_governance_integrity::*;
 use mutualaid_common::{Proposal, Vote};
+use mutualaid_governance_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_proposal, requirement_for_voting,
+    gate_consciousness, requirement_for_proposal, requirement_for_voting, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -92,8 +92,9 @@ pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
     }
 
     let action_hash = create_entry(&EntryTypes::Proposal(proposal))?;
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created proposal".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created proposal".into()
+    )))
 }
 
 /// Get all proposals
@@ -110,10 +111,7 @@ pub fn cast_vote(vote: Vote) -> ExternResult<Record> {
 
     // Check for double-voting: look up existing votes linked to this proposal
     let existing_vote_links = get_links(
-        LinkQuery::try_new(
-            vote.proposal_hash.clone(),
-            LinkTypes::ProposalToVotes,
-        )?,
+        LinkQuery::try_new(vote.proposal_hash.clone(), LinkTypes::ProposalToVotes)?,
         GetStrategy::default(),
     )?;
 
@@ -143,8 +141,9 @@ pub fn cast_vote(vote: Vote) -> ExternResult<Record> {
         (),
     )?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created vote".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created vote".into()
+    )))
 }
 
 #[cfg(test)]
@@ -152,8 +151,8 @@ mod tests {
     #[allow(unused_imports)]
     use super::*;
     use mutualaid_common::{
-        MemberRole, MemberStatus, ProposalStatus, ProposalType,
-        RuleCategory, VoteChoice, VotingMethod,
+        MemberRole, MemberStatus, ProposalStatus, ProposalType, RuleCategory, VoteChoice,
+        VotingMethod,
     };
 
     // ── Integrity enum serde roundtrip tests ──────────────────────────
@@ -482,7 +481,12 @@ mod tests {
 
     #[test]
     fn vote_choice_all_variants_clone_eq() {
-        for vc in [VoteChoice::Yes, VoteChoice::No, VoteChoice::Abstain, VoteChoice::Block] {
+        for vc in [
+            VoteChoice::Yes,
+            VoteChoice::No,
+            VoteChoice::Abstain,
+            VoteChoice::Block,
+        ] {
             assert_eq!(vc, vc.clone());
         }
     }
@@ -521,7 +525,10 @@ mod tests {
             status: ProposalStatus::Draft,
             created_at: Timestamp::from_micros(1000000),
         };
-        assert!(proposal.title.trim().is_empty(), "Whitespace-only title should be detected");
+        assert!(
+            proposal.title.trim().is_empty(),
+            "Whitespace-only title should be detected"
+        );
     }
 
     #[test]
@@ -541,7 +548,10 @@ mod tests {
             status: ProposalStatus::Draft,
             created_at: Timestamp::from_micros(1000000),
         };
-        assert!(proposal.title.trim().is_empty(), "Empty title should be detected");
+        assert!(
+            proposal.title.trim().is_empty(),
+            "Empty title should be detected"
+        );
     }
 
     #[test]
@@ -561,7 +571,10 @@ mod tests {
             status: ProposalStatus::Draft,
             created_at: Timestamp::from_micros(1000000),
         };
-        assert!(proposal.description.trim().is_empty(), "Whitespace-only description should be detected");
+        assert!(
+            proposal.description.trim().is_empty(),
+            "Whitespace-only description should be detected"
+        );
     }
 
     #[test]
@@ -601,7 +614,10 @@ mod tests {
             status: ProposalStatus::Draft,
             created_at: Timestamp::from_micros(1000000),
         };
-        assert_eq!(proposal.threshold_percent, 0, "Zero threshold should be detected");
+        assert_eq!(
+            proposal.threshold_percent, 0,
+            "Zero threshold should be detected"
+        );
     }
 
     #[test]
@@ -709,7 +725,10 @@ mod tests {
 
         // Same voter on same proposal should be detected
         assert_eq!(vote1.voter, vote2.voter, "Same voter should be detected");
-        assert_eq!(vote1.proposal_hash, vote2.proposal_hash, "Same proposal should be detected");
+        assert_eq!(
+            vote1.proposal_hash, vote2.proposal_hash,
+            "Same proposal should be detected"
+        );
     }
 
     #[test]
@@ -734,7 +753,10 @@ mod tests {
             voted_at: Timestamp::from_micros(2000000),
         };
 
-        assert_ne!(vote1.voter, vote2.voter, "Different voters should not be flagged");
+        assert_ne!(
+            vote1.voter, vote2.voter,
+            "Different voters should not be flagged"
+        );
     }
 
     #[test]
@@ -759,12 +781,18 @@ mod tests {
             voted_at: Timestamp::from_micros(2000000),
         };
 
-        assert_ne!(vote1.proposal_hash, vote2.proposal_hash, "Different proposals should not be flagged");
+        assert_ne!(
+            vote1.proposal_hash, vote2.proposal_hash,
+            "Different proposals should not be flagged"
+        );
     }
 
     #[test]
     fn min_voting_period_constant_is_5_minutes() {
         // 5 minutes = 5 * 60 * 1_000_000 microseconds = 300_000_000
-        assert_eq!(MIN_VOTING_PERIOD_MS, 300_000_000, "MIN_VOTING_PERIOD_MS should be 5 minutes in microseconds");
+        assert_eq!(
+            MIN_VOTING_PERIOD_MS, 300_000_000,
+            "MIN_VOTING_PERIOD_MS should be 5 minutes in microseconds"
+        );
     }
 }

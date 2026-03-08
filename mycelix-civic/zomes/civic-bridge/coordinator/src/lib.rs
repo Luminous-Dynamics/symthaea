@@ -11,21 +11,14 @@
 use civic_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    self as bridge,
-    DispatchInput, DispatchResult, CrossClusterDispatchInput,
-    ResolveQueryInput, EventTypeQuery, BridgeHealth,
-    JusticeAreaQuery, JusticeAreaResult,
-    FactcheckStatusQuery, FactcheckStatusResult,
-    AuditTrailQuery, AuditTrailEntry, AuditTrailResult,
-    WaterSafetyQuery, WaterSafetyResult,
-    EmergencyFoodQuery, EmergencyFoodResult,
-    ShelterCapacityQuery, ShelterCapacityResult,
-    EmergencyCareQuery, EmergencyCareResult,
-    RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
-    BridgeDomain, resolve_civic_zome,
-    ConsciousnessCredential, ConsciousnessTier,
-    needs_refresh,
-    GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult,
+    self as bridge, check_rate_limit_count, needs_refresh, resolve_civic_zome, AuditTrailEntry,
+    AuditTrailQuery, AuditTrailResult, BridgeDomain, BridgeHealth, ConsciousnessCredential,
+    ConsciousnessTier, CrossClusterDispatchInput, DispatchInput, DispatchResult,
+    EmergencyCareQuery, EmergencyCareResult, EmergencyFoodQuery, EmergencyFoodResult,
+    EventTypeQuery, FactcheckStatusQuery, FactcheckStatusResult, GateAuditInput,
+    GovernanceAuditFilter, GovernanceAuditResult, JusticeAreaQuery, JusticeAreaResult,
+    ResolveQueryInput, ShelterCapacityQuery, ShelterCapacityResult, WaterSafetyQuery,
+    WaterSafetyResult, RATE_LIMIT_WINDOW_SECS,
 };
 
 // ============================================================================
@@ -86,12 +79,9 @@ fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
     let window_start_micros = now.as_micros() - (RATE_LIMIT_WINDOW_SECS * 1_000_000);
     let window_start = Timestamp::from_micros(window_start_micros);
 
-    let recent_count = links.iter()
-        .filter(|l| l.timestamp >= window_start)
-        .count();
+    let recent_count = links.iter().filter(|l| l.timestamp >= window_start).count();
 
-    check_rate_limit_count(recent_count)
-        .map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
+    check_rate_limit_count(recent_count).map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
 
     // Log this dispatch
     create_link(
@@ -177,10 +167,20 @@ pub fn query_civic(query: CivicQueryEntry) -> ExternResult<Record> {
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllQueries, ())?;
 
     let agent_anchor = ensure_anchor(&format!("agent_queries:{}", query.requester))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToQuery, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToQuery,
+        (),
+    )?;
 
     let domain_anchor = ensure_anchor(&format!("domain_queries:{}", query.domain))?;
-    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToQuery, ())?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToQuery,
+        (),
+    )?;
 
     // Attempt auto-dispatch using type-safe routing
     let target = BridgeDomain::from_str_loose(&query.domain)
@@ -197,7 +197,8 @@ pub fn query_civic(query: CivicQueryEntry) -> ExternResult<Record> {
         };
         if let Ok(result) = dispatch_call(dispatch) {
             if result.success {
-                let result_str = result.response
+                let result_str = result
+                    .response
                     .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
                     .unwrap_or_else(|| "null".to_string());
                 let _ = resolve_query(ResolveQueryInput {
@@ -237,7 +238,9 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid query entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid query entry".into()
+        )))?;
 
     let now = sys_time()?;
     query.result = Some(input.result);
@@ -297,13 +300,28 @@ pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
 
     let type_anchor = ensure_anchor(&format!("event_type:{}:{}", event.domain, event.event_type))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::EventTypeToEvent,
+        (),
+    )?;
 
     let agent_anchor = ensure_anchor(&format!("agent_events:{}", event.source_agent))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToEvent,
+        (),
+    )?;
 
     let domain_anchor = ensure_anchor(&format!("domain_events:{}", event.domain))?;
-    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToEvent, ())?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToEvent,
+        (),
+    )?;
 
     // Emit signal to connected UI clients
     let signal = BridgeEventSignal {
@@ -347,11 +365,21 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
 
     // Event type index
     let type_anchor = ensure_anchor(&format!("event_type:governance_gate:{}", input.action_name))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::EventTypeToEvent,
+        (),
+    )?;
 
     // Agent index
     let agent_anchor = ensure_anchor(&format!("agent_events:{}", agent))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToEvent,
+        (),
+    )?;
 
     // Domain index
     let domain_anchor = ensure_anchor("domain_events:governance_gate")?;
@@ -362,7 +390,9 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
 
 /// Query governance gate audit events with filtering.
 #[hdk_extern]
-pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult<GovernanceAuditResult> {
+pub fn get_governance_audit_trail(
+    filter: GovernanceAuditFilter,
+) -> ExternResult<GovernanceAuditResult> {
     let domain_anchor = anchor_hash("domain_events:governance_gate")?;
     let links = get_links(
         LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
@@ -375,21 +405,31 @@ pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult
             if let Ok(Some(event)) = record.entry().to_app_option::<CivicEventEntry>() {
                 if let Ok(audit) = serde_json::from_str::<GateAuditInput>(&event.payload) {
                     if let Some(ref action) = filter.action_name {
-                        if &audit.action_name != action { continue; }
+                        if &audit.action_name != action {
+                            continue;
+                        }
                     }
                     if let Some(ref zome) = filter.zome_name {
-                        if &audit.zome_name != zome { continue; }
+                        if &audit.zome_name != zome {
+                            continue;
+                        }
                     }
                     if let Some(eligible) = filter.eligible {
-                        if audit.eligible != eligible { continue; }
+                        if audit.eligible != eligible {
+                            continue;
+                        }
                     }
                     if let Some(from_us) = filter.from_us {
                         let event_us = event.created_at.as_micros();
-                        if event_us < from_us { continue; }
+                        if event_us < from_us {
+                            continue;
+                        }
                     }
                     if let Some(to_us) = filter.to_us {
                         let event_us = event.created_at.as_micros();
-                        if event_us > to_us { continue; }
+                        if event_us > to_us {
+                            continue;
+                        }
                     }
                     entries.push(audit);
                 }
@@ -397,7 +437,10 @@ pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult
         }
     }
     let total = entries.len() as u32;
-    Ok(GovernanceAuditResult { entries, total_matched: total })
+    Ok(GovernanceAuditResult {
+        entries,
+        total_matched: total,
+    })
 }
 
 // ============================================================================
@@ -584,7 +627,9 @@ pub struct PropertyEnforcementResult {
 /// to verify a property exists and identify the owner before issuing
 /// sanctions or freezing transfers.
 #[hdk_extern]
-pub fn query_property_for_enforcement(input: QueryPropertyForEnforcementInput) -> ExternResult<PropertyEnforcementResult> {
+pub fn query_property_for_enforcement(
+    input: QueryPropertyForEnforcementInput,
+) -> ExternResult<PropertyEnforcementResult> {
     let dispatch = CrossClusterDispatchInput {
         role: COMMONS_ROLE.to_string(),
         zome: "commons_bridge".to_string(),
@@ -642,7 +687,9 @@ pub struct HousingCapacityResult {
 /// to identify available housing that could supplement dedicated shelters
 /// during large-scale disasters.
 #[hdk_extern]
-pub fn check_housing_capacity_for_sheltering(input: CheckHousingCapacityInput) -> ExternResult<HousingCapacityResult> {
+pub fn check_housing_capacity_for_sheltering(
+    input: CheckHousingCapacityInput,
+) -> ExternResult<HousingCapacityResult> {
     let response = call(
         CallTargetCell::OtherRole("commons_land".into()),
         ZomeName::from("housing_units"),
@@ -653,8 +700,9 @@ pub fn check_housing_capacity_for_sheltering(input: CheckHousingCapacityInput) -
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             let count = records.len() as u32;
             Ok(HousingCapacityResult {
                 commons_reachable: true,
@@ -678,12 +726,18 @@ pub fn check_housing_capacity_for_sheltering(input: CheckHousingCapacityInput) -
         Ok(other) => Ok(HousingCapacityResult {
             commons_reachable: false,
             recommendation: None,
-            error: Some(format!("Unexpected response from commons housing_units: {:?}", other)),
+            error: Some(format!(
+                "Unexpected response from commons housing_units: {:?}",
+                other
+            )),
         }),
         Err(e) => Ok(HousingCapacityResult {
             commons_reachable: false,
             recommendation: None,
-            error: Some(format!("Failed to reach commons cluster housing_units: {:?}", e)),
+            error: Some(format!(
+                "Failed to reach commons cluster housing_units: {:?}",
+                e
+            )),
         }),
     }
 }
@@ -712,7 +766,9 @@ pub struct CareCredentialVerifyResult {
 /// to verify the qualifications of care providers when their testimony
 /// or assessments are submitted as evidence.
 #[hdk_extern]
-pub fn verify_care_credentials_for_evidence(input: VerifyCareCredentialsInput) -> ExternResult<CareCredentialVerifyResult> {
+pub fn verify_care_credentials_for_evidence(
+    input: VerifyCareCredentialsInput,
+) -> ExternResult<CareCredentialVerifyResult> {
     let dispatch = CrossClusterDispatchInput {
         role: COMMONS_ROLE.to_string(),
         zome: "care_credentials".to_string(),
@@ -723,16 +779,14 @@ pub fn verify_care_credentials_for_evidence(input: VerifyCareCredentialsInput) -
     };
 
     match bridge::dispatch_call_cross_cluster_commons(&dispatch, ALLOWED_COMMONS_ZOMES) {
-        Ok(result) if result.success => {
-            Ok(CareCredentialVerifyResult {
-                commons_reachable: true,
-                recommendation: Some(format!(
-                    "Care credentials for '{}' retrieved from commons — evaluate for case '{}'",
-                    input.provider_did, input.case_id
-                )),
-                error: None,
-            })
-        }
+        Ok(result) if result.success => Ok(CareCredentialVerifyResult {
+            commons_reachable: true,
+            recommendation: Some(format!(
+                "Care credentials for '{}' retrieved from commons — evaluate for case '{}'",
+                input.provider_did, input.case_id
+            )),
+            error: None,
+        }),
         Ok(result) => Ok(CareCredentialVerifyResult {
             commons_reachable: true,
             recommendation: None,
@@ -755,7 +809,9 @@ pub fn verify_care_credentials_for_evidence(input: VerifyCareCredentialsInput) -
 /// to determine which water sources in an affected area are safe for
 /// consumption during disaster response.
 #[hdk_extern]
-pub fn query_water_safety_for_emergency(input: WaterSafetyQuery) -> ExternResult<WaterSafetyResult> {
+pub fn query_water_safety_for_emergency(
+    input: WaterSafetyQuery,
+) -> ExternResult<WaterSafetyResult> {
     let dispatch = CrossClusterDispatchInput {
         role: COMMONS_ROLE.to_string(),
         zome: "water_purity".to_string(),
@@ -768,8 +824,9 @@ pub fn query_water_safety_for_emergency(input: WaterSafetyQuery) -> ExternResult
     match bridge::dispatch_call_cross_cluster_commons(&dispatch, ALLOWED_COMMONS_ZOMES) {
         Ok(result) if result.success => {
             if let Some(response) = result.response {
-                let decoded: WaterSafetyResult = ExternIO(response).decode()
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+                let decoded: WaterSafetyResult = ExternIO(response).decode().map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+                })?;
                 Ok(decoded)
             } else {
                 Ok(WaterSafetyResult {
@@ -784,9 +841,10 @@ pub fn query_water_safety_for_emergency(input: WaterSafetyQuery) -> ExternResult
             contaminated_sources: 0,
             total_sources: 0,
         }),
-        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cross-cluster water safety query failed: {:?}", e)
-        ))),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-cluster water safety query failed: {:?}",
+            e
+        )))),
     }
 }
 
@@ -810,8 +868,9 @@ pub fn query_food_for_emergency(input: EmergencyFoodQuery) -> ExternResult<Emerg
     match bridge::dispatch_call_cross_cluster_commons(&dispatch, ALLOWED_COMMONS_ZOMES) {
         Ok(result) if result.success => {
             if let Some(response) = result.response {
-                let decoded: EmergencyFoodResult = ExternIO(response).decode()
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+                let decoded: EmergencyFoodResult = ExternIO(response).decode().map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+                })?;
                 Ok(decoded)
             } else {
                 Ok(EmergencyFoodResult {
@@ -826,9 +885,10 @@ pub fn query_food_for_emergency(input: EmergencyFoodQuery) -> ExternResult<Emerg
             distribution_points: 0,
             estimated_days_supply: 0.0,
         }),
-        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cross-cluster food availability query failed: {:?}", e)
-        ))),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-cluster food availability query failed: {:?}",
+            e
+        )))),
     }
 }
 
@@ -839,7 +899,9 @@ pub fn query_food_for_emergency(input: EmergencyFoodQuery) -> ExternResult<Emerg
 /// to find available beds and shelters near a disaster zone, supplementing
 /// dedicated emergency shelters with community housing capacity.
 #[hdk_extern]
-pub fn query_shelter_capacity_for_emergency(input: ShelterCapacityQuery) -> ExternResult<ShelterCapacityResult> {
+pub fn query_shelter_capacity_for_emergency(
+    input: ShelterCapacityQuery,
+) -> ExternResult<ShelterCapacityResult> {
     let dispatch = CrossClusterDispatchInput {
         role: COMMONS_ROLE.to_string(),
         zome: "housing_units".to_string(),
@@ -852,8 +914,9 @@ pub fn query_shelter_capacity_for_emergency(input: ShelterCapacityQuery) -> Exte
     match bridge::dispatch_call_cross_cluster_commons(&dispatch, ALLOWED_COMMONS_ZOMES) {
         Ok(result) if result.success => {
             if let Some(response) = result.response {
-                let decoded: ShelterCapacityResult = ExternIO(response).decode()
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+                let decoded: ShelterCapacityResult = ExternIO(response).decode().map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+                })?;
                 Ok(decoded)
             } else {
                 Ok(ShelterCapacityResult {
@@ -868,9 +931,10 @@ pub fn query_shelter_capacity_for_emergency(input: ShelterCapacityQuery) -> Exte
             total_shelters: 0,
             nearest_shelter_km: 0.0,
         }),
-        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cross-cluster shelter capacity query failed: {:?}", e)
-        ))),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-cluster shelter capacity query failed: {:?}",
+            e
+        )))),
     }
 }
 
@@ -894,8 +958,9 @@ pub fn query_care_for_emergency(input: EmergencyCareQuery) -> ExternResult<Emerg
     match bridge::dispatch_call_cross_cluster_commons(&dispatch, ALLOWED_COMMONS_ZOMES) {
         Ok(result) if result.success => {
             if let Some(response) = result.response {
-                let decoded: EmergencyCareResult = ExternIO(response).decode()
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+                let decoded: EmergencyCareResult = ExternIO(response).decode().map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+                })?;
                 Ok(decoded)
             } else {
                 Ok(EmergencyCareResult {
@@ -908,9 +973,10 @@ pub fn query_care_for_emergency(input: EmergencyCareQuery) -> ExternResult<Emerg
             available_providers: 0,
             nearest_provider_km: 0.0,
         }),
-        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cross-cluster care provider query failed: {:?}", e)
-        ))),
+        Err(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-cluster care provider query failed: {:?}",
+            e
+        )))),
     }
 }
 
@@ -927,23 +993,24 @@ pub fn query_audit_trail(query: AuditTrailQuery) -> ExternResult<AuditTrailResul
     let from = Timestamp::from_micros(query.from_us);
     let to = Timestamp::from_micros(query.to_us);
 
-    let records = if let (Some(ref domain), Some(ref event_type)) = (&query.domain, &query.event_type) {
-        let type_anchor = anchor_hash(&format!("event_type:{}:{}", domain, event_type))?;
-        let links = get_links(
-            LinkQuery::try_new(type_anchor, LinkTypes::EventTypeToEvent)?,
-            GetStrategy::default(),
-        )?;
-        bridge::records_from_links(links)?
-    } else if let Some(ref domain) = query.domain {
-        let domain_anchor = anchor_hash(&format!("domain_events:{}", domain))?;
-        let links = get_links(
-            LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
-            GetStrategy::default(),
-        )?;
-        bridge::records_from_links(links)?
-    } else {
-        get_all_events(())?
-    };
+    let records =
+        if let (Some(ref domain), Some(ref event_type)) = (&query.domain, &query.event_type) {
+            let type_anchor = anchor_hash(&format!("event_type:{}:{}", domain, event_type))?;
+            let links = get_links(
+                LinkQuery::try_new(type_anchor, LinkTypes::EventTypeToEvent)?,
+                GetStrategy::default(),
+            )?;
+            bridge::records_from_links(links)?
+        } else if let Some(ref domain) = query.domain {
+            let domain_anchor = anchor_hash(&format!("domain_events:{}", domain))?;
+            let links = get_links(
+                LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
+                GetStrategy::default(),
+            )?;
+            bridge::records_from_links(links)?
+        } else {
+            get_all_events(())?
+        };
 
     let mut entries = Vec::new();
     for record in &records {
@@ -957,10 +1024,25 @@ pub fn query_audit_trail(query: AuditTrailQuery) -> ExternResult<AuditTrailResul
             let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone())
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Serialize: {:?}", e))))?;
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
-                let domain = value.get("domain").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                let event_type = value.get("event_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                let source = value.get("source_agent").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                let payload = value.get("payload").and_then(|v| v.as_str()).unwrap_or("{}");
+                let domain = value
+                    .get("domain")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let event_type = value
+                    .get("event_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let source = value
+                    .get("source_agent")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let payload = value
+                    .get("payload")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("{}");
                 let preview = if payload.len() > 120 {
                     format!("{}...", &payload[..120])
                 } else {
@@ -1031,8 +1113,9 @@ pub fn get_active_cases_for_area(input: JusticeAreaQuery) -> ExternResult<Justic
     let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
     if result.success {
         if let Some(response) = result.response {
-            let decoded: JusticeAreaResult = ExternIO(response).decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let decoded: JusticeAreaResult = ExternIO(response).decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             Ok(decoded)
         } else {
             Ok(JusticeAreaResult {
@@ -1066,8 +1149,9 @@ pub fn check_factcheck_status(input: FactcheckStatusQuery) -> ExternResult<Factc
     let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
     if result.success {
         if let Some(response) = result.response {
-            let decoded: FactcheckStatusResult = ExternIO(response).decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let decoded: FactcheckStatusResult = ExternIO(response).decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             Ok(decoded)
         } else {
             Ok(FactcheckStatusResult {
@@ -1090,10 +1174,7 @@ pub fn check_factcheck_status(input: FactcheckStatusQuery) -> ExternResult<Factc
 // ============================================================================
 
 /// Identity-side zomes that civic-bridge is allowed to call cross-cluster.
-const ALLOWED_IDENTITY_ZOMES: &[&str] = &[
-    "identity_bridge",
-    "did_registry",
-];
+const ALLOWED_IDENTITY_ZOMES: &[&str] = &["identity_bridge", "did_registry"];
 
 /// The hApp role name for the Identity DNA.
 const IDENTITY_ROLE: &str = "identity";
@@ -1190,20 +1271,31 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
     }
 
     let link = links.into_iter().max_by_key(|l| l.timestamp).unwrap();
-    let target = link.target.into_action_hash().ok_or_else(||
-        wasm_error!(WasmErrorInner::Guest("Invalid credential cache link target".into())))?;
+    let target = link.target.into_action_hash().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid credential cache link target".into()
+        ))
+    })?;
 
     if let Some(record) = get_latest_record(target)? {
-        let cached: CachedCredentialEntry = record.entry()
+        let cached: CachedCredentialEntry = record
+            .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in cached credential record".into())))?;
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "No entry in cached credential record".into()
+                ))
+            })?;
 
         if cached.did == did && now - cached.cached_at_us < CREDENTIAL_CACHE_TTL_US {
             let credential: ConsciousnessCredential = serde_json::from_str(&cached.credential_json)
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-                    "Credential cache decode error: {}", e
-                ))))?;
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Credential cache decode error: {}",
+                        e
+                    )))
+                })?;
             // Check credential expiry — don't serve expired credentials from cache
             if credential.is_expired(now as u64) {
                 return Ok(None);
@@ -1218,10 +1310,12 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
 /// Store a consciousness credential in the local cache.
 fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
     let now = sys_time()?.as_micros();
-    let json = serde_json::to_string(credential)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "Credential cache encode error: {}", e
-        ))))?;
+    let json = serde_json::to_string(credential).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Credential cache encode error: {}",
+            e
+        )))
+    })?;
 
     let entry = CachedCredentialEntry {
         did: credential.did.clone(),
@@ -1250,7 +1344,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
         // Proactive refresh — attempt inline refresh, fall back to cached if it fails
         let now_us = sys_time()?.as_micros() as u64;
         if needs_refresh(&cached, now_us) {
-            debug!("Credential nearing expiry, attempting proactive refresh for {}", cached.did);
+            debug!(
+                "Credential nearing expiry, attempting proactive refresh for {}",
+                cached.did
+            );
             if let Ok(ZomeCallResponse::Ok(response)) = call(
                 CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
                 ZomeName::new("identity_bridge"),
@@ -1300,14 +1397,17 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
             // Identity role unavailable (single-DNA mode or network partition).
             // Return a permissive fallback credential so single-cluster operations
             // can proceed. In production, the identity role will provide real scores.
-            debug!("Identity role unavailable, using fallback consciousness credential for {}", did);
+            debug!(
+                "Identity role unavailable, using fallback consciousness credential for {}",
+                did
+            );
             let now_us = sys_time()?.as_micros() as u64;
             ConsciousnessCredential::from_unified_consciousness(
                 did.clone(),
-                0.5,   // unified_consciousness — mid-range default
-                0.5,   // identity — above Participant threshold (0.25)
-                0.5,   // reputation
-                0.5,   // community
+                0.5, // unified_consciousness — mid-range default
+                0.5, // identity — above Participant threshold (0.25)
+                0.5, // reputation
+                0.5, // community
                 "did:mycelix:civic-bridge-fallback".to_string(),
                 now_us,
             )
@@ -1326,7 +1426,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
     // Proactive refresh check (covers edge case: identity issued a short-lived credential)
     let now_us = sys_time()?.as_micros() as u64;
     if needs_refresh(&credential, now_us) {
-        debug!("Freshly-issued credential nearing expiry, attempting proactive refresh for {}", credential.did);
+        debug!(
+            "Freshly-issued credential nearing expiry, attempting proactive refresh for {}",
+            credential.did
+        );
         if let Ok(ZomeCallResponse::Ok(response)) = call(
             CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
             ZomeName::new("identity_bridge"),
@@ -1354,7 +1457,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
 /// existing cached credential (or a fallback if no cache exists).
 #[hdk_extern]
 pub fn refresh_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
-    debug!("civic-bridge: refreshing consciousness credential for {}", did);
+    debug!(
+        "civic-bridge: refreshing consciousness credential for {}",
+        did
+    );
 
     // Attempt cross-cluster call to identity bridge
     let payload = ExternIO::encode(did.clone())
@@ -1384,7 +1490,10 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
         }
         _ => {
             // Identity cluster unreachable — return existing cached credential if available
-            debug!("civic-bridge: identity cluster unreachable during refresh for {}", did);
+            debug!(
+                "civic-bridge: identity cluster unreachable during refresh for {}",
+                did
+            );
             if let Some(cached) = get_cached_credential(&did)? {
                 return Ok(cached);
             }
@@ -1392,7 +1501,10 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
             let now_us = sys_time()?.as_micros() as u64;
             ConsciousnessCredential::from_unified_consciousness(
                 did.clone(),
-                0.5, 0.5, 0.5, 0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
                 "did:mycelix:civic-bridge-fallback".to_string(),
                 now_us,
             )
@@ -1480,21 +1592,40 @@ mod tests {
 
     #[test]
     fn commons_allowlist_covers_all_commons_domains() {
-        let has_property = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("property_"));
-        let has_housing = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("housing_"));
+        let has_property = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .any(|z| z.starts_with("property_"));
+        let has_housing = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .any(|z| z.starts_with("housing_"));
         let has_care = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("care_"));
-        let has_mutualaid = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("mutualaid_"));
-        let has_water = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("water_"));
+        let has_mutualaid = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .any(|z| z.starts_with("mutualaid_"));
+        let has_water = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .any(|z| z.starts_with("water_"));
         let has_food = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("food_"));
-        let has_transport = ALLOWED_COMMONS_ZOMES.iter().any(|z| z.starts_with("transport_"));
+        let has_transport = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .any(|z| z.starts_with("transport_"));
         let has_bridge = ALLOWED_COMMONS_ZOMES.contains(&"commons_bridge");
-        assert!(has_property, "ALLOWED_COMMONS_ZOMES missing property domain");
+        assert!(
+            has_property,
+            "ALLOWED_COMMONS_ZOMES missing property domain"
+        );
         assert!(has_housing, "ALLOWED_COMMONS_ZOMES missing housing domain");
         assert!(has_care, "ALLOWED_COMMONS_ZOMES missing care domain");
-        assert!(has_mutualaid, "ALLOWED_COMMONS_ZOMES missing mutualaid domain");
+        assert!(
+            has_mutualaid,
+            "ALLOWED_COMMONS_ZOMES missing mutualaid domain"
+        );
         assert!(has_water, "ALLOWED_COMMONS_ZOMES missing water domain");
         assert!(has_food, "ALLOWED_COMMONS_ZOMES missing food domain");
-        assert!(has_transport, "ALLOWED_COMMONS_ZOMES missing transport domain");
+        assert!(
+            has_transport,
+            "ALLOWED_COMMONS_ZOMES missing transport domain"
+        );
         assert!(has_bridge, "ALLOWED_COMMONS_ZOMES missing commons_bridge");
     }
 
@@ -1516,29 +1647,74 @@ mod tests {
 
     #[test]
     fn resolve_justice_domain() {
-        assert_eq!(resolve_domain_zome("justice", "submit_evidence").unwrap(), "justice_evidence");
-        assert_eq!(resolve_domain_zome("justice", "start_arbitration").unwrap(), "justice_arbitration");
-        assert_eq!(resolve_domain_zome("justice", "initiate_restorative").unwrap(), "justice_restorative");
-        assert_eq!(resolve_domain_zome("justice", "enforce_sanction").unwrap(), "justice_enforcement");
-        assert_eq!(resolve_domain_zome("justice", "file_case").unwrap(), "justice_cases");
+        assert_eq!(
+            resolve_domain_zome("justice", "submit_evidence").unwrap(),
+            "justice_evidence"
+        );
+        assert_eq!(
+            resolve_domain_zome("justice", "start_arbitration").unwrap(),
+            "justice_arbitration"
+        );
+        assert_eq!(
+            resolve_domain_zome("justice", "initiate_restorative").unwrap(),
+            "justice_restorative"
+        );
+        assert_eq!(
+            resolve_domain_zome("justice", "enforce_sanction").unwrap(),
+            "justice_enforcement"
+        );
+        assert_eq!(
+            resolve_domain_zome("justice", "file_case").unwrap(),
+            "justice_cases"
+        );
     }
 
     #[test]
     fn resolve_emergency_domain() {
-        assert_eq!(resolve_domain_zome("emergency", "assess_triage").unwrap(), "emergency_triage");
-        assert_eq!(resolve_domain_zome("emergency", "deploy_resource").unwrap(), "emergency_resources");
-        assert_eq!(resolve_domain_zome("emergency", "coordinate_response").unwrap(), "emergency_coordination");
-        assert_eq!(resolve_domain_zome("emergency", "open_shelter").unwrap(), "emergency_shelters");
-        assert_eq!(resolve_domain_zome("emergency", "send_alert").unwrap(), "emergency_comms");
-        assert_eq!(resolve_domain_zome("emergency", "report_incident").unwrap(), "emergency_incidents");
+        assert_eq!(
+            resolve_domain_zome("emergency", "assess_triage").unwrap(),
+            "emergency_triage"
+        );
+        assert_eq!(
+            resolve_domain_zome("emergency", "deploy_resource").unwrap(),
+            "emergency_resources"
+        );
+        assert_eq!(
+            resolve_domain_zome("emergency", "coordinate_response").unwrap(),
+            "emergency_coordination"
+        );
+        assert_eq!(
+            resolve_domain_zome("emergency", "open_shelter").unwrap(),
+            "emergency_shelters"
+        );
+        assert_eq!(
+            resolve_domain_zome("emergency", "send_alert").unwrap(),
+            "emergency_comms"
+        );
+        assert_eq!(
+            resolve_domain_zome("emergency", "report_incident").unwrap(),
+            "emergency_incidents"
+        );
     }
 
     #[test]
     fn resolve_media_domain() {
-        assert_eq!(resolve_domain_zome("media", "verify_attribution").unwrap(), "media_attribution");
-        assert_eq!(resolve_domain_zome("media", "run_factcheck").unwrap(), "media_factcheck");
-        assert_eq!(resolve_domain_zome("media", "curate_content").unwrap(), "media_curation");
-        assert_eq!(resolve_domain_zome("media", "submit_article").unwrap(), "media_publication");
+        assert_eq!(
+            resolve_domain_zome("media", "verify_attribution").unwrap(),
+            "media_attribution"
+        );
+        assert_eq!(
+            resolve_domain_zome("media", "run_factcheck").unwrap(),
+            "media_factcheck"
+        );
+        assert_eq!(
+            resolve_domain_zome("media", "curate_content").unwrap(),
+            "media_curation"
+        );
+        assert_eq!(
+            resolve_domain_zome("media", "submit_article").unwrap(),
+            "media_publication"
+        );
     }
 
     #[test]
@@ -1570,7 +1746,10 @@ mod tests {
         let json = serde_json::to_string(&result).unwrap();
         let r2: PropertyEnforcementResult = serde_json::from_str(&json).unwrap();
         assert!(r2.property_found);
-        assert_eq!(r2.enforcement_advisory.as_deref(), Some("Proceed with caution"));
+        assert_eq!(
+            r2.enforcement_advisory.as_deref(),
+            Some("Proceed with caution")
+        );
     }
 
     #[test]
@@ -1978,7 +2157,10 @@ mod tests {
     #[test]
     fn allowed_commons_zomes_entries_are_non_empty() {
         for zome in ALLOWED_COMMONS_ZOMES {
-            assert!(!zome.is_empty(), "ALLOWED_COMMONS_ZOMES contains an empty string");
+            assert!(
+                !zome.is_empty(),
+                "ALLOWED_COMMONS_ZOMES contains an empty string"
+            );
             assert!(
                 !zome.contains(' '),
                 "ALLOWED_COMMONS_ZOMES entry '{}' contains whitespace",
@@ -1989,9 +2171,18 @@ mod tests {
 
     #[test]
     fn allowed_zomes_per_domain_count() {
-        let justice_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("justice_")).count();
-        let emergency_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("emergency_")).count();
-        let media_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("media_")).count();
+        let justice_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("justice_"))
+            .count();
+        let emergency_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("emergency_"))
+            .count();
+        let media_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("media_"))
+            .count();
         assert_eq!(justice_count, 5, "Expected 5 justice zomes");
         assert_eq!(emergency_count, 6, "Expected 6 emergency zomes");
         assert_eq!(media_count, 4, "Expected 4 media zomes");
@@ -2024,13 +2215,16 @@ mod tests {
             assert!(
                 resolved.is_some(),
                 "resolve_domain_zome('{}', '{}') returned None",
-                domain, query_type
+                domain,
+                query_type
             );
             let zome_name = resolved.unwrap();
             assert!(
                 ALLOWED_ZOMES.contains(&zome_name.as_str()),
                 "resolve_domain_zome('{}', '{}') returned '{}' which is not in ALLOWED_ZOMES",
-                domain, query_type, zome_name
+                domain,
+                query_type,
+                zome_name
             );
         }
     }
@@ -2041,8 +2235,14 @@ mod tests {
     fn resolve_empty_query_type_uses_default() {
         // Empty query_type should fall through to the default zome for each domain
         assert_eq!(resolve_domain_zome("justice", "").unwrap(), "justice_cases");
-        assert_eq!(resolve_domain_zome("emergency", "").unwrap(), "emergency_incidents");
-        assert_eq!(resolve_domain_zome("media", "").unwrap(), "media_publication");
+        assert_eq!(
+            resolve_domain_zome("emergency", "").unwrap(),
+            "emergency_incidents"
+        );
+        assert_eq!(
+            resolve_domain_zome("media", "").unwrap(),
+            "media_publication"
+        );
     }
 
     #[test]
@@ -2053,10 +2253,22 @@ mod tests {
     #[test]
     fn resolve_case_insensitive_domain() {
         // Domain matching is now case-insensitive (fixed via routing module)
-        assert_eq!(resolve_domain_zome("Justice", "file_case").unwrap(), "justice_cases");
-        assert_eq!(resolve_domain_zome("JUSTICE", "file_case").unwrap(), "justice_cases");
-        assert_eq!(resolve_domain_zome("EMERGENCY", "report_incident").unwrap(), "emergency_incidents");
-        assert_eq!(resolve_domain_zome("Media", "submit_article").unwrap(), "media_publication");
+        assert_eq!(
+            resolve_domain_zome("Justice", "file_case").unwrap(),
+            "justice_cases"
+        );
+        assert_eq!(
+            resolve_domain_zome("JUSTICE", "file_case").unwrap(),
+            "justice_cases"
+        );
+        assert_eq!(
+            resolve_domain_zome("EMERGENCY", "report_incident").unwrap(),
+            "emergency_incidents"
+        );
+        assert_eq!(
+            resolve_domain_zome("Media", "submit_article").unwrap(),
+            "media_publication"
+        );
     }
 
     #[test]
@@ -2212,20 +2424,62 @@ mod tests {
 
     #[test]
     fn cross_cluster_commons_allowlist_per_domain_count() {
-        let property_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("property_")).count();
-        let housing_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("housing_")).count();
-        let care_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("care_")).count();
-        let mutualaid_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("mutualaid_")).count();
-        let water_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("water_")).count();
-        let food_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("food_")).count();
-        let transport_count = ALLOWED_COMMONS_ZOMES.iter().filter(|z| z.starts_with("transport_")).count();
-        assert_eq!(property_count, 4, "Expected 4 property zomes in ALLOWED_COMMONS_ZOMES");
-        assert_eq!(housing_count, 6, "Expected 6 housing zomes in ALLOWED_COMMONS_ZOMES");
-        assert_eq!(care_count, 5, "Expected 5 care zomes in ALLOWED_COMMONS_ZOMES");
-        assert_eq!(mutualaid_count, 7, "Expected 7 mutualaid zomes in ALLOWED_COMMONS_ZOMES");
-        assert_eq!(water_count, 5, "Expected 5 water zomes in ALLOWED_COMMONS_ZOMES");
-        assert_eq!(food_count, 4, "Expected 4 food zomes in ALLOWED_COMMONS_ZOMES");
-        assert_eq!(transport_count, 3, "Expected 3 transport zomes in ALLOWED_COMMONS_ZOMES");
+        let property_count = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("property_"))
+            .count();
+        let housing_count = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("housing_"))
+            .count();
+        let care_count = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("care_"))
+            .count();
+        let mutualaid_count = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("mutualaid_"))
+            .count();
+        let water_count = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("water_"))
+            .count();
+        let food_count = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("food_"))
+            .count();
+        let transport_count = ALLOWED_COMMONS_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("transport_"))
+            .count();
+        assert_eq!(
+            property_count, 4,
+            "Expected 4 property zomes in ALLOWED_COMMONS_ZOMES"
+        );
+        assert_eq!(
+            housing_count, 6,
+            "Expected 6 housing zomes in ALLOWED_COMMONS_ZOMES"
+        );
+        assert_eq!(
+            care_count, 5,
+            "Expected 5 care zomes in ALLOWED_COMMONS_ZOMES"
+        );
+        assert_eq!(
+            mutualaid_count, 7,
+            "Expected 7 mutualaid zomes in ALLOWED_COMMONS_ZOMES"
+        );
+        assert_eq!(
+            water_count, 5,
+            "Expected 5 water zomes in ALLOWED_COMMONS_ZOMES"
+        );
+        assert_eq!(
+            food_count, 4,
+            "Expected 4 food zomes in ALLOWED_COMMONS_ZOMES"
+        );
+        assert_eq!(
+            transport_count, 3,
+            "Expected 3 transport zomes in ALLOWED_COMMONS_ZOMES"
+        );
     }
 
     // ---- Identity cross-cluster allowlist ----
@@ -2260,7 +2514,10 @@ mod tests {
     #[test]
     fn identity_allowlist_entries_are_non_empty() {
         for zome in ALLOWED_IDENTITY_ZOMES {
-            assert!(!zome.is_empty(), "ALLOWED_IDENTITY_ZOMES contains an empty string");
+            assert!(
+                !zome.is_empty(),
+                "ALLOWED_IDENTITY_ZOMES contains an empty string"
+            );
             assert!(
                 !zome.contains(' '),
                 "ALLOWED_IDENTITY_ZOMES entry '{}' contains whitespace",
@@ -2402,7 +2659,11 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let r2: CareCredentialVerifyResult = serde_json::from_str(&json).unwrap();
         assert!(!r2.commons_reachable);
-        assert!(r2.error.as_ref().unwrap().contains("OtherRole not installed"));
+        assert!(r2
+            .error
+            .as_ref()
+            .unwrap()
+            .contains("OtherRole not installed"));
     }
 
     // ========================================================================

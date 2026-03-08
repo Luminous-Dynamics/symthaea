@@ -23,9 +23,9 @@ pub struct FactCheck {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EpistemicPosition {
-    pub empirical: f64,   // 0.0 to 1.0
-    pub normative: f64,   // 0.0 to 1.0
-    pub mythic: f64,      // 0.0 to 1.0
+    pub empirical: f64, // 0.0 to 1.0
+    pub normative: f64, // 0.0 to 1.0
+    pub mythic: f64,    // 0.0 to 1.0
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -125,36 +125,32 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::FactCheck(check) => {
-                        validate_create_fact_check(EntryCreationAction::Create(action), check)
-                    }
-                    EntryTypes::SourceCredibility(source) => {
-                        validate_create_source_credibility(EntryCreationAction::Create(action), source)
-                    }
-                    EntryTypes::FactCheckDispute(dispute) => {
-                        validate_create_fact_check_dispute(EntryCreationAction::Create(action), dispute)
-                    }
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::FactCheck(check) => {
+                    validate_create_fact_check(EntryCreationAction::Create(action), check)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::FactCheck(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Fact checks cannot be updated".into(),
-                        ))
-                    }
-                    EntryTypes::SourceCredibility(source) => {
-                        validate_update_source_credibility(action, source)
-                    }
-                    EntryTypes::FactCheckDispute(dispute) => {
-                        validate_update_fact_check_dispute(action, dispute)
-                    }
+                EntryTypes::SourceCredibility(source) => {
+                    validate_create_source_credibility(EntryCreationAction::Create(action), source)
                 }
-            }
+                EntryTypes::FactCheckDispute(dispute) => {
+                    validate_create_fact_check_dispute(EntryCreationAction::Create(action), dispute)
+                }
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::FactCheck(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Fact checks cannot be updated".into(),
+                )),
+                EntryTypes::SourceCredibility(source) => {
+                    validate_update_source_credibility(action, source)
+                }
+                EntryTypes::FactCheckDispute(dispute) => {
+                    validate_update_fact_check_dispute(action, dispute)
+                }
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
@@ -206,49 +202,81 @@ fn validate_create_fact_check(
     check: FactCheck,
 ) -> ExternResult<ValidateCallbackResult> {
     if check.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("FactCheck ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "FactCheck ID cannot be empty".into(),
+        ));
     }
     if check.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("FactCheck ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "FactCheck ID too long (max 256 chars)".into(),
+        ));
     }
     if check.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("FactCheck publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "FactCheck publication_id cannot be empty".into(),
+        ));
     }
     if check.publication_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("FactCheck publication_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "FactCheck publication_id too long (max 256 chars)".into(),
+        ));
     }
     if !check.checker_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Checker must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Checker must be a valid DID".into(),
+        ));
     }
     if check.checker_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Checker DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Checker DID too long (max 256 chars)".into(),
+        ));
     }
     if check.claim_text.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Claim text required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Claim text required".into(),
+        ));
     }
     if check.claim_text.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Claim text too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Claim text too long (max 4096 chars)".into(),
+        ));
     }
     if check.claim_location.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Claim location too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Claim location too long (max 256 chars)".into(),
+        ));
     }
     // Validate evidence items
     for item in &check.evidence {
         if item.description.len() > 4096 {
-            return Ok(ValidateCallbackResult::Invalid("Evidence description too long (max 4096 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Evidence description too long (max 4096 chars)".into(),
+            ));
         }
         if let Some(ref url) = item.source_url {
             if url.len() > 2048 {
-                return Ok(ValidateCallbackResult::Invalid("Evidence source URL too long (max 2048 chars)".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Evidence source URL too long (max 2048 chars)".into(),
+                ));
             }
         }
     }
     let ep = &check.epistemic_position;
     if !ep.empirical.is_finite() || !ep.normative.is_finite() || !ep.mythic.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("epistemic position values must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "epistemic position values must be a finite number".into(),
+        ));
     }
-    if ep.empirical < 0.0 || ep.empirical > 1.0 || ep.normative < 0.0 || ep.normative > 1.0 || ep.mythic < 0.0 || ep.mythic > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Epistemic values must be 0-1".into()));
+    if ep.empirical < 0.0
+        || ep.empirical > 1.0
+        || ep.normative < 0.0
+        || ep.normative > 1.0
+        || ep.mythic < 0.0
+        || ep.mythic > 1.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Epistemic values must be 0-1".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -258,16 +286,24 @@ fn validate_create_source_credibility(
     source: SourceCredibility,
 ) -> ExternResult<ValidateCallbackResult> {
     if source.source_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SourceCredibility source_id cannot be empty".into(),
+        ));
     }
     if source.source_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SourceCredibility source_id too long (max 256 chars)".into(),
+        ));
     }
     if !source.credibility_score.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("credibility_score must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "credibility_score must be a finite number".into(),
+        ));
     }
     if source.credibility_score < 0.0 || source.credibility_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Credibility must be 0-1".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Credibility must be 0-1".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -277,10 +313,14 @@ fn validate_update_source_credibility(
     source: SourceCredibility,
 ) -> ExternResult<ValidateCallbackResult> {
     if !source.credibility_score.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("credibility_score must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "credibility_score must be a finite number".into(),
+        ));
     }
     if source.credibility_score < 0.0 || source.credibility_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Credibility must be 0-1".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Credibility must be 0-1".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -290,28 +330,44 @@ fn validate_create_fact_check_dispute(
     dispute: FactCheckDispute,
 ) -> ExternResult<ValidateCallbackResult> {
     if dispute.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Dispute ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute ID cannot be empty".into(),
+        ));
     }
     if dispute.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Dispute ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute ID too long (max 256 chars)".into(),
+        ));
     }
     if dispute.fact_check_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Dispute fact_check_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute fact_check_id cannot be empty".into(),
+        ));
     }
     if dispute.fact_check_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Dispute fact_check_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute fact_check_id too long (max 256 chars)".into(),
+        ));
     }
     if !dispute.disputer_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Disputer must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disputer must be a valid DID".into(),
+        ));
     }
     if dispute.disputer_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Disputer DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disputer DID too long (max 256 chars)".into(),
+        ));
     }
     if dispute.reason.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Dispute reason required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute reason required".into(),
+        ));
     }
     if dispute.reason.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Dispute reason too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute reason too long (max 4096 chars)".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -825,8 +881,7 @@ mod tests {
         for variant in variants {
             let mut dispute = make_dispute();
             dispute.status = variant;
-            let result =
-                validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+            let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
             assert!(is_valid(&result));
         }
     }
@@ -895,7 +950,10 @@ mod tests {
         fc.publication_id = "".into();
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FactCheck publication_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "FactCheck publication_id cannot be empty"
+        );
     }
 
     #[test]
@@ -904,7 +962,10 @@ mod tests {
         fc.publication_id = "   ".into();
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FactCheck publication_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "FactCheck publication_id cannot be empty"
+        );
     }
 
     #[test]
@@ -913,7 +974,10 @@ mod tests {
         sc.source_id = "".into();
         let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "SourceCredibility source_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "SourceCredibility source_id cannot be empty"
+        );
     }
 
     #[test]
@@ -922,7 +986,10 @@ mod tests {
         sc.source_id = "   ".into();
         let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "SourceCredibility source_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "SourceCredibility source_id cannot be empty"
+        );
     }
 
     #[test]
@@ -949,7 +1016,10 @@ mod tests {
         dispute.fact_check_id = "".into();
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Dispute fact_check_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "Dispute fact_check_id cannot be empty"
+        );
     }
 
     #[test]
@@ -958,7 +1028,10 @@ mod tests {
         dispute.fact_check_id = "   ".into();
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Dispute fact_check_id cannot be empty");
+        assert_eq!(
+            invalid_msg(&result),
+            "Dispute fact_check_id cannot be empty"
+        );
     }
 
     #[test]
@@ -1001,7 +1074,10 @@ mod tests {
         fc.id = "i".repeat(257);
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FactCheck ID too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "FactCheck ID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1018,7 +1094,10 @@ mod tests {
         fc.publication_id = "p".repeat(257);
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "FactCheck publication_id too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "FactCheck publication_id too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1071,7 +1150,10 @@ mod tests {
         fc.claim_location = "l".repeat(257);
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Claim location too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Claim location too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1086,7 +1168,10 @@ mod tests {
         }];
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Evidence description too long (max 4096 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Evidence description too long (max 4096 chars)"
+        );
     }
 
     #[test]
@@ -1101,7 +1186,10 @@ mod tests {
         }];
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Evidence source URL too long (max 2048 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Evidence source URL too long (max 2048 chars)"
+        );
     }
 
     #[test]
@@ -1118,7 +1206,10 @@ mod tests {
         sc.source_id = "s".repeat(257);
         let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "SourceCredibility source_id too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "SourceCredibility source_id too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1152,7 +1243,10 @@ mod tests {
         dispute.fact_check_id = "f".repeat(257);
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Dispute fact_check_id too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Dispute fact_check_id too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1169,7 +1263,10 @@ mod tests {
         dispute.disputer_did = format!("did:{}", "x".repeat(253));
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Disputer DID too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Disputer DID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -1186,7 +1283,10 @@ mod tests {
         dispute.reason = "r".repeat(4097);
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Dispute reason too long (max 4096 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Dispute reason too long (max 4096 chars)"
+        );
     }
 
     // ========================================================================

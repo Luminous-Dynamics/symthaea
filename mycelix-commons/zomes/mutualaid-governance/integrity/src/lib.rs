@@ -44,75 +44,89 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::AllProposals => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllProposals link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AllProposals => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllProposals link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::ProposalToVotes => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ProposalToVotes link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AllRules => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllRules link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AllMembers => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllMembers link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::ProposalToVotes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ProposalToVotes link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllRules => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllRules link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllMembers => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllMembers link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }
 
 fn validate_proposal(proposal: Proposal) -> ExternResult<ValidateCallbackResult> {
     if proposal.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Proposal ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal ID cannot be empty".into(),
+        ));
     }
     if proposal.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Proposal ID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal ID must be 256 characters or fewer".into(),
+        ));
     }
     if proposal.title.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Proposal title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal title cannot be empty".into(),
+        ));
     }
     if proposal.title.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Proposal title must be 512 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal title must be 512 characters or fewer".into(),
+        ));
     }
     if proposal.description.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Proposal description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal description cannot be empty".into(),
+        ));
     }
     if proposal.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Proposal description must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proposal description must be 4096 characters or fewer".into(),
+        ));
     }
     if proposal.quorum_percent > 100 {
-        return Ok(ValidateCallbackResult::Invalid("Quorum percent must be 0-100".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quorum percent must be 0-100".into(),
+        ));
     }
     if proposal.threshold_percent > 100 {
-        return Ok(ValidateCallbackResult::Invalid("Threshold percent must be 0-100".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Threshold percent must be 0-100".into(),
+        ));
     }
     // Voting window: starts must be before ends
     if proposal.voting_starts >= proposal.voting_ends {
         return Ok(ValidateCallbackResult::Invalid(
-            "voting_starts must be before voting_ends".into()
+            "voting_starts must be before voting_ends".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -120,52 +134,78 @@ fn validate_proposal(proposal: Proposal) -> ExternResult<ValidateCallbackResult>
 
 fn validate_rule(rule: Rule) -> ExternResult<ValidateCallbackResult> {
     if rule.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Rule ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rule ID cannot be empty".into(),
+        ));
     }
     if rule.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Rule ID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rule ID must be 256 characters or fewer".into(),
+        ));
     }
     if rule.title.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Rule title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rule title cannot be empty".into(),
+        ));
     }
     if rule.title.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Rule title must be 512 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rule title must be 512 characters or fewer".into(),
+        ));
     }
     if rule.text.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Rule text cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rule text cannot be empty".into(),
+        ));
     }
     if rule.text.len() > 8192 {
-        return Ok(ValidateCallbackResult::Invalid("Rule text must be 8192 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rule text must be 8192 characters or fewer".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_member(member: Member) -> ExternResult<ValidateCallbackResult> {
     if member.display_name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Member display name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member display name cannot be empty".into(),
+        ));
     }
     if member.display_name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Member display name must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member display name must be 256 characters or fewer".into(),
+        ));
     }
     if member.roles.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Member must have at least one role".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member must have at least one role".into(),
+        ));
     }
     if member.roles.len() > 20 {
-        return Ok(ValidateCallbackResult::Invalid("Member cannot have more than 20 roles".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Member cannot have more than 20 roles".into(),
+        ));
     }
     if let Some(score) = member.matl_score {
         if !score.is_finite() || !(0.0..=1.0).contains(&score) {
-            return Ok(ValidateCallbackResult::Invalid("MATL score must be a finite number between 0.0 and 1.0".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "MATL score must be a finite number between 0.0 and 1.0".into(),
+            ));
         }
     }
     // Validate custom role name lengths
     for role in &member.roles {
         if let MemberRole::Custom(name) = role {
             if name.trim().is_empty() {
-                return Ok(ValidateCallbackResult::Invalid("Custom role name cannot be empty".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Custom role name cannot be empty".into(),
+                ));
             }
             if name.len() > 128 {
-                return Ok(ValidateCallbackResult::Invalid("Custom role name must be 128 characters or fewer".into()));
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Custom role name must be 128 characters or fewer".into(),
+                ));
             }
         }
     }
@@ -175,7 +215,9 @@ fn validate_member(member: Member) -> ExternResult<ValidateCallbackResult> {
 fn validate_vote(vote: Vote) -> ExternResult<ValidateCallbackResult> {
     if let Some(ref reasoning) = vote.reasoning {
         if reasoning.len() > 4096 {
-            return Ok(ValidateCallbackResult::Invalid("Vote reasoning must be 4096 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Vote reasoning must be 4096 characters or fewer".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -238,7 +280,10 @@ mod tests {
 
         assert_eq!(proposal, deserialized);
         assert_eq!(deserialized.id, "proposal-002");
-        assert_eq!(deserialized.modifies_rule, Some(ActionHash::from_raw_36(vec![0xab; 36])));
+        assert_eq!(
+            deserialized.modifies_rule,
+            Some(ActionHash::from_raw_36(vec![0xab; 36]))
+        );
     }
 
     #[test]
@@ -1174,9 +1219,15 @@ mod tests {
     fn member_matl_score_boundary_passes() {
         let mut m = make_valid_member();
         m.matl_score = Some(0.0);
-        assert!(matches!(validate_member(m.clone()), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_member(m.clone()),
+            Ok(ValidateCallbackResult::Valid)
+        ));
         m.matl_score = Some(1.0);
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     // ========================================================================
@@ -1189,14 +1240,20 @@ mod tests {
     fn proposal_id_at_max_length_passes() {
         let mut p = make_valid_proposal();
         p.id = "x".repeat(64);
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn proposal_id_over_max_length_rejected() {
         let mut p = make_valid_proposal();
         p.id = "x".repeat(257);
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Invalid(_))));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // -- Proposal title --
@@ -1205,14 +1262,20 @@ mod tests {
     fn proposal_title_at_max_length_passes() {
         let mut p = make_valid_proposal();
         p.title = "t".repeat(512);
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn proposal_title_over_max_length_rejected() {
         let mut p = make_valid_proposal();
         p.title = "t".repeat(513);
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Invalid(_))));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // -- Proposal description --
@@ -1221,14 +1284,20 @@ mod tests {
     fn proposal_description_at_max_length_passes() {
         let mut p = make_valid_proposal();
         p.description = "d".repeat(4096);
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn proposal_description_over_max_length_rejected() {
         let mut p = make_valid_proposal();
         p.description = "d".repeat(4097);
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Invalid(_))));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // -- Rule ID --
@@ -1237,14 +1306,20 @@ mod tests {
     fn rule_id_at_max_length_passes() {
         let mut r = make_valid_rule();
         r.id = "r".repeat(64);
-        assert!(matches!(validate_rule(r), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_rule(r),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn rule_id_over_max_length_rejected() {
         let mut r = make_valid_rule();
         r.id = "r".repeat(257);
-        assert!(matches!(validate_rule(r), Ok(ValidateCallbackResult::Invalid(_))));
+        assert!(matches!(
+            validate_rule(r),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // -- Rule title --
@@ -1253,14 +1328,20 @@ mod tests {
     fn rule_title_at_max_length_passes() {
         let mut r = make_valid_rule();
         r.title = "t".repeat(512);
-        assert!(matches!(validate_rule(r), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_rule(r),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn rule_title_over_max_length_rejected() {
         let mut r = make_valid_rule();
         r.title = "t".repeat(513);
-        assert!(matches!(validate_rule(r), Ok(ValidateCallbackResult::Invalid(_))));
+        assert!(matches!(
+            validate_rule(r),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // -- Rule text --
@@ -1269,14 +1350,20 @@ mod tests {
     fn rule_text_at_max_length_passes() {
         let mut r = make_valid_rule();
         r.text = "x".repeat(8192);
-        assert!(matches!(validate_rule(r), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_rule(r),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn rule_text_over_max_length_rejected() {
         let mut r = make_valid_rule();
         r.text = "x".repeat(8193);
-        assert!(matches!(validate_rule(r), Ok(ValidateCallbackResult::Invalid(_))));
+        assert!(matches!(
+            validate_rule(r),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // -- Member display_name --
@@ -1285,14 +1372,20 @@ mod tests {
     fn member_display_name_at_max_length_passes() {
         let mut m = make_valid_member();
         m.display_name = "n".repeat(256);
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn member_display_name_over_max_length_rejected() {
         let mut m = make_valid_member();
         m.display_name = "n".repeat(257);
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Invalid(_))));
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // -- Member roles Vec --
@@ -1300,15 +1393,25 @@ mod tests {
     #[test]
     fn member_roles_at_max_count_passes() {
         let mut m = make_valid_member();
-        m.roles = (0..20).map(|i| MemberRole::Custom(format!("role-{}", i))).collect();
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+        m.roles = (0..20)
+            .map(|i| MemberRole::Custom(format!("role-{}", i)))
+            .collect();
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn member_roles_over_max_count_rejected() {
         let mut m = make_valid_member();
-        m.roles = (0..21).map(|i| MemberRole::Custom(format!("role-{}", i))).collect();
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Invalid(_))));
+        m.roles = (0..21)
+            .map(|i| MemberRole::Custom(format!("role-{}", i)))
+            .collect();
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // ========================================================================
@@ -1335,28 +1438,40 @@ mod tests {
     fn vote_no_reasoning_passes() {
         let mut v = make_valid_vote();
         v.reasoning = None;
-        assert!(matches!(validate_vote(v), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_vote(v),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn vote_reasoning_at_max_length_passes() {
         let mut v = make_valid_vote();
         v.reasoning = Some("r".repeat(4096));
-        assert!(matches!(validate_vote(v), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_vote(v),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn vote_reasoning_over_max_length_rejected() {
         let mut v = make_valid_vote();
         v.reasoning = Some("r".repeat(4097));
-        assert!(matches!(validate_vote(v), Ok(ValidateCallbackResult::Invalid(_))));
+        assert!(matches!(
+            validate_vote(v),
+            Ok(ValidateCallbackResult::Invalid(_))
+        ));
     }
 
     // ========================================================================
     // LINK TAG VALIDATION TESTS
     // ========================================================================
 
-    fn validate_link_tag(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_link_tag(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
             LinkTypes::AllProposals => {
@@ -1453,7 +1568,10 @@ mod tests {
         let mut p = make_valid_proposal();
         p.voting_starts = Timestamp::from_micros(1000);
         p.voting_ends = Timestamp::from_micros(2000);
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
@@ -1464,7 +1582,11 @@ mod tests {
         let result = validate_proposal(p);
         assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
         if let Ok(ValidateCallbackResult::Invalid(msg)) = result {
-            assert!(msg.contains("voting_starts must be before voting_ends"), "Got: {}", msg);
+            assert!(
+                msg.contains("voting_starts must be before voting_ends"),
+                "Got: {}",
+                msg
+            );
         }
     }
 
@@ -1482,7 +1604,10 @@ mod tests {
         let mut p = make_valid_proposal();
         p.voting_starts = Timestamp::from_micros(1000);
         p.voting_ends = Timestamp::from_micros(1001);
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     // ── Quorum edge cases ───────────────────────────────────────────────
@@ -1492,7 +1617,10 @@ mod tests {
         let mut p = make_valid_proposal();
         p.quorum_percent = 0;
         p.threshold_percent = 0;
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
@@ -1500,7 +1628,10 @@ mod tests {
         let mut p = make_valid_proposal();
         p.quorum_percent = 100;
         p.threshold_percent = 100;
-        assert!(matches!(validate_proposal(p), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_proposal(p),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
@@ -1517,14 +1648,20 @@ mod tests {
     fn member_matl_score_exactly_0_ok() {
         let mut m = make_valid_member();
         m.matl_score = Some(0.0);
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn member_matl_score_exactly_1_ok() {
         let mut m = make_valid_member();
         m.matl_score = Some(1.0);
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
@@ -1555,7 +1692,10 @@ mod tests {
     fn member_single_role_ok() {
         let mut m = make_valid_member();
         m.roles = vec![MemberRole::Member];
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
@@ -1570,7 +1710,10 @@ mod tests {
     fn member_role_name_exactly_128_ok() {
         let mut m = make_valid_member();
         m.roles = vec![MemberRole::Custom("x".repeat(128))];
-        assert!(matches!(validate_member(m), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_member(m),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
@@ -1595,14 +1738,20 @@ mod tests {
     fn vote_empty_reasoning_ok() {
         let mut v = make_valid_vote();
         v.reasoning = Some(String::new());
-        assert!(matches!(validate_vote(v), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_vote(v),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     #[test]
     fn vote_reasoning_exactly_4096_ok() {
         let mut v = make_valid_vote();
         v.reasoning = Some("v".repeat(4096));
-        assert!(matches!(validate_vote(v), Ok(ValidateCallbackResult::Valid)));
+        assert!(matches!(
+            validate_vote(v),
+            Ok(ValidateCallbackResult::Valid)
+        ));
     }
 
     // ── Rule edge cases ─────────────────────────────────────────────────

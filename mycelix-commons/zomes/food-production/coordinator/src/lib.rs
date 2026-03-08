@@ -4,8 +4,8 @@
 use food_production_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -87,11 +87,22 @@ pub fn register_plot(plot: Plot) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Plot(plot.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_plots".to_string())))?;
-    create_link(anchor_hash("all_plots")?, action_hash.clone(), LinkTypes::AllPlots, ())?;
-    create_link(plot.steward, action_hash.clone(), LinkTypes::StewardToPlot, ())?;
+    create_link(
+        anchor_hash("all_plots")?,
+        action_hash.clone(),
+        LinkTypes::AllPlots,
+        (),
+    )?;
+    create_link(
+        plot.steward,
+        action_hash.clone(),
+        LinkTypes::StewardToPlot,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created plot".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created plot".into()
+    )))
 }
 
 #[hdk_extern]
@@ -120,10 +131,16 @@ pub fn plant_crop(crop: Crop) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Plot not found".into())))?;
 
     let action_hash = create_entry(&EntryTypes::Crop(crop.clone()))?;
-    create_link(crop.plot_hash, action_hash.clone(), LinkTypes::PlotToCrop, ())?;
+    create_link(
+        crop.plot_hash,
+        action_hash.clone(),
+        LinkTypes::PlotToCrop,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created crop".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created crop".into()
+    )))
 }
 
 #[hdk_extern]
@@ -149,7 +166,12 @@ pub fn record_harvest(yr: YieldRecord) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Crop not found".into())))?;
 
     let action_hash = create_entry(&EntryTypes::YieldRecord(yr.clone()))?;
-    create_link(yr.crop_hash.clone(), action_hash.clone(), LinkTypes::CropToYield, ())?;
+    create_link(
+        yr.crop_hash.clone(),
+        action_hash.clone(),
+        LinkTypes::CropToYield,
+        (),
+    )?;
     create_link(agent, action_hash.clone(), LinkTypes::AgentToYield, ())?;
 
     // Emit bridge signal so the UI can update with new harvest data
@@ -162,8 +184,9 @@ pub fn record_harvest(yr: YieldRecord) -> ExternResult<Record> {
         ),
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created yield record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created yield record".into()
+    )))
 }
 
 #[hdk_extern]
@@ -186,10 +209,16 @@ pub fn create_season_plan(plan: SeasonPlan) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Plot not found".into())))?;
 
     let action_hash = create_entry(&EntryTypes::SeasonPlan(plan.clone()))?;
-    create_link(plan.plot_hash, action_hash.clone(), LinkTypes::PlotToSeasonPlan, ())?;
+    create_link(
+        plan.plot_hash,
+        action_hash.clone(),
+        LinkTypes::PlotToSeasonPlan,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created season plan".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created season plan".into()
+    )))
 }
 
 #[hdk_extern]
@@ -213,10 +242,13 @@ pub fn add_garden_member(input: AddMemberInput) -> ExternResult<Record> {
     let caller = agent_info()?.agent_initial_pubkey;
     let plot_record = get(input.plot_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Plot not found".into())))?;
-    let plot: Plot = plot_record.entry()
+    let plot: Plot = plot_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid plot entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid plot entry".into()
+        )))?;
     if caller != plot.steward {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only the plot steward can add garden members".into()
@@ -231,9 +263,15 @@ pub fn add_garden_member(input: AddMemberInput) -> ExternResult<Record> {
         joined_at: now.as_micros() as u64,
     };
     let action_hash = create_entry(&EntryTypes::GardenMembership(membership))?;
-    create_link(input.plot_hash, action_hash.clone(), LinkTypes::PlotToMembers, ())?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created membership".into())))
+    create_link(
+        input.plot_hash,
+        action_hash.clone(),
+        LinkTypes::PlotToMembers,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created membership".into()
+    )))
 }
 
 #[hdk_extern]
@@ -251,18 +289,25 @@ pub fn remove_garden_member(input: RemoveMemberInput) -> ExternResult<ActionHash
 
     // Only the plot steward can remove members
     let caller = agent_info()?.agent_initial_pubkey;
-    let membership_record = get(input.membership_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Membership not found".into())))?;
-    let membership: GardenMembership = membership_record.entry()
+    let membership_record = get(input.membership_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Membership not found".into())),
+    )?;
+    let membership: GardenMembership = membership_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid membership entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid membership entry".into()
+        )))?;
     let plot_record = get(membership.plot_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Plot not found".into())))?;
-    let plot: Plot = plot_record.entry()
+    let plot: Plot = plot_record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid plot entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid plot entry".into()
+        )))?;
     if caller != plot.steward {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only the plot steward can remove garden members".into()
@@ -428,7 +473,11 @@ mod tests {
     #[test]
     fn plot_serde_all_soil_and_status_combinations() {
         let soils = [SoilType::Clay, SoilType::Peat, SoilType::Chalk];
-        let statuses = [PlotStatus::Fallow, PlotStatus::Preparing, PlotStatus::Retired];
+        let statuses = [
+            PlotStatus::Fallow,
+            PlotStatus::Preparing,
+            PlotStatus::Retired,
+        ];
         for (soil, status) in soils.iter().zip(statuses.iter()) {
             let plot = Plot {
                 id: "p-combo".to_string(),
@@ -567,7 +616,11 @@ mod tests {
             plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
             year: 2026,
             season: "Spring".to_string(),
-            planned_crops: vec!["Tomato".to_string(), "Basil".to_string(), "Pepper".to_string()],
+            planned_crops: vec![
+                "Tomato".to_string(),
+                "Basil".to_string(),
+                "Pepper".to_string(),
+            ],
             rotation_notes: Some("Follow legumes with brassicas".to_string()),
         };
         let json = serde_json::to_string(&sp).unwrap();
@@ -576,7 +629,10 @@ mod tests {
         assert_eq!(decoded.season, "Spring");
         assert_eq!(decoded.planned_crops.len(), 3);
         assert_eq!(decoded.planned_crops[0], "Tomato");
-        assert_eq!(decoded.rotation_notes, Some("Follow legumes with brassicas".to_string()));
+        assert_eq!(
+            decoded.rotation_notes,
+            Some("Follow legumes with brassicas".to_string())
+        );
     }
 
     #[test]
@@ -730,7 +786,11 @@ mod tests {
 
     #[test]
     fn add_member_input_serde_roundtrip_all_roles() {
-        for role in [GardenRole::Steward, GardenRole::Volunteer, GardenRole::Member] {
+        for role in [
+            GardenRole::Steward,
+            GardenRole::Volunteer,
+            GardenRole::Member,
+        ] {
             let input = AddMemberInput {
                 plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
                 member: AgentPubKey::from_raw_36(vec![0xab; 36]),

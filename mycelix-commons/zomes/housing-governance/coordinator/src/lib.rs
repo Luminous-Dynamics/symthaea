@@ -4,8 +4,8 @@
 use hdk::prelude::*;
 use housing_governance_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_proposal, requirement_for_voting, requirement_for_constitutional,
+    gate_consciousness, requirement_for_constitutional, requirement_for_proposal,
+    requirement_for_voting, GovernanceEligibility, GovernanceRequirement,
 };
 use std::collections::HashMap;
 
@@ -487,7 +487,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: RecordMinutesInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.minutes, "Discussed budget and maintenance schedule.");
+        assert_eq!(
+            decoded.minutes,
+            "Discussed budget and maintenance schedule."
+        );
         assert_eq!(decoded.attendees.len(), 2);
         assert_eq!(decoded.attendees[0], agent_a);
     }
@@ -619,7 +622,10 @@ mod tests {
         let meeting = BoardMeeting {
             cooperative_hash: None,
             title: "Monthly Board Meeting".to_string(),
-            agenda: vec!["Budget review".to_string(), "New member applications".to_string()],
+            agenda: vec![
+                "Budget review".to_string(),
+                "New member applications".to_string(),
+            ],
             scheduled_at: Timestamp::from_micros(1000000),
             location: "Community Room".to_string(),
             meeting_type: MeetingType::Regular,

@@ -2,8 +2,8 @@
 use hdk::prelude::*;
 use justice_evidence_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_proposal, requirement_for_voting,
+    gate_consciousness, requirement_for_proposal, requirement_for_voting, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -54,16 +54,24 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 pub fn submit_evidence(evidence: Evidence) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "submit_evidence")?;
     if evidence.title.is_empty() || evidence.title.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Title must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Title must be 1-256 characters".into()
+        )));
     }
     if evidence.description.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Description must be under 4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Description must be under 4096 characters".into()
+        )));
     }
     if evidence.complaint_id.is_empty() || evidence.complaint_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Complaint ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Complaint ID must be 1-256 characters".into()
+        )));
     }
     if evidence.submitter.is_empty() || evidence.submitter.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Submitter must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Submitter must be 1-256 characters".into()
+        )));
     }
     let action_hash = create_entry(&EntryTypes::Evidence(evidence.clone()))?;
     create_link(
@@ -85,10 +93,15 @@ pub fn submit_evidence(evidence: Evidence) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn get_complaint_evidence(complaint_id: String) -> ExternResult<Vec<Record>> {
     if complaint_id.is_empty() || complaint_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Complaint ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Complaint ID must be 1-256 characters".into()
+        )));
     }
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("complaint:{}", complaint_id))?, LinkTypes::ComplaintToEvidence)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("complaint:{}", complaint_id))?,
+            LinkTypes::ComplaintToEvidence,
+        )?,
         GetStrategy::default(),
     )?;
     records_from_links(links)
@@ -99,18 +112,28 @@ pub fn get_complaint_evidence(complaint_id: String) -> ExternResult<Vec<Record>>
 pub fn verify_evidence(input: VerifyEvidenceInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "verify_evidence")?;
     if input.evidence_id.is_empty() || input.evidence_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Evidence ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Evidence ID must be 1-256 characters".into()
+        )));
     }
     if input.verifier.is_empty() || input.verifier.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Verifier must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Verifier must be 1-256 characters".into()
+        )));
     }
     if let Some(ref notes) = input.notes {
         if notes.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Notes must be under 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Notes must be under 4096 characters".into()
+            )));
         }
     }
     let verification = EvidenceVerification {
-        id: format!("verification:{}:{}", input.evidence_id, sys_time()?.as_micros()),
+        id: format!(
+            "verification:{}:{}",
+            input.evidence_id,
+            sys_time()?.as_micros()
+        ),
         evidence_id: input.evidence_id.clone(),
         verifier: input.verifier.clone(),
         status: input.status,
@@ -141,13 +164,19 @@ pub struct VerifyEvidenceInput {
 pub fn dispute_evidence(input: DisputeEvidenceInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "dispute_evidence")?;
     if input.evidence_id.is_empty() || input.evidence_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Evidence ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Evidence ID must be 1-256 characters".into()
+        )));
     }
     if input.disputant.is_empty() || input.disputant.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Disputant must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Disputant must be 1-256 characters".into()
+        )));
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-4096 characters".into()
+        )));
     }
     let dispute = EvidenceDispute {
         id: format!("dispute:{}:{}", input.evidence_id, sys_time()?.as_micros()),
@@ -179,10 +208,15 @@ pub struct DisputeEvidenceInput {
 #[hdk_extern]
 pub fn get_evidence_verifications(evidence_id: String) -> ExternResult<Vec<Record>> {
     if evidence_id.is_empty() || evidence_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Evidence ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Evidence ID must be 1-256 characters".into()
+        )));
     }
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("evidence:{}", evidence_id))?, LinkTypes::EvidenceToVerification)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("evidence:{}", evidence_id))?,
+            LinkTypes::EvidenceToVerification,
+        )?,
         GetStrategy::default(),
     )?;
     records_from_links(links)
@@ -192,10 +226,15 @@ pub fn get_evidence_verifications(evidence_id: String) -> ExternResult<Vec<Recor
 #[hdk_extern]
 pub fn get_evidence_disputes(evidence_id: String) -> ExternResult<Vec<Record>> {
     if evidence_id.is_empty() || evidence_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Evidence ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Evidence ID must be 1-256 characters".into()
+        )));
     }
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("evidence:{}", evidence_id))?, LinkTypes::EvidenceToDispute)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("evidence:{}", evidence_id))?,
+            LinkTypes::EvidenceToDispute,
+        )?,
         GetStrategy::default(),
     )?;
     records_from_links(links)
@@ -205,10 +244,15 @@ pub fn get_evidence_disputes(evidence_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_evidence_by_submitter(submitter: String) -> ExternResult<Vec<Record>> {
     if submitter.is_empty() || submitter.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Submitter must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Submitter must be 1-256 characters".into()
+        )));
     }
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("submitter:{}", submitter))?, LinkTypes::SubmitterToEvidence)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("submitter:{}", submitter))?,
+            LinkTypes::SubmitterToEvidence,
+        )?,
         GetStrategy::default(),
     )?;
     records_from_links(links)
@@ -239,7 +283,10 @@ mod tests {
         assert_eq!(decoded.evidence_id, "ev-1");
         assert_eq!(decoded.verifier, "did:example:juror1");
         assert_eq!(decoded.status, VerificationStatus::Verified);
-        assert_eq!(decoded.notes, Some("Verified via chain analysis".to_string()));
+        assert_eq!(
+            decoded.notes,
+            Some("Verified via chain analysis".to_string())
+        );
     }
 
     #[test]
@@ -348,7 +395,10 @@ mod tests {
         };
         let json = serde_json::to_string(&evidence).unwrap();
         let decoded: Evidence = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.encrypted_content, Some("base64-encrypted-data".to_string()));
+        assert_eq!(
+            decoded.encrypted_content,
+            Some("base64-encrypted-data".to_string())
+        );
     }
 
     // ========================================================================
@@ -550,7 +600,8 @@ mod tests {
             submitter: "did:example:\u{30A2}\u{30EA}\u{30B9}".to_string(),
             evidence_type: EvidenceType::Document,
             title: "\u{5408}\u{540C}\u{66F8}".to_string(),
-            description: "\u{0410}\u{0440}\u{0431}\u{0438}\u{0442}\u{0440}\u{0430}\u{0436}".to_string(),
+            description: "\u{0410}\u{0440}\u{0431}\u{0438}\u{0442}\u{0440}\u{0430}\u{0436}"
+                .to_string(),
             content_hash: "sha256:abc".to_string(),
             encrypted_content: None,
             submitted: ts(),

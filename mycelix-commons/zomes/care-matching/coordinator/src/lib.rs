@@ -1,11 +1,11 @@
 //! Matching Coordinator Zome
 //! Business logic for finding, suggesting, accepting, and declining care matches.
 
-use hdk::prelude::*;
 use care_matching_integrity::*;
+use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 // holochain_serialized_bytes is a dependency needed by the SerializedBytes derive macro
@@ -453,10 +453,27 @@ fn calculate_match_factors(offer: &ServiceOffer, request: &ServiceRequest) -> Ma
 /// Wire-compatible copy of mutualaid ResourceType for serialization.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MutualAidResourceType {
-    PowerTool, HandTool, GardenTool, CookingEquipment, CraftingSupplies,
-    Car, Truck, Bicycle, Trailer, Boat,
-    MeetingRoom, Workshop, Kitchen, GardenPlot, StorageSpace, ParkingSpot,
-    CampingGear, SportsEquipment, MusicInstrument, Photography, Projector,
+    PowerTool,
+    HandTool,
+    GardenTool,
+    CookingEquipment,
+    CraftingSupplies,
+    Car,
+    Truck,
+    Bicycle,
+    Trailer,
+    Boat,
+    MeetingRoom,
+    Workshop,
+    Kitchen,
+    GardenPlot,
+    StorageSpace,
+    ParkingSpot,
+    CampingGear,
+    SportsEquipment,
+    MusicInstrument,
+    Photography,
+    Projector,
     Custom(String),
 }
 
@@ -489,7 +506,9 @@ pub struct ResourceAvailabilityResult {
 /// mutualaid_resources directly using `call(CallTargetCell::Local, ...)`.
 /// For example, an eldercare match might need mobility aids or medical equipment.
 #[hdk_extern]
-pub fn check_resources_for_care_request(input: CheckResourcesInput) -> ExternResult<ResourceAvailabilityResult> {
+pub fn check_resources_for_care_request(
+    input: CheckResourcesInput,
+) -> ExternResult<ResourceAvailabilityResult> {
     let resource_type = map_care_to_resource_type(&input.category);
 
     let search = LocalSearchResourcesInput {
@@ -509,8 +528,9 @@ pub fn check_resources_for_care_request(input: CheckResourcesInput) -> ExternRes
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             let count = records.len() as u32;
             Ok(ResourceAvailabilityResult {
                 category: input.category,
@@ -582,7 +602,12 @@ mod tests {
         Timestamp::from_micros(0)
     }
 
-    fn make_offer(category: ServiceCategory, location: &str, availability: &str, hours: f32) -> ServiceOffer {
+    fn make_offer(
+        category: ServiceCategory,
+        location: &str,
+        availability: &str,
+        hours: f32,
+    ) -> ServiceOffer {
         ServiceOffer {
             provider: agent_a(),
             category,
@@ -597,7 +622,12 @@ mod tests {
         }
     }
 
-    fn make_request(category: ServiceCategory, location: &str, schedule: &str, hours: f32) -> ServiceRequest {
+    fn make_request(
+        category: ServiceCategory,
+        location: &str,
+        schedule: &str,
+        hours: f32,
+    ) -> ServiceRequest {
         ServiceRequest {
             requester: agent_b(),
             category,
@@ -744,7 +774,12 @@ mod tests {
 
     #[test]
     fn partial_location_match_gives_0_6() {
-        let offer = make_offer(ServiceCategory::Childcare, "Downtown Austin", "flexible", 10.0);
+        let offer = make_offer(
+            ServiceCategory::Childcare,
+            "Downtown Austin",
+            "flexible",
+            10.0,
+        );
         let request = make_request(ServiceCategory::Childcare, "Austin", "flexible", 5.0);
         let factors = calculate_match_factors(&offer, &request);
         assert!((factors.proximity_score - 0.6).abs() < 0.001);
@@ -780,7 +815,12 @@ mod tests {
 
     #[test]
     fn overlapping_schedule_gives_0_7() {
-        let offer = make_offer(ServiceCategory::Childcare, "Austin", "Monday and Tuesday", 10.0);
+        let offer = make_offer(
+            ServiceCategory::Childcare,
+            "Austin",
+            "Monday and Tuesday",
+            10.0,
+        );
         let request = make_request(ServiceCategory::Childcare, "Austin", "Monday", 5.0);
         let factors = calculate_match_factors(&offer, &request);
         assert!((factors.schedule_compatibility - 0.7).abs() < 0.001);

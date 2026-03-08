@@ -512,10 +512,7 @@ mod tests {
         team.members = vec![];
         let result = validate_create_team(fake_create(), team);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Team must have at least one member"
-        );
+        assert_eq!(invalid_msg(&result), "Team must have at least one member");
     }
 
     #[test]
@@ -604,10 +601,7 @@ mod tests {
         assignment.objective = "".into();
         let result = validate_create_assignment(fake_create(), assignment);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Assignment objective cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Assignment objective cannot be empty");
     }
 
     #[test]
@@ -650,10 +644,7 @@ mod tests {
         sitrep.conditions = "".into();
         let result = validate_create_sitrep(fake_create(), sitrep);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "SITREP conditions cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "SITREP conditions cannot be empty");
     }
 
     #[test]
@@ -715,10 +706,7 @@ mod tests {
         cp.lat = -90.1;
         let result = validate_create_checkpoint(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -727,10 +715,7 @@ mod tests {
         cp.lat = 90.1;
         let result = validate_create_checkpoint(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -811,10 +796,7 @@ mod tests {
         cp.battery_level = Some(101);
         let result = validate_create_checkpoint(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Battery level cannot exceed 100"
-        );
+        assert_eq!(invalid_msg(&result), "Battery level cannot exceed 100");
     }
 
     #[test]
@@ -857,10 +839,7 @@ mod tests {
         let result = validate_create_checkpoint(fake_create(), cp);
         // Lat check comes first
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -1056,7 +1035,9 @@ mod tests {
     #[test]
     fn assignment_unicode_objective_passes() {
         let mut assignment = make_assignment();
-        assignment.objective = "\u{7DCA}\u{6025}\u{907F}\u{96E3}\u{6240}\u{3092}\u{78BA}\u{4FDD}\u{3059}\u{308B}".into(); // Japanese
+        assignment.objective =
+            "\u{7DCA}\u{6025}\u{907F}\u{96E3}\u{6240}\u{3092}\u{78BA}\u{4FDD}\u{3059}\u{308B}"
+                .into(); // Japanese
         let result = validate_create_assignment(fake_create(), assignment);
         assert!(is_valid(&result));
     }
@@ -1073,11 +1054,11 @@ mod tests {
     fn sitrep_unicode_resources_and_hazards_passes() {
         let mut sitrep = make_sitrep();
         sitrep.resources_needed = vec![
-            "\u{6551}\u{6025}\u{7BB1}".into(),  // Japanese: first aid kit
-            "\u{98DF}\u{7CE7}".into(),          // Chinese: food rations
+            "\u{6551}\u{6025}\u{7BB1}".into(), // Japanese: first aid kit
+            "\u{98DF}\u{7CE7}".into(),         // Chinese: food rations
         ];
         sitrep.hazards = vec![
-            "\u{653E}\u{5C04}\u{7DDA}".into(),  // Japanese: radiation
+            "\u{653E}\u{5C04}\u{7DDA}".into(), // Japanese: radiation
         ];
         let result = validate_create_sitrep(fake_create(), sitrep);
         assert!(is_valid(&result));
@@ -1336,10 +1317,7 @@ mod tests {
         };
         let result = validate_create_team(fake_create(), team);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Team must have at least one member"
-        );
+        assert_eq!(invalid_msg(&result), "Team must have at least one member");
     }
 
     #[test]
@@ -1349,10 +1327,7 @@ mod tests {
         cp.lon = -181.0;
         let result = validate_create_checkpoint(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Latitude must be between -90 and 90"
-        );
+        assert_eq!(invalid_msg(&result), "Latitude must be between -90 and 90");
     }
 
     #[test]
@@ -1392,7 +1367,10 @@ mod tests {
     // LINK TAG VALIDATION TESTS
     // ========================================================================
 
-    fn validate_create_link_tag(link_type: LinkTypes, tag: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_create_link_tag(
+        link_type: LinkTypes,
+        tag: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag_len = tag.len();
         match link_type {
             LinkTypes::TeamToSitrep => {
@@ -1482,13 +1460,34 @@ mod tests {
     #[test]
     fn massive_link_tag_rejected_all_types() {
         let huge_tag = vec![0xFFu8; 10_000];
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AllTeams, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ActiveTeams, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::TeamToAssignment, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::TeamToSitrep, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::ZoneToTeam, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AgentToCheckpoint, huge_tag.clone())));
-        assert!(is_invalid(&validate_create_link_tag(LinkTypes::AgentToTeam, huge_tag.clone())));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::AllTeams,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::ActiveTeams,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::TeamToAssignment,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::TeamToSitrep,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::ZoneToTeam,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::AgentToCheckpoint,
+            huge_tag.clone()
+        )));
+        assert!(is_invalid(&validate_create_link_tag(
+            LinkTypes::AgentToTeam,
+            huge_tag.clone()
+        )));
     }
 
     // -- Delete link tag tests --
@@ -1521,7 +1520,10 @@ mod tests {
         team.id = "T".repeat(257);
         let result = validate_create_team(fake_create(), team);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Team ID must be 256 characters or fewer");
+        assert_eq!(
+            invalid_msg(&result),
+            "Team ID must be 256 characters or fewer"
+        );
     }
 
     #[test]
@@ -1538,7 +1540,10 @@ mod tests {
         team.name = "N".repeat(513);
         let result = validate_create_team(fake_create(), team);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Team name must be 512 characters or fewer");
+        assert_eq!(
+            invalid_msg(&result),
+            "Team name must be 512 characters or fewer"
+        );
     }
 
     #[test]

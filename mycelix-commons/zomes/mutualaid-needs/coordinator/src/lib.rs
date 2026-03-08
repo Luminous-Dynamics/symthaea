@@ -7,8 +7,8 @@ use hdk::prelude::*;
 use mutualaid_common::*;
 use mutualaid_needs_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -134,7 +134,12 @@ pub fn create_need(input: CreateNeedInput) -> ExternResult<Record> {
 
     // Link from category anchor to need
     let cat_anchor = category_anchor(&input.category)?;
-    create_link(cat_anchor, action_hash.clone(), LinkTypes::CategoryToNeeds, ())?;
+    create_link(
+        cat_anchor,
+        action_hash.clone(),
+        LinkTypes::CategoryToNeeds,
+        (),
+    )?;
 
     // Link to all needs
     let all_anchor = all_needs_anchor()?;
@@ -143,7 +148,12 @@ pub fn create_need(input: CreateNeedInput) -> ExternResult<Record> {
     // If emergency, add to emergency needs
     if input.emergency {
         let emergency_anchor = emergency_needs_anchor()?;
-        create_link(emergency_anchor, action_hash.clone(), LinkTypes::EmergencyNeeds, ())?;
+        create_link(
+            emergency_anchor,
+            action_hash.clone(),
+            LinkTypes::EmergencyNeeds,
+            (),
+        )?;
     }
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -193,7 +203,10 @@ pub fn search_needs(input: SearchNeedsInput) -> ExternResult<Vec<Record>> {
         LinkTypes::AllNeeds
     };
 
-    let links = get_links(LinkQuery::try_new(anchor, link_type)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, link_type)?,
+        GetStrategy::default(),
+    )?;
 
     let limit = input.limit.unwrap_or(100) as usize;
     let mut results = Vec::new();
@@ -205,12 +218,7 @@ pub fn search_needs(input: SearchNeedsInput) -> ExternResult<Vec<Record>> {
 
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get_latest_record(hash)? {
-                if let Some(need) = record
-                    .entry()
-                    .to_app_option::<Need>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(need) = record.entry().to_app_option::<Need>().ok().flatten() {
                     // Only include open needs
                     if need.status != NeedStatus::Open {
                         continue;
@@ -266,14 +274,17 @@ pub fn get_emergency_needs(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn withdraw_need(hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "withdraw_need")?;
-    let record = get_latest_record(hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Need not found".to_string())))?;
+    let record = get_latest_record(hash.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Need not found".to_string()
+    )))?;
 
     let mut need: Need = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse need".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse need".to_string()
+        )))?;
 
     // Verify ownership
     let agent = agent_info()?.agent_initial_pubkey;
@@ -325,7 +336,12 @@ pub fn create_offer(input: CreateOfferInput) -> ExternResult<Record> {
 
     // Link from category anchor to offer
     let cat_anchor = category_anchor(&input.category)?;
-    create_link(cat_anchor, action_hash.clone(), LinkTypes::CategoryToOffers, ())?;
+    create_link(
+        cat_anchor,
+        action_hash.clone(),
+        LinkTypes::CategoryToOffers,
+        (),
+    )?;
 
     // Link to all offers
     let all_anchor = all_offers_anchor()?;
@@ -382,12 +398,7 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
 
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get_latest_record(hash)? {
-                if let Some(offer) = record
-                    .entry()
-                    .to_app_option::<Offer>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(offer) = record.entry().to_app_option::<Offer>().ok().flatten() {
                     // Only include available offers
                     if offer.status != OfferStatus::Available {
                         continue;
@@ -425,14 +436,17 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn withdraw_offer(hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "withdraw_offer")?;
-    let record = get_latest_record(hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?;
+    let record = get_latest_record(hash.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Offer not found".to_string()
+    )))?;
 
     let mut offer: Offer = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse offer".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse offer".to_string()
+        )))?;
 
     // Verify ownership
     let agent = agent_info()?.agent_initial_pubkey;
@@ -462,24 +476,30 @@ pub fn propose_match(input: ProposeMatchInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Get need
-    let need_record = get(input.need_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Need not found".to_string())))?;
+    let need_record = get(input.need_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Need not found".to_string())
+    ))?;
 
     let need: Need = need_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse need".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse need".to_string()
+        )))?;
 
     // Get offer
-    let offer_record = get(input.offer_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?;
+    let offer_record = get(input.offer_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Offer not found".to_string())
+    ))?;
 
     let offer: Offer = offer_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse offer".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse offer".to_string()
+        )))?;
 
     // Verify categories match
     if need.category != offer.category {
@@ -505,8 +525,18 @@ pub fn propose_match(input: ProposeMatchInput) -> ExternResult<Record> {
     let action_hash = create_entry(EntryTypes::Match(m))?;
 
     // Link from need and offer to match
-    create_link(input.need_hash, action_hash.clone(), LinkTypes::NeedToMatches, ())?;
-    create_link(input.offer_hash, action_hash.clone(), LinkTypes::OfferToMatches, ())?;
+    create_link(
+        input.need_hash,
+        action_hash.clone(),
+        LinkTypes::NeedToMatches,
+        (),
+    )?;
+    create_link(
+        input.offer_hash,
+        action_hash.clone(),
+        LinkTypes::OfferToMatches,
+        (),
+    )?;
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created match".to_string()
@@ -517,14 +547,17 @@ pub fn propose_match(input: ProposeMatchInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn accept_match(match_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "accept_match")?;
-    let record = get_latest_record(match_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".to_string())))?;
+    let record = get_latest_record(match_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Match not found".to_string())
+    ))?;
 
     let mut m: Match = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse match".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse match".to_string()
+        )))?;
 
     // Verify the current agent is the requester or offerer
     let agent = agent_info()?.agent_initial_pubkey;
@@ -557,14 +590,17 @@ pub fn schedule_handoff(input: ScheduleHandoffInput) -> ExternResult<Record> {
     let match_hash = input.match_hash;
     let scheduled_time = input.scheduled_time;
     let location = input.location;
-    let record = get_latest_record(match_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".to_string())))?;
+    let record = get_latest_record(match_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Match not found".to_string())
+    ))?;
 
     let mut m: Match = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse match".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse match".to_string()
+        )))?;
 
     // Verify the current agent is a participant
     let agent = agent_info()?.agent_initial_pubkey;
@@ -636,14 +672,17 @@ pub fn fulfill_match(input: FulfillMatchInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Get match
-    let match_record = get(input.match_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".to_string())))?;
+    let match_record = get(input.match_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Match not found".to_string())
+    ))?;
 
     let mut m: Match = match_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse match".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse match".to_string()
+        )))?;
 
     let agent = agent_info()?.agent_initial_pubkey;
     let is_requester = agent == m.requester;
@@ -668,7 +707,12 @@ pub fn fulfill_match(input: FulfillMatchInput) -> ExternResult<Record> {
     let fulfillment_hash = create_entry(EntryTypes::Fulfillment(fulfillment))?;
 
     // Link match to fulfillment
-    create_link(input.match_hash.clone(), fulfillment_hash.clone(), LinkTypes::MatchToFulfillment, ())?;
+    create_link(
+        input.match_hash.clone(),
+        fulfillment_hash.clone(),
+        LinkTypes::MatchToFulfillment,
+        (),
+    )?;
 
     // Update match status
     m.status = MatchStatus::Completed;
@@ -676,21 +720,29 @@ pub fn fulfill_match(input: FulfillMatchInput) -> ExternResult<Record> {
 
     // Update need and offer statuses
     let mut need: Need = get(m.need_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Need not found".to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Need not found".to_string()
+        )))?
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse need".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse need".to_string()
+        )))?;
 
     need.status = NeedStatus::Fulfilled;
     update_entry(m.need_hash, EntryTypes::Need(need))?;
 
     let mut offer: Offer = get(m.offer_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Offer not found".to_string()
+        )))?
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse offer".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse offer".to_string()
+        )))?;
 
     offer.status = OfferStatus::Completed;
     update_entry(m.offer_hash, EntryTypes::Offer(offer))?;
@@ -704,24 +756,30 @@ pub fn fulfill_match(input: FulfillMatchInput) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn confirm_fulfillment(fulfillment_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_basic(), "confirm_fulfillment")?;
-    let record = get_latest_record(fulfillment_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Fulfillment not found".to_string())))?;
+    let record = get_latest_record(fulfillment_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Fulfillment not found".to_string())
+    ))?;
 
     let mut fulfillment: Fulfillment = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse fulfillment".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse fulfillment".to_string()
+        )))?;
 
     // Get the match to verify the agent
-    let match_record = get(fulfillment.match_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Match not found".to_string())))?;
+    let match_record = get(fulfillment.match_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Match not found".to_string())),
+    )?;
 
     let m: Match = match_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse match".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse match".to_string()
+        )))?;
 
     let agent = agent_info()?.agent_initial_pubkey;
 
@@ -752,7 +810,12 @@ fn generate_id(prefix: &str) -> String {
     let agent = agent_info()
         .map(|info| info.agent_initial_pubkey.to_string())
         .unwrap_or_default();
-    format!("{}_{}_{}",  prefix, now.as_micros(), &agent[..8.min(agent.len())])
+    format!(
+        "{}_{}_{}",
+        prefix,
+        now.as_micros(),
+        &agent[..8.min(agent.len())]
+    )
 }
 
 /// Simple anchor helper
@@ -887,7 +950,10 @@ mod tests {
         assert_eq!(decoded.need_hash, need_hash);
         assert_eq!(decoded.offer_hash, offer_hash);
         assert_eq!(decoded.quantity, Some(3));
-        assert_eq!(decoded.handoff_location, Some("Community center".to_string()));
+        assert_eq!(
+            decoded.handoff_location,
+            Some("Community center".to_string())
+        );
     }
 
     #[test]
@@ -903,7 +969,10 @@ mod tests {
         let decoded: FulfillMatchInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.match_hash, match_hash);
         assert_eq!(decoded.quantity_given, Some(2));
-        assert_eq!(decoded.gratitude_message, Some("Thank you so much!".to_string()));
+        assert_eq!(
+            decoded.gratitude_message,
+            Some("Thank you so much!".to_string())
+        );
     }
 
     #[test]
@@ -1146,7 +1215,9 @@ mod tests {
 
     #[test]
     fn create_need_input_many_reciprocity_offers_serde() {
-        let offers: Vec<String> = (0..50).map(|i| format!("Reciprocity offer #{}", i)).collect();
+        let offers: Vec<String> = (0..50)
+            .map(|i| format!("Reciprocity offer #{}", i))
+            .collect();
         let input = CreateNeedInput {
             title: "Large request".to_string(),
             description: "Needs many things in return".to_string(),
@@ -1178,7 +1249,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: CreateOfferInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.available_until, Some(Timestamp::from_micros(1700500000000000)));
+        assert_eq!(
+            decoded.available_until,
+            Some(Timestamp::from_micros(1700500000000000))
+        );
         assert_eq!(decoded.asking_for.len(), 2);
     }
 

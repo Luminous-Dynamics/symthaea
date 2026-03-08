@@ -1,12 +1,11 @@
 //! Transport Impact Coordinator Zome
 //! Business logic for trip logging, emissions calculation, and carbon credits.
 
-use transport_impact_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic,
+    gate_consciousness, requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
 };
+use transport_impact_integrity::*;
 
 // ============================================================================
 // BRIDGE SIGNAL (for cross-domain UI notification)
@@ -64,17 +63,17 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// Average CO2 emissions per km by mode (kg CO2/km)
 fn emissions_factor(mode: &TripMode) -> f64 {
     match mode {
-        TripMode::Driving => 0.21,           // Average car
-        TripMode::ElectricVehicle => 0.05,   // EV with average grid
-        TripMode::Transit => 0.089,          // Bus/train average
-        TripMode::Carpool => 0.07,           // Car split among passengers
+        TripMode::Driving => 0.21,         // Average car
+        TripMode::ElectricVehicle => 0.05, // EV with average grid
+        TripMode::Transit => 0.089,        // Bus/train average
+        TripMode::Carpool => 0.07,         // Car split among passengers
         TripMode::Cycling => 0.0,
         TripMode::Walking => 0.0,
-        TripMode::Flying => 0.255,           // Helicopter/eVTOL average
-        TripMode::Water => 0.19,             // Ferry average
-        TripMode::Rail => 0.041,             // Train/tram average
-        TripMode::Micromobility => 0.0,      // Human-powered / negligible electric
-        TripMode::Autonomous => 0.05,        // Autonomous EV
+        TripMode::Flying => 0.255,      // Helicopter/eVTOL average
+        TripMode::Water => 0.19,        // Ferry average
+        TripMode::Rail => 0.041,        // Train/tram average
+        TripMode::Micromobility => 0.0, // Human-powered / negligible electric
+        TripMode::Autonomous => 0.05,   // Autonomous EV
     }
 }
 
@@ -95,11 +94,26 @@ pub fn log_trip(mut trip: TripLog) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::TripLog(trip.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_trips".to_string())))?;
-    create_link(anchor_hash("all_trips")?, action_hash.clone(), LinkTypes::AllTrips, ())?;
-    create_link(agent.clone(), action_hash.clone(), LinkTypes::AgentToTrip, ())?;
+    create_link(
+        anchor_hash("all_trips")?,
+        action_hash.clone(),
+        LinkTypes::AllTrips,
+        (),
+    )?;
+    create_link(
+        agent.clone(),
+        action_hash.clone(),
+        LinkTypes::AgentToTrip,
+        (),
+    )?;
 
     if let Some(ref vehicle_hash) = trip.vehicle_hash {
-        create_link(vehicle_hash.clone(), action_hash.clone(), LinkTypes::VehicleToTrip, ())?;
+        create_link(
+            vehicle_hash.clone(),
+            action_hash.clone(),
+            LinkTypes::VehicleToTrip,
+            (),
+        )?;
     }
 
     // Award carbon credits for low-emission modes
@@ -135,8 +149,9 @@ pub fn log_trip(mut trip: TripLog) -> ExternResult<Record> {
         });
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created trip".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created trip".into()
+    )))
 }
 
 fn calculate_trip_emissions(trip: &TripLog) -> f64 {
@@ -186,11 +201,12 @@ pub struct EmissionsCalcResult {
 #[hdk_extern]
 pub fn calculate_emissions(input: EmissionsCalcInput) -> ExternResult<EmissionsCalcResult> {
     let base = input.distance_km * emissions_factor(&input.mode);
-    let emissions = if input.passengers > 1 && matches!(input.mode, TripMode::Driving | TripMode::Carpool) {
-        base / input.passengers as f64
-    } else {
-        base
-    };
+    let emissions =
+        if input.passengers > 1 && matches!(input.mode, TripMode::Driving | TripMode::Carpool) {
+            base / input.passengers as f64
+        } else {
+            base
+        };
     let baseline = input.distance_km * 0.21;
 
     Ok(EmissionsCalcResult {
@@ -218,9 +234,10 @@ pub fn redeem_credits(input: RedeemInput) -> ExternResult<Record> {
     // Verify sufficient balance before redeeming
     let balance = get_agent_carbon_balance(agent.clone())?;
     if input.credits_redeemed > balance.balance {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Insufficient carbon credits: requested {}, available {}", input.credits_redeemed, balance.balance)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Insufficient carbon credits: requested {}, available {}",
+            input.credits_redeemed, balance.balance
+        ))));
     }
 
     let now = sys_time()?.as_micros() / 1_000_000;
@@ -233,10 +250,16 @@ pub fn redeem_credits(input: RedeemInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::CreditRedemption(redemption))?;
-    create_link(agent, action_hash.clone(), LinkTypes::AgentToRedemptions, ())?;
+    create_link(
+        agent,
+        action_hash.clone(),
+        LinkTypes::AgentToRedemptions,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created redemption".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created redemption".into()
+    )))
 }
 
 #[hdk_extern]
@@ -394,7 +417,9 @@ mod tests {
 
     #[test]
     fn emissions_factor_ev_lower_than_driving() {
-        assert!(emissions_factor(&TripMode::ElectricVehicle) < emissions_factor(&TripMode::Driving));
+        assert!(
+            emissions_factor(&TripMode::ElectricVehicle) < emissions_factor(&TripMode::Driving)
+        );
     }
 
     #[test]
@@ -550,10 +575,17 @@ mod tests {
     #[test]
     fn emissions_calc_input_all_modes() {
         for mode in [
-            TripMode::Driving, TripMode::Cycling, TripMode::Walking,
-            TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle,
-            TripMode::Flying, TripMode::Water, TripMode::Rail,
-            TripMode::Micromobility, TripMode::Autonomous,
+            TripMode::Driving,
+            TripMode::Cycling,
+            TripMode::Walking,
+            TripMode::Transit,
+            TripMode::Carpool,
+            TripMode::ElectricVehicle,
+            TripMode::Flying,
+            TripMode::Water,
+            TripMode::Rail,
+            TripMode::Micromobility,
+            TripMode::Autonomous,
         ] {
             let input = EmissionsCalcInput {
                 distance_km: 10.0,

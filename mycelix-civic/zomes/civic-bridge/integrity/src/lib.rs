@@ -7,11 +7,11 @@
 //! with the Commons bridge). The `EntryTypes` enum and validation are local.
 
 use hdi::prelude::*;
-use mycelix_bridge_entry_types::{
-    BridgeQueryEntry, BridgeEventEntry,
-    validate_query_fields, validate_event_fields, validate_cached_credential,
-};
 pub use mycelix_bridge_entry_types::CachedCredentialEntry;
+use mycelix_bridge_entry_types::{
+    validate_cached_credential, validate_event_fields, validate_query_fields, BridgeEventEntry,
+    BridgeQueryEntry,
+};
 
 /// Anchor entry for deterministic link bases
 #[hdk_entry_helper]
@@ -56,7 +56,10 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, action: _ }) => match app_entry {
+        FlatOp::StoreEntry(OpEntry::CreateEntry {
+            app_entry,
+            action: _,
+        }) => match app_entry {
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             EntryTypes::Query(query) => validate_query(&query),
             EntryTypes::Event(event) => validate_event(&event),
@@ -141,18 +144,37 @@ mod tests {
 
     #[test]
     fn valid_domains_has_expected_count() {
-        assert_eq!(VALID_DOMAINS.len(), 4, "expected 4 civic domains (3 + governance_gate)");
+        assert_eq!(
+            VALID_DOMAINS.len(),
+            4,
+            "expected 4 civic domains (3 + governance_gate)"
+        );
     }
 
     #[test]
     fn valid_domains_does_not_contain_commons_domains() {
-        assert!(!VALID_DOMAINS.contains(&"property"), "property is a commons domain");
-        assert!(!VALID_DOMAINS.contains(&"housing"), "housing is a commons domain");
+        assert!(
+            !VALID_DOMAINS.contains(&"property"),
+            "property is a commons domain"
+        );
+        assert!(
+            !VALID_DOMAINS.contains(&"housing"),
+            "housing is a commons domain"
+        );
         assert!(!VALID_DOMAINS.contains(&"care"), "care is a commons domain");
-        assert!(!VALID_DOMAINS.contains(&"mutualaid"), "mutualaid is a commons domain");
-        assert!(!VALID_DOMAINS.contains(&"water"), "water is a commons domain");
+        assert!(
+            !VALID_DOMAINS.contains(&"mutualaid"),
+            "mutualaid is a commons domain"
+        );
+        assert!(
+            !VALID_DOMAINS.contains(&"water"),
+            "water is a commons domain"
+        );
         assert!(!VALID_DOMAINS.contains(&"food"), "food is a commons domain");
-        assert!(!VALID_DOMAINS.contains(&"transport"), "transport is a commons domain");
+        assert!(
+            !VALID_DOMAINS.contains(&"transport"),
+            "transport is a commons domain"
+        );
     }
 
     // ── Query validation: domain ────────────────────────────────────────

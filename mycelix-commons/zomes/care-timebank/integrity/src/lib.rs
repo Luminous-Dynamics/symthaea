@@ -805,9 +805,7 @@ mod tests {
                 );
             }
             Ok(ValidateCallbackResult::Valid) => {
-                panic!(
-                    "Expected Invalid containing '{expected_substr}', got Valid"
-                )
+                panic!("Expected Invalid containing '{expected_substr}', got Valid")
             }
             other => panic!("Expected Invalid, got {other:?}"),
         }
@@ -903,7 +901,10 @@ mod tests {
         assert_eq!(ServiceCategory::Gardening.anchor_key(), "gardening");
         assert_eq!(ServiceCategory::Tutoring.anchor_key(), "tutoring");
         assert_eq!(ServiceCategory::TechSupport.anchor_key(), "techsupport");
-        assert_eq!(ServiceCategory::Transportation.anchor_key(), "transportation");
+        assert_eq!(
+            ServiceCategory::Transportation.anchor_key(),
+            "transportation"
+        );
         assert_eq!(ServiceCategory::Companionship.anchor_key(), "companionship");
         assert_eq!(ServiceCategory::HealthSupport.anchor_key(), "healthsupport");
         assert_eq!(ServiceCategory::HomeRepair.anchor_key(), "homerepair");
@@ -911,7 +912,10 @@ mod tests {
         assert_eq!(ServiceCategory::Counseling.anchor_key(), "counseling");
         assert_eq!(ServiceCategory::ArtMusic.anchor_key(), "artmusic");
         assert_eq!(ServiceCategory::LanguageHelp.anchor_key(), "languagehelp");
-        assert_eq!(ServiceCategory::Administrative.anchor_key(), "administrative");
+        assert_eq!(
+            ServiceCategory::Administrative.anchor_key(),
+            "administrative"
+        );
     }
 
     #[test]
@@ -1476,10 +1480,7 @@ mod tests {
     fn update_offer_empty_title() {
         let mut o = valid_offer();
         o.title = String::new();
-        assert_invalid(
-            validate_update_offer(o),
-            "Offer title cannot be empty",
-        );
+        assert_invalid(validate_update_offer(o), "Offer title cannot be empty");
     }
 
     #[test]
@@ -1518,10 +1519,7 @@ mod tests {
     fn update_request_empty_title() {
         let mut r = valid_request();
         r.title = String::new();
-        assert_invalid(
-            validate_update_request(r),
-            "Request title cannot be empty",
-        );
+        assert_invalid(validate_update_request(r), "Request title cannot be empty");
     }
 
     #[test]
@@ -1550,40 +1548,28 @@ mod tests {
     fn update_exchange_provider_rating_zero() {
         let mut e = valid_exchange();
         e.rating_provider = Some(0);
-        assert_invalid(
-            validate_update_exchange(e),
-            "Provider rating must be 1-5",
-        );
+        assert_invalid(validate_update_exchange(e), "Provider rating must be 1-5");
     }
 
     #[test]
     fn update_exchange_provider_rating_six() {
         let mut e = valid_exchange();
         e.rating_provider = Some(6);
-        assert_invalid(
-            validate_update_exchange(e),
-            "Provider rating must be 1-5",
-        );
+        assert_invalid(validate_update_exchange(e), "Provider rating must be 1-5");
     }
 
     #[test]
     fn update_exchange_recipient_rating_zero() {
         let mut e = valid_exchange();
         e.rating_recipient = Some(0);
-        assert_invalid(
-            validate_update_exchange(e),
-            "Recipient rating must be 1-5",
-        );
+        assert_invalid(validate_update_exchange(e), "Recipient rating must be 1-5");
     }
 
     #[test]
     fn update_exchange_recipient_rating_six() {
         let mut e = valid_exchange();
         e.rating_recipient = Some(6);
-        assert_invalid(
-            validate_update_exchange(e),
-            "Recipient rating must be 1-5",
-        );
+        assert_invalid(validate_update_exchange(e), "Recipient rating must be 1-5");
     }
 
     #[test]
@@ -1601,10 +1587,7 @@ mod tests {
         let mut e = valid_exchange();
         e.rating_provider = Some(3);
         e.rating_recipient = Some(0);
-        assert_invalid(
-            validate_update_exchange(e),
-            "Recipient rating must be 1-5",
-        );
+        assert_invalid(validate_update_exchange(e), "Recipient rating must be 1-5");
     }
 
     #[test]
@@ -1613,10 +1596,7 @@ mod tests {
         e.rating_provider = Some(255);
         e.rating_recipient = Some(3);
         // Provider check comes first
-        assert_invalid(
-            validate_update_exchange(e),
-            "Provider rating must be 1-5",
-        );
+        assert_invalid(validate_update_exchange(e), "Provider rating must be 1-5");
     }
 
     // ── validate_update_request numeric bounds ──────────────────────────
@@ -1822,10 +1802,7 @@ mod tests {
     fn update_offer_skills_over_max_count() {
         let mut o = valid_offer();
         o.skills_required = (0..21).map(|i| format!("skill_{i}")).collect();
-        assert_invalid(
-            validate_update_offer(o),
-            "Cannot list more than 20 skills",
-        );
+        assert_invalid(validate_update_offer(o), "Cannot list more than 20 skills");
     }
 
     #[test]
@@ -1944,22 +1921,28 @@ mod tests {
     ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
-            LinkTypes::AgentToOffer | LinkTypes::AgentToRequest |
-            LinkTypes::AllActiveOffers | LinkTypes::AllOpenRequests |
-            LinkTypes::AgentToExchange | LinkTypes::AgentToCredit |
-            LinkTypes::OfferToExchange | LinkTypes::RequestToExchange => {
+            LinkTypes::AgentToOffer
+            | LinkTypes::AgentToRequest
+            | LinkTypes::AllActiveOffers
+            | LinkTypes::AllOpenRequests
+            | LinkTypes::AgentToExchange
+            | LinkTypes::AgentToCredit
+            | LinkTypes::OfferToExchange
+            | LinkTypes::RequestToExchange => {
                 if tag.0.len() > 256 {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        format!("{:?} link tag too long (max 256 bytes)", link_type),
-                    ));
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
             LinkTypes::CategoryToOffer | LinkTypes::CategoryToRequest => {
                 if tag.0.len() > 512 {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        format!("{:?} link tag too long (max 512 bytes)", link_type),
-                    ));
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 512 bytes)",
+                        link_type
+                    )));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
@@ -1968,7 +1951,10 @@ mod tests {
 
     #[test]
     fn link_tag_agent_to_offer_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::AgentToOffer, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::AgentToOffer,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1979,7 +1965,10 @@ mod tests {
 
     #[test]
     fn link_tag_category_to_offer_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::CategoryToOffer, vec![0u8; 512]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::CategoryToOffer,
+            vec![0u8; 512],
+        ));
     }
 
     #[test]
@@ -1990,12 +1979,16 @@ mod tests {
 
     #[test]
     fn link_tag_category_to_request_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::CategoryToRequest, vec![0u8; 512]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::CategoryToRequest,
+            vec![0u8; 512],
+        ));
     }
 
     #[test]
     fn link_tag_category_to_request_over_limit() {
-        let result = validate_create_link_tag(LinkTypes::CategoryToRequest, vec![0u8; 513]).unwrap();
+        let result =
+            validate_create_link_tag(LinkTypes::CategoryToRequest, vec![0u8; 513]).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -2123,20 +2116,14 @@ mod tests {
     fn update_offer_empty_skill_name() {
         let mut o = valid_offer();
         o.skills_required = vec!["".to_string()];
-        assert_invalid(
-            validate_update_offer(o),
-            "Skill name cannot be empty",
-        );
+        assert_invalid(validate_update_offer(o), "Skill name cannot be empty");
     }
 
     #[test]
     fn update_offer_whitespace_skill_name() {
         let mut o = valid_offer();
         o.skills_required = vec!["   ".to_string()];
-        assert_invalid(
-            validate_update_offer(o),
-            "Skill name cannot be empty",
-        );
+        assert_invalid(validate_update_offer(o), "Skill name cannot be empty");
     }
 
     // ── Update category validation tests ─────────────────────────────

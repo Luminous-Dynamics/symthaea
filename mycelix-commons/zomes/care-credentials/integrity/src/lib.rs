@@ -195,9 +195,7 @@ fn validate_credential_type_other(credential_type: &CredentialType) -> Result<()
             return Err("Custom credential type label cannot be empty".to_string());
         }
         if s.len() > 128 {
-            return Err(
-                "Custom credential type label must be 128 characters or fewer".to_string(),
-            );
+            return Err("Custom credential type label must be 128 characters or fewer".to_string());
         }
     }
     Ok(())
@@ -224,11 +222,12 @@ fn validate_create_credential(
     }
     // If metadata is non-empty, validate it is valid JSON
     if !cred.metadata.trim().is_empty()
-        && serde_json::from_str::<serde_json::Value>(&cred.metadata).is_err() {
-            return Ok(ValidateCallbackResult::Invalid(
-                "Metadata must be valid JSON".into(),
-            ));
-        }
+        && serde_json::from_str::<serde_json::Value>(&cred.metadata).is_err()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Metadata must be valid JSON".into(),
+        ));
+    }
     // If expires_at is set, it must be after issued_at
     if let Some(expires) = cred.expires_at {
         if expires <= cred.issued_at {
@@ -429,7 +428,10 @@ mod tests {
 
     #[test]
     fn test_credential_type_anchor_key_childcare_training() {
-        assert_eq!(CredentialType::ChildcareTraining.anchor_key(), "childcare_training");
+        assert_eq!(
+            CredentialType::ChildcareTraining.anchor_key(),
+            "childcare_training"
+        );
     }
 
     #[test]
@@ -444,7 +446,10 @@ mod tests {
 
     #[test]
     fn test_credential_type_anchor_key_background_check() {
-        assert_eq!(CredentialType::BackgroundCheck.anchor_key(), "background_check");
+        assert_eq!(
+            CredentialType::BackgroundCheck.anchor_key(),
+            "background_check"
+        );
     }
 
     #[test]
@@ -1018,15 +1023,13 @@ mod tests {
 
     #[test]
     fn test_link_tag_type_to_credential_at_limit() {
-        let result =
-            validate_create_link_tag(LinkTypes::TypeToCredential, vec![0u8; 512]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::TypeToCredential, vec![0u8; 512]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
     #[test]
     fn test_link_tag_type_to_credential_over_limit() {
-        let result =
-            validate_create_link_tag(LinkTypes::TypeToCredential, vec![0u8; 513]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::TypeToCredential, vec![0u8; 513]).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 
@@ -1046,8 +1049,7 @@ mod tests {
 
     #[test]
     fn test_link_tag_empty_tag_valid() {
-        let result =
-            validate_create_link_tag(LinkTypes::AgentToCredential, vec![]).unwrap();
+        let result = validate_create_link_tag(LinkTypes::AgentToCredential, vec![]).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -1084,7 +1086,10 @@ mod tests {
         let result = validate_create_credential(valid_create_action(), cred).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
         if let ValidateCallbackResult::Invalid(msg) = result {
-            assert_eq!(msg, "Custom credential type label must be 128 characters or fewer");
+            assert_eq!(
+                msg,
+                "Custom credential type label must be 128 characters or fewer"
+            );
         }
     }
 
@@ -1201,7 +1206,10 @@ mod tests {
         let result = validate_update_credential(cred).unwrap();
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
         if let ValidateCallbackResult::Invalid(msg) = result {
-            assert_eq!(msg, "Custom credential type label must be 128 characters or fewer");
+            assert_eq!(
+                msg,
+                "Custom credential type label must be 128 characters or fewer"
+            );
         }
     }
 

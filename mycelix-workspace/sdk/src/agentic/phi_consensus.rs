@@ -19,10 +19,10 @@
 //! - **Coherence-Boosted Confidence**: Higher collective Phi = higher confidence
 //! - **Harmonic Weight**: trust × phi_contribution × epistemic_factors
 
-use super::multi_agent::{AgentVote, ConsensusConfig, ConsensusResult};
 use super::coherence_integration::{
     measure_collective_coherence, CollectiveCoherenceLevel, CollectiveCoherenceResult,
 };
+use super::multi_agent::{AgentVote, ConsensusConfig, ConsensusResult};
 use super::{AgentStatus, InstrumentalActor};
 use crate::matl::KVector;
 use serde::{Deserialize, Serialize};

@@ -6,8 +6,8 @@
 
 use hdi::prelude::*;
 use support_types::{
-    SupportCategory, TicketPriority, TicketStatus, AutonomyLevel,
-    ActionType as SupportActionType, EpistemicStatus,
+    ActionType as SupportActionType, AutonomyLevel, EpistemicStatus, SupportCategory,
+    TicketPriority, TicketStatus,
 };
 
 // ============================================================================
@@ -210,90 +210,88 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::ShardedTickets => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ShardedTickets link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::ShardedTickets => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ShardedTickets link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::AgentToTicket => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToTicket link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::StatusToTicket => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "StatusToTicket link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::CategoryToTicket => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "CategoryToTicket link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::TicketToComment => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "TicketToComment link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::TicketToAction => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "TicketToAction link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::ActionToUndo => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ActionToUndo link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToAlert => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToAlert link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::TicketToEscalations => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "TicketToEscalations link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::TicketToSurvey => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "TicketToSurvey link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::AgentToTicket => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToTicket link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::StatusToTicket => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "StatusToTicket link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CategoryToTicket => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CategoryToTicket link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TicketToComment => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TicketToComment link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TicketToAction => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TicketToAction link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ActionToUndo => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ActionToUndo link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToAlert => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToAlert link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TicketToEscalations => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TicketToEscalations link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::TicketToSurvey => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "TicketToSurvey link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -690,9 +688,12 @@ mod tests {
     #[test]
     fn serde_roundtrip_support_category() {
         let variants = vec![
-            SupportCategory::Network, SupportCategory::Hardware,
-            SupportCategory::Software, SupportCategory::Holochain,
-            SupportCategory::Mycelix, SupportCategory::Security,
+            SupportCategory::Network,
+            SupportCategory::Hardware,
+            SupportCategory::Software,
+            SupportCategory::Holochain,
+            SupportCategory::Mycelix,
+            SupportCategory::Security,
             SupportCategory::General,
         ];
         for v in &variants {
@@ -705,8 +706,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_ticket_priority() {
         let variants = vec![
-            TicketPriority::Low, TicketPriority::Medium,
-            TicketPriority::High, TicketPriority::Critical,
+            TicketPriority::Low,
+            TicketPriority::Medium,
+            TicketPriority::High,
+            TicketPriority::Critical,
         ];
         for v in &variants {
             let json = serde_json::to_string(v).unwrap();
@@ -718,8 +721,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_ticket_status() {
         let variants = vec![
-            TicketStatus::Open, TicketStatus::InProgress,
-            TicketStatus::AwaitingUser, TicketStatus::Resolved,
+            TicketStatus::Open,
+            TicketStatus::InProgress,
+            TicketStatus::AwaitingUser,
+            TicketStatus::Resolved,
             TicketStatus::Closed,
         ];
         for v in &variants {
@@ -732,7 +737,8 @@ mod tests {
     #[test]
     fn serde_roundtrip_autonomy_level() {
         let variants = vec![
-            AutonomyLevel::Advisory, AutonomyLevel::SemiAutonomous,
+            AutonomyLevel::Advisory,
+            AutonomyLevel::SemiAutonomous,
             AutonomyLevel::FullAutonomous,
         ];
         for v in &variants {
@@ -745,8 +751,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_action_type() {
         let variants = vec![
-            SupportActionType::RestartService, SupportActionType::ClearCache,
-            SupportActionType::UpdateConfig, SupportActionType::RunDiagnostic,
+            SupportActionType::RestartService,
+            SupportActionType::ClearCache,
+            SupportActionType::UpdateConfig,
+            SupportActionType::RunDiagnostic,
             SupportActionType::Custom("patch-apply".to_string()),
         ];
         for v in &variants {
@@ -759,8 +767,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_epistemic_status() {
         let variants = vec![
-            EpistemicStatus::Certain, EpistemicStatus::Probable,
-            EpistemicStatus::Uncertain, EpistemicStatus::Unknown,
+            EpistemicStatus::Certain,
+            EpistemicStatus::Probable,
+            EpistemicStatus::Uncertain,
+            EpistemicStatus::Unknown,
             EpistemicStatus::OutOfDomain,
         ];
         for v in &variants {
@@ -816,9 +826,12 @@ mod tests {
     #[test]
     fn ticket_all_categories_valid() {
         for cat in [
-            SupportCategory::Network, SupportCategory::Hardware,
-            SupportCategory::Software, SupportCategory::Holochain,
-            SupportCategory::Mycelix, SupportCategory::Security,
+            SupportCategory::Network,
+            SupportCategory::Hardware,
+            SupportCategory::Software,
+            SupportCategory::Holochain,
+            SupportCategory::Mycelix,
+            SupportCategory::Security,
             SupportCategory::General,
         ] {
             let mut t = valid_support_ticket();
@@ -830,8 +843,10 @@ mod tests {
     #[test]
     fn ticket_all_priorities_valid() {
         for pri in [
-            TicketPriority::Low, TicketPriority::Medium,
-            TicketPriority::High, TicketPriority::Critical,
+            TicketPriority::Low,
+            TicketPriority::Medium,
+            TicketPriority::High,
+            TicketPriority::Critical,
         ] {
             let mut t = valid_support_ticket();
             t.priority = pri;
@@ -842,8 +857,10 @@ mod tests {
     #[test]
     fn ticket_all_statuses_valid() {
         for status in [
-            TicketStatus::Open, TicketStatus::InProgress,
-            TicketStatus::AwaitingUser, TicketStatus::Resolved,
+            TicketStatus::Open,
+            TicketStatus::InProgress,
+            TicketStatus::AwaitingUser,
+            TicketStatus::Resolved,
             TicketStatus::Closed,
         ] {
             let mut t = valid_support_ticket();
@@ -855,7 +872,8 @@ mod tests {
     #[test]
     fn ticket_all_autonomy_levels_valid() {
         for level in [
-            AutonomyLevel::Advisory, AutonomyLevel::SemiAutonomous,
+            AutonomyLevel::Advisory,
+            AutonomyLevel::SemiAutonomous,
             AutonomyLevel::FullAutonomous,
         ] {
             let mut t = valid_support_ticket();
@@ -1002,9 +1020,10 @@ mod tests {
             LinkTypes::TicketToSurvey => "TicketToSurvey",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }
@@ -1111,8 +1130,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_escalation_level_all_variants() {
         let variants = vec![
-            EscalationLevel::Tier1, EscalationLevel::Tier2,
-            EscalationLevel::Management, EscalationLevel::Emergency,
+            EscalationLevel::Tier1,
+            EscalationLevel::Tier2,
+            EscalationLevel::Management,
+            EscalationLevel::Emergency,
         ];
         for v in &variants {
             let json = serde_json::to_string(v).unwrap();
@@ -1498,7 +1519,10 @@ mod tests {
     fn alert_predicted_failure_empty_rejected() {
         let mut a = valid_preemptive_alert();
         a.predicted_failure = String::new();
-        assert_invalid(validate_preemptive_alert(a), "predicted_failure cannot be empty");
+        assert_invalid(
+            validate_preemptive_alert(a),
+            "predicted_failure cannot be empty",
+        );
     }
 
     #[test]
@@ -1519,7 +1543,10 @@ mod tests {
     fn alert_recommended_action_empty_rejected() {
         let mut a = valid_preemptive_alert();
         a.recommended_action = String::new();
-        assert_invalid(validate_preemptive_alert(a), "recommended_action cannot be empty");
+        assert_invalid(
+            validate_preemptive_alert(a),
+            "recommended_action cannot be empty",
+        );
     }
 
     #[test]
@@ -1547,6 +1574,9 @@ mod tests {
     fn alert_expected_time_to_failure_over_limit_rejected() {
         let mut a = valid_preemptive_alert();
         a.expected_time_to_failure = Some("x".repeat(257));
-        assert_invalid(validate_preemptive_alert(a), "expected_time_to_failure too long");
+        assert_invalid(
+            validate_preemptive_alert(a),
+            "expected_time_to_failure too long",
+        );
     }
 }

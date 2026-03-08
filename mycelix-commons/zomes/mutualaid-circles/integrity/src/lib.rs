@@ -918,23 +918,38 @@ mod tests {
         // Test 0.0
         let mut circle = valid_credit_circle();
         circle.transaction_fee_percent = 0.0;
-        assert!(matches!(validate_credit_circle(circle.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credit_circle(circle.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Test 5.0 (mid-range)
         circle.transaction_fee_percent = 5.0;
-        assert!(matches!(validate_credit_circle(circle.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credit_circle(circle.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Test 9.9999
         circle.transaction_fee_percent = 9.9999;
-        assert!(matches!(validate_credit_circle(circle.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credit_circle(circle.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Test 10.0 (exactly at limit)
         circle.transaction_fee_percent = 10.0;
-        assert!(matches!(validate_credit_circle(circle.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credit_circle(circle.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Test 10.0001 (just over limit)
         circle.transaction_fee_percent = 10.0001;
-        assert!(matches!(validate_credit_circle(circle).unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            validate_credit_circle(circle).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     #[test]
@@ -944,23 +959,38 @@ mod tests {
 
         // Zero balance
         line.balance = 0;
-        assert!(matches!(validate_credit_line(line.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credit_line(line.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Positive balance
         line.balance = 500;
-        assert!(matches!(validate_credit_line(line.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credit_line(line.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Max positive
         line.balance = i64::MAX;
-        assert!(matches!(validate_credit_line(line.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credit_line(line.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // At limit (negative)
         line.balance = -1000;
-        assert!(matches!(validate_credit_line(line.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credit_line(line.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Just over limit
         line.balance = -1001;
-        assert!(matches!(validate_credit_line(line).unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            validate_credit_line(line).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     #[test]
@@ -969,19 +999,31 @@ mod tests {
 
         // Exactly zero
         balance.credit_available = 0;
-        assert!(matches!(validate_balance(balance.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_balance(balance.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Small positive
         balance.credit_available = 1;
-        assert!(matches!(validate_balance(balance.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_balance(balance.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Large positive
         balance.credit_available = 1_000_000_000;
-        assert!(matches!(validate_balance(balance.clone()).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_balance(balance.clone()).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
 
         // Small negative
         balance.credit_available = -1;
-        assert!(matches!(validate_balance(balance).unwrap(), ValidateCallbackResult::Invalid(_)));
+        assert!(matches!(
+            validate_balance(balance).unwrap(),
+            ValidateCallbackResult::Invalid(_)
+        ));
     }
 
     // =============================================================================

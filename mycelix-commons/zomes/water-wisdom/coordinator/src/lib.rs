@@ -2,13 +2,16 @@
 //! Business logic for traditional water knowledge, conservation, and climate patterns
 
 use hdk::prelude::*;
-use water_wisdom_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use water_wisdom_integrity::*;
 
-fn require_consciousness(requirement: &GovernanceRequirement, action_name: &str) -> ExternResult<GovernanceEligibility> {
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
     gate_consciousness("commons_bridge", requirement, action_name)
 }
 
@@ -294,7 +297,10 @@ pub struct UpdateTraditionalPracticeInput {
 #[hdk_extern]
 pub fn update_practice(input: UpdateTraditionalPracticeInput) -> ExternResult<ActionHash> {
     require_consciousness(&requirement_for_proposal(), "update_practice")?;
-    update_entry(input.original_action_hash, &EntryTypes::TraditionalPractice(input.updated_entry))
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::TraditionalPractice(input.updated_entry),
+    )
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -305,9 +311,14 @@ pub struct UpdateConservationMethodInput {
 
 /// Update a conservation method
 #[hdk_extern]
-pub fn update_conservation_method(input: UpdateConservationMethodInput) -> ExternResult<ActionHash> {
+pub fn update_conservation_method(
+    input: UpdateConservationMethodInput,
+) -> ExternResult<ActionHash> {
     require_consciousness(&requirement_for_proposal(), "update_conservation_method")?;
-    update_entry(input.original_action_hash, &EntryTypes::ConservationMethod(input.updated_entry))
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::ConservationMethod(input.updated_entry),
+    )
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -320,7 +331,10 @@ pub struct UpdateClimateWaterPatternInput {
 #[hdk_extern]
 pub fn update_climate_pattern(input: UpdateClimateWaterPatternInput) -> ExternResult<ActionHash> {
     require_consciousness(&requirement_for_proposal(), "update_climate_pattern")?;
-    update_entry(input.original_action_hash, &EntryTypes::ClimateWaterPattern(input.updated_entry))
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::ClimateWaterPattern(input.updated_entry),
+    )
 }
 
 // ============================================================================
@@ -588,7 +602,9 @@ mod tests {
         assert_eq!(back.season, "Summer");
         assert_eq!(back.pattern_type, PatternType::Drought);
         assert_eq!(back.indicators.len(), 3);
-        assert!(back.indicators.contains(&"Increased wildfire risk".to_string()));
+        assert!(back
+            .indicators
+            .contains(&"Increased wildfire risk".to_string()));
     }
 
     #[test]
@@ -628,7 +644,8 @@ mod tests {
         let practice = TraditionalPractice {
             id: "tp-unicode".to_string(),
             title: "\u{0642}\u{0646}\u{0627}\u{0629}".to_string(),
-            description: "\u{53e4}\u{4ee3}\u{306e}\u{6c34}\u{7ba1}\u{7406}\u{6280}\u{8853}".to_string(),
+            description: "\u{53e4}\u{4ee3}\u{306e}\u{6c34}\u{7ba1}\u{7406}\u{6280}\u{8853}"
+                .to_string(),
             practice_type: PracticeType::Irrigation,
             region: "\u{4e2d}\u{4e1c}".to_string(),
             culture_or_community: "\u{0641}\u{0627}\u{0631}\u{0633}\u{06cc}".to_string(),
@@ -684,7 +701,9 @@ mod tests {
             description: "Unprecedented low water levels across tributaries".to_string(),
             observed_by: AgentPubKey::from_raw_36(vec![0xab; 36]),
             observed_at: Timestamp::from_micros(1_800_000_000),
-            indicators: (0..20).map(|i| format!("Indicator {}: measurement data", i)).collect(),
+            indicators: (0..20)
+                .map(|i| format!("Indicator {}: measurement data", i))
+                .collect(),
         };
         let json = serde_json::to_string(&pattern).unwrap();
         let back: ClimateWaterPattern = serde_json::from_str(&json).unwrap();
@@ -790,7 +809,10 @@ mod tests {
                 effectiveness_rating: Some(9),
             },
         };
-        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            input.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(input.updated_entry.title, "Updated Qanat System");
         assert_eq!(input.updated_entry.effectiveness_rating, Some(9));
     }
@@ -858,7 +880,10 @@ mod tests {
                 difficulty: DifficultyLevel::Intermediate,
             },
         };
-        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            input.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(input.updated_entry.title, "Updated Drip Irrigation");
         assert_eq!(input.updated_entry.water_saved_percent, Some(70));
     }
@@ -922,7 +947,10 @@ mod tests {
                 indicators: vec!["Reduced streamflow".to_string(), "Low aquifer".to_string()],
             },
         };
-        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            input.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(input.updated_entry.region, "Southwest US");
         assert_eq!(input.updated_entry.indicators.len(), 2);
     }

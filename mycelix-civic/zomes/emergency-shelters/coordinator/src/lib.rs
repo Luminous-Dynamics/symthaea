@@ -1,11 +1,11 @@
 //! Shelters Coordinator Zome
 //! Shelter registration, occupancy tracking, and person check-in/out
 
-use hdk::prelude::*;
 use emergency_shelters_integrity::*;
+use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 /// Helper to get an anchor entry hash
@@ -492,9 +492,7 @@ pub fn haversine_distance_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 
     let dlat = (lat2 - lat1).to_radians();
     let dlon = (lon2 - lon1).to_radians();
     let a = (dlat / 2.0).sin().powi(2)
-        + lat1.to_radians().cos()
-            * lat2.to_radians().cos()
-            * (dlon / 2.0).sin().powi(2);
+        + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
     let c = 2.0 * a.sqrt().asin();
     6371.0 * c
 }
@@ -576,11 +574,7 @@ mod tests {
         // Two points about 1 km apart in Richardson, TX
         // (32.9483, -96.7299) to (32.9573, -96.7299) -- ~1 km north
         let d = haversine_distance_km(32.9483, -96.7299, 32.9573, -96.7299);
-        assert!(
-            (d - 1.0).abs() < 0.1,
-            "Expected ~1 km, got {} km",
-            d
-        );
+        assert!((d - 1.0).abs() < 0.1, "Expected ~1 km, got {} km", d);
     }
 
     // ========================================================================
@@ -958,7 +952,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).expect("serialize");
         let parsed: UpdateShelterInput = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(parsed.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            parsed.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(parsed.updated_entry.name, "Updated Community Center");
         assert_eq!(parsed.updated_entry.capacity, 300);
         assert_eq!(parsed.updated_entry.amenities.len(), 3);
@@ -1008,7 +1005,10 @@ mod tests {
         let json = serde_json::to_string(&input).expect("serialize");
         let parsed: UpdateShelterInput = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(parsed.updated_entry.status, ShelterStatus::Full);
-        assert_eq!(parsed.updated_entry.current_occupancy, parsed.updated_entry.capacity);
+        assert_eq!(
+            parsed.updated_entry.current_occupancy,
+            parsed.updated_entry.capacity
+        );
     }
 
     #[test]

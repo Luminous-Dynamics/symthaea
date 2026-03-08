@@ -105,38 +105,33 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::Publication(publication) => {
-                        validate_create_publication(EntryCreationAction::Create(action), publication)
-                    }
-                    EntryTypes::ContentBlock(block) => {
-                        validate_create_content_block(EntryCreationAction::Create(action), block)
-                    }
-                    EntryTypes::PublicationVersion(version) => {
-                        validate_create_publication_version(EntryCreationAction::Create(action), version)
-                    }
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::Publication(publication) => {
+                    validate_create_publication(EntryCreationAction::Create(action), publication)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::Publication(publication) => {
-                        validate_update_publication(action, publication)
-                    }
-                    EntryTypes::ContentBlock(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Content blocks cannot be updated".into(),
-                        ))
-                    }
-                    EntryTypes::PublicationVersion(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Publication versions cannot be updated".into(),
-                        ))
-                    }
+                EntryTypes::ContentBlock(block) => {
+                    validate_create_content_block(EntryCreationAction::Create(action), block)
                 }
-            }
+                EntryTypes::PublicationVersion(version) => validate_create_publication_version(
+                    EntryCreationAction::Create(action),
+                    version,
+                ),
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::Publication(publication) => {
+                    validate_update_publication(action, publication)
+                }
+                EntryTypes::ContentBlock(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Content blocks cannot be updated".into(),
+                )),
+                EntryTypes::PublicationVersion(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Publication versions cannot be updated".into(),
+                )),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink {
@@ -197,51 +192,75 @@ fn validate_create_publication(
     publication: Publication,
 ) -> ExternResult<ValidateCallbackResult> {
     if !publication.author_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Author must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Author must be a valid DID".into(),
+        ));
     }
     if publication.title.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Title cannot be empty".into(),
+        ));
     }
     if publication.content_hash.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Content hash required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content hash required".into(),
+        ));
     }
 
     // String length limits
     if publication.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Publication ID too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication ID too long (max 256)".into(),
+        ));
     }
     if publication.title.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Publication title too long (max 512)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication title too long (max 512)".into(),
+        ));
     }
     if publication.content_hash.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Content hash too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content hash too long (max 256)".into(),
+        ));
     }
     if publication.author_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Author DID too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Author DID too long (max 256)".into(),
+        ));
     }
     if publication.language.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Language too long (max 128)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Language too long (max 128)".into(),
+        ));
     }
 
     // Vec length limits
     if publication.co_authors.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Too many co-authors (max 50)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many co-authors (max 50)".into(),
+        ));
     }
     if publication.tags.len() > 100 {
-        return Ok(ValidateCallbackResult::Invalid("Too many tags (max 100)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many tags (max 100)".into(),
+        ));
     }
 
     // Validate co-author DIDs
     for co_author in &publication.co_authors {
         if co_author.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Co-author DID too long (max 256)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Co-author DID too long (max 256)".into(),
+            ));
         }
     }
 
     // Validate tag lengths
     for tag in &publication.tags {
         if tag.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Tag too long (max 256)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Tag too long (max 256)".into(),
+            ));
         }
     }
 
@@ -253,45 +272,65 @@ fn validate_update_publication(
     publication: Publication,
 ) -> ExternResult<ValidateCallbackResult> {
     if publication.title.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Title cannot be empty".into(),
+        ));
     }
 
     // String length limits
     if publication.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Publication ID too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication ID too long (max 256)".into(),
+        ));
     }
     if publication.title.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Publication title too long (max 512)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication title too long (max 512)".into(),
+        ));
     }
     if publication.content_hash.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Content hash too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content hash too long (max 256)".into(),
+        ));
     }
     if publication.author_did.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Author DID too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Author DID too long (max 256)".into(),
+        ));
     }
     if publication.language.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Language too long (max 128)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Language too long (max 128)".into(),
+        ));
     }
 
     // Vec length limits
     if publication.co_authors.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Too many co-authors (max 50)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many co-authors (max 50)".into(),
+        ));
     }
     if publication.tags.len() > 100 {
-        return Ok(ValidateCallbackResult::Invalid("Too many tags (max 100)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Too many tags (max 100)".into(),
+        ));
     }
 
     // Validate co-author DIDs
     for co_author in &publication.co_authors {
         if co_author.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Co-author DID too long (max 256)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Co-author DID too long (max 256)".into(),
+            ));
         }
     }
 
     // Validate tag lengths
     for tag in &publication.tags {
         if tag.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Tag too long (max 256)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Tag too long (max 256)".into(),
+            ));
         }
     }
 
@@ -303,22 +342,32 @@ fn validate_create_content_block(
     block: ContentBlock,
 ) -> ExternResult<ValidateCallbackResult> {
     if block.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Content block publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content block publication_id cannot be empty".into(),
+        ));
     }
     if block.content.trim().is_empty() && block.encrypted_content.is_none() {
-        return Ok(ValidateCallbackResult::Invalid("Content block must have content or encrypted_content".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content block must have content or encrypted_content".into(),
+        ));
     }
 
     // String length limits
     if block.publication_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Content block publication_id too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content block publication_id too long (max 256)".into(),
+        ));
     }
     if block.content.len() > 1_048_576 {
-        return Ok(ValidateCallbackResult::Invalid("Content block content too long (max 1048576)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content block content too long (max 1048576)".into(),
+        ));
     }
     if let Some(ref encrypted) = block.encrypted_content {
         if encrypted.len() > 1_048_576 {
-            return Ok(ValidateCallbackResult::Invalid("Content block encrypted_content too long (max 1048576)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Content block encrypted_content too long (max 1048576)".into(),
+            ));
         }
     }
 
@@ -330,24 +379,36 @@ fn validate_create_publication_version(
     version: PublicationVersion,
 ) -> ExternResult<ValidateCallbackResult> {
     if version.publication_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Publication version publication_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication version publication_id cannot be empty".into(),
+        ));
     }
     if version.content_hash.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Publication version content_hash cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication version content_hash cannot be empty".into(),
+        ));
     }
     if version.version == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Publication version number must be at least 1".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication version number must be at least 1".into(),
+        ));
     }
 
     // String length limits
     if version.publication_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Publication version publication_id too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication version publication_id too long (max 256)".into(),
+        ));
     }
     if version.content_hash.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Publication version content_hash too long (max 256)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication version content_hash too long (max 256)".into(),
+        ));
     }
     if version.change_summary.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Publication version change_summary too long (max 4096)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Publication version change_summary too long (max 4096)".into(),
+        ));
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -961,7 +1022,11 @@ mod tests {
                 )),
                 pub_data,
             );
-            assert!(is_valid(result), "Failed for content_type: {:?}", content_type);
+            assert!(
+                is_valid(result),
+                "Failed for content_type: {:?}",
+                content_type
+            );
         }
     }
 
@@ -988,7 +1053,11 @@ mod tests {
                 )),
                 pub_data,
             );
-            assert!(is_valid(result), "Failed for license_type: {:?}", license_type);
+            assert!(
+                is_valid(result),
+                "Failed for license_type: {:?}",
+                license_type
+            );
         }
     }
 

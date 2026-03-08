@@ -2,8 +2,8 @@
 use hdk::prelude::*;
 use media_attribution_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 /// Helper function to create an anchor entry and return its hash
@@ -19,7 +19,6 @@ fn require_consciousness(
 ) -> ExternResult<GovernanceEligibility> {
     gate_consciousness("civic_bridge", requirement, action_name)
 }
-
 
 fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
     let Some(details) = get_details(action_hash, GetOptions::default())? else {
@@ -44,7 +43,12 @@ pub fn add_attribution(input: AddAttributionInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "add_attribution")?;
     let now = sys_time()?;
     let attribution = Attribution {
-        id: format!("attr:{}:{}:{}", input.publication_id, input.contributor_did, now.as_micros()),
+        id: format!(
+            "attr:{}:{}:{}",
+            input.publication_id,
+            input.contributor_did,
+            now.as_micros()
+        ),
         publication_id: input.publication_id.clone(),
         contributor_did: input.contributor_did.clone(),
         role: input.role,
@@ -54,8 +58,18 @@ pub fn add_attribution(input: AddAttributionInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Attribution(attribution))?;
-    create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToAttributions, ())?;
-    create_link(anchor_hash(&input.contributor_did)?, action_hash.clone(), LinkTypes::ContributorToAttributions, ())?;
+    create_link(
+        anchor_hash(&input.publication_id)?,
+        action_hash.clone(),
+        LinkTypes::PublicationToAttributions,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&input.contributor_did)?,
+        action_hash.clone(),
+        LinkTypes::ContributorToAttributions,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -72,7 +86,12 @@ pub fn set_royalty_rule(input: SetRoyaltyInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_basic(), "set_royalty_rule")?;
     let now = sys_time()?;
     let rule = RoyaltyRule {
-        id: format!("royalty:{}:{:?}:{}", input.publication_id, input.rule_type, now.as_micros()),
+        id: format!(
+            "royalty:{}:{:?}:{}",
+            input.publication_id,
+            input.rule_type,
+            now.as_micros()
+        ),
         publication_id: input.publication_id.clone(),
         rule_type: input.rule_type,
         percentage: input.percentage,
@@ -82,7 +101,12 @@ pub fn set_royalty_rule(input: SetRoyaltyInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::RoyaltyRule(rule))?;
-    create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToRoyalties, ())?;
+    create_link(
+        anchor_hash(&input.publication_id)?,
+        action_hash.clone(),
+        LinkTypes::PublicationToRoyalties,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -109,7 +133,12 @@ pub fn record_usage(input: RecordUsageInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::UsageRecord(usage))?;
-    create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToUsage, ())?;
+    create_link(
+        anchor_hash(&input.publication_id)?,
+        action_hash.clone(),
+        LinkTypes::PublicationToUsage,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -124,9 +153,19 @@ pub struct RecordUsageInput {
 #[hdk_extern]
 pub fn get_publication_attributions(publication_id: String) -> ExternResult<Vec<Record>> {
     let mut attributions = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToAttributions as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(
+            0.into(),
+            (LinkTypes::PublicationToAttributions as u8).into(),
+        ),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             attributions.push(record);
         }
     }
@@ -136,9 +175,19 @@ pub fn get_publication_attributions(publication_id: String) -> ExternResult<Vec<
 #[hdk_extern]
 pub fn get_contributor_works(did: String) -> ExternResult<Vec<Record>> {
     let mut works = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&did)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::ContributorToAttributions as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&did)?,
+        LinkTypeFilter::single_type(
+            0.into(),
+            (LinkTypes::ContributorToAttributions as u8).into(),
+        ),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             works.push(record);
         }
     }
@@ -149,7 +198,9 @@ pub fn get_contributor_works(did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_attribution(attribution_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Attribution)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Attribution,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -167,7 +218,9 @@ pub fn get_attribution(attribution_id: String) -> ExternResult<Option<Record>> {
 pub fn verify_attribution(input: VerifyAttributionInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "verify_attribution")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Attribution)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Attribution,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -175,19 +228,27 @@ pub fn verify_attribution(input: VerifyAttributionInput) -> ExternResult<Record>
             if attr.id == input.attribution_id {
                 // Only contributor can verify
                 if attr.contributor_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only contributor can verify attribution".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only contributor can verify attribution".into()
+                    )));
                 }
 
                 let verified = Attribution {
                     verified: true,
                     ..attr
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Attribution(verified))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Attribution(verified),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Attribution not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Attribution not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -201,7 +262,9 @@ pub struct VerifyAttributionInput {
 pub fn update_share_percentage(input: UpdateShareInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "update_share_percentage")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Attribution)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Attribution,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -211,12 +274,18 @@ pub fn update_share_percentage(input: UpdateShareInput) -> ExternResult<Record> 
                     share_percentage: input.new_share_percentage,
                     ..attr
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Attribution(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Attribution(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Attribution not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Attribution not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -263,9 +332,16 @@ pub struct UpdateRoyaltyRuleInput {
 #[hdk_extern]
 pub fn get_publication_royalties(publication_id: String) -> ExternResult<Vec<Record>> {
     let mut royalties = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToRoyalties as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToRoyalties as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             royalties.push(record);
         }
     }
@@ -276,9 +352,16 @@ pub fn get_publication_royalties(publication_id: String) -> ExternResult<Vec<Rec
 #[hdk_extern]
 pub fn get_publication_usage(publication_id: String) -> ExternResult<Vec<Record>> {
     let mut usage = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToUsage as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToUsage as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             usage.push(record);
         }
     }
@@ -290,7 +373,9 @@ pub fn get_publication_usage(publication_id: String) -> ExternResult<Vec<Record>
 pub fn deactivate_royalty_rule(input: DeactivateRoyaltyInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "deactivate_royalty_rule")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::RoyaltyRule)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::RoyaltyRule,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -300,12 +385,18 @@ pub fn deactivate_royalty_rule(input: DeactivateRoyaltyInput) -> ExternResult<Re
                     active: false,
                     ..rule
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::RoyaltyRule(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::RoyaltyRule(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Royalty rule not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Royalty rule not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -317,7 +408,9 @@ pub struct DeactivateRoyaltyInput {
 #[hdk_extern]
 pub fn get_contributor_earnings(did: String) -> ExternResult<ContributorEarnings> {
     let attribution_filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Attribution)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Attribution,
+        )?))
         .include_entries(true);
 
     let mut publication_ids = Vec::new();
@@ -334,7 +427,9 @@ pub fn get_contributor_earnings(did: String) -> ExternResult<ContributorEarnings
 
     // Calculate total royalties earned
     let usage_filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::UsageRecord)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::UsageRecord,
+        )?))
         .include_entries(true);
 
     let mut total_royalties = 0.0;
@@ -351,7 +446,11 @@ pub fn get_contributor_earnings(did: String) -> ExternResult<ContributorEarnings
     Ok(ContributorEarnings {
         contributor_did: did,
         publication_count: publication_ids.len() as u32,
-        average_share_percentage: if publication_ids.is_empty() { 0.0 } else { total_share / publication_ids.len() as f64 },
+        average_share_percentage: if publication_ids.is_empty() {
+            0.0
+        } else {
+            total_share / publication_ids.len() as f64
+        },
         total_royalties_earned: total_royalties,
     })
 }
@@ -368,7 +467,9 @@ pub struct ContributorEarnings {
 #[hdk_extern]
 pub fn get_attributions_by_role(role: ContributorRole) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Attribution)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Attribution,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
@@ -386,7 +487,9 @@ pub fn get_attributions_by_role(role: ContributorRole) -> ExternResult<Vec<Recor
 #[hdk_extern]
 pub fn get_publication_shares(publication_id: String) -> ExternResult<PublicationShares> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Attribution)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Attribution,
+        )?))
         .include_entries(true);
 
     let mut total_percentage = 0.0;
@@ -468,7 +571,9 @@ pub fn compute_average_share(shares: &[f64]) -> f64 {
 pub fn remove_attribution(input: RemoveAttributionInput) -> ExternResult<()> {
     require_consciousness(&requirement_for_proposal(), "remove_attribution")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Attribution)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Attribution,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -479,7 +584,9 @@ pub fn remove_attribution(input: RemoveAttributionInput) -> ExternResult<()> {
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Attribution not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Attribution not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -528,7 +635,9 @@ pub struct EvidenceDisputeCheckResult {
 /// has open disputes. A publication citing disputed evidence should
 /// carry a credibility warning.
 #[hdk_extern]
-pub fn check_evidence_disputes_for_publication(input: CheckEvidenceDisputesInput) -> ExternResult<EvidenceDisputeCheckResult> {
+pub fn check_evidence_disputes_for_publication(
+    input: CheckEvidenceDisputesInput,
+) -> ExternResult<EvidenceDisputeCheckResult> {
     let response = call(
         CallTargetCell::Local,
         ZomeName::from("justice_evidence"),
@@ -539,8 +648,9 @@ pub fn check_evidence_disputes_for_publication(input: CheckEvidenceDisputesInput
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
 
             let total = records.len() as u32;
             let mut unresolved = 0u32;
@@ -889,7 +999,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: UpdateAttributionInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            decoded.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(decoded.updated_entry.share_percentage, 60.0);
         assert!(decoded.updated_entry.verified);
     }
@@ -929,7 +1042,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: UpdateAttributionInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.updated_entry.role, ContributorRole::Other("sound-designer".into()));
+        assert_eq!(
+            decoded.updated_entry.role,
+            ContributorRole::Other("sound-designer".into())
+        );
     }
 
     #[test]
@@ -948,7 +1064,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: UpdateRoyaltyRuleInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xcd; 36]));
+        assert_eq!(
+            decoded.original_action_hash,
+            ActionHash::from_raw_36(vec![0xcd; 36])
+        );
         assert_eq!(decoded.updated_entry.rule_type, RoyaltyType::PerDownload);
         assert_eq!(decoded.updated_entry.percentage, 15.0);
         assert_eq!(decoded.updated_entry.minimum_amount, Some(0.05));

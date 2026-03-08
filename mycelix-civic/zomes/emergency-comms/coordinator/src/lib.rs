@@ -4,8 +4,8 @@
 use emergency_comms_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 /// Helper to get an anchor entry hash
@@ -781,7 +781,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: UpdateMessageInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            decoded.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(decoded.updated_entry.priority, MessagePriority::Flash);
         assert_eq!(decoded.updated_entry.content, "Updated evacuation notice");
     }
@@ -825,7 +828,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: UpdateChannelInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xcd; 36]));
+        assert_eq!(
+            decoded.original_action_hash,
+            ActionHash::from_raw_36(vec![0xcd; 36])
+        );
         assert_eq!(decoded.updated_entry.name, "Renamed Channel");
         assert_eq!(decoded.updated_entry.participants.len(), 3);
     }
@@ -861,9 +867,18 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: UpdateBroadcastInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xef; 36]));
-        assert_eq!(decoded.updated_entry.broadcast_type, BroadcastType::AllClear);
-        assert_eq!(decoded.updated_entry.content, "All clear - danger has passed");
+        assert_eq!(
+            decoded.original_action_hash,
+            ActionHash::from_raw_36(vec![0xef; 36])
+        );
+        assert_eq!(
+            decoded.updated_entry.broadcast_type,
+            BroadcastType::AllClear
+        );
+        assert_eq!(
+            decoded.updated_entry.content,
+            "All clear - danger has passed"
+        );
     }
 
     #[test]

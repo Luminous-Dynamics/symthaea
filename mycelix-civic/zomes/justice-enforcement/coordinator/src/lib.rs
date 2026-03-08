@@ -6,8 +6,8 @@
 use hdk::prelude::*;
 use justice_enforcement_integrity::*;
 use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_constitutional, requirement_for_voting,
     GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_voting, requirement_for_constitutional,
 };
 
 fn require_consciousness(
@@ -57,8 +57,9 @@ fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
 pub fn create_enforcement(enforcement: Enforcement) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "create_enforcement")?;
     let action_hash = create_entry(&EntryTypes::Enforcement(enforcement.clone()))?;
-    let record = get_latest_record(action_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created enforcement".into())))?;
+    let record = get_latest_record(action_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not get created enforcement".into())
+    ))?;
 
     // Link from decision
     let decision_path = Path::from(format!("decisions/{}/enforcement", enforcement.decision_id));
@@ -86,8 +87,11 @@ pub fn create_enforcement(enforcement: Enforcement) -> ExternResult<Record> {
 pub fn get_decision_enforcement(decision_id: String) -> ExternResult<Vec<Record>> {
     let decision_path = Path::from(format!("decisions/{}/enforcement", decision_id));
     let links = get_links(
-        LinkQuery::try_new(decision_path.path_entry_hash()?, LinkTypes::DecisionToEnforcement)?,
-        GetStrategy::default()
+        LinkQuery::try_new(
+            decision_path.path_entry_hash()?,
+            LinkTypes::DecisionToEnforcement,
+        )?,
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -106,20 +110,25 @@ pub fn get_decision_enforcement(decision_id: String) -> ExternResult<Vec<Record>
 #[hdk_extern]
 pub fn record_action(input: RecordActionInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "record_action")?;
-    let record = get(input.enforcement_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Enforcement not found".into())))?;
+    let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Enforcement not found".into())
+    ))?;
 
-    let mut enforcement: Enforcement = record.entry()
+    let mut enforcement: Enforcement = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid enforcement entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid enforcement entry".into()
+        )))?;
 
     enforcement.actions.push(input.action);
 
     let action_hash = update_entry(input.enforcement_hash, &enforcement)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated enforcement".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -131,14 +140,19 @@ pub struct RecordActionInput {
 /// Update enforcement status
 #[hdk_extern]
 pub fn update_enforcement_status(input: UpdateEnforcementStatusInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_voting(), "update_enforcement_status")?;
-    let record = get(input.enforcement_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Enforcement not found".into())))?;
+    let _eligibility =
+        require_consciousness(&requirement_for_voting(), "update_enforcement_status")?;
+    let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Enforcement not found".into())
+    ))?;
 
-    let mut enforcement: Enforcement = record.entry()
+    let mut enforcement: Enforcement = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid enforcement entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid enforcement entry".into()
+        )))?;
 
     let old_status = enforcement.status.clone();
     enforcement.status = input.new_status.clone();
@@ -154,7 +168,7 @@ pub fn update_enforcement_status(input: UpdateEnforcementStatusInput) -> ExternR
     let old_status_path = Path::from(format!("enforcement/status/{:?}", old_status));
     let old_links = get_links(
         LinkQuery::try_new(old_status_path.path_entry_hash()?, LinkTypes::AllCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
     for link in old_links {
         if link.target == input.enforcement_hash.clone().into() {
@@ -170,8 +184,9 @@ pub fn update_enforcement_status(input: UpdateEnforcementStatusInput) -> ExternR
         (),
     )?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated enforcement".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -184,13 +199,17 @@ pub struct UpdateEnforcementStatusInput {
 #[hdk_extern]
 pub fn complete_enforcement(input: CompleteEnforcementInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "complete_enforcement")?;
-    let record = get(input.enforcement_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Enforcement not found".into())))?;
+    let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Enforcement not found".into())
+    ))?;
 
-    let mut enforcement: Enforcement = record.entry()
+    let mut enforcement: Enforcement = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid enforcement entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid enforcement entry".into()
+        )))?;
 
     enforcement.status = EnforcementStatus::Completed;
     enforcement.completed_at = Some(sys_time()?);
@@ -202,8 +221,9 @@ pub fn complete_enforcement(input: CompleteEnforcementInput) -> ExternResult<Rec
 
     let action_hash = update_entry(input.enforcement_hash, &enforcement)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated enforcement".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -216,13 +236,17 @@ pub struct CompleteEnforcementInput {
 #[hdk_extern]
 pub fn mark_enforcement_failed(input: FailedEnforcementInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "mark_enforcement_failed")?;
-    let record = get(input.enforcement_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Enforcement not found".into())))?;
+    let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Enforcement not found".into())
+    ))?;
 
-    let mut enforcement: Enforcement = record.entry()
+    let mut enforcement: Enforcement = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid enforcement entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid enforcement entry".into()
+        )))?;
 
     enforcement.status = EnforcementStatus::Failed;
 
@@ -238,8 +262,9 @@ pub fn mark_enforcement_failed(input: FailedEnforcementInput) -> ExternResult<Re
 
     let action_hash = update_entry(input.enforcement_hash, &enforcement)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated enforcement".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -254,7 +279,7 @@ pub fn get_pending_enforcements(_: ()) -> ExternResult<Vec<Record>> {
     let pending_path = Path::from("enforcement/status/Pending");
     let links = get_links(
         LinkQuery::try_new(pending_path.path_entry_hash()?, LinkTypes::AllCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -270,7 +295,7 @@ pub fn get_pending_enforcements(_: ()) -> ExternResult<Vec<Record>> {
     let in_progress_path = Path::from("enforcement/status/InProgress");
     let ip_links = get_links(
         LinkQuery::try_new(in_progress_path.path_entry_hash()?, LinkTypes::AllCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     for link in ip_links {
@@ -290,7 +315,7 @@ pub fn get_enforcements_by_status(status: EnforcementStatus) -> ExternResult<Vec
     let status_path = Path::from(format!("enforcement/status/{:?}", status));
     let links = get_links(
         LinkQuery::try_new(status_path.path_entry_hash()?, LinkTypes::AllCases)?,
-        GetStrategy::default()
+        GetStrategy::default(),
     )?;
 
     let mut records = Vec::new();
@@ -308,14 +333,21 @@ pub fn get_enforcements_by_status(status: EnforcementStatus) -> ExternResult<Vec
 /// Execute cross-hApp enforcement action
 #[hdk_extern]
 pub fn execute_cross_happ_action(input: CrossHappActionInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_constitutional(), "execute_cross_happ_action")?;
-    let record = get(input.enforcement_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Enforcement not found".into())))?;
+    let _eligibility = require_consciousness(
+        &requirement_for_constitutional(),
+        "execute_cross_happ_action",
+    )?;
+    let record = get(input.enforcement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Enforcement not found".into())
+    ))?;
 
-    let mut enforcement: Enforcement = record.entry()
+    let mut enforcement: Enforcement = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid enforcement entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid enforcement entry".into()
+        )))?;
 
     // Record the cross-hApp action
     let action = EnforcementAction {
@@ -329,8 +361,9 @@ pub fn execute_cross_happ_action(input: CrossHappActionInput) -> ExternResult<Re
 
     let action_hash = update_entry(input.enforcement_hash, &enforcement)?;
 
-    get_latest_record(action_hash)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get updated enforcement".into())))
+    get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not get updated enforcement".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -350,7 +383,9 @@ pub struct CrossHappActionInput {
 /// Cross-domain call: justice-enforcement → justice-cases via CallTargetCell::Local.
 /// Ensures enforcement actions are only created for real, decided cases.
 #[hdk_extern]
-pub fn verify_case_for_enforcement(input: VerifyCaseForEnforcementInput) -> ExternResult<CaseVerificationResult> {
+pub fn verify_case_for_enforcement(
+    input: VerifyCaseForEnforcementInput,
+) -> ExternResult<CaseVerificationResult> {
     // Call justice_cases to get all cases and find the matching one
     let response = call(
         CallTargetCell::Local,
@@ -361,17 +396,19 @@ pub fn verify_case_for_enforcement(input: VerifyCaseForEnforcementInput) -> Exte
     );
 
     let cases: Vec<Record> = match &response {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?
-        }
+        Ok(ZomeCallResponse::Ok(extern_io)) => extern_io
+            .decode()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?,
         Ok(other) => {
             return Ok(CaseVerificationResult {
                 case_found: false,
                 case_id: None,
                 phase: None,
                 status: None,
-                error: Some(format!("Unexpected response from justice_cases: {:?}", other)),
+                error: Some(format!(
+                    "Unexpected response from justice_cases: {:?}",
+                    other
+                )),
             });
         }
         Err(e) => {
@@ -391,15 +428,18 @@ pub fn verify_case_for_enforcement(input: VerifyCaseForEnforcementInput) -> Exte
     for record in &cases {
         if let Some(entry) = record.entry().as_option() {
             // Try to decode as a generic JSON to extract case_id
-            let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone())
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e))))?;
+            let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone()).map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
+            })?;
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
                 if let Some(id) = value.get("case_id").and_then(|v| v.as_str()) {
                     if id == input.case_id {
-                        let phase = value.get("phase")
+                        let phase = value
+                            .get("phase")
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());
-                        let status = value.get("status")
+                        let status = value
+                            .get("status")
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string());
 
@@ -421,7 +461,10 @@ pub fn verify_case_for_enforcement(input: VerifyCaseForEnforcementInput) -> Exte
         case_id: None,
         phase: None,
         status: None,
-        error: Some(format!("Case '{}' not found in justice system", input.case_id)),
+        error: Some(format!(
+            "Case '{}' not found in justice system",
+            input.case_id
+        )),
     })
 }
 
@@ -524,7 +567,10 @@ mod tests {
         let input2: RecordActionInput = serde_json::from_str(&json).unwrap();
         assert_eq!(input2.enforcement_hash, fake_action_hash());
         assert_eq!(input2.action.result, "Notification sent successfully");
-        assert_eq!(input2.action.target_happ.as_deref(), Some("mycelix-commons"));
+        assert_eq!(
+            input2.action.target_happ.as_deref(),
+            Some("mycelix-commons")
+        );
     }
 
     #[test]
@@ -580,7 +626,11 @@ mod tests {
             assert_eq!(input2.enforcement_hash, fake_action_hash());
             // Verify the JSON contains the status name
             let json_val: serde_json::Value = serde_json::from_str(&json).unwrap();
-            assert!(json_val.get("new_status").is_some(), "Missing new_status for {:?}", status);
+            assert!(
+                json_val.get("new_status").is_some(),
+                "Missing new_status for {:?}",
+                status
+            );
         }
     }
 
@@ -598,7 +648,10 @@ mod tests {
         let input2: CompleteEnforcementInput = serde_json::from_str(&json).unwrap();
         assert_eq!(input2.enforcement_hash, fake_action_hash());
         assert!(input2.final_action.is_some());
-        assert_eq!(input2.final_action.unwrap().result, "Notification sent successfully");
+        assert_eq!(
+            input2.final_action.unwrap().result,
+            "Notification sent successfully"
+        );
     }
 
     #[test]
@@ -830,9 +883,7 @@ mod tests {
 
     #[test]
     fn verify_case_input_empty_case_id() {
-        let input = VerifyCaseForEnforcementInput {
-            case_id: "".into(),
-        };
+        let input = VerifyCaseForEnforcementInput { case_id: "".into() };
         let json = serde_json::to_string(&input).unwrap();
         let input2: VerifyCaseForEnforcementInput = serde_json::from_str(&json).unwrap();
         assert!(input2.case_id.is_empty());

@@ -14,9 +14,9 @@
 use mycelix_sdk::agentic::{
     analyze_behavior, calculate_epistemic_weight, calculate_kredit_from_trust,
     check_coherence_for_action, compute_kvector_update, compute_trust_score, get_recommendations,
-    maybe_escalate, measure_coherence, should_proceed, ActionOutcome, AgentClass,
-    AgentConstraints, AgentId, AgentOutput, AgentOutputBuilder, AgentStatus, InstrumentalActor,
-    KVectorBridgeConfig, MoralUncertainty, OutputContent, CoherenceMeasurementConfig, UncertainOutput,
+    maybe_escalate, measure_coherence, should_proceed, ActionOutcome, AgentClass, AgentConstraints,
+    AgentId, AgentOutput, AgentOutputBuilder, AgentStatus, CoherenceMeasurementConfig,
+    InstrumentalActor, KVectorBridgeConfig, MoralUncertainty, OutputContent, UncertainOutput,
 };
 use mycelix_sdk::epistemic::{
     EmpiricalLevel, EpistemicClassification, HarmonicLevel, MaterialityLevel, NormativeLevel,

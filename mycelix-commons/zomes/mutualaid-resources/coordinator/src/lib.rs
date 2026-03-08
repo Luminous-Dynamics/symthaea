@@ -7,8 +7,8 @@ use hdk::prelude::*;
 use mutualaid_common::*;
 use mutualaid_resources_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 /// Result of crediting timebank hours after resource usage
@@ -142,7 +142,12 @@ pub fn create_resource(input: CreateResourceInput) -> ExternResult<Record> {
 
     // Link from type anchor to resource
     let type_anchor = resource_type_anchor(&input.resource_type)?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::TypeToResources, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::TypeToResources,
+        (),
+    )?;
 
     // Link to all resources
     let all_anchor = all_resources_anchor()?;
@@ -150,7 +155,12 @@ pub fn create_resource(input: CreateResourceInput) -> ExternResult<Record> {
 
     // Link to available resources
     let avail_anchor = available_resources_anchor()?;
-    create_link(avail_anchor, action_hash.clone(), LinkTypes::AvailableResources, ())?;
+    create_link(
+        avail_anchor,
+        action_hash.clone(),
+        LinkTypes::AvailableResources,
+        (),
+    )?;
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created resource".to_string()
@@ -205,7 +215,10 @@ pub fn search_resources(input: SearchResourcesInput) -> ExternResult<Vec<Record>
         LinkTypes::AllResources
     };
 
-    let links = get_links(LinkQuery::try_new(anchor, link_type)?, GetStrategy::default())?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, link_type)?,
+        GetStrategy::default(),
+    )?;
 
     let limit = input.limit.unwrap_or(100) as usize;
     let mut results = Vec::new();
@@ -260,17 +273,21 @@ pub struct SetResourceAvailabilityInput {
 
 #[hdk_extern]
 pub fn set_resource_availability(input: SetResourceAvailabilityInput) -> ExternResult<Record> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "set_resource_availability")?;
+    let _eligibility =
+        require_consciousness(&requirement_for_proposal(), "set_resource_availability")?;
     let hash = input.hash;
     let available = input.available;
-    let record = get_latest_record(hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())))?;
+    let record = get_latest_record(hash.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Resource not found".to_string()
+    )))?;
 
     let mut resource: SharedResource = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse resource".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse resource".to_string()
+        )))?;
 
     // Verify ownership
     let agent = agent_info()?.agent_initial_pubkey;
@@ -302,14 +319,17 @@ pub fn create_booking(input: CreateBookingInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Verify resource exists
-    let resource_record = get(input.resource_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())))?;
+    let resource_record = get(input.resource_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())),
+    )?;
 
     let resource: SharedResource = resource_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse resource".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse resource".to_string()
+        )))?;
 
     if !resource.currently_available {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -318,7 +338,11 @@ pub fn create_booking(input: CreateBookingInput) -> ExternResult<Record> {
     }
 
     // Check for conflicts
-    let conflicts = check_booking_conflicts(input.resource_hash.clone(), input.start_time, input.end_time)?;
+    let conflicts = check_booking_conflicts(
+        input.resource_hash.clone(),
+        input.start_time,
+        input.end_time,
+    )?;
     if !conflicts.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Booking conflicts with existing reservations".to_string()
@@ -341,7 +365,12 @@ pub fn create_booking(input: CreateBookingInput) -> ExternResult<Record> {
     let action_hash = create_entry(EntryTypes::Booking(booking))?;
 
     // Create links
-    create_link(input.resource_hash, action_hash.clone(), LinkTypes::ResourceToBookings, ())?;
+    create_link(
+        input.resource_hash,
+        action_hash.clone(),
+        LinkTypes::ResourceToBookings,
+        (),
+    )?;
     create_link(booker, action_hash.clone(), LinkTypes::BookerToBookings, ())?;
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -365,15 +394,12 @@ fn check_booking_conflicts(
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get_latest_record(hash.clone())? {
-                if let Some(booking) = record
-                    .entry()
-                    .to_app_option::<Booking>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(booking) = record.entry().to_app_option::<Booking>().ok().flatten() {
                     // Skip cancelled or completed bookings
                     match booking.status {
-                        BookingStatus::Cancelled | BookingStatus::Completed | BookingStatus::NoShow => continue,
+                        BookingStatus::Cancelled
+                        | BookingStatus::Completed
+                        | BookingStatus::NoShow => continue,
                         _ => {}
                     }
 
@@ -434,24 +460,30 @@ pub fn get_my_bookings(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn confirm_booking(booking_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "confirm_booking")?;
-    let record = get_latest_record(booking_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
+    let record = get_latest_record(booking_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Booking not found".to_string())
+    ))?;
 
     let mut booking: Booking = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse booking".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse booking".to_string()
+        )))?;
 
     // Verify owner
-    let resource_record = get(booking.resource_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())))?;
+    let resource_record = get(booking.resource_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())),
+    )?;
 
     let resource: SharedResource = resource_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse resource".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse resource".to_string()
+        )))?;
 
     let agent = agent_info()?.agent_initial_pubkey;
     if resource.owner != agent {
@@ -473,26 +505,32 @@ pub fn confirm_booking(booking_hash: ActionHash) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "cancel_booking")?;
-    let record = get_latest_record(booking_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
+    let record = get_latest_record(booking_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Booking not found".to_string())
+    ))?;
 
     let mut booking: Booking = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse booking".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse booking".to_string()
+        )))?;
 
     let agent = agent_info()?.agent_initial_pubkey;
     if booking.booker != agent {
         // Also allow owner to cancel
-        let resource_record = get(booking.resource_hash.clone(), GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())))?;
+        let resource_record = get(booking.resource_hash.clone(), GetOptions::default())?.ok_or(
+            wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())),
+        )?;
 
         let resource: SharedResource = resource_record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse resource".to_string())))?;
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Could not parse resource".to_string()
+            )))?;
 
         if resource.owner != agent {
             return Err(wasm_error!(WasmErrorInner::Guest(
@@ -533,29 +571,40 @@ pub fn start_usage(input: RecordUsageInput) -> ExternResult<Record> {
     let action_hash = create_entry(EntryTypes::Usage(usage))?;
 
     // Update booking status
-    let booking_record = get(input.booking_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
+    let booking_record = get(input.booking_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())),
+    )?;
 
     let mut booking: Booking = booking_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse booking".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse booking".to_string()
+        )))?;
 
     booking.status = BookingStatus::Active;
     update_entry(input.booking_hash.clone(), EntryTypes::Booking(booking))?;
 
     // Link usage to booking's resource
-    let booking_record = get(input.booking_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
+    let booking_record = get(input.booking_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Booking not found".to_string())
+    ))?;
 
     let booking: Booking = booking_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse booking".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse booking".to_string()
+        )))?;
 
-    create_link(booking.resource_hash, action_hash.clone(), LinkTypes::ResourceToUsage, ())?;
+    create_link(
+        booking.resource_hash,
+        action_hash.clone(),
+        LinkTypes::ResourceToUsage,
+        (),
+    )?;
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created usage record".to_string()
@@ -569,14 +618,17 @@ pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Find the usage record for this booking
-    let booking_record = get(input.booking_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
+    let booking_record = get(input.booking_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())),
+    )?;
 
     let booking: Booking = booking_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse booking".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse booking".to_string()
+        )))?;
 
     // Get usage records for this resource
     let links = get_links(
@@ -590,12 +642,7 @@ pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get_latest_record(hash.clone())? {
-                if let Some(usage) = record
-                    .entry()
-                    .to_app_option::<Usage>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(usage) = record.entry().to_app_option::<Usage>().ok().flatten() {
                     if usage.booking_hash == input.booking_hash && usage.actual_end.is_none() {
                         usage_hash = Some(hash);
                         usage_record = Some(record);
@@ -618,7 +665,9 @@ pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse usage".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse usage".to_string()
+        )))?;
 
     usage.actual_end = Some(Timestamp::from_micros(now.as_micros() as i64));
     usage.condition_after = Some(input.condition_after);
@@ -632,7 +681,9 @@ pub fn complete_usage(input: CompleteUsageInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse booking".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse booking".to_string()
+        )))?;
 
     booking.status = BookingStatus::Completed;
     update_entry(input.booking_hash, EntryTypes::Booking(booking))?;
@@ -663,32 +714,41 @@ pub struct CompleteUsageWithTimebankInput {
 /// When a resource usage is completed, this creates a corresponding time credit
 /// entry so the resource owner earns time credits for sharing.
 #[hdk_extern]
-pub fn complete_usage_with_timebank(input: CompleteUsageWithTimebankInput) -> ExternResult<TimebankCreditResult> {
-    let _eligibility = require_consciousness(&requirement_for_proposal(), "complete_usage_with_timebank")?;
+pub fn complete_usage_with_timebank(
+    input: CompleteUsageWithTimebankInput,
+) -> ExternResult<TimebankCreditResult> {
+    let _eligibility =
+        require_consciousness(&requirement_for_proposal(), "complete_usage_with_timebank")?;
     if !input.hours_used.is_finite() || input.hours_used < 0.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "hours_used must be a finite non-negative number".into()
         )));
     }
     // First, get the booking to find resource owner and booker
-    let booking_record = get(input.booking_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())))?;
+    let booking_record = get(input.booking_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Booking not found".to_string())),
+    )?;
 
     let booking: Booking = booking_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse booking".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse booking".to_string()
+        )))?;
 
     // Get the resource to find its owner
-    let resource_record = get(booking.resource_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())))?;
+    let resource_record = get(booking.resource_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Resource not found".to_string())),
+    )?;
 
     let resource: SharedResource = resource_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse resource".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse resource".to_string()
+        )))?;
 
     // Complete the usage via the normal flow
     let _usage_result = complete_usage(CompleteUsageInput {
@@ -719,29 +779,28 @@ pub fn complete_usage_with_timebank(input: CompleteUsageWithTimebankInput) -> Ex
     );
 
     match &response {
-        Ok(ZomeCallResponse::Ok(_)) => {
-            Ok(TimebankCreditResult {
-                credited: true,
-                hours: input.hours_used,
-                error: None,
-            })
-        }
+        Ok(ZomeCallResponse::Ok(_)) => Ok(TimebankCreditResult {
+            credited: true,
+            hours: input.hours_used,
+            error: None,
+        }),
         Ok(other) => {
             // Usage completed but timebank credit failed — still return success
             // but flag the credit failure
             Ok(TimebankCreditResult {
                 credited: false,
                 hours: input.hours_used,
-                error: Some(format!("Usage completed but timebank credit failed: {:?}", other)),
+                error: Some(format!(
+                    "Usage completed but timebank credit failed: {:?}",
+                    other
+                )),
             })
         }
-        Err(e) => {
-            Ok(TimebankCreditResult {
-                credited: false,
-                hours: input.hours_used,
-                error: Some(format!("Usage completed but timebank call failed: {:?}", e)),
-            })
-        }
+        Err(e) => Ok(TimebankCreditResult {
+            credited: false,
+            hours: input.hours_used,
+            error: Some(format!("Usage completed but timebank call failed: {:?}", e)),
+        }),
     }
 }
 
@@ -776,7 +835,12 @@ pub fn record_maintenance(input: RecordMaintenanceInput) -> ExternResult<Record>
     let action_hash = create_entry(EntryTypes::Maintenance(maintenance))?;
 
     // Link to resource
-    create_link(input.resource_hash, action_hash.clone(), LinkTypes::ResourceToMaintenance, ())?;
+    create_link(
+        input.resource_hash,
+        action_hash.clone(),
+        LinkTypes::ResourceToMaintenance,
+        (),
+    )?;
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created maintenance record".to_string()
@@ -813,7 +877,12 @@ fn generate_id(prefix: &str) -> String {
     let agent = agent_info()
         .map(|info| info.agent_initial_pubkey.to_string())
         .unwrap_or_default();
-    format!("{}_{}_{}",  prefix, now.as_micros(), &agent[..8.min(agent.len())])
+    format!(
+        "{}_{}_{}",
+        prefix,
+        now.as_micros(),
+        &agent[..8.min(agent.len())]
+    )
 }
 
 /// Simple anchor helper
@@ -1069,7 +1138,10 @@ mod tests {
         assert_eq!(back.resource_type, ResourceType::PowerTool);
         assert_eq!(back.condition, ResourceCondition::Good);
         assert_eq!(back.photos.len(), 1);
-        assert_eq!(back.liability_notes, Some("User responsible for damages".to_string()));
+        assert_eq!(
+            back.liability_notes,
+            Some("User responsible for damages".to_string())
+        );
     }
 
     #[test]
@@ -1276,7 +1348,10 @@ mod tests {
             parts_used: vec![],
             next_due: None,
         };
-        assert!(!input.hours_spent.is_finite(), "NaN hours_spent should fail is_finite()");
+        assert!(
+            !input.hours_spent.is_finite(),
+            "NaN hours_spent should fail is_finite()"
+        );
     }
 
     #[test]
@@ -1290,7 +1365,10 @@ mod tests {
             parts_used: vec![],
             next_due: None,
         };
-        assert!(!input.hours_spent.is_finite(), "Infinite hours_spent should fail is_finite()");
+        assert!(
+            !input.hours_spent.is_finite(),
+            "Infinite hours_spent should fail is_finite()"
+        );
     }
 
     #[test]
@@ -1331,7 +1409,10 @@ mod tests {
             hours_used: f64::NAN,
             category_description: "Test".to_string(),
         };
-        assert!(!input.hours_used.is_finite(), "NaN hours_used should fail is_finite()");
+        assert!(
+            !input.hours_used.is_finite(),
+            "NaN hours_used should fail is_finite()"
+        );
     }
 
     #[test]

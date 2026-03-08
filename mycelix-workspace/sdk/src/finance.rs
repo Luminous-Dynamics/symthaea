@@ -460,6 +460,9 @@ mod tests {
         assert!(!Currency::Mycel.is_transferable());
         assert_eq!(FeeTier::from_mycel(0.5), FeeTier::Member);
         assert_eq!(TendLimitTier::from_vitality(5), TendLimitTier::Emergency);
-        assert_eq!(MetabolicState::from_vitality(90.0), MetabolicState::Thriving);
+        assert_eq!(
+            MetabolicState::from_vitality(90.0),
+            MetabolicState::Thriving
+        );
     }
 }

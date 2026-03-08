@@ -507,10 +507,7 @@ mod tests {
             description: "Extended drought conditions with below-average rainfall".into(),
             observed_by: fake_agent(),
             observed_at: Timestamp::from_micros(1_000_000),
-            indicators: vec![
-                "Reduced streamflow".into(),
-                "Lowered aquifer levels".into(),
-            ],
+            indicators: vec!["Reduced streamflow".into(), "Lowered aquifer levels".into()],
         }
     }
 
@@ -675,10 +672,7 @@ mod tests {
         p.description = "".into();
         let result = validate_create_practice(fake_create(), p);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Practice description cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Practice description cannot be empty");
     }
 
     #[test]
@@ -696,10 +690,7 @@ mod tests {
         p.culture_or_community = "".into();
         let result = validate_create_practice(fake_create(), p);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Culture or community cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Culture or community cannot be empty");
     }
 
     #[test]
@@ -986,10 +977,7 @@ mod tests {
     fn conservation_method_duplicate_classifications_accepted() {
         // Validation does not check for duplicates
         let mut m = make_conservation_method();
-        m.applicable_to = vec![
-            WaterClassification::Potable,
-            WaterClassification::Potable,
-        ];
+        m.applicable_to = vec![WaterClassification::Potable, WaterClassification::Potable];
         let result = validate_create_conservation_method(fake_create(), m);
         assert!(is_valid(&result));
     }
@@ -1083,10 +1071,7 @@ mod tests {
         cp.indicators = (0..51).map(|i| format!("Indicator {}", i)).collect();
         let result = validate_create_climate_pattern(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Cannot have more than 50 indicators"
-        );
+        assert_eq!(invalid_msg(&result), "Cannot have more than 50 indicators");
     }
 
     #[test]
@@ -1251,10 +1236,7 @@ mod tests {
         cp.indicators = (0..100).map(|i| format!("Ind {}", i)).collect();
         let result = validate_create_climate_pattern(fake_create(), cp);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Cannot have more than 50 indicators"
-        );
+        assert_eq!(invalid_msg(&result), "Cannot have more than 50 indicators");
     }
 
     // ========================================================================
@@ -1422,9 +1404,7 @@ mod tests {
     fn conservation_method_many_applicable_to_accepted() {
         let mut m = make_conservation_method();
         // 100 items (with duplicates) should be valid since no cap is enforced
-        m.applicable_to = (0..100)
-            .map(|_| WaterClassification::Potable)
-            .collect();
+        m.applicable_to = (0..100).map(|_| WaterClassification::Potable).collect();
         let result = validate_create_conservation_method(fake_create(), m);
         assert!(is_valid(&result));
     }

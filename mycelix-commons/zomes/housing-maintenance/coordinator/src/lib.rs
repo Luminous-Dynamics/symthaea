@@ -4,8 +4,8 @@
 use hdk::prelude::*;
 use housing_maintenance_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -361,10 +361,27 @@ pub fn get_building_maintenance_history(building_hash: ActionHash) -> ExternResu
 /// Wire-compatible copy of mutualaid ResourceType for deserialization.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum MutualAidResourceType {
-    PowerTool, HandTool, GardenTool, CookingEquipment, CraftingSupplies,
-    Car, Truck, Bicycle, Trailer, Boat,
-    MeetingRoom, Workshop, Kitchen, GardenPlot, StorageSpace, ParkingSpot,
-    CampingGear, SportsEquipment, MusicInstrument, Photography, Projector,
+    PowerTool,
+    HandTool,
+    GardenTool,
+    CookingEquipment,
+    CraftingSupplies,
+    Car,
+    Truck,
+    Bicycle,
+    Trailer,
+    Boat,
+    MeetingRoom,
+    Workshop,
+    Kitchen,
+    GardenPlot,
+    StorageSpace,
+    ParkingSpot,
+    CampingGear,
+    SportsEquipment,
+    MusicInstrument,
+    Photography,
+    Projector,
     Custom(String),
 }
 
@@ -400,7 +417,9 @@ pub struct CommunityResourcesResult {
 /// via `call(CallTargetCell::Local, ...)` to find community-owned tools
 /// and equipment that could be used for housing repairs.
 #[hdk_extern]
-pub fn find_community_resources_for_repair(input: FindCommunityResourcesInput) -> ExternResult<CommunityResourcesResult> {
+pub fn find_community_resources_for_repair(
+    input: FindCommunityResourcesInput,
+) -> ExternResult<CommunityResourcesResult> {
     let resource_type = map_maintenance_to_resource_type(&input.maintenance_category);
     let type_label = resource_type.as_ref().map(|t| format!("{:?}", t));
 
@@ -421,8 +440,9 @@ pub fn find_community_resources_for_repair(input: FindCommunityResourcesInput) -
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             let count = records.len() as u32;
             Ok(CommunityResourcesResult {
                 resources_found: count,
@@ -608,7 +628,10 @@ mod tests {
     fn record_inspection_input_serde_roundtrip() {
         let input = RecordInspectionInput {
             inspection_hash: fake_action_hash(),
-            findings: vec!["Minor crack in wall".to_string(), "Water stain on ceiling".to_string()],
+            findings: vec![
+                "Minor crack in wall".to_string(),
+                "Water stain on ceiling".to_string(),
+            ],
             passed: false,
             next_due: Some(Timestamp::from_micros(1_000_000)),
         };
@@ -669,7 +692,10 @@ mod tests {
         let decoded: CommunityResourcesResult = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.resources_found, 3);
         assert!(decoded.has_resources);
-        assert_eq!(decoded.resource_type_searched, Some("PowerTool".to_string()));
+        assert_eq!(
+            decoded.resource_type_searched,
+            Some("PowerTool".to_string())
+        );
         assert!(decoded.error.is_none());
     }
 
@@ -685,7 +711,11 @@ mod tests {
         let decoded: CommunityResourcesResult = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.resources_found, 0);
         assert!(!decoded.has_resources);
-        assert!(decoded.error.as_ref().unwrap().contains("connection refused"));
+        assert!(decoded
+            .error
+            .as_ref()
+            .unwrap()
+            .contains("connection refused"));
     }
 
     // ── Integrity enum serde roundtrips ────────────────────────────────

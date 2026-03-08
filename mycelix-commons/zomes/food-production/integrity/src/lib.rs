@@ -201,66 +201,64 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::AllPlots => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllPlots link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AllPlots => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllPlots link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::StewardToPlot => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "StewardToPlot link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::PlotToCrop => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "PlotToCrop link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::CropToYield => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "CropToYield link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::PlotToSeasonPlan => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "PlotToSeasonPlan link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToYield => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToYield link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::PlotToMembers => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "PlotToMembers link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::StewardToPlot => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "StewardToPlot link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PlotToCrop => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PlotToCrop link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::CropToYield => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "CropToYield link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PlotToSeasonPlan => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PlotToSeasonPlan link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToYield => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToYield link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PlotToMembers => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PlotToMembers link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -271,60 +269,94 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_plot(plot: Plot) -> ExternResult<ValidateCallbackResult> {
     if plot.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Plot ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plot ID cannot be empty".into(),
+        ));
     }
     if plot.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Plot ID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plot ID must be 256 characters or fewer".into(),
+        ));
     }
     if plot.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Plot name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plot name cannot be empty".into(),
+        ));
     }
     if plot.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Plot name must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plot name must be 256 characters or fewer".into(),
+        ));
     }
     if !plot.area_sqm.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Area must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Area must be a finite number".into(),
+        ));
     }
     if plot.area_sqm <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Area must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Area must be positive".into(),
+        ));
     }
     if !plot.location_lat.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be a finite number".into(),
+        ));
     }
     if plot.location_lat < -90.0 || plot.location_lat > 90.0 {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
     }
     if !plot.location_lon.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be a finite number".into(),
+        ));
     }
     if plot.location_lon < -180.0 || plot.location_lon > 180.0 {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_crop(crop: Crop) -> ExternResult<ValidateCallbackResult> {
     if crop.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Crop name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Crop name cannot be empty".into(),
+        ));
     }
     if crop.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Crop name must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Crop name must be 256 characters or fewer".into(),
+        ));
     }
     if crop.variety.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Crop variety cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Crop variety cannot be empty".into(),
+        ));
     }
     if crop.variety.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Crop variety must be 128 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Crop variety must be 128 characters or fewer".into(),
+        ));
     }
     if crop.allergen_flags.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 allergen flags".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 allergen flags".into(),
+        ));
     }
     for flag in &crop.allergen_flags {
         if flag.trim().is_empty() {
-            return Ok(ValidateCallbackResult::Invalid("Allergen flag cannot be empty".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Allergen flag cannot be empty".into(),
+            ));
         }
         if flag.len() > 128 {
-            return Ok(ValidateCallbackResult::Invalid("Allergen flag too long (max 128 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Allergen flag too long (max 128 chars)".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -332,14 +364,20 @@ fn validate_crop(crop: Crop) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_yield(yr: YieldRecord) -> ExternResult<ValidateCallbackResult> {
     if !yr.quantity_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite number".into(),
+        ));
     }
     if yr.quantity_kg <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Yield quantity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Yield quantity must be positive".into(),
+        ));
     }
     if let Some(ref notes) = yr.notes {
         if notes.len() > 4096 {
-            return Ok(ValidateCallbackResult::Invalid("Yield notes must be 4096 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Yield notes must be 4096 characters or fewer".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -347,25 +385,37 @@ fn validate_yield(yr: YieldRecord) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_season_plan(sp: SeasonPlan) -> ExternResult<ValidateCallbackResult> {
     if sp.season.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Season cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Season cannot be empty".into(),
+        ));
     }
     if sp.season.len() > 64 {
-        return Ok(ValidateCallbackResult::Invalid("Season must be 64 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Season must be 64 characters or fewer".into(),
+        ));
     }
     if sp.planned_crops.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Must plan at least one crop".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Must plan at least one crop".into(),
+        ));
     }
     if sp.planned_crops.len() > 100 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot plan more than 100 crops".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot plan more than 100 crops".into(),
+        ));
     }
     for crop_name in &sp.planned_crops {
         if crop_name.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Each planned crop name must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each planned crop name must be 256 characters or fewer".into(),
+            ));
         }
     }
     if let Some(ref notes) = sp.rotation_notes {
         if notes.len() > 2048 {
-            return Ok(ValidateCallbackResult::Invalid("Rotation notes must be 2048 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Rotation notes must be 2048 characters or fewer".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -373,7 +423,9 @@ fn validate_season_plan(sp: SeasonPlan) -> ExternResult<ValidateCallbackResult> 
 
 fn validate_garden_membership(m: GardenMembership) -> ExternResult<ValidateCallbackResult> {
     if m.joined_at == 0 {
-        return Ok(ValidateCallbackResult::Invalid("GardenMembership joined_at cannot be zero".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "GardenMembership joined_at cannot be zero".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -477,8 +529,13 @@ mod tests {
     #[test]
     fn serde_roundtrip_soil_type() {
         let types = vec![
-            SoilType::Clay, SoilType::Sandy, SoilType::Loam,
-            SoilType::Silt, SoilType::Peat, SoilType::Chalk, SoilType::Mixed,
+            SoilType::Clay,
+            SoilType::Sandy,
+            SoilType::Loam,
+            SoilType::Silt,
+            SoilType::Peat,
+            SoilType::Chalk,
+            SoilType::Mixed,
         ];
         for t in &types {
             let json = serde_json::to_string(t).unwrap();
@@ -490,8 +547,12 @@ mod tests {
     #[test]
     fn serde_roundtrip_plot_type() {
         let types = vec![
-            PlotType::Garden, PlotType::FoodForest, PlotType::Orchard,
-            PlotType::Greenhouse, PlotType::Raised, PlotType::Rooftop,
+            PlotType::Garden,
+            PlotType::FoodForest,
+            PlotType::Orchard,
+            PlotType::Greenhouse,
+            PlotType::Raised,
+            PlotType::Rooftop,
         ];
         for t in &types {
             let json = serde_json::to_string(t).unwrap();
@@ -503,8 +564,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_plot_status() {
         let statuses = vec![
-            PlotStatus::Active, PlotStatus::Fallow,
-            PlotStatus::Preparing, PlotStatus::Retired,
+            PlotStatus::Active,
+            PlotStatus::Fallow,
+            PlotStatus::Preparing,
+            PlotStatus::Retired,
         ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
@@ -516,8 +579,12 @@ mod tests {
     #[test]
     fn serde_roundtrip_crop_status() {
         let statuses = vec![
-            CropStatus::Planned, CropStatus::Planted, CropStatus::Growing,
-            CropStatus::Ready, CropStatus::Harvested, CropStatus::Failed,
+            CropStatus::Planned,
+            CropStatus::Planted,
+            CropStatus::Growing,
+            CropStatus::Ready,
+            CropStatus::Harvested,
+            CropStatus::Failed,
         ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
@@ -529,8 +596,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_quality_grade() {
         let grades = vec![
-            QualityGrade::Premium, QualityGrade::Standard,
-            QualityGrade::Processing, QualityGrade::Compost,
+            QualityGrade::Premium,
+            QualityGrade::Standard,
+            QualityGrade::Processing,
+            QualityGrade::Compost,
         ];
         for g in &grades {
             let json = serde_json::to_string(g).unwrap();
@@ -709,8 +778,15 @@ mod tests {
 
     #[test]
     fn plot_all_soil_types_valid() {
-        for st in [SoilType::Clay, SoilType::Sandy, SoilType::Loam,
-                    SoilType::Silt, SoilType::Peat, SoilType::Chalk, SoilType::Mixed] {
+        for st in [
+            SoilType::Clay,
+            SoilType::Sandy,
+            SoilType::Loam,
+            SoilType::Silt,
+            SoilType::Peat,
+            SoilType::Chalk,
+            SoilType::Mixed,
+        ] {
             let mut p = valid_plot();
             p.soil_type = st;
             assert_valid(validate_plot(p));
@@ -719,8 +795,14 @@ mod tests {
 
     #[test]
     fn plot_all_plot_types_valid() {
-        for pt in [PlotType::Garden, PlotType::FoodForest, PlotType::Orchard,
-                    PlotType::Greenhouse, PlotType::Raised, PlotType::Rooftop] {
+        for pt in [
+            PlotType::Garden,
+            PlotType::FoodForest,
+            PlotType::Orchard,
+            PlotType::Greenhouse,
+            PlotType::Raised,
+            PlotType::Rooftop,
+        ] {
             let mut p = valid_plot();
             p.plot_type = pt;
             assert_valid(validate_plot(p));
@@ -729,8 +811,12 @@ mod tests {
 
     #[test]
     fn plot_all_statuses_valid() {
-        for status in [PlotStatus::Active, PlotStatus::Fallow,
-                       PlotStatus::Preparing, PlotStatus::Retired] {
+        for status in [
+            PlotStatus::Active,
+            PlotStatus::Fallow,
+            PlotStatus::Preparing,
+            PlotStatus::Retired,
+        ] {
             let mut p = valid_plot();
             p.status = status;
             assert_valid(validate_plot(p));
@@ -796,8 +882,14 @@ mod tests {
 
     #[test]
     fn crop_all_statuses_valid() {
-        for status in [CropStatus::Planned, CropStatus::Planted, CropStatus::Growing,
-                       CropStatus::Ready, CropStatus::Harvested, CropStatus::Failed] {
+        for status in [
+            CropStatus::Planned,
+            CropStatus::Planted,
+            CropStatus::Growing,
+            CropStatus::Ready,
+            CropStatus::Harvested,
+            CropStatus::Failed,
+        ] {
             let mut c = valid_crop();
             c.status = status;
             assert_valid(validate_crop(c));
@@ -853,8 +945,12 @@ mod tests {
 
     #[test]
     fn yield_all_quality_grades_valid() {
-        for grade in [QualityGrade::Premium, QualityGrade::Standard,
-                      QualityGrade::Processing, QualityGrade::Compost] {
+        for grade in [
+            QualityGrade::Premium,
+            QualityGrade::Standard,
+            QualityGrade::Processing,
+            QualityGrade::Compost,
+        ] {
             let mut yr = valid_yield_record();
             yr.quality_grade = grade;
             assert_valid(validate_yield(yr));
@@ -984,7 +1080,10 @@ mod tests {
     fn plot_name_too_long_rejected() {
         let mut p = valid_plot();
         p.name = "x".repeat(257);
-        assert_invalid(validate_plot(p), "Plot name must be 256 characters or fewer");
+        assert_invalid(
+            validate_plot(p),
+            "Plot name must be 256 characters or fewer",
+        );
     }
 
     #[test]
@@ -1007,7 +1106,10 @@ mod tests {
     fn crop_name_too_long_rejected() {
         let mut c = valid_crop();
         c.name = "x".repeat(257);
-        assert_invalid(validate_crop(c), "Crop name must be 256 characters or fewer");
+        assert_invalid(
+            validate_crop(c),
+            "Crop name must be 256 characters or fewer",
+        );
     }
 
     #[test]
@@ -1028,7 +1130,10 @@ mod tests {
     fn crop_variety_too_long_rejected() {
         let mut c = valid_crop();
         c.variety = "x".repeat(129);
-        assert_invalid(validate_crop(c), "Crop variety must be 128 characters or fewer");
+        assert_invalid(
+            validate_crop(c),
+            "Crop variety must be 128 characters or fewer",
+        );
     }
 
     #[test]
@@ -1051,7 +1156,10 @@ mod tests {
     fn yield_notes_too_long_rejected() {
         let mut yr = valid_yield_record();
         yr.notes = Some("x".repeat(4097));
-        assert_invalid(validate_yield(yr), "Yield notes must be 4096 characters or fewer");
+        assert_invalid(
+            validate_yield(yr),
+            "Yield notes must be 4096 characters or fewer",
+        );
     }
 
     #[test]
@@ -1074,7 +1182,10 @@ mod tests {
     fn season_plan_season_too_long_rejected() {
         let mut sp = valid_season_plan();
         sp.season = "x".repeat(65);
-        assert_invalid(validate_season_plan(sp), "Season must be 64 characters or fewer");
+        assert_invalid(
+            validate_season_plan(sp),
+            "Season must be 64 characters or fewer",
+        );
     }
 
     #[test]
@@ -1095,7 +1206,10 @@ mod tests {
     fn season_plan_rotation_notes_too_long_rejected() {
         let mut sp = valid_season_plan();
         sp.rotation_notes = Some("x".repeat(2049));
-        assert_invalid(validate_season_plan(sp), "Rotation notes must be 2048 characters or fewer");
+        assert_invalid(
+            validate_season_plan(sp),
+            "Rotation notes must be 2048 characters or fewer",
+        );
     }
 
     #[test]
@@ -1141,7 +1255,10 @@ mod tests {
     fn season_plan_planned_crop_name_too_long_rejected() {
         let mut sp = valid_season_plan();
         sp.planned_crops = vec!["x".repeat(257)];
-        assert_invalid(validate_season_plan(sp), "Each planned crop name must be 256 characters or fewer");
+        assert_invalid(
+            validate_season_plan(sp),
+            "Each planned crop name must be 256 characters or fewer",
+        );
     }
 
     #[test]
@@ -1166,7 +1283,10 @@ mod tests {
             "x".repeat(257),
             "Another valid".to_string(),
         ];
-        assert_invalid(validate_season_plan(sp), "Each planned crop name must be 256 characters or fewer");
+        assert_invalid(
+            validate_season_plan(sp),
+            "Each planned crop name must be 256 characters or fewer",
+        );
     }
 
     // ── Link tag length validation tests ────────────────────────────────
@@ -1192,9 +1312,10 @@ mod tests {
             LinkTypes::PlotToMembers => "PlotToMembers",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }
@@ -1290,7 +1411,11 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_garden_role_all_variants() {
-        let roles = vec![GardenRole::Steward, GardenRole::Volunteer, GardenRole::Member];
+        let roles = vec![
+            GardenRole::Steward,
+            GardenRole::Volunteer,
+            GardenRole::Member,
+        ];
         for r in &roles {
             let json = serde_json::to_string(r).unwrap();
             let back: GardenRole = serde_json::from_str(&json).unwrap();
@@ -1382,7 +1507,10 @@ mod tests {
     fn garden_membership_zero_joined_at_rejected() {
         let mut m = valid_garden_membership();
         m.joined_at = 0;
-        assert_invalid(validate_garden_membership(m), "GardenMembership joined_at cannot be zero");
+        assert_invalid(
+            validate_garden_membership(m),
+            "GardenMembership joined_at cannot be zero",
+        );
     }
 
     // ── NaN/Infinity bypass hardening tests ────────────────────────────
@@ -1452,7 +1580,11 @@ mod tests {
 
     #[test]
     fn garden_membership_all_roles_valid() {
-        for role in [GardenRole::Steward, GardenRole::Volunteer, GardenRole::Member] {
+        for role in [
+            GardenRole::Steward,
+            GardenRole::Volunteer,
+            GardenRole::Member,
+        ] {
             let mut m = valid_garden_membership();
             m.role = role;
             assert_valid(validate_garden_membership(m));

@@ -83,7 +83,16 @@ impl TrustStatement {
     /// Create a statement: "Dimension k_i exceeds threshold"
     pub fn dimension_exceeds(dimension: u8, threshold: f32) -> Self {
         let dim_names = [
-            "k_r", "k_a", "k_i", "k_p", "k_m", "k_s", "k_h", "k_topo", "k_v", "k_coherence",
+            "k_r",
+            "k_a",
+            "k_i",
+            "k_p",
+            "k_m",
+            "k_s",
+            "k_h",
+            "k_topo",
+            "k_v",
+            "k_coherence",
         ];
         let dim_name = dim_names.get(dimension as usize).unwrap_or(&"k_?");
 

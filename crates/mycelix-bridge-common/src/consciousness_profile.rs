@@ -375,9 +375,7 @@ pub fn should_audit(
         // Sample ~10% of basic/proposal approvals using action-salted hash
         _ => {
             let sample_byte = agent_hash.last().copied().unwrap_or(0);
-            let salt: u8 = action_name
-                .bytes()
-                .fold(0u8, |acc, b| acc.wrapping_add(b));
+            let salt: u8 = action_name.bytes().fold(0u8, |acc, b| acc.wrapping_add(b));
             sample_byte.wrapping_add(salt) < 26 // ~10% of 256
         }
     }
@@ -396,8 +394,7 @@ pub fn needs_refresh(credential: &ConsciousnessCredential, now_us: u64) -> bool 
 
 /// Check whether an agent is eligible for a bootstrap credential.
 pub fn is_bootstrap_eligible(agent_count: u32, identity_score: f64) -> bool {
-    agent_count < BOOTSTRAP_COMMUNITY_THRESHOLD
-        && identity_score >= BOOTSTRAP_MIN_IDENTITY
+    agent_count < BOOTSTRAP_COMMUNITY_THRESHOLD && identity_score >= BOOTSTRAP_MIN_IDENTITY
 }
 
 /// Create a bootstrap credential for cold-start communities.
@@ -704,7 +701,12 @@ pub fn gate_consciousness(
     let eligibility = evaluate_governance(&credential, requirement, now_us);
 
     // Fire audit log (best-effort, rate-limited via should_audit)
-    if should_audit(requirement, eligibility.eligible, agent.as_ref(), action_name) {
+    if should_audit(
+        requirement,
+        eligibility.eligible,
+        agent.as_ref(),
+        action_name,
+    ) {
         let audit = GateAuditInput {
             action_name: action_name.to_string(),
             zome_name: zome_info()?.name.to_string(),
@@ -744,10 +746,16 @@ pub fn gate_consciousness(
             credential.did.clone(),
         ) {
             Ok(_) => {
-                debug!("gate_consciousness: refresh triggered successfully via {}", bridge_zome);
+                debug!(
+                    "gate_consciousness: refresh triggered successfully via {}",
+                    bridge_zome
+                );
             }
             Err(e) => {
-                debug!("gate_consciousness: refresh failed (non-fatal) via {}: {:?}", bridge_zome, e);
+                debug!(
+                    "gate_consciousness: refresh failed (non-fatal) via {}: {:?}",
+                    bridge_zome, e
+                );
             }
         }
     }
@@ -1750,19 +1758,44 @@ mod tests {
     #[test]
     fn should_audit_always_logs_rejections() {
         assert!(should_audit(&requirement_for_basic(), false, &[0u8], "any"));
-        assert!(should_audit(&requirement_for_basic(), false, &[255u8], "any"));
+        assert!(should_audit(
+            &requirement_for_basic(),
+            false,
+            &[255u8],
+            "any"
+        ));
     }
 
     #[test]
     fn should_audit_always_logs_constitutional() {
-        assert!(should_audit(&requirement_for_constitutional(), true, &[0u8], "amend"));
-        assert!(should_audit(&requirement_for_constitutional(), true, &[255u8], "amend"));
+        assert!(should_audit(
+            &requirement_for_constitutional(),
+            true,
+            &[0u8],
+            "amend"
+        ));
+        assert!(should_audit(
+            &requirement_for_constitutional(),
+            true,
+            &[255u8],
+            "amend"
+        ));
     }
 
     #[test]
     fn should_audit_always_logs_voting() {
-        assert!(should_audit(&requirement_for_voting(), true, &[0u8], "vote"));
-        assert!(should_audit(&requirement_for_voting(), true, &[255u8], "vote"));
+        assert!(should_audit(
+            &requirement_for_voting(),
+            true,
+            &[0u8],
+            "vote"
+        ));
+        assert!(should_audit(
+            &requirement_for_voting(),
+            true,
+            &[255u8],
+            "vote"
+        ));
     }
 
     #[test]
@@ -1893,10 +1926,16 @@ mod tests {
             min_community: None,
         };
         let eligibility = evaluate_governance(&cred, &requirement, NOW);
-        assert!(eligibility.eligible, "nearing-expiry credential should still pass gate");
+        assert!(
+            eligibility.eligible,
+            "nearing-expiry credential should still pass gate"
+        );
 
         // Step 3: needs_refresh should be true — triggering background refresh
-        assert!(needs_refresh(&cred, NOW), "credential nearing expiry should trigger refresh");
+        assert!(
+            needs_refresh(&cred, NOW),
+            "credential nearing expiry should trigger refresh"
+        );
     }
 
     #[test]
@@ -1920,7 +1959,10 @@ mod tests {
         assert!(eligibility.eligible);
 
         // No refresh needed — credential is fresh
-        assert!(!needs_refresh(&cred, NOW), "fresh credential should NOT trigger refresh");
+        assert!(
+            !needs_refresh(&cred, NOW),
+            "fresh credential should NOT trigger refresh"
+        );
     }
 
     #[test]
@@ -1947,7 +1989,10 @@ mod tests {
         assert!(!eligibility.eligible, "expired credential should fail gate");
 
         // No refresh for expired credentials
-        assert!(!needs_refresh(&cred, NOW), "expired credential should NOT trigger refresh");
+        assert!(
+            !needs_refresh(&cred, NOW),
+            "expired credential should NOT trigger refresh"
+        );
     }
 
     // -- GateAuditInput with correlation_id --
@@ -2000,9 +2045,7 @@ mod tests {
 
     #[test]
     fn mvb_profile_clamps_out_of_range() {
-        let profile = ConsciousnessProfile::from_unified_consciousness(
-            1.5, -0.2, 0.5, 0.5,
-        );
+        let profile = ConsciousnessProfile::from_unified_consciousness(1.5, -0.2, 0.5, 0.5);
         assert_eq!(profile.engagement, 1.0);
         assert_eq!(profile.identity, 0.0);
     }
@@ -2012,14 +2055,19 @@ mod tests {
         let cred = ConsciousnessCredential::from_unified_consciousness(
             "did:mycelix:agent123".into(),
             0.65, // C_unified
-            0.80, 0.50, 0.40,
+            0.80,
+            0.50,
+            0.40,
             "did:mycelix:bridge".into(),
             NOW,
         );
         assert_eq!(cred.did, "did:mycelix:agent123");
         assert_eq!(cred.profile.engagement, 0.65);
         assert_eq!(cred.issued_at, NOW);
-        assert_eq!(cred.expires_at, NOW + ConsciousnessCredential::DEFAULT_TTL_US);
+        assert_eq!(
+            cred.expires_at,
+            NOW + ConsciousnessCredential::DEFAULT_TTL_US
+        );
         assert!(!cred.is_expired(NOW));
         // Tier should be Citizen (combined ≈ 0.575 → >= 0.4)
         assert!(cred.tier >= ConsciousnessTier::Citizen);
@@ -2042,19 +2090,23 @@ mod tests {
         );
 
         // Step 2: Evaluate against proposal requirement
-        let result = evaluate_governance(
-            &cred,
-            &requirement_for_proposal(),
-            NOW,
-        );
+        let result = evaluate_governance(&cred, &requirement_for_proposal(), NOW);
 
         // Step 3: Verify decision
-        assert!(result.eligible, "High-consciousness agent should be proposal-eligible");
+        assert!(
+            result.eligible,
+            "High-consciousness agent should be proposal-eligible"
+        );
         assert!(result.tier >= ConsciousnessTier::Participant);
         assert!(result.weight_bp > 0);
 
         // Step 4: Audit logging (verify audit input can be constructed)
-        let should_log = should_audit(&requirement_for_proposal(), result.eligible, b"agent_high", "submit_proposal");
+        let should_log = should_audit(
+            &requirement_for_proposal(),
+            result.eligible,
+            b"agent_high",
+            "submit_proposal",
+        );
         // 100% of basic approvals sampled at 10%, but we just verify the function works
         let _audit = GateAuditInput {
             action_name: "submit_proposal".into(),
@@ -2086,18 +2138,22 @@ mod tests {
             NOW,
         );
 
-        let result = evaluate_governance(
-            &cred,
-            &requirement_for_proposal(),
-            NOW,
-        );
+        let result = evaluate_governance(&cred, &requirement_for_proposal(), NOW);
 
-        assert!(!result.eligible, "Low-consciousness agent should NOT be proposal-eligible");
+        assert!(
+            !result.eligible,
+            "Low-consciousness agent should NOT be proposal-eligible"
+        );
         assert_eq!(result.tier, ConsciousnessTier::Observer);
         assert_eq!(result.weight_bp, 0);
 
         // Rejections are always logged (100% audit rate)
-        assert!(should_audit(&requirement_for_proposal(), false, b"agent_low", "submit_proposal"));
+        assert!(should_audit(
+            &requirement_for_proposal(),
+            false,
+            b"agent_low",
+            "submit_proposal"
+        ));
     }
 
     #[test]
@@ -2108,7 +2164,9 @@ mod tests {
         let cred = ConsciousnessCredential::from_unified_consciousness(
             "did:mycelix:agent_zero".into(),
             0.0, // zero consciousness
-            0.0, 0.0, 0.0,
+            0.0,
+            0.0,
+            0.0,
             "did:mycelix:bridge".into(),
             NOW,
         );
@@ -2143,7 +2201,10 @@ mod tests {
     #[test]
     fn bootstrap_boundary() {
         assert!(!is_bootstrap_eligible(BOOTSTRAP_COMMUNITY_THRESHOLD, 0.5));
-        assert!(is_bootstrap_eligible(BOOTSTRAP_COMMUNITY_THRESHOLD - 1, 0.5));
+        assert!(is_bootstrap_eligible(
+            BOOTSTRAP_COMMUNITY_THRESHOLD - 1,
+            0.5
+        ));
         assert!(is_bootstrap_eligible(2, BOOTSTRAP_MIN_IDENTITY));
     }
 
@@ -2176,7 +2237,11 @@ mod tests {
     #[test]
     fn bootstrap_governance_expired_rejected() {
         let cred = bootstrap_credential("did:mycelix:first".into(), 0.5, NOW);
-        let result = evaluate_bootstrap_governance(&cred, &requirement_for_basic(), NOW + BOOTSTRAP_TTL_US + 1);
+        let result = evaluate_bootstrap_governance(
+            &cred,
+            &requirement_for_basic(),
+            NOW + BOOTSTRAP_TTL_US + 1,
+        );
         assert!(!result.eligible);
     }
 
@@ -2240,16 +2305,30 @@ mod tests {
 
     #[test]
     fn is_valid_detects_nan() {
-        let valid = ConsciousnessProfile { identity: 0.5, reputation: 0.5, community: 0.5, engagement: 0.5 };
+        let valid = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        };
         assert!(valid.is_valid());
 
-        let nan_id = ConsciousnessProfile { identity: f64::NAN, ..valid.clone() };
+        let nan_id = ConsciousnessProfile {
+            identity: f64::NAN,
+            ..valid.clone()
+        };
         assert!(!nan_id.is_valid());
 
-        let inf_rep = ConsciousnessProfile { reputation: f64::INFINITY, ..valid.clone() };
+        let inf_rep = ConsciousnessProfile {
+            reputation: f64::INFINITY,
+            ..valid.clone()
+        };
         assert!(!inf_rep.is_valid());
 
-        let neg_inf = ConsciousnessProfile { community: f64::NEG_INFINITY, ..valid };
+        let neg_inf = ConsciousnessProfile {
+            community: f64::NEG_INFINITY,
+            ..valid
+        };
         assert!(!neg_inf.is_valid());
     }
 

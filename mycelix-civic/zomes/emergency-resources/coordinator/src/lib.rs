@@ -1,12 +1,11 @@
 //! Resources Coordinator Zome
 //! Emergency resource registration, deployment, and request fulfillment
 
-use hdk::prelude::*;
 use emergency_resources_integrity::*;
+use hdk::prelude::*;
 use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, requirement_for_voting,
     GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_basic, requirement_for_proposal,
-    requirement_for_voting,
 };
 
 fn require_consciousness(
@@ -449,15 +448,13 @@ mod tests {
         let result = NearbySheltersResult {
             shelters_found: 2,
             total_available_capacity: 350,
-            shelters: vec![
-                ShelterInfo {
-                    name: "Shelter A".to_string(),
-                    address: "456 Oak Ave".to_string(),
-                    capacity: 200,
-                    current_occupancy: 150,
-                    available_capacity: 50,
-                },
-            ],
+            shelters: vec![ShelterInfo {
+                name: "Shelter A".to_string(),
+                address: "456 Oak Ave".to_string(),
+                capacity: 200,
+                current_occupancy: 150,
+                available_capacity: 50,
+            }],
             error: None,
         };
         let json = serde_json::to_string(&result).unwrap();
@@ -900,13 +897,35 @@ struct LocalShelter {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalShelterType { GeneralPopulation, SpecialNeeds, Medical, Pet, Evacuation }
+enum LocalShelterType {
+    GeneralPopulation,
+    SpecialNeeds,
+    Medical,
+    Pet,
+    Evacuation,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalAmenity { Beds, Kitchen, Showers, Laundry, MedicalBay, PetArea, ChildArea, Generator, WheelchairAccess, Wifi }
+enum LocalAmenity {
+    Beds,
+    Kitchen,
+    Showers,
+    Laundry,
+    MedicalBay,
+    PetArea,
+    ChildArea,
+    Generator,
+    WheelchairAccess,
+    Wifi,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-enum LocalShelterStatus { Open, Full, Closed, Evacuating }
+enum LocalShelterStatus {
+    Open,
+    Full,
+    Closed,
+    Evacuating,
+}
 
 /// Wire-compatible copy of emergency_shelters FindNearbySheltersInput.
 #[derive(Serialize, Deserialize, Debug)]
@@ -950,7 +969,9 @@ pub struct NearbySheltersResult {
 /// a resource depot. This enables smart resource routing to where
 /// shelter occupants need them most.
 #[hdk_extern]
-pub fn find_shelters_needing_resources(input: FindSheltersForResourceInput) -> ExternResult<NearbySheltersResult> {
+pub fn find_shelters_needing_resources(
+    input: FindSheltersForResourceInput,
+) -> ExternResult<NearbySheltersResult> {
     let search = LocalFindNearbySheltersInput {
         lat: input.lat,
         lon: input.lon,
@@ -967,8 +988,9 @@ pub fn find_shelters_needing_resources(input: FindSheltersForResourceInput) -> E
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
 
             let mut shelters = Vec::new();
             let mut total_available = 0u32;

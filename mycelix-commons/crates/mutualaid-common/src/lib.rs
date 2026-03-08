@@ -470,7 +470,10 @@ pub enum BookingStatus {
 pub enum PaymentMethod {
     Free,
     TimeCredits(f64),
-    CircleCredits { circle_hash: ActionHash, amount: i64 },
+    CircleCredits {
+        circle_hash: ActionHash,
+        amount: i64,
+    },
     External(String),
 }
 
@@ -1101,10 +1104,7 @@ pub enum LocationConstraint {
     /// Specific address
     FixedLocation(String),
     /// Within radius of point
-    WithinRadius {
-        geohash: String,
-        radius_km: f32,
-    },
+    WithinRadius { geohash: String, radius_km: f32 },
     /// At requester's location
     AtRequester,
     /// At provider's location
@@ -1120,7 +1120,7 @@ pub enum LocationConstraint {
 impl Default for Availability {
     fn default() -> Self {
         Self {
-            days: vec![1, 2, 3, 4, 5], // Monday-Friday
+            days: vec![1, 2, 3, 4, 5],  // Monday-Friday
             start_minutes: 540,         // 9:00 AM
             end_minutes: 1020,          // 5:00 PM
             timezone_offset_minutes: 0, // UTC

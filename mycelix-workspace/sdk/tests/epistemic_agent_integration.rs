@@ -17,12 +17,12 @@ use mycelix_sdk::agentic::{
 
     check_coherence_for_action,
     classify_output,
+    coherence_to_kvector_dimension,
+
     compute_kvector_update,
     compute_trust_score,
     maybe_escalate,
     measure_coherence,
-    coherence_to_kvector_dimension,
-
     should_proceed,
     update_agent_kvector,
     ActionOutcome,
@@ -38,6 +38,7 @@ use mycelix_sdk::agentic::{
     BehaviorLogEntry,
     ClassificationHints,
     CoherenceHistory,
+    CoherenceMeasurementConfig,
     // Phase 3: Phi Measurement
     CoherenceState,
     EpistemicStats,
@@ -47,7 +48,6 @@ use mycelix_sdk::agentic::{
     // Phase 4: GIS Integration
     MoralUncertainty,
     OutputContent,
-    CoherenceMeasurementConfig,
     RelevanceDuration,
 
     UncertainOutput,
@@ -294,7 +294,10 @@ fn test_full_agent_lifecycle() {
     println!("\n========== EPISTEMIC FINGERPRINT ==========");
     println!("Agent ID: {}", agent.agent_id.as_str());
     println!("Trust Score: {:.4}", agent.k_vector.trust_score());
-    println!("Coherence (Phi): {:.4}", coherence_history.rolling_coherence);
+    println!(
+        "Coherence (Phi): {:.4}",
+        coherence_history.rolling_coherence
+    );
     println!("Epistemic Quality: {:.4}", epistemic_stats.quality_score());
     println!("KREDIT Cap: {}", agent.kredit_cap);
     println!("Status: {:?}", agent.status);

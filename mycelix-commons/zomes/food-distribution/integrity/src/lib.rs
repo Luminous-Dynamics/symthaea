@@ -123,50 +123,48 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::AllMarkets => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllMarkets link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AllMarkets => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllMarkets link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::MarketToListing => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "MarketToListing link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::ProducerToListing => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ProducerToListing link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::BuyerToOrder => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "BuyerToOrder link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::ListingToOrder => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ListingToOrder link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::MarketToListing => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MarketToListing link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ProducerToListing => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ProducerToListing link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::BuyerToOrder => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "BuyerToOrder link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::ListingToOrder => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ListingToOrder link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -177,76 +175,118 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_market(m: Market) -> ExternResult<ValidateCallbackResult> {
     if m.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Market ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Market ID cannot be empty".into(),
+        ));
     }
     if m.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Market ID must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Market ID must be 256 characters or fewer".into(),
+        ));
     }
     if m.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Market name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Market name cannot be empty".into(),
+        ));
     }
     if m.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Market name must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Market name must be 256 characters or fewer".into(),
+        ));
     }
     if m.schedule.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Schedule must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schedule must be 256 characters or fewer".into(),
+        ));
     }
     if !m.location_lat.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be a finite number".into(),
+        ));
     }
     if m.location_lat < -90.0 || m.location_lat > 90.0 {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
     }
     if !m.location_lon.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be a finite number".into(),
+        ));
     }
     if m.location_lon < -180.0 || m.location_lon > 180.0 {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_listing(l: Listing) -> ExternResult<ValidateCallbackResult> {
     if l.product_name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Product name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Product name cannot be empty".into(),
+        ));
     }
     if l.product_name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Product name must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Product name must be 256 characters or fewer".into(),
+        ));
     }
     if !l.quantity_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite number".into(),
+        ));
     }
     if l.quantity_kg <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be positive".into(),
+        ));
     }
     if !l.price_per_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Price must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Price must be a finite number".into(),
+        ));
     }
     if l.price_per_kg < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Price cannot be negative".into(),
+        ));
     }
     // Allergen flags validation
     if l.allergen_flags.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 allergen flags".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 allergen flags".into(),
+        ));
     }
     for flag in &l.allergen_flags {
         if flag.trim().is_empty() {
-            return Ok(ValidateCallbackResult::Invalid("Allergen flag cannot be empty".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Allergen flag cannot be empty".into(),
+            ));
         }
         if flag.len() > 128 {
-            return Ok(ValidateCallbackResult::Invalid("Allergen flag too long (max 128 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Allergen flag too long (max 128 chars)".into(),
+            ));
         }
     }
     // Cultural markers validation
     if l.cultural_markers.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 cultural markers".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 cultural markers".into(),
+        ));
     }
     for marker in &l.cultural_markers {
         if marker.trim().is_empty() {
-            return Ok(ValidateCallbackResult::Invalid("Cultural marker cannot be empty".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Cultural marker cannot be empty".into(),
+            ));
         }
         if marker.len() > 128 {
-            return Ok(ValidateCallbackResult::Invalid("Cultural marker too long (max 128 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Cultural marker too long (max 128 chars)".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -254,10 +294,14 @@ fn validate_listing(l: Listing) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_order(o: Order) -> ExternResult<ValidateCallbackResult> {
     if !o.quantity_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite number".into(),
+        ));
     }
     if o.quantity_kg <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Order quantity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Order quantity must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -340,7 +384,12 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_market_type() {
-        let types = vec![MarketType::Farmers, MarketType::CSA, MarketType::FoodBank, MarketType::CoOp];
+        let types = vec![
+            MarketType::Farmers,
+            MarketType::CSA,
+            MarketType::FoodBank,
+            MarketType::CoOp,
+        ];
         for t in &types {
             let json = serde_json::to_string(t).unwrap();
             let back: MarketType = serde_json::from_str(&json).unwrap();
@@ -351,8 +400,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_listing_status() {
         let statuses = vec![
-            ListingStatus::Available, ListingStatus::Reserved,
-            ListingStatus::Sold, ListingStatus::Expired,
+            ListingStatus::Available,
+            ListingStatus::Reserved,
+            ListingStatus::Sold,
+            ListingStatus::Expired,
         ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
@@ -364,8 +415,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_order_status() {
         let statuses = vec![
-            OrderStatus::Pending, OrderStatus::Confirmed,
-            OrderStatus::Fulfilled, OrderStatus::Cancelled,
+            OrderStatus::Pending,
+            OrderStatus::Confirmed,
+            OrderStatus::Fulfilled,
+            OrderStatus::Cancelled,
         ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
@@ -513,7 +566,12 @@ mod tests {
 
     #[test]
     fn market_all_types_valid() {
-        for mt in [MarketType::Farmers, MarketType::CSA, MarketType::FoodBank, MarketType::CoOp] {
+        for mt in [
+            MarketType::Farmers,
+            MarketType::CSA,
+            MarketType::FoodBank,
+            MarketType::CoOp,
+        ] {
             let mut m = valid_market();
             m.market_type = mt;
             assert_valid(validate_market(m));
@@ -632,8 +690,12 @@ mod tests {
 
     #[test]
     fn listing_all_statuses_valid() {
-        for status in [ListingStatus::Available, ListingStatus::Reserved,
-                       ListingStatus::Sold, ListingStatus::Expired] {
+        for status in [
+            ListingStatus::Available,
+            ListingStatus::Reserved,
+            ListingStatus::Sold,
+            ListingStatus::Expired,
+        ] {
             let mut l = valid_listing();
             l.status = status;
             assert_valid(validate_listing(l));
@@ -696,8 +758,12 @@ mod tests {
 
     #[test]
     fn order_all_statuses_valid() {
-        for status in [OrderStatus::Pending, OrderStatus::Confirmed,
-                       OrderStatus::Fulfilled, OrderStatus::Cancelled] {
+        for status in [
+            OrderStatus::Pending,
+            OrderStatus::Confirmed,
+            OrderStatus::Fulfilled,
+            OrderStatus::Cancelled,
+        ] {
             let mut o = valid_order();
             o.status = status;
             assert_valid(validate_order(o));
@@ -733,9 +799,10 @@ mod tests {
             LinkTypes::ListingToOrder => "ListingToOrder",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }
@@ -928,7 +995,10 @@ mod tests {
     fn listing_too_many_allergens_rejected() {
         let mut l = valid_listing();
         l.allergen_flags = (0..51).map(|i| format!("allergen_{i}")).collect();
-        assert_invalid(validate_listing(l), "Cannot have more than 50 allergen flags");
+        assert_invalid(
+            validate_listing(l),
+            "Cannot have more than 50 allergen flags",
+        );
     }
 
     #[test]
@@ -942,7 +1012,10 @@ mod tests {
     fn listing_allergen_flag_too_long_rejected() {
         let mut l = valid_listing();
         l.allergen_flags = vec!["x".repeat(129)];
-        assert_invalid(validate_listing(l), "Allergen flag too long (max 128 chars)");
+        assert_invalid(
+            validate_listing(l),
+            "Allergen flag too long (max 128 chars)",
+        );
     }
 
     #[test]
@@ -974,7 +1047,10 @@ mod tests {
     fn listing_too_many_cultural_markers_rejected() {
         let mut l = valid_listing();
         l.cultural_markers = (0..51).map(|i| format!("marker_{i}")).collect();
-        assert_invalid(validate_listing(l), "Cannot have more than 50 cultural markers");
+        assert_invalid(
+            validate_listing(l),
+            "Cannot have more than 50 cultural markers",
+        );
     }
 
     #[test]
@@ -988,7 +1064,10 @@ mod tests {
     fn listing_cultural_marker_too_long_rejected() {
         let mut l = valid_listing();
         l.cultural_markers = vec!["x".repeat(129)];
-        assert_invalid(validate_listing(l), "Cultural marker too long (max 128 chars)");
+        assert_invalid(
+            validate_listing(l),
+            "Cultural marker too long (max 128 chars)",
+        );
     }
 
     // ── String length limit boundary tests ────────────────────────────────
@@ -1004,7 +1083,10 @@ mod tests {
     fn market_id_over_limit_rejected() {
         let mut m = valid_market();
         m.id = "A".repeat(257);
-        assert_invalid(validate_market(m), "Market ID must be 256 characters or fewer");
+        assert_invalid(
+            validate_market(m),
+            "Market ID must be 256 characters or fewer",
+        );
     }
 
     #[test]
@@ -1018,7 +1100,10 @@ mod tests {
     fn market_name_over_limit_rejected() {
         let mut m = valid_market();
         m.name = "A".repeat(257);
-        assert_invalid(validate_market(m), "Market name must be 256 characters or fewer");
+        assert_invalid(
+            validate_market(m),
+            "Market name must be 256 characters or fewer",
+        );
     }
 
     #[test]
@@ -1032,7 +1117,10 @@ mod tests {
     fn market_schedule_over_limit_rejected() {
         let mut m = valid_market();
         m.schedule = "S".repeat(257);
-        assert_invalid(validate_market(m), "Schedule must be 256 characters or fewer");
+        assert_invalid(
+            validate_market(m),
+            "Schedule must be 256 characters or fewer",
+        );
     }
 
     #[test]
@@ -1046,6 +1134,9 @@ mod tests {
     fn listing_product_name_over_limit_rejected() {
         let mut l = valid_listing();
         l.product_name = "P".repeat(257);
-        assert_invalid(validate_listing(l), "Product name must be 256 characters or fewer");
+        assert_invalid(
+            validate_listing(l),
+            "Product name must be 256 characters or fewer",
+        );
     }
 }

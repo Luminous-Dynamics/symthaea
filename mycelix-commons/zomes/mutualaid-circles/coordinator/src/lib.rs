@@ -4,13 +4,13 @@
 //! in the Mycelix Mutual Aid hApp. Implements mutual credit with automatic clearing.
 
 use hdk::prelude::*;
-use mutualaid_common::*;
 use mutualaid_circles_integrity::*;
-use std::collections::HashMap;
+use mutualaid_common::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use std::collections::HashMap;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -128,8 +128,18 @@ pub fn create_circle(input: CreateCircleInput) -> ExternResult<Record> {
     let line_hash = create_entry(EntryTypes::CreditLine(credit_line))?;
 
     // Create links
-    create_link(action_hash.clone(), founder.clone(), LinkTypes::CircleToMembers, ())?;
-    create_link(founder.clone(), action_hash.clone(), LinkTypes::MemberToCircles, ())?;
+    create_link(
+        action_hash.clone(),
+        founder.clone(),
+        LinkTypes::CircleToMembers,
+        (),
+    )?;
+    create_link(
+        founder.clone(),
+        action_hash.clone(),
+        LinkTypes::MemberToCircles,
+        (),
+    )?;
     create_link(founder, line_hash, LinkTypes::MemberToCreditLines, ())?;
 
     // Link to all circles
@@ -203,7 +213,10 @@ pub struct UpdateCreditCircleInput {
 #[hdk_extern]
 pub fn update_circle(input: UpdateCreditCircleInput) -> ExternResult<ActionHash> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "update_circle")?;
-    update_entry(input.original_action_hash, EntryTypes::CreditCircle(input.updated_entry))
+    update_entry(
+        input.original_action_hash,
+        EntryTypes::CreditCircle(input.updated_entry),
+    )
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -216,7 +229,10 @@ pub struct UpdateCreditLineInput {
 #[hdk_extern]
 pub fn update_credit_line(input: UpdateCreditLineInput) -> ExternResult<ActionHash> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "update_credit_line")?;
-    update_entry(input.original_action_hash, EntryTypes::CreditLine(input.updated_entry))
+    update_entry(
+        input.original_action_hash,
+        EntryTypes::CreditLine(input.updated_entry),
+    )
 }
 
 // =============================================================================
@@ -231,14 +247,17 @@ pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Get the circle to check default credit limit
-    let circle_record = get(input.circle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".to_string())))?;
+    let circle_record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Circle not found".to_string())),
+    )?;
 
     let circle: CreditCircle = circle_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse circle".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse circle".to_string()
+        )))?;
 
     if !circle.active {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -270,9 +289,24 @@ pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
     let line_hash = create_entry(EntryTypes::CreditLine(credit_line))?;
 
     // Create links
-    create_link(input.circle_hash.clone(), member.clone(), LinkTypes::CircleToMembers, ())?;
-    create_link(member.clone(), input.circle_hash.clone(), LinkTypes::MemberToCircles, ())?;
-    create_link(member, line_hash.clone(), LinkTypes::MemberToCreditLines, ())?;
+    create_link(
+        input.circle_hash.clone(),
+        member.clone(),
+        LinkTypes::CircleToMembers,
+        (),
+    )?;
+    create_link(
+        member.clone(),
+        input.circle_hash.clone(),
+        LinkTypes::MemberToCircles,
+        (),
+    )?;
+    create_link(
+        member,
+        line_hash.clone(),
+        LinkTypes::MemberToCreditLines,
+        (),
+    )?;
 
     get_latest_record(line_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created credit line".to_string()
@@ -291,12 +325,7 @@ pub fn get_my_credit_line_for_circle(circle_hash: ActionHash) -> ExternResult<Op
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get_latest_record(hash)? {
-                if let Some(line) = record
-                    .entry()
-                    .to_app_option::<CreditLine>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(line) = record.entry().to_app_option::<CreditLine>().ok().flatten() {
                     if line.circle_hash == circle_hash {
                         return Ok(Some(record));
                     }
@@ -338,28 +367,32 @@ pub fn transfer(input: TransferInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Get sender's credit line
-    let from_line_record = get_my_credit_line_for_circle(input.circle_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "You are not a member of this circle".to_string()
-        )))?;
+    let from_line_record =
+        get_my_credit_line_for_circle(input.circle_hash.clone())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("You are not a member of this circle".to_string())
+        ))?;
 
     let mut from_line: CreditLine = from_line_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse credit line".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse credit line".to_string()
+        )))?;
 
     // Get recipient's credit line
     let to_line_record = get_credit_line_for_member(input.circle_hash.clone(), input.to.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Recipient is not a member of this circle".to_string()
-        )))?;
+        "Recipient is not a member of this circle".to_string()
+    )))?;
 
     let mut to_line: CreditLine = to_line_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse credit line".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse credit line".to_string()
+        )))?;
 
     // Check if sender has enough credit
     let new_from_balance = from_line.balance - input.amount;
@@ -402,9 +435,19 @@ pub fn transfer(input: TransferInput) -> ExternResult<Record> {
     update_entry(to_line_hash, EntryTypes::CreditLine(to_line))?;
 
     // Create links
-    create_link(input.circle_hash, tx_hash.clone(), LinkTypes::CircleToTransactions, ())?;
+    create_link(
+        input.circle_hash,
+        tx_hash.clone(),
+        LinkTypes::CircleToTransactions,
+        (),
+    )?;
     create_link(from, tx_hash.clone(), LinkTypes::MemberToTransactions, ())?;
-    create_link(input.to, tx_hash.clone(), LinkTypes::MemberToTransactions, ())?;
+    create_link(
+        input.to,
+        tx_hash.clone(),
+        LinkTypes::MemberToTransactions,
+        (),
+    )?;
 
     get_latest_record(tx_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created transaction".to_string()
@@ -424,12 +467,7 @@ fn get_credit_line_for_member(
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get_latest_record(hash)? {
-                if let Some(line) = record
-                    .entry()
-                    .to_app_option::<CreditLine>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(line) = record.entry().to_app_option::<CreditLine>().ok().flatten() {
                     if line.circle_hash == circle_hash {
                         return Ok(Some(record));
                     }
@@ -499,16 +537,17 @@ pub fn get_circle_transactions(circle_hash: ActionHash) -> ExternResult<Vec<Reco
 #[hdk_extern]
 pub fn get_my_balance_in_circle(circle_hash: ActionHash) -> ExternResult<Balance> {
     let agent = agent_info()?.agent_initial_pubkey;
-    let line_record = get_my_credit_line_for_circle(circle_hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "You are not a member of this circle".to_string()
-        )))?;
+    let line_record = get_my_credit_line_for_circle(circle_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("You are not a member of this circle".to_string())
+    ))?;
 
     let line: CreditLine = line_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse credit line".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse credit line".to_string()
+        )))?;
 
     let credit_available = if line.balance < 0 {
         line.credit_limit as i64 + line.balance
@@ -533,7 +572,8 @@ pub fn get_circle_balances(circle_hash: ActionHash) -> ExternResult<Vec<Balance>
 
     let mut balances = Vec::new();
     for member in members {
-        if let Some(line_record) = get_credit_line_for_member(circle_hash.clone(), member.clone())? {
+        if let Some(line_record) = get_credit_line_for_member(circle_hash.clone(), member.clone())?
+        {
             if let Some(line) = line_record
                 .entry()
                 .to_app_option::<CreditLine>()
@@ -575,7 +615,9 @@ pub fn run_clearing(input: ClearingInput) -> ExternResult<Vec<Record>> {
     // Build a map of balances
     let mut balances: HashMap<AgentPubKey, i64> = HashMap::new();
     for member in &members {
-        if let Some(line_record) = get_credit_line_for_member(input.circle_hash.clone(), member.clone())? {
+        if let Some(line_record) =
+            get_credit_line_for_member(input.circle_hash.clone(), member.clone())?
+        {
             if let Some(line) = line_record
                 .entry()
                 .to_app_option::<CreditLine>()
@@ -639,7 +681,9 @@ pub fn run_clearing(input: ClearingInput) -> ExternResult<Vec<Record>> {
             }
 
             // Update credit lines
-            if let Some(debtor_line_record) = get_credit_line_for_member(input.circle_hash.clone(), debtor.clone())? {
+            if let Some(debtor_line_record) =
+                get_credit_line_for_member(input.circle_hash.clone(), debtor.clone())?
+            {
                 if let Some(mut line) = debtor_line_record
                     .entry()
                     .to_app_option::<CreditLine>()
@@ -653,7 +697,9 @@ pub fn run_clearing(input: ClearingInput) -> ExternResult<Vec<Record>> {
                 }
             }
 
-            if let Some(creditor_line_record) = get_credit_line_for_member(input.circle_hash.clone(), creditor.clone())? {
+            if let Some(creditor_line_record) =
+                get_credit_line_for_member(input.circle_hash.clone(), creditor.clone())?
+            {
                 if let Some(mut line) = creditor_line_record
                     .entry()
                     .to_app_option::<CreditLine>()
@@ -683,14 +729,17 @@ pub fn adjust_credit_limit(input: AdjustCreditLimitInput) -> ExternResult<Record
     let now = sys_time()?;
 
     // Get circle to check max limit
-    let circle_record = get(input.circle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".to_string())))?;
+    let circle_record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Circle not found".to_string())),
+    )?;
 
     let circle: CreditCircle = circle_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse circle".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse circle".to_string()
+        )))?;
 
     if input.new_limit > circle.max_credit_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -708,7 +757,9 @@ pub fn adjust_credit_limit(input: AdjustCreditLimitInput) -> ExternResult<Record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse credit line".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse credit line".to_string()
+        )))?;
 
     // Check if new limit would put member over limit
     if line.balance < 0 && line.balance.abs() > input.new_limit {
@@ -738,7 +789,12 @@ fn generate_id(prefix: &str) -> String {
     let agent = agent_info()
         .map(|info| info.agent_initial_pubkey.to_string())
         .unwrap_or_default();
-    format!("{}_{}_{}",  prefix, now.as_micros(), &agent[..8.min(agent.len())])
+    format!(
+        "{}_{}_{}",
+        prefix,
+        now.as_micros(),
+        &agent[..8.min(agent.len())]
+    )
 }
 
 /// Anchor for all circles
@@ -1199,7 +1255,10 @@ mod tests {
                 active: true,
             },
         };
-        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            input.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(input.updated_entry.name, "Updated Circle");
         assert_eq!(input.updated_entry.default_credit_limit, 2000);
     }
@@ -1279,7 +1338,10 @@ mod tests {
                 last_activity: Timestamp::from_micros(200),
             },
         };
-        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(
+            input.original_action_hash,
+            ActionHash::from_raw_36(vec![0xdb; 36])
+        );
         assert_eq!(input.updated_entry.credit_limit, 2000);
         assert_eq!(input.updated_entry.balance, 500);
     }
@@ -1325,7 +1387,10 @@ mod tests {
         };
         let cloned = input.clone();
         assert_eq!(cloned.original_action_hash, input.original_action_hash);
-        assert_eq!(cloned.updated_entry.credit_limit, input.updated_entry.credit_limit);
+        assert_eq!(
+            cloned.updated_entry.credit_limit,
+            input.updated_entry.credit_limit
+        );
         assert_eq!(cloned.updated_entry.status, input.updated_entry.status);
     }
 }

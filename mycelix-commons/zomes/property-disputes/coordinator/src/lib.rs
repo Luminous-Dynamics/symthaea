@@ -1,10 +1,10 @@
 //! Property Disputes Coordinator Zome
 use hdk::prelude::*;
-use property_disputes_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_proposal, requirement_for_voting,
+    gate_consciousness, requirement_for_proposal, requirement_for_voting, GovernanceEligibility,
+    GovernanceRequirement,
 };
+use property_disputes_integrity::*;
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
@@ -21,7 +21,6 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     // Return the deterministic entry hash
     hash_entry(&anchor)
 }
-
 
 fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
     let Some(details) = get_details(action_hash, GetOptions::default())? else {
@@ -60,8 +59,18 @@ pub fn file_dispute(input: FileDisputeInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::PropertyDispute(dispute))?;
-    create_link(anchor_hash(&input.property_id)?, action_hash.clone(), LinkTypes::PropertyToDisputes, ())?;
-    create_link(anchor_hash(&input.claimant_did)?, action_hash.clone(), LinkTypes::ClaimantToDisputes, ())?;
+    create_link(
+        anchor_hash(&input.property_id)?,
+        action_hash.clone(),
+        LinkTypes::PropertyToDisputes,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&input.claimant_did)?,
+        action_hash.clone(),
+        LinkTypes::ClaimantToDisputes,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -90,7 +99,12 @@ pub fn file_ownership_claim(input: FileClaimInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::OwnershipClaim(claim))?;
-    create_link(anchor_hash(&input.property_id)?, action_hash.clone(), LinkTypes::PropertyToClaims, ())?;
+    create_link(
+        anchor_hash(&input.property_id)?,
+        action_hash.clone(),
+        LinkTypes::PropertyToClaims,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -105,22 +119,42 @@ pub struct FileClaimInput {
 #[hdk_extern]
 pub fn escalate_to_justice(input: EscalateInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "escalate_to_justice")?;
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::PropertyDispute,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
-        if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
+        if let Some(dispute) = record
+            .entry()
+            .to_app_option::<PropertyDispute>()
+            .ok()
+            .flatten()
+        {
             if dispute.id == input.dispute_id {
                 let updated = PropertyDispute {
                     status: DisputeStatus::Arbitration,
                     justice_case_id: Some(input.justice_case_id.clone()),
                     ..dispute
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PropertyDispute(updated))?;
-                create_link(action_hash.clone(), anchor_hash(&input.justice_case_id)?, LinkTypes::DisputeToJustice, ())?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::PropertyDispute(updated),
+                )?;
+                create_link(
+                    action_hash.clone(),
+                    anchor_hash(&input.justice_case_id)?,
+                    LinkTypes::DisputeToJustice,
+                    (),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Dispute not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -132,22 +166,41 @@ pub struct EscalateInput {
 #[hdk_extern]
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "resolve_dispute")?;
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::PropertyDispute,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
-        if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
+        if let Some(dispute) = record
+            .entry()
+            .to_app_option::<PropertyDispute>()
+            .ok()
+            .flatten()
+        {
             if dispute.id == input.dispute_id {
                 let now = sys_time()?;
                 let updated = PropertyDispute {
-                    status: if input.dismissed { DisputeStatus::Dismissed } else { DisputeStatus::Resolved },
+                    status: if input.dismissed {
+                        DisputeStatus::Dismissed
+                    } else {
+                        DisputeStatus::Resolved
+                    },
                     resolved: Some(now),
                     ..dispute
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PropertyDispute(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::PropertyDispute(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Dispute not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -159,8 +212,15 @@ pub struct ResolveDisputeInput {
 #[hdk_extern]
 pub fn get_property_disputes(property_id: String) -> ExternResult<Vec<Record>> {
     let mut disputes = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&property_id)?, LinkTypes::PropertyToDisputes)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&property_id)?, LinkTypes::PropertyToDisputes)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             disputes.push(record);
         }
     }
@@ -171,11 +231,18 @@ pub fn get_property_disputes(property_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_dispute(dispute_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::PropertyDispute,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
+        if let Some(dispute) = record
+            .entry()
+            .to_app_option::<PropertyDispute>()
+            .ok()
+            .flatten()
+        {
             if dispute.id == dispute_id {
                 return Ok(Some(record));
             }
@@ -188,8 +255,15 @@ pub fn get_dispute(dispute_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_claimant_disputes(claimant_did: String) -> ExternResult<Vec<Record>> {
     let mut disputes = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&claimant_did)?, LinkTypes::ClaimantToDisputes)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&claimant_did)?, LinkTypes::ClaimantToDisputes)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             disputes.push(record);
         }
     }
@@ -200,8 +274,15 @@ pub fn get_claimant_disputes(claimant_did: String) -> ExternResult<Vec<Record>> 
 #[hdk_extern]
 pub fn get_property_claims(property_id: String) -> ExternResult<Vec<Record>> {
     let mut claims = Vec::new();
-    for link in get_links(LinkQuery::try_new(anchor_hash(&property_id)?, LinkTypes::PropertyToClaims)?, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+    for link in get_links(
+        LinkQuery::try_new(anchor_hash(&property_id)?, LinkTypes::PropertyToClaims)?,
+        GetStrategy::default(),
+    )? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             claims.push(record);
         }
     }
@@ -213,22 +294,35 @@ pub fn get_property_claims(property_id: String) -> ExternResult<Vec<Record>> {
 pub fn update_dispute_status(input: UpdateDisputeStatusInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "update_dispute_status")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::PropertyDispute,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
+        if let Some(dispute) = record
+            .entry()
+            .to_app_option::<PropertyDispute>()
+            .ok()
+            .flatten()
+        {
             if dispute.id == input.dispute_id {
                 let updated = PropertyDispute {
                     status: input.new_status,
                     ..dispute
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PropertyDispute(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::PropertyDispute(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Dispute not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -242,18 +336,29 @@ pub struct UpdateDisputeStatusInput {
 pub fn update_claim_status(input: UpdateClaimStatusInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_voting(), "update_claim_status")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::OwnershipClaim)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::OwnershipClaim,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(claim) = record.entry().to_app_option::<OwnershipClaim>().ok().flatten() {
+        if let Some(claim) = record
+            .entry()
+            .to_app_option::<OwnershipClaim>()
+            .ok()
+            .flatten()
+        {
             if claim.id == input.claim_id {
                 let updated = OwnershipClaim {
                     status: input.new_status,
                     ..claim
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::OwnershipClaim(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::OwnershipClaim(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -271,27 +376,47 @@ pub struct UpdateClaimStatusInput {
 pub fn add_dispute_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "add_dispute_evidence")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::PropertyDispute,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
+        if let Some(dispute) = record
+            .entry()
+            .to_app_option::<PropertyDispute>()
+            .ok()
+            .flatten()
+        {
             if dispute.id == input.dispute_id {
                 // Only parties can add evidence
-                if dispute.claimant_did != input.submitter_did && dispute.respondent_did != input.submitter_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only parties can add evidence".into())));
+                if dispute.claimant_did != input.submitter_did
+                    && dispute.respondent_did != input.submitter_did
+                {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only parties can add evidence".into()
+                    )));
                 }
 
                 let mut evidence_ids = dispute.evidence_ids.clone();
                 evidence_ids.push(input.evidence_id);
 
-                let updated = PropertyDispute { evidence_ids, ..dispute };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PropertyDispute(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let updated = PropertyDispute {
+                    evidence_ids,
+                    ..dispute
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::PropertyDispute(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Dispute not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -305,12 +430,19 @@ pub struct AddEvidenceInput {
 #[hdk_extern]
 pub fn get_disputes_by_status(status: DisputeStatus) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::PropertyDispute,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
     for record in query(filter)? {
-        if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
+        if let Some(dispute) = record
+            .entry()
+            .to_app_option::<PropertyDispute>()
+            .ok()
+            .flatten()
+        {
             if dispute.status == status {
                 results.push(record);
             }
@@ -323,11 +455,18 @@ pub fn get_disputes_by_status(status: DisputeStatus) -> ExternResult<Vec<Record>
 #[hdk_extern]
 pub fn get_ownership_claim(claim_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::OwnershipClaim)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::OwnershipClaim,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(claim) = record.entry().to_app_option::<OwnershipClaim>().ok().flatten() {
+        if let Some(claim) = record
+            .entry()
+            .to_app_option::<OwnershipClaim>()
+            .ok()
+            .flatten()
+        {
             if claim.id == claim_id {
                 return Ok(Some(record));
             }
@@ -341,23 +480,39 @@ pub fn get_ownership_claim(claim_id: String) -> ExternResult<Option<Record>> {
 pub fn add_claim_document(input: AddDocumentInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "add_claim_document")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::OwnershipClaim)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::OwnershipClaim,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(claim) = record.entry().to_app_option::<OwnershipClaim>().ok().flatten() {
+        if let Some(claim) = record
+            .entry()
+            .to_app_option::<OwnershipClaim>()
+            .ok()
+            .flatten()
+        {
             if claim.id == input.claim_id {
                 // Only claimant can add documents
                 if claim.claimant_did != input.submitter_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only claimant can add documents".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only claimant can add documents".into()
+                    )));
                 }
 
                 let mut docs = claim.supporting_documents.clone();
                 docs.push(input.document_id);
 
-                let updated = OwnershipClaim { supporting_documents: docs, ..claim };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::OwnershipClaim(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let updated = OwnershipClaim {
+                    supporting_documents: docs,
+                    ..claim
+                };
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::OwnershipClaim(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
@@ -375,12 +530,19 @@ pub struct AddDocumentInput {
 #[hdk_extern]
 pub fn get_respondent_disputes(respondent_did: String) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::PropertyDispute,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
     for record in query(filter)? {
-        if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
+        if let Some(dispute) = record
+            .entry()
+            .to_app_option::<PropertyDispute>()
+            .ok()
+            .flatten()
+        {
             if dispute.respondent_did == respondent_did {
                 results.push(record);
             }
@@ -699,7 +861,11 @@ mod tests {
             property_id: "prop-claim-full".to_string(),
             claimant_did: "did:key:z6MkClaimer".to_string(),
             claim_basis: ClaimBasis::AdversePossession,
-            supporting_documents: vec!["affidavit.pdf".to_string(), "tax-records.pdf".to_string(), "photos.zip".to_string()],
+            supporting_documents: vec![
+                "affidavit.pdf".to_string(),
+                "tax-records.pdf".to_string(),
+                "photos.zip".to_string(),
+            ],
         };
         let json = serde_json::to_string(&input).unwrap();
         let decoded: FileClaimInput = serde_json::from_str(&json).unwrap();

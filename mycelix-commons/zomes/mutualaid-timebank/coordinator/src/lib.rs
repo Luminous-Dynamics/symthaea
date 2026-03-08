@@ -7,8 +7,8 @@ use hdk::prelude::*;
 use mutualaid_common::*;
 use mutualaid_timebank_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -127,16 +127,16 @@ pub fn create_service_offer(input: CreateOfferInput) -> ExternResult<Record> {
     let action_hash = create_entry(EntryTypes::ServiceOffer(offer.clone()))?;
 
     // Link from agent to offer
-    create_link(
-        provider,
-        action_hash.clone(),
-        LinkTypes::AgentToOffers,
-        (),
-    )?;
+    create_link(provider, action_hash.clone(), LinkTypes::AgentToOffers, ())?;
 
     // Link from category anchor to offer
     let cat_anchor = category_anchor(&input.category)?;
-    create_link(cat_anchor, action_hash.clone(), LinkTypes::CategoryToOffers, ())?;
+    create_link(
+        cat_anchor,
+        action_hash.clone(),
+        LinkTypes::CategoryToOffers,
+        (),
+    )?;
 
     // Link to all offers
     let all_anchor = all_offers_anchor()?;
@@ -243,14 +243,17 @@ pub fn search_offers(input: SearchOffersInput) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn deactivate_offer(hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "deactivate_offer")?;
-    let record = get_latest_record(hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Offer not found".to_string())))?;
+    let record = get_latest_record(hash.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Offer not found".to_string()
+    )))?;
 
     let mut offer: ServiceOffer = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse offer".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse offer".to_string()
+        )))?;
 
     // Verify ownership
     let agent = agent_info()?.agent_initial_pubkey;
@@ -307,7 +310,12 @@ pub fn create_service_request(input: CreateRequestInput) -> ExternResult<Record>
 
     // Link from category anchor to request
     let cat_anchor = category_anchor(&input.category)?;
-    create_link(cat_anchor, action_hash.clone(), LinkTypes::CategoryToRequests, ())?;
+    create_link(
+        cat_anchor,
+        action_hash.clone(),
+        LinkTypes::CategoryToRequests,
+        (),
+    )?;
 
     // Link to all requests
     let all_anchor = all_requests_anchor()?;
@@ -458,10 +466,20 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<Record> {
 
     // Link from offer/request if applicable
     if let Some(offer_hash) = input.offer_hash {
-        create_link(offer_hash, action_hash.clone(), LinkTypes::OfferToExchange, ())?;
+        create_link(
+            offer_hash,
+            action_hash.clone(),
+            LinkTypes::OfferToExchange,
+            (),
+        )?;
     }
     if let Some(request_hash) = input.request_hash {
-        create_link(request_hash, action_hash.clone(), LinkTypes::RequestToExchange, ())?;
+        create_link(
+            request_hash,
+            action_hash.clone(),
+            LinkTypes::RequestToExchange,
+            (),
+        )?;
     }
 
     // Create time credit entry
@@ -520,14 +538,17 @@ pub fn get_exchanges_by_agent(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn confirm_exchange(hash: ActionHash) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "confirm_exchange")?;
-    let record = get_latest_record(hash.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".to_string())))?;
+    let record = get_latest_record(hash.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Exchange not found".to_string()
+    )))?;
 
     let mut exchange: TimeExchange = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse exchange".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse exchange".to_string()
+        )))?;
 
     let agent = agent_info()?.agent_initial_pubkey;
     if agent != exchange.provider && agent != exchange.recipient {
@@ -549,14 +570,17 @@ pub fn confirm_exchange(hash: ActionHash) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "rate_exchange")?;
-    let record = get(input.exchange_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".to_string())))?;
+    let record = get(input.exchange_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Exchange not found".to_string())
+    ))?;
 
     let mut exchange: TimeExchange = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not parse exchange".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse exchange".to_string()
+        )))?;
 
     let agent = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
@@ -608,12 +632,7 @@ pub fn get_balance_for_agent(agent: AgentPubKey) -> ExternResult<f64> {
     for link in links {
         if let Some(hash) = link.target.into_action_hash() {
             if let Some(record) = get_latest_record(hash)? {
-                if let Some(credit) = record
-                    .entry()
-                    .to_app_option::<TimeCredit>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(credit) = record.entry().to_app_option::<TimeCredit>().ok().flatten() {
                     balance += credit.hours;
                 }
             }
@@ -633,7 +652,12 @@ fn generate_id(prefix: &str) -> String {
     let agent = agent_info()
         .map(|info| info.agent_initial_pubkey.to_string())
         .unwrap_or_default();
-    format!("{}_{}_{}",  prefix, now.as_micros(), &agent[..8.min(agent.len())])
+    format!(
+        "{}_{}_{}",
+        prefix,
+        now.as_micros(),
+        &agent[..8.min(agent.len())]
+    )
 }
 
 /// Simple anchor helper
@@ -671,7 +695,10 @@ mod tests {
             title: "Math Tutoring".to_string(),
             description: "Can help with algebra and calculus".to_string(),
             category: ServiceCategory::Tutoring,
-            qualifications: vec!["BS in Mathematics".to_string(), "5 years experience".to_string()],
+            qualifications: vec![
+                "BS in Mathematics".to_string(),
+                "5 years experience".to_string(),
+            ],
             availability: Availability::default(),
             location: LocationConstraint::Remote,
             min_duration_hours: 0.5,

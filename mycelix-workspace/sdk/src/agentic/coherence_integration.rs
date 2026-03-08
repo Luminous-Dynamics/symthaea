@@ -113,7 +113,8 @@ pub fn measure_collective_coherence(agents: &[&InstrumentalActor]) -> Collective
     }
 
     // Compute individual coherence values
-    let individual_coherences: Vec<f64> = agents.iter().map(|a| compute_agent_coherence(a)).collect();
+    let individual_coherences: Vec<f64> =
+        agents.iter().map(|a| compute_agent_coherence(a)).collect();
 
     let sum_individual: f64 = individual_coherences.iter().sum();
     let average_individual_coherence = sum_individual / agents.len() as f64;
@@ -600,7 +601,11 @@ pub fn cluster_agents_by_coherence(
 
     let cluster_count = coherence_clusters.len();
     let avg_cluster_size = if cluster_count > 0 {
-        coherence_clusters.iter().map(|c| c.members.len()).sum::<usize>() as f64 / cluster_count as f64
+        coherence_clusters
+            .iter()
+            .map(|c| c.members.len())
+            .sum::<usize>() as f64
+            / cluster_count as f64
     } else {
         0.0
     };

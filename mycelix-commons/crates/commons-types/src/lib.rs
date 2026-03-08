@@ -6,12 +6,12 @@
 //! - Bridge types for cross-domain communication
 //! - Geographic types shared across domains
 
-pub mod batch;
 pub mod anchors;
+pub mod batch;
 pub mod bridge_types;
 pub mod geo;
 
-pub use batch::*;
 pub use anchors::*;
+pub use batch::*;
 pub use bridge_types::*;
 pub use geo::*;

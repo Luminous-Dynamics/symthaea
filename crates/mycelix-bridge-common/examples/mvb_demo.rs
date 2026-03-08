@@ -18,13 +18,7 @@ fn now_us() -> u64 {
         .as_micros() as u64
 }
 
-fn demo_agent(
-    name: &str,
-    c_unified: f64,
-    identity: f64,
-    reputation: f64,
-    community: f64,
-) {
+fn demo_agent(name: &str, c_unified: f64, identity: f64, reputation: f64, community: f64) {
     let now = now_us();
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("Agent: {}", name);
@@ -38,14 +32,20 @@ fn demo_agent(
     println!("      identity:   {:.2} (25%)", profile.identity);
     println!("      reputation: {:.2} (25%)", profile.reputation);
     println!("      community:  {:.2} (30%)", profile.community);
-    println!("      engagement: {:.2} (20%) <- C_unified", profile.engagement);
+    println!(
+        "      engagement: {:.2} (20%) <- C_unified",
+        profile.engagement
+    );
     println!("      combined:   {:.3}", profile.combined_score());
     println!("      tier:       {:?}", profile.tier());
 
     // Step 2: Issue credential
     let cred = ConsciousnessCredential::from_unified_consciousness(
         format!("did:mycelix:{}", name),
-        c_unified, identity, reputation, community,
+        c_unified,
+        identity,
+        reputation,
+        community,
         "did:mycelix:bridge_demo".into(),
         now,
     );
@@ -71,8 +71,10 @@ fn demo_agent(
         } else {
             "no weight".into()
         };
-        println!("      {:<16} [{}] {} (tier={:?})",
-            action, icon, weight, result.tier);
+        println!(
+            "      {:<16} [{}] {} (tier={:?})",
+            action, icon, weight, result.tier
+        );
 
         if !result.reasons.is_empty() {
             for reason in &result.reasons {

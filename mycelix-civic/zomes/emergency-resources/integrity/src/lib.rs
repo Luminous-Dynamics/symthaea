@@ -1266,7 +1266,10 @@ mod tests {
         r.location = "x".repeat(4097);
         let result = validate_create_resource(fake_create(), r);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Resource location too long (max 4096)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Resource location too long (max 4096)"
+        );
     }
 
     // -- Request location (max 4096) --
@@ -1323,7 +1326,10 @@ mod tests {
         r.location = "x".repeat(4097);
         let result = validate_update_resource(r);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Resource location too long (max 4096)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Resource location too long (max 4096)"
+        );
     }
 
     // -- Update request location limit --

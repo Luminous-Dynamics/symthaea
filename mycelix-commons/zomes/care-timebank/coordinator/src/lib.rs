@@ -1,11 +1,11 @@
 //! Timebank Coordinator Zome
 //! Business logic for service offers, requests, exchanges, and time credits.
 
-use hdk::prelude::*;
 use care_timebank_integrity::*;
+use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 /// Helper to get an anchor entry hash
@@ -641,7 +641,10 @@ mod tests {
         assert_eq!(ServiceCategory::Gardening.anchor_key(), "gardening");
         assert_eq!(ServiceCategory::Tutoring.anchor_key(), "tutoring");
         assert_eq!(ServiceCategory::TechSupport.anchor_key(), "techsupport");
-        assert_eq!(ServiceCategory::Transportation.anchor_key(), "transportation");
+        assert_eq!(
+            ServiceCategory::Transportation.anchor_key(),
+            "transportation"
+        );
         assert_eq!(ServiceCategory::Companionship.anchor_key(), "companionship");
         assert_eq!(ServiceCategory::HealthSupport.anchor_key(), "healthsupport");
         assert_eq!(ServiceCategory::HomeRepair.anchor_key(), "homerepair");
@@ -649,7 +652,10 @@ mod tests {
         assert_eq!(ServiceCategory::Counseling.anchor_key(), "counseling");
         assert_eq!(ServiceCategory::ArtMusic.anchor_key(), "artmusic");
         assert_eq!(ServiceCategory::LanguageHelp.anchor_key(), "languagehelp");
-        assert_eq!(ServiceCategory::Administrative.anchor_key(), "administrative");
+        assert_eq!(
+            ServiceCategory::Administrative.anchor_key(),
+            "administrative"
+        );
     }
 
     #[test]
@@ -812,7 +818,10 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let decoded: CompleteExchangeInput = serde_json::from_str(&json).unwrap();
         assert!((decoded.hours - 0.0).abs() < f32::EPSILON);
-        assert_eq!(decoded.category, ServiceCategory::Other("Zero-hour test".to_string()));
+        assert_eq!(
+            decoded.category,
+            ServiceCategory::Other("Zero-hour test".to_string())
+        );
     }
 
     #[test]

@@ -21,6 +21,8 @@ pub mod api;
 pub mod attack_detection;
 pub mod calibration_engine;
 pub mod cascade_analysis;
+pub mod coherence_bridge;
+pub mod coherence_integration;
 pub mod constraints;
 pub mod coordination;
 pub mod cross_domain;
@@ -41,8 +43,6 @@ pub mod monitoring;
 pub mod multi_agent;
 pub mod orchestration;
 pub mod persistence;
-pub mod coherence_bridge;
-pub mod coherence_integration;
 pub mod phi_consensus;
 pub mod provenance;
 pub mod simulation;
@@ -195,6 +195,30 @@ pub use cascade_analysis::{
     TopologyAnalysis,
     TopologyRisk,
     TrustNetwork,
+};
+pub use coherence_bridge::{
+    check_coherence_for_action, coherence_to_kvector_dimension, measure_coherence,
+    output_to_vector, AgentCoherenceResult, CoherenceCheckResult, CoherenceHistory,
+    CoherenceMeasurementConfig, CoherenceState,
+};
+pub use coherence_integration::{
+    check_coherence_gating,
+    cluster_agents_by_coherence,
+    measure_collective_coherence,
+    CoherenceCluster,
+    // Clustering
+    CoherenceClusterResult,
+    // Coherence-gated actions
+    CoherenceGatingConfig,
+    CoherenceGatingRecommendation,
+    CoherenceGatingResult,
+    CollectiveCoherenceLevel,
+    // Collective Coherence
+    CollectiveCoherenceResult,
+    EmergentBehavior,
+    // Emergent behavior detection
+    EmergentBehaviorType,
+    StakesLevel,
 };
 pub use constraints::{enforce_constraints, AgentClass, AgentConstraints};
 pub use cross_domain::{
@@ -453,10 +477,6 @@ pub use persistence::{
     PersistenceError,
     PersistenceResult,
 };
-pub use coherence_bridge::{
-    check_coherence_for_action, measure_coherence, output_to_vector, coherence_to_kvector_dimension,
-    AgentCoherenceResult, CoherenceCheckResult, CoherenceHistory, CoherenceState, CoherenceMeasurementConfig,
-};
 pub use phi_consensus::{
     compute_phi_contributions,
     compute_phi_weighted_consensus,
@@ -471,25 +491,6 @@ pub use phi_consensus::{
     PhiConsensusStatus,
     // Phi contribution analysis
     PhiContribution,
-};
-pub use coherence_integration::{
-    check_coherence_gating,
-    cluster_agents_by_coherence,
-    measure_collective_coherence,
-    CollectiveCoherenceLevel,
-    // Collective Coherence
-    CollectiveCoherenceResult,
-    EmergentBehavior,
-    // Emergent behavior detection
-    EmergentBehaviorType,
-    CoherenceCluster,
-    // Clustering
-    CoherenceClusterResult,
-    // Coherence-gated actions
-    CoherenceGatingConfig,
-    CoherenceGatingRecommendation,
-    CoherenceGatingResult,
-    StakesLevel,
 };
 pub use provenance::{
     ChainBuilder,

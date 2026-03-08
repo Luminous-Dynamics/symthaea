@@ -963,10 +963,7 @@ mod tests {
     #[test]
     fn create_application_references_unicode_valid() {
         let mut app = valid_application();
-        app.references = vec![
-            "Ari Takahashi".to_string(),
-            "Muller".to_string(),
-        ];
+        app.references = vec!["Ari Takahashi".to_string(), "Muller".to_string()];
         assert_valid(validate_create_application(fake_create(), app));
     }
 
@@ -1332,10 +1329,7 @@ mod tests {
     #[test]
     fn create_application_unicode_references_valid() {
         let mut app = valid_application();
-        app.references = vec![
-            "Sakura Yamamoto".to_string(),
-            "Elena Petrova".to_string(),
-        ];
+        app.references = vec!["Sakura Yamamoto".to_string(), "Elena Petrova".to_string()];
         assert_valid(validate_create_application(fake_create(), app));
     }
 
@@ -1422,14 +1416,18 @@ mod tests {
     ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
-            LinkTypes::AllMembers | LinkTypes::AgentToMember |
-            LinkTypes::AllApplications | LinkTypes::ApplicantToApplication |
-            LinkTypes::Waitlist | LinkTypes::MemberToAgreement |
-            LinkTypes::UnitToAgreement => {
+            LinkTypes::AllMembers
+            | LinkTypes::AgentToMember
+            | LinkTypes::AllApplications
+            | LinkTypes::ApplicantToApplication
+            | LinkTypes::Waitlist
+            | LinkTypes::MemberToAgreement
+            | LinkTypes::UnitToAgreement => {
                 if tag.0.len() > 256 {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        format!("{:?} link tag too long (max 256 bytes)", link_type),
-                    ));
+                    return Ok(ValidateCallbackResult::Invalid(format!(
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
+                    )));
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
@@ -1438,7 +1436,10 @@ mod tests {
 
     #[test]
     fn link_tag_all_members_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::AllMembers, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::AllMembers,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1449,7 +1450,10 @@ mod tests {
 
     #[test]
     fn link_tag_waitlist_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::Waitlist, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::Waitlist,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1460,7 +1464,10 @@ mod tests {
 
     #[test]
     fn link_tag_unit_to_agreement_at_limit() {
-        assert_valid(validate_create_link_tag(LinkTypes::UnitToAgreement, vec![0u8; 256]));
+        assert_valid(validate_create_link_tag(
+            LinkTypes::UnitToAgreement,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]

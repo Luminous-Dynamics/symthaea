@@ -248,12 +248,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 EntryTypes::SpaceCapability(cap) => validate_create_capability(action, cap),
                 EntryTypes::SpaceInvitation(inv) => validate_create_invitation(action, inv),
-                EntryTypes::ResourceBooking(booking) => {
-                    validate_create_booking(action, booking)
-                }
-                EntryTypes::SpaceSchedule(schedule) => {
-                    validate_create_schedule(action, schedule)
-                }
+                EntryTypes::ResourceBooking(booking) => validate_create_booking(action, booking),
+                EntryTypes::SpaceSchedule(schedule) => validate_create_schedule(action, schedule),
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..

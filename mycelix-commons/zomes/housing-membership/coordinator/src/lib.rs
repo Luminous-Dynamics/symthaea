@@ -4,8 +4,8 @@
 use hdk::prelude::*;
 use housing_membership_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal, requirement_for_voting,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, requirement_for_voting,
+    GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(

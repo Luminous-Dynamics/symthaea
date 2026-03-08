@@ -4,8 +4,8 @@
 use food_preservation_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -61,11 +61,17 @@ pub fn start_batch(batch: PreservationBatch) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::PreservationBatch(batch.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_batches".to_string())))?;
-    create_link(anchor_hash("all_batches")?, action_hash.clone(), LinkTypes::AllBatches, ())?;
+    create_link(
+        anchor_hash("all_batches")?,
+        action_hash.clone(),
+        LinkTypes::AllBatches,
+        (),
+    )?;
     create_link(agent, action_hash.clone(), LinkTypes::AgentToBatch, ())?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created batch".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created batch".into()
+    )))
 }
 
 #[hdk_extern]
@@ -73,15 +79,22 @@ pub fn complete_batch(batch_hash: ActionHash) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "complete_batch")?;
     let record = get(batch_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Batch not found".into())))?;
-    let mut batch: PreservationBatch = record.entry()
+    let mut batch: PreservationBatch = record
+        .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid batch entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid batch entry".into()
+        )))?;
 
     batch.status = BatchStatus::Completed;
-    let new_hash = update_entry(record.action_address().clone(), &EntryTypes::PreservationBatch(batch))?;
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated batch".into())))
+    let new_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::PreservationBatch(batch),
+    )?;
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated batch".into()
+    )))
 }
 
 #[hdk_extern]
@@ -109,10 +122,16 @@ pub fn register_method(method: PreservationMethod) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::PreservationMethod(method))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_methods".to_string())))?;
-    create_link(anchor_hash("all_methods")?, action_hash.clone(), LinkTypes::AllMethods, ())?;
+    create_link(
+        anchor_hash("all_methods")?,
+        action_hash.clone(),
+        LinkTypes::AllMethods,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created method".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created method".into()
+    )))
 }
 
 #[hdk_extern]
@@ -134,10 +153,16 @@ pub fn register_storage(storage: StorageUnit) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::StorageUnit(storage))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_storage".to_string())))?;
-    create_link(anchor_hash("all_storage")?, action_hash.clone(), LinkTypes::AllStorage, ())?;
+    create_link(
+        anchor_hash("all_storage")?,
+        action_hash.clone(),
+        LinkTypes::AllStorage,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created storage".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created storage".into()
+    )))
 }
 
 #[hdk_extern]
@@ -239,7 +264,10 @@ mod tests {
         assert_eq!(decoded.method, "Lacto-fermentation");
         assert_eq!(decoded.quantity_kg, 5.0);
         assert_eq!(decoded.status, BatchStatus::InProgress);
-        assert_eq!(decoded.notes, Some("First fermentation attempt".to_string()));
+        assert_eq!(
+            decoded.notes,
+            Some("First fermentation attempt".to_string())
+        );
     }
 
     #[test]

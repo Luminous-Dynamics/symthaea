@@ -291,7 +291,7 @@ pub struct Mediation {
     /// Scheduled sessions
     pub sessions: Vec<MediationSession>,
     /// Proposed settlements
-    pub proposals: Vec<String>,  // Settlement IDs
+    pub proposals: Vec<String>, // Settlement IDs
     /// Created timestamp
     pub created_at: Timestamp,
     /// Deadline
@@ -2945,11 +2945,13 @@ mod tests {
     #[test]
     fn case_too_many_parties_rejected() {
         let mut case = make_case();
-        case.parties = (0..21).map(|i| CaseParty {
-            did: format!("did:example:party{}", i),
-            role: PartyRole::Witness,
-            joined_at: ts(),
-        }).collect();
+        case.parties = (0..21)
+            .map(|i| CaseParty {
+                did: format!("did:example:party{}", i),
+                role: PartyRole::Witness,
+                joined_at: ts(),
+            })
+            .collect();
         let result = validate_case(&case);
         assert!(is_invalid(&result));
         assert_eq!(invalid_msg(&result), "Too many parties (max 20)");
@@ -2969,7 +2971,10 @@ mod tests {
         ev.description = "d".repeat(4097);
         let result = validate_evidence(&ev);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Evidence description too long (max 4096)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Evidence description too long (max 4096)"
+        );
     }
 
     #[test]
@@ -2986,7 +2991,10 @@ mod tests {
         dec.reasoning = "r".repeat(16385);
         let result = validate_decision(&dec);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Decision reasoning too long (max 16384)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Decision reasoning too long (max 16384)"
+        );
     }
 
     #[test]
@@ -3009,22 +3017,29 @@ mod tests {
     #[test]
     fn enforcement_too_many_actions_rejected() {
         let mut enf = make_enforcement();
-        enf.actions = (0..101).map(|_| EnforcementAction {
-            action_type: EnforcementActionType::Notification,
-            target_happ: None,
-            target_entry: None,
-            executed_at: ts(),
-            result: "done".into(),
-        }).collect();
+        enf.actions = (0..101)
+            .map(|_| EnforcementAction {
+                action_type: EnforcementActionType::Notification,
+                target_happ: None,
+                target_entry: None,
+                executed_at: ts(),
+                result: "done".into(),
+            })
+            .collect();
         let result = validate_enforcement(&enf);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Too many enforcement actions (max 100)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Too many enforcement actions (max 100)"
+        );
     }
 
     #[test]
     fn restorative_too_many_participants_rejected() {
         let mut circle = make_restorative_circle();
-        circle.participants = (0..51).map(|i| make_circle_participant(&format!("did:example:p{}", i))).collect();
+        circle.participants = (0..51)
+            .map(|i| make_circle_participant(&format!("did:example:p{}", i)))
+            .collect();
         let result = validate_restorative(&circle);
         assert!(is_invalid(&result));
         assert_eq!(invalid_msg(&result), "Too many participants (max 50)");
@@ -3033,7 +3048,9 @@ mod tests {
     #[test]
     fn arbitration_too_many_arbitrators_rejected() {
         let arb = make_arbitration(
-            (0..11).map(|i| make_arbitrator(&format!("did:example:arb{}", i))).collect()
+            (0..11)
+                .map(|i| make_arbitrator(&format!("did:example:arb{}", i)))
+                .collect(),
         );
         let result = validate_arbitration(&arb);
         assert!(is_invalid(&result));

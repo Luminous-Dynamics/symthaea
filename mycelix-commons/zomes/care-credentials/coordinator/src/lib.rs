@@ -4,8 +4,8 @@
 use care_credentials_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -413,10 +413,16 @@ mod tests {
     fn credential_type_anchor_key_known_variants() {
         assert_eq!(CredentialType::FirstAid.anchor_key(), "firstaid");
         assert_eq!(CredentialType::CPR.anchor_key(), "cpr");
-        assert_eq!(CredentialType::ChildcareTraining.anchor_key(), "childcare_training");
+        assert_eq!(
+            CredentialType::ChildcareTraining.anchor_key(),
+            "childcare_training"
+        );
         assert_eq!(CredentialType::ElderCare.anchor_key(), "eldercare");
         assert_eq!(CredentialType::MentalHealthFirstAid.anchor_key(), "mhfa");
-        assert_eq!(CredentialType::BackgroundCheck.anchor_key(), "background_check");
+        assert_eq!(
+            CredentialType::BackgroundCheck.anchor_key(),
+            "background_check"
+        );
         assert_eq!(CredentialType::DrivingLicense.anchor_key(), "driving");
         assert_eq!(CredentialType::SpecialNeeds.anchor_key(), "special_needs");
     }
@@ -496,7 +502,10 @@ mod tests {
         };
         let json = serde_json::to_string(&cred).unwrap();
         let decoded: CareCredential = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.credential_type, CredentialType::Other("Doula Certification".to_string()));
+        assert_eq!(
+            decoded.credential_type,
+            CredentialType::Other("Doula Certification".to_string())
+        );
         assert!(decoded.metadata.contains("advanced"));
     }
 

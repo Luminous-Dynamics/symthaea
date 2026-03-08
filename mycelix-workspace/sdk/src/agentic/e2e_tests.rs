@@ -122,7 +122,10 @@ mod tests {
         println!("✓ Phase 1: Agent created with 10D K-Vector");
         println!("  Trust score: {:.3}", trust_score);
         println!("  Derived KREDIT cap: {}", derived_kredit);
-        println!("  k_coherence (coherence): {:.2}", agent.k_vector.k_coherence);
+        println!(
+            "  k_coherence (coherence): {:.2}",
+            agent.k_vector.k_coherence
+        );
     }
 
     // ========================================================================
@@ -305,8 +308,14 @@ mod tests {
         );
 
         println!("✓ Phase 5: Coherence dimension validated");
-        println!("  High coherence k_coherence: {:.2}", high_coherence.k_coherence);
-        println!("  Low coherence k_coherence: {:.2}", low_coherence.k_coherence);
+        println!(
+            "  High coherence k_coherence: {:.2}",
+            high_coherence.k_coherence
+        );
+        println!(
+            "  Low coherence k_coherence: {:.2}",
+            low_coherence.k_coherence
+        );
         println!("  Updated k_coherence: {:.2}", updated.k_coherence);
     }
 
@@ -326,7 +335,10 @@ mod tests {
         let mut agent = create_test_agent("epistemic-agent-001", initial_kvector);
         println!("  Created agent: {}", agent.agent_id.as_str());
         println!("  Initial trust: {:.3}", agent.k_vector.trust_score());
-        println!("  Initial coherence (k_coherence): {:.2}", agent.k_vector.k_coherence);
+        println!(
+            "  Initial coherence (k_coherence): {:.2}",
+            agent.k_vector.k_coherence
+        );
 
         // === STEP 2: Record Behavior & Update K-Vector ===
         println!("\n─── Step 2: Behavior → K-Vector ───");
@@ -650,7 +662,10 @@ mod tests {
         println!("  KREDIT Cap: {}", agent.kredit_cap);
         println!("  k_r (Reputation): {:.2}", agent.k_vector.k_r);
         println!("  k_p (Performance): {:.2}", agent.k_vector.k_p);
-        println!("  k_coherence (Coherence): {:.2}", agent.k_vector.k_coherence);
+        println!(
+            "  k_coherence (Coherence): {:.2}",
+            agent.k_vector.k_coherence
+        );
 
         // Verify improvement
         let final_cap = agent.kredit_cap;

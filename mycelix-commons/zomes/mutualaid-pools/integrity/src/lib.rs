@@ -282,33 +282,33 @@ fn validate_mutual_aid_pool(pool: &MutualAidPool) -> ExternResult<ValidateCallba
 
     if pool.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool ID must be 256 characters or fewer".into()
+            "Pool ID must be 256 characters or fewer".into(),
         ));
     }
 
     // Validate name is not empty
     if pool.name.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            PoolsError::EmptyName.to_string()
+            PoolsError::EmptyName.to_string(),
         ));
     }
 
     if pool.name.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool name must be 256 characters or fewer".into()
+            "Pool name must be 256 characters or fewer".into(),
         ));
     }
 
     if pool.description.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool description must be 4096 characters or fewer".into()
+            "Pool description must be 4096 characters or fewer".into(),
         ));
     }
 
     // Validate member count
     if pool.members.len() > 500 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot have more than 500 members".into()
+            "Cannot have more than 500 members".into(),
         ));
     }
 
@@ -317,9 +317,10 @@ fn validate_mutual_aid_pool(pool: &MutualAidPool) -> ExternResult<ValidateCallba
     for member in &pool.members {
         validate_did(member)?;
         if !seen_members.insert(member.as_str()) {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("Duplicate member DID: {}", member)
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Duplicate member DID: {}",
+                member
+            )));
         }
     }
 
@@ -327,40 +328,39 @@ fn validate_mutual_aid_pool(pool: &MutualAidPool) -> ExternResult<ValidateCallba
     if !pool.members.is_empty()
         && pool.disbursement_rules.min_approvals as usize > pool.members.len()
     {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "min_approvals ({}) exceeds member count ({})",
-                pool.disbursement_rules.min_approvals,
-                pool.members.len()
-            )
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "min_approvals ({}) exceeds member count ({})",
+            pool.disbursement_rules.min_approvals,
+            pool.members.len()
+        )));
     }
 
     // Validate contribution rules
     if pool.contribution_rules.max_withdrawal == 0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Max withdrawal must be greater than 0".into()
+            "Max withdrawal must be greater than 0".into(),
         ));
     }
 
     // Validate disbursement rules
     if pool.disbursement_rules.min_approvals == 0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Minimum approvals must be greater than 0".into()
+            "Minimum approvals must be greater than 0".into(),
         ));
     }
 
     if pool.disbursement_rules.approval_threshold_percent > 100 {
         return Ok(ValidateCallbackResult::Invalid(
             PoolsError::InvalidApprovalThreshold(
-                pool.disbursement_rules.approval_threshold_percent
-            ).to_string()
+                pool.disbursement_rules.approval_threshold_percent,
+            )
+            .to_string(),
         ));
     }
 
     if pool.disbursement_rules.max_disbursement == 0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Max disbursement must be greater than 0".into()
+            "Max disbursement must be greater than 0".into(),
         ));
     }
 
@@ -375,17 +375,17 @@ fn validate_contribution(contribution: &Contribution) -> ExternResult<ValidateCa
 
     if contribution.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Contribution ID must be 256 characters or fewer".into()
+            "Contribution ID must be 256 characters or fewer".into(),
         ));
     }
     if contribution.pool_id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool ID must be 256 characters or fewer".into()
+            "Pool ID must be 256 characters or fewer".into(),
         ));
     }
     if contribution.member_did.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Member DID must be 256 characters or fewer".into()
+            "Member DID must be 256 characters or fewer".into(),
         ));
     }
 
@@ -395,14 +395,14 @@ fn validate_contribution(contribution: &Contribution) -> ExternResult<ValidateCa
     // Validate amount is positive
     if contribution.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid(
-            PoolsError::ZeroAmount.to_string()
+            PoolsError::ZeroAmount.to_string(),
         ));
     }
 
     if let Some(ref note) = contribution.note {
         if note.len() > 4096 {
             return Ok(ValidateCallbackResult::Invalid(
-                "Contribution note must be 4096 characters or fewer".into()
+                "Contribution note must be 4096 characters or fewer".into(),
             ));
         }
     }
@@ -418,17 +418,17 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
 
     if disbursement.id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Disbursement ID must be 256 characters or fewer".into()
+            "Disbursement ID must be 256 characters or fewer".into(),
         ));
     }
     if disbursement.pool_id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool ID must be 256 characters or fewer".into()
+            "Pool ID must be 256 characters or fewer".into(),
         ));
     }
     if disbursement.recipient_did.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Recipient DID must be 256 characters or fewer".into()
+            "Recipient DID must be 256 characters or fewer".into(),
         ));
     }
 
@@ -438,32 +438,32 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
     // Validate amount is positive
     if disbursement.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid(
-            PoolsError::ZeroAmount.to_string()
+            PoolsError::ZeroAmount.to_string(),
         ));
     }
 
     // Validate reason is not empty
     if disbursement.reason.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
-            PoolsError::EmptyReason.to_string()
+            PoolsError::EmptyReason.to_string(),
         ));
     }
 
     if disbursement.reason.len() > 4096 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Disbursement reason must be 4096 characters or fewer".into()
+            "Disbursement reason must be 4096 characters or fewer".into(),
         ));
     }
 
     // Validate approver and rejector Vec limits
     if disbursement.approved_by.len() > 100 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot have more than 100 approvers".into()
+            "Cannot have more than 100 approvers".into(),
         ));
     }
     if disbursement.rejected_by.len() > 100 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot have more than 100 rejectors".into()
+            "Cannot have more than 100 rejectors".into(),
         ));
     }
 
@@ -477,13 +477,17 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
 
     // Check for overlap between approved_by and rejected_by (same person both approving and rejecting)
     {
-        let approver_set: std::collections::HashSet<&str> =
-            disbursement.approved_by.iter().map(|s| s.as_str()).collect();
+        let approver_set: std::collections::HashSet<&str> = disbursement
+            .approved_by
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
         for rejector in &disbursement.rejected_by {
             if approver_set.contains(rejector.as_str()) {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("DID appears in both approved_by and rejected_by: {}", rejector)
-                ));
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "DID appears in both approved_by and rejected_by: {}",
+                    rejector
+                )));
             }
         }
     }
@@ -493,9 +497,10 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
         let mut seen = std::collections::HashSet::new();
         for approver in &disbursement.approved_by {
             if !seen.insert(approver.as_str()) {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("Duplicate DID in approved_by: {}", approver)
-                ));
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Duplicate DID in approved_by: {}",
+                    approver
+                )));
             }
         }
     }
@@ -505,9 +510,10 @@ fn validate_disbursement(disbursement: &Disbursement) -> ExternResult<ValidateCa
         let mut seen = std::collections::HashSet::new();
         for rejector in &disbursement.rejected_by {
             if !seen.insert(rejector.as_str()) {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("Duplicate DID in rejected_by: {}", rejector)
-                ));
+                return Ok(ValidateCallbackResult::Invalid(format!(
+                    "Duplicate DID in rejected_by: {}",
+                    rejector
+                )));
             }
         }
     }
@@ -522,12 +528,12 @@ fn validate_pool_membership(membership: &PoolMembership) -> ExternResult<Validat
 
     if membership.pool_id.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Pool ID must be 256 characters or fewer".into()
+            "Pool ID must be 256 characters or fewer".into(),
         ));
     }
     if membership.member_did.len() > 256 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Member DID must be 256 characters or fewer".into()
+            "Member DID must be 256 characters or fewer".into(),
         ));
     }
 
@@ -625,7 +631,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 Ok(ValidateCallbackResult::Valid)
             }
         },
-        FlatOp::RegisterDeleteLink { link_type, action, .. } => {
+        FlatOp::RegisterDeleteLink {
+            link_type, action, ..
+        } => {
             let original_action = must_get_action(action.link_add_address.clone())?;
             let original_author = original_action.action().author().clone();
             if action.author != original_author {
@@ -644,9 +652,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 | LinkTypes::PoolToPendingDisbursement => Ok(ValidateCallbackResult::Valid),
             }
         }
-        FlatOp::StoreRecord(_)
-        | FlatOp::RegisterAgentActivity(_)
-        | FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreRecord(_) | FlatOp::RegisterAgentActivity(_) | FlatOp::RegisterUpdate(_) => {
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::RegisterDelete(OpDelete { action, .. }) => {
             let original_action = must_get_action(action.deletes_address.clone())?;
             let original_author = original_action.action().author().clone();
@@ -762,11 +770,7 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_pool_status() {
-        let statuses = vec![
-            PoolStatus::Active,
-            PoolStatus::Paused,
-            PoolStatus::Closed,
-        ];
+        let statuses = vec![PoolStatus::Active, PoolStatus::Paused, PoolStatus::Closed];
         for status in &statuses {
             let json = serde_json::to_string(status).unwrap();
             let back: PoolStatus = serde_json::from_str(&json).unwrap();
@@ -792,11 +796,7 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_member_role() {
-        let roles = vec![
-            MemberRole::Admin,
-            MemberRole::Member,
-            MemberRole::Observer,
-        ];
+        let roles = vec![MemberRole::Admin, MemberRole::Member, MemberRole::Observer];
         for role in &roles {
             let json = serde_json::to_string(role).unwrap();
             let back: MemberRole = serde_json::from_str(&json).unwrap();
@@ -937,20 +937,14 @@ mod tests {
     fn validate_pool_empty_name() {
         let mut pool = valid_pool();
         pool.name = String::new();
-        assert_invalid(
-            validate_mutual_aid_pool(&pool),
-            "Pool name cannot be empty",
-        );
+        assert_invalid(validate_mutual_aid_pool(&pool), "Pool name cannot be empty");
     }
 
     #[test]
     fn validate_pool_whitespace_only_name() {
         let mut pool = valid_pool();
         pool.name = "   ".to_string();
-        assert_invalid(
-            validate_mutual_aid_pool(&pool),
-            "Pool name cannot be empty",
-        );
+        assert_invalid(validate_mutual_aid_pool(&pool), "Pool name cannot be empty");
     }
 
     #[test]
@@ -1102,10 +1096,7 @@ mod tests {
     fn validate_contribution_zero_amount() {
         let mut contrib = valid_contribution();
         contrib.amount = 0;
-        assert_invalid(
-            validate_contribution(&contrib),
-            "Amount cannot be zero",
-        );
+        assert_invalid(validate_contribution(&contrib), "Amount cannot be zero");
     }
 
     #[test]
@@ -1173,10 +1164,7 @@ mod tests {
     fn validate_disbursement_zero_amount() {
         let mut disb = valid_disbursement();
         disb.amount = 0;
-        assert_invalid(
-            validate_disbursement(&disb),
-            "Amount cannot be zero",
-        );
+        assert_invalid(validate_disbursement(&disb), "Amount cannot be zero");
     }
 
     #[test]
@@ -1190,20 +1178,14 @@ mod tests {
     fn validate_disbursement_empty_reason() {
         let mut disb = valid_disbursement();
         disb.reason = String::new();
-        assert_invalid(
-            validate_disbursement(&disb),
-            "Reason cannot be empty",
-        );
+        assert_invalid(validate_disbursement(&disb), "Reason cannot be empty");
     }
 
     #[test]
     fn validate_disbursement_whitespace_reason() {
         let mut disb = valid_disbursement();
         disb.reason = "   ".to_string();
-        assert_invalid(
-            validate_disbursement(&disb),
-            "Reason cannot be empty",
-        );
+        assert_invalid(validate_disbursement(&disb), "Reason cannot be empty");
     }
 
     #[test]
@@ -1729,15 +1711,23 @@ mod tests {
 
     // ── Link tag validation tests ──────────────────────────────────────
 
-    fn validate_link_tag_for(link_type: LinkTypes, tag_bytes: Vec<u8>) -> ExternResult<ValidateCallbackResult> {
+    fn validate_link_tag_for(
+        link_type: LinkTypes,
+        tag_bytes: Vec<u8>,
+    ) -> ExternResult<ValidateCallbackResult> {
         let tag = LinkTag(tag_bytes);
         match link_type {
-            LinkTypes::AnchorToPool | LinkTypes::PoolToContribution | LinkTypes::PoolToDisbursement
-            | LinkTypes::PoolToMembership | LinkTypes::MemberToMembership
-            | LinkTypes::MemberToContribution | LinkTypes::MemberToDisbursement => {
+            LinkTypes::AnchorToPool
+            | LinkTypes::PoolToContribution
+            | LinkTypes::PoolToDisbursement
+            | LinkTypes::PoolToMembership
+            | LinkTypes::MemberToMembership
+            | LinkTypes::MemberToContribution
+            | LinkTypes::MemberToDisbursement => {
                 if tag.0.len() > 256 {
                     return Ok(ValidateCallbackResult::Invalid(format!(
-                        "{:?} link tag too long (max 256 bytes)", link_type
+                        "{:?} link tag too long (max 256 bytes)",
+                        link_type
                     )));
                 }
                 Ok(ValidateCallbackResult::Valid)
@@ -1755,7 +1745,10 @@ mod tests {
 
     #[test]
     fn test_link_anchor_to_pool_tag_at_limit() {
-        assert_valid(validate_link_tag_for(LinkTypes::AnchorToPool, vec![0u8; 256]));
+        assert_valid(validate_link_tag_for(
+            LinkTypes::AnchorToPool,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1768,7 +1761,10 @@ mod tests {
 
     #[test]
     fn test_link_pool_to_pending_disbursement_tag_at_limit() {
-        assert_valid(validate_link_tag_for(LinkTypes::PoolToPendingDisbursement, vec![0u8; 512]));
+        assert_valid(validate_link_tag_for(
+            LinkTypes::PoolToPendingDisbursement,
+            vec![0u8; 512],
+        ));
     }
 
     #[test]
@@ -1781,7 +1777,10 @@ mod tests {
 
     #[test]
     fn test_link_member_to_membership_tag_at_limit() {
-        assert_valid(validate_link_tag_for(LinkTypes::MemberToMembership, vec![0u8; 256]));
+        assert_valid(validate_link_tag_for(
+            LinkTypes::MemberToMembership,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1794,7 +1793,10 @@ mod tests {
 
     #[test]
     fn test_link_pool_to_contribution_tag_at_limit() {
-        assert_valid(validate_link_tag_for(LinkTypes::PoolToContribution, vec![0u8; 256]));
+        assert_valid(validate_link_tag_for(
+            LinkTypes::PoolToContribution,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1807,7 +1809,10 @@ mod tests {
 
     #[test]
     fn test_link_pool_to_disbursement_tag_at_limit() {
-        assert_valid(validate_link_tag_for(LinkTypes::PoolToDisbursement, vec![0u8; 256]));
+        assert_valid(validate_link_tag_for(
+            LinkTypes::PoolToDisbursement,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1820,7 +1825,10 @@ mod tests {
 
     #[test]
     fn test_link_pool_to_membership_tag_at_limit() {
-        assert_valid(validate_link_tag_for(LinkTypes::PoolToMembership, vec![0u8; 256]));
+        assert_valid(validate_link_tag_for(
+            LinkTypes::PoolToMembership,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1833,7 +1841,10 @@ mod tests {
 
     #[test]
     fn test_link_member_to_contribution_tag_at_limit() {
-        assert_valid(validate_link_tag_for(LinkTypes::MemberToContribution, vec![0u8; 256]));
+        assert_valid(validate_link_tag_for(
+            LinkTypes::MemberToContribution,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1846,7 +1857,10 @@ mod tests {
 
     #[test]
     fn test_link_member_to_disbursement_tag_at_limit() {
-        assert_valid(validate_link_tag_for(LinkTypes::MemberToDisbursement, vec![0u8; 256]));
+        assert_valid(validate_link_tag_for(
+            LinkTypes::MemberToDisbursement,
+            vec![0u8; 256],
+        ));
     }
 
     #[test]
@@ -1867,20 +1881,14 @@ mod tests {
     fn validate_pool_duplicate_members_rejected() {
         let mut pool = valid_pool();
         pool.members = vec![valid_did(), valid_did2(), valid_did()];
-        assert_invalid(
-            validate_mutual_aid_pool(&pool),
-            "Duplicate member DID",
-        );
+        assert_invalid(validate_mutual_aid_pool(&pool), "Duplicate member DID");
     }
 
     #[test]
     fn validate_pool_all_same_members_rejected() {
         let mut pool = valid_pool();
         pool.members = vec![valid_did(), valid_did(), valid_did()];
-        assert_invalid(
-            validate_mutual_aid_pool(&pool),
-            "Duplicate member DID",
-        );
+        assert_invalid(validate_mutual_aid_pool(&pool), "Duplicate member DID");
     }
 
     #[test]
@@ -2003,20 +2011,14 @@ mod tests {
     fn validate_disbursement_duplicate_approver() {
         let mut disb = valid_disbursement();
         disb.approved_by = vec![valid_did(), valid_did()];
-        assert_invalid(
-            validate_disbursement(&disb),
-            "Duplicate DID in approved_by",
-        );
+        assert_invalid(validate_disbursement(&disb), "Duplicate DID in approved_by");
     }
 
     #[test]
     fn validate_disbursement_duplicate_rejector() {
         let mut disb = valid_disbursement();
         disb.rejected_by = vec![valid_did(), valid_did()];
-        assert_invalid(
-            validate_disbursement(&disb),
-            "Duplicate DID in rejected_by",
-        );
+        assert_invalid(validate_disbursement(&disb), "Duplicate DID in rejected_by");
     }
 
     // ── DID injection attempts ──────────────────────────────────────────

@@ -2,8 +2,7 @@
 use hdk::prelude::*;
 use media_factcheck_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_proposal,
+    gate_consciousness, requirement_for_proposal, GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -19,7 +18,6 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
     hash_entry(&anchor)
 }
-
 
 fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
     let Some(details) = get_details(action_hash, GetOptions::default())? else {
@@ -56,11 +54,26 @@ pub fn submit_fact_check(input: SubmitFactCheckInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::FactCheck(check))?;
-    create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToFactChecks, ())?;
-    create_link(anchor_hash(&input.checker_did)?, action_hash.clone(), LinkTypes::CheckerToFactChecks, ())?;
+    create_link(
+        anchor_hash(&input.publication_id)?,
+        action_hash.clone(),
+        LinkTypes::PublicationToFactChecks,
+        (),
+    )?;
+    create_link(
+        anchor_hash(&input.checker_did)?,
+        action_hash.clone(),
+        LinkTypes::CheckerToFactChecks,
+        (),
+    )?;
 
     // Link claim text for cross-reference
-    create_link(anchor_hash(&input.claim_text)?, action_hash.clone(), LinkTypes::ClaimToFactCheck, ())?;
+    create_link(
+        anchor_hash(&input.claim_text)?,
+        action_hash.clone(),
+        LinkTypes::ClaimToFactCheck,
+        (),
+    )?;
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
@@ -79,9 +92,16 @@ pub struct SubmitFactCheckInput {
 #[hdk_extern]
 pub fn get_publication_fact_checks(publication_id: String) -> ExternResult<Vec<Record>> {
     let mut checks = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToFactChecks as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToFactChecks as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             checks.push(record);
         }
     }
@@ -91,9 +111,16 @@ pub fn get_publication_fact_checks(publication_id: String) -> ExternResult<Vec<R
 #[hdk_extern]
 pub fn search_fact_checks_for_claim(claim_text: String) -> ExternResult<Vec<Record>> {
     let mut checks = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&claim_text)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::ClaimToFactCheck as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&claim_text)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::ClaimToFactCheck as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             checks.push(record);
         }
     }
@@ -130,7 +157,9 @@ pub struct UpdateCredibilityInput {
 #[hdk_extern]
 pub fn get_fact_check(fact_check_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheck)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::FactCheck,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -147,9 +176,16 @@ pub fn get_fact_check(fact_check_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_checker_fact_checks(checker_did: String) -> ExternResult<Vec<Record>> {
     let mut checks = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&checker_did)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::CheckerToFactChecks as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&checker_did)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::CheckerToFactChecks as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             checks.push(record);
         }
     }
@@ -160,7 +196,9 @@ pub fn get_checker_fact_checks(checker_did: String) -> ExternResult<Vec<Record>>
 #[hdk_extern]
 pub fn get_fact_checks_by_verdict(verdict: FactCheckVerdict) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheck)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::FactCheck,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
@@ -191,7 +229,12 @@ pub fn dispute_fact_check(input: DisputeFactCheckInput) -> ExternResult<Record> 
     };
 
     let action_hash = create_entry(&EntryTypes::FactCheckDispute(dispute))?;
-    create_link(anchor_hash(&input.fact_check_id)?, action_hash.clone(), LinkTypes::FactCheckToDisputes, ())?;
+    create_link(
+        anchor_hash(&input.fact_check_id)?,
+        action_hash.clone(),
+        LinkTypes::FactCheckToDisputes,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -208,11 +251,18 @@ pub struct DisputeFactCheckInput {
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "resolve_dispute")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheckDispute)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::FactCheckDispute,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(dispute) = record.entry().to_app_option::<FactCheckDispute>().ok().flatten() {
+        if let Some(dispute) = record
+            .entry()
+            .to_app_option::<FactCheckDispute>()
+            .ok()
+            .flatten()
+        {
             if dispute.id == input.dispute_id {
                 let now = sys_time()?;
                 let updated = FactCheckDispute {
@@ -220,12 +270,18 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
                     resolved: Some(now),
                     ..dispute
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::FactCheckDispute(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::FactCheckDispute(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Dispute not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -238,9 +294,16 @@ pub struct ResolveDisputeInput {
 #[hdk_extern]
 pub fn get_fact_check_disputes(fact_check_id: String) -> ExternResult<Vec<Record>> {
     let mut disputes = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&fact_check_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::FactCheckToDisputes as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&fact_check_id)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::FactCheckToDisputes as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             disputes.push(record);
         }
     }
@@ -251,11 +314,18 @@ pub fn get_fact_check_disputes(fact_check_id: String) -> ExternResult<Vec<Record
 #[hdk_extern]
 pub fn get_source_credibility(source_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::SourceCredibility)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::SourceCredibility,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(source) = record.entry().to_app_option::<SourceCredibility>().ok().flatten() {
+        if let Some(source) = record
+            .entry()
+            .to_app_option::<SourceCredibility>()
+            .ok()
+            .flatten()
+        {
             if source.source_id == source_id {
                 return Ok(Some(record));
             }
@@ -268,7 +338,9 @@ pub fn get_source_credibility(source_id: String) -> ExternResult<Option<Record>>
 #[hdk_extern]
 pub fn get_checker_stats(checker_did: String) -> ExternResult<CheckerStats> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheck)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::FactCheck,
+        )?))
         .include_entries(true);
 
     let mut total_checks = 0;
@@ -283,7 +355,9 @@ pub fn get_checker_stats(checker_did: String) -> ExternResult<CheckerStats> {
                 match check.verdict {
                     FactCheckVerdict::True => true_count += 1,
                     FactCheckVerdict::False => false_count += 1,
-                    FactCheckVerdict::PartiallyTrue | FactCheckVerdict::Misleading => mixed_count += 1,
+                    FactCheckVerdict::PartiallyTrue | FactCheckVerdict::Misleading => {
+                        mixed_count += 1
+                    }
                     _ => {}
                 }
             }
@@ -333,9 +407,15 @@ pub fn aggregate_checker_stats(checker_did: String, verdicts: &[FactCheckVerdict
     for verdict in verdicts {
         total_checks += 1;
         let (t, f, m) = classify_verdict(verdict);
-        if t { true_count += 1; }
-        if f { false_count += 1; }
-        if m { mixed_count += 1; }
+        if t {
+            true_count += 1;
+        }
+        if f {
+            false_count += 1;
+        }
+        if m {
+            mixed_count += 1;
+        }
     }
 
     CheckerStats {
@@ -352,7 +432,9 @@ pub fn aggregate_checker_stats(checker_did: String, verdicts: &[FactCheckVerdict
 pub fn add_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "add_evidence")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheck)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::FactCheck,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -360,19 +442,27 @@ pub fn add_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
             if check.id == input.fact_check_id {
                 // Only checker can add evidence
                 if check.checker_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only checker can add evidence".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only checker can add evidence".into()
+                    )));
                 }
 
                 let mut evidence = check.evidence.clone();
                 evidence.extend(input.new_evidence);
 
                 let updated = FactCheck { evidence, ..check };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::FactCheck(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::FactCheck(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Fact check not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Fact check not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -387,26 +477,36 @@ pub struct AddEvidenceInput {
 pub fn update_verdict(input: UpdateVerdictInput) -> ExternResult<Record> {
     require_consciousness(&requirement_for_proposal(), "update_verdict")?;
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::FactCheck)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::FactCheck,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(check) = record.entry().to_app_option::<FactCheck>().ok().flatten() {
             if check.id == input.fact_check_id {
                 if check.checker_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only checker can update verdict".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only checker can update verdict".into()
+                    )));
                 }
 
                 let updated = FactCheck {
                     verdict: input.new_verdict,
                     ..check
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::FactCheck(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::FactCheck(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Fact check not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Fact check not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -439,13 +539,27 @@ struct LocalDisaster {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 enum LocalDisasterType {
-    Hurricane, Earthquake, Wildfire, Flood, Tornado,
-    Pandemic, Industrial, MassCasualty, CyberAttack,
-    Infrastructure, Other(String),
+    Hurricane,
+    Earthquake,
+    Wildfire,
+    Flood,
+    Tornado,
+    Pandemic,
+    Industrial,
+    MassCasualty,
+    CyberAttack,
+    Infrastructure,
+    Other(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalSeverityLevel { Level1, Level2, Level3, Level4, Level5 }
+enum LocalSeverityLevel {
+    Level1,
+    Level2,
+    Level3,
+    Level4,
+    Level5,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct LocalAffectedArea {
@@ -466,13 +580,29 @@ struct LocalOperationalZone {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalZonePriority { Critical, High, Medium, Low }
+enum LocalZonePriority {
+    Critical,
+    High,
+    Medium,
+    Low,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalZoneStatus { Unassessed, Active, Cleared, Hazardous, Evacuated }
+enum LocalZoneStatus {
+    Unassessed,
+    Active,
+    Cleared,
+    Hazardous,
+    Evacuated,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum LocalDisasterStatus { Declared, Active, Recovery, Closed }
+enum LocalDisasterStatus {
+    Declared,
+    Active,
+    Recovery,
+    Closed,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VerifyDisasterClaimInput {
@@ -498,7 +628,9 @@ pub struct DisasterVerificationResult {
 /// emergency_incidents directly using `call(CallTargetCell::Local, ...)`.
 /// Before rating a disaster-related claim, verify the disaster actually exists.
 #[hdk_extern]
-pub fn verify_disaster_claim(input: VerifyDisasterClaimInput) -> ExternResult<DisasterVerificationResult> {
+pub fn verify_disaster_claim(
+    input: VerifyDisasterClaimInput,
+) -> ExternResult<DisasterVerificationResult> {
     let response = call(
         CallTargetCell::Local,
         ZomeName::from("emergency_incidents"),
@@ -509,8 +641,9 @@ pub fn verify_disaster_claim(input: VerifyDisasterClaimInput) -> ExternResult<Di
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
 
             let active_count = records.len() as u32;
 
@@ -522,14 +655,18 @@ pub fn verify_disaster_claim(input: VerifyDisasterClaimInput) -> ExternResult<Di
                     .ok()
                     .flatten()
                 {
-                    let id_match = input.disaster_id.as_ref()
+                    let id_match = input
+                        .disaster_id
+                        .as_ref()
                         .map(|id| disaster.id == *id)
                         .unwrap_or(false);
 
-                    let keyword_match = disaster.title
+                    let keyword_match = disaster
+                        .title
                         .to_lowercase()
                         .contains(&input.claim_keyword.to_lowercase())
-                        || disaster.description
+                        || disaster
+                            .description
                             .to_lowercase()
                             .contains(&input.claim_keyword.to_lowercase());
 
@@ -674,8 +811,8 @@ mod tests {
             FactCheckVerdict::False,
             FactCheckVerdict::PartiallyTrue,
             FactCheckVerdict::Misleading,
-            FactCheckVerdict::Opinion,       // other
-            FactCheckVerdict::Unverifiable,  // other
+            FactCheckVerdict::Opinion,      // other
+            FactCheckVerdict::Unverifiable, // other
             FactCheckVerdict::True,
         ];
         let stats = aggregate_checker_stats("did:example:checker".into(), &verdicts);
@@ -687,7 +824,10 @@ mod tests {
 
     #[test]
     fn aggregate_preserves_checker_did() {
-        let stats = aggregate_checker_stats("did:example:specific-checker".into(), &[FactCheckVerdict::True]);
+        let stats = aggregate_checker_stats(
+            "did:example:specific-checker".into(),
+            &[FactCheckVerdict::True],
+        );
         assert_eq!(stats.checker_did, "did:example:specific-checker");
     }
 
@@ -892,9 +1032,21 @@ mod tests {
     #[test]
     fn epistemic_position_boundary_values() {
         let positions = vec![
-            EpistemicPosition { empirical: 0.0, normative: 0.0, mythic: 0.0 },
-            EpistemicPosition { empirical: 1.0, normative: 1.0, mythic: 1.0 },
-            EpistemicPosition { empirical: 0.5, normative: 0.5, mythic: 0.5 },
+            EpistemicPosition {
+                empirical: 0.0,
+                normative: 0.0,
+                mythic: 0.0,
+            },
+            EpistemicPosition {
+                empirical: 1.0,
+                normative: 1.0,
+                mythic: 1.0,
+            },
+            EpistemicPosition {
+                empirical: 0.5,
+                normative: 0.5,
+                mythic: 0.5,
+            },
         ];
         for pos in positions {
             let json = serde_json::to_string(&pos).expect("serialize");
@@ -994,6 +1146,9 @@ mod tests {
         let parsed: DisputeFactCheckInput = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(parsed.counter_evidence.len(), 2);
         assert!(!parsed.counter_evidence[0].supports_claim);
-        assert_eq!(parsed.counter_evidence[1].source_did.as_deref(), Some("did:example:expert"));
+        assert_eq!(
+            parsed.counter_evidence[1].source_did.as_deref(),
+            Some("did:example:expert")
+        );
     }
 }

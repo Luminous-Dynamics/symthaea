@@ -24,6 +24,12 @@ use crate::agentic::{
     cascade_analysis::{
         CascadeConfig, CascadeEngine, CascadeResult, EdgeType, NetworkAgent, NetworkEdge,
     },
+    // Coherence
+    coherence_bridge::{
+        check_zk_operation_coherence, coherence_weighted_attestation, export_coherence_metrics,
+        update_agent_coherence, CoherenceExport, CoherenceHistory, CoherenceMeasurementConfig,
+        CoherenceState, ZKCoherenceGatingResult, ZKOperationType,
+    },
     // Dashboard
     dashboard::{AlertSeverity, Dashboard, DashboardConfig, LiveMetrics, MetricsInput},
     // Differential privacy
@@ -40,12 +46,6 @@ use crate::agentic::{
     // Trust pipeline
     kvector_bridge::calculate_kredit_from_trust,
     lifecycle::record_uncertainty_outcome,
-    // Coherence
-    coherence_bridge::{
-        check_zk_operation_coherence, export_coherence_metrics, coherence_weighted_attestation,
-        update_agent_coherence, CoherenceHistory, CoherenceState, CoherenceExport,
-        CoherenceMeasurementConfig, ZKOperationType, ZKCoherenceGatingResult,
-    },
     // Uncertainty (GIS)
     uncertainty::{EscalationRequest, MoralActionGuidance, MoralUncertainty},
     // Verification
@@ -2031,7 +2031,8 @@ impl ZKIntegratedPipeline {
         statement: ProofStatement,
     ) -> Result<AgentTrustProofResult, IntegrationError> {
         // Check Phi coherence first
-        let gating = self.check_coherence_for_zk_operation(agent_id, ZKOperationType::GenerateProof)?;
+        let gating =
+            self.check_coherence_for_zk_operation(agent_id, ZKOperationType::GenerateProof)?;
 
         if !gating.permitted {
             return Err(IntegrationError::PhiCoherenceError(format!(
@@ -2055,7 +2056,8 @@ impl ZKIntegratedPipeline {
         base_attestation_weight: f64,
     ) -> Result<ZKAttestationResult, IntegrationError> {
         // Check if attester has sufficient coherence
-        let gating = self.check_coherence_for_zk_operation(from_agent, ZKOperationType::GenerateProof)?;
+        let gating =
+            self.check_coherence_for_zk_operation(from_agent, ZKOperationType::GenerateProof)?;
 
         if !gating.permitted {
             return Err(IntegrationError::PhiCoherenceError(format!(
@@ -2065,8 +2067,10 @@ impl ZKIntegratedPipeline {
         }
 
         // Apply Phi weighting to attestation
-        let weighted_attestation =
-            coherence_weighted_attestation(base_attestation_weight as f32, gating.current_coherence);
+        let weighted_attestation = coherence_weighted_attestation(
+            base_attestation_weight as f32,
+            gating.current_coherence,
+        );
 
         // Process with weighted attestation
         self.process_zk_attestation(from_agent, to_agent, weighted_attestation as f64)
@@ -3910,14 +3914,16 @@ mod tests {
         pipeline.register_agent_with_commitment(agent);
 
         // Should be able to generate proofs
-        let result =
-            pipeline.check_coherence_for_zk_operation("coherent-agent", ZKOperationType::GenerateProof);
+        let result = pipeline
+            .check_coherence_for_zk_operation("coherent-agent", ZKOperationType::GenerateProof);
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
 
         // Should be able to participate in Byzantine consensus
-        let result = pipeline
-            .check_coherence_for_zk_operation("coherent-agent", ZKOperationType::ByzantineConsensus);
+        let result = pipeline.check_coherence_for_zk_operation(
+            "coherent-agent",
+            ZKOperationType::ByzantineConsensus,
+        );
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
     }
@@ -3932,22 +3938,24 @@ mod tests {
         pipeline.register_agent_with_commitment(agent);
 
         // Should NOT be able to generate proofs
-        let result =
-            pipeline.check_coherence_for_zk_operation("degraded-agent", ZKOperationType::GenerateProof);
+        let result = pipeline
+            .check_coherence_for_zk_operation("degraded-agent", ZKOperationType::GenerateProof);
         assert!(result.is_ok());
         let gating = result.unwrap();
         assert!(!gating.permitted);
         assert_eq!(gating.current_state, CoherenceState::Degraded);
 
         // Should NOT participate in Byzantine consensus
-        let result = pipeline
-            .check_coherence_for_zk_operation("degraded-agent", ZKOperationType::ByzantineConsensus);
+        let result = pipeline.check_coherence_for_zk_operation(
+            "degraded-agent",
+            ZKOperationType::ByzantineConsensus,
+        );
         assert!(result.is_ok());
         assert!(!result.unwrap().permitted);
 
         // CAN verify proofs (low stakes)
-        let result =
-            pipeline.check_coherence_for_zk_operation("degraded-agent", ZKOperationType::VerifyProof);
+        let result = pipeline
+            .check_coherence_for_zk_operation("degraded-agent", ZKOperationType::VerifyProof);
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
     }

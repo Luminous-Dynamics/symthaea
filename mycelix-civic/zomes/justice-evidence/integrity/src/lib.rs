@@ -16,7 +16,13 @@ pub struct Evidence {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum EvidenceType { Document, Testimony, Transaction, CrossReference, Media }
+pub enum EvidenceType {
+    Document,
+    Testimony,
+    Transaction,
+    CrossReference,
+    Media,
+}
 
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -30,7 +36,12 @@ pub struct EvidenceVerification {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum VerificationStatus { Verified, Challenged, Rejected, Pending }
+pub enum VerificationStatus {
+    Verified,
+    Challenged,
+    Rejected,
+    Pending,
+}
 
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -52,7 +63,12 @@ pub enum EntryTypes {
 }
 
 #[hdk_link_types]
-pub enum LinkTypes { ComplaintToEvidence, SubmitterToEvidence, EvidenceToVerification, EvidenceToDispute }
+pub enum LinkTypes {
+    ComplaintToEvidence,
+    SubmitterToEvidence,
+    EvidenceToVerification,
+    EvidenceToDispute,
+}
 
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
@@ -69,54 +85,86 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_evidence(evidence: &Evidence) -> ExternResult<ValidateCallbackResult> {
     if !evidence.submitter.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Submitter must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Submitter must be a valid DID".into(),
+        ));
     }
     if evidence.submitter.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Submitter DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Submitter DID too long (max 256 chars)".into(),
+        ));
     }
     if evidence.content_hash.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Content hash required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content hash required".into(),
+        ));
     }
     if evidence.content_hash.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Content hash too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Content hash too long (max 256 chars)".into(),
+        ));
     }
     if evidence.description.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description cannot be empty".into(),
+        ));
     }
     if evidence.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description too long (max 4096 chars)".into(),
+        ));
     }
     if evidence.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence ID too long (max 256 chars)".into(),
+        ));
     }
     if evidence.complaint_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Complaint ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Complaint ID too long (max 256 chars)".into(),
+        ));
     }
     if evidence.title.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Title too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Title too long (max 256 chars)".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_evidence_verification(v: &EvidenceVerification) -> ExternResult<ValidateCallbackResult> {
+fn validate_evidence_verification(
+    v: &EvidenceVerification,
+) -> ExternResult<ValidateCallbackResult> {
     if !v.verifier.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Verifier must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Verifier must be a valid DID".into(),
+        ));
     }
     if v.verifier.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Verifier DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Verifier DID too long (max 256 chars)".into(),
+        ));
     }
     if v.evidence_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Evidence ID required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence ID required".into(),
+        ));
     }
     if v.evidence_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence ID too long (max 256 chars)".into(),
+        ));
     }
     if v.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Verification ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Verification ID too long (max 256 chars)".into(),
+        ));
     }
     if let Some(ref notes) = v.notes {
         if notes.len() > 8192 {
-            return Ok(ValidateCallbackResult::Invalid("Notes too long (max 8192 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Notes too long (max 8192 chars)".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -124,25 +172,39 @@ fn validate_evidence_verification(v: &EvidenceVerification) -> ExternResult<Vali
 
 fn validate_evidence_dispute(d: &EvidenceDispute) -> ExternResult<ValidateCallbackResult> {
     if !d.disputant.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Disputant must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disputant must be a valid DID".into(),
+        ));
     }
     if d.disputant.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Disputant DID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Disputant DID too long (max 256 chars)".into(),
+        ));
     }
     if d.evidence_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Evidence ID required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence ID required".into(),
+        ));
     }
     if d.evidence_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Evidence ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Evidence ID too long (max 256 chars)".into(),
+        ));
     }
     if d.reason.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Dispute reason required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute reason required".into(),
+        ));
     }
     if d.reason.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Dispute reason too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute reason too long (max 4096 chars)".into(),
+        ));
     }
     if d.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Dispute ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute ID too long (max 256 chars)".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -627,7 +689,10 @@ mod tests {
         ev.content_hash = "a".repeat(10_000);
         let result = validate_evidence(&ev);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Content hash too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Content hash too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -644,7 +709,10 @@ mod tests {
         ev.content_hash = "a".repeat(257);
         let result = validate_evidence(&ev);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Content hash too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Content hash too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -653,7 +721,10 @@ mod tests {
         ev.submitter = format!("did:example:{}", "x".repeat(10_000));
         let result = validate_evidence(&ev);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Submitter DID too long (max 256 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Submitter DID too long (max 256 chars)"
+        );
     }
 
     #[test]
@@ -697,7 +768,10 @@ mod tests {
         ev.description = "d".repeat(4097);
         let result = validate_evidence(&ev);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Description too long (max 4096 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Description too long (max 4096 chars)"
+        );
     }
 
     #[test]
@@ -723,7 +797,10 @@ mod tests {
         d.reason = "x".repeat(100_000);
         let result = validate_evidence_dispute(&d);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Dispute reason too long (max 4096 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Dispute reason too long (max 4096 chars)"
+        );
     }
 
     #[test]
@@ -740,7 +817,10 @@ mod tests {
         d.reason = "r".repeat(4097);
         let result = validate_evidence_dispute(&d);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Dispute reason too long (max 4096 chars)");
+        assert_eq!(
+            invalid_msg(&result),
+            "Dispute reason too long (max 4096 chars)"
+        );
     }
 
     #[test]

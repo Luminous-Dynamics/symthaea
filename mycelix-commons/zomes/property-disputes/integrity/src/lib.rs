@@ -102,66 +102,62 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::PropertyDispute(dispute) => {
-                        validate_create_property_dispute(EntryCreationAction::Create(action), dispute)
-                    }
-                    EntryTypes::OwnershipClaim(claim) => {
-                        validate_create_ownership_claim(EntryCreationAction::Create(action), claim)
-                    }
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::PropertyDispute(dispute) => {
+                    validate_create_property_dispute(EntryCreationAction::Create(action), dispute)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::PropertyDispute(dispute) => {
-                        validate_update_property_dispute(action, dispute)
-                    }
-                    EntryTypes::OwnershipClaim(claim) => {
-                        validate_update_ownership_claim(action, claim)
-                    }
-                    EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid("Anchors cannot be updated".into())),
+                EntryTypes::OwnershipClaim(claim) => {
+                    validate_create_ownership_claim(EntryCreationAction::Create(action), claim)
                 }
-            }
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::PropertyDispute(dispute) => {
+                    validate_update_property_dispute(action, dispute)
+                }
+                EntryTypes::OwnershipClaim(claim) => validate_update_ownership_claim(action, claim),
+                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Anchors cannot be updated".into(),
+                )),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::PropertyToDisputes => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "PropertyToDisputes link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::PropertyToDisputes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PropertyToDisputes link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::ClaimantToDisputes => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "ClaimantToDisputes link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::PropertyToClaims => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "PropertyToClaims link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::DisputeToJustice => {
-                    if tag.0.len() > 512 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "DisputeToJustice link tag too long (max 512 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::ClaimantToDisputes => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "ClaimantToDisputes link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::PropertyToClaims => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "PropertyToClaims link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::DisputeToJustice => {
+                if tag.0.len() > 512 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "DisputeToJustice link tag too long (max 512 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -176,40 +172,60 @@ fn validate_create_property_dispute(
 ) -> ExternResult<ValidateCallbackResult> {
     // --- Empty string checks (required fields) ---
     if dispute.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("PropertyDispute id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "PropertyDispute id cannot be empty".into(),
+        ));
     }
     if dispute.property_id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("PropertyDispute property_id cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "PropertyDispute property_id cannot be empty".into(),
+        ));
     }
     if dispute.description.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("PropertyDispute description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "PropertyDispute description cannot be empty".into(),
+        ));
     }
     // --- String length limits ---
     if dispute.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("PropertyDispute id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "PropertyDispute id too long (max 256 chars)".into(),
+        ));
     }
     if dispute.property_id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("PropertyDispute property_id too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "PropertyDispute property_id too long (max 256 chars)".into(),
+        ));
     }
     if dispute.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("PropertyDispute description too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "PropertyDispute description too long (max 4096 chars)".into(),
+        ));
     }
     for evidence_id in &dispute.evidence_ids {
         if evidence_id.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("PropertyDispute evidence_id too long (max 256 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "PropertyDispute evidence_id too long (max 256 chars)".into(),
+            ));
         }
     }
     if let Some(ref justice_case_id) = dispute.justice_case_id {
         if justice_case_id.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("PropertyDispute justice_case_id too long (max 256 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "PropertyDispute justice_case_id too long (max 256 chars)".into(),
+            ));
         }
     }
     // --- Existing validation ---
     if !dispute.claimant_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Claimant must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Claimant must be a valid DID".into(),
+        ));
     }
     if !dispute.respondent_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Respondent must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Respondent must be a valid DID".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -227,7 +243,9 @@ fn validate_create_ownership_claim(
     claim: OwnershipClaim,
 ) -> ExternResult<ValidateCallbackResult> {
     if !claim.claimant_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid("Claimant must be a valid DID".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Claimant must be a valid DID".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -488,7 +506,12 @@ mod tests {
             let claim = factory_ownership_claim(did);
             let action = EntryCreationAction::Create(mock_create_action());
             let result = validate_create_ownership_claim(action, claim).unwrap();
-            assert_eq!(result, ValidateCallbackResult::Valid, "Failed for DID: {}", did);
+            assert_eq!(
+                result,
+                ValidateCallbackResult::Valid,
+                "Failed for DID: {}",
+                did
+            );
         }
     }
 

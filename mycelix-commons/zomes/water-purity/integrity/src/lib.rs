@@ -821,10 +821,7 @@ mod tests {
         alert.contaminant = "".into();
         let result = validate_create_alert(fake_create(), alert);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Contaminant name cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Contaminant name cannot be empty");
     }
 
     #[test]
@@ -833,10 +830,7 @@ mod tests {
         alert.measured_value = -0.1;
         let result = validate_create_alert(fake_create(), alert);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Measured value cannot be negative"
-        );
+        assert_eq!(invalid_msg(&result), "Measured value cannot be negative");
     }
 
     #[test]
@@ -845,10 +839,7 @@ mod tests {
         alert.threshold_value = -0.1;
         let result = validate_create_alert(fake_create(), alert);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Threshold value cannot be negative"
-        );
+        assert_eq!(invalid_msg(&result), "Threshold value cannot be negative");
     }
 
     #[test]
@@ -965,10 +956,7 @@ mod tests {
         remediation.method = "".into();
         let result = validate_create_remediation(fake_create(), remediation);
         assert!(is_invalid(&result));
-        assert_eq!(
-            invalid_msg(&result),
-            "Remediation method cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Remediation method cannot be empty");
     }
 
     #[test]

@@ -23,20 +23,15 @@
 //! or `CallTargetCell::OtherRole("commons_land"/"commons_care")` (other DNA).
 
 use commons_bridge_integrity::*;
-use commons_types::{CommonsQuery, CommonsEvent};
+use commons_types::{CommonsEvent, CommonsQuery};
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    self as bridge,
-    DispatchInput, DispatchResult, CrossClusterDispatchInput,
-    ResolveQueryInput, EventTypeQuery, BridgeHealth,
-    PropertyOwnershipQuery, PropertyOwnershipResult,
-    CareAvailabilityQuery, CareAvailabilityResult,
-    AuditTrailQuery, AuditTrailEntry, AuditTrailResult,
-    RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
-    BridgeDomain, resolve_commons_zome,
-    ConsciousnessCredential, ConsciousnessTier,
-    needs_refresh,
-    GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult,
+    self as bridge, check_rate_limit_count, needs_refresh, resolve_commons_zome, AuditTrailEntry,
+    AuditTrailQuery, AuditTrailResult, BridgeDomain, BridgeHealth, CareAvailabilityQuery,
+    CareAvailabilityResult, ConsciousnessCredential, ConsciousnessTier, CrossClusterDispatchInput,
+    DispatchInput, DispatchResult, EventTypeQuery, GateAuditInput, GovernanceAuditFilter,
+    GovernanceAuditResult, PropertyOwnershipQuery, PropertyOwnershipResult, ResolveQueryInput,
+    RATE_LIMIT_WINDOW_SECS,
 };
 
 // ============================================================================
@@ -247,12 +242,9 @@ fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
     let window_start_micros = now.as_micros() - (RATE_LIMIT_WINDOW_SECS * 1_000_000);
     let window_start = Timestamp::from_micros(window_start_micros);
 
-    let recent_count = links.iter()
-        .filter(|l| l.timestamp >= window_start)
-        .count();
+    let recent_count = links.iter().filter(|l| l.timestamp >= window_start).count();
 
-    check_rate_limit_count(recent_count)
-        .map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
+    check_rate_limit_count(recent_count).map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
 
     // Log this dispatch
     create_link(
@@ -298,7 +290,10 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
         return Ok(DispatchResult {
             success: false,
             response: None,
-            error: Some(format!("Zome '{}' is not in the commons allowlist", input.zome)),
+            error: Some(format!(
+                "Zome '{}' is not in the commons allowlist",
+                input.zome
+            )),
         });
     }
 
@@ -338,11 +333,21 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
 
     // Link agent to query
     let agent_anchor = ensure_anchor(&format!("agent_queries:{}", query.requester))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToQuery, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToQuery,
+        (),
+    )?;
 
     // Link domain to query
     let domain_anchor = ensure_anchor(&format!("domain_queries:{}", query.domain))?;
-    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToQuery, ())?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToQuery,
+        (),
+    )?;
 
     // Attempt auto-dispatch using type-safe routing
     let target = BridgeDomain::from_str_loose(&query.domain)
@@ -359,7 +364,8 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
         };
         if let Ok(result) = dispatch_call(dispatch) {
             if result.success {
-                let result_str = result.response
+                let result_str = result
+                    .response
                     .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
                     .unwrap_or_else(|| "null".to_string());
                 // Auto-resolve the query
@@ -396,7 +402,9 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid query entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid query entry".into()
+        )))?;
 
     let now = sys_time()?;
     query.result = Some(input.result);
@@ -436,15 +444,30 @@ pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
 
     // Link by event type
     let type_anchor = ensure_anchor(&format!("event_type:{}:{}", event.domain, event.event_type))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::EventTypeToEvent,
+        (),
+    )?;
 
     // Link agent to event
     let agent_anchor = ensure_anchor(&format!("agent_events:{}", event.source_agent))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToEvent,
+        (),
+    )?;
 
     // Link domain to event
     let domain_anchor = ensure_anchor(&format!("domain_events:{}", event.domain))?;
-    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToEvent, ())?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToEvent,
+        (),
+    )?;
 
     // Emit signal to connected UI clients
     let signal = BridgeEventSignal {
@@ -488,11 +511,21 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
 
     // Event type index
     let type_anchor = ensure_anchor(&format!("event_type:governance_gate:{}", input.action_name))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::EventTypeToEvent,
+        (),
+    )?;
 
     // Agent index
     let agent_anchor = ensure_anchor(&format!("agent_events:{}", agent))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToEvent,
+        (),
+    )?;
 
     // Domain index
     let domain_anchor = ensure_anchor("domain_events:governance_gate")?;
@@ -503,7 +536,9 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
 
 /// Query governance gate audit events with filtering.
 #[hdk_extern]
-pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult<GovernanceAuditResult> {
+pub fn get_governance_audit_trail(
+    filter: GovernanceAuditFilter,
+) -> ExternResult<GovernanceAuditResult> {
     let domain_anchor = anchor_hash("domain_events:governance_gate")?;
     let links = get_links(
         LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
@@ -516,21 +551,31 @@ pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult
             if let Ok(Some(event)) = record.entry().to_app_option::<StoredEvent>() {
                 if let Ok(audit) = serde_json::from_str::<GateAuditInput>(&event.payload) {
                     if let Some(ref action) = filter.action_name {
-                        if &audit.action_name != action { continue; }
+                        if &audit.action_name != action {
+                            continue;
+                        }
                     }
                     if let Some(ref zome) = filter.zome_name {
-                        if &audit.zome_name != zome { continue; }
+                        if &audit.zome_name != zome {
+                            continue;
+                        }
                     }
                     if let Some(eligible) = filter.eligible {
-                        if audit.eligible != eligible { continue; }
+                        if audit.eligible != eligible {
+                            continue;
+                        }
                     }
                     if let Some(from_us) = filter.from_us {
                         let event_us = event.created_at.as_micros();
-                        if event_us < from_us { continue; }
+                        if event_us < from_us {
+                            continue;
+                        }
                     }
                     if let Some(to_us) = filter.to_us {
                         let event_us = event.created_at.as_micros();
-                        if event_us > to_us { continue; }
+                        if event_us > to_us {
+                            continue;
+                        }
                     }
                     entries.push(audit);
                 }
@@ -538,7 +583,10 @@ pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult
         }
     }
     let total = entries.len() as u32;
-    Ok(GovernanceAuditResult { entries, total_matched: total })
+    Ok(GovernanceAuditResult {
+        entries,
+        total_matched: total,
+    })
 }
 
 // ============================================================================
@@ -691,7 +739,9 @@ pub struct EmergencyAreaCheckResult {
 /// `CallTargetCell::OtherRole("civic")`.  Used by housing, property,
 /// and water zomes before critical operations in disaster-prone areas.
 #[hdk_extern]
-pub fn check_emergency_for_area(input: CheckEmergencyForAreaInput) -> ExternResult<EmergencyAreaCheckResult> {
+pub fn check_emergency_for_area(
+    input: CheckEmergencyForAreaInput,
+) -> ExternResult<EmergencyAreaCheckResult> {
     let response = call(
         CallTargetCell::OtherRole(CIVIC_ROLE.into()),
         ZomeName::from("emergency_incidents"),
@@ -702,8 +752,9 @@ pub fn check_emergency_for_area(input: CheckEmergencyForAreaInput) -> ExternResu
 
     match &response {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
-            let records: Vec<Record> = extern_io.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let records: Vec<Record> = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             let count = records.len() as u32;
             Ok(EmergencyAreaCheckResult {
                 has_active_emergencies: count > 0,
@@ -755,7 +806,9 @@ pub struct JusticeDisputeCheckResult {
 /// `CallTargetCell::OtherRole("civic")`.  Used by property-transfer
 /// to verify no pending enforcement actions before completing transfers.
 #[hdk_extern]
-pub fn check_justice_disputes_for_property(input: CheckJusticeDisputesInput) -> ExternResult<JusticeDisputeCheckResult> {
+pub fn check_justice_disputes_for_property(
+    input: CheckJusticeDisputesInput,
+) -> ExternResult<JusticeDisputeCheckResult> {
     // Query the civic bridge for justice-related cases matching the resource
     let dispatch = CrossClusterDispatchInput {
         role: CIVIC_ROLE.to_string(),
@@ -808,23 +861,24 @@ pub fn query_audit_trail(query: AuditTrailQuery) -> ExternResult<AuditTrailResul
 
     // Get events — if domain+event_type are both specified, use the type anchor;
     // if only domain, use the domain anchor; otherwise get all.
-    let records = if let (Some(ref domain), Some(ref event_type)) = (&query.domain, &query.event_type) {
-        let type_anchor = anchor_hash(&format!("event_type:{}:{}", domain, event_type))?;
-        let links = get_links(
-            LinkQuery::try_new(type_anchor, LinkTypes::EventTypeToEvent)?,
-            GetStrategy::default(),
-        )?;
-        bridge::records_from_links(links)?
-    } else if let Some(ref domain) = query.domain {
-        let domain_anchor = anchor_hash(&format!("domain_events:{}", domain))?;
-        let links = get_links(
-            LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
-            GetStrategy::default(),
-        )?;
-        bridge::records_from_links(links)?
-    } else {
-        get_all_events(())?
-    };
+    let records =
+        if let (Some(ref domain), Some(ref event_type)) = (&query.domain, &query.event_type) {
+            let type_anchor = anchor_hash(&format!("event_type:{}:{}", domain, event_type))?;
+            let links = get_links(
+                LinkQuery::try_new(type_anchor, LinkTypes::EventTypeToEvent)?,
+                GetStrategy::default(),
+            )?;
+            bridge::records_from_links(links)?
+        } else if let Some(ref domain) = query.domain {
+            let domain_anchor = anchor_hash(&format!("domain_events:{}", domain))?;
+            let links = get_links(
+                LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
+                GetStrategy::default(),
+            )?;
+            bridge::records_from_links(links)?
+        } else {
+            get_all_events(())?
+        };
 
     let mut entries = Vec::new();
     for record in &records {
@@ -840,10 +894,25 @@ pub fn query_audit_trail(query: AuditTrailQuery) -> ExternResult<AuditTrailResul
             let bytes: SerializedBytes = SerializedBytes::try_from(entry.clone())
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Serialize: {:?}", e))))?;
             if let Ok(value) = serde_json::from_slice::<serde_json::Value>(bytes.bytes()) {
-                let domain = value.get("domain").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                let event_type = value.get("event_type").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                let source = value.get("source_agent").and_then(|v| v.as_str()).unwrap_or("unknown").to_string();
-                let payload = value.get("payload").and_then(|v| v.as_str()).unwrap_or("{}");
+                let domain = value
+                    .get("domain")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let event_type = value
+                    .get("event_type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let source = value
+                    .get("source_agent")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                let payload = value
+                    .get("payload")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("{}");
                 let preview = if payload.len() > 120 {
                     format!("{}...", &payload[..120])
                 } else {
@@ -911,7 +980,9 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
 /// Uses smart routing: if running in commons_care DNA, the call crosses to
 /// commons_land via `CallTargetCell::OtherRole`.
 #[hdk_extern]
-pub fn verify_property_ownership(input: PropertyOwnershipQuery) -> ExternResult<PropertyOwnershipResult> {
+pub fn verify_property_ownership(
+    input: PropertyOwnershipQuery,
+) -> ExternResult<PropertyOwnershipResult> {
     enforce_rate_limit("property_registry")?;
     let payload = ExternIO::encode(&input)
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Encode error: {:?}", e))))?;
@@ -923,8 +994,9 @@ pub fn verify_property_ownership(input: PropertyOwnershipQuery) -> ExternResult<
     let result = dispatch_call(dispatch)?;
     if result.success {
         if let Some(response) = result.response {
-            let decoded: PropertyOwnershipResult = ExternIO(response).decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let decoded: PropertyOwnershipResult = ExternIO(response).decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             Ok(decoded)
         } else {
             Ok(PropertyOwnershipResult {
@@ -948,7 +1020,9 @@ pub fn verify_property_ownership(input: PropertyOwnershipQuery) -> ExternResult<
 /// Uses smart routing: if running in commons_land DNA, the call crosses to
 /// commons_care via `CallTargetCell::OtherRole`.
 #[hdk_extern]
-pub fn check_care_availability(input: CareAvailabilityQuery) -> ExternResult<CareAvailabilityResult> {
+pub fn check_care_availability(
+    input: CareAvailabilityQuery,
+) -> ExternResult<CareAvailabilityResult> {
     enforce_rate_limit("care_matching")?;
     let payload = ExternIO::encode(&input)
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Encode error: {:?}", e))))?;
@@ -960,8 +1034,9 @@ pub fn check_care_availability(input: CareAvailabilityQuery) -> ExternResult<Car
     let result = dispatch_call(dispatch)?;
     if result.success {
         if let Some(response) = result.response {
-            let decoded: CareAvailabilityResult = ExternIO(response).decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let decoded: CareAvailabilityResult = ExternIO(response).decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e)))
+            })?;
             Ok(decoded)
         } else {
             Ok(CareAvailabilityResult {
@@ -984,10 +1059,7 @@ pub fn check_care_availability(input: CareAvailabilityQuery) -> ExternResult<Car
 // ============================================================================
 
 /// Identity-side zomes that commons-bridge is allowed to call cross-cluster.
-const ALLOWED_IDENTITY_ZOMES: &[&str] = &[
-    "identity_bridge",
-    "did_registry",
-];
+const ALLOWED_IDENTITY_ZOMES: &[&str] = &["identity_bridge", "did_registry"];
 
 /// The hApp role name for the Identity DNA.
 const IDENTITY_ROLE: &str = "identity";
@@ -1075,20 +1147,31 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
 
     // Get the most recent link
     let link = links.into_iter().max_by_key(|l| l.timestamp).unwrap();
-    let target = link.target.into_action_hash().ok_or_else(||
-        wasm_error!(WasmErrorInner::Guest("Invalid credential cache link target".into())))?;
+    let target = link.target.into_action_hash().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid credential cache link target".into()
+        ))
+    })?;
 
     if let Some(record) = get(target, GetOptions::default())? {
-        let cached: CachedCredentialEntry = record.entry()
+        let cached: CachedCredentialEntry = record
+            .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in cached credential record".into())))?;
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "No entry in cached credential record".into()
+                ))
+            })?;
 
         if cached.did == did && now - cached.cached_at_us < CREDENTIAL_CACHE_TTL_US {
             let credential: ConsciousnessCredential = serde_json::from_str(&cached.credential_json)
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-                    "Credential cache decode error: {}", e
-                ))))?;
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Credential cache decode error: {}",
+                        e
+                    )))
+                })?;
             // Check credential expiry — don't serve expired credentials from cache
             if credential.is_expired(now as u64) {
                 return Ok(None);
@@ -1103,10 +1186,12 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
 /// Store a consciousness credential in the local cache.
 fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
     let now = sys_time()?.as_micros();
-    let json = serde_json::to_string(credential)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "Credential cache encode error: {}", e
-        ))))?;
+    let json = serde_json::to_string(credential).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Credential cache encode error: {}",
+            e
+        )))
+    })?;
 
     let entry = CachedCredentialEntry {
         did: credential.did.clone(),
@@ -1136,7 +1221,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
         // Proactive refresh — attempt inline refresh, fall back to cached if it fails
         let now_us = sys_time()?.as_micros() as u64;
         if needs_refresh(&cached, now_us) {
-            debug!("Credential nearing expiry, attempting proactive refresh for {}", cached.did);
+            debug!(
+                "Credential nearing expiry, attempting proactive refresh for {}",
+                cached.did
+            );
             if let Ok(ZomeCallResponse::Ok(response)) = call(
                 CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
                 ZomeName::new("identity_bridge"),
@@ -1186,14 +1274,17 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
             // Identity role unavailable (single-DNA mode or network partition).
             // Return a permissive fallback credential so single-cluster operations
             // can proceed. In production, the identity role will provide real scores.
-            debug!("Identity role unavailable, using Citizen-tier fallback credential for {}", did);
+            debug!(
+                "Identity role unavailable, using Citizen-tier fallback credential for {}",
+                did
+            );
             let now_us = sys_time()?.as_micros() as u64;
             ConsciousnessCredential::from_unified_consciousness(
                 did.clone(),
-                0.5,   // unified_consciousness — Citizen tier (permissive fallback)
-                0.5,   // identity — assumed basic verification
-                0.5,   // reputation — neutral
-                0.5,   // community — assumed local member
+                0.5, // unified_consciousness — Citizen tier (permissive fallback)
+                0.5, // identity — assumed basic verification
+                0.5, // reputation — neutral
+                0.5, // community — assumed local member
                 "did:mycelix:commons-bridge-fallback".to_string(),
                 now_us,
             )
@@ -1212,7 +1303,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
     // Proactive refresh check (covers edge case: identity issued a short-lived credential)
     let now_us = sys_time()?.as_micros() as u64;
     if needs_refresh(&credential, now_us) {
-        debug!("Freshly-issued credential nearing expiry, attempting proactive refresh for {}", credential.did);
+        debug!(
+            "Freshly-issued credential nearing expiry, attempting proactive refresh for {}",
+            credential.did
+        );
         if let Ok(ZomeCallResponse::Ok(response)) = call(
             CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
             ZomeName::new("identity_bridge"),
@@ -1240,7 +1334,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
 /// existing cached credential (or a fallback if no cache exists).
 #[hdk_extern]
 pub fn refresh_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
-    debug!("commons-bridge: refreshing consciousness credential for {}", did);
+    debug!(
+        "commons-bridge: refreshing consciousness credential for {}",
+        did
+    );
 
     // Attempt cross-cluster call to identity bridge
     let payload = ExternIO::encode(did.clone())
@@ -1270,7 +1367,10 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
         }
         _ => {
             // Identity cluster unreachable — return existing cached credential if available
-            debug!("commons-bridge: identity cluster unreachable during refresh for {}", did);
+            debug!(
+                "commons-bridge: identity cluster unreachable during refresh for {}",
+                did
+            );
             if let Some(cached) = get_cached_credential(&did)? {
                 return Ok(cached);
             }
@@ -1278,7 +1378,10 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
             let now_us = sys_time()?.as_micros() as u64;
             ConsciousnessCredential::from_unified_consciousness(
                 did.clone(),
-                0.5, 0.5, 0.5, 0.5,
+                0.5,
+                0.5,
+                0.5,
+                0.5,
                 "did:mycelix:commons-bridge-fallback".to_string(),
                 now_us,
             )
@@ -1387,12 +1490,19 @@ mod tests {
 
     #[test]
     fn civic_allowlist_covers_all_civic_domains() {
-        let has_justice = ALLOWED_CIVIC_ZOMES.iter().any(|z| z.starts_with("justice_"));
-        let has_emergency = ALLOWED_CIVIC_ZOMES.iter().any(|z| z.starts_with("emergency_"));
+        let has_justice = ALLOWED_CIVIC_ZOMES
+            .iter()
+            .any(|z| z.starts_with("justice_"));
+        let has_emergency = ALLOWED_CIVIC_ZOMES
+            .iter()
+            .any(|z| z.starts_with("emergency_"));
         let has_media = ALLOWED_CIVIC_ZOMES.iter().any(|z| z.starts_with("media_"));
         let has_bridge = ALLOWED_CIVIC_ZOMES.contains(&"civic_bridge");
         assert!(has_justice, "ALLOWED_CIVIC_ZOMES missing justice domain");
-        assert!(has_emergency, "ALLOWED_CIVIC_ZOMES missing emergency domain");
+        assert!(
+            has_emergency,
+            "ALLOWED_CIVIC_ZOMES missing emergency domain"
+        );
         assert!(has_media, "ALLOWED_CIVIC_ZOMES missing media domain");
         assert!(has_bridge, "ALLOWED_CIVIC_ZOMES missing civic_bridge");
     }
@@ -1412,69 +1522,186 @@ mod tests {
 
     #[test]
     fn resolve_property_domain() {
-        assert_eq!(resolve_domain_zome("property", "get_property").unwrap(), "property_registry");
-        assert_eq!(resolve_domain_zome("property", "transfer_ownership").unwrap(), "property_transfer");
-        assert_eq!(resolve_domain_zome("property", "file_dispute").unwrap(), "property_disputes");
-        assert_eq!(resolve_domain_zome("property", "check_title").unwrap(), "property_registry");
+        assert_eq!(
+            resolve_domain_zome("property", "get_property").unwrap(),
+            "property_registry"
+        );
+        assert_eq!(
+            resolve_domain_zome("property", "transfer_ownership").unwrap(),
+            "property_transfer"
+        );
+        assert_eq!(
+            resolve_domain_zome("property", "file_dispute").unwrap(),
+            "property_disputes"
+        );
+        assert_eq!(
+            resolve_domain_zome("property", "check_title").unwrap(),
+            "property_registry"
+        );
     }
 
     #[test]
     fn resolve_housing_domain() {
-        assert_eq!(resolve_domain_zome("housing", "create_clt_lease").unwrap(), "housing_clt");
-        assert_eq!(resolve_domain_zome("housing", "add_member").unwrap(), "housing_membership");
-        assert_eq!(resolve_domain_zome("housing", "pay_fee").unwrap(), "housing_finances");
-        assert_eq!(resolve_domain_zome("housing", "report_maintenance").unwrap(), "housing_maintenance");
-        assert_eq!(resolve_domain_zome("housing", "submit_proposal").unwrap(), "housing_governance");
-        assert_eq!(resolve_domain_zome("housing", "list_units").unwrap(), "housing_units");
+        assert_eq!(
+            resolve_domain_zome("housing", "create_clt_lease").unwrap(),
+            "housing_clt"
+        );
+        assert_eq!(
+            resolve_domain_zome("housing", "add_member").unwrap(),
+            "housing_membership"
+        );
+        assert_eq!(
+            resolve_domain_zome("housing", "pay_fee").unwrap(),
+            "housing_finances"
+        );
+        assert_eq!(
+            resolve_domain_zome("housing", "report_maintenance").unwrap(),
+            "housing_maintenance"
+        );
+        assert_eq!(
+            resolve_domain_zome("housing", "submit_proposal").unwrap(),
+            "housing_governance"
+        );
+        assert_eq!(
+            resolve_domain_zome("housing", "list_units").unwrap(),
+            "housing_units"
+        );
     }
 
     #[test]
     fn resolve_care_domain() {
-        assert_eq!(resolve_domain_zome("care", "find_match").unwrap(), "care_matching");
-        assert_eq!(resolve_domain_zome("care", "join_circle").unwrap(), "care_circles");
-        assert_eq!(resolve_domain_zome("care", "verify_credential").unwrap(), "care_credentials");
-        assert_eq!(resolve_domain_zome("care", "create_plan").unwrap(), "care_plans");
-        assert_eq!(resolve_domain_zome("care", "log_hours").unwrap(), "care_timebank");
+        assert_eq!(
+            resolve_domain_zome("care", "find_match").unwrap(),
+            "care_matching"
+        );
+        assert_eq!(
+            resolve_domain_zome("care", "join_circle").unwrap(),
+            "care_circles"
+        );
+        assert_eq!(
+            resolve_domain_zome("care", "verify_credential").unwrap(),
+            "care_credentials"
+        );
+        assert_eq!(
+            resolve_domain_zome("care", "create_plan").unwrap(),
+            "care_plans"
+        );
+        assert_eq!(
+            resolve_domain_zome("care", "log_hours").unwrap(),
+            "care_timebank"
+        );
     }
 
     #[test]
     fn resolve_mutualaid_domain() {
-        assert_eq!(resolve_domain_zome("mutualaid", "book_resource").unwrap(), "mutualaid_resources");
-        assert_eq!(resolve_domain_zome("mutualaid", "post_need").unwrap(), "mutualaid_needs");
-        assert_eq!(resolve_domain_zome("mutualaid", "join_pool").unwrap(), "mutualaid_pools");
-        assert_eq!(resolve_domain_zome("mutualaid", "submit_request").unwrap(), "mutualaid_requests");
-        assert_eq!(resolve_domain_zome("mutualaid", "form_circle").unwrap(), "mutualaid_circles");
-        assert_eq!(resolve_domain_zome("mutualaid", "propose_governance").unwrap(), "mutualaid_governance");
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "book_resource").unwrap(),
+            "mutualaid_resources"
+        );
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "post_need").unwrap(),
+            "mutualaid_needs"
+        );
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "join_pool").unwrap(),
+            "mutualaid_pools"
+        );
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "submit_request").unwrap(),
+            "mutualaid_requests"
+        );
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "form_circle").unwrap(),
+            "mutualaid_circles"
+        );
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "propose_governance").unwrap(),
+            "mutualaid_governance"
+        );
     }
 
     #[test]
     fn resolve_water_domain() {
-        assert_eq!(resolve_domain_zome("water", "test_purity").unwrap(), "water_purity");
-        assert_eq!(resolve_domain_zome("water", "log_capture").unwrap(), "water_capture");
-        assert_eq!(resolve_domain_zome("water", "assign_steward").unwrap(), "water_steward");
-        assert_eq!(resolve_domain_zome("water", "record_wisdom").unwrap(), "water_wisdom");
-        assert_eq!(resolve_domain_zome("water", "measure_flow_rate").unwrap(), "water_flow");
+        assert_eq!(
+            resolve_domain_zome("water", "test_purity").unwrap(),
+            "water_purity"
+        );
+        assert_eq!(
+            resolve_domain_zome("water", "log_capture").unwrap(),
+            "water_capture"
+        );
+        assert_eq!(
+            resolve_domain_zome("water", "assign_steward").unwrap(),
+            "water_steward"
+        );
+        assert_eq!(
+            resolve_domain_zome("water", "record_wisdom").unwrap(),
+            "water_wisdom"
+        );
+        assert_eq!(
+            resolve_domain_zome("water", "measure_flow_rate").unwrap(),
+            "water_flow"
+        );
     }
 
     #[test]
     fn resolve_food_domain() {
-        assert_eq!(resolve_domain_zome("food", "register_plot").unwrap(), "food_production");
-        assert_eq!(resolve_domain_zome("food", "list_market").unwrap(), "food_distribution");
-        assert_eq!(resolve_domain_zome("food", "place_order").unwrap(), "food_distribution");
-        assert_eq!(resolve_domain_zome("food", "start_batch").unwrap(), "food_preservation");
-        assert_eq!(resolve_domain_zome("food", "check_storage").unwrap(), "food_preservation");
-        assert_eq!(resolve_domain_zome("food", "catalog_seed").unwrap(), "food_knowledge");
-        assert_eq!(resolve_domain_zome("food", "share_recipe").unwrap(), "food_knowledge");
+        assert_eq!(
+            resolve_domain_zome("food", "register_plot").unwrap(),
+            "food_production"
+        );
+        assert_eq!(
+            resolve_domain_zome("food", "list_market").unwrap(),
+            "food_distribution"
+        );
+        assert_eq!(
+            resolve_domain_zome("food", "place_order").unwrap(),
+            "food_distribution"
+        );
+        assert_eq!(
+            resolve_domain_zome("food", "start_batch").unwrap(),
+            "food_preservation"
+        );
+        assert_eq!(
+            resolve_domain_zome("food", "check_storage").unwrap(),
+            "food_preservation"
+        );
+        assert_eq!(
+            resolve_domain_zome("food", "catalog_seed").unwrap(),
+            "food_knowledge"
+        );
+        assert_eq!(
+            resolve_domain_zome("food", "share_recipe").unwrap(),
+            "food_knowledge"
+        );
     }
 
     #[test]
     fn resolve_transport_domain() {
-        assert_eq!(resolve_domain_zome("transport", "register_vehicle").unwrap(), "transport_routes");
-        assert_eq!(resolve_domain_zome("transport", "create_route").unwrap(), "transport_routes");
-        assert_eq!(resolve_domain_zome("transport", "post_ride_share").unwrap(), "transport_sharing");
-        assert_eq!(resolve_domain_zome("transport", "request_cargo").unwrap(), "transport_sharing");
-        assert_eq!(resolve_domain_zome("transport", "get_carbon_credits").unwrap(), "transport_impact");
-        assert_eq!(resolve_domain_zome("transport", "calculate_emissions").unwrap(), "transport_impact");
+        assert_eq!(
+            resolve_domain_zome("transport", "register_vehicle").unwrap(),
+            "transport_routes"
+        );
+        assert_eq!(
+            resolve_domain_zome("transport", "create_route").unwrap(),
+            "transport_routes"
+        );
+        assert_eq!(
+            resolve_domain_zome("transport", "post_ride_share").unwrap(),
+            "transport_sharing"
+        );
+        assert_eq!(
+            resolve_domain_zome("transport", "request_cargo").unwrap(),
+            "transport_sharing"
+        );
+        assert_eq!(
+            resolve_domain_zome("transport", "get_carbon_credits").unwrap(),
+            "transport_impact"
+        );
+        assert_eq!(
+            resolve_domain_zome("transport", "calculate_emissions").unwrap(),
+            "transport_impact"
+        );
     }
 
     #[test]
@@ -1486,7 +1713,10 @@ mod tests {
 
     #[test]
     fn check_emergency_input_serde_roundtrip() {
-        let input = CheckEmergencyForAreaInput { lat: 32.95, lon: -96.73 };
+        let input = CheckEmergencyForAreaInput {
+            lat: 32.95,
+            lon: -96.73,
+        };
         let json = serde_json::to_string(&input).unwrap();
         let input2: CheckEmergencyForAreaInput = serde_json::from_str(&json).unwrap();
         assert!((input2.lat - 32.95).abs() < 1e-10);
@@ -1510,7 +1740,9 @@ mod tests {
 
     #[test]
     fn justice_dispute_input_serde_roundtrip() {
-        let input = CheckJusticeDisputesInput { resource_id: "PROP-001".into() };
+        let input = CheckJusticeDisputesInput {
+            resource_id: "PROP-001".into(),
+        };
         let json = serde_json::to_string(&input).unwrap();
         let input2: CheckJusticeDisputesInput = serde_json::from_str(&json).unwrap();
         assert_eq!(input2.resource_id, "PROP-001");
@@ -1742,7 +1974,10 @@ mod tests {
     #[test]
     fn allowed_civic_zomes_entries_are_non_empty() {
         for zome in ALLOWED_CIVIC_ZOMES {
-            assert!(!zome.is_empty(), "ALLOWED_CIVIC_ZOMES contains an empty string");
+            assert!(
+                !zome.is_empty(),
+                "ALLOWED_CIVIC_ZOMES contains an empty string"
+            );
             assert!(
                 !zome.contains(' '),
                 "ALLOWED_CIVIC_ZOMES entry '{}' contains whitespace",
@@ -1753,14 +1988,38 @@ mod tests {
 
     #[test]
     fn allowed_zomes_per_domain_count() {
-        let property_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("property_")).count();
-        let housing_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("housing_")).count();
-        let care_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("care_")).count();
-        let mutualaid_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("mutualaid_")).count();
-        let water_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("water_")).count();
-        let food_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("food_")).count();
-        let transport_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("transport_")).count();
-        let support_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("support_")).count();
+        let property_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("property_"))
+            .count();
+        let housing_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("housing_"))
+            .count();
+        let care_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("care_"))
+            .count();
+        let mutualaid_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("mutualaid_"))
+            .count();
+        let water_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("water_"))
+            .count();
+        let food_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("food_"))
+            .count();
+        let transport_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("transport_"))
+            .count();
+        let support_count = ALLOWED_ZOMES
+            .iter()
+            .filter(|z| z.starts_with("support_"))
+            .count();
         let space_count = ALLOWED_ZOMES.iter().filter(|z| *z == &"space").count();
         assert_eq!(property_count, 4, "Expected 4 property zomes");
         assert_eq!(housing_count, 6, "Expected 6 housing zomes");
@@ -1824,13 +2083,16 @@ mod tests {
             assert!(
                 resolved.is_some(),
                 "resolve_domain_zome('{}', '{}') returned None",
-                domain, query_type
+                domain,
+                query_type
             );
             let zome_name = resolved.unwrap();
             assert!(
                 ALLOWED_ZOMES.contains(&zome_name.as_str()),
                 "resolve_domain_zome('{}', '{}') returned '{}' which is not in ALLOWED_ZOMES",
-                domain, query_type, zome_name
+                domain,
+                query_type,
+                zome_name
             );
         }
     }
@@ -1840,14 +2102,26 @@ mod tests {
     #[test]
     fn resolve_empty_query_type_uses_default() {
         // Empty query_type should fall through to the default zome for each domain
-        assert_eq!(resolve_domain_zome("property", "").unwrap(), "property_registry");
+        assert_eq!(
+            resolve_domain_zome("property", "").unwrap(),
+            "property_registry"
+        );
         assert_eq!(resolve_domain_zome("housing", "").unwrap(), "housing_units");
         assert_eq!(resolve_domain_zome("care", "").unwrap(), "care_timebank");
-        assert_eq!(resolve_domain_zome("mutualaid", "").unwrap(), "mutualaid_timebank");
+        assert_eq!(
+            resolve_domain_zome("mutualaid", "").unwrap(),
+            "mutualaid_timebank"
+        );
         assert_eq!(resolve_domain_zome("water", "").unwrap(), "water_flow");
         assert_eq!(resolve_domain_zome("food", "").unwrap(), "food_production");
-        assert_eq!(resolve_domain_zome("transport", "").unwrap(), "transport_routes");
-        assert_eq!(resolve_domain_zome("support", "").unwrap(), "support_knowledge");
+        assert_eq!(
+            resolve_domain_zome("transport", "").unwrap(),
+            "transport_routes"
+        );
+        assert_eq!(
+            resolve_domain_zome("support", "").unwrap(),
+            "support_knowledge"
+        );
         assert_eq!(resolve_domain_zome("space", "").unwrap(), "space");
     }
 
@@ -1859,9 +2133,18 @@ mod tests {
     #[test]
     fn resolve_case_insensitive_domain() {
         // Domain matching is now case-insensitive (fixed via routing module)
-        assert_eq!(resolve_domain_zome("Property", "get_property").unwrap(), "property_registry");
-        assert_eq!(resolve_domain_zome("PROPERTY", "get_property").unwrap(), "property_registry");
-        assert_eq!(resolve_domain_zome("HOUSING", "list_units").unwrap(), "housing_units");
+        assert_eq!(
+            resolve_domain_zome("Property", "get_property").unwrap(),
+            "property_registry"
+        );
+        assert_eq!(
+            resolve_domain_zome("PROPERTY", "get_property").unwrap(),
+            "property_registry"
+        );
+        assert_eq!(
+            resolve_domain_zome("HOUSING", "list_units").unwrap(),
+            "housing_units"
+        );
     }
 
     #[test]
@@ -1910,8 +2193,15 @@ mod tests {
         // The health_check function lists all 9 commons domains; verify the list
         // is consistent with what resolve_domain_zome accepts.
         let expected_domains = vec![
-            "property", "housing", "care", "mutualaid", "water", "food", "transport",
-            "support", "space",
+            "property",
+            "housing",
+            "care",
+            "mutualaid",
+            "water",
+            "food",
+            "transport",
+            "support",
+            "space",
         ];
         for domain in &expected_domains {
             assert!(
@@ -2074,7 +2364,10 @@ mod tests {
     #[test]
     fn identity_allowlist_entries_are_non_empty() {
         for zome in ALLOWED_IDENTITY_ZOMES {
-            assert!(!zome.is_empty(), "ALLOWED_IDENTITY_ZOMES contains an empty string");
+            assert!(
+                !zome.is_empty(),
+                "ALLOWED_IDENTITY_ZOMES contains an empty string"
+            );
             assert!(
                 !zome.contains(' '),
                 "ALLOWED_IDENTITY_ZOMES entry '{}' contains whitespace",

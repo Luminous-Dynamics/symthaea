@@ -29,4 +29,3 @@ pub enum PartyRole {
     Endorser,
     Curator,
 }
-

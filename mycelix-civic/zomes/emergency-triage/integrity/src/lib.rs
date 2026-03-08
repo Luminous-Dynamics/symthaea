@@ -148,7 +148,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_triage_fields(record: &TriageRecord, require_location: bool) -> ExternResult<ValidateCallbackResult> {
+fn validate_triage_fields(
+    record: &TriageRecord,
+    require_location: bool,
+) -> ExternResult<ValidateCallbackResult> {
     if record.patient_id.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Patient ID cannot be empty".into(),
@@ -937,10 +940,7 @@ mod tests {
                 let result = validate_create_triage(fake_create(), record);
                 // Dead + Urgent is the only invalid combination
                 if *cat == TriageCategory::Dead && *prio == TransportPriority::Urgent {
-                    assert!(
-                        is_invalid(result),
-                        "Expected invalid for Dead x Urgent"
-                    );
+                    assert!(is_invalid(result), "Expected invalid for Dead x Urgent");
                 } else {
                     assert!(
                         is_valid(result),
@@ -960,9 +960,7 @@ mod tests {
     fn validate_create_link_tag(link_type: &LinkTypes, tag: &LinkTag) -> ValidateCallbackResult {
         let tag_len = tag.0.len();
         match link_type {
-            LinkTypes::DisasterToTriage
-            | LinkTypes::PatientToTriage
-            | LinkTypes::AgentToTriage => {
+            LinkTypes::DisasterToTriage | LinkTypes::PatientToTriage | LinkTypes::AgentToTriage => {
                 if tag_len > 256 {
                     ValidateCallbackResult::Invalid("Link tag too long (max 256 bytes)".into())
                 } else {

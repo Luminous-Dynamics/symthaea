@@ -32,14 +32,20 @@ fn arb_profile() -> impl Strategy<Value = ConsciousnessProfile> {
 
 /// Generate a profile with unclamped (potentially out-of-range) dimensions.
 fn arb_unclamped_profile() -> impl Strategy<Value = ConsciousnessProfile> {
-    (-10.0..=10.0f64, -10.0..=10.0f64, -10.0..=10.0f64, -10.0..=10.0f64).prop_map(
-        |(identity, reputation, community, engagement)| ConsciousnessProfile {
-            identity,
-            reputation,
-            community,
-            engagement,
-        },
+    (
+        -10.0..=10.0f64,
+        -10.0..=10.0f64,
+        -10.0..=10.0f64,
+        -10.0..=10.0f64,
     )
+        .prop_map(
+            |(identity, reputation, community, engagement)| ConsciousnessProfile {
+                identity,
+                reputation,
+                community,
+                engagement,
+            },
+        )
 }
 
 /// A "reasonable" timestamp base (somewhere around 2025).
@@ -467,7 +473,12 @@ fn infinity_safety_combined_score() {
         (f64::INFINITY, 0.5, 0.5, 0.5),
         (f64::NEG_INFINITY, 0.5, 0.5, 0.5),
         (f64::INFINITY, f64::INFINITY, f64::INFINITY, f64::INFINITY),
-        (f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY),
+        (
+            f64::NEG_INFINITY,
+            f64::NEG_INFINITY,
+            f64::NEG_INFINITY,
+            f64::NEG_INFINITY,
+        ),
         (f64::INFINITY, f64::NEG_INFINITY, 0.5, 0.5),
     ];
 
@@ -483,17 +494,27 @@ fn infinity_safety_combined_score() {
         assert!(
             !score.is_nan(),
             "clamped().combined_score() is NaN for Infinity profile ({}, {}, {}, {})",
-            identity, reputation, community, engagement,
+            identity,
+            reputation,
+            community,
+            engagement,
         );
         assert!(
             score.is_finite(),
             "clamped().combined_score() is not finite for profile ({}, {}, {}, {})",
-            identity, reputation, community, engagement,
+            identity,
+            reputation,
+            community,
+            engagement,
         );
         assert!(
             (0.0..=1.0).contains(&score),
             "clamped().combined_score() = {} out of [0,1] for profile ({}, {}, {}, {})",
-            score, identity, reputation, community, engagement,
+            score,
+            identity,
+            reputation,
+            community,
+            engagement,
         );
     }
 }
@@ -523,7 +544,11 @@ fn nan_sanitized_by_clamped() {
             score.is_finite(),
             "Expected clamped() to sanitize NaN but got {} \
              for profile ({}, {}, {}, {})",
-            score, identity, reputation, community, engagement,
+            score,
+            identity,
+            reputation,
+            community,
+            engagement,
         );
     }
 }

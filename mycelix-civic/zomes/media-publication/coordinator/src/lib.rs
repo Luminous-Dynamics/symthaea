@@ -2,8 +2,7 @@
 use hdk::prelude::*;
 use media_publication_integrity::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_proposal,
+    gate_consciousness, requirement_for_proposal, GovernanceEligibility, GovernanceRequirement,
 };
 
 fn require_consciousness(
@@ -19,7 +18,6 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
     let _ = create_entry(&EntryTypes::Anchor(anchor.clone()));
     hash_entry(&anchor)
 }
-
 
 fn get_latest_record(action_hash: ActionHash) -> ExternResult<Option<Record>> {
     let Some(details) = get_details(action_hash, GetOptions::default())? else {
@@ -61,10 +59,20 @@ pub fn publish(input: PublishInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Publication(publication.clone()))?;
-    create_link(anchor_hash(&input.author_did)?, action_hash.clone(), LinkTypes::AuthorToPublications, ())?;
+    create_link(
+        anchor_hash(&input.author_did)?,
+        action_hash.clone(),
+        LinkTypes::AuthorToPublications,
+        (),
+    )?;
 
     for tag in input.tags {
-        create_link(anchor_hash(&tag.to_lowercase())?, action_hash.clone(), LinkTypes::TagToPublications, ())?;
+        create_link(
+            anchor_hash(&tag.to_lowercase())?,
+            action_hash.clone(),
+            LinkTypes::TagToPublications,
+            (),
+        )?;
     }
 
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
@@ -93,7 +101,12 @@ pub fn add_content_block(input: AddBlockInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::ContentBlock(block))?;
-    create_link(anchor_hash(&input.publication_id)?, action_hash.clone(), LinkTypes::PublicationToBlocks, ())?;
+    create_link(
+        anchor_hash(&input.publication_id)?,
+        action_hash.clone(),
+        LinkTypes::PublicationToBlocks,
+        (),
+    )?;
     get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
@@ -109,7 +122,11 @@ pub struct AddBlockInput {
 pub fn update_publication(input: UpdateInput) -> ExternResult<Record> {
     let _eligibility = require_consciousness(&requirement_for_proposal(), "update_publication")?;
 
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Publication,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
         if let Some(pub_entry) = record.entry().to_app_option::<Publication>().ok().flatten() {
             if pub_entry.id == input.publication_id {
@@ -125,7 +142,12 @@ pub fn update_publication(input: UpdateInput) -> ExternResult<Record> {
                     created: now,
                 };
                 let version_hash = create_entry(&EntryTypes::PublicationVersion(version))?;
-                create_link(anchor_hash(&input.publication_id)?, version_hash, LinkTypes::PublicationToVersions, ())?;
+                create_link(
+                    anchor_hash(&input.publication_id)?,
+                    version_hash,
+                    LinkTypes::PublicationToVersions,
+                    (),
+                )?;
 
                 // Update publication
                 let updated = Publication {
@@ -134,12 +156,18 @@ pub fn update_publication(input: UpdateInput) -> ExternResult<Record> {
                     version: new_version,
                     ..pub_entry
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Publication(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Publication(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Publication not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Publication not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -151,7 +179,11 @@ pub struct UpdateInput {
 
 #[hdk_extern]
 pub fn get_publication(publication_id: String) -> ExternResult<Option<Record>> {
-    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?)).include_entries(true);
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Publication,
+        )?))
+        .include_entries(true);
     for record in query(filter)? {
         if let Some(pub_entry) = record.entry().to_app_option::<Publication>().ok().flatten() {
             if pub_entry.id == publication_id {
@@ -165,9 +197,16 @@ pub fn get_publication(publication_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn search_by_tag(tag: String) -> ExternResult<Vec<Record>> {
     let mut publications = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&tag.to_lowercase())?, LinkTypeFilter::single_type(0.into(), (LinkTypes::TagToPublications as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&tag.to_lowercase())?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::TagToPublications as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             publications.push(record);
         }
     }
@@ -178,9 +217,16 @@ pub fn search_by_tag(tag: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_author_publications(author_did: String) -> ExternResult<Vec<Record>> {
     let mut publications = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&author_did)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::AuthorToPublications as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&author_did)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::AuthorToPublications as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             publications.push(record);
         }
     }
@@ -191,9 +237,16 @@ pub fn get_author_publications(author_did: String) -> ExternResult<Vec<Record>> 
 #[hdk_extern]
 pub fn get_publication_blocks(publication_id: String) -> ExternResult<Vec<Record>> {
     let mut blocks = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToBlocks as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToBlocks as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             blocks.push(record);
         }
     }
@@ -204,9 +257,16 @@ pub fn get_publication_blocks(publication_id: String) -> ExternResult<Vec<Record
 #[hdk_extern]
 pub fn get_publication_versions(publication_id: String) -> ExternResult<Vec<Record>> {
     let mut versions = Vec::new();
-    let query = LinkQuery::new(anchor_hash(&publication_id)?, LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToVersions as u8).into()));
+    let query = LinkQuery::new(
+        anchor_hash(&publication_id)?,
+        LinkTypeFilter::single_type(0.into(), (LinkTypes::PublicationToVersions as u8).into()),
+    );
     for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+        if let Some(record) = get(
+            ActionHash::try_from(link.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?,
+            GetOptions::default(),
+        )? {
             versions.push(record);
         }
     }
@@ -217,7 +277,9 @@ pub fn get_publication_versions(publication_id: String) -> ExternResult<Vec<Reco
 #[hdk_extern]
 pub fn get_publications_by_type(content_type: ContentType) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Publication,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
@@ -235,7 +297,9 @@ pub fn get_publications_by_type(content_type: ContentType) -> ExternResult<Vec<R
 #[hdk_extern]
 pub fn get_publications_by_language(language: String) -> ExternResult<Vec<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Publication,
+        )?))
         .include_entries(true);
 
     let mut results = Vec::new();
@@ -253,7 +317,9 @@ pub fn get_publications_by_language(language: String) -> ExternResult<Vec<Record
 #[hdk_extern]
 pub fn delete_publication(input: DeletePublicationInput) -> ExternResult<()> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Publication,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -261,14 +327,18 @@ pub fn delete_publication(input: DeletePublicationInput) -> ExternResult<()> {
             if pub_entry.id == input.publication_id {
                 // Only author can delete
                 if pub_entry.author_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only author can delete".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only author can delete".into()
+                    )));
                 }
                 delete_entry(record.action_address().clone())?;
                 return Ok(());
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Publication not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Publication not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -281,7 +351,9 @@ pub struct DeletePublicationInput {
 #[hdk_extern]
 pub fn add_tags(input: AddTagsInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Publication,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
@@ -289,7 +361,9 @@ pub fn add_tags(input: AddTagsInput) -> ExternResult<Record> {
             if pub_entry.id == input.publication_id {
                 // Only author can add tags
                 if pub_entry.author_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only author can add tags".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only author can add tags".into()
+                    )));
                 }
 
                 let now = sys_time()?;
@@ -297,7 +371,12 @@ pub fn add_tags(input: AddTagsInput) -> ExternResult<Record> {
 
                 // Create links for new tags
                 for tag in &input.new_tags {
-                    create_link(anchor_hash(&tag.to_lowercase())?, action_hash.clone(), LinkTypes::TagToPublications, ())?;
+                    create_link(
+                        anchor_hash(&tag.to_lowercase())?,
+                        action_hash.clone(),
+                        LinkTypes::TagToPublications,
+                        (),
+                    )?;
                 }
 
                 let mut all_tags = pub_entry.tags.clone();
@@ -309,11 +388,14 @@ pub fn add_tags(input: AddTagsInput) -> ExternResult<Record> {
                     ..pub_entry
                 };
                 let new_hash = update_entry(action_hash, &EntryTypes::Publication(updated))?;
-                return get_latest_record(new_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                return get_latest_record(new_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Publication not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Publication not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -327,14 +409,18 @@ pub struct AddTagsInput {
 #[hdk_extern]
 pub fn update_license(input: UpdateLicenseInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Publication,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
         if let Some(pub_entry) = record.entry().to_app_option::<Publication>().ok().flatten() {
             if pub_entry.id == input.publication_id {
                 if pub_entry.author_did != input.requester_did {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Only author can update license".into())));
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only author can update license".into()
+                    )));
                 }
 
                 let now = sys_time()?;
@@ -343,12 +429,18 @@ pub fn update_license(input: UpdateLicenseInput) -> ExternResult<Record> {
                     updated: Some(now),
                     ..pub_entry
                 };
-                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::Publication(updated))?;
-                return get_latest_record(action_hash)?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::Publication(updated),
+                )?;
+                return get_latest_record(action_hash)?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Publication not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Publication not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -362,7 +454,9 @@ pub struct UpdateLicenseInput {
 #[hdk_extern]
 pub fn get_author_stats(author_did: String) -> ExternResult<AuthorStats> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Publication,
+        )?))
         .include_entries(true);
 
     let mut publication_count = 0;
@@ -658,7 +752,9 @@ mod tests {
 
     #[test]
     fn publish_input_serde_many_co_authors() {
-        let co_authors: Vec<String> = (0..20).map(|i| format!("did:mycelix:coauthor{}", i)).collect();
+        let co_authors: Vec<String> = (0..20)
+            .map(|i| format!("did:mycelix:coauthor{}", i))
+            .collect();
         let input = PublishInput {
             title: "Collaborative Work".into(),
             content_hash: "QmCollab".into(),
@@ -721,7 +817,10 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let input2: UpdateLicenseInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(input2.new_license.license_type, LicenseType::Custom("Proprietary-v2".into()));
+        assert_eq!(
+            input2.new_license.license_type,
+            LicenseType::Custom("Proprietary-v2".into())
+        );
         assert!(!input2.new_license.attribution_required);
         assert!(!input2.new_license.commercial_use);
         assert!(!input2.new_license.derivative_works);

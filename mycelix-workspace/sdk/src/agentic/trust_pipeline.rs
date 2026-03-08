@@ -510,9 +510,9 @@ impl TrustPipeline {
             kvector.k_m, // Membership unchanged
             kvector.k_s, // Stake unchanged
             (kvector.k_h + delta.historical_delta).clamp(0.0, 1.0),
-            kvector.k_topo, // Topology unchanged
-            kvector.k_v,    // Verification unchanged
-            kvector.k_coherence,  // Coherence unchanged by trust delta
+            kvector.k_topo,      // Topology unchanged
+            kvector.k_v,         // Verification unchanged
+            kvector.k_coherence, // Coherence unchanged by trust delta
         )
     }
 

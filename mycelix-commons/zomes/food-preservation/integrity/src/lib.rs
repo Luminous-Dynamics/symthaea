@@ -116,62 +116,63 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::PreservationMethod(m) => validate_method(m),
                 EntryTypes::StorageUnit(s) => validate_storage(s),
             },
-            OpEntry::UpdateEntry { app_entry: EntryTypes::PreservationBatch(b), .. } => validate_batch(b),
+            OpEntry::UpdateEntry {
+                app_entry: EntryTypes::PreservationBatch(b),
+                ..
+            } => validate_batch(b),
             OpEntry::UpdateEntry { .. } => Ok(ValidateCallbackResult::Valid),
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
-            match link_type {
-                LinkTypes::AllBatches => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllBatches link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => match link_type {
+            LinkTypes::AllBatches => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllBatches link tag too long (max 256 bytes)".into(),
+                    ));
                 }
-                LinkTypes::AllMethods => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllMethods link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AllStorage => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AllStorage link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::MethodToBatch => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "MethodToBatch link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::StorageToBatch => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "StorageToBatch link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
-                LinkTypes::AgentToBatch => {
-                    if tag.0.len() > 256 {
-                        return Ok(ValidateCallbackResult::Invalid(
-                            "AgentToBatch link tag too long (max 256 bytes)".into(),
-                        ));
-                    }
-                    Ok(ValidateCallbackResult::Valid)
-                }
+                Ok(ValidateCallbackResult::Valid)
             }
-        }
+            LinkTypes::AllMethods => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllMethods link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllStorage => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllStorage link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::MethodToBatch => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "MethodToBatch link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::StorageToBatch => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "StorageToBatch link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AgentToBatch => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AgentToBatch link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+        },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
@@ -182,44 +183,66 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_batch(b: PreservationBatch) -> ExternResult<ValidateCallbackResult> {
     if b.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Batch ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Batch ID cannot be empty".into(),
+        ));
     }
     if b.method.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Method cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Method cannot be empty".into(),
+        ));
     }
     if b.method.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Method too long (max 128 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Method too long (max 128 chars)".into(),
+        ));
     }
     if !b.quantity_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be a finite number".into(),
+        ));
     }
     if b.quantity_kg <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Quantity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity must be positive".into(),
+        ));
     }
     // Batch ID max length
     if b.id.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Batch ID too long (max 128 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Batch ID too long (max 128 chars)".into(),
+        ));
     }
     // expected_ready must be >= started_at
     if b.expected_ready < b.started_at {
-        return Ok(ValidateCallbackResult::Invalid("expected_ready cannot be before started_at".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "expected_ready cannot be before started_at".into(),
+        ));
     }
     // Allergen flags validation
     if b.allergen_flags.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 allergen flags".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 allergen flags".into(),
+        ));
     }
     for flag in &b.allergen_flags {
         if flag.trim().is_empty() {
-            return Ok(ValidateCallbackResult::Invalid("Allergen flag cannot be empty".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Allergen flag cannot be empty".into(),
+            ));
         }
         if flag.len() > 128 {
-            return Ok(ValidateCallbackResult::Invalid("Allergen flag too long (max 128 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Allergen flag too long (max 128 chars)".into(),
+            ));
         }
     }
     // Notes max length (if present)
     if let Some(ref notes) = b.notes {
         if notes.len() > 4096 {
-            return Ok(ValidateCallbackResult::Invalid("Batch notes too long (max 4096 chars)".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Batch notes too long (max 4096 chars)".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -227,38 +250,58 @@ fn validate_batch(b: PreservationBatch) -> ExternResult<ValidateCallbackResult> 
 
 fn validate_method(m: PreservationMethod) -> ExternResult<ValidateCallbackResult> {
     if m.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Method name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Method name cannot be empty".into(),
+        ));
     }
     if m.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Method name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Method name too long (max 256 chars)".into(),
+        ));
     }
     if m.description.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description cannot be empty".into(),
+        ));
     }
     if m.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description too long (max 4096 chars)".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_storage(s: StorageUnit) -> ExternResult<ValidateCallbackResult> {
     if s.id.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Storage ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Storage ID cannot be empty".into(),
+        ));
     }
     if s.id.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Storage ID too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Storage ID too long (max 256 chars)".into(),
+        ));
     }
     if s.name.trim().is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Storage name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Storage name cannot be empty".into(),
+        ));
     }
     if s.name.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Storage name too long (max 256 chars)".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Storage name too long (max 256 chars)".into(),
+        ));
     }
     if !s.capacity_kg.is_finite() {
-        return Ok(ValidateCallbackResult::Invalid("Capacity must be a finite number".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Capacity must be a finite number".into(),
+        ));
     }
     if s.capacity_kg <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Capacity must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Capacity must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -337,8 +380,10 @@ mod tests {
     #[test]
     fn serde_roundtrip_batch_status() {
         let statuses = vec![
-            BatchStatus::InProgress, BatchStatus::Completed,
-            BatchStatus::Failed, BatchStatus::Consumed,
+            BatchStatus::InProgress,
+            BatchStatus::Completed,
+            BatchStatus::Failed,
+            BatchStatus::Consumed,
         ];
         for s in &statuses {
             let json = serde_json::to_string(s).unwrap();
@@ -349,7 +394,11 @@ mod tests {
 
     #[test]
     fn serde_roundtrip_skill_level() {
-        let levels = vec![SkillLevel::Beginner, SkillLevel::Intermediate, SkillLevel::Advanced];
+        let levels = vec![
+            SkillLevel::Beginner,
+            SkillLevel::Intermediate,
+            SkillLevel::Advanced,
+        ];
         for l in &levels {
             let json = serde_json::to_string(l).unwrap();
             let back: SkillLevel = serde_json::from_str(&json).unwrap();
@@ -360,8 +409,12 @@ mod tests {
     #[test]
     fn serde_roundtrip_storage_type() {
         let types = vec![
-            StorageType::RootCellar, StorageType::Cellar, StorageType::Freezer,
-            StorageType::Dehydrator, StorageType::Fermenter, StorageType::Pantry,
+            StorageType::RootCellar,
+            StorageType::Cellar,
+            StorageType::Freezer,
+            StorageType::Dehydrator,
+            StorageType::Fermenter,
+            StorageType::Pantry,
             StorageType::Composter,
         ];
         for t in &types {
@@ -499,8 +552,12 @@ mod tests {
 
     #[test]
     fn batch_all_statuses_valid() {
-        for status in [BatchStatus::InProgress, BatchStatus::Completed,
-                       BatchStatus::Failed, BatchStatus::Consumed] {
+        for status in [
+            BatchStatus::InProgress,
+            BatchStatus::Completed,
+            BatchStatus::Failed,
+            BatchStatus::Consumed,
+        ] {
             let mut b = valid_batch();
             b.status = status;
             assert_valid(validate_batch(b));
@@ -605,7 +662,11 @@ mod tests {
 
     #[test]
     fn method_all_skill_levels_valid() {
-        for level in [SkillLevel::Beginner, SkillLevel::Intermediate, SkillLevel::Advanced] {
+        for level in [
+            SkillLevel::Beginner,
+            SkillLevel::Intermediate,
+            SkillLevel::Advanced,
+        ] {
             let mut m = valid_method();
             m.skill_level = level;
             assert_valid(validate_method(m));
@@ -745,9 +806,15 @@ mod tests {
 
     #[test]
     fn all_storage_types_valid() {
-        for st in [StorageType::RootCellar, StorageType::Cellar, StorageType::Freezer,
-                    StorageType::Dehydrator, StorageType::Fermenter, StorageType::Pantry,
-                    StorageType::Composter] {
+        for st in [
+            StorageType::RootCellar,
+            StorageType::Cellar,
+            StorageType::Freezer,
+            StorageType::Dehydrator,
+            StorageType::Fermenter,
+            StorageType::Pantry,
+            StorageType::Composter,
+        ] {
             let mut s = valid_storage();
             s.storage_type = st;
             assert_valid(validate_storage(s));
@@ -805,9 +872,10 @@ mod tests {
             LinkTypes::AgentToBatch => "AgentToBatch",
         };
         if tag.0.len() > max {
-            ValidateCallbackResult::Invalid(
-                format!("{} link tag too long (max {} bytes)", name, max),
-            )
+            ValidateCallbackResult::Invalid(format!(
+                "{} link tag too long (max {} bytes)",
+                name, max
+            ))
         } else {
             ValidateCallbackResult::Valid
         }
@@ -949,7 +1017,10 @@ mod tests {
         let mut b = valid_batch();
         b.started_at = 1700000000;
         b.expected_ready = 1699999999;
-        assert_invalid(validate_batch(b), "expected_ready cannot be before started_at");
+        assert_invalid(
+            validate_batch(b),
+            "expected_ready cannot be before started_at",
+        );
     }
 
     #[test]
@@ -1026,5 +1097,4 @@ mod tests {
         b.notes = Some("n".repeat(4096));
         assert_valid(validate_batch(b));
     }
-
 }

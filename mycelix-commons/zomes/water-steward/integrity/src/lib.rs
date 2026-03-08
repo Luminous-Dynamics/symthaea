@@ -561,11 +561,7 @@ mod tests {
             id: "ws-001".into(),
             name: "Cedar Creek Watershed".into(),
             huc_code: Some("17110006".into()),
-            boundary: vec![
-                (45.5, -122.6),
-                (45.6, -122.5),
-                (45.4, -122.4),
-            ],
+            boundary: vec![(45.5, -122.6), (45.6, -122.5), (45.4, -122.4)],
             area_sq_km: 150.0,
             stewardship_type: StewardshipType::Commons,
             governing_body: None,
@@ -1183,10 +1179,7 @@ mod tests {
         let mut right = make_water_right();
         right.conditions = (0..51).map(|i| format!("Condition {}", i)).collect();
         let result = validate_create_water_right(fake_create(), right);
-        assert_eq!(
-            invalid_msg(&result),
-            "Cannot have more than 50 conditions"
-        );
+        assert_eq!(invalid_msg(&result), "Cannot have more than 50 conditions");
     }
 
     #[test]
@@ -1318,11 +1311,7 @@ mod tests {
     #[test]
     fn water_right_oversized_condition_in_middle_rejected() {
         let mut right = make_water_right();
-        right.conditions = vec![
-            "Short".into(),
-            "x".repeat(1025),
-            "Also short".into(),
-        ];
+        right.conditions = vec!["Short".into(), "x".repeat(1025), "Also short".into()];
         let result = validate_create_water_right(fake_create(), right);
         assert!(is_invalid(&result));
     }
@@ -1446,10 +1435,7 @@ mod tests {
         let mut dispute = make_dispute();
         dispute.description = "".into();
         let result = validate_create_water_dispute(fake_create(), dispute);
-        assert_eq!(
-            invalid_msg(&result),
-            "Dispute description cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Dispute description cannot be empty");
     }
 
     #[test]
@@ -1712,8 +1698,7 @@ mod tests {
                 }
                 Ok(ValidateCallbackResult::Valid)
             }
-            LinkTypes::RightToTransfer
-            | LinkTypes::StewardshipTypeToWatershed => {
+            LinkTypes::RightToTransfer | LinkTypes::StewardshipTypeToWatershed => {
                 if tag.0.len() > 512 {
                     return Ok(ValidateCallbackResult::Invalid(format!(
                         "{:?} link tag too long (max 512 bytes)",
@@ -1908,10 +1893,7 @@ mod tests {
         let mut right = make_water_right();
         right.conditions = (0..51).map(|_| "".into()).collect();
         let result = validate_create_water_right(fake_create(), right);
-        assert_eq!(
-            invalid_msg(&result),
-            "Cannot have more than 50 conditions"
-        );
+        assert_eq!(invalid_msg(&result), "Cannot have more than 50 conditions");
     }
 
     #[test]
@@ -1932,10 +1914,7 @@ mod tests {
         dispute.description = "".into();
         dispute.respondent = dispute.complainant.clone();
         let result = validate_create_water_dispute(fake_create(), dispute);
-        assert_eq!(
-            invalid_msg(&result),
-            "Dispute description cannot be empty"
-        );
+        assert_eq!(invalid_msg(&result), "Dispute description cannot be empty");
     }
 
     #[test]
