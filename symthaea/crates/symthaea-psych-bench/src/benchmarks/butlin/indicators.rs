@@ -4,6 +4,11 @@
 //! consciousness indicators. Rather than running the cognitive loop
 //! (which requires the full symthaea crate), this evaluates each
 //! indicator based on Symthaea's known architectural properties.
+//!
+//! **Shared formulas** (must match `examples/butlin_validation.rs`):
+//! - `normalize_phi(phi) = 2/(1+exp(-phi)) - 1`
+//! - `blend_score = 0.6 * static + 0.4 * runtime`
+//! - HOT-2 runtime: `(bottleneck * 2.0).clamp(0, 1)`
 
 use super::report::{ButlinIndicatorReport, IndicatorEvidence, IndicatorStatus};
 use crate::harness::config::BenchmarkConfig;
