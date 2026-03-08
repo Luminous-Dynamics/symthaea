@@ -9,6 +9,10 @@ yarn-error.log*
 pnpm-debug.log*
 .pnpm/
 
+# === Confidential / Legal ===
+patents/
+docs/PATENT_FILING_GUIDE.md
+
 # === Environment & Local Config ===
 .env
 .env.*
