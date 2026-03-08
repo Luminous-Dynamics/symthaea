@@ -193,7 +193,6 @@ fn speed_modulation_varies_tau_factor() {
 // Multi-substrate soak: 200 cycles with mid-run switch
 // ═══════════════════════════════════════════════════════════════════════════════
 
-#[test]
 // ═══════════════════════════════════════════════════════════════════════════════
 // PHASE 4: Hybrid substrate modeling — per-region substrate assignment
 // ═══════════════════════════════════════════════════════════════════════════════
