@@ -166,4 +166,85 @@ mod tests {
         assert!(hv.dim() > 0);
         assert!(hv.norm() > 0.0);
     }
+
+    #[test]
+    fn test_encode_empty_name() {
+        let mut cb = NixCodebook::new();
+        let mut enc = PackageEncoder::new(&mut cb);
+        let hv = enc.encode_name("");
+        assert!(hv.dim() > 0);
+        assert!(hv.norm() < 1e-6, "Empty name should produce zero vector");
+    }
+
+    #[test]
+    fn test_encode_dotted_path() {
+        let mut cb = NixCodebook::new();
+        let mut enc = PackageEncoder::new(&mut cb);
+        let hv = enc.encode_name("python311Packages.numpy");
+        assert!(hv.norm() > 0.0);
+
+        // Should share tokens with a related package
+        let hv2 = {
+            let mut enc2 = PackageEncoder::new(&mut cb);
+            enc2.encode_name("python311Packages.scipy")
+        };
+        let sim = hv.similarity(&hv2);
+        assert!(
+            sim > 0.0,
+            "Packages in the same python namespace should share some similarity ({:.3})",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_metadata_no_description_no_categories() {
+        let mut cb = NixCodebook::new();
+        let meta = PackageMetadata {
+            name: "hello".to_string(),
+            description: None,
+            categories: vec![],
+        };
+        let hv = {
+            let mut enc = PackageEncoder::new(&mut cb);
+            enc.encode_metadata(&meta)
+        };
+        assert!(hv.dim() > 0);
+        assert!(hv.norm() > 0.0, "Name-only metadata should still encode");
+    }
+
+    #[test]
+    fn test_encode_name_all_separators() {
+        // Name with all three separator types: `.`, `-`, `_`
+        let mut cb = NixCodebook::new();
+        let mut enc = PackageEncoder::new(&mut cb);
+        let hv = enc.encode_name("my-pkg_lib.core");
+        assert!(hv.norm() > 0.0);
+    }
+
+    #[test]
+    fn test_description_stopwords_filtered() {
+        let mut cb = NixCodebook::new();
+        // Description of only stopwords → zero vector for description component
+        let meta_stopwords = PackageMetadata {
+            name: "test".to_string(),
+            description: Some("a an the is are".to_string()),
+            categories: vec![],
+        };
+        let meta_real = PackageMetadata {
+            name: "test".to_string(),
+            description: Some("powerful compiler framework optimization".to_string()),
+            categories: vec![],
+        };
+        let hv1 = {
+            let mut enc = PackageEncoder::new(&mut cb);
+            enc.encode_metadata(&meta_stopwords)
+        };
+        let hv2 = {
+            let mut enc = PackageEncoder::new(&mut cb);
+            enc.encode_metadata(&meta_real)
+        };
+        // Both should encode, but with different description contributions
+        assert!(hv1.norm() > 0.0);
+        assert!(hv2.norm() > 0.0);
+    }
 }

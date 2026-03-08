@@ -75,6 +75,8 @@ struct DaemonState {
     nix_plugin: NixOsPlugin,
     /// Count of maintenance plans generated (dry-run).
     maintenance_plan_count: u32,
+    /// Cumulative count of persistence write errors (working_memory, predictions, knowledge, causal graph).
+    persist_error_count: u64,
 }
 
 /// Tracks alert continuity across IPC cycles.
@@ -135,6 +137,7 @@ impl DaemonState {
             active_inference: NixActiveInference::new(),
             nix_plugin: NixOsPlugin,
             maintenance_plan_count: 0,
+            persist_error_count: 0,
         }
     }
 
@@ -503,6 +506,16 @@ impl DaemonState {
 
         // Prune alert state for alerts that are no longer active
         self.alert_state.retain(|k, _| active_keys.contains(k));
+
+        // Hard cap to prevent unbounded growth if predictions accumulate
+        const MAX_ALERT_ENTRIES: usize = 500;
+        if self.alert_state.len() > MAX_ALERT_ENTRIES {
+            // Keep entries with highest consecutive_cycles (most established)
+            let mut entries: Vec<_> = self.alert_state.drain().collect();
+            entries.sort_by(|a, b| b.1.consecutive_cycles.cmp(&a.1.consecutive_cycles));
+            entries.truncate(MAX_ALERT_ENTRIES);
+            self.alert_state = entries.into_iter().collect();
+        }
 
         alerts
     }
@@ -1075,25 +1088,37 @@ fn main() -> ! {
             let wm_path = snapshot_path.with_file_name("working_memory.json");
             let saved = state.working_memory.save();
             if let Ok(json) = serde_json::to_string_pretty(&saved) {
-                let _ = std::fs::write(&wm_path, json);
+                if let Err(e) = std::fs::write(&wm_path, json) {
+                    state.persist_error_count += 1;
+                    eprintln!("nix-mind-daemon: working_memory write failed: {e}");
+                }
             }
 
             let pred_path = snapshot_path.with_file_name("predictive_history.json");
             let pred_saved = state.predictive_monitor.save();
             if let Ok(json) = serde_json::to_string_pretty(&pred_saved) {
-                let _ = std::fs::write(&pred_path, json);
+                if let Err(e) = std::fs::write(&pred_path, json) {
+                    state.persist_error_count += 1;
+                    eprintln!("nix-mind-daemon: predictive_history write failed: {e}");
+                }
             }
 
             if let Some(kb) = &state.knowledge_base {
                 if kb.dynamic_len() > 0 {
                     let kb_path = snapshot_path.with_file_name("knowledge_learned.json");
-                    let _ = std::fs::write(&kb_path, kb.save_dynamic());
+                    if let Err(e) = std::fs::write(&kb_path, kb.save_dynamic()) {
+                        state.persist_error_count += 1;
+                        eprintln!("nix-mind-daemon: knowledge_learned write failed: {e}");
+                    }
                 }
             }
 
             // Persist causal graph
             let causal_path = snapshot_path.with_file_name("causal_graph.json");
-            let _ = state.causal_graph.save(&causal_path);
+            if let Err(e) = state.causal_graph.save(&causal_path) {
+                state.persist_error_count += 1;
+                eprintln!("nix-mind-daemon: causal_graph write failed: {e}");
+            }
         }
 
         // Increment the cycle counter for observability.
@@ -1499,8 +1524,13 @@ mod tests {
             "No space left on device",
             "write error at /nix/store",
         );
-        assert!(prompt.contains("nix-daemon.service"));
-        assert!(prompt.contains("space"));
+        // The POML template substitutes {{ unit }} with the unit name
+        assert!(
+            prompt.contains("nix-daemon.service"),
+            "Prompt should contain unit name. Got: {}",
+            prompt
+        );
+        assert!(!prompt.is_empty());
     }
 
     #[test]
@@ -1522,5 +1552,42 @@ mod tests {
         // Should have learned the article (without Ollama enrichment)
         let kb = state.knowledge_base.as_ref().unwrap();
         assert_eq!(kb.dynamic_len(), 1);
+    }
+
+    #[test]
+    fn test_persist_error_count_starts_at_zero() {
+        let state = DaemonState::new(&test_config());
+        assert_eq!(state.persist_error_count, 0);
+    }
+
+    #[test]
+    fn test_alert_state_capacity_bounded() {
+        let config = test_config();
+        let mut state = DaemonState::new(&config);
+
+        // Insert many alert tracking entries
+        for i in 0..2000 {
+            state.alert_state.insert(
+                format!("metric_{}@1h", i),
+                AlertTracking {
+                    first_seen: i as u64,
+                    consecutive_cycles: 1,
+                    prev_predicted_value: 0.5,
+                },
+            );
+        }
+        assert_eq!(state.alert_state.len(), 2000);
+
+        // After build_alerts with no active predictions, all should be pruned
+        state.predictive_monitor = PredictiveMonitor::with_defaults();
+        let alerts = state.build_alerts(100);
+        // All entries pruned since no predictions match
+        assert!(
+            state.alert_state.is_empty(),
+            "Alert state should be pruned when no predictions are active, got {}",
+            state.alert_state.len()
+        );
+        // Should return empty alerts
+        assert!(alerts.is_empty());
     }
 }

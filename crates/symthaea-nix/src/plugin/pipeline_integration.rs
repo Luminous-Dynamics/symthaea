@@ -442,7 +442,7 @@ impl NixPipelineProcessor {
         //    Every 50 learn cycles, discover_structure() examines accumulated
         //    numeric observations for variable pairs with 20+ data points.
         self.learn_cycle_count += 1;
-        if self.learn_cycle_count % 50 == 0 {
+        if self.learn_cycle_count.is_multiple_of(50) {
             let edges_before = self.causal_graph.edge_count();
             let new_edges = self.causal_graph.discover_structure();
             self.last_discovery_edge_count = new_edges.len();
@@ -777,5 +777,79 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_e2e_anomaly_process_learn_knowledge_cycle() {
+        // End-to-end: detect anomaly → process → learn → verify causal graph + episode
+        let mut proc = NixPipelineProcessor::new().with_skip_observe(true);
+
+        // Step 1: Process an anomaly-like input (service failure)
+        let result = proc.process("restart nginx after crash", 0.8, 0.7);
+        assert!(
+            result.phi_allowed,
+            "Confident quadrant with high phi should allow execution"
+        );
+        assert!(!result.plan.goal.description.is_empty());
+
+        // Step 2: Simulate successful outcome and learn
+        let dim = proc.engine().world_model().system_state().dim();
+        let state_after = ContinuousHV::random(dim, 999);
+        let initial_episodes = proc.engine().episode_count();
+        let initial_edges = proc.causal_graph().edge_count();
+
+        proc.learn("restart nginx after crash", true, state_after);
+
+        // Step 3: Verify episodic memory grew
+        assert_eq!(
+            proc.engine().episode_count(),
+            initial_episodes + 1,
+            "Episodic memory should have one new entry"
+        );
+
+        // Step 4: Verify causal graph learned the action→outcome relationship
+        assert!(
+            proc.causal_graph().edge_count() >= initial_edges,
+            "Causal graph should not lose edges after learning"
+        );
+        let conf = proc.causal_graph().edge_confidence(
+            "action:restart nginx after crash",
+            "outcome:success:restart nginx after crash",
+        );
+        assert!(
+            conf.is_some(),
+            "Should have causal edge from restart action to success outcome"
+        );
+    }
+
+    #[test]
+    fn test_e2e_mixed_outcomes_shape_causal_graph() {
+        // Multiple learn cycles with mixed success/failure → graph should reflect
+        let mut proc = NixPipelineProcessor::new();
+        let dim = proc.engine().world_model().system_state().dim();
+
+        // 10 successes + 5 failures for same action
+        for i in 0..15 {
+            let state_after = ContinuousHV::random(dim, i + 500);
+            let success = i < 10;
+            proc.learn("upgrade system", success, state_after);
+        }
+
+        // Success edge should be stronger than failure edge
+        let success_conf = proc
+            .causal_graph()
+            .edge_confidence("action:upgrade system", "outcome:success:upgrade system")
+            .unwrap_or(0.0);
+        let failure_conf = proc
+            .causal_graph()
+            .edge_confidence("action:upgrade system", "outcome:failure:upgrade system")
+            .unwrap_or(0.0);
+
+        assert!(
+            success_conf > failure_conf,
+            "10 successes vs 5 failures: success edge ({:.3}) should be stronger than failure ({:.3})",
+            success_conf,
+            failure_conf,
+        );
     }
 }

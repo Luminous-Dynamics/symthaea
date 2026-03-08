@@ -197,6 +197,20 @@ impl HdcBridge {
     /// The projection preserves similarity: embeddings that are similar
     /// in the original space will have similar BinaryHV vectors.
     pub fn project(&self, embedding: &[f32]) -> BinaryHV {
+        let projected = self.project_continuous(embedding);
+        // Convert to binary BinaryHV by sign thresholding
+        Self::to_hv16(&projected)
+    }
+
+    /// Project an embedding to HDC space as continuous floats.
+    ///
+    /// Returns the raw JL-projected vector without binarization. This preserves
+    /// the full semantic signal from the embedding model, making it suitable for
+    /// feeding into systems that operate on continuous similarity (e.g., moral
+    /// topology persistent homology, harmony projection).
+    ///
+    /// The output dimension matches `config.output_dim` (default: 16,384).
+    pub fn project_continuous(&self, embedding: &[f32]) -> Vec<f32> {
         let input_dim = self.config.input_dim;
         let output_dim = self.config.output_dim;
 
@@ -254,8 +268,7 @@ impl HdcBridge {
             projected.push(sum);
         }
 
-        // Convert to binary BinaryHV by sign thresholding
-        Self::to_hv16(&projected)
+        projected
     }
 
     /// Project multiple embeddings in batch.
