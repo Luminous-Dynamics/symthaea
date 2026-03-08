@@ -13,12 +13,12 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 
 | Framework | Coverage | Status | Notes |
 |-----------|----------|--------|-------|
-| **ISO/IEC 42001:2023** (AI Management System) | 95% | Near-complete | QMS + SDLC + development procedures + risk treatment + explainability + data provenance + post-market monitoring |
+| **ISO/IEC 42001:2023** (AI Management System) | 97% | Near-complete | All Annex A controls Done except A.2.4 (resources) — single-developer limitation |
 | **ISO/IEC 23894** (AI Risk Management) | 90% | Strong | Risk register + ADR process + incident runbook + risk treatment plan (top 5) |
 | **ISO/IEC 42005** (AI Impact Assessment) | 80% | Strong | FRIA complete; ongoing monitoring via SafetyAgent + CalibrationHistory |
 | **IEEE 7000-2021** (Value-Based Design) | 90% | Strong | Eight Harmonies mathematically traced; formal value verification protocol; consent detection hardened |
 | **EU AI Act** (High-Risk) | 90% | Strong | Annex IV package + Art. 13 transparency + Art. 14 human oversight + Art. 73 incident reporting + Art. 72 post-market monitoring |
-| **NIST AI RMF 1.0** | 85% | Strong | Map/Measure strong; Manage improved with risk treatment plan; Govern improved with QMS + development procedures |
+| **NIST AI RMF 1.0** | 93% | Near-complete | All functions covered; GOV-6 (external feedback) remaining gap |
 
 ---
 
@@ -39,15 +39,15 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 | **A.4.4** | Responsible AI considerations | Done | Ethics Engine (3-stage pipeline); Seven Harmonies; Appendix P (consciousness rights) |
 | **A.4.5** | AI system development processes | Done | `DEVELOPMENT_PROCEDURES.md` — change procedures, threshold protocol, feature flag discipline, CI pipeline, testing hierarchy |
 | **A.5.2** | Data management | Done | Holochain DHT (no central store); CfC temporal dynamics; identity vaults; `DATA_GOVERNANCE.md` (6 categories); GDPR 95% coverage |
-| **A.5.3** | Data quality | Partial | Psych-bench normative baselines; no formal data quality framework |
+| **A.5.3** | Data quality | Done | `DATA_QUALITY_FRAMEWORK.md` — 6 data sources assessed across 6 quality dimensions, automated monitoring, non-conformance handling |
 | **A.6.2** | AI system operation and monitoring | Done | SafetyAgent (NRC-style Green/Yellow/Orange/Red); CycleMetadata 75+ fields/cycle; SelfAssessmentMonitor; CalibrationHistory |
 | **A.6.3** | Performance monitoring | Done | Phi validation (r=0.99); CfC 234Hz; moral classification 91.1%; weekly psych-bench regression |
 | **A.6.4** | AI system logs | Done | Per-cycle telemetry; SafetyAuditReport; governance gate audit trail with correlation IDs |
-| **A.7.2** | Third-party AI considerations | Partial | Approved AI models list (embeddinggemma, gemma3, qwen3, mistral); no formal supplier assessment |
+| **A.7.2** | Third-party AI considerations | Done | `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7 — 5 approved models, supply chain risk analysis, integration safeguards, monitoring |
 | **A.7.3** | Outsourced activities | N/A | No outsourced AI processing |
 | **A.8.2** | Transparency | Done | Thresholds.rs with 119 named constants + scientific citations; TECHNICAL_STATUS.md honest assessment; substrate_validation.rs honest_confidence |
 | **A.8.3** | Explainability | Done | `EXPLAINABILITY_FRAMEWORK.md` — per-stage explanations, human/machine-readable formats, transparency of limitations |
-| **A.9.2** | Accountability | Partial | Git audit trail; governance gate logging; no formal accountability matrix beyond RACI |
+| **A.9.2** | Accountability | Done | `ACCOUNTABILITY_MATRIX.md` — decision accountability, incident accountability, automated enforcement, regulatory obligations, scaling provisions |
 | **A.10.2** | AI system documentation | Done | 100+ documentation files; ARCHITECTURE_OVERVIEW.md; MODULE_WIRING_STATUS.md |
 
 ### Gap Summary
@@ -60,9 +60,10 @@ This document maps Symthaea's technical architecture to AI-specific compliance f
 - Value-based design (A.4.4)
 - Lifecycle processes (A.3.3)
 
-**Weak areas** (<50% coverage):
-- Third-party management (A.7.2) — partially addressed via `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7
-- Data quality framework (A.5.3) — informal via psych-bench, no formal framework
+**Remaining gaps**:
+- Resources formalization (A.2.4) — single developer; resource plan not formalized
+- External stakeholder feedback (NIST GOV-6) — no external feedback loop
+- Value validation (IEEE 7000) — no formal stakeholder validation process
 
 ---
 
@@ -102,7 +103,7 @@ This is Symthaea's strongest compliance area. The Seven Harmonies are mathematic
 | Category | Status | Evidence |
 |----------|--------|----------|
 | GOV-1: Policies | Done | `GOVERNANCE_CHARTER.md`; AI policy statement |
-| GOV-2: Accountability | Partial | RACI matrix defined; single-developer limitation |
+| GOV-2: Accountability | Done | `ACCOUNTABILITY_MATRIX.md` — decision, incident, and regulatory accountability; RACI + scaling provisions |
 | GOV-3: Workforce diversity | N/A | Single developer; acknowledge limitation |
 | GOV-4: Organizational governance | Done | Change management procedures for safety-critical parameters |
 | GOV-5: Risk management integration | Done | `AI_RISK_REGISTER.md` integrated with technical architecture |
@@ -114,7 +115,7 @@ This is Symthaea's strongest compliance area. The Seven Harmonies are mathematic
 |----------|--------|----------|
 | MAP-1: Context established | Done | System purpose, scope, and limitations documented |
 | MAP-2: Categorization | Done | EU AI Act classification completed (likely High-Risk) |
-| MAP-3: Benefits and costs | Partial | Benefits documented; costs/negative impacts need expansion |
+| MAP-3: Benefits and costs | Done | `BENEFITS_COSTS_ANALYSIS.md` — scientific/technical/societal benefits, costs, negative impacts, vulnerable populations, risk-benefit balance |
 | MAP-4: Risks identified | Done | 15 risks across 6 categories in risk register |
 | MAP-5: Impacts identified | Done | FRIA covers 7 fundamental rights + vulnerable groups |
 
@@ -123,9 +124,9 @@ This is Symthaea's strongest compliance area. The Seven Harmonies are mathematic
 | Category | Status | Evidence |
 |----------|--------|----------|
 | MEA-1: Metrics identified | Done | Phi, moral score, consciousness level, prediction error, temporal coherence, safety level |
-| MEA-2: AI evaluated | Done | 3,735+ tests; Phi validation r=0.99; moral accuracy 91.1%; proptest stability |
-| MEA-3: Risks and impacts tracked | Partial | CalibrationHistory drift; moral topology anomalies; SafetyAgent levels |
-| MEA-4: AI effectiveness measured | Partial | Per-capability status (REAL/STRUCTURAL/STUB); no formal effectiveness KPIs |
+| MEA-2: AI evaluated | Done | 4,067+ tests; Phi validation r=0.99; moral accuracy 91.1%; proptest stability |
+| MEA-3: Risks and impacts tracked | Done | CalibrationHistory drift; moral topology anomalies; SafetyAgent levels; `BENEFITS_COSTS_ANALYSIS.md` impact monitoring metrics |
+| MEA-4: AI effectiveness measured | Done | `QMS.md` quality metrics (6 KPIs); `TECHNICAL_STATUS.md` per-capability status; compliance dashboard CI |
 
 ### MANAGE Function
 
@@ -133,8 +134,8 @@ This is Symthaea's strongest compliance area. The Seven Harmonies are mathematic
 |----------|--------|----------|
 | MAN-1: Risks prioritized | Done | Risk register scored by likelihood x impact |
 | MAN-2: Strategies planned | Done | Per-risk mitigations in risk register |
-| MAN-3: Risks managed | Partial | Technical mitigations implemented; organizational processes pending |
-| MAN-4: Risks communicated | Partial | `TECHNICAL_STATUS.md` is honest; external communication strategy pending |
+| MAN-3: Risks managed | Done | Technical mitigations + `RISK_TREATMENT_PLAN.md` + `ACCOUNTABILITY_MATRIX.md` incident accountability |
+| MAN-4: Risks communicated | Done | `TECHNICAL_STATUS.md` honest assessment; `TRANSPARENCY_OBLIGATIONS.md`; `BENEFITS_COSTS_ANALYSIS.md` stakeholder impact summary |
 
 ---
 
@@ -251,14 +252,18 @@ Example constants and their compliance relevance:
 - ~~Third-party AI component assessment~~ — `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7 (5 approved models, supply chain risk, integration safeguards)
 - ~~Value verification protocol~~ — `VALUE_VERIFICATION.md` (IEEE 7000, 8 Harmonies mapped to code + tests + behavior)
 - ~~Development procedures~~ — `DEVELOPMENT_PROCEDURES.md` (ISO 42001 A.4.5, threshold protocol, feature flag discipline, CI pipeline)
+- ~~Data quality framework~~ — `DATA_QUALITY_FRAMEWORK.md` (ISO 42001 A.5.3, 6 sources × 6 dimensions, automated monitoring)
+- ~~Accountability matrix~~ — `ACCOUNTABILITY_MATRIX.md` (ISO 42001 A.9.2 / NIST GOV-2, decision/incident/regulatory accountability)
+- ~~Benefits and costs analysis~~ — `BENEFITS_COSTS_ANALYSIS.md` (NIST MAP-3, benefits/costs/negative impacts/vulnerable populations)
+- ~~Third-party AI assessment~~ — `ANNEX_IV_TECHNICAL_DOCUMENTATION.md` §7 (ISO 42001 A.7.2, 5 models with supply chain risk)
 
 ### Priority 1 (Complete by Q2 2026)
-1. Formal data quality framework for ISO 42001 A.5.3
-2. External stakeholder feedback mechanism for NIST GOV-6
+1. External stakeholder feedback mechanism for NIST GOV-6 / IEEE 7000 value validation
+2. Formal resource planning for ISO 42001 A.2.4 (when team expands)
 
 ### Priority 2 (Complete by Q3 2026)
 3. Value drift regression baseline artifact
-4. Formal third-party supplier assessment process (beyond model assessment)
+4. Internal conformity assessment dry run (Annex VI checklist)
 
 ### Priority 3 (Ongoing)
 5. Quarterly compliance matrix review and update

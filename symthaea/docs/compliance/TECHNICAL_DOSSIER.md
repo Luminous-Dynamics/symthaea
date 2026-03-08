@@ -77,9 +77,9 @@ Per `COMPLIANCE_MATRIX.md`, current coverage:
 
 | Standard | Coverage | Notes |
 |----------|----------|-------|
-| ISO 42001 (AI Management) | 95% | QMS + development procedures + risk treatment + data provenance |
-| IEEE 7000 (Ethical Design) | 90% | Eight Harmonies value framework with formal verification protocol |
-| NIST AI RMF | 85% | Govern/Map/Measure/Manage all addressed |
+| ISO 42001 (AI Management) | 97% | All Annex A controls Done except A.2.4 (resources) |
+| IEEE 7000 (Ethical Design) | 90% | Eight Harmonies with formal value verification protocol |
+| NIST AI RMF | 93% | All functions covered; GOV-6 (external feedback) remaining gap |
 | EU AI Act | 90% | Annex IV package + Articles 9/10/11/12/13/14/15/72/73 covered |
 
 ---

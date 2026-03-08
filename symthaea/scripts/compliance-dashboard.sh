@@ -131,6 +131,9 @@ run_suite "Proptest Threshold Sensitivity" \
 run_suite "Calibration E2E" \
     "cargo test --test calibration_e2e 2>&1"
 
+run_suite "Substrate Simulation" \
+    "cargo test --test substrate_simulation 2>&1"
+
 if ! $JSON_MODE; then
     echo ""
     echo -e "${BOLD}Governance Enforcement${RESET}"
@@ -176,7 +179,10 @@ for doc in \
     "docs/compliance/HUMAN_OVERSIGHT.md" \
     "docs/compliance/ANNEX_IV_TECHNICAL_DOCUMENTATION.md" \
     "docs/compliance/VALUE_VERIFICATION.md" \
-    "docs/compliance/DEVELOPMENT_PROCEDURES.md"; do
+    "docs/compliance/DEVELOPMENT_PROCEDURES.md" \
+    "docs/compliance/DATA_QUALITY_FRAMEWORK.md" \
+    "docs/compliance/ACCOUNTABILITY_MATRIX.md" \
+    "docs/compliance/BENEFITS_COSTS_ANALYSIS.md"; do
     DOCS_CHECKED=$((DOCS_CHECKED + 1))
     if [ ! -f "$doc" ]; then
         DOCS_MISSING=$((DOCS_MISSING + 1))
