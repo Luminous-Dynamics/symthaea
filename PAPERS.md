@@ -550,7 +550,7 @@ All located at `mycelix-core/docs/root-notes/papers/`. Three distinct research t
 
 **Location**: `/mnt/windows/Users/Trist/OneDrive/Documents/_Docs/ERC/`
 
-These are the philosophical foundations underlying the Seven Harmonies framework used across Kosmic-Lab and Symthaea:
+These are the philosophical foundations underlying the Eight Harmonies framework used across Kosmic-Lab and Symthaea:
 
 | Work | Format | Size |
 |------|--------|------|

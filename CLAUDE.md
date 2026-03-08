@@ -120,7 +120,7 @@ embeddinggemma:300m | gemma3:1b | qwen3:1.7b | gemma3:4b | mistral:7b
 
 **Transparency**: Mark estimates as "estimated", acknowledge unknowns
 **Quality**: Right complexity from start, no hacks
-**Philosophy**: Seven Harmonies guide all work
+**Philosophy**: Eight Harmonies guide all work
 
 ---
 

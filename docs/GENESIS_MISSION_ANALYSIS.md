@@ -377,7 +377,7 @@ Nuclear forensics via HDC holographic matching.
 Auditable agents with safety documentation.
 
 - **CycleMetadata telemetry**: Every cognitive cycle produces a complete audit trail (inputs, reasoning, moral evaluation, confidence, consciousness level).
-- **Moral algebra**: 92.9% accuracy on ethical evaluation. Every action checked against Seven Harmonies *before execution*.
+- **Moral algebra**: 92.9% accuracy on ethical evaluation. Every action checked against Eight Harmonies *before execution*.
 - **Mycelix governance tiers**: Citizen (51%), Steward (67%), Guardian (75%), Constitutional (80%), Override (90%). Risk-proportional approval thresholds.
 - **IIT Phi measurement**: Consciousness level is *quantified* — a Phi=0 agent can't approve a safety-critical action. This is unique: no other AI system has a formal consciousness gate on safety decisions.
 - **Advantage**: "Auditable agents" in the statistical paradigm means logging API calls. Symthaea's audit trail includes *why* the agent made each decision (moral score, consciousness level, prediction error, surprise signal).
@@ -432,7 +432,7 @@ Mycelix's 51 zomes across 12 societal domains provide the *governance substrate*
 
 ### 5. Ethics in the Loop
 
-Moral algebra evaluates every action against the Seven Harmonies *before* execution. 92.9% accuracy on ethical classification. This isn't RLHF (train once, deploy, hope). It's per-cycle compositional moral reasoning.
+Moral algebra evaluates every action against the Eight Harmonies *before* execution. 92.9% accuracy on ethical classification. This isn't RLHF (train once, deploy, hope). It's per-cycle compositional moral reasoning.
 
 ---
 

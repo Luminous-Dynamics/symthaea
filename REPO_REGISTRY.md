@@ -52,7 +52,7 @@ Last updated: 2026-03-06
 | `mycelix-supplychain/` | 1,551 | Archived | Supply chain |
 | `mycelix.net/` | 0 | Website only | |
 
-### Philosophy / Seven Harmonies (low-sensitivity, low-value for portfolio)
+### Philosophy / Eight Harmonies (low-sensitivity, low-value for portfolio)
 
 | Directory | What |
 |-----------|------|
