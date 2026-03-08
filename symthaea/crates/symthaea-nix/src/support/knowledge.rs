@@ -277,6 +277,14 @@ impl KnowledgeBase {
         self.dynamic_articles.len()
     }
 
+    /// Get the hit count for a dynamic article by ID.
+    pub fn dynamic_hit_count(&self, id: &str) -> Option<u32> {
+        self.dynamic_articles
+            .iter()
+            .find(|a| a.id == id)
+            .map(|a| a.hit_count)
+    }
+
     pub fn search_by_hv(&self, query_hv: &ContinuousHV, k: usize) -> Vec<KnowledgeMatch<'_>> {
         let mut scored: Vec<KnowledgeMatch<'_>> = self
             .articles
@@ -1288,5 +1296,67 @@ mod tests {
         let kb = KnowledgeBase::new(&mut codebook);
         assert!(kb.static_len() > 0, "should have static articles");
         assert_eq!(kb.dynamic_len(), 0, "no dynamic articles yet");
+    }
+
+    #[test]
+    fn test_hit_count_increments_on_search_all() {
+        let mut codebook = NixCodebook::new();
+        let mut kb = KnowledgeBase::new(&mut codebook);
+
+        kb.add_learned_article(
+            make_dynamic_article("dyn-hit-test", "Custom service crash fix"),
+            &mut codebook,
+        );
+        assert_eq!(kb.dynamic_hit_count("dyn-hit-test"), Some(0));
+
+        // search_all with k large enough to include the dynamic article
+        let results = kb.search_all("custom service crash fix", &mut codebook, 100);
+        let dynamic_in_results = results.iter().any(|m| m.is_dynamic() && m.id() == "dyn-hit-test");
+        assert!(dynamic_in_results, "Dynamic article should be in results");
+
+        // Hit count should have incremented
+        assert_eq!(
+            kb.dynamic_hit_count("dyn-hit-test"),
+            Some(1),
+            "Hit count should increment when article appears in search_all results"
+        );
+
+        // Search again — should increment again
+        let _ = kb.search_all("custom service crash fix", &mut codebook, 100);
+        assert_eq!(kb.dynamic_hit_count("dyn-hit-test"), Some(2));
+    }
+
+    #[test]
+    fn test_hit_count_accessor_missing_id() {
+        let mut codebook = NixCodebook::new();
+        let kb = KnowledgeBase::new(&mut codebook);
+        assert_eq!(kb.dynamic_hit_count("nonexistent"), None);
+    }
+
+    #[test]
+    fn test_hit_count_preserved_through_save_load() {
+        let mut codebook = NixCodebook::new();
+        let mut kb = KnowledgeBase::new(&mut codebook);
+
+        kb.add_learned_article(
+            make_dynamic_article("dyn-persist-hit", "Persist hit test"),
+            &mut codebook,
+        );
+
+        // Search to increment hit count
+        let _ = kb.search_all("persist hit test", &mut codebook, 100);
+        let hits_before = kb.dynamic_hit_count("dyn-persist-hit").unwrap();
+        assert!(hits_before > 0);
+
+        // Save and reload
+        let json = kb.save_dynamic();
+        let mut kb2 = KnowledgeBase::new(&mut codebook);
+        kb2.load_dynamic(&json, &mut codebook);
+
+        assert_eq!(
+            kb2.dynamic_hit_count("dyn-persist-hit"),
+            Some(hits_before),
+            "Hit count should be preserved through save/load"
+        );
     }
 }
