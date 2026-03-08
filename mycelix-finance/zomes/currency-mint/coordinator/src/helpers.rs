@@ -21,7 +21,7 @@ pub(crate) fn get_currency_inner(currency_id: &str) -> ExternResult<(Record, Cur
             currency_id
         ))))?;
 
-    let action_hash =
+    let original_hash =
         link.target
             .clone()
             .into_action_hash()
@@ -29,9 +29,12 @@ pub(crate) fn get_currency_inner(currency_id: &str) -> ExternResult<(Record, Cur
                 "Invalid link target".into()
             )))?;
 
-    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Currency record not found".into())
-    ))?;
+    // Follow the update chain to get the latest version of the entry.
+    // The link always points to the original create action, but update_entry
+    // creates new actions that form a chain: create → update1 → update2 → ...
+    // Each update is recorded as an update of its predecessor, so we must
+    // recursively follow the chain until we find an action with no updates.
+    let record = follow_update_chain(original_hash)?;
 
     let def = record
         .entry()
@@ -64,7 +67,7 @@ pub(crate) fn get_or_create_minted_balance(
 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(bal) = record
                     .entry()
                     .to_app_option::<MintedBalance>()
@@ -145,7 +148,7 @@ pub(crate) fn update_minted_balance(
 
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(link_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(link_hash) {
                 if let Some(mut bal) = record
                     .entry()
                     .to_app_option::<MintedBalance>()
@@ -183,7 +186,7 @@ pub(crate) fn find_minted_exchange(
 
     if let Some(link) = links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(link_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(link_hash) {
                 if let Some(ex) = record
                     .entry()
                     .to_app_option::<MintedExchange>()
@@ -223,9 +226,7 @@ pub(crate) fn find_dispute_record(
                 "Invalid dispute link target".into()
             )))?;
 
-    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Dispute record not found".into())
-    ))?;
+    let record = follow_update_chain(action_hash)?;
 
     let dispute = record
         .entry()
@@ -274,7 +275,7 @@ pub(crate) fn count_currency_exchanges(currency_id: &str) -> ExternResult<(u64, 
 
     for link in exchange_links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(ex) = record
                     .entry()
                     .to_app_option::<MintedExchange>()
@@ -309,7 +310,7 @@ pub(crate) fn collect_currency_members(
     let mut member_dids = std::collections::HashSet::new();
     for link in exchange_links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(ex) = record
                     .entry()
                     .to_app_option::<MintedExchange>()
@@ -331,4 +332,37 @@ pub(crate) fn collect_currency_members(
 
 pub(crate) fn compute_demurrage(balance: i32, rate: f64, elapsed_secs: u64) -> i32 {
     compute_minted_demurrage(balance, rate, elapsed_secs)
+}
+
+/// Recursively follow the Holochain update chain from an original action hash
+/// to find the latest version of a record. Each `update_entry` creates a new
+/// action that is recorded as an update of its predecessor.
+pub(crate) fn follow_update_chain(action_hash: ActionHash) -> ExternResult<Record> {
+    let mut current_hash = action_hash;
+    loop {
+        let details = get_details(current_hash.clone(), GetOptions::default())?.ok_or(
+            wasm_error!(WasmErrorInner::Guest(
+                "Currency record not found".into()
+            )),
+        )?;
+        match details {
+            Details::Record(record_details) => {
+                if let Some(latest_update) = record_details.updates.last() {
+                    // Continue following the chain
+                    current_hash = latest_update.action_address().clone();
+                } else {
+                    // No more updates — this is the latest
+                    return Ok(record_details.record);
+                }
+            }
+            _ => {
+                // Fallback: just get the record directly
+                return get(current_hash, GetOptions::default())?.ok_or(
+                    wasm_error!(WasmErrorInner::Guest(
+                        "Currency record not found".into()
+                    )),
+                );
+            }
+        }
+    }
 }

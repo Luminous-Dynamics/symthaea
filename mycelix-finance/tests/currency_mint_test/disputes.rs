@@ -35,7 +35,7 @@ async fn test_open_dispute() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let receiver_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let receiver_did = format!("did:mycelix:{}", agents[1]);
 
     // Create, activate, and record a confirmed exchange
     let def: CurrencyDefinition = conductor
@@ -120,7 +120,7 @@ async fn test_get_and_resolve_dispute() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let receiver_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let receiver_did = format!("did:mycelix:{}", agents[1]);
 
     // Create, activate, exchange, dispute
     let def: CurrencyDefinition = conductor
@@ -564,7 +564,7 @@ async fn test_duplicate_dispute_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let receiver_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let receiver_did = format!("did:mycelix:{}", agents[1]);
 
     // Create, activate, exchange (auto-confirmed)
     let def: CurrencyDefinition = conductor
@@ -654,7 +654,7 @@ async fn test_dispute_on_unconfirmed_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with requires_confirmation (exchanges start unconfirmed)
     let def: CurrencyDefinition = conductor
@@ -733,7 +733,7 @@ async fn test_double_resolution_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let receiver_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let receiver_did = format!("did:mycelix:{}", agents[1]);
 
     // Create, activate, exchange (auto-confirmed)
     let def: CurrencyDefinition = conductor
@@ -840,7 +840,7 @@ async fn test_dispute_by_non_participant_rejected() {
     let cell_c = &apps[2].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
     let zome_c = cell_c.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create, activate, exchange (auto-confirmed)
     let def: CurrencyDefinition = conductor

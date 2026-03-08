@@ -96,7 +96,7 @@ async fn test_currency_stats_zero_sum() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     let def: CurrencyDefinition = conductor
         .call(

@@ -231,5 +231,5 @@ pub async fn setup_finance_conductor(
         .setup_app_for_agents("mycelix-finance", &agents, &[dna])
         .await
         .expect("Install app");
-    (conductor, agents, apps)
+    (conductor, agents, apps.into())
 }

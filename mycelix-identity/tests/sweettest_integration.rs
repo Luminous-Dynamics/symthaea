@@ -1646,6 +1646,7 @@ async fn test_reject_malformed_multibase_key_no_prefix() {
             type_: "Ed25519VerificationKey2020".to_string(),
             controller: "did:mycelix:test".to_string(),
             public_key_multibase: "ABCDEF1234567890ABCDEF1234567890ABCDEF12".to_string(),
+            algorithm: None,
         }]),
         authentication: None,
         key_agreement: None,
@@ -1678,6 +1679,7 @@ async fn test_reject_multibase_key_with_invalid_base58_chars() {
             type_: "Ed25519VerificationKey2020".to_string(),
             controller: "did:mycelix:test".to_string(),
             public_key_multibase: "z0OIlInvalidBase58Characters!!".to_string(),
+            algorithm: None,
         }]),
         authentication: None,
         key_agreement: None,
@@ -1710,6 +1712,7 @@ async fn test_reject_multibase_key_too_short() {
             type_: "Ed25519VerificationKey2020".to_string(),
             controller: "did:mycelix:test".to_string(),
             public_key_multibase: "zABC".to_string(),
+            algorithm: None,
         }]),
         authentication: None,
         key_agreement: None,
@@ -1742,6 +1745,7 @@ async fn test_accept_valid_non_ed25519_key_type() {
             type_: "X25519KeyAgreementKey2020".to_string(),
             controller: "did:mycelix:test".to_string(),
             public_key_multibase: "zSomeOpaqueKeyMaterial12345678901234567890".to_string(),
+            algorithm: None,
         }]),
         authentication: None,
         key_agreement: None,
@@ -3058,6 +3062,7 @@ mod key_rotation_tests {
             type_: "Multikey".to_string(),
             controller: did_id.clone(),
             public_key_multibase: "z6Mktest123rotatedkey456".to_string(),
+            algorithm: None,
         };
 
         let mut updated_methods = did_doc.verification_method.clone();

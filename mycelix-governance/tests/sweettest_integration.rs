@@ -585,6 +585,7 @@ pub struct Council {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
 pub enum CouncilType {
     Root,
     Domain { domain: String },

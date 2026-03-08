@@ -68,7 +68,7 @@ pub fn get_member_portfolio(member_did: String) -> ExternResult<Vec<MintedBalanc
 
     for link in member_currency_links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(def) = record
                     .entry()
                     .to_app_option::<CurrencyDefinition>()

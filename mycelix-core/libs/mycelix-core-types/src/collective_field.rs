@@ -776,6 +776,7 @@ pub struct HarmonyEmphasis {
     pub universal_interconnectedness: f64,
     pub sacred_reciprocity: f64,
     pub evolutionary_progression: f64,
+    pub sacred_stillness: f64,
 }
 
 impl HarmonyEmphasis {
@@ -788,6 +789,7 @@ impl HarmonyEmphasis {
             Harmony::UniversalInterconnectedness => self.universal_interconnectedness,
             Harmony::SacredReciprocity => self.sacred_reciprocity,
             Harmony::EvolutionaryProgression => self.evolutionary_progression,
+            Harmony::SacredStillness => self.sacred_stillness,
         }
     }
 
@@ -2195,6 +2197,7 @@ impl GovernanceAdapter {
             universal_interconnectedness: voter.k_trust,
             sacred_reciprocity: voter.stake_weight.min(0.5) * 2.0, // Cap influence
             evolutionary_progression: voter.participation_score,
+            sacred_stillness: 0.5, // Default moderate
         };
 
         Participant {
@@ -2452,6 +2455,7 @@ mod tests {
                 universal_interconnectedness: 0.5,
                 sacred_reciprocity: 0.5,
                 evolutionary_progression: 0.4,
+                sacred_stillness: 0.5,
             },
             epistemic_level: epistemic,
             alignments: alignments.into_iter().map(String::from).collect(),
@@ -2496,6 +2500,7 @@ mod tests {
                 universal_interconnectedness: 0.9,
                 sacred_reciprocity: 0.9,
                 evolutionary_progression: 0.9,
+                sacred_stillness: 0.9,
             };
             participants.push(p);
         }
@@ -2586,6 +2591,7 @@ mod tests {
                     universal_interconnectedness: agreement_level,
                     sacred_reciprocity: agreement_level,
                     evolutionary_progression: agreement_level,
+                    sacred_stillness: agreement_level,
                 };
                 participants.push(p);
             }
@@ -2616,6 +2622,7 @@ mod tests {
                 universal_interconnectedness: 0.95,
                 sacred_reciprocity: 0.95,
                 evolutionary_progression: 0.95,
+                sacred_stillness: 0.95,
             };
             participants.push(p);
         }
@@ -2665,6 +2672,7 @@ mod tests {
                 universal_interconnectedness: 0.95,
                 sacred_reciprocity: 0.95,
                 evolutionary_progression: 0.95,
+                sacred_stillness: 0.95,
             };
             participants.push(p);
         }
@@ -2750,6 +2758,7 @@ mod tests {
                 universal_interconnectedness: agreement,
                 sacred_reciprocity: agreement,
                 evolutionary_progression: agreement,
+                sacred_stillness: agreement,
             };
             participants.push(p);
         }

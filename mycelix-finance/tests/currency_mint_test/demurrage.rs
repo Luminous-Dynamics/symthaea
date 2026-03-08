@@ -35,7 +35,7 @@ async fn test_compost_zero_sum() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let receiver_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let receiver_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with 2% demurrage
     let def: CurrencyDefinition = conductor
@@ -111,8 +111,8 @@ async fn test_demurrage_and_compost() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let alice_did = format!("did:mycelix:{}", agents[0].to_raw_36());
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let alice_did = format!("did:mycelix:{}", agents[0]);
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with 2% demurrage
     let def: CurrencyDefinition = conductor
@@ -240,7 +240,7 @@ async fn test_redistribute_compost() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     let def: CurrencyDefinition = conductor
         .call(
@@ -685,7 +685,7 @@ async fn test_demurrage_on_non_active_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create, activate, do an exchange to create a positive balance
     let def: CurrencyDefinition = conductor
@@ -720,7 +720,7 @@ async fn test_demurrage_on_non_active_rejected() {
             },
         )
         .await;
-    let alice_did = format!("did:mycelix:{}", agents[0].to_raw_36());
+    let alice_did = format!("did:mycelix:{}", agents[0]);
     println!("  - Exchange recorded, provider has positive balance");
 
     // Suspend the currency
@@ -801,7 +801,7 @@ async fn test_redistribute_on_non_active_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create, activate, exchange (to have members and potential compost)
     let def: CurrencyDefinition = conductor
@@ -891,7 +891,7 @@ async fn test_redistribute_insufficient_compost() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create and activate currency
     let def: CurrencyDefinition = conductor

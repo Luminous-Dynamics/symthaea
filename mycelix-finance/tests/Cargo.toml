@@ -106,10 +106,10 @@ path = "treasury_test.rs"
 name = "sweettest_integration"
 path = "sweettest_integration.rs"
 
-# Currency Mint (Currency Factory) Tests
+# Currency Mint (Currency Factory) Tests — 56 sweettests across 7 modules
 [[test]]
 name = "currency_mint_test"
-path = "currency_mint_test.rs"
+path = "currency_mint_test/main.rs"
 
 # Consciousness Gating Sweettest (DID identity + MYCEL tier gates)
 [[test]]

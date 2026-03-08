@@ -104,7 +104,7 @@ pub fn record_minted_exchange(input: RecordMintedExchangeInput) -> ExternResult<
         let mut today_count: u8 = 0;
         for link in exchange_links {
             if let Some(action_hash) = link.target.into_action_hash() {
-                if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Ok(record) = follow_update_chain(action_hash) {
                     if let Some(ex) = record
                         .entry()
                         .to_app_option::<MintedExchange>()
@@ -277,7 +277,7 @@ pub fn list_pending_exchanges(currency_id: String) -> ExternResult<Vec<MintedExc
     let mut pending = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(ex) = record
                     .entry()
                     .to_app_option::<MintedExchange>()
@@ -308,7 +308,7 @@ pub fn list_pending_for_receiver(receiver_did: String) -> ExternResult<Vec<Minte
     let mut pending = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(ex) = record
                     .entry()
                     .to_app_option::<MintedExchange>()
@@ -406,7 +406,7 @@ pub fn get_currency_exchanges(input: PaginatedCurrencyInput) -> ExternResult<Vec
     let mut exchanges = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(ex) = record
                     .entry()
                     .to_app_option::<MintedExchange>()
@@ -448,7 +448,7 @@ pub fn get_member_exchanges(input: GetMemberExchangesInput) -> ExternResult<Vec<
     let mut exchanges = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(ex) = record
                     .entry()
                     .to_app_option::<MintedExchange>()

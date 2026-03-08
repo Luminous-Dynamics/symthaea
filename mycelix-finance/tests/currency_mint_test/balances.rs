@@ -84,8 +84,8 @@ async fn test_member_exchange_history() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let provider_did = format!("did:mycelix:{}", agents[0].to_raw_36());
-    let receiver_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let provider_did = format!("did:mycelix:{}", agents[0]);
+    let receiver_did = format!("did:mycelix:{}", agents[1]);
 
     // Create and activate
     let def: CurrencyDefinition = conductor
@@ -219,8 +219,8 @@ async fn test_portfolio_and_member_listing() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let alice_did = format!("did:mycelix:{}", agents[0].to_raw_36());
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let alice_did = format!("did:mycelix:{}", agents[0]);
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create and activate two currencies
     let def_x: CurrencyDefinition = conductor
@@ -476,7 +476,7 @@ async fn test_members_sorted_unique() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     let def: CurrencyDefinition = conductor
         .call(

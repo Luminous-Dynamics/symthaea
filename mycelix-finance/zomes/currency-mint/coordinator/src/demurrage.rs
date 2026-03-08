@@ -60,7 +60,7 @@ pub fn apply_minted_demurrage(input: ApplyDemurrageInput) -> ExternResult<Demurr
 
         if let Some(link) = links.first() {
             if let Some(link_hash) = link.target.clone().into_action_hash() {
-                if let Some(record) = get(link_hash, GetOptions::default())? {
+                if let Ok(record) = follow_update_chain(link_hash) {
                     if let Some(mut updated_bal) = record
                         .entry()
                         .to_app_option::<MintedBalance>()
@@ -90,7 +90,7 @@ pub fn apply_minted_demurrage(input: ApplyDemurrageInput) -> ExternResult<Demurr
         )?;
         if let Some(link) = compost_links.first() {
             if let Some(link_hash) = link.target.clone().into_action_hash() {
-                if let Some(record) = get(link_hash, GetOptions::default())? {
+                if let Ok(record) = follow_update_chain(link_hash) {
                     compost.balance += deduction;
                     compost.last_activity = now;
                     update_entry(record.action_address().clone(), &compost)?;
@@ -230,7 +230,7 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
         )?;
         if let Some(link) = links.first() {
             if let Some(link_hash) = link.target.clone().into_action_hash() {
-                if let Some(record) = get(link_hash, GetOptions::default())? {
+                if let Ok(record) = follow_update_chain(link_hash) {
                     if let Some(mut bal) = record
                         .entry()
                         .to_app_option::<MintedBalance>()
@@ -257,7 +257,7 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
     )?;
     if let Some(link) = compost_links.first() {
         if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(link_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(link_hash) {
                 if let Some(mut bal) = record
                     .entry()
                     .to_app_option::<MintedBalance>()

@@ -141,7 +141,7 @@ async fn test_cancel_exchange_guards() {
     let (mut conductor, agents, apps) = setup_finance_conductor(2).await;
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Auto-confirm currency (no confirmation needed)
     let def: CurrencyDefinition = conductor

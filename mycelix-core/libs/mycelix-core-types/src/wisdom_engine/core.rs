@@ -1009,37 +1009,40 @@ impl Epistemology {
             Self::AfricanUbuntu => {
                 // Ubuntu: Community and reciprocity focused
                 HarmonicWeights {
-                    rc: 0.15,
-                    psf: 0.20,
-                    iw: 0.10,
-                    ip: 0.10,
-                    ui: 0.25, // "I am because we are"
-                    sr: 0.15,
-                    ep: 0.05,
+                    rc: 0.13,
+                    psf: 0.18,
+                    iw: 0.09,
+                    ip: 0.09,
+                    ui: 0.22, // "I am because we are"
+                    sr: 0.13,
+                    ep: 0.04,
+                    ss: 0.12,
                 }
             }
             Self::Pragmatist => {
                 // Pragmatism: What works and flourishing
                 HarmonicWeights {
-                    rc: 0.15,
-                    psf: 0.25,
-                    iw: 0.20,
-                    ip: 0.15,
-                    ui: 0.10,
-                    sr: 0.10,
-                    ep: 0.05,
+                    rc: 0.13,
+                    psf: 0.22,
+                    iw: 0.18,
+                    ip: 0.13,
+                    ui: 0.09,
+                    sr: 0.09,
+                    ep: 0.04,
+                    ss: 0.12,
                 }
             }
             Self::FeministStandpoint => {
                 // Feminist: Care and reciprocity
                 HarmonicWeights {
-                    rc: 0.10,
-                    psf: 0.30,
-                    iw: 0.10,
-                    ip: 0.10,
-                    ui: 0.15,
-                    sr: 0.20,
-                    ep: 0.05,
+                    rc: 0.09,
+                    psf: 0.26,
+                    iw: 0.09,
+                    ip: 0.09,
+                    ui: 0.13,
+                    sr: 0.18,
+                    ep: 0.04,
+                    ss: 0.12,
                 }
             }
             _ => HarmonicWeights::balanced(),
@@ -1912,7 +1915,7 @@ impl CausalGraph {
         let adjustment_magnitude = self.learning_rate * error_magnitude * prediction.confidence;
 
         let mut suggested = prediction.weights_used.clone();
-        let mut deltas = [0.0f32; 7];
+        let mut deltas = [0.0f32; 8];
 
         // Adjust weights proportionally to their current values
         // Higher weights get larger adjustments
@@ -1930,6 +1933,7 @@ impl CausalGraph {
         suggested.ui += deltas[4];
         suggested.sr += deltas[5];
         suggested.ep += deltas[6];
+        suggested.ss += deltas[7];
 
         // Clamp to valid range and normalize
         let clamp_weight = |w: f32| w.max(0.01); // Minimum 1% weight
@@ -1940,6 +1944,7 @@ impl CausalGraph {
         suggested.ui = clamp_weight(suggested.ui);
         suggested.sr = clamp_weight(suggested.sr);
         suggested.ep = clamp_weight(suggested.ep);
+        suggested.ss = clamp_weight(suggested.ss);
         suggested.normalize();
 
         let explanation = if error > 0.0 {

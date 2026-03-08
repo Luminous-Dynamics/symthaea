@@ -265,7 +265,7 @@ pub fn get_dao_currencies(dao_did: String) -> ExternResult<Vec<CurrencyDefinitio
     let mut currencies = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(def) = record
                     .entry()
                     .to_app_option::<CurrencyDefinition>()
@@ -294,7 +294,7 @@ pub fn list_active_currencies(_: ()) -> ExternResult<Vec<CurrencyDefinition>> {
     let mut currencies = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(def) = record
                     .entry()
                     .to_app_option::<CurrencyDefinition>()
@@ -330,7 +330,7 @@ pub fn search_currencies(query: String) -> ExternResult<Vec<CurrencyDefinition>>
     let mut results = Vec::new();
     for link in links {
         if let Some(action_hash) = link.target.into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(record) = follow_update_chain(action_hash) {
                 if let Some(def) = record
                     .entry()
                     .to_app_option::<CurrencyDefinition>()

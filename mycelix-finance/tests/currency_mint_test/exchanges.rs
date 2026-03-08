@@ -402,7 +402,7 @@ async fn test_rate_limit_enforcement() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with rate limit of 3 exchanges per day
     let mut params = test_params("RateLimitCoin", "RL");
@@ -491,8 +491,8 @@ async fn test_two_party_confirmation_flow() {
     let cell_b = &apps[1].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
     let zome_b = cell_b.zome("currency_mint");
-    let alice_did = format!("did:mycelix:{}", agents[0].to_raw_36());
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let alice_did = format!("did:mycelix:{}", agents[0]);
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with confirmation required
     let def: CurrencyDefinition = conductor
@@ -633,7 +633,7 @@ async fn test_get_exchange() {
 
     let cell = &apps[0].cells()[0];
     let zome = cell.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     let def: CurrencyDefinition = conductor
         .call(
@@ -1434,7 +1434,7 @@ async fn test_nan_inf_hours_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create and activate currency
     let def: CurrencyDefinition = conductor
@@ -1531,7 +1531,7 @@ async fn test_zero_negative_hours_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create and activate currency
     let def: CurrencyDefinition = conductor
@@ -1611,7 +1611,7 @@ async fn test_confirm_on_suspended_currency() {
     let cell_b = &apps[1].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
     let zome_b = cell_b.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with requires_confirmation
     let def: CurrencyDefinition = conductor
@@ -1703,7 +1703,7 @@ async fn test_daily_rate_limit() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with max_exchanges_per_day = 2
     let mut params = test_params("RateLimit", "RL");
@@ -1802,7 +1802,7 @@ async fn test_confirm_by_non_receiver_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with requires_confirmation
     let def: CurrencyDefinition = conductor
@@ -1876,7 +1876,7 @@ async fn test_cancel_by_non_participant_rejected() {
     let cell_c = &apps[2].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
     let zome_c = cell_c.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency with confirmation + timeout
     let mut params = test_params_with_confirmation("CancelAuth", "CA");
@@ -1950,7 +1950,7 @@ async fn test_cancel_no_timeout_rejected() {
 
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
-    let bob_did = format!("did:mycelix:{}", agents[1].to_raw_36());
+    let bob_did = format!("did:mycelix:{}", agents[1]);
 
     // Create currency: requires_confirmation=true but timeout=0 (never expires)
     let mut params = test_params("NoTimeout", "NT");

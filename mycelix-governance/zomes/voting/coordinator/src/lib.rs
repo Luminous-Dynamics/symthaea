@@ -3036,6 +3036,7 @@ fn harmony_to_string(harmony: &Harmony) -> String {
         Harmony::UniversalInterconnectedness => "UniversalInterconnectedness".to_string(),
         Harmony::SacredReciprocity => "SacredReciprocity".to_string(),
         Harmony::EvolutionaryProgression => "EvolutionaryProgression".to_string(),
+        Harmony::SacredStillness => "SacredStillness".to_string(),
     }
 }
 
