@@ -768,18 +768,18 @@ mod tests {
     }
 
     #[test]
-    fn test_simulated_executor() {
+    fn test_executor_runs_valid_rust() {
         let mut executor = CodeExecutor::new();
         let result = executor.execute_rust("fn main() {}", None);
-        assert!(result.simulated);
+        // Valid Rust compiles (real or simulated depending on sandbox config)
         assert!(result.compiled);
     }
 
     #[test]
-    fn test_nix_evaluation_simulated() {
+    fn test_nix_evaluation() {
         let mut executor = CodeExecutor::new();
         let result = executor.evaluate_nix("1 + 1");
-        assert!(result.simulated);
+        // Nix eval succeeds (real or simulated depending on env)
         assert!(result.compiled);
     }
 }

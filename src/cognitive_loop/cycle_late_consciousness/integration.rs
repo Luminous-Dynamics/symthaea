@@ -567,12 +567,14 @@ impl CognitiveLoopService {
                 );
             }
 
-            // Wire SocialEmbedding self-model from existing cognitive signals.
-            // The system already HAS a self-model — meta-cognition, predictive self,
-            // attention schema — but SocialEmbedding never received it, leaving
-            // Soc permanently at 0.35. Update every 10 cycles (co-prime with narrative).
-            // Science: Gallese (2001) — self-other distinction requires self-model first.
+            // Wire SocialEmbedding from existing cognitive signals.
+            // The system already HAS a self-model (meta-cognition, predictive self,
+            // attention schema) AND processes user input (implicitly modeling another
+            // agent), but SocialEmbedding never received either, leaving Soc at 0.35.
+            // Science: Gallese (2001) — self-other distinction requires self-model;
+            // Frith & Frith (2006) — Theory of Mind from predicting others' behavior.
             if self.stats.total_cycles % 10 == 0 {
+                // Self-model: what the system knows about itself
                 let self_goals = vec![
                     "reduce_prediction_error".to_string(),
                     "maintain_coherence".to_string(),
@@ -584,10 +586,41 @@ impl CognitiveLoopService {
                     format!("coherence_{:.1}", ctx.coherence),
                     format!("safety_{:.1}", late.predictive_self_safety),
                 ];
-                let emotional_state = late.affective_valence as f64;
+                self.master_equation.social_embedding.update_self_model(
+                    self_goals,
+                    self_beliefs,
+                    late.affective_valence as f64,
+                );
+
+                // User agent model: the system IS modeling the user (their input
+                // drives prediction, their patterns are tracked by social_coherence).
+                // Prediction accuracy serves as ToM accuracy proxy.
+                let user_goals = vec![
+                    "communicate".to_string(),
+                    "seek_understanding".to_string(),
+                ];
+                let user_beliefs = vec![
+                    format!("trust_{:.1}", self.social_mgr.social.social_trust),
+                    format!("cooperation_{:.1}", self.social_mgr.social.social_cooperation_rate),
+                ];
+                self.master_equation.social_embedding.update_agent_model(
+                    "user",
+                    user_beliefs,
+                    user_goals,
+                    0.0, // neutral valence (we don't know user's emotions)
+                    self.social_mgr.social.social_prediction_accuracy as f64,
+                );
+
+                // Feed prediction accuracy as ToM feedback — when the system
+                // correctly predicts user input patterns, its "other_modeling_accuracy"
+                // should reflect that.
+                let accuracy = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
                 self.master_equation
                     .social_embedding
-                    .update_self_model(self_goals, self_beliefs, emotional_state);
+                    .record_tom_prediction("user", accuracy);
+                self.master_equation
+                    .social_embedding
+                    .provide_tom_feedback("user", accuracy);
             }
 
             // Blend SpectralMIP Phi into the MCE's Φ input when cached.
@@ -601,9 +634,9 @@ impl CognitiveLoopService {
                 .carryover
                 .consciousness
                 .last_spectral_mip_phi
-                .map(|phi| phi * 0.6)
+                .map(|phi| (phi * 0.6).clamp(0.0, 1.0))
                 .unwrap_or(0.0);
-            let phi_input = ctx.unified_psi.max(spectral_boost);
+            let phi_input = ctx.unified_psi.max(spectral_boost).clamp(0.0, 1.0);
 
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
                 phi: phi_input,
