@@ -42,6 +42,9 @@ pub(crate) struct NeuromodManager {
 
     /// Closed-loop validator: tracks whether calibration adjustments actually improved metrics.
     pub calibration_validator: super::calibration::CalibrationValidator,
+
+    /// Cycle at which `pending_calibration` was set (for always-awake fallback timeout).
+    pub pending_calibration_since_cycle: Option<u64>,
 }
 
 impl Default for NeuromodManager {
@@ -59,6 +62,7 @@ impl Default for NeuromodManager {
             calibration_battery_spawned_at: None,
             calibration_history: super::calibration::CalibrationHistory::default(),
             calibration_validator: super::calibration::CalibrationValidator::default(),
+            pending_calibration_since_cycle: None,
         }
     }
 }

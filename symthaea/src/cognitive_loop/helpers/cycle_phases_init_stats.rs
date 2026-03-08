@@ -185,6 +185,25 @@ impl CognitiveLoopService {
             self.neuromod.was_sleeping = is_sleep_now;
         }
 
+        // ── Always-awake fallback: apply stale calibration ──
+        // Systems that never enter sleep still need calibration maintenance.
+        // McEwen (1998): allostatic load accumulates when corrections are deferred.
+        if let (Some(_), Some(since)) = (
+            &self.neuromod.pending_calibration,
+            self.neuromod.pending_calibration_since_cycle,
+        ) {
+            let age = self.stats.total_cycles as u64 - since;
+            if age >= super::super::thresholds::ALWAYS_AWAKE_STALE_CYCLES {
+                tracing::info!(
+                    age,
+                    threshold = super::super::thresholds::ALWAYS_AWAKE_STALE_CYCLES,
+                    "Always-awake fallback: applying stale calibration"
+                );
+                self.apply_pending_calibration();
+                self.neuromod.self_assessment.reset_after_calibration();
+            }
+        }
+
         // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
         // Halved: bath circadian baselines (Phase 2) provide the other 50%
         let plasticity_half = 1.0 + (self.biorhythm_mgr.rhythm.plasticity_mod as f32 - 1.0) * 0.5;
@@ -361,6 +380,7 @@ impl CognitiveLoopService {
                         "Self-assessment triggered auto-calibration"
                     );
                     self.neuromod.pending_calibration = Some(cal);
+                    self.neuromod.pending_calibration_since_cycle = Some(self.stats.total_cycles as u64);
                 }
             }
         }
