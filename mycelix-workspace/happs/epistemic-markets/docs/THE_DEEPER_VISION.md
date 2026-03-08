@@ -151,9 +151,9 @@ pub enum EpistemicOther {
 
 ---
 
-## Part III: The Seven Harmonies and Epistemic Markets
+## Part III: The Eight Harmonies and Epistemic Markets
 
-The Mycelix ecosystem is grounded in the Seven Harmonies of Infinite Love. How do they inform epistemic markets?
+The Mycelix ecosystem is grounded in the Eight Harmonies of Infinite Love. How do they inform epistemic markets?
 
 ### 1. Resonant Coherence
 *Harmonious integration, luminous order, boundless creativity*

@@ -673,7 +673,7 @@ export interface GetAgentSnapshotsInput {
   limit?: number;
 }
 
-/** Input for assessing value alignment with Seven Harmonies */
+/** Input for assessing value alignment with Eight Harmonies */
 export interface AssessValueAlignmentInput {
   proposal_id: string;
   proposal_content: string;

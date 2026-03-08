@@ -7,7 +7,7 @@
  * This client wraps the governance bridge coordinator which provides:
  * - Consciousness snapshots and gate verification (Φ-gated actions)
  * - Signed Φ attestations from Symthaea
- * - Value alignment assessment (Seven Harmonies)
+ * - Value alignment assessment (Eight Harmonies)
  * - Consciousness-aware weighted voting
  * - K-Vector trust, MATL scores, federated reputation
  * - Cross-hApp query, execution, and event broadcasting
@@ -199,7 +199,7 @@ export class BridgeClient {
   }
 
   /**
-   * Assess a proposal's alignment with the Seven Harmonies
+   * Assess a proposal's alignment with the Eight Harmonies
    *
    * Returns per-harmony scores, overall alignment, authenticity,
    * violations, and a governance recommendation.

@@ -156,7 +156,7 @@ export const DEMO_THOUGHTS: Thought[] = [
   {
     id: makeId(),
     content:
-      'The Seven Harmonies framework provides a non-reductive way to evaluate technology: sacred reciprocity, integral wisdom, evolutionary progression, and the rest form a coherent ethical compass.',
+      'The Eight Harmonies framework provides a non-reductive way to evaluate technology: sacred reciprocity, integral wisdom, evolutionary progression, and the rest form a coherent ethical compass.',
     thought_type: ThoughtType.Reflection,
     epistemic: {
       empirical: EmpiricalLevel.E0,

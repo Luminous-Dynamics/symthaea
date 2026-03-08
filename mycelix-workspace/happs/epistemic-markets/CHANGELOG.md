@@ -61,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ADVANCED_MECHANISMS.md**: Belief graphs, attention markets
 - **ECOSYSTEM_INTEGRATION.md**: Cross-hApp patterns
 - **LONG_TERM_VISION.md**: Civilizational evolution
-- **THE_DEEPER_VISION.md**: Seven Harmonies alignment
+- **THE_DEEPER_VISION.md**: Eight Harmonies alignment
 - **THE_LIVING_PROTOCOL.md**: System as living entity
 - **RESEARCH_AGENDA.md**: Open questions
 - **COMPARATIVE_ANALYSIS.md**: vs Polymarket, Metaculus, etc.

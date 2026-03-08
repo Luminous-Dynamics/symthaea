@@ -1,7 +1,7 @@
 /**
  * @mycelix/sdk GIS v4.0 - Graceful Ignorance System
  *
- * The Kosmic Song synthesis: Consciousness (Φ) + Seven Harmonies + Epistemic Humility
+ * The Kosmic Song synthesis: Consciousness (Φ) + Eight Harmonies + Epistemic Humility
  *
  * This module extends the E-N-M classification with:
  * - H-dimension (Harmonic): Which value harmonies are affected
@@ -54,7 +54,7 @@ export enum HarmonicLevel {
   H2_Multiple = 2,
   /** Affects most harmonies (4-6) */
   H3_Broad = 3,
-  /** Affects all seven harmonies - civilizational scope */
+  /** Affects all eight harmonies - civilizational scope */
   H4_Universal = 4,
 }
 

@@ -23,7 +23,7 @@ Epistemic Markets transcends traditional prediction markets to create a living i
 |----------|----------|
 | [**ECOSYSTEM_INTEGRATION**](./docs/ECOSYSTEM_INTEGRATION.md) | How we connect with all Mycelix hApps |
 | [**LONG_TERM_VISION**](./docs/LONG_TERM_VISION.md) | Evolution from tool to civilizational nervous system |
-| [**THE_DEEPER_VISION**](./docs/THE_DEEPER_VISION.md) | Spiritual dimensions, Seven Harmonies, healing |
+| [**THE_DEEPER_VISION**](./docs/THE_DEEPER_VISION.md) | Spiritual dimensions, Eight Harmonies, healing |
 | [**THE_LIVING_PROTOCOL**](./docs/THE_LIVING_PROTOCOL.md) | How the system becomes genuinely alive |
 | [**ADVANCED_MECHANISMS**](./docs/ADVANCED_MECHANISMS.md) | Belief graphs, attention markets, anti-manipulation |
 

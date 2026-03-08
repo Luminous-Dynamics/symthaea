@@ -9,6 +9,9 @@
     "test:smoke": "vitest run tests/smoke.test.ts",
     "seed": "tsx scripts/seed-knowledge.ts"
   },
+  "overrides": {
+    "rollup": ">=4.31.0"
+  },
   "devDependencies": {
     "@holochain/client": "0.20.2",
     "@holochain/tryorama": "0.19.0",

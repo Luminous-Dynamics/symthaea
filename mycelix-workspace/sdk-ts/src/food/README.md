@@ -242,7 +242,7 @@ KNOWLEDGE [crop]             → Get growing guide
 
 ## Consciousness-First Food
 
-This module embodies the Seven Harmonies:
+This module embodies the Eight Harmonies:
 
 1. **Truth** - Verifiable provenance, epistemic claims on growing knowledge
 2. **Kindness** - Food security, allergy safety, nutrition access

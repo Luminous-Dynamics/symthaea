@@ -392,7 +392,7 @@ export interface TraditionalPractice {
 // Wisdom Layer (Consciousness Integration)
 // ============================================================================
 
-/** Seven Harmonies for consciousness-gated decisions */
+/** Eight Harmonies for consciousness-gated decisions */
 export enum Harmony {
   ResonantCoherence = 0,        // Integration-Knowing
   PanSentientFlourishing = 1,   // Care-Knowing
