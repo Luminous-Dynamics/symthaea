@@ -994,6 +994,10 @@ name = "voice_diagnostic"
 required-features = ["voice-tts"]
 
 [[example]]
+name = "guided_design_sweep"
+required-features = ["physics-bridge"]
+
+[[example]]
 name = "plasma_disruption_benchmark"
 required-features = ["physics"]
 

@@ -141,6 +141,20 @@ impl Biorhythm {
         ((self.hour + self.timezone_offset_hours + self.phase_offset) % 24.0 + 24.0) % 24.0
     }
 
+    /// Detect the system's timezone offset from UTC.
+    ///
+    /// Uses `chrono::Local` to query the OS timezone at this instant.
+    /// Returns offset in fractional hours (e.g., -5.0 for CDT, +5.5 for IST).
+    ///
+    /// This should be called once at startup or when the user explicitly
+    /// changes timezone — NOT every cycle (that would defeat UTC-internal).
+    pub fn detect_system_timezone() -> f64 {
+        use chrono::Local;
+        let local = Local::now();
+        let offset_secs = local.offset().local_minus_utc();
+        offset_secs as f64 / 3600.0
+    }
+
     /// Pull phase_offset toward 0 (entrainment to local zeitgeber).
     /// Called each biorhythm refresh (~97 cycles).
     pub fn entrain(&mut self) {

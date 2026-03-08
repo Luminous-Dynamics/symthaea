@@ -197,6 +197,12 @@ pub enum CurriculumType {
 
     /// Holochain distributed application development
     Holochain,
+
+    /// Code generation fundamentals
+    CodeGeneration,
+
+    /// Advanced code generation: composition, property tests, LLM integration
+    CodeGenerationAdvanced,
 }
 
 impl CurriculumType {
@@ -214,6 +220,8 @@ impl CurriculumType {
             CurriculumType::Rust => "Rust Programming",
             CurriculumType::RustAdvanced => "Advanced Rust",
             CurriculumType::Holochain => "Holochain Development",
+            CurriculumType::CodeGeneration => "Code Generation",
+            CurriculumType::CodeGenerationAdvanced => "Advanced Code Generation",
         }
     }
 
@@ -239,6 +247,12 @@ impl CurriculumType {
                 "Master async Rust, macros, unsafe, and systems programming"
             }
             CurriculumType::Holochain => "Build distributed applications on Holochain",
+            CurriculumType::CodeGeneration => {
+                "Learn consciousness-aware code generation with HDC + CfC"
+            }
+            CurriculumType::CodeGenerationAdvanced => {
+                "Master pattern composition, property testing, and LLM integration"
+            }
         }
     }
 }
@@ -289,6 +303,12 @@ impl Curriculum {
             CurriculumType::Rust => Self::builtin_rust(),
             CurriculumType::RustAdvanced => Self::builtin_rust_advanced(),
             CurriculumType::Holochain => Self::builtin_holochain(),
+            CurriculumType::CodeGeneration => {
+                super::code_curriculum::code_generation_curriculum()
+            }
+            CurriculumType::CodeGenerationAdvanced => {
+                super::code_curriculum::code_generation_advanced_curriculum()
+            }
         }
     }
 

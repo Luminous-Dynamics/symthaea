@@ -20,7 +20,7 @@ pub struct TemporalConsistencyMonitor {
     /// Maximum history length.
     max_history: usize,
     /// Minimum acceptable cycle duration (catches impossibly fast cycles).
-    min_cycle_duration: Duration,
+    pub min_cycle_duration: Duration,
     /// Maximum acceptable cycle duration (catches frozen/resumed cycles).
     max_cycle_duration: Duration,
     /// Consecutive anomaly count.

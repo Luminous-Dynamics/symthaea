@@ -88,6 +88,11 @@ pub struct IntegrityManager {
     pub canaries: CanaryRunner,
     /// Most recent integrity status for telemetry.
     pub status: IntegrityStatus,
+    /// Timestamp of the last cycle start, for computing wall elapsed.
+    last_cycle_instant: Instant,
+    /// Substrate tau factor for scaling temporal consistency tolerance.
+    /// Set via `set_substrate_tau_factor()`. Default 1.0.
+    substrate_tau_factor: f32,
 }
 
 /// Co-prime attestation check interval (not in the existing set: 7,11,13,19,23,47,97).
@@ -101,10 +106,24 @@ impl IntegrityManager {
             temporal: TemporalConsistencyMonitor::new(),
             canaries: CanaryRunner::new(),
             status: IntegrityStatus::default(),
+            last_cycle_instant: Instant::now(),
+            substrate_tau_factor: 1.0,
         }
     }
 
-    /// Run integrity checks that are due this cycle.
+    /// Set the substrate tau factor for scaling temporal consistency tolerance.
+    ///
+    /// Faster substrates (tau > 1) legitimately have shorter cycle times,
+    /// so the temporal monitor's min_cycle_duration should scale accordingly.
+    pub fn set_substrate_tau_factor(&mut self, tau: f32) {
+        self.substrate_tau_factor = tau;
+        // Scale temporal monitor thresholds: faster substrate → shorter acceptable cycles
+        let inv_tau = 1.0 / tau.max(0.01);
+        self.temporal.min_cycle_duration =
+            std::time::Duration::from_micros((100.0 * inv_tau as f64) as u64);
+    }
+
+    /// Run integrity checks that are due this cycle. Self-tracks wall elapsed.
     ///
     /// Each component fires at its own co-prime interval:
     /// - Attestation: every 101 cycles
@@ -113,9 +132,10 @@ impl IntegrityManager {
     pub fn tick(
         &mut self,
         cycle: usize,
-        wall_elapsed: std::time::Duration,
         cfc_delta_t: f32,
     ) -> &IntegrityStatus {
+        let wall_elapsed = self.last_cycle_instant.elapsed();
+        self.last_cycle_instant = Instant::now();
         self.status.anomalies.clear();
         self.status.last_check_cycle = cycle;
 
@@ -183,6 +203,37 @@ impl Default for IntegrityManager {
     }
 }
 
+// ── Real-structure attestation helpers ─────────────────────────────────────
+
+impl IntegrityManager {
+    /// Register safety-critical thresholds for attestation.
+    ///
+    /// These are the values where tampering would be most dangerous:
+    /// consciousness equation weights, safety level thresholds, moral topology constants.
+    pub fn register_safety_thresholds(&mut self, thresholds: &[f32]) {
+        self.attestation.register_snapshot(
+            "safety_thresholds",
+            &attestation::blake3_hash_f32_slice(thresholds),
+        );
+    }
+
+    /// Register consciousness equation weights for attestation.
+    pub fn register_consciousness_weights(&mut self, weights: &[f64]) {
+        self.attestation.register_snapshot(
+            "consciousness_weights",
+            &attestation::blake3_hash_f64_slice(weights),
+        );
+    }
+
+    /// Register neuromodulator receptor sensitivity curves.
+    pub fn register_receptor_sensitivities(&mut self, sensitivities: &[f32]) {
+        self.attestation.register_snapshot(
+            "receptor_sensitivities",
+            &attestation::blake3_hash_f32_slice(sensitivities),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,7 +250,7 @@ mod tests {
     #[test]
     fn test_tick_on_non_check_cycle_is_clean() {
         let mut mgr = IntegrityManager::new();
-        let status = mgr.tick(5, std::time::Duration::from_millis(20), 0.02);
+        let status = mgr.tick(5, 0.02);
         assert!(status.attestation_passed);
         assert!(status.temporal_passed);
     }

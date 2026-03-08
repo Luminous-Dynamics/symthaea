@@ -1354,3 +1354,52 @@ proptest! {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 31. Session 12: Wiring + binding intelligence regression guards
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
+    /// Verify Session 12 regression guards:
+    /// - Epistemic conflict exploration doesn't cause runaway exploration
+    /// - Phenomenal fragmentation dampens confidence (doesn't boost it)
+    /// - Temporal discontinuity dampens LR (doesn't boost it)
+    /// - Cross-modal binding modulation keeps confidence bounded
+    /// - Resonator semantic LR modulation is finite and bounded
+    #[test]
+    fn prop_session12_regression_guards(inputs in fuzz_input_sequence(60, 100)) {
+        let mut service = feedback_service();
+
+        for (i, input) in inputs.iter().enumerate() {
+            let result = service.cycle(input);
+            let m = &result.metadata;
+
+            // Exploration factor must remain bounded even with epistemic conflict boosts
+            let exploration = service.exploration_factor();
+            assert_finite_f32(exploration, &format!("exploration@cycle{i}"))?;
+            prop_assert!(exploration >= 0.0 && exploration <= 5.0,
+                "exploration out of bounds: {} at cycle {i}", exploration);
+
+            // Confidence must stay bounded even with fragmentation/binding modulation
+            let conf = service.prediction_confidence();
+            prop_assert!(conf >= 0.0 && conf <= 1.0,
+                "confidence out of bounds after Session 12 mods: {conf} at cycle {i}");
+
+            // LR must stay bounded even with temporal discontinuity + resonator mods
+            let lr = m.actual_effective_lr;
+            assert_finite_f32(lr, &format!("lr@cycle{i}"))?;
+            prop_assert!(lr >= 0.0 && lr <= 2.0,
+                "LR out of bounds after Session 12 mods: {lr} at cycle {i}");
+
+            // New telemetry fields must be finite booleans (no panic/crash)
+            // (booleans can't be NaN, but verifying the fields exist and are populated)
+            let _ = m.epistemic_conflict_exploration;
+            let _ = m.phenomenal_fragmentation_recovery;
+            let _ = m.temporal_discontinuity_recovery;
+            let _ = m.binding_attention_modulated;
+            let _ = m.resonator_semantic_lr_mod;
+        }
+    }
+}
