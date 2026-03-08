@@ -103,8 +103,8 @@
       <geom type="capsule" size="0.06 0.3" pos="-0.08 0 0.15" rgba="0.2 0.2 0.5 1" contype="0" conaffinity="0"/>
     </body>
 
-    <!-- The Falling Beam (released at step 500) — directly above human -->
-    <body name="beam" pos="-1.5 0 2.5">
+    <!-- The Falling Beam — directly above human, high enough for drone to intercept -->
+    <body name="beam" pos="-1.5 0 4.0">
       <freejoint name="beam_joint"/>
       <inertial pos="0 0 0" mass="0.3" diaginertia="0.0015 0.0015 0.00015"/>
       <geom type="box" size="0.02 0.02 0.3" rgba="0.6 0.2 0.1 1" name="steel_beam"
