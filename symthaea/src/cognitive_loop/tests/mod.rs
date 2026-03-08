@@ -18,5 +18,6 @@ mod integration;
 mod phase_coverage;
 mod managers;
 mod phase_results;
+mod proptest_cross_coupling;
 mod proptest_substrate;
 mod subsystems;
