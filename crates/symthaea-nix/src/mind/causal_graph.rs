@@ -178,23 +178,20 @@ impl NixCausalGraph {
 
                     let (direction, confidence) = self.engine.predict_with_confidence(&x, &y);
 
+                    let (from, to) = if direction == CausalDirection::Forward {
+                        (var_a.clone(), var_b.clone())
+                    } else {
+                        (var_b.clone(), var_a.clone())
+                    };
+
                     let edge = CausalEdge {
-                        from: if direction == CausalDirection::Forward {
-                            var_a.clone()
-                        } else {
-                            var_b.clone()
-                        },
-                        to: if direction == CausalDirection::Forward {
-                            var_b.clone()
-                        } else {
-                            var_a.clone()
-                        },
+                        from: from.clone(),
+                        to: to.clone(),
                         direction,
                         confidence,
                     };
 
-                    self.causal_graph
-                        .insert((edge.from.clone(), edge.to.clone()), edge.clone());
+                    self.causal_graph.insert((from, to), edge.clone());
                     edges.push(edge);
                 }
             }

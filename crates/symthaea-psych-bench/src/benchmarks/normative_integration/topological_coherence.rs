@@ -46,8 +46,8 @@ const FRAG_DAMPENING: f64 = 0.1;
 /// Base consciousness level.
 const BASE_CONSCIOUSNESS: f64 = 0.8;
 
-/// Number of harmony axes.
-const N_HARMONIES: usize = 7;
+/// Number of harmony axes (Eight Harmonies).
+const N_HARMONIES: usize = 8;
 
 /// Topological Coherence Benchmark.
 pub struct TopologicalCoherenceBenchmark;

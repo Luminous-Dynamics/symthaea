@@ -255,6 +255,7 @@ jobs:
           - "genesis-missions"
           - "genesis"
           - "wasm-sandbox"
+          - "integrity"
     steps:
       - uses: actions/checkout@v4
 
@@ -396,6 +397,7 @@ jobs:
           - "nix-mind,reasoning_engine"
           - "vision-manifold-camera,full_perception"
           - "wasm-sandbox,reasoning_engine"
+          - "integrity,full_consciousness"
     steps:
       - uses: actions/checkout@v4
 

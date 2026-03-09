@@ -653,10 +653,23 @@ impl CognitiveLoopService {
             let broadcast_input =
                 (ctx.coherence as f64 + gwt_boost + attention_boost).clamp(0.0, 1.0);
 
+            // WM richness: prefrontal stats alone cap ~0.58 because utilization
+            // stays moderate and early graduation quality is low. WM in consciousness
+            // theory (Baars & Franklin 2003) includes the global workspace's coalition
+            // breadth — larger coalitions = more information in conscious access.
+            // Blend GWT quality (up to +0.15) so W can escape the 0.58 ceiling.
+            let wm_base = self.prefrontal_utilization();
+            let gwt_wm_quality = if gwt_broadcast {
+                0.05 + 0.1 * (gwt_coalition_size.min(5) as f64 / 5.0)
+            } else {
+                0.0
+            };
+            let working_memory = (wm_base + gwt_wm_quality).clamp(0.0, 1.0);
+
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
                 phi: phi_input,
                 broadcast: broadcast_input,
-                working_memory: self.prefrontal_utilization(),
+                working_memory,
                 attention: ctx.peak_attention as f64,
                 // CfC is recurrent from cycle 1 — starting at 0 is dishonest and
                 // crushes the softmin (τ=0.1). Floor at 0.3, ramp to 1.0 over 100 cycles.

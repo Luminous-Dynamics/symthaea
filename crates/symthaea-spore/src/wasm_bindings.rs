@@ -6,7 +6,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::config::SporeConfig;
-use crate::engine::{CycleResult, SporeEngine as InnerEngine};
+use crate::engine::SporeEngine as InnerEngine;
 
 /// WASM-exported Spore consciousness engine.
 #[wasm_bindgen]
@@ -43,9 +43,19 @@ impl SporeEngine {
         serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
     }
 
-    /// Current Phi (consciousness level).
-    pub fn phi(&self) -> f32 {
-        self.inner.phi()
+    /// Current consciousness level.
+    pub fn consciousness_level(&self) -> f32 {
+        self.inner.consciousness_level()
+    }
+
+    /// Honest confidence in the consciousness measurement (0.0-0.95).
+    pub fn honest_confidence(&self) -> f32 {
+        self.inner.honest_confidence()
+    }
+
+    /// Current harmony alignment score (0.0-1.0).
+    pub fn harmony_alignment(&self) -> f32 {
+        self.inner.harmony_alignment()
     }
 
     /// Neuromodulator state as JSON string.
@@ -58,7 +68,7 @@ impl SporeEngine {
         self.inner.substrate_feasibility()
     }
 
-    /// Human-readable consciousness report.
+    /// Human-readable consciousness report with epistemic disclaimers.
     pub fn consciousness_report(&self) -> String {
         self.inner.consciousness_report()
     }
@@ -76,5 +86,10 @@ impl SporeEngine {
     /// Current cycle count.
     pub fn cycle_count(&self) -> u64 {
         self.inner.cycle_count()
+    }
+
+    /// Number of active SporeEngine instances globally.
+    pub fn active_instance_count() -> usize {
+        InnerEngine::active_instance_count()
     }
 }

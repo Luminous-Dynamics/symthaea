@@ -36,8 +36,8 @@ const REPEATS_PER_LEVEL: usize = 5;
 /// Dampening strength (matches ethics_engine default).
 const DAMPENING_STRENGTH: f64 = 0.15;
 
-/// Number of harmony axes.
-const N_HARMONIES: usize = 7;
+/// Number of harmony axes (Eight Harmonies).
+const N_HARMONIES: usize = 8;
 
 /// Anomaly Proportionality Benchmark.
 pub struct AnomalyProportionalityBenchmark;

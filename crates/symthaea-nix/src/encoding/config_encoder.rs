@@ -202,16 +202,12 @@ mod tests {
 
     #[test]
     fn test_encode_empty_config() {
-        let config = NixConfig {
-            options: vec![],
-            imports: vec![],
-            module_args: vec![],
-        };
+        let mut parser = NixParser::new();
+        let config = parser.parse("{ ... }: { }").unwrap();
         let mut cb = NixCodebook::new();
         let mut enc = ConfigEncoder::new(&mut cb);
         let hv = enc.encode_config(&config);
         assert!(hv.dim() > 0);
-        // Empty config → zero vector
         assert!(hv.norm() < 1e-6, "Empty config should produce zero vector");
     }
 

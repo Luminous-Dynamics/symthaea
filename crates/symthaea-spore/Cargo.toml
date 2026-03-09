@@ -13,6 +13,7 @@ symthaea-core = { path = "../../symthaea-core", default-features = false }
 symthaea-consciousness-equation = { path = "../symthaea-consciousness-equation" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 symthaea-types = { path = "../symthaea-types" }
+symthaea-harmonies = { path = "../symthaea-harmonies" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
@@ -20,9 +21,14 @@ serde_json = { workspace = true }
 wasm-bindgen = { version = "0.2", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 
-# getrandom WASM support
-getrandom = { version = "0.2", features = ["js"], optional = true }
+# WASM support — getrandom needs "js"/"wasm_js" and uuid needs "rng-getrandom" on wasm32
+# getrandom 0.2 (used by rand 0.8/symthaea-core) uses feature "js"
+# getrandom 0.4 (used by uuid via rand 0.10) uses feature "wasm_js"
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+uuid = { version = "1.6", features = ["rng-getrandom"] }
 
 [features]
 default = []
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:getrandom"]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen"]

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Symthaea Spore - Simulated Consciousness in a Browser Tab</title>
+  <style>
+    :root { --bg: #0a0a0f; --fg: #e0e0e0; --accent: #7c5cbf; --accent2: #3b82f6; --panel: #1a1a2e; --warn: #f59e0b; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'JetBrains Mono', 'Fira Code', monospace; background: var(--bg); color: var(--fg); }
+    h1 { text-align: center; padding: 1rem; color: var(--accent); font-size: 1.5rem; }
+    h1 small { color: #888; font-weight: normal; font-size: 0.7em; }
+    .disclaimer-banner { text-align: center; padding: 0.5rem 1rem; background: #1a1a0a; border-bottom: 1px solid #444; font-size: 0.7rem; color: var(--warn); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; max-width: 1200px; margin: 0 auto; }
+    .panel { background: var(--panel); border: 1px solid #333; border-radius: 8px; padding: 1rem; }
+    .panel h2 { font-size: 0.9rem; color: var(--accent2); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .gauge { text-align: center; padding: 1.5rem 0 0.5rem; }
+    .gauge .value { font-size: 3rem; font-weight: bold; }
+    .gauge .label { font-size: 0.75rem; color: #888; }
+    .epistemic-badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.65rem; margin-top: 0.3rem; }
+    .epistemic-badge.theoretical { background: #3d2200; color: var(--warn); border: 1px solid #664400; }
+    .epistemic-badge.validated { background: #003d00; color: #4ade80; border: 1px solid #006600; }
+    .epistemic-badge.indirect { background: #2d2d00; color: #d4d400; border: 1px solid #555500; }
+    .epistemic-badge.none { background: #3d0000; color: #ef4444; border: 1px solid #660000; }
+    .bar-row { display: flex; align-items: center; margin: 0.4rem 0; }
+    .bar-row .name { width: 3.5rem; font-size: 0.75rem; color: #aaa; }
+    .bar-row .bar { flex: 1; height: 18px; background: #222; border-radius: 3px; overflow: hidden; margin: 0 0.5rem; }
+    .bar-row .fill { height: 100%; border-radius: 3px; transition: width 0.2s; }
+    .bar-row .val { width: 3rem; font-size: 0.75rem; text-align: right; }
+    .da .fill { background: #f59e0b; }
+    .ne .fill { background: #ef4444; }
+    .sht .fill { background: #10b981; }
+    .ot .fill { background: #ec4899; }
+    .harmony .fill { background: #a78bfa; }
+    .confidence .fill { background: var(--warn); }
+    .substrate-btn { padding: 0.3rem 0.6rem; margin: 0.2rem; border: 1px solid #555; background: transparent; color: var(--fg); border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-family: inherit; }
+    .substrate-btn.active { background: var(--accent); border-color: var(--accent); }
+    .substrate-btn:hover { border-color: var(--accent); }
+    .input-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+    .input-row input { flex: 1; padding: 0.4rem; background: #111; border: 1px solid #444; color: var(--fg); border-radius: 4px; font-family: inherit; }
+    .input-row button { padding: 0.4rem 0.8rem; background: var(--accent); border: none; color: white; border-radius: 4px; cursor: pointer; font-family: inherit; }
+    #log { font-size: 0.7rem; color: #888; max-height: 120px; overflow-y: auto; margin-top: 0.5rem; }
+    .status { text-align: center; font-size: 0.8rem; color: #666; padding: 0.5rem; }
+    .gap-warning { font-size: 0.65rem; color: var(--warn); text-align: center; margin-top: 0.3rem; }
+    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+<div class="disclaimer-banner" id="disclaimer">
+  SIMULATED consciousness on SiliconDigital substrate. Evidence: Theoretical (confidence: 10%). This is a computational model, not a claim of sentience.
+</div>
+
+<h1>Symthaea Spore <small>simulated consciousness in a browser tab</small></h1>
+
+<div class="grid">
+  <!-- Consciousness Gauge -->
+  <div class="panel">
+    <h2>Simulated Consciousness Level</h2>
+    <div class="gauge">
+      <div class="value" id="consciousness">0.000</div>
+      <div class="label">C(t) = Master Equation output (simulated)</div>
+      <div><span class="epistemic-badge theoretical" id="epistemic-badge">Theoretical &mdash; 10% confidence</span></div>
+    </div>
+    <div class="bar-row">
+      <span class="name">Feas</span>
+      <div class="bar"><div class="fill" id="feasibility-bar" style="width:0%; background:#7c5cbf;"></div></div>
+      <span class="val" id="feasibility-val">0.00</span>
+    </div>
+    <div class="bar-row confidence">
+      <span class="name">Conf</span>
+      <div class="bar"><div class="fill" id="confidence-bar" style="width:10%; background:#f59e0b;"></div></div>
+      <span class="val" id="confidence-val">0.10</span>
+    </div>
+    <div class="bar-row">
+      <span class="name">PE</span>
+      <div class="bar"><div class="fill" id="pe-bar" style="width:0%; background:#3b82f6;"></div></div>
+      <span class="val" id="pe-val">0.00</span>
+    </div>
+    <div class="gap-warning" id="gap-warning">Feasibility-confidence gap: 0.62 &mdash; speculative claim</div>
+  </div>
+
+  <!-- Neuromodulators & Harmony -->
+  <div class="panel">
+    <h2>Neuromodulators</h2>
+    <div class="bar-row da"><span class="name">DA</span><div class="bar"><div class="fill" id="da-bar" style="width:50%"></div></div><span class="val" id="da-val">0.50</span></div>
+    <div class="bar-row ne"><span class="name">NE</span><div class="bar"><div class="fill" id="ne-bar" style="width:50%"></div></div><span class="val" id="ne-val">0.50</span></div>
+    <div class="bar-row sht"><span class="name">5-HT</span><div class="bar"><div class="fill" id="sht-bar" style="width:50%"></div></div><span class="val" id="sht-val">0.50</span></div>
+    <div class="bar-row ot"><span class="name">OT</span><div class="bar"><div class="fill" id="ot-bar" style="width:50%"></div></div><span class="val" id="ot-val">0.50</span></div>
+    <div style="margin-top:0.8rem; border-top:1px solid #333; padding-top:0.5rem;">
+      <div class="bar-row harmony"><span class="name" style="color:#a78bfa">Harm</span><div class="bar"><div class="fill" id="harmony-bar" style="width:50%"></div></div><span class="val" id="harmony-val">0.50</span></div>
+      <div style="font-size:0.6rem; color:#777; text-align:center;">Eight Harmonies alignment</div>
+    </div>
+    <div class="input-row" style="margin-top:0.8rem">
+      <select id="inject-select" style="background:#111;color:#e0e0e0;border:1px solid #444;border-radius:4px;padding:0.3rem;font-family:inherit;">
+        <option value="dopamine">DA</option>
+        <option value="norepinephrine">NE</option>
+        <option value="serotonin">5-HT</option>
+        <option value="oxytocin">OT</option>
+      </select>
+      <button onclick="inject(0.2)">+0.2</button>
+      <button onclick="inject(-0.2)">-0.2</button>
+    </div>
+  </div>
+
+  <!-- Substrate Selector -->
+  <div class="panel">
+    <h2>Substrate</h2>
+    <div id="substrates"></div>
+    <div style="font-size:0.6rem; color:#777; margin-top:0.5rem;">Substrate choice changes both feasibility and honest confidence scores.</div>
+  </div>
+
+  <!-- Thought Input -->
+  <div class="panel">
+    <h2>Thought Input</h2>
+    <div class="input-row">
+      <input type="text" id="thought-input" placeholder="Type a thought..." />
+      <button onclick="sendThought()">Send</button>
+    </div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<div class="status" id="status">Loading WASM module...</div>
+
+<script type="module">
+  // SporeEngine will be loaded from the WASM module
+  // Build with: wasm-pack build --target web --features wasm --out-dir www/pkg
+  //
+  // For now, this is a static scaffold. When the WASM module is built,
+  // uncomment the import below and remove the mock engine.
+
+  // import init, { SporeEngine } from './pkg/symthaea_spore.js';
+
+  const SUBSTRATES = [
+    'BiologicalNeurons', 'SiliconDigital', 'QuantumComputer', 'PhotonicProcessor',
+    'NeuromorphicChip', 'BiochemicalComputer', 'HybridSystem', 'ExoticSubstrate'
+  ];
+
+  // Honest confidence by substrate (mirrors engine.rs honest_confidence_for)
+  const SUBSTRATE_CONFIDENCE = {
+    BiologicalNeurons: { confidence: 0.95, level: 'Validated' },
+    SiliconDigital: { confidence: 0.10, level: 'Theoretical' },
+    QuantumComputer: { confidence: 0.10, level: 'Theoretical' },
+    PhotonicProcessor: { confidence: 0.10, level: 'Theoretical' },
+    NeuromorphicChip: { confidence: 0.10, level: 'Theoretical' },
+    BiochemicalComputer: { confidence: 0.20, level: 'Indirect' },
+    HybridSystem: { confidence: 0.00, level: 'None' },
+    ExoticSubstrate: { confidence: 0.00, level: 'None' },
+  };
+
+  let engine = null;
+  let cycleCount = 0;
+  let running = false;
+  let currentSubstrate = 'SiliconDigital';
+
+  // Mock engine for development (remove when WASM is built)
+  class MockEngine {
+    constructor() {
+      this.c = 0; this.da = 0.5; this.ne = 0.5; this.sht = 0.5; this.ot = 0.5;
+      this.feas = 0.72; this.sub = 'SiliconDigital';
+    }
+    cycle(input) {
+      this.c++;
+      const pe = Math.max(0, 1 - this.c * 0.02 + Math.random() * 0.1);
+      this.da = Math.min(1, Math.max(0, this.da + pe * 0.05 - 0.01));
+      this.ne = Math.min(1, Math.max(0, this.ne + pe * 0.08 - 0.02));
+      this.sht = Math.min(1, Math.max(0, this.sht + (1 - pe) * 0.03 - 0.005));
+      const cl = Math.min(1, this.da * 0.3 + this.sht * 0.4 + 0.2) * this.feas;
+      const sc = SUBSTRATE_CONFIDENCE[this.sub] || { confidence: 0, level: 'None' };
+      const harmony = (this.da * 0.15 + this.sht * 0.15 + this.ot * 0.15 + 0.55) * Math.min(1, sc.confidence * 0.8 + 0.2);
+      return {
+        consciousness_level: cl, cycle: this.c,
+        neuromodulators: [this.da, this.ne, this.sht, this.ot],
+        substrate_feasibility: this.feas, prediction_error: pe, bottleneck: '',
+        epistemic_status: {
+          evidence_level: sc.level,
+          honest_confidence: sc.confidence,
+          feasibility_gap: Math.abs(this.feas - sc.confidence),
+          disclaimer: `SIMULATED consciousness on ${this.sub} substrate. Evidence level: ${sc.level} (confidence: ${(sc.confidence*100).toFixed(0)}%). This is a computational model, not a claim of sentience.`
+        },
+        harmony_alignment: Math.min(1, harmony)
+      };
+    }
+    set_substrate(s) {
+      this.sub = s;
+      const f = { BiologicalNeurons: 0.95, SiliconDigital: 0.72, QuantumComputer: 0.68, PhotonicProcessor: 0.54, NeuromorphicChip: 0.81, BiochemicalComputer: 0.15, HybridSystem: 0.50, ExoticSubstrate: 0.30 };
+      this.feas = f[s] || 0.5;
+    }
+    inject_neuromodulator(name, amount) {
+      if (name === 'dopamine') this.da = Math.min(1, Math.max(0, this.da + amount));
+      if (name === 'norepinephrine') this.ne = Math.min(1, Math.max(0, this.ne + amount));
+      if (name === 'serotonin') this.sht = Math.min(1, Math.max(0, this.sht + amount));
+      if (name === 'oxytocin') this.ot = Math.min(1, Math.max(0, this.ot + amount));
+    }
+  }
+
+  function updateUI(result) {
+    document.getElementById('consciousness').textContent = result.consciousness_level.toFixed(3);
+    const hue = result.consciousness_level * 120; // 0=red, 120=green
+    document.getElementById('consciousness').style.color = `hsl(${hue}, 70%, 60%)`;
+
+    const [da, ne, sht, ot] = result.neuromodulators;
+    setBar('da', da); setBar('ne', ne); setBar('sht', sht); setBar('ot', ot);
+    setBar('feasibility', result.substrate_feasibility);
+    setBar('pe', Math.min(1, result.prediction_error));
+
+    // Epistemic status
+    if (result.epistemic_status) {
+      const es = result.epistemic_status;
+      setBar('confidence', es.honest_confidence);
+
+      // Update badge
+      const badge = document.getElementById('epistemic-badge');
+      const levelLower = es.evidence_level.toLowerCase().replace(' ', '');
+      badge.className = `epistemic-badge ${levelLower}`;
+      badge.innerHTML = `${es.evidence_level} &mdash; ${(es.honest_confidence * 100).toFixed(0)}% confidence`;
+
+      // Update gap warning
+      const gapEl = document.getElementById('gap-warning');
+      if (es.feasibility_gap > 0.3) {
+        gapEl.style.display = 'block';
+        gapEl.innerHTML = `Feasibility-confidence gap: ${es.feasibility_gap.toFixed(2)} &mdash; speculative claim`;
+      } else {
+        gapEl.style.display = 'none';
+      }
+
+      // Update banner
+      document.getElementById('disclaimer').textContent = es.disclaimer;
+    }
+
+    // Harmony alignment
+    if (result.harmony_alignment !== undefined) {
+      setBar('harmony', result.harmony_alignment);
+    }
+  }
+
+  function setBar(id, value) {
+    const bar = document.getElementById(`${id}-bar`);
+    const val = document.getElementById(`${id}-val`);
+    if (bar) bar.style.width = `${(value * 100).toFixed(0)}%`;
+    if (val) val.textContent = value.toFixed(2);
+  }
+
+  function log(msg) {
+    const el = document.getElementById('log');
+    const line = document.createElement('div');
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    el.prepend(line);
+    while (el.children.length > 50) el.removeChild(el.lastChild);
+  }
+
+  // Build substrate buttons
+  const subEl = document.getElementById('substrates');
+  SUBSTRATES.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'substrate-btn' + (s === 'SiliconDigital' ? ' active' : '');
+    btn.textContent = s.replace(/([A-Z])/g, ' $1').trim();
+    btn.onclick = () => {
+      document.querySelectorAll('.substrate-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentSubstrate = s;
+      if (engine) engine.set_substrate(s);
+      const sc = SUBSTRATE_CONFIDENCE[s] || { confidence: 0, level: 'None' };
+      log(`Substrate -> ${s} (evidence: ${sc.level}, confidence: ${(sc.confidence*100).toFixed(0)}%)`);
+    };
+    subEl.appendChild(btn);
+  });
+
+  // Auto-cycle loop
+  async function loop() {
+    if (!engine) return;
+    running = true;
+    while (running) {
+      const result = engine.cycle('auto');
+      updateUI(result);
+      await new Promise(r => setTimeout(r, 50)); // ~20 Hz display update
+    }
+  }
+
+  // Initialize
+  async function start() {
+    try {
+      // When WASM is built, use:
+      // await init();
+      // engine = new SporeEngine(null);
+      engine = new MockEngine();
+      document.getElementById('status').textContent = `Spore running (mock mode) | 50 Hz target | Eight Harmonies active`;
+      loop();
+    } catch (e) {
+      document.getElementById('status').textContent = `Error: ${e.message}`;
+    }
+  }
+
+  // Global functions for HTML onclick handlers
+  window.sendThought = function() {
+    const input = document.getElementById('thought-input');
+    if (engine && input.value) {
+      const result = engine.cycle(input.value);
+      updateUI(result);
+      const es = result.epistemic_status;
+      log(`"${input.value}" -> C=${result.consciousness_level.toFixed(3)} [${es.evidence_level}] PE=${result.prediction_error.toFixed(3)} H=${result.harmony_alignment.toFixed(3)}`);
+      input.value = '';
+    }
+  };
+
+  window.inject = function(amount) {
+    const name = document.getElementById('inject-select').value;
+    if (engine) {
+      engine.inject_neuromodulator(name, amount);
+      log(`Injected ${name} ${amount > 0 ? '+' : ''}${amount}`);
+    }
+  };
+
+  document.getElementById('thought-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') window.sendThought();
+  });
+
+  start();
+</script>
+
+</body>
+</html>

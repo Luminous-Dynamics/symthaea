@@ -373,4 +373,63 @@ mod tests {
         assert_eq!(total, 3000);
         assert_eq!(count, 2);
     }
+
+    #[test]
+    fn test_parse_store_info_invalid_json() {
+        let (total, count) = GcManager::parse_store_info("not json");
+        assert_eq!(total, 0);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_parse_store_info_empty_array() {
+        let (total, count) = GcManager::parse_store_info("[]");
+        assert_eq!(total, 0);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_parse_store_info_missing_nar_size() {
+        let json = r#"[{"path": "/nix/store/abc"}, {"path": "/nix/store/def", "narSize": 500}]"#;
+        let (total, count) = GcManager::parse_store_info(json);
+        assert_eq!(total, 500);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_human_bytes_boundaries() {
+        assert_eq!(GcAnalysis::human_bytes(1024), "1.0 KiB");
+        assert_eq!(GcAnalysis::human_bytes(1024 * 1024 - 1), "1024.0 KiB");
+        assert_eq!(GcAnalysis::human_bytes(1024 * 1024), "1.0 MiB");
+        assert_eq!(GcAnalysis::human_bytes(0), "0 B");
+        assert_eq!(GcAnalysis::human_bytes(1), "1 B");
+    }
+
+    #[test]
+    fn test_gc_analysis_accessors() {
+        let analysis = GcAnalysis {
+            total_store_bytes: 10 * 1024 * 1024 * 1024,
+            reclaimable_bytes: 5 * 1024 * 1024 * 1024,
+            dead_path_count: 100,
+            live_root_count: 50,
+            total_generations: 10,
+        };
+        assert_eq!(analysis.total_store_human(), "10.0 GiB");
+        assert_eq!(analysis.reclaimable_human(), "5.0 GiB");
+        assert!((analysis.reclaimable_percent() - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_recommend_medium_store() {
+        let analysis = GcAnalysis {
+            total_store_bytes: 30 * 1024 * 1024 * 1024,
+            reclaimable_bytes: 5 * 1024 * 1024 * 1024,
+            dead_path_count: 200,
+            live_root_count: 30,
+            total_generations: 8,
+        };
+        let rec = GcManager::recommend(&analysis);
+        assert!(rec.recommended);
+        assert!(rec.reason.contains("reclaimable"));
+    }
 }

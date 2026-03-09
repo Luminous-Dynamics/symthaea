@@ -350,4 +350,54 @@ mod tests {
         let info = FlakeRegistry::parse_flake_metadata_json("/test", json).unwrap();
         assert_eq!(info.inputs, vec!["aaa-first", "mmm-middle", "zzz-last"]);
     }
+
+    #[test]
+    fn test_discover_empty_search_paths() {
+        let result = FlakeRegistry::discover(&[]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_discover_nonexistent_paths() {
+        let result = FlakeRegistry::discover(&["/nonexistent/path/abc123"]);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_parse_path_fallback_when_missing() {
+        let json = r#"{"description": "no path field"}"#;
+        let info = FlakeRegistry::parse_flake_metadata_json("/my/provided/path", json).unwrap();
+        assert_eq!(info.path, "/my/provided/path");
+    }
+
+    #[test]
+    fn test_extract_inputs_no_locks() {
+        let value: serde_json::Value = serde_json::from_str(r#"{"path": "/test"}"#).unwrap();
+        let inputs = FlakeRegistry::extract_inputs_from_locks(&value);
+        assert!(inputs.is_empty());
+    }
+
+    #[test]
+    fn test_extract_inputs_empty_root_inputs() {
+        let value: serde_json::Value = serde_json::from_str(
+            r#"{"locks": {"nodes": {"root": {"inputs": {}}}}}"#,
+        )
+        .unwrap();
+        let inputs = FlakeRegistry::extract_inputs_from_locks(&value);
+        assert!(inputs.is_empty());
+    }
+
+    #[test]
+    fn test_parse_flake_metadata_null_values() {
+        let json = r#"{
+            "description": null,
+            "path": "/test",
+            "lastModified": null
+        }"#;
+        let info = FlakeRegistry::parse_flake_metadata_json("/test", json).unwrap();
+        assert!(info.description.is_none());
+        assert!(info.last_modified.is_none());
+    }
 }
