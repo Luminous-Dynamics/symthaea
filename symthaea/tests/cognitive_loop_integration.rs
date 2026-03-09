@@ -7100,17 +7100,20 @@ fn test_broca_telemetry_quality_fields() {
     let config = CognitiveLoopConfig::default();
     let mut service = CognitiveLoopService::new(config).unwrap();
     let result = service.cycle("test broca telemetry");
-    let broca = &result.metadata.broca;
-    // These should exist and be finite (defaulted to 0.0 when broca isn't enabled)
-    assert!(broca.quality.is_finite(), "broca.quality not finite");
-    assert!(
-        broca.long_coherence.is_finite(),
-        "broca.long_coherence not finite"
-    );
-    assert!(
-        broca.semantic_pe.is_finite(),
-        "broca.semantic_pe not finite"
-    );
+    // broca is Option<BrocaGenerationTelemetry>; when ssm_language is off it may be None
+    if let Some(broca) = &result.metadata.broca {
+        // These should be finite (defaulted to 0.0 when broca isn't enabled)
+        assert!(broca.quality.is_finite(), "broca.quality not finite");
+        assert!(
+            broca.long_coherence.is_finite(),
+            "broca.long_coherence not finite"
+        );
+        assert!(
+            broca.semantic_pe.is_finite(),
+            "broca.semantic_pe not finite"
+        );
+    }
+    // If None, that's acceptable — no broca generation occurred
 }
 
 // ── Cross-subsystem coupling integration tests ────────────────────────
@@ -7135,17 +7138,19 @@ fn test_broca_quality_tracked_over_cycles() {
     for i in 0..100 {
         let result = service.cycle(inputs[i % inputs.len()]);
         let m = &result.metadata;
-        // Broca quality in metadata should always be finite
-        assert!(
-            m.broca.quality.is_finite(),
-            "broca.quality not finite at cycle {i}: {}",
-            m.broca.quality
-        );
-        assert!(
-            m.broca.quality >= 0.0 && m.broca.quality <= 1.0,
-            "broca.quality out of [0,1] at cycle {i}: {}",
-            m.broca.quality
-        );
+        // Broca quality in metadata: when present, should be finite and bounded
+        if let Some(broca) = &m.broca {
+            assert!(
+                broca.quality.is_finite(),
+                "broca.quality not finite at cycle {i}: {}",
+                broca.quality
+            );
+            assert!(
+                broca.quality >= 0.0 && broca.quality <= 1.0,
+                "broca.quality out of [0,1] at cycle {i}: {}",
+                broca.quality
+            );
+        }
     }
 
     let stats = service.stats();
@@ -7325,17 +7330,19 @@ fn test_cross_coupling_no_nan_500_cycles() {
             result.prediction_error
         );
 
-        // Broca quality: finite, bounded [0, 1]
-        assert!(
-            m.broca.quality.is_finite(),
-            "broca.quality not finite at cycle {i}: {}",
-            m.broca.quality
-        );
-        assert!(
-            m.broca.quality >= 0.0 && m.broca.quality <= 1.0,
-            "broca.quality out of [0,1] at cycle {i}: {}",
-            m.broca.quality
-        );
+        // Broca quality: when present, finite and bounded [0, 1]
+        if let Some(broca) = &m.broca {
+            assert!(
+                broca.quality.is_finite(),
+                "broca.quality not finite at cycle {i}: {}",
+                broca.quality
+            );
+            assert!(
+                broca.quality >= 0.0 && broca.quality <= 1.0,
+                "broca.quality out of [0,1] at cycle {i}: {}",
+                broca.quality
+            );
+        }
 
         // ToM prediction mismatch: finite, bounded [0, 1]
         assert!(
