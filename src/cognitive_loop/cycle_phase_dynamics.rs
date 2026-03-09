@@ -546,7 +546,7 @@ impl CognitiveLoopService {
         // Science: McClelland et al. (1995) — complementary learning systems.
         if resonator_best_sim > RESONATOR_CONSOLIDATION_THRESHOLD {
             self.fep.agent.precision.prior_precision = (self.fep.agent.precision.prior_precision
-                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD as f32) as f64 * 0.1)
+                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD) as f64 * 0.1)
                 .min(2.0);
             if self.stats.total_cycles > 10 {
                 self.scale_lr("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE);

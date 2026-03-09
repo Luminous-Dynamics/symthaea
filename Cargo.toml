@@ -370,6 +370,7 @@ wait-timeout = "0.2"
 
 [features]
 default = []
+parallel = []  # Rayon parallelism in cognitive loop (gate for WASM compat)
 
 # ── Binary build gates ──────────────────────────────────────────────
 # These enable optional dependencies for specific binaries.
