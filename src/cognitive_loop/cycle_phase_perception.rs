@@ -351,6 +351,16 @@ impl CognitiveLoopService {
             startup_suppressed,
             startup_warmup_progress,
             negation_detected,
+            #[cfg(feature = "vision-manifold")]
+            vision_mean_surprise,
+            #[cfg(feature = "vision-manifold")]
+            cross_manifold_prediction_error,
+            #[cfg(feature = "vision-manifold")]
+            vision_horizon_errors,
+            #[cfg(feature = "vision-manifold")]
+            scene_recognized,
+            #[cfg(feature = "vision-manifold")]
+            vision_telemetry,
         })
     }
 }

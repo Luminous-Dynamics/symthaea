@@ -39,7 +39,29 @@ impl CognitiveLoopService {
 
         // Integrity: run tamper detection (temporal every cycle, canaries at co-prime intervals)
         #[cfg(feature = "integrity")]
-        self.integrity_manager.tick(self.stats.total_cycles as usize, self.config.cfc_config.delta_t);
+        {
+            // Night phase: run full integrity sweep (all attestations + all canaries)
+            // Science: immune system deep maintenance during sleep (Besedovsky et al. 2012)
+            let is_night = self.biorhythm_mgr.rhythm.phase
+                == crate::chronobiology::CircadianPhase::Night;
+            self.integrity_manager.tick(
+                self.stats.total_cycles as usize,
+                self.config.cfc_config.delta_t,
+                is_night,
+            );
+            // Escalate critical integrity anomalies to safety telemetry
+            if self.integrity_manager.has_critical_anomaly() {
+                tracing::error!(
+                    target: "cognitive_loop::integrity",
+                    anomaly_count = self.integrity_manager.status.anomalies.len(),
+                    "Critical integrity anomaly detected — escalating safety"
+                );
+                // Feed integrity failure into safety-relevant carryover so the
+                // safety precheck and downstream SafetyAgent consumers see it.
+                // Attestation failure = consciousness metrics untrustworthy.
+                self.carryover.quality.last_epistemic_confidence = 0.0;
+            }
+        }
         let mut module_timings = super::ModuleTimings::default();
 
         // ═══════════════════════════════════════════════════════════════════

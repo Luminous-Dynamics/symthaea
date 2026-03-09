@@ -580,6 +580,20 @@ impl EthicsEngine {
         self.cache.last_anomaly_report = anomaly_report.clone();
         self.cache.last_topology_fresh = topology_fresh;
 
+        // Escalate verdict when trajectory convergence signals a compartmentalized
+        // adversarial plan (severity > 0.7 → Blocked, any convergence → at least Caution).
+        let unified_verdict = if anomaly_report.trajectory_convergence
+            && anomaly_report.convergence_severity > 0.7
+        {
+            EthicalVerdict::Blocked
+        } else if anomaly_report.trajectory_convergence
+            && unified_verdict == EthicalVerdict::Safe
+        {
+            EthicalVerdict::Caution
+        } else {
+            unified_verdict
+        };
+
         let total_us = total_start.elapsed().as_micros() as u64;
 
         // Clamp lr_factor

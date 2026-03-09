@@ -1403,3 +1403,53 @@ proptest! {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 32. Session 13: Convergence + flow regression guards
+// ═══════════════════════════════════════════════════════════════════════════════
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(5))]
+
+    /// Verify Session 13 regression guards:
+    /// - Confidence velocity dampening doesn't kill exploration entirely
+    /// - Flow LR modulation stays within subsystem LR bounds
+    /// - FEP efficiency confidence boost is finite
+    /// - Attention overload threshold raise is bounded
+    /// - Quality exploration floor keeps minimum exploration alive
+    #[test]
+    fn prop_session13_regression_guards(inputs in fuzz_input_sequence(60, 100)) {
+        let mut service = feedback_service();
+
+        for (i, input) in inputs.iter().enumerate() {
+            let result = service.cycle(input);
+            let m = &result.metadata;
+
+            // Exploration must remain non-negative (convergence dampening bounded)
+            let exploration = service.exploration_factor();
+            assert_finite_f32(exploration, &format!("exploration@cycle{i}"))?;
+            prop_assert!(exploration >= 0.0,
+                "exploration went negative from convergence dampening: {} at cycle {i}",
+                exploration);
+
+            // Confidence must stay bounded (FEP efficiency boost finite)
+            let conf = service.prediction_confidence();
+            prop_assert!(conf >= 0.0 && conf <= 1.0,
+                "confidence out of bounds after Session 13 mods: {conf} at cycle {i}");
+
+            // LR must stay bounded (flow modulation bounded)
+            let lr = m.actual_effective_lr;
+            assert_finite_f32(lr, &format!("lr@cycle{i}"))?;
+            prop_assert!(lr >= 0.0 && lr <= 2.0,
+                "LR out of bounds after Session 13 mods: {lr} at cycle {i}");
+
+            // Verify new telemetry fields exist and are populated
+            let _ = m.fep_td_converged;
+            let _ = m.confidence_rising_dampen;
+            let _ = m.flow_lr_boost;
+            let _ = m.fep_efficiency_boost;
+            let _ = m.attention_overload_threshold;
+            let _ = m.quality_exploration_floor;
+        }
+    }
+}

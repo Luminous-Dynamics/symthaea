@@ -992,6 +992,26 @@ pub struct CycleMetadata {
     /// Whether resonator similarity modulated semantic LR.
     #[serde(default)]
     pub resonator_semantic_lr_mod: bool,
+
+    // ── Session 13: Convergence + Flow Intelligence ─────────────────────
+    /// Whether FEP TD error convergence dampened exploration.
+    #[serde(default)]
+    pub fep_td_converged: bool,
+    /// Whether rising confidence dampened exploration.
+    #[serde(default)]
+    pub confidence_rising_dampen: bool,
+    /// Whether flow state boosted subsystem LR.
+    #[serde(default)]
+    pub flow_lr_boost: bool,
+    /// Whether FEP efficiency boosted confidence via proposal system.
+    #[serde(default)]
+    pub fep_efficiency_boost: bool,
+    /// Whether attention overload raised threshold.
+    #[serde(default)]
+    pub attention_overload_threshold: bool,
+    /// Whether sustained high quality maintained exploration floor.
+    #[serde(default)]
+    pub quality_exploration_floor: bool,
 }
 
 fn default_response_profile() -> String {
