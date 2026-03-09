@@ -78,6 +78,8 @@ impl CognitiveLoopService {
             predictive_budget_gated: dynamics.attention.predictive_budget_gated,
             #[cfg(feature = "vision-manifold")]
             scene_recognized: perception.scene_recognized,
+            #[cfg(feature = "semantic-encoder")]
+            semantic_embedding: None, // TODO: wire to semantic_embedding_channel
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -169,7 +171,7 @@ impl CognitiveLoopService {
         let consciousness_limiting_component = subsystem_metrics.consciousness_limiting_component;
         let affect_cons_valence = subsystem_metrics.affect_cons_valence;
         let affect_cons_arousal = subsystem_metrics.affect_cons_arousal;
-        let _pipeline_consciousness = subsystem_metrics.pipeline_consciousness;
+        let pipeline_consciousness = subsystem_metrics.pipeline_consciousness;
         let multimodal_integrated_phi = subsystem_metrics.multimodal_integrated_phi;
         let consciousness_state_label = subsystem_metrics.consciousness_state_label;
         let consciousness_state_level = subsystem_metrics.consciousness_state_level;
@@ -373,6 +375,26 @@ impl CognitiveLoopService {
                 (epistemic_gate_confidence - EPISTEMIC_TRUST_THRESHOLD) * EPISTEMIC_TRUST_SCALE;
             self.scale_threshold("epistemic_gate_trust", 1.0 - trust_factor);
         }
+
+        // Session 15 Item 1: Pipeline consciousness → epistemic caution modulation.
+        // High pipeline consciousness → relax epistemic caution (system is integrated).
+        // Low pipeline consciousness → tighten caution (subsystems aren't coherent).
+        // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
+        self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
+        let _pipeline_consciousness_gated = if pipeline_consciousness > 0.7
+            && self.stats.total_cycles > 15
+        {
+            self.scale_threshold("pipeline_conscious_relax", 0.97);
+            true
+        } else if pipeline_consciousness < 0.3
+            && pipeline_consciousness > 0.0
+            && self.stats.total_cycles > 15
+        {
+            self.scale_threshold("pipeline_conscious_caution", 1.03);
+            true
+        } else {
+            false
+        };
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH

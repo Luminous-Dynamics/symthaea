@@ -382,3 +382,47 @@ fn diagnostic_round5_trajectory() {
         }
     }
 }
+
+/// Verify that narrative episodes accumulate and N grows over 200 cycles.
+/// Before this wiring, N was stuck at ~0.15 (no episodes ever fed).
+#[test]
+fn test_mce_narrative_wiring() {
+    let config = CognitiveLoopConfig::default();
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // N should start low (no episodes yet)
+    let n_start = service.master_equation.narrative_coherence.compute();
+    assert!(
+        n_start < 0.2,
+        "N should start low with no episodes, got {n_start}"
+    );
+    assert_eq!(
+        service.master_equation.narrative_coherence.episode_count(),
+        0
+    );
+
+    // Run 200 cycles
+    for _ in 0..200 {
+        let _ = service.cycle("narrative wiring test");
+    }
+
+    let n_end = service.master_equation.narrative_coherence.compute();
+    let episodes = service.master_equation.narrative_coherence.episode_count();
+    let scenarios = service.master_equation.narrative_coherence.scenario_count();
+
+    // After 200 cycles, should have accumulated episodes from consolidation events
+    assert!(
+        episodes > 5,
+        "Expected >5 episodes after 200 cycles, got {episodes}"
+    );
+    // Future scenarios should be fed from prediction horizon
+    assert!(
+        scenarios > 0,
+        "Expected >0 future scenarios after 200 cycles, got {scenarios}"
+    );
+    // N should have grown substantially
+    assert!(
+        n_end > n_start + 0.1,
+        "N should grow: start={n_start:.3}, end={n_end:.3}"
+    );
+}

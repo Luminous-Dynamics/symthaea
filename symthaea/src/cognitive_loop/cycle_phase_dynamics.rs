@@ -275,6 +275,13 @@ impl CognitiveLoopService {
                 self.set_lr("crash_freeze", frozen_lr);
                 self.carryover.quality.crash_freeze_remaining -= 1;
             }
+            // Session 15 Item 4: Confidence crash → relax binding threshold.
+            // During crash recovery, binding requirements should be lenient — the system
+            // needs to re-integrate, not reject fragmented inputs.
+            // Science: Dehaene (2014) — post-disruption GWT lowers ignition threshold.
+            if self.carryover.quality.crash_freeze_remaining > 0 {
+                self.scale_threshold("crash_binding_relax", 0.95);
+            }
         }
 
         // Session 9 Item 1: PE variance → confidence modulation.
@@ -381,6 +388,14 @@ impl CognitiveLoopService {
                 * RESONATOR_LOW_ERROR_CONFIDENCE_SCALE;
             self.adjust_confidence("resonator_error_low", confidence_boost);
             self.stats.resonator_error_exploration_count += 1;
+            // Session 15 Item 7: Sustained low resonator error → confidence recovery.
+            // If >80% of recent cycles had low error, give an additional confidence nudge.
+            // Science: Bar (2009) — consistent prediction accuracy signals reliable model.
+            if self.stats.total_cycles > 20
+                && self.stats.resonator_error_exploration_count > (self.stats.total_cycles / 2) as u64
+            {
+                self.adjust_confidence("resonator_sustained_low", 0.005);
+            }
             -confidence_boost
         } else {
             0.0
@@ -596,10 +611,16 @@ impl CognitiveLoopService {
         let pre_dist = pre_pull_valence.abs().max(0.01);
         let post_dist = post_pull_valence.abs();
         let cycle_efficiency = post_dist / pre_dist;
-        // EMA smooth (alpha=0.2)
-        self.carryover.quality.homeostasis_efficiency =
-            self.carryover.quality.homeostasis_efficiency * (1.0 - HOMEOSTASIS_EFFICIENCY_EMA)
-                + cycle_efficiency * HOMEOSTASIS_EFFICIENCY_EMA;
+        // EMA smooth (alpha=0.2), clamped to [0.5, 1.5] to prevent unbounded drift.
+        // Session 15 Item 6: Clamp homeostasis efficiency.
+        // Science: Cannon (1929) — regulation has bounded operating range.
+        self.carryover.quality.homeostasis_efficiency = (self
+            .carryover
+            .quality
+            .homeostasis_efficiency
+            * (1.0 - HOMEOSTASIS_EFFICIENCY_EMA)
+            + cycle_efficiency * HOMEOSTASIS_EFFICIENCY_EMA)
+            .clamp(0.5, 1.5);
 
         // High transition cost → strengthen homeostasis to resist unnecessary mode changes.
         // Kelso (1995): costly transitions increase the system's tendency to stay in current attractor.
@@ -1801,7 +1822,15 @@ impl CognitiveLoopService {
                 .saturating_add(1);
             let counter = self.carryover.urgency.anomaly_recovery_counter;
             if counter <= 20 {
-                let recovery = counter as f32 / 20.0;
+                // Session 15 Item 8: Accelerate recovery when Phi is improving.
+                // If unified Psi exceeds recent average, add bonus progress.
+                // Science: Tononi (2004) — rising Phi signals integration recovery.
+                let phi_bonus = if unified_psi > self.stats.avg_psi as f64 * 1.05 {
+                    0.25 // 25% bonus progress when Phi above average
+                } else {
+                    0.0
+                };
+                let recovery = ((counter as f32 / 20.0) + phi_bonus).min(1.0);
                 reasoning_lr_factor *= 0.5 + recovery * 0.5;
                 anomaly_recovery_progress = recovery;
                 self.stats.anomaly_recovery_active_count += 1;
@@ -2066,10 +2095,15 @@ impl CognitiveLoopService {
             let broca_novelty =
                 prediction_error > self.config.learning_threshold || surprise_triggered;
             // Adaptive cadence: poor user model → generate more (probe to refine)
+            // Session 15 Item 5: Attention fatigue → Broca cadence gating.
+            // High fatigue → widen spacing (don't generate when attention depleted).
+            // Science: Mackworth (1948) — vigilance decrement degrades production quality.
+            let fatigue_spacing_boost =
+                if self.self_model_tier.attention_schema.fatigue > 0.6 { 3 } else { 0 };
             let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
-                5 // more frequent when user model is inaccurate
+                5 + fatigue_spacing_boost // more frequent when user model is inaccurate
             } else {
-                7 // default spacing
+                7 + fatigue_spacing_boost // default spacing
             };
             let broca_should_generate = broca_psi > 0.4
                 && broca_novelty

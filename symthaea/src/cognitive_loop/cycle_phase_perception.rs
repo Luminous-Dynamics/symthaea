@@ -361,6 +361,10 @@ impl CognitiveLoopService {
             scene_recognized,
             #[cfg(feature = "vision-manifold")]
             vision_telemetry,
+            #[cfg(feature = "foveation")]
+            foveation_recognition_count,
+            #[cfg(feature = "foveation")]
+            foveation_top_confidence,
         })
     }
 }

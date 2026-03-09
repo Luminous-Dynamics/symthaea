@@ -910,6 +910,16 @@ impl CognitiveLoopService {
                     1.0, // adenosine
                     1.0, // endocannabinoid
                 ]);
+                // Register moral topology constants for tamper detection.
+                // MORAL_DIM and harmony basis structure — distorting these
+                // silently corrupts all moral evaluations.
+                im.register_moral_topology_constants(&[
+                    crate::hdc::moral_algebra::MORAL_DIM as f32,
+                    symthaea_types::N_HARMONIES as f32,
+                    // Harmony interaction constants (8 × weight 0.125 = normalized)
+                    0.125, 0.125, 0.125, 0.125,
+                    0.125, 0.125, 0.125, 0.125,
+                ]);
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);
                 im

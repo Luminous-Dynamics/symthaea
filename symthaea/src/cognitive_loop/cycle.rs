@@ -49,6 +49,34 @@ impl CognitiveLoopService {
                 self.config.cfc_config.delta_t,
                 is_night,
             );
+            // Live verification: re-hash safety thresholds from current const values
+            // (catches binary patching that the frozen-copy attestation might miss
+            //  if the patching happened after initial registration)
+            let live_hash = crate::integrity::attestation::blake3_hash_f32_slice(&[
+                super::thresholds::MORAL_CONCERN_THRESHOLD,
+                super::thresholds::MORAL_BENEFIT_THRESHOLD,
+                super::thresholds::MORAL_CONCERN_EXPLORATION_DAMPEN,
+                super::thresholds::MORAL_CONCERN_PAUSE_BOOST,
+                super::thresholds::MORAL_BENEFIT_CONFIDENCE_BOOST,
+            ]);
+            if let Some(failure) = self
+                .integrity_manager
+                .verify_live_thresholds("safety_thresholds", live_hash)
+            {
+                tracing::error!(
+                    target: "cognitive_loop::integrity",
+                    "{failure}"
+                );
+                self.integrity_manager.status.attestation_passed = false;
+                self.integrity_manager.status.anomalies.push(
+                    crate::integrity::IntegrityAnomaly {
+                        source: "live_attestation",
+                        description: failure,
+                        detected_at: std::time::Instant::now(),
+                        severity: crate::integrity::AnomalySeverity::Critical,
+                    },
+                );
+            }
             // Escalate critical integrity anomalies to safety telemetry
             if self.integrity_manager.has_critical_anomaly() {
                 tracing::error!(

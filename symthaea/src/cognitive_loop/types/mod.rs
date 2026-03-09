@@ -77,6 +77,13 @@ pub struct IntegrityTelemetry {
     pub has_critical: bool,
     /// Cycle number of the last integrity check.
     pub last_check_cycle: usize,
+    /// Consciousness confidence multiplier (1.0 = trusted, 0.5 = drift, 0.1 = critical).
+    #[serde(default = "default_integrity_confidence")]
+    pub integrity_confidence: f32,
+}
+
+fn default_integrity_confidence() -> f32 {
+    1.0
 }
 
 #[cfg(test)]

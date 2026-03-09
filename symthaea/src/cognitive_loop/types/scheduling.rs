@@ -117,4 +117,7 @@ pub(crate) struct CycleState<'a> {
     /// Whether a visual scene was recognized this cycle (for dream salience boost).
     #[cfg(feature = "vision-manifold")]
     pub scene_recognized: bool,
+    /// Semantic embedding from neural encoder (for episodic memory similarity).
+    #[cfg(feature = "semantic-encoder")]
+    pub semantic_embedding: Option<Vec<f32>>,
 }

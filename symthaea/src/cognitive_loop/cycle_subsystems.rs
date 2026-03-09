@@ -722,6 +722,8 @@ mod tests {
             predictive_budget_gated: false,
             #[cfg(feature = "vision-manifold")]
             scene_recognized: false,
+            #[cfg(feature = "semantic-encoder")]
+            semantic_embedding: None,
         }
     }
 

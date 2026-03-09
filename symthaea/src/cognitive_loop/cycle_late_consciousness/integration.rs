@@ -520,6 +520,23 @@ impl CognitiveLoopService {
         // MASTER CONSCIOUSNESS EQUATION: comprehensive consciousness metric
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
+
+        // PRE-MCE NARRATIVE: surprise-triggered episodes bypass MCE gating.
+        // Without this, episodes only accumulate inside the MCE block (every 5-20
+        // cycles), creating a circular dependency: low C → infrequent MCE → few
+        // episodes → low N → low C. Surprise events are encoded pre-consciously.
+        // Science: Ranganath & Rainer (2003) — novel stimuli are encoded into
+        // memory even without full conscious access (pre-attentive encoding).
+        if ctx.surprise_triggered {
+            let valence = -(ctx.prediction_error as f64 * 0.3); // surprise is mildly negative
+            self.master_equation
+                .narrative_coherence
+                .add_episode(
+                    format!("surprise_pre_pe{:.2}", ctx.prediction_error),
+                    valence,
+                );
+        }
+
         // Run every 10th cycle to amortize cost. Maps cognitive loop signals to
         // the 8-factor ConsciousnessInputs: Phi, Broadcast, WorkingMemory,
         // Attention, Recurrence, Embodiment, Knowledge, Synchrony.
@@ -677,9 +694,11 @@ impl CognitiveLoopService {
             let broadcast_input =
                 (ctx.coherence as f64 + gwt_boost + attention_boost).clamp(0.0, 1.0);
 
-            // WM richness: prefrontal stats (~0.58) + GWT coalition quality + attention.
+            // WM richness: prefrontal stats (~0.58) + GWT coalition quality + attention
+            // + prediction confidence (knowledge content in WM).
             // Science: Baars & Franklin (2003) — WM capacity = prefrontal buffer +
             // global workspace broadcast reach + attentional gating.
+            // Cowan (2005) — WM is not just buffer size but also accessible knowledge.
             let wm_base = self.prefrontal_utilization();
             let gwt_wm = if gwt_broadcast {
                 0.05 + 0.1 * (gwt_coalition_size.min(5) as f64 / 5.0)
@@ -688,7 +707,10 @@ impl CognitiveLoopService {
             };
             // Attention gates WM access — high attention = efficient WM use.
             let attn_wm = ctx.peak_attention as f64 * 0.1;
-            let working_memory = (wm_base + gwt_wm + attn_wm).clamp(0.0, 1.0);
+            // Prediction confidence reflects world-model quality accessible in WM.
+            // Capped at 0.05 to keep it a seasoning, not a main course.
+            let knowledge_wm = self.prediction_confidence * 0.05;
+            let working_memory = (wm_base + gwt_wm + attn_wm + knowledge_wm).clamp(0.0, 1.0);
 
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
                 phi: phi_input,
@@ -700,10 +722,19 @@ impl CognitiveLoopService {
                 // Science: Elman (1990) — recurrent networks have temporal integration from t=0.
                 recurrence: (0.3 + 0.7 * self.stats.total_cycles.min(100) as f64 / 100.0),
                 embodiment: late.body_psi_modulation, // virtual body provides embodiment
-                // Floor at 0.2: even with no predictions, the system has SOME knowledge
-                // of its own state. Prevents softmin death spiral where knowledge→0
-                // crushes consciousness, preventing the learning that would raise it.
-                knowledge: self.prediction_confidence.max(0.2),
+                // Knowledge: prediction confidence + meta-cognitive accuracy + prediction
+                // coherence. Floor at 0.2: even with no predictions, the system has
+                // SOME knowledge. Multiple sources prevent softmin death spiral.
+                // Science: Fleming & Dolan (2012) — metacognitive accuracy IS self-knowledge.
+                // Clark (2013) — coherent multi-scale predictions = well-structured generative model.
+                knowledge: {
+                    let base_k = self.prediction_confidence;
+                    // Meta-cognitive accuracy: knowing how well you know (scaled 0.4x)
+                    let meta_k = late.meta_cognitive_accuracy as f64 * 0.4;
+                    // Prediction coherence: multi-scale prediction agreement (scaled 0.1x)
+                    let coherence_k = self.stats.avg_prediction_coherence as f64 * 0.1;
+                    (base_k.max(meta_k) + coherence_k).max(0.2).min(1.0)
+                },
                 // Synchrony: baseline + coherence + attention + flow.
                 // Attention IS synchrony — selective amplification requires
                 // phase-locked neural coordination (Fries 2015). Raised baseline
@@ -788,10 +819,55 @@ impl CognitiveLoopService {
             if level > consolidation_threshold {
                 // Trigger demand-driven consolidation at above-average consciousness
                 self.fep.episodic_memory.consolidate_recent();
+
+                // NARRATIVE WIRING: Consolidation events ARE narrative episodes.
+                // When consciousness exceeds its rolling average, the system is in a
+                // heightened-awareness state worth recording as autobiographical memory.
+                // Science: Conway & Pleydell-Pearce (2000) — episodes encoded during
+                // high-awareness moments form the backbone of autobiographical narrative.
+                // Valence: map from body arousal (emotional coloring of the moment).
+                let episode_valence = late.body_valence as f64 * 0.5; // [-0.5, 0.5]
+                let episode_label = if ctx.surprise_triggered {
+                    format!(
+                        "surprise_c{:.2}_pe{:.2}",
+                        level, ctx.prediction_error
+                    )
+                } else if ctx.moral_concern_detected {
+                    format!("moral_c{:.2}", level)
+                } else {
+                    format!("consolidation_c{:.2}", level)
+                };
+                self.master_equation
+                    .narrative_coherence
+                    .add_episode(episode_label, episode_valence);
             }
             // Scale learning signal by consciousness quality (gradual, not on/off)
             // This complements the binary consciousness_awake gate with continuous modulation
             self.fep.learning_signal *= (0.5_f32 + level as f32 * 0.5_f32).clamp(0.5_f32, 1.0_f32);
+
+            // NARRATIVE WIRING: Feed prediction-horizon data as future scenarios.
+            // The prediction system already computes multi-scale horizons — these
+            // ARE the system's simulation of its own future states.
+            // Science: Suddendorf & Corballis (2007) — mental time travel (episodic
+            // future thinking) requires both autobiographical memory AND prospective
+            // simulation. Feeding scenarios builds future_simulation_depth.
+            // Gate: only every 10th cycle (co-prime with MCE cadence) to avoid churn.
+            if self.stats.total_cycles % 10 == 3 {
+                let horizon_steps = self.config.cfc_config.prediction_horizons.len().max(1);
+                let pe = ctx.prediction_error as f64;
+                // Probability = inverse of prediction error (lower PE = more confident forecast)
+                let probability = (1.0 - pe).clamp(0.1, 0.9);
+                // Desirability: valence of the predicted state
+                let desirability = late.body_valence as f64;
+                self.master_equation
+                    .narrative_coherence
+                    .add_future_scenario(
+                        format!("prediction_h{}_pe{:.2}", horizon_steps, pe),
+                        horizon_steps,
+                        probability,
+                        desirability,
+                    );
+            }
 
             level
         } else {
