@@ -12,17 +12,23 @@ use currency_mint_integrity::CurrencyDefinition;
 
 /// Consolidated demurrage test: 10 scenarios sharing a single conductor.
 ///
-/// Uses a manual runtime with 8MB worker thread stacks because the consolidated
-/// async state machine (10 scenarios, 776 lines) exceeds tokio's default 2MB.
+/// Runs block_on inside a thread with 16MB stack because the consolidated
+/// async state machine (10 scenarios, 776 lines) exceeds default stack sizes.
 #[test]
 #[ignore]
 fn test_demurrage_all() {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
-        .build()
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(test_demurrage_all_inner());
+        })
         .unwrap()
-        .block_on(test_demurrage_all_inner());
+        .join()
+        .unwrap();
 }
 
 async fn test_demurrage_all_inner() {

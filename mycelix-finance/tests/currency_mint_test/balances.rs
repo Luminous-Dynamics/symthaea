@@ -12,17 +12,23 @@
 use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
 
-/// Uses a manual runtime with 8MB worker thread stacks because the consolidated
-/// async state machine exceeds tokio's default 2MB.
+/// Runs block_on inside a thread with 16MB stack because the consolidated
+/// async state machine exceeds default stack sizes.
 #[test]
 #[ignore]
 fn test_balances_all() {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
-        .build()
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(test_balances_all_inner());
+        })
         .unwrap()
-        .block_on(test_balances_all_inner());
+        .join()
+        .unwrap();
 }
 
 async fn test_balances_all_inner() {

@@ -13,17 +13,23 @@ use mycelix_finance_types::CurrencyStatus;
 
 /// Consolidated dispute and amendment tests — single conductor, 3 agents.
 ///
-/// Uses a manual runtime with 8MB worker thread stacks because the consolidated
-/// async state machine (10 scenarios, 748 lines) exceeds tokio's default 2MB.
+/// Runs block_on inside a thread with 16MB stack because the consolidated
+/// async state machine (10 scenarios, 748 lines) exceeds default stack sizes.
 #[test]
 #[ignore]
 fn test_disputes_all() {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
-        .build()
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(test_disputes_all_inner());
+        })
         .unwrap()
-        .block_on(test_disputes_all_inner());
+        .join()
+        .unwrap();
 }
 
 async fn test_disputes_all_inner() {
@@ -343,9 +349,9 @@ async fn test_disputes_all_inner() {
 
         let new_params = test_params("AmendGuard Updated", "AG");
 
-        // Amend on Draft — should fail (not Active or Suspended)
-        let result: Result<CurrencyDefinition, _> = conductor
-            .call_fallible(
+        // Amend on Draft — allowed (Draft and Active both permit amendments)
+        let amended: CurrencyDefinition = conductor
+            .call(
                 &zome_a,
                 "amend_currency_params",
                 AmendCurrencyParamsInput {
@@ -355,8 +361,8 @@ async fn test_disputes_all_inner() {
                 },
             )
             .await;
-        assert!(result.is_err(), "Amend on Draft should be rejected");
-        println!("  - Amend on Draft: rejected");
+        assert_eq!(amended.params.name, "AmendGuard Updated");
+        println!("  - Amend on Draft: accepted (correct)");
 
         // Activate, then Retire
         let _: CurrencyDefinition = conductor

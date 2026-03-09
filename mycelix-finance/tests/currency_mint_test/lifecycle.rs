@@ -19,12 +19,18 @@ use mycelix_finance_types::CurrencyStatus;
 #[test]
 #[ignore]
 fn test_lifecycle_all() {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
-        .build()
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(test_lifecycle_all_inner());
+        })
         .unwrap()
-        .block_on(test_lifecycle_all_inner());
+        .join()
+        .unwrap();
 }
 
 async fn test_lifecycle_all_inner() {

@@ -11,12 +11,18 @@ use currency_mint_integrity::CurrencyDefinition;
 #[test]
 #[ignore]
 fn test_stats_all() {
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
-        .build()
+    std::thread::Builder::new()
+        .stack_size(16 * 1024 * 1024)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(test_stats_all_inner());
+        })
         .unwrap()
-        .block_on(test_stats_all_inner());
+        .join()
+        .unwrap();
 }
 
 async fn test_stats_all_inner() {
