@@ -441,21 +441,15 @@ mod tests {
     #[test]
     fn test_parsed_code_entities_of_kind() {
         let mut code = ParsedCode::new("let x = 1;", "nix");
-        code.entities.push(CodeEntity::new(
-            EntityKind::Variable,
-            "x",
-            Span::default(),
-        ));
+        code.entities
+            .push(CodeEntity::new(EntityKind::Variable, "x", Span::default()));
         code.entities.push(CodeEntity::new(
             EntityKind::Function,
             "foo",
             Span::default(),
         ));
-        code.entities.push(CodeEntity::new(
-            EntityKind::Variable,
-            "y",
-            Span::default(),
-        ));
+        code.entities
+            .push(CodeEntity::new(EntityKind::Variable, "y", Span::default()));
         let vars = code.entities_of_kind(EntityKind::Variable);
         assert_eq!(vars.len(), 2);
         assert_eq!(vars[0].name, "x");
@@ -602,7 +596,10 @@ mod tests {
         let y: Vec<f64> = (0..20).map(|i| i as f64 * 2.0).collect();
         let (dir, conf) = engine.predict_with_confidence(&x, &y);
         assert_eq!(dir, CausalDirection::Forward);
-        assert!(conf > 0.0, "Correlated series should have positive confidence");
+        assert!(
+            conf > 0.0,
+            "Correlated series should have positive confidence"
+        );
         assert!(conf <= 1.0);
     }
 

@@ -282,9 +282,15 @@ mod tests {
         let hv = ContinuousHV::random(1024, 42);
 
         let goal = gi.infer_from_hv(hv, "pre-encoded goal");
-        assert!((goal.confidence - 0.5).abs() < 1e-6, "infer_from_hv always returns 0.5 confidence");
+        assert!(
+            (goal.confidence - 0.5).abs() < 1e-6,
+            "infer_from_hv always returns 0.5 confidence"
+        );
         assert_eq!(goal.description, "pre-encoded goal");
-        assert!(!goal.needs_clarification, "0.5 confidence should not need clarification");
+        assert!(
+            !goal.needs_clarification,
+            "0.5 confidence should not need clarification"
+        );
         assert!(goal.goal_state.norm() > 0.0);
     }
 
@@ -321,7 +327,10 @@ mod tests {
         let sim = goal.goal_state.similarity(&hv);
         // First call: context is just the input itself after push, so
         // blending input + context (which includes input) should be close
-        assert!(sim > 0.5, "First infer_from_hv should stay close to input, got sim={sim}");
+        assert!(
+            sim > 0.5,
+            "First infer_from_hv should stay close to input, got sim={sim}"
+        );
     }
 
     #[test]
@@ -331,7 +340,10 @@ mod tests {
 
         // Initially no context
         let initial = gi.current_goal();
-        assert!(initial.norm() < 1e-6, "Empty context should have near-zero norm");
+        assert!(
+            initial.norm() < 1e-6,
+            "Empty context should have near-zero norm"
+        );
 
         // After inference, context should be non-zero
         gi.infer("install firefox", &mut cb);
