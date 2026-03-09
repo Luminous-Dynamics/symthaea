@@ -86,6 +86,9 @@ use super::thresholds::{
     TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE, TRANSITION_COST_THRESHOLD,
     WM_MISMATCH_CONFIDENCE_SCALE, WM_MISMATCH_LR_SCALE, WORLD_MODEL_SPONGINESS_THRESHOLD,
     WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
+    COHERENCE_VELOCITY_BUDGET_CONTRACT, COHERENCE_VELOCITY_BUDGET_EXPAND,
+    COHERENCE_VELOCITY_BUDGET_THRESHOLD, HOMEOSTASIS_NEUROMOD_STEP,
+    HOMEOSTASIS_RECALIBRATE_HIGH, HOMEOSTASIS_RECALIBRATE_LOW,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -615,6 +618,17 @@ impl CognitiveLoopService {
             homeostasis_pull_strength *= HOMEOSTASIS_PULL_REDUCTION;
         } else if eff < HOMEOSTASIS_EFFICIENCY_LOW && eff > 0.0 {
             homeostasis_pull_strength *= HOMEOSTASIS_PULL_INCREASE;
+        }
+
+        // Homeostasis efficiency → learning recalibration.
+        // Sustained overshoot (>1.15) → system is overcorrecting → dampen LR.
+        // Sustained undershoot (<0.85) → system is sluggish → boost LR.
+        // Science: Turrigiano (2008) — homeostatic failure triggers synaptic recalibration.
+        if eff > HOMEOSTASIS_RECALIBRATE_HIGH && self.stats.total_cycles > 20 {
+            self.scale_lr("homeostasis_overcorrect", 1.0 - HOMEOSTASIS_NEUROMOD_STEP);
+            self.scale_exploration("homeostasis_overcorrect", 1.0 + HOMEOSTASIS_NEUROMOD_STEP);
+        } else if eff < HOMEOSTASIS_RECALIBRATE_LOW && eff > 0.0 && self.stats.total_cycles > 20 {
+            self.scale_lr("homeostasis_sluggish", 1.0 + HOMEOSTASIS_NEUROMOD_STEP);
         }
 
         // Session 10 Item 3: Coherence velocity → CfC tau modulation.
@@ -1288,6 +1302,14 @@ impl CognitiveLoopService {
             let dampen = (1.0 - confidence_velocity * 0.1).max(0.95);
             self.scale_exploration("confidence_rising", dampen);
         }
+        // Falling confidence → speed up learning (model needs correction).
+        // Confidence collapse signals prediction degradation → recalibrate faster.
+        // Science: Cools et al. (2008) — rapid confidence decline triggers
+        // serotonergic recalibration and increased learning rate.
+        if confidence_velocity < -0.05 && self.stats.total_cycles > 15 {
+            let boost = (1.0 + (-confidence_velocity - 0.05) * 0.3).min(1.15);
+            self.scale_lr("confidence_falling", boost);
+        }
         let unified_psi = neuromod_result.unified_psi;
         let guiding_question = neuromod_result.guiding_question;
         let dominant_harmonic = neuromod_result.dominant_harmonic;
@@ -1440,11 +1462,26 @@ impl CognitiveLoopService {
                 1.0
             }
         };
+        // Coherence velocity → attention budget allocation.
+        // Dropping coherence → preserve budget (system losing grip);
+        // rising coherence → expand budget (model confidence growing).
+        // Science: Bar (2009) — coherence collapse demands attention reallocation.
+        let coherence_velocity_budget_scale = {
+            let cv = self.carryover.quality.coherence_velocity;
+            if cv < -COHERENCE_VELOCITY_BUDGET_THRESHOLD {
+                COHERENCE_VELOCITY_BUDGET_CONTRACT
+            } else if cv > COHERENCE_VELOCITY_BUDGET_THRESHOLD {
+                COHERENCE_VELOCITY_BUDGET_EXPAND
+            } else {
+                1.0
+            }
+        };
         let attention_budget_us = (ATTENTION_BUDGET_US as f64
             * neuromod_attention_alloc as f64
             * depth_budget_scale
             * epistemic_budget_scale as f64
-            * stillness_budget_scale) as u64;
+            * stillness_budget_scale
+            * coherence_velocity_budget_scale) as u64;
 
         // Active Rest Mode: track Sacred Stillness dominance streak
         {

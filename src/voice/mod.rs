@@ -472,7 +472,7 @@ impl VoiceOutput {
 
         let samples = if self.config.enable_tts && self.initialized {
             // Try Kokoro TTS first, fall back to simulated
-            if let Some(ref kokoro) = self.kokoro {
+            if let Some(ref mut kokoro) = self.kokoro {
                 if let Some(mut audio) = kokoro.synthesize(text, Some(self.config.voice_id)) {
                     // Apply pacing by resampling: rate > 1.0 = faster = fewer samples
                     if (pacing.rate - 1.0).abs() > 0.05 {

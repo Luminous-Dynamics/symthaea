@@ -7,8 +7,6 @@
 //! researching them on the web and converting documentation into
 //! structured HDC-encoded learning objectives.
 
-#![cfg(feature = "web_research_module")]
-
 use anyhow::Result;
 use chrono::Utc;
 use serde::Serialize;

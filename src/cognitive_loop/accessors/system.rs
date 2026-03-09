@@ -96,6 +96,30 @@ impl CognitiveLoopService {
         self.ethics_engine.moral_topology().last_summary().clone()
     }
 
+    /// Get the latest trajectory convergence status from the topological immune system.
+    ///
+    /// Returns a clone of the most recent [`TrajectoryConvergenceReport`] produced
+    /// by the ethics engine during cycle execution. Includes severity, matched
+    /// hazard template, and per-signal details for all three convergence signals.
+    pub fn convergence_status(
+        &self,
+    ) -> crate::hdc::moral_topology::TrajectoryConvergenceReport {
+        self.ethics_engine
+            .moral_topology()
+            .last_convergence_report()
+            .clone()
+    }
+
+    /// Get a human-readable explanation of the current convergence status.
+    ///
+    /// Wraps [`TrajectoryConvergenceReport::explain`] with the active anomaly config.
+    pub fn convergence_explanation(
+        &self,
+    ) -> crate::hdc::moral_topology::ConvergenceExplanation {
+        let report = self.ethics_engine.moral_topology().last_convergence_report();
+        report.explain(self.ethics_engine.moral_topology().anomaly_config())
+    }
+
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.
     #[cfg(feature = "vision-manifold")]
     pub fn vision_evaluate_horizons(&self) -> Option<symthaea_vision_manifold::HorizonAccuracy> {
