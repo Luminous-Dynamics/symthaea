@@ -349,6 +349,16 @@ mod tests {
         assert!((bio.timezone_offset_hours).abs() < 0.001);
     }
 
+    #[test]
+    fn test_detect_system_timezone_in_range() {
+        let tz = Biorhythm::detect_system_timezone();
+        assert!(
+            (-12.0..=14.0).contains(&tz),
+            "detected tz should be in [-12, 14]: {}",
+            tz
+        );
+    }
+
     // ── Phase 4: Circadian Phase Shifting ────────────────────────────
 
     #[test]

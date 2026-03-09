@@ -211,25 +211,34 @@ impl IntegrityManager {
     /// These are the values where tampering would be most dangerous:
     /// consciousness equation weights, safety level thresholds, moral topology constants.
     pub fn register_safety_thresholds(&mut self, thresholds: &[f32]) {
-        self.attestation.register_snapshot(
+        let hash = attestation::blake3_hash_f32_slice(thresholds);
+        let frozen = thresholds.to_vec();
+        self.attestation.register(
             "safety_thresholds",
-            &attestation::blake3_hash_f32_slice(thresholds),
+            hash,
+            Box::new(move || attestation::blake3_hash_f32_slice(&frozen)),
         );
     }
 
     /// Register consciousness equation weights for attestation.
     pub fn register_consciousness_weights(&mut self, weights: &[f64]) {
-        self.attestation.register_snapshot(
+        let hash = attestation::blake3_hash_f64_slice(weights);
+        let frozen = weights.to_vec();
+        self.attestation.register(
             "consciousness_weights",
-            &attestation::blake3_hash_f64_slice(weights),
+            hash,
+            Box::new(move || attestation::blake3_hash_f64_slice(&frozen)),
         );
     }
 
     /// Register neuromodulator receptor sensitivity curves.
     pub fn register_receptor_sensitivities(&mut self, sensitivities: &[f32]) {
-        self.attestation.register_snapshot(
+        let hash = attestation::blake3_hash_f32_slice(sensitivities);
+        let frozen = sensitivities.to_vec();
+        self.attestation.register(
             "receptor_sensitivities",
-            &attestation::blake3_hash_f32_slice(sensitivities),
+            hash,
+            Box::new(move || attestation::blake3_hash_f32_slice(&frozen)),
         );
     }
 }
