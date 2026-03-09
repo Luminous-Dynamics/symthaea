@@ -524,8 +524,8 @@ export class OfflineQueue {
       pendingCount: items.filter((i) => i.status === 'pending' || i.status === 'syncing').length,
     });
 
-    // Try immediate sync if online
-    if (this._state$.value.isOnline && !this._state$.value.isSyncing) {
+    // Try immediate sync if online and autoSync is enabled
+    if (this.config.autoSync && this._state$.value.isOnline && !this._state$.value.isSyncing) {
       void this.sync();
     }
 
@@ -622,8 +622,8 @@ export class OfflineQueue {
       pendingCount: this._state$.value.pendingCount + 1,
     });
 
-    // Try immediate sync
-    if (this._state$.value.isOnline && !this._state$.value.isSyncing) {
+    // Try immediate sync if autoSync is enabled
+    if (this.config.autoSync && this._state$.value.isOnline && !this._state$.value.isSyncing) {
       void this.sync();
     }
 

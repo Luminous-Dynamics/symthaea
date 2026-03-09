@@ -931,7 +931,8 @@ describe('OfflineQueue', () => {
   let queue: OfflineQueue;
 
   beforeEach(async () => {
-    queue = createOfflineQueue();
+    // Disable autoSync so items remain pending during assertions
+    queue = createOfflineQueue(undefined, undefined, { autoSync: false });
     await queue.initialize();
   });
 
