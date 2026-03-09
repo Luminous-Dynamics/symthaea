@@ -1,0 +1,206 @@
+name: Mycelix Sweettest CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'mycelix-identity/**'
+      - 'mycelix-governance/**'
+      - 'mycelix-commons/**'
+      - 'mycelix-civic/**'
+      - 'mycelix-hearth/**'
+      - 'mycelix-personal/**'
+      - 'mycelix-attribution/**'
+      - 'mycelix-workspace/**'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'mycelix-identity/**'
+      - 'mycelix-governance/**'
+      - 'mycelix-commons/**'
+      - 'mycelix-civic/**'
+      - 'mycelix-hearth/**'
+      - 'mycelix-personal/**'
+      - 'mycelix-attribution/**'
+      - 'mycelix-workspace/**'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
+
+jobs:
+  # ── Identity Sweettests ────────────────────────────────────────
+  identity-sweettest:
+    name: Identity Sweettests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Install Holochain tools
+        run: |
+          nix profile install nixpkgs#holochain
+          which hc && hc --version || echo "hc not available, using cargo"
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-identity/target
+            mycelix-identity/tests/target
+          key: ${{ runner.os }}-identity-sweettest-${{ hashFiles('mycelix-identity/**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-identity-sweettest-
+
+      - name: Build Identity WASM zomes
+        run: |
+          for zome in zomes/*/integrity zomes/*/coordinator; do
+            if [ -f "$zome/Cargo.toml" ]; then
+              cargo build --release --target wasm32-unknown-unknown --manifest-path "$zome/Cargo.toml"
+            fi
+          done
+        working-directory: mycelix-identity
+
+      - name: Pack Identity DNA
+        run: hc dna pack dna/ -o dna/mycelix_identity_dna.dna
+        working-directory: mycelix-identity
+
+      - name: Run Identity sweettests
+        run: cargo test --release --test sweettest_integration -- --ignored --test-threads=1
+        working-directory: mycelix-identity/tests
+        continue-on-error: true
+        env:
+          RUST_LOG: warn
+
+  # ── Governance Sweettests ──────────────────────────────────────
+  governance-sweettest:
+    name: Governance Sweettests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Install Holochain tools
+        run: |
+          nix profile install nixpkgs#holochain
+          which hc && hc --version || echo "hc not available, using cargo"
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-governance/target
+            mycelix-governance/tests/target
+          key: ${{ runner.os }}-governance-sweettest-${{ hashFiles('mycelix-governance/**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-governance-sweettest-
+
+      - name: Build Governance WASM zomes
+        run: |
+          for zome in zomes/*/integrity zomes/*/coordinator; do
+            if [ -f "$zome/Cargo.toml" ]; then
+              cargo build --release --target wasm32-unknown-unknown --manifest-path "$zome/Cargo.toml"
+            fi
+          done
+        working-directory: mycelix-governance
+
+      - name: Pack Governance DNA
+        run: hc dna pack dna/ -o dna/mycelix_governance_dna.dna
+        working-directory: mycelix-governance
+
+      - name: Run Governance sweettests
+        run: cargo test --release --test sweettest_integration -- --ignored --test-threads=1
+        working-directory: mycelix-governance/tests
+        continue-on-error: true
+        env:
+          RUST_LOG: warn
+
+  # ── Workspace Cross-hApp Sweettests ────────────────────────────
+  workspace-sweettest:
+    name: Cross-hApp Sweettests
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    timeout-minutes: 150
+    needs: [identity-sweettest, governance-sweettest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+
+      - name: Install Holochain tools
+        run: |
+          nix profile install nixpkgs#holochain
+          which hc && hc --version || echo "hc not available, using cargo"
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/tests/sweettest/target
+          key: ${{ runner.os }}-workspace-sweettest-${{ hashFiles('mycelix-workspace/tests/sweettest/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-workspace-sweettest-
+
+      - name: Build Identity WASM + DNA
+        run: |
+          for zome in zomes/*/integrity zomes/*/coordinator; do
+            [ -f "$zome/Cargo.toml" ] && cargo build --release --target wasm32-unknown-unknown --manifest-path "$zome/Cargo.toml"
+          done
+          hc dna pack dna/ -o dna/mycelix_identity_dna.dna
+        working-directory: mycelix-identity
+
+      - name: Build Governance WASM + DNA
+        run: |
+          for zome in zomes/*/integrity zomes/*/coordinator; do
+            [ -f "$zome/Cargo.toml" ] && cargo build --release --target wasm32-unknown-unknown --manifest-path "$zome/Cargo.toml"
+          done
+          hc dna pack dna/ -o dna/mycelix_governance_dna.dna
+        working-directory: mycelix-governance
+
+      - name: Run cross-hApp bridge tests
+        run: cargo test --release --test cross_happ_bridge -- --ignored --test-threads=1
+        working-directory: mycelix-workspace/tests/sweettest
+        continue-on-error: true
+        env:
+          RUST_LOG: warn
+
+      - name: Run governance workflow tests
+        run: cargo test --release --test governance_workflow -- --ignored --test-threads=1
+        working-directory: mycelix-workspace/tests/sweettest
+        continue-on-error: true
+        env:
+          RUST_LOG: warn

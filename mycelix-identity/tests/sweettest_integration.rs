@@ -1194,11 +1194,42 @@ mod mfa_tests {
         pub reason: String,
     }
 
+    /// Mirror of mfa_coordinator::OracleAttestation
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct OracleAttestation {
+        pub oracle_pubkey: String,
+        pub signature: String,
+        pub data_hash: String,
+        pub attested_at: u64,
+    }
+
+    /// Mirror of mfa_coordinator::GuardianAttestation
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct GuardianAttestation {
+        pub guardian_did: String,
+        pub signature: String,
+        pub timestamp: u64,
+    }
+
+    /// Mirror of mfa_coordinator::VerificationProof
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub enum VerificationProof {
+        Signature { signature: String, message: String },
+        WebAuthn { authenticator_data: String, client_data_hash: String, signature: String },
+        BiometricChallenge { template_hash: String, response: String, oracle_attestation: Option<OracleAttestation> },
+        GitcoinPassport { score: f64, checked_at: u64, stamps: Vec<String>, oracle_attestation: Option<OracleAttestation> },
+        VerifiableCredential { credential: String, issuer: String, credential_type: String },
+        SocialRecovery { guardian_signatures: Vec<GuardianAttestation>, threshold: u32 },
+        Knowledge { answer_hash: String },
+    }
+
     /// Mirror of mfa_coordinator::VerifyFactorInput
     #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
     pub struct VerifyFactorInput {
         pub did: String,
         pub factor_id: String,
+        pub challenge: Option<String>,
+        pub proof: Option<VerificationProof>,
     }
 
     /// Mirror of mfa_coordinator::AssuranceOutput

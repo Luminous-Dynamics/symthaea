@@ -126,6 +126,8 @@ pub struct AcademicProof {
     pub domain: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub challenge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub algorithm: Option<u16>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -314,6 +316,7 @@ fn test_proof() -> AcademicProof {
         cryptosuite: Some("eddsa-rdfc-2022".to_string()),
         domain: None,
         challenge: None,
+        algorithm: None,
     }
 }
 

@@ -56,6 +56,7 @@ coordinator:
         - name: recovery_integrity
         - name: did_registry_integrity
         - name: identity_bridge_integrity
+        - name: mfa_integrity
 
     - name: identity_bridge
       path: "../target/wasm32-unknown-unknown/release/identity_bridge.wasm"
