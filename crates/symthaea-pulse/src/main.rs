@@ -870,7 +870,7 @@ fn main() -> Result<()> {
             moral_attractor_detected: m.ethics.moral_attractor_detected,
             in_active_rest: m.ethics.in_active_rest,
             stillness_dominance_streak: m.ethics.stillness_dominance_streak,
-            broca_quality: m.broca.quality,
+            broca_quality: 0.0, // TODO: wire broca telemetry when available on CycleMetadata
             tom_mismatch: m.tom_prediction_mismatch,
         });
         last_result = Some(result);
@@ -1023,11 +1023,11 @@ fn main() -> Result<()> {
         narrative,
         sparkline,
         integrity: IntegrityInfo {
-            attestation_passed: last.metadata.integrity.attestation_passed,
-            temporal_passed: last.metadata.integrity.temporal_passed,
-            canaries_passed: last.metadata.integrity.canaries_passed,
-            anomaly_count: last.metadata.integrity.anomaly_count,
-            has_critical: last.metadata.integrity.has_critical,
+            attestation_passed: m.integrity.attestation_passed,
+            temporal_passed: m.integrity.temporal_passed,
+            canaries_passed: m.integrity.canaries_passed,
+            anomaly_count: m.integrity.anomaly_count,
+            has_critical: m.integrity.has_critical,
             canary_count: 6,      // 6 built-in canaries
             attestation_count: 3, // safety thresholds + consciousness weights + receptor sensitivities
         },
@@ -1185,7 +1185,7 @@ fn main() -> Result<()> {
                     moral_attractor_detected: wm.ethics.moral_attractor_detected,
                     in_active_rest: wm.ethics.in_active_rest,
                     stillness_dominance_streak: wm.ethics.stillness_dominance_streak,
-                    broca_quality: wm.broca.quality,
+                    broca_quality: 0.0, // TODO: wire broca telemetry when available on CycleMetadata
                     tom_mismatch: wm.tom_prediction_mismatch,
                 });
                 watch_result = Some(result);
