@@ -2095,11 +2095,13 @@ impl CognitiveLoopService {
             // Session 15 Item 5: Attention fatigue → Broca cadence gating.
             // High fatigue → widen spacing (don't generate when attention depleted).
             // Science: Mackworth (1948) — vigilance decrement degrades production quality.
-            let fatigue_spacing_boost = if self.self_model_tier.attention_schema.fatigue > 0.6 {
-                3
-            } else {
-                0
-            };
+            let fatigue_level = self
+                .self_model_tier
+                .attention_schema
+                .as_ref()
+                .map(|a| a.fatigue_level())
+                .unwrap_or(0.0);
+            let fatigue_spacing_boost = if fatigue_level > 0.6 { 3 } else { 0 };
             let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
                 5 + fatigue_spacing_boost // more frequent when user model is inaccurate
             } else {

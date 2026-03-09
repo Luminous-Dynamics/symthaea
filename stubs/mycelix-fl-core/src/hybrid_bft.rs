@@ -45,39 +45,103 @@ pub fn hybrid_trimmed_mean(
     if contributions.is_empty() {
         return None;
     }
-    let gated: Vec<&ReputationGradient> = contributions
+    // Step 1: reputation gating
+    let gated_with_idx: Vec<(usize, &ReputationGradient)> = contributions
         .iter()
-        .filter(|c| c.reputation >= config.min_reputation)
+        .enumerate()
+        .filter(|(_, c)| c.reputation >= config.min_reputation)
         .collect();
-    let gated_count = gated.len();
+    let gated_count = gated_with_idx.len();
     if gated_count < 2 {
         return None;
     }
-    let dim = gated[0].update.gradients.len();
+    let dim = gated_with_idx[0].1.update.gradients.len();
     if dim == 0 {
         return None;
     }
-    let weights: Vec<f32> = gated
+
+    // Step 2: coordinate-wise trimming
+    let trim_count = ((gated_count as f32) * config.trim_fraction).ceil() as usize;
+    let mut trimmed_set = std::collections::HashSet::new();
+
+    for d in 0..dim {
+        let mut vals: Vec<(usize, f32, f32)> = gated_with_idx
+            .iter()
+            .map(|&(orig_idx, c)| {
+                let v = if d < c.update.gradients.len() {
+                    c.update.gradients[d]
+                } else {
+                    0.0
+                };
+                let w = c.reputation.powf(config.reputation_exponent)
+                    * (1.0 - config.reputation_outlier_weight * (1.0 - c.reputation));
+                (orig_idx, v, w)
+            })
+            .collect();
+        vals.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Trim from both ends
+        for i in 0..trim_count.min(vals.len() / 2) {
+            trimmed_set.insert(vals[i].0);
+        }
+        for i in 0..trim_count.min(vals.len() / 2) {
+            trimmed_set.insert(vals[vals.len() - 1 - i].0);
+        }
+    }
+
+    // Step 3: weighted aggregation of surviving contributions
+    let surviving: Vec<(usize, &ReputationGradient)> = gated_with_idx
         .iter()
-        .map(|c| c.reputation.powf(config.reputation_exponent))
+        .filter(|(idx, _)| !trimmed_set.contains(idx))
+        .copied()
+        .collect();
+    let surviving_count = surviving.len();
+
+    let weights: Vec<f32> = surviving
+        .iter()
+        .map(|(_, c)| c.reputation.powf(config.reputation_exponent))
         .collect();
     let total_weight: f32 = weights.iter().sum();
-    if total_weight <= 0.0 {
-        return None;
+    if total_weight <= 0.0 || surviving.is_empty() {
+        // Fall back to gated set if trimming removed everything
+        let weights: Vec<f32> = gated_with_idx
+            .iter()
+            .map(|(_, c)| c.reputation.powf(config.reputation_exponent))
+            .collect();
+        let total_weight: f32 = weights.iter().sum();
+        let mut aggregated = vec![0.0f32; dim];
+        for ((_, contrib), &weight) in gated_with_idx.iter().zip(weights.iter()) {
+            let normalized = weight / total_weight;
+            for (i, &g) in contrib.update.gradients.iter().enumerate() {
+                aggregated[i] += g * normalized;
+            }
+        }
+        return Some(HybridAggregationResult {
+            aggregated,
+            gated_count,
+            surviving_count: gated_count,
+            total_weight,
+            trimmed_indices: vec![],
+        });
     }
+
     let mut aggregated = vec![0.0f32; dim];
-    for (contrib, &weight) in gated.iter().zip(weights.iter()) {
+    for ((_, contrib), &weight) in surviving.iter().zip(weights.iter()) {
         let normalized = weight / total_weight;
         for (i, &g) in contrib.update.gradients.iter().enumerate() {
             aggregated[i] += g * normalized;
         }
     }
+
+    let mut trimmed_indices: Vec<usize> = trimmed_set.into_iter().collect();
+    trimmed_indices.sort();
+
     Some(HybridAggregationResult {
         aggregated,
         gated_count,
-        surviving_count: gated_count,
+        surviving_count,
         total_weight,
-        trimmed_indices: vec![],
+        trimmed_indices,
     })
 }
 

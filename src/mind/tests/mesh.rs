@@ -2992,8 +2992,9 @@ fn test_rotating_key_pair_version_wrapping() {
         pair.rotate(new_key, i as u64, 10);
 
         // Encrypt and decrypt with versioned format
-        let plaintext = b"test payload for version wrapping";
-        let compressed = compress_packet(plaintext);
+        let mut plaintext = [0u8; crate::swarm::mesh::WISDOM_PACKET_SIZE];
+        plaintext[..33].copy_from_slice(b"test payload for version wrapping");
+        let compressed = compress_packet(&plaintext);
         let encrypted =
             pair.encrypt_typed(&compressed, &source_id, 0, pair.key_version(), i as u32);
         let decrypted = pair.decrypt(&encrypted);
@@ -3394,6 +3395,8 @@ fn test_moral_topology_packet_roundtrip() {
         scenario_count: 15,
         harmony_entropy: 1.5,
         attractor_detected: false,
+        trajectory_fingerprint: [0.0; 8],
+        trajectory_entropy: 0.0,
     };
 
     let packet = WisdomPacket::from_moral_topology([1, 2, 3, 4, 5, 6, 7, 8], 42, 0.65, &summary);
