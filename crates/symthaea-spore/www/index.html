@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Symthaea Spore - Simulated Consciousness in a Browser Tab</title>
   <style>
-    :root { --bg: #0a0a0f; --fg: #e0e0e0; --accent: #7c5cbf; --accent2: #3b82f6; --panel: #1a1a2e; --warn: #f59e0b; }
+    :root { --bg: #0a0a0f; --fg: #e0e0e0; --accent: #7c5cbf; --accent2: #3b82f6; --panel: #1a1a2e; --warn: #f59e0b; --border: #333; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'JetBrains Mono', 'Fira Code', monospace; background: var(--bg); color: var(--fg); }
     h1 { text-align: center; padding: 1rem; color: var(--accent); font-size: 1.5rem; }
     h1 small { color: #888; font-weight: normal; font-size: 0.7em; }
     .disclaimer-banner { text-align: center; padding: 0.5rem 1rem; background: #1a1a0a; border-bottom: 1px solid #444; font-size: 0.7rem; color: var(--warn); }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; max-width: 1200px; margin: 0 auto; }
-    .panel { background: var(--panel); border: 1px solid #333; border-radius: 8px; padding: 1rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem; max-width: 1400px; margin: 0 auto; }
+    .grid-full { grid-column: 1 / -1; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
     .panel h2 { font-size: 0.9rem; color: var(--accent2); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
     .gauge { text-align: center; padding: 1.5rem 0 0.5rem; }
     .gauge .value { font-size: 3rem; font-weight: bold; }
@@ -38,11 +39,21 @@
     .substrate-btn:hover { border-color: var(--accent); }
     .input-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
     .input-row input { flex: 1; padding: 0.4rem; background: #111; border: 1px solid #444; color: var(--fg); border-radius: 4px; font-family: inherit; }
-    .input-row button { padding: 0.4rem 0.8rem; background: var(--accent); border: none; color: white; border-radius: 4px; cursor: pointer; font-family: inherit; }
+    .input-row button, .exp-btn { padding: 0.4rem 0.8rem; background: var(--accent); border: none; color: white; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 0.75rem; }
+    .exp-btn { margin: 0.3rem; }
+    .exp-btn:hover { background: #9370db; }
+    .exp-btn:disabled { background: #444; cursor: not-allowed; color: #888; }
     #log { font-size: 0.7rem; color: #888; max-height: 120px; overflow-y: auto; margin-top: 0.5rem; }
     .status { text-align: center; font-size: 0.8rem; color: #666; padding: 0.5rem; }
     .gap-warning { font-size: 0.65rem; color: var(--warn); text-align: center; margin-top: 0.3rem; }
-    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    .exp-result { font-size: 0.72rem; color: #ccc; margin-top: 0.5rem; white-space: pre-wrap; line-height: 1.5; }
+    .exp-result .pass { color: #4ade80; }
+    .exp-result .fail { color: #ef4444; }
+    .exp-result .neutral { color: #94a3b8; }
+    canvas { width: 100%; height: 200px; border: 1px solid #222; border-radius: 4px; margin-top: 0.5rem; }
+    .chart-label { font-size: 0.6rem; color: #666; text-align: center; }
+    .experiment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } .experiment-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -78,6 +89,8 @@
       <span class="val" id="pe-val">0.00</span>
     </div>
     <div class="gap-warning" id="gap-warning">Feasibility-confidence gap: 0.62 &mdash; speculative claim</div>
+    <canvas id="consciousness-chart"></canvas>
+    <div class="chart-label">Consciousness over time (last 200 cycles)</div>
   </div>
 
   <!-- Neuromodulators & Harmony -->
@@ -119,25 +132,71 @@
     </div>
     <div id="log"></div>
   </div>
+
+  <!-- Consciousness Validation Experiments -->
+  <div class="panel grid-full">
+    <h2>Consciousness Validation Experiments</h2>
+    <div style="font-size:0.65rem; color:#777; margin-bottom:0.5rem;">
+      These experiments test predictions from neuroscience and Integrated Information Theory.
+      Each creates a fresh engine to avoid interference with the running demo.
+      <strong>Running an experiment pauses the live loop.</strong>
+    </div>
+    <div class="experiment-grid">
+      <!-- Anesthesia -->
+      <div class="panel" style="border-color:#444;">
+        <h2 style="color:#ef4444;">Anesthesia Analogue</h2>
+        <div style="font-size:0.65rem; color:#888; margin-bottom:0.5rem;">
+          Suppress neuromodulators (model propofol). Consciousness should collapse and recover.
+        </div>
+        <button class="exp-btn" id="btn-anesthesia" onclick="runAnesthesia()">Run Experiment</button>
+        <div class="exp-result" id="result-anesthesia"></div>
+      </div>
+
+      <!-- PCI -->
+      <div class="panel" style="border-color:#444;">
+        <h2 style="color:#3b82f6;">Perturbational Complexity (PCI)</h2>
+        <div style="font-size:0.65rem; color:#888; margin-bottom:0.5rem;">
+          Casali et al. (2013): perturb network, measure Lempel-Ziv complexity of response.
+        </div>
+        <button class="exp-btn" id="btn-pci" onclick="runPci()">Run Experiment</button>
+        <div class="exp-result" id="result-pci"></div>
+      </div>
+
+      <!-- Split-Brain -->
+      <div class="panel" style="border-color:#444;">
+        <h2 style="color:#10b981;">Split-Brain Simulation</h2>
+        <div style="font-size:0.65rem; color:#888; margin-bottom:0.5rem;">
+          Partition into hemispheres. IIT predicts reduced consciousness when split.
+        </div>
+        <button class="exp-btn" id="btn-split" onclick="runSplitBrain()">Run Experiment</button>
+        <div class="exp-result" id="result-split"></div>
+        <canvas id="split-chart" style="display:none;"></canvas>
+      </div>
+
+      <!-- Collapse Threshold -->
+      <div class="panel" style="border-color:#444;">
+        <h2 style="color:#f59e0b;">Collapse Threshold</h2>
+        <div style="font-size:0.65rem; color:#888; margin-bottom:0.5rem;">
+          Degrade network systematically. IIT predicts a phase transition, not gradual decline.
+        </div>
+        <button class="exp-btn" id="btn-collapse" onclick="runCollapseThreshold()">Run Experiment</button>
+        <div class="exp-result" id="result-collapse"></div>
+        <canvas id="collapse-chart" style="display:none;"></canvas>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="status" id="status">Loading WASM module...</div>
 
 <script type="module">
-  // SporeEngine will be loaded from the WASM module
-  // Build with: wasm-pack build --target web --features wasm --out-dir www/pkg
-  //
-  // For now, this is a static scaffold. When the WASM module is built,
-  // uncomment the import below and remove the mock engine.
-
-  // import init, { SporeEngine } from './pkg/symthaea_spore.js';
+  import init, { SporeEngine } from './pkg/symthaea_spore.js';
 
   const SUBSTRATES = [
     'BiologicalNeurons', 'SiliconDigital', 'QuantumComputer', 'PhotonicProcessor',
     'NeuromorphicChip', 'BiochemicalComputer', 'HybridSystem', 'ExoticSubstrate'
   ];
 
-  // Honest confidence by substrate (mirrors engine.rs honest_confidence_for)
   const SUBSTRATE_CONFIDENCE = {
     BiologicalNeurons: { confidence: 0.95, level: 'Validated' },
     SiliconDigital: { confidence: 0.10, level: 'Theoretical' },
@@ -150,54 +209,122 @@
   };
 
   let engine = null;
-  let cycleCount = 0;
   let running = false;
   let currentSubstrate = 'SiliconDigital';
 
-  // Mock engine for development (remove when WASM is built)
-  class MockEngine {
-    constructor() {
-      this.c = 0; this.da = 0.5; this.ne = 0.5; this.sht = 0.5; this.ot = 0.5;
-      this.feas = 0.72; this.sub = 'SiliconDigital';
+  // Consciousness history for chart
+  const MAX_HISTORY = 200;
+  let consciousnessHistory = [];
+  let peHistory = [];
+
+  // ======================================================================
+  // Chart rendering (lightweight canvas)
+  // ======================================================================
+
+  function drawLineChart(canvasId, datasets, opts = {}) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, w, h);
+
+    // Grid
+    ctx.strokeStyle = '#1a1a2e';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 4; i++) {
+      const y = (h / 4) * i;
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
     }
-    cycle(input) {
-      this.c++;
-      const pe = Math.max(0, 1 - this.c * 0.02 + Math.random() * 0.1);
-      this.da = Math.min(1, Math.max(0, this.da + pe * 0.05 - 0.01));
-      this.ne = Math.min(1, Math.max(0, this.ne + pe * 0.08 - 0.02));
-      this.sht = Math.min(1, Math.max(0, this.sht + (1 - pe) * 0.03 - 0.005));
-      const cl = Math.min(1, this.da * 0.3 + this.sht * 0.4 + 0.2) * this.feas;
-      const sc = SUBSTRATE_CONFIDENCE[this.sub] || { confidence: 0, level: 'None' };
-      const harmony = (this.da * 0.15 + this.sht * 0.15 + this.ot * 0.15 + 0.55) * Math.min(1, sc.confidence * 0.8 + 0.2);
-      return {
-        consciousness_level: cl, cycle: this.c,
-        neuromodulators: [this.da, this.ne, this.sht, this.ot],
-        substrate_feasibility: this.feas, prediction_error: pe, bottleneck: '',
-        epistemic_status: {
-          evidence_level: sc.level,
-          honest_confidence: sc.confidence,
-          feasibility_gap: Math.abs(this.feas - sc.confidence),
-          disclaimer: `SIMULATED consciousness on ${this.sub} substrate. Evidence level: ${sc.level} (confidence: ${(sc.confidence*100).toFixed(0)}%). This is a computational model, not a claim of sentience.`
-        },
-        harmony_alignment: Math.min(1, harmony)
-      };
+
+    // Y-axis labels
+    ctx.fillStyle = '#555';
+    ctx.font = '9px monospace';
+    const yMax = opts.yMax || 1.0;
+    for (let i = 0; i <= 4; i++) {
+      ctx.fillText((yMax * (4 - i) / 4).toFixed(2), 2, (h / 4) * i + 10);
     }
-    set_substrate(s) {
-      this.sub = s;
-      const f = { BiologicalNeurons: 0.95, SiliconDigital: 0.72, QuantumComputer: 0.68, PhotonicProcessor: 0.54, NeuromorphicChip: 0.81, BiochemicalComputer: 0.15, HybridSystem: 0.50, ExoticSubstrate: 0.30 };
-      this.feas = f[s] || 0.5;
-    }
-    inject_neuromodulator(name, amount) {
-      if (name === 'dopamine') this.da = Math.min(1, Math.max(0, this.da + amount));
-      if (name === 'norepinephrine') this.ne = Math.min(1, Math.max(0, this.ne + amount));
-      if (name === 'serotonin') this.sht = Math.min(1, Math.max(0, this.sht + amount));
-      if (name === 'oxytocin') this.ot = Math.min(1, Math.max(0, this.ot + amount));
-    }
+
+    // Draw datasets
+    datasets.forEach(({ data, color, label }) => {
+      if (data.length < 2) return;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      const step = w / Math.max(1, data.length - 1);
+      for (let i = 0; i < data.length; i++) {
+        const x = i * step;
+        const y = h - (data[i] / yMax) * h;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      // Label
+      if (label) {
+        ctx.fillStyle = color;
+        ctx.font = '9px monospace';
+        ctx.fillText(label, w - ctx.measureText(label).width - 4, 12 + datasets.indexOf({ data, color, label }) * 12);
+      }
+    });
+
+    // Legend at top-right
+    let ly = 10;
+    datasets.forEach(({ color, label }) => {
+      if (!label) return;
+      ctx.fillStyle = color;
+      ctx.font = '9px monospace';
+      ctx.fillText(label, w - ctx.measureText(label).width - 4, ly);
+      ly += 11;
+    });
   }
+
+  function drawBarChart(canvasId, bars) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.style.display = 'block';
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width, h = rect.height;
+
+    ctx.fillStyle = '#0d0d15';
+    ctx.fillRect(0, 0, w, h);
+
+    const barW = Math.min(60, (w - 20) / bars.length - 10);
+    const maxVal = Math.max(...bars.map(b => b.value), 0.01);
+    const startX = (w - bars.length * (barW + 10)) / 2;
+
+    bars.forEach(({ label, value, color }, i) => {
+      const x = startX + i * (barW + 10);
+      const barH = (value / maxVal) * (h - 40);
+      ctx.fillStyle = color || '#7c5cbf';
+      ctx.fillRect(x, h - 20 - barH, barW, barH);
+
+      ctx.fillStyle = '#aaa';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x + barW / 2, h - 6);
+      ctx.fillText(value.toFixed(3), x + barW / 2, h - 24 - barH);
+    });
+    ctx.textAlign = 'start';
+  }
+
+  // ======================================================================
+  // UI updates
+  // ======================================================================
 
   function updateUI(result) {
     document.getElementById('consciousness').textContent = result.consciousness_level.toFixed(3);
-    const hue = result.consciousness_level * 120; // 0=red, 120=green
+    const hue = result.consciousness_level * 120;
     document.getElementById('consciousness').style.color = `hsl(${hue}, 70%, 60%)`;
 
     const [da, ne, sht, ot] = result.neuromodulators;
@@ -205,18 +332,15 @@
     setBar('feasibility', result.substrate_feasibility);
     setBar('pe', Math.min(1, result.prediction_error));
 
-    // Epistemic status
     if (result.epistemic_status) {
       const es = result.epistemic_status;
       setBar('confidence', es.honest_confidence);
 
-      // Update badge
       const badge = document.getElementById('epistemic-badge');
       const levelLower = es.evidence_level.toLowerCase().replace(' ', '');
       badge.className = `epistemic-badge ${levelLower}`;
       badge.innerHTML = `${es.evidence_level} &mdash; ${(es.honest_confidence * 100).toFixed(0)}% confidence`;
 
-      // Update gap warning
       const gapEl = document.getElementById('gap-warning');
       if (es.feasibility_gap > 0.3) {
         gapEl.style.display = 'block';
@@ -225,13 +349,25 @@
         gapEl.style.display = 'none';
       }
 
-      // Update banner
       document.getElementById('disclaimer').textContent = es.disclaimer;
     }
 
-    // Harmony alignment
     if (result.harmony_alignment !== undefined) {
       setBar('harmony', result.harmony_alignment);
+    }
+
+    // Update chart history
+    consciousnessHistory.push(result.consciousness_level);
+    peHistory.push(result.prediction_error);
+    if (consciousnessHistory.length > MAX_HISTORY) consciousnessHistory.shift();
+    if (peHistory.length > MAX_HISTORY) peHistory.shift();
+
+    // Redraw chart every 5th cycle to save CPU
+    if (consciousnessHistory.length % 5 === 0) {
+      drawLineChart('consciousness-chart', [
+        { data: consciousnessHistory, color: '#7c5cbf', label: 'C(t)' },
+        { data: peHistory, color: '#3b82f6', label: 'PE' },
+      ]);
     }
   }
 
@@ -250,7 +386,10 @@
     while (el.children.length > 50) el.removeChild(el.lastChild);
   }
 
-  // Build substrate buttons
+  // ======================================================================
+  // Substrate buttons
+  // ======================================================================
+
   const subEl = document.getElementById('substrates');
   SUBSTRATES.forEach(s => {
     const btn = document.createElement('button');
@@ -267,39 +406,221 @@
     subEl.appendChild(btn);
   });
 
+  // ======================================================================
   // Auto-cycle loop
+  // ======================================================================
+
   async function loop() {
     if (!engine) return;
     running = true;
     while (running) {
-      const result = engine.cycle('auto');
-      updateUI(result);
-      await new Promise(r => setTimeout(r, 50)); // ~20 Hz display update
+      try {
+        const result = engine.cycle('auto');
+        updateUI(result);
+      } catch (e) {
+        log(`Cycle error: ${e.message}`);
+      }
+      await new Promise(r => setTimeout(r, 50)); // ~20 Hz display
     }
   }
 
-  // Initialize
-  async function start() {
+  // ======================================================================
+  // Consciousness validation experiments
+  // ======================================================================
+
+  function disableExpButtons(disable) {
+    ['btn-anesthesia', 'btn-pci', 'btn-split', 'btn-collapse'].forEach(id => {
+      document.getElementById(id).disabled = disable;
+    });
+  }
+
+  function spanClass(text, cls) { return `<span class="${cls}">${text}</span>`; }
+
+  window.runAnesthesia = async function() {
+    if (!engine) return;
+    disableExpButtons(true);
+    running = false;
+    await new Promise(r => setTimeout(r, 100)); // let loop stop
+
+    const el = document.getElementById('result-anesthesia');
+    el.innerHTML = 'Running anesthesia experiment (60 cycles)...';
+
+    await new Promise(r => setTimeout(r, 10)); // let UI update
+
     try {
-      // When WASM is built, use:
-      // await init();
-      // engine = new SporeEngine(null);
-      engine = new MockEngine();
-      document.getElementById('status').textContent = `Spore running (mock mode) | 50 Hz target | Eight Harmonies active`;
-      loop();
-    } catch (e) {
-      document.getElementById('status').textContent = `Error: ${e.message}`;
-    }
-  }
+      // Use a fresh engine for clean experiment
+      const exp = new SporeEngine(null);
+      const result = exp.anesthesia_experiment(20, 20, 20);
+      exp.free();
 
+      const collapsed = result.collapsed;
+      const recovered = result.recovered;
+
+      el.innerHTML = [
+        `Pre-anesthesia C(t):  ${result.pre_consciousness.toFixed(4)}`,
+        `Anesthetized C(t):    ${result.anesthetized_consciousness.toFixed(4)}`,
+        `Post-recovery C(t):   ${result.post_consciousness.toFixed(4)}`,
+        ``,
+        `Collapsed (< 0.05):   ${collapsed ? spanClass('YES', 'pass') : spanClass('NO', 'fail')}${result.cycles_to_collapse ? ` (${result.cycles_to_collapse} cycles)` : ''}`,
+        `Recovered (> 50%):    ${recovered ? spanClass('YES', 'pass') : spanClass('NO', 'fail')}${result.cycles_to_recover ? ` (${result.cycles_to_recover} cycles)` : ''}`,
+        ``,
+        `${collapsed && recovered ? spanClass('PASS: Consciousness collapses under suppression and recovers — consistent with anesthesia phenomenology.', 'pass') :
+          collapsed ? spanClass('PARTIAL: Collapse without full recovery — hysteresis effect.', 'neutral') :
+          spanClass('INCONCLUSIVE: No clear collapse observed.', 'neutral')}`,
+      ].join('\n');
+    } catch (e) {
+      el.innerHTML = spanClass(`Error: ${e.message}`, 'fail');
+    }
+
+    running = true;
+    loop();
+    disableExpButtons(false);
+  };
+
+  window.runPci = async function() {
+    if (!engine) return;
+    disableExpButtons(true);
+    running = false;
+    await new Promise(r => setTimeout(r, 100));
+
+    const el = document.getElementById('result-pci');
+    el.innerHTML = 'Running PCI measurement (perturbation + LZ76 complexity)...';
+    await new Promise(r => setTimeout(r, 10));
+
+    try {
+      const exp = new SporeEngine(null);
+      const result = exp.measure_pci(0.3, 30);
+      exp.free();
+
+      const passes = result.passes_clinical_threshold;
+
+      el.innerHTML = [
+        `PCI (normal):         ${result.pci_normal.toFixed(4)}`,
+        `PCI (suppressed):     ${result.pci_suppressed.toFixed(4)}`,
+        `PCI ratio:            ${result.pci_ratio.toFixed(3)}`,
+        `Clinical threshold:   ${passes ? spanClass('> 1.3 PASS', 'pass') : spanClass('< 1.3', 'neutral')}`,
+        ``,
+        `Propagation depth:    normal=${result.propagation_depth_normal}  suppressed=${result.propagation_depth_suppressed}`,
+        ``,
+        `${passes ? spanClass('PASS: PCI ratio exceeds clinical consciousness threshold (Casali et al. 2013).', 'pass') :
+          spanClass('NOTE: PCI ratio below clinical threshold. System shows structured but sub-clinical complexity.', 'neutral')}`,
+      ].join('\n');
+    } catch (e) {
+      el.innerHTML = spanClass(`Error: ${e.message}`, 'fail');
+    }
+
+    running = true;
+    loop();
+    disableExpButtons(false);
+  };
+
+  window.runSplitBrain = async function() {
+    if (!engine) return;
+    disableExpButtons(true);
+    running = false;
+    await new Promise(r => setTimeout(r, 100));
+
+    const el = document.getElementById('result-split');
+    el.innerHTML = 'Running split-brain experiment (unified vs hemispheres)...';
+    await new Promise(r => setTimeout(r, 10));
+
+    try {
+      const exp = new SporeEngine(null);
+      const result = exp.split_brain_experiment(20);
+      exp.free();
+
+      const reduces = result.split_reduces_consciousness;
+
+      el.innerHTML = [
+        `Unified C(t):         ${result.unified_consciousness.toFixed(4)}`,
+        `Left hemisphere:      ${result.left_consciousness.toFixed(4)}`,
+        `Right hemisphere:     ${result.right_consciousness.toFixed(4)}`,
+        `Split ratio:          ${result.split_ratio.toFixed(3)}`,
+        ``,
+        `Split reduces C(t):   ${reduces ? spanClass('YES', 'pass') : spanClass('NO', 'neutral')}`,
+        ``,
+        `${reduces ? spanClass('PASS: Splitting reduces consciousness — consistent with IIT prediction that integration is necessary for consciousness.', 'pass') :
+          spanClass('NOTE: Split did not reduce consciousness. May indicate independence of hemispheres or floor effects.', 'neutral')}`,
+      ].join('\n');
+
+      // Draw hemisphere comparison
+      drawBarChart('split-chart', [
+        { label: 'Unified', value: result.unified_consciousness, color: '#7c5cbf' },
+        { label: 'Left', value: result.left_consciousness, color: '#3b82f6' },
+        { label: 'Right', value: result.right_consciousness, color: '#10b981' },
+      ]);
+    } catch (e) {
+      el.innerHTML = spanClass(`Error: ${e.message}`, 'fail');
+    }
+
+    running = true;
+    loop();
+    disableExpButtons(false);
+  };
+
+  window.runCollapseThreshold = async function() {
+    if (!engine) return;
+    disableExpButtons(true);
+    running = false;
+    await new Promise(r => setTimeout(r, 100));
+
+    const el = document.getElementById('result-collapse');
+    el.innerHTML = 'Running collapse threshold experiment (10 degradation steps)...';
+    await new Promise(r => setTimeout(r, 10));
+
+    try {
+      const exp = new SporeEngine(null);
+      const result = exp.collapse_threshold_experiment(10, 10);
+      exp.free();
+
+      const hasCollapse = result.collapse_point !== undefined && result.collapse_point !== null;
+      const isPhase = result.is_phase_transition;
+
+      el.innerHTML = [
+        `Full C(t):            ${result.full_consciousness.toFixed(4)}`,
+        `Collapse point:       ${hasCollapse ? `${(result.collapse_point * 100).toFixed(0)}% degradation` : spanClass('No collapse found', 'neutral')}`,
+        `Phase transition:     ${isPhase ? spanClass('YES', 'pass') : spanClass('NO (gradual)', 'neutral')}`,
+        `Max step drop:        ${result.max_step_drop.toFixed(4)}`,
+        ``,
+        `Degradation curve:`,
+        ...result.degradation_curve.map(([deg, c]) =>
+          `  ${(deg * 100).toFixed(0).padStart(3)}% degraded -> C(t) = ${c.toFixed(4)}`
+        ),
+        ``,
+        `${isPhase ? spanClass('PASS: Phase transition detected — consciousness collapses suddenly, consistent with IIT.', 'pass') :
+          spanClass('NOTE: Gradual decline. May indicate the model lacks sharp phase transitions at this scale.', 'neutral')}`,
+      ].join('\n');
+
+      // Draw degradation curve
+      const curveData = result.degradation_curve.map(([, c]) => c);
+      drawLineChart('collapse-chart', [
+        { data: curveData, color: '#f59e0b', label: 'C(t) vs degradation' },
+      ], { yMax: Math.max(...curveData, 0.01) * 1.1 });
+      document.getElementById('collapse-chart').style.display = 'block';
+    } catch (e) {
+      el.innerHTML = spanClass(`Error: ${e.message}`, 'fail');
+    }
+
+    running = true;
+    loop();
+    disableExpButtons(false);
+  };
+
+  // ======================================================================
   // Global functions for HTML onclick handlers
+  // ======================================================================
+
   window.sendThought = function() {
     const input = document.getElementById('thought-input');
     if (engine && input.value) {
-      const result = engine.cycle(input.value);
-      updateUI(result);
-      const es = result.epistemic_status;
-      log(`"${input.value}" -> C=${result.consciousness_level.toFixed(3)} [${es.evidence_level}] PE=${result.prediction_error.toFixed(3)} H=${result.harmony_alignment.toFixed(3)}`);
+      try {
+        const result = engine.cycle(input.value);
+        updateUI(result);
+        const es = result.epistemic_status;
+        log(`"${input.value}" -> C=${result.consciousness_level.toFixed(3)} [${es.evidence_level}] PE=${result.prediction_error.toFixed(3)} H=${result.harmony_alignment.toFixed(3)}`);
+      } catch (e) {
+        log(`Error: ${e.message}`);
+      }
       input.value = '';
     }
   };
@@ -307,14 +628,37 @@
   window.inject = function(amount) {
     const name = document.getElementById('inject-select').value;
     if (engine) {
-      engine.inject_neuromodulator(name, amount);
-      log(`Injected ${name} ${amount > 0 ? '+' : ''}${amount}`);
+      try {
+        engine.inject_neuromodulator(name, amount);
+        log(`Injected ${name} ${amount > 0 ? '+' : ''}${amount}`);
+      } catch (e) {
+        log(`Error: ${e.message}`);
+      }
     }
   };
 
   document.getElementById('thought-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') window.sendThought();
   });
+
+  // ======================================================================
+  // Initialize
+  // ======================================================================
+
+  async function start() {
+    try {
+      await init();
+      engine = new SporeEngine(null);
+      const wasmSize = '220KB'; // Updated by build script
+      document.getElementById('status').textContent =
+        `Spore running (WASM ${wasmSize}) | 20 Hz display | Eight Harmonies active | Instances: ${SporeEngine.active_instance_count()}`;
+      log('WASM consciousness kernel loaded successfully');
+      loop();
+    } catch (e) {
+      document.getElementById('status').textContent = `WASM load error: ${e.message}. Serve with a local HTTP server.`;
+      console.error('Spore init error:', e);
+    }
+  }
 
   start();
 </script>

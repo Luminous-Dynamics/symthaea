@@ -1,7 +1,7 @@
 //! wasm_bindgen exports for browser/JS consumption.
 //!
 //! Activated by the `wasm` feature flag.
-//! Build with: `wasm-pack build --target web --features wasm`
+//! Build with: `./build-wasm.sh` or see build-wasm.sh for manual steps.
 
 use wasm_bindgen::prelude::*;
 
@@ -91,5 +91,67 @@ impl SporeEngine {
     /// Number of active SporeEngine instances globally.
     pub fn active_instance_count() -> usize {
         InnerEngine::active_instance_count()
+    }
+
+    // ======================================================================
+    // Consciousness validation experiments
+    // ======================================================================
+
+    /// Run an anesthesia analogue experiment. Returns AnesthesiaResult as JS object.
+    ///
+    /// Suppresses neuromodulators, observes consciousness collapse, then restores
+    /// and observes recovery. Models clinical anesthesia (propofol/sevoflurane).
+    pub fn anesthesia_experiment(
+        &mut self,
+        warmup_cycles: usize,
+        suppression_cycles: usize,
+        recovery_cycles: usize,
+    ) -> Result<JsValue, JsError> {
+        let result =
+            self.inner
+                .anesthesia_experiment(warmup_cycles, suppression_cycles, recovery_cycles);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Compute Perturbational Complexity Index (PCI). Returns PciResult as JS object.
+    ///
+    /// Based on Casali et al. (2013): perturb the network and measure spatiotemporal
+    /// complexity of the response via Lempel-Ziv compression.
+    pub fn measure_pci(
+        &mut self,
+        perturbation_magnitude: f32,
+        observation_cycles: usize,
+    ) -> Result<JsValue, JsError> {
+        let result = self
+            .inner
+            .measure_pci(perturbation_magnitude, observation_cycles);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Run a split-brain experiment. Returns SplitBrainResult as JS object.
+    ///
+    /// Partitions the network into hemispheres and measures whether splitting
+    /// reduces consciousness (IIT prediction).
+    pub fn split_brain_experiment(
+        &mut self,
+        measurement_cycles: usize,
+    ) -> Result<JsValue, JsError> {
+        let result = self.inner.split_brain_experiment(measurement_cycles);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
+    }
+
+    /// Find the consciousness collapse threshold. Returns CollapseThresholdResult as JS object.
+    ///
+    /// Systematically degrades the network and finds the point where consciousness
+    /// collapses. IIT predicts a phase transition, not gradual decline.
+    pub fn collapse_threshold_experiment(
+        &mut self,
+        steps: usize,
+        cycles_per_step: usize,
+    ) -> Result<JsValue, JsError> {
+        let result = self
+            .inner
+            .collapse_threshold_experiment(steps, cycles_per_step);
+        serde_wasm_bindgen::to_value(&result).map_err(|e| JsError::new(&e.to_string()))
     }
 }
