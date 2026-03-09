@@ -190,6 +190,17 @@ impl CognitiveLoopService {
             self.carryover.urgency.consecutive_low_error,
         );
 
+        // Session 15 Item 2: Early warning at 5+ consecutive low-coherence cycles.
+        // Mild exploration boost + confidence dampening before the hard Critical at 10.
+        // Science: Bar (2009) — moderate incoherence suggests model drift, not failure.
+        let low_coherence_early_warning = self.carryover.urgency.consecutive_low_coherence >= 5
+            && self.carryover.urgency.consecutive_low_coherence
+                <= super::super::thresholds::LOW_COHERENCE_EXPLORATION_THRESHOLD;
+        if low_coherence_early_warning {
+            self.adjust_exploration("low_coherence_early", 0.02);
+            self.scale_confidence("low_coherence_early", 0.98);
+        }
+
         // Sustained low coherence (>10 cycles) forces Critical — model needs full reprocessing.
         // Also boost exploration: if the model is persistently confused, seek novel inputs.
         // Schmidhuber (2010): curiosity-driven learning from persistent prediction failure.
@@ -404,6 +415,13 @@ impl CognitiveLoopService {
                 // Mode just changed — reset hysteresis to full
                 self.carryover.quality.hysteresis_factor = 1.0;
             }
+        }
+
+        // Session 15 Item 3: Sustained mode stability → dampen exploration.
+        // 50+ cycles in same mode → system has settled → reduce exploration pressure.
+        // Science: Friston (2010) — low free energy states require less active inference.
+        if self.carryover.urgency.mode_stability_counter > 50 {
+            self.scale_exploration("mode_stable", 0.98);
         }
 
         UrgencyResult {

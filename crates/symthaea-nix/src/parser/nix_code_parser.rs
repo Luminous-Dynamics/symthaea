@@ -288,4 +288,139 @@ mod tests {
         let parser = NixCodeParser::new();
         assert_eq!(parser.file_extensions(), &["nix"]);
     }
+
+    #[test]
+    fn test_language_name() {
+        let parser = NixCodeParser::new();
+        assert_eq!(parser.language_name(), "nix");
+    }
+
+    #[test]
+    fn test_parse_empty_module() {
+        let mut parser = NixCodeParser::new();
+        let result = parser.parse("{ ... }: { }");
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+        assert_eq!(parsed.language, "nix");
+    }
+
+    #[test]
+    fn test_parse_error_returns_diagnostic() {
+        let mut parser = NixCodeParser::new();
+        // Totally broken syntax — just a bare equals
+        let result = parser.parse("= = = ;");
+        // NixParser may or may not error on this; if it errors, the diagnostic should have a message
+        if let Err(diag) = result {
+            assert!(!diag.message.is_empty());
+            assert!(matches!(diag.severity, DiagnosticSeverity::Error));
+        }
+    }
+
+    #[test]
+    fn test_classify_enable_option() {
+        let mut parser = NixCodeParser::new();
+        let code = r#"{ ... }: { services.nginx.enable = true; }"#;
+        let parsed = parser.parse(code).unwrap();
+        let bindings = parsed.entities_of_kind(EntityKind::Binding);
+        assert!(
+            !bindings.is_empty(),
+            "enable options should be classified as Binding"
+        );
+    }
+
+    #[test]
+    fn test_classify_non_enable_binding() {
+        let mut parser = NixCodeParser::new();
+        let code = r#"{ ... }: { services.nginx.package = "nginx"; }"#;
+        let parsed = parser.parse(code).unwrap();
+        // services.* paths should be classified as Binding
+        let bindings = parsed.entities_of_kind(EntityKind::Binding);
+        assert!(
+            !bindings.is_empty(),
+            "services.* paths should be classified as Binding"
+        );
+    }
+
+    #[test]
+    fn test_flake_structure_detection() {
+        let mut parser = NixCodeParser::new();
+        let code = r#"
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+  outputs = { self, nixpkgs, ... }: { };
+}
+"#;
+        let parsed = parser.parse(code).unwrap();
+        // Should detect flake structure and add a Module entity
+        let modules = parsed.entities_of_kind(EntityKind::Module);
+        // Source contains both "inputs" and "outputs" → should produce a flake module entity
+        let flake_module = modules.iter().find(|e| e.name == "flake");
+        assert!(
+            flake_module.is_some(),
+            "Should detect flake structure as Module"
+        );
+    }
+
+    #[test]
+    fn test_non_flake_no_module_entity() {
+        let mut parser = NixCodeParser::new();
+        let code = r#"{ pkgs, ... }: { services.nginx.enable = true; }"#;
+        let parsed = parser.parse(code).unwrap();
+        let modules = parsed.entities_of_kind(EntityKind::Module);
+        let flake_module = modules.iter().find(|e| e.name == "flake");
+        assert!(
+            flake_module.is_none(),
+            "Non-flake code should not produce flake module"
+        );
+    }
+
+    #[test]
+    fn test_detect_diagnostics_missing_semicolon() {
+        let parser = NixCodeParser::new();
+        let parsed = ParsedCode::new("  foo = bar\n  baz = 1;", "nix");
+        let diags = parser.detect_diagnostics(&parsed);
+        assert!(
+            !diags.is_empty(),
+            "Should detect missing semicolon on 'foo = bar'"
+        );
+        assert!(diags[0].message.contains("semicolon"));
+    }
+
+    #[test]
+    fn test_detect_diagnostics_clean_code() {
+        let parser = NixCodeParser::new();
+        let parsed = ParsedCode::new("  foo = bar;", "nix");
+        let diags = parser.detect_diagnostics(&parsed);
+        assert!(
+            diags.is_empty(),
+            "Clean code should have no diagnostics, got {:?}",
+            diags
+        );
+    }
+
+    #[test]
+    fn test_flake_input_entity_kind() {
+        let mut parser = NixCodeParser::new();
+        let code = r#"
+{
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs";
+  outputs = { self, nixpkgs }: { };
+}
+"#;
+        let parsed = parser.parse(code).unwrap();
+        let flake_inputs = parsed.entities_of_kind(EntityKind::FlakeInput);
+        assert!(
+            !flake_inputs.is_empty(),
+            "inputs.* paths should produce FlakeInput entities"
+        );
+    }
+
+    #[test]
+    fn test_extract_entities_returns_same() {
+        let mut parser = NixCodeParser::new();
+        let code = r#"{ ... }: { services.nginx.enable = true; }"#;
+        let parsed = parser.parse(code).unwrap();
+        let extracted = parser.extract_entities(&parsed);
+        assert_eq!(extracted.len(), parsed.entities.len());
+    }
 }

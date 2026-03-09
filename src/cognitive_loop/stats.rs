@@ -169,6 +169,9 @@ pub struct LoopStats {
     /// Unified Φ from the unification engine
     pub unified_psi: f32,
 
+    /// EMA of unified Φ for trend detection
+    pub avg_psi: f32,
+
     /// Unified emotional valence (VAD-based, from EmotionalBridge)
     pub unified_emotional_valence: f32,
 

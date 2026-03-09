@@ -400,6 +400,7 @@ impl CognitiveLoopService {
         };
 
         let enable_user_state = config.enable_user_state_inference;
+        let enable_coherence_field = config.enable_coherence_field;
         #[cfg(feature = "nurture")]
         let enable_nurture_attachment = config.enable_nurture_attachment;
         let enable_resonator_recall = config.enable_resonator_recall;
@@ -731,6 +732,11 @@ impl CognitiveLoopService {
             } else {
                 None
             },
+            coherence_field: if enable_coherence_field {
+                Some(crate::physiology::CoherenceField::new())
+            } else {
+                None
+            },
             virtual_body,
             #[cfg(feature = "nurture")]
             nurture_attachment: if enable_nurture_attachment {
@@ -909,6 +915,22 @@ impl CognitiveLoopService {
                     1.0, // glutamate
                     1.0, // adenosine
                     1.0, // endocannabinoid
+                ]);
+                // Register moral topology constants for tamper detection.
+                // MORAL_DIM and harmony basis structure — distorting these
+                // silently corrupts all moral evaluations.
+                im.register_moral_topology_constants(&[
+                    crate::hdc::moral_algebra::MORAL_DIM as f32,
+                    symthaea_types::N_HARMONIES as f32,
+                    // Harmony interaction constants (8 × weight 0.125 = normalized)
+                    0.125,
+                    0.125,
+                    0.125,
+                    0.125,
+                    0.125,
+                    0.125,
+                    0.125,
+                    0.125,
                 ]);
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);

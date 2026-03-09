@@ -10,7 +10,7 @@
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
 use super::gate::{safety_gate, SafetyGateResult};
-use symthaea_physics::grid::{GridOutput, GridSafetyLevel};
+use symthaea_physics::grid::{GridFepAction, GridOutput, GridSafetyLevel};
 
 /// Adapter that translates Grid Digital Twin outputs into Safety Agent inputs.
 pub struct GridSafetyAdapter {

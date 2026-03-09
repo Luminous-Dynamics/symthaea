@@ -49,6 +49,35 @@ impl CognitiveLoopService {
                 self.config.cfc_config.delta_t,
                 is_night,
             );
+            // Live verification: re-hash safety thresholds from current const values
+            // (catches binary patching that the frozen-copy attestation might miss
+            //  if the patching happened after initial registration)
+            let live_hash = crate::integrity::attestation::blake3_hash_f32_slice(&[
+                super::thresholds::MORAL_CONCERN_THRESHOLD,
+                super::thresholds::MORAL_BENEFIT_THRESHOLD,
+                super::thresholds::MORAL_CONCERN_EXPLORATION_DAMPEN,
+                super::thresholds::MORAL_CONCERN_PAUSE_BOOST,
+                super::thresholds::MORAL_BENEFIT_CONFIDENCE_BOOST,
+            ]);
+            if let Some(failure) = self
+                .integrity_manager
+                .verify_live_thresholds("safety_thresholds", live_hash)
+            {
+                tracing::error!(
+                    target: "cognitive_loop::integrity",
+                    "{failure}"
+                );
+                self.integrity_manager.status.attestation_passed = false;
+                self.integrity_manager
+                    .status
+                    .anomalies
+                    .push(crate::integrity::IntegrityAnomaly {
+                        source: "live_attestation",
+                        description: failure,
+                        detected_at: std::time::Instant::now(),
+                        severity: crate::integrity::AnomalySeverity::Critical,
+                    });
+            }
             // Escalate critical integrity anomalies to safety telemetry
             if self.integrity_manager.has_critical_anomaly() {
                 tracing::error!(
@@ -68,6 +97,17 @@ impl CognitiveLoopService {
         // Science: adaptive UI via inferred cognitive state (Ritter et al. 2019)
         if let Some(ref mut usi) = self.user_state {
             usi.process(input, false);
+            let state = usi.state();
+            // Frustration → dampen exploration (noisy signals, don't overfit to errors)
+            // Flow → boost exploration (user engaged, safe to explore)
+            // Science: Yerkes-Dodson (1908) — moderate arousal optimal for learning
+            if state.frustration > 0.5 {
+                self.carryover.quality.last_exploration_bonus *=
+                    1.0 - 0.3 * (state.frustration - 0.5) as f32;
+            }
+            if state.is_in_flow() {
+                self.carryover.quality.last_exploration_bonus += 0.05;
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -85,6 +125,14 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════
         let mut dynamics =
             self.phase_dynamics(input, &perception, cycle_start, &mut module_timings);
+
+        // Coherence field: apply hormone modulation from neuromod bath
+        // Science: McEwen (2007) — allostatic load shapes integration capacity
+        if let Some(ref mut cf) = self.coherence_field {
+            use super::neuromodulators::NeuromodulatorBathExt;
+            let hormones = self.neuromod.bath.to_hormone_state();
+            cf.apply_hormone_modulation(&hormones);
+        }
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 3: FEEDBACK

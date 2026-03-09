@@ -1012,6 +1012,69 @@ pub struct CycleMetadata {
     /// Whether sustained high quality maintained exploration floor.
     #[serde(default)]
     pub quality_exploration_floor: bool,
+
+    // ── Session 15: Feedback Loop Observability ─────────────────────────
+    /// Moral salience easing applied to consolidation threshold (0.0 when inactive).
+    #[serde(default)]
+    pub moral_consolidation_ease: f32,
+    /// Effective consolidation threshold (consciousness EMA - margin - moral ease).
+    #[serde(default)]
+    pub consolidation_threshold: f32,
+    /// Whether MCE bottleneck LR boost was applied this cycle.
+    #[serde(default)]
+    pub mce_bottleneck_lr_applied: bool,
+    /// Whether homeostasis recalibration adjusted LR (overcorrect or sluggish).
+    #[serde(default)]
+    pub homeostasis_recalibrated: bool,
+    /// Whether falling confidence boosted LR.
+    #[serde(default)]
+    pub confidence_falling_lr_boost: bool,
+    /// Whether coherence velocity scaled attention budget.
+    #[serde(default)]
+    pub coherence_velocity_budget_scaled: bool,
+    /// Whether temporal chain depth modulated LR (deep=dampen, shallow=boost).
+    #[serde(default)]
+    pub temporal_chain_depth_lr_mod: bool,
+    /// Whether EqV2 bottleneck response fired a targeted boost.
+    #[serde(default)]
+    pub eq_v2_bottleneck_response: bool,
+
+    // ── Session 14: Late Consciousness Feedback ──────────────────────────
+    /// Whether living mind vitality modulated confidence.
+    #[serde(default)]
+    pub living_mind_vitality_feedback: bool,
+    /// Whether low meta-cognitive accuracy dampened subsystem LR.
+    #[serde(default)]
+    pub metacog_low_accuracy_dampen: bool,
+    /// Whether predictive self-safety boosted LR.
+    #[serde(default)]
+    pub self_safety_lr_boost: bool,
+    /// Whether embodied agency stable range boosted confidence.
+    #[serde(default)]
+    pub embodied_agency_stable: bool,
+
+    // ── Session 15: Bidirectional Feedback & Dead State Revival ──────────
+    /// Whether pipeline consciousness modulated epistemic threshold.
+    #[serde(default)]
+    pub pipeline_consciousness_gated: bool,
+    /// Whether early low-coherence warning fired (5-10 cycles).
+    #[serde(default)]
+    pub low_coherence_early_warning: bool,
+    /// Whether sustained mode stability dampened exploration.
+    #[serde(default)]
+    pub mode_stable_exploration_dampen: bool,
+    /// Whether confidence crash relaxed binding threshold.
+    #[serde(default)]
+    pub crash_binding_relaxed: bool,
+    /// Whether attention fatigue widened Broca cadence spacing.
+    #[serde(default)]
+    pub attention_fatigue_broca_gated: bool,
+    /// Whether sustained low resonator error gave extra confidence boost.
+    #[serde(default)]
+    pub resonator_sustained_low_boost: bool,
+    /// Whether anomaly recovery was accelerated by improving Phi.
+    #[serde(default)]
+    pub anomaly_recovery_phi_accelerated: bool,
 }
 
 fn default_response_profile() -> String {

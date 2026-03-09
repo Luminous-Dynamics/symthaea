@@ -1441,6 +1441,92 @@ impl CodeGenerator {
 
         emitter.emit_from_spec(spec, plan)
     }
+
+    /// Attempt automatic repair of generated Rust code based on compiler error output.
+    ///
+    /// Uses `diagnose_compile_error` to identify the error category, then applies
+    /// targeted source-level fixes. Returns `Some(fixed_source)` if a fix was applied.
+    pub fn try_auto_fix(&self, source: &str, stderr: &str) -> Option<String> {
+        let fixes = diagnose_compile_error(stderr);
+        if fixes.is_empty() {
+            return None;
+        }
+
+        let mut fixed = source.to_string();
+        let mut applied = false;
+
+        for fix in &fixes {
+            match fix.category {
+                "type_inference" => {
+                    // Add turbofish to bare .parse() calls
+                    if fixed.contains(".parse()") && !fixed.contains(".parse::<") {
+                        // Try to infer type from context: look for -> Type or : Type
+                        if let Some(ret) = Self::extract_return_type_from_source(&fixed) {
+                            fixed = fixed.replace(".parse()", &format!(".parse::<{}>()", ret));
+                            applied = true;
+                        }
+                    }
+                }
+                "wrong_method" => {
+                    // .dedup() on iterator → restructure to Vec method
+                    if stderr.contains("dedup") && fixed.contains(".dedup()") {
+                        // Check if dedup is chained on an iterator (not on a Vec binding)
+                        if fixed.contains(".iter()") && fixed.contains(".dedup()") {
+                            // Cannot auto-fix complex chains — flag for regeneration
+                        }
+                    }
+                }
+                "type_mismatch" => {
+                    // &T vs T: add .copied() or .cloned() before .collect()
+                    if stderr.contains("expected") && fixed.contains(".iter()") {
+                        if !fixed.contains(".cloned()") && !fixed.contains(".copied()") {
+                            fixed =
+                                fixed.replace(".iter().collect()", ".iter().cloned().collect()");
+                            fixed = fixed.replace(
+                                ".iter().enumerate().collect()",
+                                ".into_iter().enumerate().collect()",
+                            );
+                            fixed = fixed.replace(".iter().zip(", ".into_iter().zip(");
+                            applied = true;
+                        }
+                    }
+                }
+                "empty_closure" => {
+                    // Replace empty closures |x| ) with a default
+                    if fixed.contains("|x| )") || fixed.contains("|x| /* ") {
+                        fixed = fixed.replace("|x| )", "|x| true)");
+                        applied = true;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        if applied {
+            Some(fixed)
+        } else {
+            None
+        }
+    }
+
+    /// Extract return type from generated Rust source by scanning for `-> Type {`.
+    fn extract_return_type_from_source(source: &str) -> Option<String> {
+        for line in source.lines() {
+            let trimmed = line.trim();
+            if (trimmed.starts_with("pub fn ") || trimmed.starts_with("fn "))
+                && trimmed.contains("->")
+            {
+                if let Some(arrow) = trimmed.find("->") {
+                    let after = trimmed[arrow + 2..].trim();
+                    let ret = after.trim_end_matches('{').trim();
+                    if !ret.is_empty() {
+                        return Some(ret.to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -1541,14 +1627,20 @@ mod tests {
 
     #[test]
     fn test_parsed_type_simple() {
-        assert_eq!(ParsedType::parse("i32"), ParsedType::Simple("i32".to_string()));
+        assert_eq!(
+            ParsedType::parse("i32"),
+            ParsedType::Simple("i32".to_string())
+        );
     }
 
     #[test]
     fn test_parsed_type_generic() {
         let t = ParsedType::parse("Vec<i32>");
         match t {
-            ParsedType::Generic { ref base, ref params } => {
+            ParsedType::Generic {
+                ref base,
+                ref params,
+            } => {
                 assert_eq!(base, "Vec");
                 assert_eq!(params.len(), 1);
                 assert_eq!(params[0], ParsedType::Simple("i32".to_string()));
@@ -1561,7 +1653,10 @@ mod tests {
     fn test_parsed_type_nested() {
         let t = ParsedType::parse("HashMap<String, Vec<f64>>");
         match t {
-            ParsedType::Generic { ref base, ref params } => {
+            ParsedType::Generic {
+                ref base,
+                ref params,
+            } => {
                 assert_eq!(base, "HashMap");
                 assert_eq!(params.len(), 2);
                 assert!(matches!(&params[1], ParsedType::Generic { base, .. } if base == "Vec"));
@@ -1593,5 +1688,96 @@ mod tests {
 
         let fixes3 = diagnose_compile_error("all good, no errors");
         assert!(fixes3.is_empty());
+    }
+
+    #[test]
+    fn test_auto_fix_type_inference() {
+        let gen = CodeGenerator::with_default_dim();
+        let source = "pub fn parse_int(s: &str) -> i32 {\n    s.parse().unwrap_or_default()\n}";
+        let stderr = "error[E0282]: type annotations needed";
+        let fixed = gen.try_auto_fix(source, stderr);
+        assert!(fixed.is_some(), "Should auto-fix type inference");
+        let fixed = fixed.unwrap();
+        assert!(
+            fixed.contains(".parse::<i32>()"),
+            "Should add turbofish: {}",
+            fixed
+        );
+    }
+
+    #[test]
+    fn test_auto_fix_type_mismatch_iter() {
+        let gen = CodeGenerator::with_default_dim();
+        let source = "a.iter().zip(b.iter()).collect()";
+        let stderr = "error[E0308]: mismatched types\nexpected (i32, i32), found (&i32, &i32)";
+        let fixed = gen.try_auto_fix(source, stderr);
+        assert!(fixed.is_some(), "Should auto-fix iter to into_iter");
+        let fixed = fixed.unwrap();
+        assert!(
+            fixed.contains("into_iter()"),
+            "Should switch to into_iter: {}",
+            fixed
+        );
+    }
+
+    #[test]
+    fn test_auto_fix_no_fix_needed() {
+        let gen = CodeGenerator::with_default_dim();
+        let result = gen.try_auto_fix("fn good() { }", "all good");
+        assert!(result.is_none(), "Should return None when no fix needed");
+    }
+
+    #[test]
+    fn test_e2e_generate_and_validate() {
+        // End-to-end: text intent → generation → validation → distillation
+        let gen = CodeGenerator::with_default_dim();
+        let spec = CodeSpec::new("rust", "add", "Add two numbers")
+            .with_signature("fn add(a: i32, b: i32) -> i32");
+        let intent = CodeIntent::Create {
+            target: CodeTarget::new("add", EntityKind::Function).with_language("rust"),
+            spec: spec.clone(),
+        };
+
+        let result = gen.generate(&intent, &CodeContext::default());
+
+        // Generation should produce valid code
+        assert!(!result.source.is_empty(), "Should generate source");
+        assert!(
+            !result.source.contains("todo!"),
+            "Should not have todo: {}",
+            result.source
+        );
+        assert!(
+            result.source.contains("a + b"),
+            "Should have add body: {}",
+            result.source
+        );
+
+        // Type validation should be clean
+        let type_warnings = CodeGenerator::validate_types(&spec, &result.source);
+        assert!(
+            type_warnings.is_empty(),
+            "No type warnings expected: {:?}",
+            type_warnings
+        );
+
+        // Dataflow should be clean
+        if let Some(ref df) = result.dataflow {
+            assert!(
+                df.is_clean(),
+                "Dataflow should be clean: {:?}",
+                df.use_before_def
+            );
+        }
+
+        // Distillation target should be available
+        let target = gen.distillation_target(&spec, &result);
+        assert!(
+            target.is_some(),
+            "Should produce distillation target for clean native code"
+        );
+        let (_, src, quality) = target.unwrap();
+        assert!(!src.is_empty());
+        assert!(quality > 0.0, "Quality should be positive: {}", quality);
     }
 }

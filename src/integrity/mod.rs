@@ -93,6 +93,9 @@ pub struct IntegrityManager {
     /// Substrate tau factor for scaling temporal consistency tolerance.
     /// Set via `set_substrate_tau_factor()`. Default 1.0.
     substrate_tau_factor: f32,
+    /// Confidence multiplier for consciousness scores (1.0 = fully trusted,
+    /// 0.5 = drift detected, 0.1 = critical anomaly). Updated each tick.
+    pub integrity_confidence: f32,
 }
 
 /// Co-prime attestation check interval (not in the existing set: 7,11,13,19,23,47,97).
@@ -124,6 +127,7 @@ impl IntegrityManager {
             status: IntegrityStatus::default(),
             last_cycle_instant: Instant::now(),
             substrate_tau_factor: 1.0,
+            integrity_confidence: 1.0,
         }
     }
 
@@ -158,12 +162,27 @@ impl IntegrityManager {
         if full_sweep || (cycle % ATTESTATION_INTERVAL == 0 && cycle > 0) {
             let failures = self.attestation.verify_all(cycle);
             self.status.attestation_passed = failures.is_empty();
+            // Determine severity from consecutive failure streaks:
+            // 1-2 consecutive = Warning (transient drift, FP noise)
+            // 3+  consecutive = Critical (persistent corruption)
+            let max_streak = self
+                .attestation
+                .records()
+                .iter()
+                .map(|r| r.consecutive_failures)
+                .max()
+                .unwrap_or(0);
+            let severity = if max_streak >= 3 {
+                AnomalySeverity::Critical
+            } else {
+                AnomalySeverity::Warning
+            };
             for failure in failures {
                 self.status.anomalies.push(IntegrityAnomaly {
                     source: "attestation",
                     description: failure,
                     detected_at: Instant::now(),
-                    severity: AnomalySeverity::Critical,
+                    severity,
                 });
             }
         }
@@ -203,6 +222,16 @@ impl IntegrityManager {
                 severity,
             });
         }
+
+        // Compute integrity confidence for consciousness gating.
+        // Critical anomaly → 0.1 (distrust metrics), Warning only → 0.5, clean → 1.0.
+        self.integrity_confidence = if self.has_critical_anomaly() {
+            0.1
+        } else if !self.status.anomalies.is_empty() {
+            0.5
+        } else {
+            1.0
+        };
 
         &self.status
     }
@@ -260,6 +289,41 @@ impl IntegrityManager {
             Box::new(move || attestation::blake3_hash_f32_slice(&frozen)),
         );
     }
+
+    /// Register moral topology basis constants for attestation.
+    ///
+    /// These are the HDC harmony basis vector dimensions and moral algebra constants.
+    /// Tampering with these would silently distort all moral evaluations.
+    pub fn register_moral_topology_constants(&mut self, constants: &[f32]) {
+        let hash = attestation::blake3_hash_f32_slice(constants);
+        let frozen = constants.to_vec();
+        self.attestation.register(
+            "moral_topology_constants",
+            hash,
+            Box::new(move || attestation::blake3_hash_f32_slice(&frozen)),
+        );
+    }
+
+    /// Verify live safety thresholds against the registered baseline.
+    ///
+    /// Called from the cognitive cycle with current threshold values. This catches
+    /// runtime mutation (not just binary patching) because it hashes the live
+    /// values rather than a frozen copy.
+    ///
+    /// Returns `Some(failure_description)` if the live values differ from baseline.
+    pub fn verify_live_thresholds(&self, name: &str, live_hash: [u8; 32]) -> Option<String> {
+        for record in self.attestation.records() {
+            if record.name == name && record.baseline_hash != live_hash {
+                return Some(format!(
+                    "Live attestation FAILED for '{}': baseline {:x?} != live {:x?}",
+                    name,
+                    &record.baseline_hash[..8],
+                    &live_hash[..8],
+                ));
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -301,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn test_full_sweep_detects_tampering() {
+    fn test_full_sweep_detects_drift_on_first_failure() {
         let mut mgr = IntegrityManager::new();
         let baseline = attestation::blake3_hash(b"original");
         mgr.attestation.register(
@@ -309,8 +373,73 @@ mod tests {
             baseline,
             Box::new(move || attestation::blake3_hash(b"modified")),
         );
-        let status = mgr.tick(1, 0.02, true);
-        assert!(!status.attestation_passed);
+        mgr.tick(1, 0.02, true);
+        assert!(!mgr.status.attestation_passed);
+        // First failure = Warning (drift), not Critical
+        assert!(!mgr.has_critical_anomaly());
+        assert_eq!(mgr.status.anomalies.len(), 1);
+        assert_eq!(mgr.status.anomalies[0].severity, AnomalySeverity::Warning);
+    }
+
+    #[test]
+    fn test_consecutive_failures_escalate_to_critical() {
+        let mut mgr = IntegrityManager::new();
+        let baseline = attestation::blake3_hash(b"original");
+        mgr.attestation.register(
+            "tampered",
+            baseline,
+            Box::new(move || attestation::blake3_hash(b"modified")),
+        );
+        // 3 consecutive failures → escalate to Critical
+        mgr.tick(101, 0.02, false); // streak=1
+        mgr.tick(202, 0.02, false); // streak=2
+        mgr.tick(303, 0.02, false); // streak=3 → Critical
+        assert!(!mgr.status.attestation_passed);
         assert!(mgr.has_critical_anomaly());
+    }
+
+    #[test]
+    fn test_integrity_confidence_tracks_severity() {
+        let mut mgr = IntegrityManager::new();
+        // Clean state → confidence 1.0
+        mgr.tick(1, 0.02, false);
+        assert_eq!(mgr.integrity_confidence, 1.0);
+
+        // Register a tampered attestation
+        let baseline = attestation::blake3_hash(b"original");
+        mgr.attestation.register(
+            "tampered",
+            baseline,
+            Box::new(move || attestation::blake3_hash(b"modified")),
+        );
+        // First failure → Warning → confidence 0.5
+        mgr.tick(101, 0.02, false);
+        assert_eq!(mgr.integrity_confidence, 0.5);
+
+        // 3 consecutive → Critical → confidence 0.1
+        mgr.tick(202, 0.02, false);
+        mgr.tick(303, 0.02, false);
+        assert_eq!(mgr.integrity_confidence, 0.1);
+    }
+
+    #[test]
+    fn test_verify_live_thresholds_passes_when_matching() {
+        let mut mgr = IntegrityManager::new();
+        let values = [1.0f32, 2.0, 3.0];
+        mgr.register_safety_thresholds(&values);
+        let live_hash = attestation::blake3_hash_f32_slice(&values);
+        assert!(mgr
+            .verify_live_thresholds("safety_thresholds", live_hash)
+            .is_none());
+    }
+
+    #[test]
+    fn test_verify_live_thresholds_fails_when_different() {
+        let mut mgr = IntegrityManager::new();
+        mgr.register_safety_thresholds(&[1.0, 2.0, 3.0]);
+        let tampered_hash = attestation::blake3_hash_f32_slice(&[1.0, 2.0, 999.0]);
+        assert!(mgr
+            .verify_live_thresholds("safety_thresholds", tampered_hash)
+            .is_some());
     }
 }

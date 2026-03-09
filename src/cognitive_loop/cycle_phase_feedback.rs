@@ -39,10 +39,11 @@ use super::thresholds::{
     SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
     STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
     STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
-    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW,
-    TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
-    UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
-    UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TEMPORAL_CHAIN_DEEP_LR_SCALE,
+    TEMPORAL_CHAIN_DEEP_THRESHOLD, TEMPORAL_CHAIN_SHALLOW_LR_SCALE,
+    TEMPORAL_CHAIN_SHALLOW_THRESHOLD, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW, TOM_ACCURACY_SCALE,
+    TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE, UNIFIED_QUALITY_AGREEMENT_WEIGHT,
+    UNIFIED_QUALITY_ANOMALY_WEIGHT, UNIFIED_QUALITY_PREDICTION_WEIGHT,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -78,6 +79,8 @@ impl CognitiveLoopService {
             predictive_budget_gated: dynamics.attention.predictive_budget_gated,
             #[cfg(feature = "vision-manifold")]
             scene_recognized: perception.scene_recognized,
+            #[cfg(feature = "semantic-encoder")]
+            semantic_embedding: None, // TODO: wire to semantic_embedding_channel
         };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -116,6 +119,22 @@ impl CognitiveLoopService {
             let adjusted_psi = (unified_psi * scale).clamp(0.0, 1.0);
             self.unification_engine.update_psi(adjusted_psi);
             self.stats.context_phi_applied_count += 1;
+        }
+
+        // ── Temporal chain depth → LR gating ──────────────────────────────
+        // Deep causal chains need stable consolidation (dampen LR);
+        // shallow chains need rapid hypothesis testing (boost LR).
+        // Science: Zelazo (2004) — cognitive complexity demands stable representations;
+        // Gopnik (2012) — shallow causal models benefit from rapid exploration.
+        if temporal_max_chain_length >= TEMPORAL_CHAIN_DEEP_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.scale_lr("deep_causal_chain", TEMPORAL_CHAIN_DEEP_LR_SCALE);
+        } else if temporal_max_chain_length > 0
+            && temporal_max_chain_length <= TEMPORAL_CHAIN_SHALLOW_THRESHOLD
+            && self.stats.total_cycles > 15
+        {
+            self.scale_lr("shallow_causal_chain", TEMPORAL_CHAIN_SHALLOW_LR_SCALE);
         }
 
         let value_embeddings_created = consciousness_metrics.value_embeddings_created;
@@ -169,7 +188,7 @@ impl CognitiveLoopService {
         let consciousness_limiting_component = subsystem_metrics.consciousness_limiting_component;
         let affect_cons_valence = subsystem_metrics.affect_cons_valence;
         let affect_cons_arousal = subsystem_metrics.affect_cons_arousal;
-        let _pipeline_consciousness = subsystem_metrics.pipeline_consciousness;
+        let pipeline_consciousness = subsystem_metrics.pipeline_consciousness;
         let multimodal_integrated_phi = subsystem_metrics.multimodal_integrated_phi;
         let consciousness_state_label = subsystem_metrics.consciousness_state_label;
         let consciousness_state_level = subsystem_metrics.consciousness_state_level;
@@ -373,6 +392,25 @@ impl CognitiveLoopService {
                 (epistemic_gate_confidence - EPISTEMIC_TRUST_THRESHOLD) * EPISTEMIC_TRUST_SCALE;
             self.scale_threshold("epistemic_gate_trust", 1.0 - trust_factor);
         }
+
+        // Session 15 Item 1: Pipeline consciousness → epistemic caution modulation.
+        // High pipeline consciousness → relax epistemic caution (system is integrated).
+        // Low pipeline consciousness → tighten caution (subsystems aren't coherent).
+        // Science: Dehaene (2014) — global workspace ignition requires integrated processing.
+        self.carryover.quality.last_pipeline_consciousness = pipeline_consciousness;
+        let _pipeline_consciousness_gated =
+            if pipeline_consciousness > 0.7 && self.stats.total_cycles > 15 {
+                self.scale_threshold("pipeline_conscious_relax", 0.97);
+                true
+            } else if pipeline_consciousness < 0.3
+                && pipeline_consciousness > 0.0
+                && self.stats.total_cycles > 15
+            {
+                self.scale_threshold("pipeline_conscious_caution", 1.03);
+                true
+            } else {
+                false
+            };
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH
@@ -787,23 +825,27 @@ impl CognitiveLoopService {
         // bottleneck detection. Covers all 7 CoreComponents including
         // Workspace, Recursion, Integration, Knowledge (not in gradient path).
         if let Some(ref component) = consciousness_output.limiting_component {
+            use crate::cognitive_loop::thresholds::{
+                EQ_V2_INTEGRATION_CONFIDENCE_BOOST, EQ_V2_KNOWLEDGE_EXPLORATION_BOOST,
+                EQ_V2_RECURSION_LR_SCALE, EQ_V2_WORKSPACE_CONFIDENCE_BOOST,
+            };
             use crate::consciousness::consciousness_equation_v2::CoreComponent;
             match component {
                 CoreComponent::Workspace => {
                     // Low workspace → boost attention budget and GWT broadcast
-                    self.adjust_confidence("eq_v2_workspace", 0.005);
+                    self.adjust_confidence("eq_v2_workspace", EQ_V2_WORKSPACE_CONFIDENCE_BOOST);
                 }
                 CoreComponent::Recursion => {
                     // Low recursion (HOT depth) → boost meta-cognitive sensitivity
-                    self.scale_lr("eq_v2_recursion", 1.02);
+                    self.scale_lr("eq_v2_recursion", EQ_V2_RECURSION_LR_SCALE);
                 }
                 CoreComponent::Integration => {
                     // Low integration → increase coherence sensitivity
-                    self.adjust_confidence("eq_v2_integration", 0.008);
+                    self.adjust_confidence("eq_v2_integration", EQ_V2_INTEGRATION_CONFIDENCE_BOOST);
                 }
                 CoreComponent::Knowledge => {
                     // Low epistemic quality → boost exploration for information gain
-                    self.adjust_exploration("eq_v2_knowledge", 0.02);
+                    self.adjust_exploration("eq_v2_knowledge", EQ_V2_KNOWLEDGE_EXPLORATION_BOOST);
                 }
                 // Attention, Binding, Efficacy already handled by Phase 19 gradient path
                 _ => {}

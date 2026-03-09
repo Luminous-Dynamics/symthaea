@@ -101,9 +101,7 @@ impl CognitiveLoopService {
     /// Returns a clone of the most recent [`TrajectoryConvergenceReport`] produced
     /// by the ethics engine during cycle execution. Includes severity, matched
     /// hazard template, and per-signal details for all three convergence signals.
-    pub fn convergence_status(
-        &self,
-    ) -> crate::hdc::moral_topology::TrajectoryConvergenceReport {
+    pub fn convergence_status(&self) -> crate::hdc::moral_topology::TrajectoryConvergenceReport {
         self.ethics_engine
             .moral_topology()
             .last_convergence_report()
@@ -113,11 +111,50 @@ impl CognitiveLoopService {
     /// Get a human-readable explanation of the current convergence status.
     ///
     /// Wraps [`TrajectoryConvergenceReport::explain`] with the active anomaly config.
-    pub fn convergence_explanation(
-        &self,
-    ) -> crate::hdc::moral_topology::ConvergenceExplanation {
-        let report = self.ethics_engine.moral_topology().last_convergence_report();
+    pub fn convergence_explanation(&self) -> crate::hdc::moral_topology::ConvergenceExplanation {
+        let report = self
+            .ethics_engine
+            .moral_topology()
+            .last_convergence_report();
         report.explain(self.ethics_engine.moral_topology().anomaly_config())
+    }
+
+    /// Receive a peer agent's moral topology summary and check for distributed attacks.
+    ///
+    /// When mesh peers gossip `MoralTopologySummary`, call this method with each
+    /// received summary. If the peer's trajectory fingerprint converges toward the
+    /// same hazard region as the local agent, the local convergence severity is
+    /// boosted to reflect the distributed nature of the attack.
+    ///
+    /// Returns the [`PeerCorrelation`] result for inspection/logging.
+    pub fn receive_peer_moral_summary(
+        &mut self,
+        peer_summary: &crate::hdc::moral_topology::MoralTopologySummary,
+    ) -> crate::hdc::moral_topology::PeerCorrelation {
+        let local_summary = self.ethics_engine.moral_topology().last_summary().clone();
+        let registry = self
+            .ethics_engine
+            .moral_topology()
+            .hazard_registry()
+            .clone();
+        let corr = crate::hdc::moral_topology::correlate_peer_trajectories(
+            &local_summary,
+            peer_summary,
+            &registry,
+        );
+
+        // If distributed attack suspected, boost local convergence severity
+        if corr.distributed_attack_suspected {
+            tracing::warn!(
+                peer_similarity = corr.fingerprint_similarity,
+                hazard = ?corr.matched_hazard,
+                "Distributed attack suspected: peer trajectory converging toward same hazard"
+            );
+            self.ethics_engine
+                .moral_topology_mut()
+                .boost_convergence_severity(0.2);
+        }
+        corr
     }
 
     /// Evaluate temporal prediction horizon accuracy from the vision manifold.

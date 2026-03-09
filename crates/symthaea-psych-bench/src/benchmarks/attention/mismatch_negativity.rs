@@ -310,18 +310,9 @@ impl PsychBenchmark for MismatchNegativityBenchmark {
             }
         }
 
-        result.insert(
-            "detection_accuracy",
-            MetricValue::from_samples(&det_accs),
-        );
-        result.insert(
-            "false_alarm_rate",
-            MetricValue::from_samples(&fa_rates),
-        );
-        result.insert(
-            "mismatch_magnitude",
-            MetricValue::from_samples(&mm_mags),
-        );
+        result.insert("detection_accuracy", MetricValue::from_samples(&det_accs));
+        result.insert("false_alarm_rate", MetricValue::from_samples(&fa_rates));
+        result.insert("mismatch_magnitude", MetricValue::from_samples(&mm_mags));
         result.insert(
             "attentional_independence",
             MetricValue::from_samples(&att_indeps),

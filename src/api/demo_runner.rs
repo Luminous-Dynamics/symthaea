@@ -218,6 +218,14 @@ impl DemoRunner {
             moral_trajectory_convergence: m.ethics.moral_trajectory_convergence,
             moral_convergence_severity: m.ethics.moral_convergence_severity,
             moral_matched_hazard: m.ethics.moral_matched_hazard.clone(),
+            moral_convergence_explanation: {
+                let report = self.service.convergence_status();
+                if report.severity > 0.0 || report.convergence_detected {
+                    Some(self.service.convergence_explanation())
+                } else {
+                    None
+                }
+            },
             // Vision manifold telemetry (defaults, overwritten below if active)
             vision_active: false,
             vision_prediction_error: 0.0,

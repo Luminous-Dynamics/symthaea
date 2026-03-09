@@ -57,11 +57,8 @@ impl PhonemeDiscriminationBenchmark {
         let continuum: Vec<ContinuousHV> = (0..=n_steps)
             .map(|i| {
                 let t = i as f32 / n_steps as f32;
-                ContinuousHV::weighted_bundle(
-                    &[&endpoint_ba, &endpoint_pa],
-                    &[1.0 - t, t],
-                )
-                .normalize()
+                ContinuousHV::weighted_bundle(&[&endpoint_ba, &endpoint_pa], &[1.0 - t, t])
+                    .normalize()
             })
             .collect();
 
@@ -115,8 +112,7 @@ impl PhonemeDiscriminationBenchmark {
                 let stim_2 = &continuum[i + step_diff];
 
                 // Is this pair cross-boundary?
-                let crosses_boundary =
-                    (i < boundary_idx && i + step_diff >= boundary_idx)
+                let crosses_boundary = (i < boundary_idx && i + step_diff >= boundary_idx)
                     || (i >= boundary_idx && i + step_diff < boundary_idx);
 
                 // Physical difference: similarity between the two stimuli
@@ -142,8 +138,7 @@ impl PhonemeDiscriminationBenchmark {
                 };
 
                 // The stimuli ARE different (step_diff > 0), so "different" is correct
-                let evidence_different =
-                    (1.0 - physical_sim) + categorical_diff;
+                let evidence_different = (1.0 - physical_sim) + categorical_diff;
 
                 // Decision with noise
                 let n_presentations = 5;

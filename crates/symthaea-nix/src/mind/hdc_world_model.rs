@@ -421,4 +421,160 @@ mod tests {
         let result = wm2.load(&path);
         assert!(result.is_err(), "Should reject dimension mismatch");
     }
+
+    #[test]
+    fn test_ema_alpha_clamping() {
+        // Below minimum
+        let wm = HdcWorldModel::new(256).with_ema_alpha(0.0);
+        assert!((wm.ema_alpha - 0.01).abs() < 1e-6, "Should clamp to 0.01");
+
+        // Above maximum
+        let wm2 = HdcWorldModel::new(256).with_ema_alpha(5.0);
+        assert!((wm2.ema_alpha - 1.0).abs() < 1e-6, "Should clamp to 1.0");
+
+        // Within range
+        let wm3 = HdcWorldModel::new(256).with_ema_alpha(0.5);
+        assert!((wm3.ema_alpha - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_drift_no_expected_state() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim);
+        wm.observe(&ContinuousHV::random(dim, 1));
+
+        let report = wm.detect_drift(0.5);
+        assert!(!report.drifted, "No expected state → no drift");
+        assert!((report.similarity - 1.0).abs() < 1e-6);
+        assert!(report.facet_drifts.is_empty());
+    }
+
+    #[test]
+    fn test_facet_lookup_nonexistent() {
+        let wm = HdcWorldModel::new(256);
+        assert!(wm.facet("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_observe_facet_rebuilds_state() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim);
+
+        let svc = ContinuousHV::random(dim, 1);
+        let pkg = ContinuousHV::random(dim, 2);
+
+        wm.observe_facet("services", &svc);
+        let state_after_one = wm.state().clone();
+
+        wm.observe_facet("packages", &pkg);
+        let state_after_two = wm.state().clone();
+
+        // State should change after adding a second facet
+        let sim = state_after_one.similarity(&state_after_two);
+        assert!(
+            sim < 0.99,
+            "Adding a second facet should change state, sim={sim}"
+        );
+    }
+
+    #[test]
+    fn test_project_action_with_expected_state() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim);
+
+        let current = ContinuousHV::random(dim, 1);
+        let expected = ContinuousHV::random(dim, 2);
+        wm.observe(&current);
+        wm.set_expected_state(expected);
+
+        let delta = ContinuousHV::random(dim, 3);
+        let proj = wm.project_action(&delta);
+
+        // drift_improvement should be non-zero when expected state is set
+        assert!(
+            proj.drift_improvement.is_finite(),
+            "drift_improvement should be finite"
+        );
+    }
+
+    #[test]
+    fn test_project_action_no_expected_state() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim);
+        wm.observe(&ContinuousHV::random(dim, 1));
+
+        let delta = ContinuousHV::random(dim, 2);
+        let proj = wm.project_action(&delta);
+        assert!(
+            (proj.drift_improvement).abs() < 1e-6,
+            "No expected state → zero drift improvement"
+        );
+    }
+
+    #[test]
+    fn test_drift_with_facets() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim);
+
+        let expected = ContinuousHV::random(dim, 99);
+        wm.set_expected_state(expected);
+
+        wm.observe_facet("services", &ContinuousHV::random(dim, 1));
+        wm.observe_facet("packages", &ContinuousHV::random(dim, 2));
+
+        let report = wm.detect_drift(0.9);
+        // Should have per-facet drift scores
+        assert_eq!(report.facet_drifts.len(), 2);
+        for (name, sim) in &report.facet_drifts {
+            assert!(sim.is_finite(), "Facet '{name}' drift should be finite");
+        }
+    }
+
+    #[test]
+    fn test_save_nonexistent_dir() {
+        let wm = HdcWorldModel::new(256);
+        let result = wm.save(Path::new("/nonexistent/dir/model.json"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_nonexistent_file() {
+        let mut wm = HdcWorldModel::new(256);
+        let result = wm.load(Path::new("/nonexistent/model.json"));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_invalid_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.json");
+        std::fs::write(&path, "not valid json").unwrap();
+
+        let mut wm = HdcWorldModel::new(256);
+        let result = wm.load(&path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_multiple_observations_ema() {
+        let dim = 256;
+        let mut wm = HdcWorldModel::new(dim).with_ema_alpha(0.1);
+
+        let obs1 = ContinuousHV::random(dim, 1);
+        let obs2 = ContinuousHV::random(dim, 2);
+        let obs3 = ContinuousHV::random(dim, 3);
+
+        wm.observe(&obs1);
+        wm.observe(&obs2);
+        wm.observe(&obs3);
+        assert_eq!(wm.observation_count(), 3);
+
+        // With low alpha (0.1), state should still be more similar to obs1 (first/dominant)
+        let sim1 = wm.state().similarity(&obs1);
+        let sim3 = wm.state().similarity(&obs3);
+        assert!(
+            sim1 > sim3,
+            "With alpha=0.1, earlier observations should dominate: sim1={sim1}, sim3={sim3}"
+        );
+    }
 }

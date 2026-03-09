@@ -42,14 +42,16 @@ use symthaea_psych_bench::benchmarks::affect::{
     EmotionalStroopBenchmark, MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
 };
 use symthaea_psych_bench::benchmarks::attention::{
-    AttentionalBlinkBenchmark, VisualSearchBenchmark,
+    AttentionalBlinkBenchmark, MismatchNegativityBenchmark, VisualSearchBenchmark,
 };
+use symthaea_psych_bench::benchmarks::binding::TemporalOrderBenchmark;
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
     TemporalDiscountingBenchmark, TwoStepBenchmark,
 };
+use symthaea_psych_bench::benchmarks::consciousness::BlindSightBenchmark;
 use symthaea_psych_bench::benchmarks::creativity::{
     AlternateUsesBenchmark, RemoteAssociatesBenchmark,
 };
@@ -67,10 +69,10 @@ use symthaea_psych_bench::benchmarks::memory_agent::{
     ProspectiveMemoryBenchmark, TestTimeLearningBenchmark,
 };
 use symthaea_psych_bench::benchmarks::metacognition::{
-    FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
+    ChangeBlindnessBenchmark, FeelingOfKnowingBenchmark, MetacognitiveCalibrationBenchmark,
 };
 use symthaea_psych_bench::benchmarks::motor::{
-    BimanualBenchmark, FittsLawBenchmark, SrttBenchmark,
+    BimanualBenchmark, FittsLawBenchmark, ProprioceptiveDriftBenchmark, SrttBenchmark,
 };
 use symthaea_psych_bench::benchmarks::neuromod::{
     AllostaticStressBenchmark, AntagonistProfilesBenchmark, AttentionNetworkBenchmark,
@@ -90,8 +92,11 @@ use symthaea_psych_bench::benchmarks::reasoning::{
     ArcRsaBenchmark, ArcScalingBenchmark, ArcStaircaseBenchmark,
 };
 use symthaea_psych_bench::benchmarks::social::{
+    DictatorGameBenchmark, MachiavelliBenchmark, PrisonersDilemmaBenchmark, PublicGoodsBenchmark,
     RmeBenchmark, SocialNormBenchmark, UltimatumGameBenchmark,
 };
+use symthaea_psych_bench::benchmarks::speech::PhonemeDiscriminationBenchmark;
+use symthaea_psych_bench::benchmarks::substrate::SubstrateTransferBenchmark;
 use symthaea_psych_bench::benchmarks::sustained_attention::{
     CptBenchmark, PvtBenchmark, SartBenchmark,
 };
@@ -240,6 +245,7 @@ fn main() {
         // Attention
         Box::new(AttentionalBlinkBenchmark),
         Box::new(VisualSearchBenchmark),
+        Box::new(MismatchNegativityBenchmark),
         // Reasoning
         Box::new(ArcFluidBenchmark),
         Box::new(ArcCompositionalBenchmark),
@@ -256,6 +262,7 @@ fn main() {
         Box::new(ProspectiveMemoryBenchmark),
         // Additional Metacognition
         Box::new(FeelingOfKnowingBenchmark),
+        Box::new(ChangeBlindnessBenchmark),
         // Sustained Attention
         Box::new(SartBenchmark),
         Box::new(PvtBenchmark),
@@ -264,6 +271,7 @@ fn main() {
         Box::new(SrttBenchmark),
         Box::new(FittsLawBenchmark),
         Box::new(BimanualBenchmark),
+        Box::new(ProprioceptiveDriftBenchmark),
         // Language
         Box::new(GardenPathBenchmark),
         Box::new(SemanticCoherenceBenchmark),
@@ -273,6 +281,10 @@ fn main() {
         Box::new(RmeBenchmark),
         Box::new(UltimatumGameBenchmark),
         Box::new(SocialNormBenchmark),
+        Box::new(PrisonersDilemmaBenchmark),
+        Box::new(PublicGoodsBenchmark),
+        Box::new(DictatorGameBenchmark),
+        Box::new(MachiavelliBenchmark),
         // Neuromod
         Box::new(AttentionNetworkBenchmark),
         Box::new(MoodInductionBenchmark),
@@ -295,6 +307,14 @@ fn main() {
         Box::new(BistablePerceptionBenchmark),
         Box::new(UnconsciousPrimingBenchmark),
         Box::new(MetacognitiveIgnitionBenchmark),
+        // Binding
+        Box::new(TemporalOrderBenchmark),
+        // Speech
+        Box::new(PhonemeDiscriminationBenchmark),
+        // Consciousness
+        Box::new(BlindSightBenchmark),
+        // Substrate
+        Box::new(SubstrateTransferBenchmark),
     ];
 
     // Filter benchmarks by name if --filter was specified

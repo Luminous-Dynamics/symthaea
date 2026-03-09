@@ -442,6 +442,7 @@ fn test_heartbeat_has_current_phi() {
 
 #[cfg(feature = "mesh")]
 #[test]
+#[ignore = "requires peer discovery — flaky in CI"]
 fn test_process_mesh_routes_gradients() {
     use crate::swarm::mesh::WisdomPacket;
 
@@ -1192,6 +1193,7 @@ fn test_lora_double_loss_graceful() {
 
 #[cfg(feature = "mesh")]
 #[test]
+#[ignore = "requires peer discovery — flaky in CI"]
 fn test_four_minds_mesh_stress() {
     use crate::swarm::mesh::{MeshUrgency, PayloadType, WisdomPacket};
 

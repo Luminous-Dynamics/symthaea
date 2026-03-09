@@ -143,6 +143,16 @@ impl BrocaGenerator {
         }
     }
 
+    /// Create a generator with the 4K vocabulary (4,096 tokens).
+    ///
+    /// Use this for production training and deployment. The 4K vocabulary covers
+    /// common English words, morphological affixes, and consciousness-domain terms.
+    /// For unit tests, use `new()` which uses the faster minimal vocabulary (208 tokens).
+    pub fn new_4k(genesis: &GenesisSeed, config: BrocaConfig) -> Self {
+        let tokenizer = BpeTokenizer::default_4k();
+        Self::with_tokenizer(genesis, config, tokenizer)
+    }
+
     /// Create a generator with a custom tokenizer.
     pub fn with_tokenizer(
         genesis: &GenesisSeed,

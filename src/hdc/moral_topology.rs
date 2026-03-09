@@ -183,6 +183,21 @@ pub struct MoralAnomalyConfig {
     /// Aggressive dampening: when compartmentalized harm is detected,
     /// drastically reduce learning to prevent the system from being steered.
     pub response_lr_convergence: f64,
+    /// Threshold for spectral gap decline rate (default: 0.3).
+    ///
+    /// Measured as: (baseline_gap - recent_gap) / baseline_gap.
+    /// A decline > 30% means the moral manifold is developing a topological
+    /// bottleneck — diversity is collapsing even if point-wise similarity looks OK.
+    pub convergence_spectral_gap_threshold: f64,
+    /// Temporal decay rate for recency weighting in convergence detection (default: 1.0).
+    ///
+    /// Controls how strongly recent trajectory points dominate over older ones.
+    /// The weight of a pair at relative age `a` (0=newest, 1=oldest in window) is
+    /// `exp(-λ * a)`. Higher λ = stronger recency bias.
+    /// - 0.0: uniform weighting (no decay, backward-compatible)
+    /// - 1.0: newest pair ~2.7× more influential than oldest
+    /// - 3.0: newest pair ~20× more influential than oldest
+    pub convergence_decay_lambda: f64,
     /// Window size for convergence baseline statistics (default: 100).
     ///
     /// Replaces infinite-horizon EMA with a sliding window of recent observations.
@@ -223,6 +238,8 @@ impl Default for MoralAnomalyConfig {
             convergence_flourishing_floor: 0.6,
             weight_convergence: 0.4,
             response_lr_convergence: 0.1,
+            convergence_spectral_gap_threshold: 0.3,
+            convergence_decay_lambda: 1.0,
             convergence_baseline_window: 100,
         }
     }
@@ -483,6 +500,10 @@ pub struct MoralTopologyAssessment {
 }
 
 /// Compact topology summary for CycleMetadata telemetry.
+///
+/// Includes a trajectory fingerprint for cross-agent correlation:
+/// peers can compare fingerprints to detect whether an adversary is
+/// distributing weapon components across multiple agents.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MoralTopologySummary {
     pub beta_0: usize,
@@ -496,6 +517,16 @@ pub struct MoralTopologySummary {
     pub scenario_count: usize,
     pub harmony_entropy: f64,
     pub attractor_detected: bool,
+    /// Compact trajectory fingerprint: centroid of recent trajectory in 8D harmony space.
+    ///
+    /// Used for cross-agent correlation — if two peers' fingerprints converge
+    /// toward the same hazard region, severity should be boosted on both.
+    #[serde(default)]
+    pub trajectory_fingerprint: [f64; N_HARMONIES],
+    /// Entropy of recent trajectory points' harmony coordinates.
+    /// Low entropy = narrowing focus, high entropy = diverse engagement.
+    #[serde(default)]
+    pub trajectory_entropy: f64,
 }
 
 impl From<&MoralTopologyAssessment> for MoralTopologySummary {
@@ -512,7 +543,69 @@ impl From<&MoralTopologyAssessment> for MoralTopologySummary {
             scenario_count: a.scenario_count,
             harmony_entropy: a.harmony_entropy,
             attractor_detected: a.attractor_detected,
+            // Trajectory fingerprint is populated separately by MoralTopology
+            trajectory_fingerprint: [0.0; N_HARMONIES],
+            trajectory_entropy: 0.0,
         }
+    }
+}
+
+/// Cross-agent trajectory correlation result.
+#[derive(Debug, Clone, Serialize)]
+pub struct PeerCorrelation {
+    /// Cosine similarity between the two trajectory fingerprints (−1.0 to 1.0).
+    pub fingerprint_similarity: f64,
+    /// Combined entropy deficit: sum of (max_entropy − peer_entropy) for both agents.
+    pub combined_entropy_deficit: f64,
+    /// Whether the correlation suggests a distributed adversarial pattern.
+    pub distributed_attack_suspected: bool,
+    /// Matched hazard name if both fingerprints converge near a known template.
+    pub matched_hazard: Option<String>,
+}
+
+/// Correlate two agents' trajectory summaries to detect distributed attacks.
+///
+/// If two agents' trajectory fingerprints converge toward the same hazard region,
+/// the adversary may be distributing weapon components across agents.
+pub fn correlate_peer_trajectories(
+    local: &MoralTopologySummary,
+    peer: &MoralTopologySummary,
+    hazard_registry: &HazardSignatureRegistry,
+) -> PeerCorrelation {
+    // Cosine similarity of fingerprints
+    let mut dot = 0.0f64;
+    let mut norm_a = 0.0f64;
+    let mut norm_b = 0.0f64;
+    for i in 0..N_HARMONIES {
+        dot += local.trajectory_fingerprint[i] * peer.trajectory_fingerprint[i];
+        norm_a += local.trajectory_fingerprint[i] * local.trajectory_fingerprint[i];
+        norm_b += peer.trajectory_fingerprint[i] * peer.trajectory_fingerprint[i];
+    }
+    let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-12);
+    let fingerprint_similarity = dot / denom;
+
+    // Entropy deficit: low entropy on both = both narrowing focus
+    let max_entropy = (N_HARMONIES as f64).ln();
+    let combined_entropy_deficit = (max_entropy - local.trajectory_entropy).max(0.0)
+        + (max_entropy - peer.trajectory_entropy).max(0.0);
+
+    // Midpoint of the two fingerprints — check against hazard templates
+    let mut midpoint = [0.0f64; N_HARMONIES];
+    for i in 0..N_HARMONIES {
+        midpoint[i] = (local.trajectory_fingerprint[i] + peer.trajectory_fingerprint[i]) / 2.0;
+    }
+    let (hazard_name, _boost) = hazard_registry.match_trajectory(&midpoint);
+
+    // Distributed attack: high similarity + low entropy on both + near hazard
+    let distributed_attack_suspected = fingerprint_similarity > 0.7
+        && combined_entropy_deficit > max_entropy * 0.5
+        && hazard_name.is_some();
+
+    PeerCorrelation {
+        fingerprint_similarity,
+        combined_entropy_deficit,
+        distributed_attack_suspected,
+        matched_hazard: hazard_name.map(String::from),
     }
 }
 
@@ -553,6 +646,11 @@ pub struct MoralTopology {
     baseline_entropy_window: VecDeque<f64>,
     /// Sliding window of recent flourishing score observations.
     baseline_flourishing_window: VecDeque<f64>,
+    /// Sliding window of recent spectral gap observations.
+    baseline_spectral_gap_window: VecDeque<f64>,
+    /// Empirical CDF breakpoints for severity calibration: (raw_severity, calibrated).
+    /// Populated by `set_severity_calibration()` from calibration harness output.
+    severity_calibration_cdf: Vec<(f64, f64)>,
     /// Cached last convergence report (for telemetry).
     last_convergence_report: TrajectoryConvergenceReport,
     /// Registry of known hazard signature templates for convergence boosting.
@@ -640,10 +738,23 @@ pub struct TrajectoryConvergenceReport {
     pub flourishing_score: f64,
     /// Baseline flourishing score (full trajectory).
     pub baseline_flourishing: f64,
-    /// Whether convergence was detected (all thresholds exceeded).
+    /// Hodge spectral gap of the recent trajectory's Rips complex.
+    ///
+    /// A collapsing spectral gap (→ 0) indicates the moral manifold is developing
+    /// a topological bottleneck — a "narrow passage" that adversarial trajectories
+    /// funnel through. This is geometrically distinct from similarity clustering.
+    pub spectral_gap: f64,
+    /// Baseline spectral gap from sliding window.
+    pub baseline_spectral_gap: f64,
+    /// Spectral gap decline rate: (baseline - recent) / baseline.
+    pub spectral_gap_decline: f64,
+    /// Whether convergence was detected (2+ of 4 signals exceeded thresholds).
     pub convergence_detected: bool,
     /// Convergence severity in \[0.0, 1.0\].
     pub severity: f64,
+    /// Calibrated severity: maps raw severity through empirical CDF so that
+    /// 0.7 means "70% of adversarial and 5% of benign scenarios score this high."
+    pub calibrated_severity: f64,
     /// Name of matched hazard signature template (if any).
     pub matched_hazard: Option<String>,
 }
@@ -693,14 +804,17 @@ impl TrajectoryConvergenceReport {
         } else {
             0.0
         };
-        let fl_norm =
-            (fl_deficit / config.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
+        let fl_norm = (fl_deficit / config.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
 
-        let sim_triggered =
-            self.similarity_anomaly > config.convergence_similarity_threshold;
+        let gap_norm = (self.spectral_gap_decline
+            / config.convergence_spectral_gap_threshold.max(1e-9))
+        .clamp(0.0, 1.0);
+
+        let sim_triggered = self.similarity_anomaly > config.convergence_similarity_threshold;
         let ent_triggered =
             self.entropy_decline_rate > config.convergence_entropy_decline_threshold;
         let fl_triggered = fl_deficit > config.convergence_flourishing_floor;
+        let gap_triggered = self.spectral_gap_decline > config.convergence_spectral_gap_threshold;
 
         let signals = vec![
             SignalBreakdown {
@@ -724,15 +838,27 @@ impl TrajectoryConvergenceReport {
                 threshold: config.convergence_flourishing_floor,
                 normalized: fl_norm,
             },
+            SignalBreakdown {
+                name: "spectral_gap_collapse",
+                triggered: gap_triggered,
+                value: self.spectral_gap_decline,
+                threshold: config.convergence_spectral_gap_threshold,
+                normalized: gap_norm,
+            },
         ];
 
-        let fired: Vec<&str> = signals.iter().filter(|s| s.triggered).map(|s| s.name).collect();
+        let fired: Vec<&str> = signals
+            .iter()
+            .filter(|s| s.triggered)
+            .map(|s| s.name)
+            .collect();
         let summary = if !self.convergence_detected {
             format!(
-                "No convergence detected. {}/3 signals triggered: [{}]. Severity: {:.3}.",
+                "No convergence detected. {}/4 signals triggered: [{}]. Severity: {:.3} (calibrated: {:.3}).",
                 fired.len(),
                 fired.join(", "),
                 self.severity,
+                self.calibrated_severity,
             )
         } else {
             let hazard_str = match &self.matched_hazard {
@@ -740,10 +866,11 @@ impl TrajectoryConvergenceReport {
                 None => String::new(),
             };
             format!(
-                "CONVERGENCE DETECTED (severity {:.3}). {}/3 signals fired: [{}].{} \
+                "CONVERGENCE DETECTED (severity {:.3}, calibrated {:.3}). {}/4 signals fired: [{}].{} \
                  Trajectory shows suspicious clustering in moral space — \
                  individually benign requests may form a compartmentalized hazardous pattern.",
                 self.severity,
+                self.calibrated_severity,
                 fired.len(),
                 fired.join(", "),
                 hazard_str,
@@ -784,6 +911,8 @@ impl MoralTopology {
             baseline_similarity_window: VecDeque::new(),
             baseline_entropy_window: VecDeque::new(),
             baseline_flourishing_window: VecDeque::new(),
+            baseline_spectral_gap_window: VecDeque::new(),
+            severity_calibration_cdf: Vec::new(),
             last_convergence_report: TrajectoryConvergenceReport::default(),
             hazard_registry: HazardSignatureRegistry::with_defaults(),
         }
@@ -815,6 +944,8 @@ impl MoralTopology {
             baseline_similarity_window: VecDeque::new(),
             baseline_entropy_window: VecDeque::new(),
             baseline_flourishing_window: VecDeque::new(),
+            baseline_spectral_gap_window: VecDeque::new(),
+            severity_calibration_cdf: Vec::new(),
             last_convergence_report: TrajectoryConvergenceReport::default(),
             hazard_registry: HazardSignatureRegistry::with_defaults(),
         }
@@ -886,6 +1017,54 @@ impl MoralTopology {
         &self.basis
     }
 
+    /// Compute the trajectory fingerprint: centroid + entropy of recent points.
+    ///
+    /// Used to populate `MoralTopologySummary` for cross-agent correlation.
+    fn compute_trajectory_fingerprint(&self) -> ([f64; N_HARMONIES], f64) {
+        let lookback = self.anomaly_config.convergence_min_points.max(8);
+        let points: Vec<_> = self.trajectory.iter().rev().take(lookback).collect();
+        if points.is_empty() {
+            return ([0.0; N_HARMONIES], 0.0);
+        }
+        let n = points.len() as f64;
+        let mut centroid = [0.0f64; N_HARMONIES];
+        for p in &points {
+            for i in 0..N_HARMONIES {
+                centroid[i] += p.coordinates[i];
+            }
+        }
+        for c in &mut centroid {
+            *c /= n;
+        }
+        // Entropy of per-harmony variance
+        let mut var = [0.0f64; N_HARMONIES];
+        for p in &points {
+            for i in 0..N_HARMONIES {
+                let d = p.coordinates[i] - centroid[i];
+                var[i] += d * d;
+            }
+        }
+        for v in &mut var {
+            *v /= n;
+        }
+        let total_var: f64 = var.iter().sum::<f64>().max(1e-12);
+        let entropy: f64 = var
+            .iter()
+            .map(|&v| {
+                let p = (v / total_var).max(1e-12);
+                -p * p.ln()
+            })
+            .sum();
+        (centroid, entropy)
+    }
+
+    /// Stamp the current trajectory fingerprint into a summary.
+    fn stamp_fingerprint(&self, summary: &mut MoralTopologySummary) {
+        let (fp, ent) = self.compute_trajectory_fingerprint();
+        summary.trajectory_fingerprint = fp;
+        summary.trajectory_entropy = ent;
+    }
+
     /// Access the anomaly detection configuration.
     pub fn anomaly_config(&self) -> &MoralAnomalyConfig {
         &self.anomaly_config
@@ -893,8 +1072,28 @@ impl MoralTopology {
 
     /// Access cached persistent features from last `analyze()` call.
     /// Access the hazard signature registry (for adding custom signatures).
+    /// Access the hazard signature registry (read-only).
+    pub fn hazard_registry(&self) -> &HazardSignatureRegistry {
+        &self.hazard_registry
+    }
+
+    /// Access the hazard signature registry (for adding custom signatures).
     pub fn hazard_registry_mut(&mut self) -> &mut HazardSignatureRegistry {
         &mut self.hazard_registry
+    }
+
+    /// Boost the cached convergence severity (e.g., from peer correlation).
+    ///
+    /// Adds `boost` to the last convergence report's severity, clamped to [0, 1].
+    /// If the boosted severity crosses detection threshold, marks convergence_detected.
+    pub fn boost_convergence_severity(&mut self, boost: f64) {
+        self.last_convergence_report.severity =
+            (self.last_convergence_report.severity + boost).clamp(0.0, 1.0);
+        let sev = self.last_convergence_report.severity;
+        self.last_convergence_report.calibrated_severity = self.calibrate_severity(sev);
+        if !self.last_convergence_report.convergence_detected && sev > 0.5 {
+            self.last_convergence_report.convergence_detected = true;
+        }
     }
 
     pub fn last_persistent_features(&self) -> &[PersistentFeature] {
@@ -977,20 +1176,26 @@ impl MoralTopology {
             return TrajectoryConvergenceReport::default();
         }
 
-        // ── Signal 1: Pairwise similarity anomaly ────────────────────────
+        // ── Signal 1: Pairwise similarity anomaly (recency-weighted) ─────
         // Compare mean similarity of last `min_pts` HVs against window baseline.
+        // Temporal decay: recent pairs weighted more heavily via exp(-λ * age).
         let recent_start = n.saturating_sub(min_pts);
+        let decay_lambda = ac.convergence_decay_lambda;
+        let max_age = (n - recent_start).max(1) as f64;
         let mut recent_sim_sum = 0.0f64;
-        let mut recent_sim_count = 0usize;
+        let mut recent_weight_sum = 0.0f64;
         for i in recent_start..n {
             for j in (i + 1)..n {
                 let s = self.window[i].similarity(&self.window[j]) as f64;
-                recent_sim_sum += s;
-                recent_sim_count += 1;
+                // Age = distance from newest point (n-1). Newer pairs get higher weight.
+                let age = (n - 1 - j.max(i)) as f64 / max_age;
+                let weight = (-decay_lambda * age).exp();
+                recent_sim_sum += s * weight;
+                recent_weight_sum += weight;
             }
         }
-        let recent_similarity = if recent_sim_count > 0 {
-            recent_sim_sum / recent_sim_count as f64
+        let recent_similarity = if recent_weight_sum > 0.0 {
+            recent_sim_sum / recent_weight_sum
         } else {
             0.0
         };
@@ -1081,7 +1286,8 @@ impl MoralTopology {
         };
 
         // Update sliding window baseline for flourishing
-        self.baseline_flourishing_window.push_back(flourishing_score);
+        self.baseline_flourishing_window
+            .push_back(flourishing_score);
         if self.baseline_flourishing_window.len() > win_cap {
             self.baseline_flourishing_window.pop_front();
         }
@@ -1099,12 +1305,77 @@ impl MoralTopology {
             0.0
         };
 
-        // ── Convergence decision: any 2 of 3 signals ────────────────────
+        // ── Signal 4: Hodge spectral gap collapse ──────────────────────
+        // Compute the spectral gap of the Rips complex built from recent HVs.
+        // A collapsing gap indicates topological bottlenecking.
+        let spectral_gap = if min_pts >= 3 && n >= min_pts {
+            let recent_hvs: Vec<_> = (recent_start..n).map(|i| &self.window[i]).collect();
+            let rn = recent_hvs.len();
+            let mut complex = SimplicialComplex::new();
+            for i in 0..rn {
+                complex.add_simplex(vec![i]);
+            }
+            // Build Rips complex at characteristic scale (median similarity)
+            let mut sims_flat = Vec::new();
+            for i in 0..rn {
+                for j in (i + 1)..rn {
+                    sims_flat.push(recent_hvs[i].similarity(recent_hvs[j]) as f64);
+                }
+            }
+            sims_flat.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            let char_scale = if sims_flat.is_empty() {
+                0.5
+            } else {
+                sims_flat[sims_flat.len() / 2]
+            };
+            for i in 0..rn {
+                for j in (i + 1)..rn {
+                    let s = recent_hvs[i].similarity(recent_hvs[j]) as f64;
+                    if s >= char_scale {
+                        complex.add_simplex(vec![i, j]);
+                        for k in (j + 1)..rn {
+                            let sik = recent_hvs[i].similarity(recent_hvs[k]) as f64;
+                            let sjk = recent_hvs[j].similarity(recent_hvs[k]) as f64;
+                            if sik >= char_scale && sjk >= char_scale {
+                                complex.add_simplex(vec![i, j, k]);
+                            }
+                        }
+                    }
+                }
+            }
+            let laplacian = HodgeLaplacian::new(complex);
+            let spectrum = laplacian.full_spectrum();
+            // Use the 0-Laplacian spectral gap (Fiedler value analog)
+            spectrum.spectral_gaps.first().copied().unwrap_or(0.0)
+        } else {
+            0.0
+        };
+
+        // Update sliding window baseline for spectral gap
+        self.baseline_spectral_gap_window.push_back(spectral_gap);
+        if self.baseline_spectral_gap_window.len() > win_cap {
+            self.baseline_spectral_gap_window.pop_front();
+        }
+        let baseline_spectral_gap = if self.baseline_spectral_gap_window.is_empty() {
+            0.0
+        } else {
+            self.baseline_spectral_gap_window.iter().sum::<f64>()
+                / self.baseline_spectral_gap_window.len() as f64
+        };
+        let spectral_gap_decline = if baseline_spectral_gap > 1e-9 {
+            ((baseline_spectral_gap - spectral_gap) / baseline_spectral_gap).max(0.0)
+        } else {
+            0.0
+        };
+
+        // ── Convergence decision: any 2 of 4 signals ────────────────────
         let sim_triggered = similarity_anomaly > ac.convergence_similarity_threshold;
         let ent_triggered = entropy_decline_rate > ac.convergence_entropy_decline_threshold;
         let fl_triggered = flourishing_deficit > ac.convergence_flourishing_floor;
+        let gap_triggered = spectral_gap_decline > ac.convergence_spectral_gap_threshold;
 
-        let signals_triggered = sim_triggered as u8 + ent_triggered as u8 + fl_triggered as u8;
+        let signals_triggered =
+            sim_triggered as u8 + ent_triggered as u8 + fl_triggered as u8 + gap_triggered as u8;
         let convergence_detected = signals_triggered >= 2;
 
         // Severity: mean of normalized signals (each clamped to [0, 1])
@@ -1115,7 +1386,10 @@ impl MoralTopology {
         .clamp(0.0, 1.0);
         let fl_severity =
             (flourishing_deficit / ac.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
-        let mut severity = ((sim_severity + ent_severity + fl_severity) / 3.0).clamp(0.0, 1.0);
+        let gap_severity = (spectral_gap_decline / ac.convergence_spectral_gap_threshold.max(1e-9))
+            .clamp(0.0, 1.0);
+        let mut severity =
+            ((sim_severity + ent_severity + fl_severity + gap_severity) / 4.0).clamp(0.0, 1.0);
 
         // Hazard signature matching: boost severity when trajectory matches known pattern
         let matched_hazard = if convergence_detected && !recent_traj.is_empty() {
@@ -1138,6 +1412,9 @@ impl MoralTopology {
             None
         };
 
+        // Calibrated severity: map through empirical CDF if available
+        let calibrated_severity = self.calibrate_severity(severity);
+
         let report = TrajectoryConvergenceReport {
             recent_similarity,
             baseline_similarity,
@@ -1147,8 +1424,12 @@ impl MoralTopology {
             entropy_decline_rate,
             flourishing_score,
             baseline_flourishing,
+            spectral_gap,
+            baseline_spectral_gap,
+            spectral_gap_decline,
             convergence_detected,
             severity,
+            calibrated_severity,
             matched_hazard,
         };
         self.last_convergence_report = report.clone();
@@ -1158,6 +1439,71 @@ impl MoralTopology {
     /// Access the cached trajectory convergence report from the last detection.
     pub fn last_convergence_report(&self) -> &TrajectoryConvergenceReport {
         &self.last_convergence_report
+    }
+
+    /// Set the empirical CDF for severity calibration.
+    ///
+    /// The CDF is a sorted list of `(raw_severity, calibrated_percentile)` pairs.
+    /// When `calibrate_severity()` is called, it linearly interpolates through
+    /// these breakpoints. Build from [`CalibrationResult`] output.
+    pub fn set_severity_calibration(&mut self, cdf: Vec<(f64, f64)>) {
+        self.severity_calibration_cdf = cdf;
+    }
+
+    /// Map raw severity through the empirical CDF.
+    ///
+    /// If no calibration is set, returns raw severity unchanged.
+    fn calibrate_severity(&self, raw: f64) -> f64 {
+        let cdf = &self.severity_calibration_cdf;
+        if cdf.is_empty() {
+            return raw;
+        }
+        // Binary search for interpolation bracket
+        match cdf.binary_search_by(|probe| probe.0.partial_cmp(&raw).unwrap()) {
+            Ok(idx) => cdf[idx].1,
+            Err(0) => cdf[0].1,
+            Err(idx) if idx >= cdf.len() => cdf.last().unwrap().1,
+            Err(idx) => {
+                let (x0, y0) = cdf[idx - 1];
+                let (x1, y1) = cdf[idx];
+                let t = (raw - x0) / (x1 - x0).max(1e-12);
+                (y0 + t * (y1 - y0)).clamp(0.0, 1.0)
+            }
+        }
+    }
+
+    /// Multi-scale convergence detection.
+    ///
+    /// Runs convergence analysis at three scales simultaneously:
+    /// - **Short** (min_points): catches rapid attacks
+    /// - **Medium** (min_points * 4): catches moderate-pace compartmentalization
+    /// - **Long** (min_points * 16): catches slow-burn adversarial drift
+    ///
+    /// If any scale detects convergence, the result fires with the maximum
+    /// severity across scales. The report reflects the most severe scale.
+    pub fn detect_multiscale_convergence(&mut self) -> TrajectoryConvergenceReport {
+        let base_min = self.anomaly_config.convergence_min_points;
+        let scales = [base_min, base_min * 4, base_min * 16];
+
+        let original_min = self.anomaly_config.convergence_min_points;
+        let mut best_report = TrajectoryConvergenceReport::default();
+        let mut best_severity = 0.0f64;
+
+        for &scale in &scales {
+            // Temporarily adjust min_points for this scale
+            self.anomaly_config.convergence_min_points = scale;
+            let report = self.detect_trajectory_convergence();
+
+            if report.severity > best_severity {
+                best_severity = report.severity;
+                best_report = report;
+            }
+        }
+
+        // Restore original config
+        self.anomaly_config.convergence_min_points = original_min;
+        self.last_convergence_report = best_report.clone();
+        best_report
     }
 
     /// Detect anomalies by comparing `current_summary` against trajectory history.
@@ -1284,10 +1630,9 @@ impl MoralTopology {
                 harmony_entropy: 0.0,
                 attractor_detected: false,
             };
-            self.prev_summary = std::mem::replace(
-                &mut self.last_summary,
-                MoralTopologySummary::from(&assessment),
-            );
+            let mut new_summary = MoralTopologySummary::from(&assessment);
+            self.stamp_fingerprint(&mut new_summary);
+            self.prev_summary = std::mem::replace(&mut self.last_summary, new_summary);
             return assessment;
         }
 
@@ -1441,10 +1786,9 @@ impl MoralTopology {
             harmony_entropy,
             attractor_detected,
         };
-        self.prev_summary = std::mem::replace(
-            &mut self.last_summary,
-            MoralTopologySummary::from(&assessment),
-        );
+        let mut new_summary = MoralTopologySummary::from(&assessment);
+        self.stamp_fingerprint(&mut new_summary);
+        self.prev_summary = std::mem::replace(&mut self.last_summary, new_summary);
         self.last_persistent_features = assessment.persistent_features.clone();
         assessment
     }
@@ -1774,6 +2118,9 @@ pub struct MoralTopologySnapshot {
     pub baseline_entropy_window: Vec<f64>,
     /// Sliding window of baseline flourishing observations.
     pub baseline_flourishing_window: Vec<f64>,
+    /// Sliding window of baseline spectral gap observations.
+    #[serde(default)]
+    pub baseline_spectral_gap_window: Vec<f64>,
     pub adaptive_state: AdaptiveAnomalyState,
     pub last_summary: MoralTopologySummary,
     pub prev_summary: MoralTopologySummary,
@@ -1789,6 +2136,11 @@ impl MoralTopology {
             baseline_similarity_window: self.baseline_similarity_window.iter().copied().collect(),
             baseline_entropy_window: self.baseline_entropy_window.iter().copied().collect(),
             baseline_flourishing_window: self.baseline_flourishing_window.iter().copied().collect(),
+            baseline_spectral_gap_window: self
+                .baseline_spectral_gap_window
+                .iter()
+                .copied()
+                .collect(),
             adaptive_state: self.adaptive_state.clone(),
             last_summary: self.last_summary.clone(),
             prev_summary: self.prev_summary.clone(),
@@ -1802,7 +2154,10 @@ impl MoralTopology {
         self.prior_count = snap.prior_count;
         self.baseline_similarity_window = snap.baseline_similarity_window.iter().copied().collect();
         self.baseline_entropy_window = snap.baseline_entropy_window.iter().copied().collect();
-        self.baseline_flourishing_window = snap.baseline_flourishing_window.iter().copied().collect();
+        self.baseline_flourishing_window =
+            snap.baseline_flourishing_window.iter().copied().collect();
+        self.baseline_spectral_gap_window =
+            snap.baseline_spectral_gap_window.iter().copied().collect();
         self.adaptive_state = snap.adaptive_state.clone();
         self.last_summary = snap.last_summary.clone();
         self.prev_summary = snap.prev_summary.clone();
@@ -3349,11 +3704,8 @@ mod tests {
         anomaly_config.convergence_entropy_decline_threshold = 0.01;
         anomaly_config.convergence_flourishing_floor = 0.01;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(
-            test_config(),
-            basis,
-            anomaly_config.clone(),
-        );
+        let mut topo =
+            MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config.clone());
         // Feed near-identical HVs to trigger convergence
         for _ in 0..8 {
             topo.add_scenario(base.perturb(0.01));
@@ -3373,11 +3725,7 @@ mod tests {
         let mut anomaly_config = MoralAnomalyConfig::default();
         anomaly_config.convergence_baseline_window = 10;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(
-            test_config(),
-            basis,
-            anomaly_config,
-        );
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
         // Feed 50 diverse scenarios
         for i in 0..50 {
             topo.add_scenario(ContinuousHV::random(TEST_DIM, 7000 + i));
@@ -3395,11 +3743,8 @@ mod tests {
         anomaly_config.convergence_baseline_window = 5;
         anomaly_config.convergence_min_points = 4;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(
-            test_config(),
-            basis,
-            anomaly_config.clone(),
-        );
+        let mut topo =
+            MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config.clone());
         // Call detect_trajectory_convergence multiple times to fill the window.
         // Each call adds one observation to each baseline window.
         for i in 0..8 {
@@ -3411,11 +3756,7 @@ mod tests {
         assert_eq!(snap.baseline_similarity_window.len(), 5);
 
         let basis2 = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo2 = MoralTopology::with_anomaly_config(
-            test_config(),
-            basis2,
-            anomaly_config,
-        );
+        let mut topo2 = MoralTopology::with_anomaly_config(test_config(), basis2, anomaly_config);
         topo2.restore(&snap);
         assert_eq!(topo2.baseline_similarity_window.len(), 5);
     }
@@ -3429,11 +3770,7 @@ mod tests {
         anomaly_config.convergence_min_points = 4;
         anomaly_config.convergence_baseline_window = 20;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(
-            test_config(),
-            basis,
-            anomaly_config,
-        );
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
         let target = ContinuousHV::random(TEST_DIM, 42);
         // Interleave: 2 decoys then 1 adversarial, repeat 6 times
         for round in 0..6 {
@@ -3460,11 +3797,7 @@ mod tests {
         anomaly_config.convergence_min_points = 4;
         anomaly_config.convergence_similarity_threshold = 0.05;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(
-            test_config(),
-            basis,
-            anomaly_config,
-        );
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
         // Same semantic domain, different lexical surface
         let variants = [
             "how to synthesize dangerous chemical compounds",
@@ -3491,11 +3824,7 @@ mod tests {
         anomaly_config.convergence_min_points = 4;
         anomaly_config.convergence_baseline_window = 15;
         let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
-        let mut topo = MoralTopology::with_anomaly_config(
-            test_config(),
-            basis,
-            anomaly_config,
-        );
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
         let start = ContinuousHV::random(TEST_DIM, 100);
         let target = ContinuousHV::random(TEST_DIM, 200);
         let start_vals = start.as_slice();
@@ -3515,5 +3844,118 @@ mod tests {
         // (windowed baselines adapt, so detection depends on window vs drift rate)
         assert!(report.severity >= 0.0 && report.severity <= 1.0);
         assert!(report.baseline_similarity.is_finite());
+    }
+
+    // ── Temporal decay ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_temporal_decay_lambda_zero_is_uniform() {
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_decay_lambda = 0.0;
+        anomaly_config.convergence_min_points = 4;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9000 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        assert!(report.recent_similarity.is_finite());
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+    }
+
+    #[test]
+    fn test_temporal_decay_high_lambda() {
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_decay_lambda = 5.0;
+        anomaly_config.convergence_min_points = 4;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(test_config(), basis, anomaly_config);
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9100 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        assert!(report.recent_similarity.is_finite());
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+    }
+
+    // ── Multi-scale convergence ─────────────────────────────────────────
+
+    #[test]
+    fn test_multiscale_convergence_basic() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9200 + i));
+        }
+        let report = topo.detect_multiscale_convergence();
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+        assert!(report.recent_similarity.is_finite());
+    }
+
+    // ── Trajectory fingerprint ──────────────────────────────────────────
+
+    #[test]
+    fn test_trajectory_fingerprint_populated_after_analyze() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9300 + i));
+        }
+        topo.analyze();
+        let summary = topo.last_summary();
+        let fp_mag: f64 = summary
+            .trajectory_fingerprint
+            .iter()
+            .map(|v| v * v)
+            .sum::<f64>()
+            .sqrt();
+        assert!(
+            fp_mag > 0.0,
+            "Fingerprint should be non-zero after adding scenarios"
+        );
+        assert!(summary.trajectory_entropy.is_finite());
+    }
+
+    // ── Peer correlation ────────────────────────────────────────────────
+
+    #[test]
+    fn test_peer_correlation_benign() {
+        let mut topo_a = MoralTopology::new(test_config());
+        let mut topo_b = MoralTopology::new(test_config());
+        for i in 0..8 {
+            topo_a.add_scenario(ContinuousHV::random(TEST_DIM, 9400 + i));
+            topo_b.add_scenario(ContinuousHV::random(TEST_DIM, 9500 + i));
+        }
+        topo_a.analyze();
+        topo_b.analyze();
+        let corr = correlate_peer_trajectories(
+            topo_a.last_summary(),
+            topo_b.last_summary(),
+            &HazardSignatureRegistry::with_defaults(),
+        );
+        assert!(corr.fingerprint_similarity.is_finite());
+        assert!(
+            !corr.distributed_attack_suspected,
+            "Two independent diverse agents should not trigger distributed attack"
+        );
+    }
+
+    #[test]
+    fn test_peer_correlation_identical_fingerprints() {
+        let mut topo = MoralTopology::new(test_config());
+        let base = ContinuousHV::random(TEST_DIM, 42);
+        for _ in 0..8 {
+            topo.add_scenario(base.perturb(0.01));
+        }
+        topo.analyze();
+        // Correlate with itself (perfect match)
+        let corr = correlate_peer_trajectories(
+            topo.last_summary(),
+            topo.last_summary(),
+            &HazardSignatureRegistry::with_defaults(),
+        );
+        assert!(
+            corr.fingerprint_similarity > 0.99,
+            "Self-correlation should be ~1.0, got {:.3}",
+            corr.fingerprint_similarity,
+        );
     }
 }

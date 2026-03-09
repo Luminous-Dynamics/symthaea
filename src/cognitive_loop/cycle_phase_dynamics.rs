@@ -47,30 +47,32 @@ use super::thresholds::{
     CAUSAL_ATTENTION_STRENGTH_THRESHOLD, CODEBOOK_FAMILIAR_TAU_SCALE, CODEBOOK_FAMILIAR_THRESHOLD,
     CODEBOOK_NOVEL_TAU_SCALE, CODEBOOK_NOVEL_THRESHOLD, COHERENCE_CONFIDENCE_BOOST,
     COHERENCE_HIGH_THRESHOLD, COHERENCE_LOW_DAMPEN_SCALE, COHERENCE_LOW_THRESHOLD,
-    COHERENCE_PREDICTION_EMA, COHERENCE_VELOCITY_TAU_BOOST, COHERENCE_VELOCITY_TAU_DAMPEN,
-    COHERENCE_VELOCITY_TAU_THRESHOLD, CONFIDENCE_CRASH_EXPLORATION_BOOST,
-    CONFIDENCE_CRASH_FREEZE_CYCLES, CONFIDENCE_CRASH_THRESHOLD, DOMINANCE_CONFIDENCE_THRESHOLD,
-    DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE, DOMINANCE_FLOW_SCALE,
-    EPISTEMIC_EXPLORE_SCALE, EPISTEMIC_EXPLORE_THRESHOLD, EPISTEMIC_LOW_DAMPEN,
-    EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER, EPISTEMIC_OSCILLATION_THRESHOLD,
-    EPISTEMIC_SEMANTIC_BOOST_SCALE, EPISTEMIC_SEMANTIC_BOOST_THRESHOLD,
-    EPISTEMIC_SEMANTIC_CAUTION_BASE, EPISTEMIC_SEMANTIC_CAUTION_SCALE,
-    EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD, EPISTEMIC_UNCERTAINTY_DEFAULT,
-    FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD, FEP_LEARNING_PLASTICITY_THRESHOLD,
-    FEP_PRAGMATIC_EXPLOIT_THRESHOLD, FEP_PRAGMATIC_EXPLORE_THRESHOLD, FEP_SURPRISE_TAU_SCALE,
-    FEP_TD_ERROR_DISCOVERY_THRESHOLD, HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA,
-    HOMEOSTASIS_EFFICIENCY_HIGH, HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_PULL_CRITICAL,
+    COHERENCE_PREDICTION_EMA, COHERENCE_VELOCITY_BUDGET_CONTRACT, COHERENCE_VELOCITY_BUDGET_EXPAND,
+    COHERENCE_VELOCITY_BUDGET_THRESHOLD, COHERENCE_VELOCITY_TAU_BOOST,
+    COHERENCE_VELOCITY_TAU_DAMPEN, COHERENCE_VELOCITY_TAU_THRESHOLD,
+    CONFIDENCE_CRASH_EXPLORATION_BOOST, CONFIDENCE_CRASH_FREEZE_CYCLES, CONFIDENCE_CRASH_THRESHOLD,
+    DOMINANCE_CONFIDENCE_THRESHOLD, DOMINANCE_CONFIDENT, DOMINANCE_DEFAULT, DOMINANCE_FLOW_BASE,
+    DOMINANCE_FLOW_SCALE, EPISTEMIC_EXPLORE_SCALE, EPISTEMIC_EXPLORE_THRESHOLD,
+    EPISTEMIC_LOW_DAMPEN, EPISTEMIC_LOW_THRESHOLD, EPISTEMIC_OSCILLATION_MULTIPLIER,
+    EPISTEMIC_OSCILLATION_THRESHOLD, EPISTEMIC_SEMANTIC_BOOST_SCALE,
+    EPISTEMIC_SEMANTIC_BOOST_THRESHOLD, EPISTEMIC_SEMANTIC_CAUTION_BASE,
+    EPISTEMIC_SEMANTIC_CAUTION_SCALE, EPISTEMIC_SEMANTIC_CAUTION_THRESHOLD,
+    EPISTEMIC_UNCERTAINTY_DEFAULT, FEP_ACCURACY_CONFIDENCE_THRESHOLD, FEP_COMPLEXITY_THRESHOLD,
+    FEP_LEARNING_PLASTICITY_THRESHOLD, FEP_PRAGMATIC_EXPLOIT_THRESHOLD,
+    FEP_PRAGMATIC_EXPLORE_THRESHOLD, FEP_SURPRISE_TAU_SCALE, FEP_TD_ERROR_DISCOVERY_THRESHOLD,
+    HOMEOSTASIS_AROUSAL_TARGET, HOMEOSTASIS_EFFICIENCY_EMA, HOMEOSTASIS_EFFICIENCY_HIGH,
+    HOMEOSTASIS_EFFICIENCY_LOW, HOMEOSTASIS_NEUROMOD_STEP, HOMEOSTASIS_PULL_CRITICAL,
     HOMEOSTASIS_PULL_CRUISE, HOMEOSTASIS_PULL_INCREASE, HOMEOSTASIS_PULL_NORMAL,
-    HOMEOSTASIS_PULL_REDUCTION, HORIZON_PE_CONTRACT_RATE, HORIZON_PE_CONTRACT_THRESHOLD,
-    HORIZON_PE_EXPAND_RATE, HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP,
-    HORIZON_SLOPE_CONTRACT_RATE, HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE,
-    HORIZON_SLOPE_THRESHOLD, MCTS_CONSOLIDATE_CONFIDENCE_SCALE,
-    MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA, MCTS_EFFECTIVENESS_EXPLORE_SCALE,
-    MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW, MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE,
-    MCTS_PLAN_CONFIDENCE_THRESHOLD, MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K,
-    PE_VARIANCE_DAMPEN_SCALE, PE_VARIANCE_MAX_EFFECT, PE_VARIANCE_THRESHOLD,
-    POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD, POLICY_TEMP_BASE,
-    POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, PREDICTION_HORIZON_MAX_SCALE,
+    HOMEOSTASIS_PULL_REDUCTION, HOMEOSTASIS_RECALIBRATE_HIGH, HOMEOSTASIS_RECALIBRATE_LOW,
+    HORIZON_PE_CONTRACT_RATE, HORIZON_PE_CONTRACT_THRESHOLD, HORIZON_PE_EXPAND_RATE,
+    HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP, HORIZON_SLOPE_CONTRACT_RATE,
+    HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE, HORIZON_SLOPE_THRESHOLD,
+    MCTS_CONSOLIDATE_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_CONFIDENCE_SCALE, MCTS_EFFECTIVENESS_EMA,
+    MCTS_EFFECTIVENESS_EXPLORE_SCALE, MCTS_EFFECTIVENESS_HIGH, MCTS_EFFECTIVENESS_LOW,
+    MCTS_EXPLOIT_LR_SCALE, MCTS_EXPLORE_SCALE, MCTS_PLAN_CONFIDENCE_THRESHOLD,
+    MCTS_PLAN_WEIGHT_SCALE, MEMORY_RECALL_TOP_K, PE_VARIANCE_DAMPEN_SCALE, PE_VARIANCE_MAX_EFFECT,
+    PE_VARIANCE_THRESHOLD, POLICY_FULL_AGREEMENT_BOOST, POLICY_MIN_WINDOW, POLICY_SOFT_THRESHOLD,
+    POLICY_TEMP_BASE, POLICY_TEMP_RANGE, POLICY_WINDOW_SIZE, PREDICTION_HORIZON_MAX_SCALE,
     PREDICTION_HORIZON_MIN_SCALE, PREDICTIVE_BUDGET_GATING_RATIO, QUANTUM_COHERENCE_BOOST_SCALE,
     QUANTUM_COHERENCE_THRESHOLD, RESONANCE_TAU_CENTER, RESONANCE_TAU_SCALE,
     RESONATOR_CONSOLIDATION_THRESHOLD, RESONATOR_ERROR_CONFIDENCE_DAMPEN,
@@ -86,9 +88,6 @@ use super::thresholds::{
     TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE, TRANSITION_COST_THRESHOLD,
     WM_MISMATCH_CONFIDENCE_SCALE, WM_MISMATCH_LR_SCALE, WORLD_MODEL_SPONGINESS_THRESHOLD,
     WORLD_MODEL_SPONGY_LR_SCALE, WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
-    COHERENCE_VELOCITY_BUDGET_CONTRACT, COHERENCE_VELOCITY_BUDGET_EXPAND,
-    COHERENCE_VELOCITY_BUDGET_THRESHOLD, HOMEOSTASIS_NEUROMOD_STEP,
-    HOMEOSTASIS_RECALIBRATE_HIGH, HOMEOSTASIS_RECALIBRATE_LOW,
 };
 #[cfg(feature = "vision-manifold")]
 use super::thresholds::{
@@ -275,6 +274,13 @@ impl CognitiveLoopService {
                 self.set_lr("crash_freeze", frozen_lr);
                 self.carryover.quality.crash_freeze_remaining -= 1;
             }
+            // Session 15 Item 4: Confidence crash → relax binding threshold.
+            // During crash recovery, binding requirements should be lenient — the system
+            // needs to re-integrate, not reject fragmented inputs.
+            // Science: Dehaene (2014) — post-disruption GWT lowers ignition threshold.
+            if self.carryover.quality.crash_freeze_remaining > 0 {
+                self.scale_threshold("crash_binding_relax", 0.95);
+            }
         }
 
         // Session 9 Item 1: PE variance → confidence modulation.
@@ -381,6 +387,15 @@ impl CognitiveLoopService {
                 * RESONATOR_LOW_ERROR_CONFIDENCE_SCALE;
             self.adjust_confidence("resonator_error_low", confidence_boost);
             self.stats.resonator_error_exploration_count += 1;
+            // Session 15 Item 7: Sustained low resonator error → confidence recovery.
+            // If >80% of recent cycles had low error, give an additional confidence nudge.
+            // Science: Bar (2009) — consistent prediction accuracy signals reliable model.
+            if self.stats.total_cycles > 20
+                && self.stats.resonator_error_exploration_count
+                    > (self.stats.total_cycles / 2) as u64
+            {
+                self.adjust_confidence("resonator_sustained_low", 0.005);
+            }
             -confidence_boost
         } else {
             0.0
@@ -596,10 +611,13 @@ impl CognitiveLoopService {
         let pre_dist = pre_pull_valence.abs().max(0.01);
         let post_dist = post_pull_valence.abs();
         let cycle_efficiency = post_dist / pre_dist;
-        // EMA smooth (alpha=0.2)
+        // EMA smooth (alpha=0.2), clamped to [0.5, 1.5] to prevent unbounded drift.
+        // Session 15 Item 6: Clamp homeostasis efficiency.
+        // Science: Cannon (1929) — regulation has bounded operating range.
         self.carryover.quality.homeostasis_efficiency =
-            self.carryover.quality.homeostasis_efficiency * (1.0 - HOMEOSTASIS_EFFICIENCY_EMA)
-                + cycle_efficiency * HOMEOSTASIS_EFFICIENCY_EMA;
+            (self.carryover.quality.homeostasis_efficiency * (1.0 - HOMEOSTASIS_EFFICIENCY_EMA)
+                + cycle_efficiency * HOMEOSTASIS_EFFICIENCY_EMA)
+                .clamp(0.5, 1.5);
 
         // High transition cost → strengthen homeostasis to resist unnecessary mode changes.
         // Kelso (1995): costly transitions increase the system's tendency to stay in current attractor.
@@ -1801,7 +1819,15 @@ impl CognitiveLoopService {
                 .saturating_add(1);
             let counter = self.carryover.urgency.anomaly_recovery_counter;
             if counter <= 20 {
-                let recovery = counter as f32 / 20.0;
+                // Session 15 Item 8: Accelerate recovery when Phi is improving.
+                // If unified Psi exceeds recent average, add bonus progress.
+                // Science: Tononi (2004) — rising Phi signals integration recovery.
+                let phi_bonus = if unified_psi > self.stats.avg_psi as f64 * 1.05 {
+                    0.25 // 25% bonus progress when Phi above average
+                } else {
+                    0.0
+                };
+                let recovery = ((counter as f32 / 20.0) + phi_bonus).min(1.0);
                 reasoning_lr_factor *= 0.5 + recovery * 0.5;
                 anomaly_recovery_progress = recovery;
                 self.stats.anomaly_recovery_active_count += 1;
@@ -2066,10 +2092,18 @@ impl CognitiveLoopService {
             let broca_novelty =
                 prediction_error > self.config.learning_threshold || surprise_triggered;
             // Adaptive cadence: poor user model → generate more (probe to refine)
-            let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
-                5 // more frequent when user model is inaccurate
+            // Session 15 Item 5: Attention fatigue → Broca cadence gating.
+            // High fatigue → widen spacing (don't generate when attention depleted).
+            // Science: Mackworth (1948) — vigilance decrement degrades production quality.
+            let fatigue_spacing_boost = if self.self_model_tier.attention_schema.fatigue > 0.6 {
+                3
             } else {
-                7 // default spacing
+                0
+            };
+            let broca_min_spacing = if self.stats.tom_prediction_mismatch_ema > 0.5 {
+                5 + fatigue_spacing_boost // more frequent when user model is inaccurate
+            } else {
+                7 + fatigue_spacing_boost // default spacing
             };
             let broca_should_generate = broca_psi > 0.4
                 && broca_novelty

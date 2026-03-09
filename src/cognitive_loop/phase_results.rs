@@ -84,6 +84,11 @@ pub(super) struct PerceptionPhaseResult {
     pub(super) scene_recognized: bool,
     #[cfg(feature = "vision-manifold")]
     pub(super) vision_telemetry: Option<symthaea_vision_manifold::VisionTelemetry>,
+    // Foveation fields (only present when feature is enabled)
+    #[cfg(feature = "foveation")]
+    pub(super) foveation_recognition_count: usize,
+    #[cfg(feature = "foveation")]
+    pub(super) foveation_top_confidence: f32,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

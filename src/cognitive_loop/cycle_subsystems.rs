@@ -617,7 +617,9 @@ impl CognitiveLoopService {
         let (empathic_compassion, empathic_tone_adj) =
             if let Some(ref mut empathy) = self.primitive_tier.empathic_unification {
                 if self.stats.total_cycles % 11 == 0 {
-                    let context = self.user_state.as_ref()
+                    let context = self
+                        .user_state
+                        .as_ref()
                         .map(|usi| usi.state().context)
                         .unwrap_or(crate::user_state_inference::ContextKind::Task);
                     let response = empathy.process(input, context);
@@ -722,6 +724,8 @@ mod tests {
             predictive_budget_gated: false,
             #[cfg(feature = "vision-manifold")]
             scene_recognized: false,
+            #[cfg(feature = "semantic-encoder")]
+            semantic_embedding: None,
         }
     }
 

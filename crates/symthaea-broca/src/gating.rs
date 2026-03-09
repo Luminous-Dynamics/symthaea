@@ -104,22 +104,28 @@ pub struct GatingConfig {
 impl Default for GatingConfig {
     fn default() -> Self {
         Self {
-            unknown_factual_penalty: -10.0,
-            unknown_hedging_boost: 5.0,
-            uncertain_factual_penalty: -3.0,
-            uncertain_hedging_boost: 2.5,
+            // Epistemic gating — reduced from original values (5.0/2.5) which
+            // dominated generation with hedging words ("maybe", "seems", "likely").
+            // These values still enforce epistemic honesty but let content through.
+            unknown_factual_penalty: -5.0,
+            unknown_hedging_boost: 1.5,
+            uncertain_factual_penalty: -2.0,
+            uncertain_hedging_boost: 1.0,
             coherence_drift_threshold: 0.3,
             high_arousal_threshold: 0.7,
             arousal_position_threshold: 10,
             low_warmth_threshold: 0.3,
             base_max_tokens: 128,
-            veto_threshold: 0.25,
+            // Semantic veto — raised from 0.25 to 0.15. The old threshold fired
+            // constantly early in generation (CfC output similarity is naturally
+            // low for the first few tokens), producing "-- wait," after every word.
+            veto_threshold: 0.15,
         }
     }
 }
 
 fn default_veto_threshold() -> f32 {
-    0.25
+    0.15
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -388,7 +394,7 @@ pub struct CoherenceFeedback {
 impl CoherenceFeedback {
     /// Create a new coherence feedback monitor.
     pub fn new(threshold: f32) -> Self {
-        Self::with_veto_threshold(threshold, 0.25)
+        Self::with_veto_threshold(threshold, 0.15)
     }
 
     /// Create with explicit veto threshold.

@@ -10,7 +10,7 @@
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
 use super::gate::{safety_gate, SafetyGateResult};
-use symthaea_physics::datacenter::{DatacenterOutput, DatacenterSafetyLevel};
+use symthaea_physics::datacenter::{DatacenterFepAction, DatacenterOutput, DatacenterSafetyLevel};
 
 /// Adapter that translates Datacenter outputs into Safety Agent inputs.
 pub struct DatacenterSafetyAdapter {

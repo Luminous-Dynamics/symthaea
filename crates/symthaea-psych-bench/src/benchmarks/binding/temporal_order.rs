@@ -237,14 +237,8 @@ impl PsychBenchmark for TemporalOrderBenchmark {
             }
         }
 
-        result.insert(
-            "simultaneity_window",
-            MetricValue::from_samples(&windows),
-        );
-        result.insert(
-            "discrimination_slope",
-            MetricValue::from_samples(&slopes),
-        );
+        result.insert("simultaneity_window", MetricValue::from_samples(&windows));
+        result.insert("discrimination_slope", MetricValue::from_samples(&slopes));
         result.insert(
             "asymptotic_accuracy",
             MetricValue::from_samples(&asymptotes),

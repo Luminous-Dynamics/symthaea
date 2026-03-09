@@ -530,6 +530,76 @@ impl CognitiveLoopService {
         metadata.quality_exploration_floor =
             self.carryover.quality.consecutive_high_quality > 10 && self.stats.total_cycles > 30;
 
+        // ── Session 14 telemetry ──
+        metadata.living_mind_vitality_feedback = feedback.self_model.living_mind_vitality > 0.6
+            || (feedback.self_model.living_mind_vitality < 0.3
+                && feedback.self_model.living_mind_vitality > 0.0);
+        metadata.metacog_low_accuracy_dampen =
+            feedback.self_model.meta_cognitive_accuracy < 0.3 && self.stats.total_cycles > 20;
+        metadata.self_safety_lr_boost = feedback.self_model.predictive_self_safety > 0.7;
+        metadata.embodied_agency_stable = feedback.self_model.embodied_agency >= 0.4
+            && feedback.self_model.embodied_agency <= 0.6;
+
+        // ── Session 15 telemetry ──
+        metadata.pipeline_consciousness_gated = {
+            let pc = self.carryover.quality.last_pipeline_consciousness;
+            (pc > 0.7 || (pc < 0.3 && pc > 0.0)) && self.stats.total_cycles > 15
+        };
+        metadata.low_coherence_early_warning = {
+            let clc = self.carryover.urgency.consecutive_low_coherence;
+            clc >= 5 && clc <= 10
+        };
+        metadata.mode_stable_exploration_dampen =
+            self.carryover.urgency.mode_stability_counter > 50;
+        metadata.crash_binding_relaxed = self.carryover.quality.crash_freeze_remaining > 0;
+        metadata.attention_fatigue_broca_gated = self
+            .self_model_tier
+            .attention_schema
+            .as_ref()
+            .map_or(false, |a| a.control_signal < 0.4);
+        metadata.resonator_sustained_low_boost = self.stats.total_cycles > 20
+            && self.stats.resonator_error_exploration_count > (self.stats.total_cycles / 2) as u64;
+        metadata.anomaly_recovery_phi_accelerated = self.carryover.urgency.anomaly_was_active
+            && self.stats.unified_psi > self.stats.avg_psi * 1.05;
+
+        // ── Session 15 continued: Feedback Loop Observability ──
+        {
+            use crate::cognitive_loop::thresholds::{
+                COHERENCE_VELOCITY_BUDGET_THRESHOLD, HOMEOSTASIS_RECALIBRATE_HIGH,
+                HOMEOSTASIS_RECALIBRATE_LOW, MORAL_CONSOLIDATION_EASE,
+                MORAL_CONSOLIDATION_THRESHOLD,
+            };
+            let ms = self.carryover.quality.last_moral_score.abs();
+            metadata.moral_consolidation_ease = if ms > MORAL_CONSOLIDATION_THRESHOLD {
+                ((ms - MORAL_CONSOLIDATION_THRESHOLD) as f64 * MORAL_CONSOLIDATION_EASE) as f32
+            } else {
+                0.0
+            };
+            metadata.consolidation_threshold = (self.carryover.history.consciousness_ema
+                - 0.1
+                - metadata.moral_consolidation_ease as f64)
+                .max(0.2) as f32;
+            metadata.mce_bottleneck_lr_applied =
+                !self.carryover.consciousness.mce_bottleneck_name.is_empty();
+            let eff = self.carryover.quality.homeostasis_efficiency;
+            metadata.homeostasis_recalibrated = self.stats.total_cycles > 20
+                && (eff > HOMEOSTASIS_RECALIBRATE_HIGH
+                    || (eff < HOMEOSTASIS_RECALIBRATE_LOW && eff > 0.0));
+            metadata.confidence_falling_lr_boost =
+                dynamics.neuromod.confidence_velocity < -0.05 && self.stats.total_cycles > 15;
+            let cv = self.carryover.quality.coherence_velocity;
+            metadata.coherence_velocity_budget_scaled =
+                cv.abs() > COHERENCE_VELOCITY_BUDGET_THRESHOLD;
+        }
+        metadata.temporal_chain_depth_lr_mod = self.stats.total_cycles > 15
+            && feedback.consciousness.temporal_max_chain_length > 0
+            && (feedback.consciousness.temporal_max_chain_length
+                >= crate::cognitive_loop::thresholds::TEMPORAL_CHAIN_DEEP_THRESHOLD
+                || feedback.consciousness.temporal_max_chain_length
+                    <= crate::cognitive_loop::thresholds::TEMPORAL_CHAIN_SHALLOW_THRESHOLD);
+        metadata.eq_v2_bottleneck_response =
+            !feedback.consciousness.eq_v2_limiting_component.is_empty();
+
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self
             .gwt_mgr
@@ -617,7 +687,15 @@ impl CognitiveLoopService {
                 anomaly_count: status.anomalies.len(),
                 has_critical: self.integrity_manager.has_critical_anomaly(),
                 last_check_cycle: status.last_check_cycle,
+                integrity_confidence: self.integrity_manager.integrity_confidence,
             };
+            // Integrity-aware consciousness gating: if integrity is compromised,
+            // discount consciousness scores — the system should distrust its own
+            // metrics when it can't verify they haven't been tampered with.
+            let ic = self.integrity_manager.integrity_confidence;
+            if ic < 1.0 {
+                metadata.consciousness_level *= ic as f64;
+            }
         }
 
         // Physics bridge telemetry
