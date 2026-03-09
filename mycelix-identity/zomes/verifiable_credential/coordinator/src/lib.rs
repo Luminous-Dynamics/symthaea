@@ -10,8 +10,8 @@
 //! W3C Data Integrity EdDSA Cryptosuites v1.0 specification.
 
 use hdk::prelude::*;
-use verifiable_credential_integrity::*;
 use mycelix_crypto::{AlgorithmId, TaggedSignature};
+use verifiable_credential_integrity::*;
 
 /// Mirror type for credential_schema deserialization (cross-zome)
 #[derive(Serialize, Deserialize, Debug)]
@@ -131,7 +131,8 @@ fn validate_claims_against_schema(
         ZomeCallResponse::Ok(result) => {
             let record: Option<Record> = result.decode().map_err(|e| {
                 wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode schema response: {:?}", e
+                    "Failed to decode schema response: {:?}",
+                    e
                 )))
             })?;
             let rec = match record {
@@ -151,12 +152,14 @@ fn validate_claims_against_schema(
         }
         ZomeCallResponse::NetworkError(err) => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Network error fetching schema: {}", err
+                "Network error fetching schema: {}",
+                err
             ))));
         }
         ZomeCallResponse::CountersigningSession(err) => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Countersigning error: {}", err
+                "Countersigning error: {}",
+                err
             ))));
         }
     };
@@ -164,7 +167,8 @@ fn validate_claims_against_schema(
     // Verify schema is active
     if !schema.active {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Schema '{}' is not active", schema_id
+            "Schema '{}' is not active",
+            schema_id
         ))));
     }
 
@@ -173,7 +177,9 @@ fn validate_claims_against_schema(
         Some(obj) => obj,
         None => {
             // If claims is not an object (e.g., array or scalar), skip field validation
-            return Ok(SchemaValidationStatus::Validated { schema_name: schema.name });
+            return Ok(SchemaValidationStatus::Validated {
+                schema_name: schema.name,
+            });
         }
     };
 
@@ -193,7 +199,9 @@ fn validate_claims_against_schema(
         ))));
     }
 
-    Ok(SchemaValidationStatus::Validated { schema_name: schema.name })
+    Ok(SchemaValidationStatus::Validated {
+        schema_name: schema.name,
+    })
 }
 
 /// Issue a new verifiable credential
@@ -213,7 +221,8 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
         SchemaValidationStatus::SchemaZomeUnavailable => {
             if input.strict_schema {
                 return Err(wasm_error!(WasmErrorInner::Guest(
-                    "strict_schema: credential_schema zome is unavailable; cannot validate schema".to_string()
+                    "strict_schema: credential_schema zome is unavailable; cannot validate schema"
+                        .to_string()
                 )));
             }
             warn!("Schema validation skipped: credential_schema zome unavailable");
@@ -225,7 +234,10 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
                     input.schema_id
                 ))));
             }
-            debug!("Schema validation skipped: schema '{}' not found (may be external)", input.schema_id);
+            debug!(
+                "Schema validation skipped: schema '{}' not found (may be external)",
+                input.schema_id
+            );
         }
         SchemaValidationStatus::NoSchema => {
             if input.strict_schema {
@@ -312,16 +324,32 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
 
     // Create links
     let issuer_hash = string_to_entry_hash(vc.issuer.did());
-    create_link(issuer_hash, action_hash.clone(), LinkTypes::IssuerToCredential, ())?;
+    create_link(
+        issuer_hash,
+        action_hash.clone(),
+        LinkTypes::IssuerToCredential,
+        (),
+    )?;
 
     let subject_hash = string_to_entry_hash(&vc.credential_subject.id);
-    create_link(subject_hash, action_hash.clone(), LinkTypes::SubjectToCredential, ())?;
+    create_link(
+        subject_hash,
+        action_hash.clone(),
+        LinkTypes::SubjectToCredential,
+        (),
+    )?;
 
     let schema_hash = string_to_entry_hash(&input.schema_id);
-    create_link(schema_hash, action_hash.clone(), LinkTypes::SchemaToCredential, ())?;
+    create_link(
+        schema_hash,
+        action_hash.clone(),
+        LinkTypes::SchemaToCredential,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created credential".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created credential".into()
+    )))
 }
 
 /// Input for issuing a credential
@@ -351,14 +379,17 @@ pub struct IssueCredentialInput {
 /// Verify a credential
 #[hdk_extern]
 pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResult> {
-    let vc = get_credential(credential_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Credential not found".into())))?;
+    let vc = get_credential(credential_id.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Credential not found".into()
+    )))?;
 
     let credential: VerifiableCredential = vc
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid credential entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid credential entry".into()
+        )))?;
 
     let now = sys_time()?;
     let mut errors = Vec::new();
@@ -446,11 +477,18 @@ pub struct VerificationResult {
 #[hdk_extern]
 pub fn get_credential(credential_id: String) -> ExternResult<Option<Record>> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::VerifiableCredential)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::VerifiableCredential,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(vc) = record.entry().to_app_option::<VerifiableCredential>().ok().flatten() {
+        if let Some(vc) = record
+            .entry()
+            .to_app_option::<VerifiableCredential>()
+            .ok()
+            .flatten()
+        {
             if vc.id == credential_id {
                 return Ok(Some(record));
             }
@@ -554,13 +592,16 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
     // Gather credentials
     let mut credentials = Vec::new();
     for cred_id in &input.credential_ids {
-        let record = get_credential(cred_id.clone())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest(format!("Credential {} not found", cred_id))))?;
+        let record = get_credential(cred_id.clone())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("Credential {} not found", cred_id)
+        )))?;
         let vc: VerifiableCredential = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid credential".into())))?;
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Invalid credential".into()
+            )))?;
         credentials.push(vc);
     }
 
@@ -585,12 +626,14 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
     }
 
     // Sign with agent's ed25519 key
-    let signature = sign_raw(
-        agent_info.agent_initial_pubkey.clone(),
-        presentation_data,
-    )?;
+    let signature = sign_raw(agent_info.agent_initial_pubkey.clone(), presentation_data)?;
     let tagged_sig = TaggedSignature::new(AlgorithmId::Ed25519, signature.as_ref().to_vec())
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Signature tagging error: {}", e))))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Signature tagging error: {}",
+                e
+            )))
+        })?;
 
     let proof = CredentialProof {
         proof_type: "DataIntegrityProof".to_string(),
@@ -621,10 +664,16 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
 
     // Link holder to presentation
     let holder_hash = string_to_entry_hash(&holder_did);
-    create_link(holder_hash, action_hash.clone(), LinkTypes::HolderToPresentation, ())?;
+    create_link(
+        holder_hash,
+        action_hash.clone(),
+        LinkTypes::HolderToPresentation,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created presentation".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created presentation".into()
+    )))
 }
 
 /// Input for creating a presentation
@@ -646,15 +695,20 @@ pub struct CreatePresentationInput {
 /// 3. Each contained credential's revocation status
 /// 4. Proof purpose is "authentication"
 #[hdk_extern]
-pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<PresentationVerificationResult> {
-    let record = get(input.presentation_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Presentation not found".into())))?;
+pub fn verify_presentation(
+    input: VerifyPresentationInput,
+) -> ExternResult<PresentationVerificationResult> {
+    let record = get(input.presentation_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Presentation not found".into())),
+    )?;
 
     let vp: VerifiablePresentation = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid presentation entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid presentation entry".into()
+        )))?;
 
     let now = sys_time()?;
     let mut errors = Vec::new();
@@ -681,7 +735,9 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
             )),
         }
     } else if vp.proof.challenge.is_some() {
-        errors.push("Presentation has challenge but verifier did not supply expected_challenge".to_string());
+        errors.push(
+            "Presentation has challenge but verifier did not supply expected_challenge".to_string(),
+        );
     }
 
     if let Some(expected) = &input.expected_domain {
@@ -697,7 +753,9 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
             )),
         }
     } else if vp.proof.domain.is_some() {
-        errors.push("Presentation has domain but verifier did not supply expected_domain".to_string());
+        errors.push(
+            "Presentation has domain but verifier did not supply expected_domain".to_string(),
+        );
     }
 
     // 3. Verify holder's proof signature
@@ -722,18 +780,26 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
             // Try TaggedSignature first, then legacy
             match TaggedSignature::from_multibase(&vp.proof.proof_value) {
                 Ok(tagged_sig) => {
-                    if tagged_sig.algorithm == AlgorithmId::Ed25519 && tagged_sig.signature_bytes.len() == 64 {
+                    if tagged_sig.algorithm == AlgorithmId::Ed25519
+                        && tagged_sig.signature_bytes.len() == 64
+                    {
                         let sig = Signature::from(
                             <[u8; 64]>::try_from(tagged_sig.signature_bytes.as_slice())
                                 .unwrap_or([0u8; 64]),
                         );
                         match verify_signature(holder_pubkey, sig, presentation_data) {
                             Ok(true) => {}
-                            Ok(false) => errors.push("Holder proof signature verification failed".to_string()),
-                            Err(e) => errors.push(format!("Holder signature verification error: {:?}", e)),
+                            Ok(false) => errors
+                                .push("Holder proof signature verification failed".to_string()),
+                            Err(e) => {
+                                errors.push(format!("Holder signature verification error: {:?}", e))
+                            }
                         }
                     } else {
-                        errors.push(format!("Unsupported presentation proof algorithm: {:?}", tagged_sig.algorithm));
+                        errors.push(format!(
+                            "Unsupported presentation proof algorithm: {:?}",
+                            tagged_sig.algorithm
+                        ));
                     }
                 }
                 Err(_) => {
@@ -745,8 +811,12 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
                             );
                             match verify_signature(holder_pubkey, sig, presentation_data) {
                                 Ok(true) => {}
-                                Ok(false) => errors.push("Holder proof signature verification failed (legacy)".to_string()),
-                                Err(e) => errors.push(format!("Holder signature verification error: {:?}", e)),
+                                Ok(false) => errors.push(
+                                    "Holder proof signature verification failed (legacy)"
+                                        .to_string(),
+                                ),
+                                Err(e) => errors
+                                    .push(format!("Holder signature verification error: {:?}", e)),
                             }
                         } else {
                             errors.push("Invalid holder signature length".to_string());
@@ -765,7 +835,11 @@ pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<Prese
 
     // 3. Batch-check revocation for all credentials in one cross-zome call
     //    (eliminates N+1 query pattern — single call instead of per-credential)
-    let cred_ids: Vec<String> = vp.verifiable_credential.iter().map(|c| c.id.clone()).collect();
+    let cred_ids: Vec<String> = vp
+        .verifiable_credential
+        .iter()
+        .map(|c| c.id.clone())
+        .collect();
     let revocation_statuses = batch_check_credential_revocation_status(&cred_ids)?;
 
     // 4. Verify each contained credential
@@ -878,7 +952,9 @@ fn hash_claim_leaf(key: &str, value: &serde_json::Value) -> Vec<u8> {
 ///
 /// Leaves are sorted by key to ensure deterministic ordering.
 /// Internal nodes: BLAKE2b-256(left || right). Odd nodes are promoted.
-fn build_claim_merkle_tree(claims: &serde_json::Map<String, serde_json::Value>) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
+fn build_claim_merkle_tree(
+    claims: &serde_json::Map<String, serde_json::Value>,
+) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
     // Sort keys for deterministic order
     let mut keys: Vec<&String> = claims.keys().collect();
     keys.sort();
@@ -942,7 +1018,11 @@ fn generate_merkle_proof(
 
     while current_level.len() > 1 {
         // Sibling index
-        let sibling_idx = if idx.is_multiple_of(2) { idx + 1 } else { idx - 1 };
+        let sibling_idx = if idx.is_multiple_of(2) {
+            idx + 1
+        } else {
+            idx - 1
+        };
 
         if sibling_idx < current_level.len() {
             proof.push(current_level[sibling_idx].clone());
@@ -978,14 +1058,17 @@ pub fn create_derived_credential(input: CreateDerivedInput) -> ExternResult<Reco
     let now = sys_time()?;
 
     // Get original credential
-    let original_record = get_credential(input.credential_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Original credential not found".into())))?;
+    let original_record = get_credential(input.credential_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Original credential not found".into())
+    ))?;
 
     let original_vc: VerifiableCredential = original_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid original credential".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid original credential".into()
+        )))?;
 
     // Verify holder is the subject
     if original_vc.credential_subject.id != holder_did {
@@ -1002,9 +1085,10 @@ pub fn create_derived_credential(input: CreateDerivedInput) -> ExternResult<Reco
         if let Some(value) = original_claims.get(claim_key) {
             derived_claims.insert(claim_key.clone(), value.clone());
         } else {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Claim '{}' not found in original credential", claim_key)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Claim '{}' not found in original credential",
+                claim_key
+            ))));
         }
     }
 
@@ -1024,10 +1108,7 @@ pub fn create_derived_credential(input: CreateDerivedInput) -> ExternResult<Reco
     }
 
     // Sign with holder's ed25519 key
-    let holder_signature = sign_raw(
-        agent_info.agent_initial_pubkey.clone(),
-        sign_data,
-    )?;
+    let holder_signature = sign_raw(agent_info.agent_initial_pubkey.clone(), sign_data)?;
 
     // Build Merkle tree over all original claims for selective disclosure proofs
     let original_claims_obj = original_claims.as_object();
@@ -1042,23 +1123,31 @@ pub fn create_derived_credential(input: CreateDerivedInput) -> ExternResult<Reco
         let mut sorted_keys: Vec<&String> = obj.keys().collect();
         sorted_keys.sort();
 
-        input.selected_claims.iter().map(|key| {
-            let leaf_index = sorted_keys.iter().position(|k| *k == key);
-            let merkle_path = leaf_index.map(|idx| generate_merkle_proof(obj, idx));
-            let commitment = leaf_index.map(|_| hash_claim_leaf(key, &obj[key]));
+        input
+            .selected_claims
+            .iter()
+            .map(|key| {
+                let leaf_index = sorted_keys.iter().position(|k| *k == key);
+                let merkle_path = leaf_index.map(|idx| generate_merkle_proof(obj, idx));
+                let commitment = leaf_index.map(|_| hash_claim_leaf(key, &obj[key]));
 
-            ClaimProof {
-                claim_key: key.clone(),
-                merkle_path,
-                commitment,
-            }
-        }).collect()
+                ClaimProof {
+                    claim_key: key.clone(),
+                    merkle_path,
+                    commitment,
+                }
+            })
+            .collect()
     } else {
-        input.selected_claims.iter().map(|key| ClaimProof {
-            claim_key: key.clone(),
-            merkle_path: None,
-            commitment: None,
-        }).collect()
+        input
+            .selected_claims
+            .iter()
+            .map(|key| ClaimProof {
+                claim_key: key.clone(),
+                merkle_path: None,
+                commitment: None,
+            })
+            .collect()
     };
 
     let derivation_proof = DerivationProof {
@@ -1094,8 +1183,9 @@ pub fn create_derived_credential(input: CreateDerivedInput) -> ExternResult<Reco
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created derived credential".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created derived credential".into()
+    )))
 }
 
 /// Input for creating a derived credential
@@ -1126,19 +1216,24 @@ pub struct DerivedVerificationResult {
 /// 4. Derived credential is not expired
 /// 5. Original credential is not revoked
 #[hdk_extern]
-pub fn verify_derived_credential(action_hash: ActionHash) -> ExternResult<DerivedVerificationResult> {
+pub fn verify_derived_credential(
+    action_hash: ActionHash,
+) -> ExternResult<DerivedVerificationResult> {
     let mut errors = Vec::new();
     let mut original_issuer_verified = false;
 
     // Fetch derived credential
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Derived credential not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Derived credential not found".into())
+    ))?;
 
     let derived: DerivedCredential = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid derived credential entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid derived credential entry".into()
+        )))?;
 
     // Check expiration
     let now = sys_time()?;
@@ -1165,7 +1260,9 @@ pub fn verify_derived_credential(action_hash: ActionHash) -> ExternResult<Derive
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid original credential".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid original credential".into()
+        )))?;
 
     // Verify the original credential hash matches
     let recomputed_hash = compute_credential_hash(&original_vc);
@@ -1203,7 +1300,10 @@ pub fn verify_derived_credential(action_hash: ActionHash) -> ExternResult<Derive
 
         for claim_proof in &derived.derivation_proof.claim_proofs {
             // Verify commitment matches the actual claim value
-            if let (Some(commitment), Some(value)) = (&claim_proof.commitment, original_claims.get(&claim_proof.claim_key)) {
+            if let (Some(commitment), Some(value)) = (
+                &claim_proof.commitment,
+                original_claims.get(&claim_proof.claim_key),
+            ) {
                 let expected_leaf = hash_claim_leaf(&claim_proof.claim_key, value);
                 if *commitment != expected_leaf {
                     errors.push(format!(
@@ -1217,7 +1317,10 @@ pub fn verify_derived_credential(action_hash: ActionHash) -> ExternResult<Derive
                 if let Some(path) = &claim_proof.merkle_path {
                     let mut sorted_keys: Vec<&String> = original_obj.keys().collect();
                     sorted_keys.sort();
-                    if let Some(leaf_idx) = sorted_keys.iter().position(|k| *k == &claim_proof.claim_key) {
+                    if let Some(leaf_idx) = sorted_keys
+                        .iter()
+                        .position(|k| *k == &claim_proof.claim_key)
+                    {
                         let mut current_hash = expected_leaf;
                         let mut idx = leaf_idx;
 
@@ -1334,14 +1437,25 @@ pub fn request_credential(input: RequestCredentialInput) -> ExternResult<Record>
 
     // Link issuer to request
     let issuer_hash = string_to_entry_hash(&input.issuer_did);
-    create_link(issuer_hash, action_hash.clone(), LinkTypes::IssuerToRequest, ())?;
+    create_link(
+        issuer_hash,
+        action_hash.clone(),
+        LinkTypes::IssuerToRequest,
+        (),
+    )?;
 
     // Link requester to request
     let requester_hash = string_to_entry_hash(&requester_did);
-    create_link(requester_hash, action_hash.clone(), LinkTypes::RequesterToRequest, ())?;
+    create_link(
+        requester_hash,
+        action_hash.clone(),
+        LinkTypes::RequesterToRequest,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created request".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created request".into()
+    )))
 }
 
 /// Input for requesting a credential
@@ -1371,8 +1485,16 @@ pub fn get_pending_requests(issuer_did: String) -> ExternResult<Vec<Record>> {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(action_hash, GetOptions::default())? {
-            if let Some(req) = record.entry().to_app_option::<CredentialRequest>().ok().flatten() {
-                if matches!(req.status, RequestStatus::Pending | RequestStatus::UnderReview) {
+            if let Some(req) = record
+                .entry()
+                .to_app_option::<CredentialRequest>()
+                .ok()
+                .flatten()
+            {
+                if matches!(
+                    req.status,
+                    RequestStatus::Pending | RequestStatus::UnderReview
+                ) {
                     requests.push(record);
                 }
             }
@@ -1390,11 +1512,18 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
 
     // Find the request
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CredentialRequest)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::CredentialRequest,
+        )?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(req) = record.entry().to_app_option::<CredentialRequest>().ok().flatten() {
+        if let Some(req) = record
+            .entry()
+            .to_app_option::<CredentialRequest>()
+            .ok()
+            .flatten()
+        {
             if req.id == input.request_id {
                 if req.issuer_did != caller_did {
                     return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1413,12 +1542,15 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
                     &EntryTypes::CredentialRequest(updated_req),
                 )?;
 
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated request".into())));
+                return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+                    WasmErrorInner::Guest("Could not find updated request".into())
+                ));
             }
         }
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Request not found".into())))
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Request not found".into()
+    )))
 }
 
 /// Input for updating request status
@@ -1485,7 +1617,10 @@ pub fn issue_credential_with_proof(input: IssueCredentialWithProofInput) -> Exte
             "Credential must include W3C credentials context".into()
         )));
     }
-    if !vc.credential_type.contains(&"VerifiableCredential".to_string()) {
+    if !vc
+        .credential_type
+        .contains(&"VerifiableCredential".to_string())
+    {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Credential type must include 'VerifiableCredential'".into()
         )));
@@ -1512,10 +1647,14 @@ pub fn issue_credential_with_proof(input: IssueCredentialWithProofInput) -> Exte
     // If TaggedSignature parsing fails, it may be a legacy Ed25519 multibase — that's OK
 
     // Validate claims against schema if specified
-    let schema_validation = validate_claims_against_schema(&vc.mycelix_schema_id, &vc.credential_subject.claims)?;
+    let schema_validation =
+        validate_claims_against_schema(&vc.mycelix_schema_id, &vc.credential_subject.claims)?;
     match &schema_validation {
         SchemaValidationStatus::Validated { schema_name } => {
-            debug!("Pre-signed credential schema validation passed for '{}'", schema_name);
+            debug!(
+                "Pre-signed credential schema validation passed for '{}'",
+                schema_name
+            );
         }
         SchemaValidationStatus::SchemaZomeUnavailable => {
             warn!("Pre-signed credential schema validation skipped: credential_schema zome unavailable");
@@ -1530,18 +1669,34 @@ pub fn issue_credential_with_proof(input: IssueCredentialWithProofInput) -> Exte
 
     // Create links
     let issuer_hash = string_to_entry_hash(vc.issuer.did());
-    create_link(issuer_hash, action_hash.clone(), LinkTypes::IssuerToCredential, ())?;
+    create_link(
+        issuer_hash,
+        action_hash.clone(),
+        LinkTypes::IssuerToCredential,
+        (),
+    )?;
 
     let subject_hash = string_to_entry_hash(&vc.credential_subject.id);
-    create_link(subject_hash, action_hash.clone(), LinkTypes::SubjectToCredential, ())?;
+    create_link(
+        subject_hash,
+        action_hash.clone(),
+        LinkTypes::SubjectToCredential,
+        (),
+    )?;
 
     if !vc.mycelix_schema_id.is_empty() {
         let schema_hash = string_to_entry_hash(&vc.mycelix_schema_id);
-        create_link(schema_hash, action_hash.clone(), LinkTypes::SchemaToCredential, ())?;
+        create_link(
+            schema_hash,
+            action_hash.clone(),
+            LinkTypes::SchemaToCredential,
+            (),
+        )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created credential".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created credential".into()
+    )))
 }
 
 /// Format timestamp as ISO 8601 string
@@ -1934,13 +2089,19 @@ mod tests {
     #[test]
     fn expired_past_date() {
         let now = Timestamp::from_micros(1_700_000_000_000_000); // ~2023-11-14
-        assert_eq!(parse_iso8601_expired("2020-01-01T00:00:00Z", now), ExpirationStatus::Expired);
+        assert_eq!(
+            parse_iso8601_expired("2020-01-01T00:00:00Z", now),
+            ExpirationStatus::Expired
+        );
     }
 
     #[test]
     fn not_expired_future_date() {
         let now = Timestamp::from_micros(1_700_000_000_000_000);
-        assert_eq!(parse_iso8601_expired("2030-01-01T00:00:00Z", now), ExpirationStatus::Valid);
+        assert_eq!(
+            parse_iso8601_expired("2030-01-01T00:00:00Z", now),
+            ExpirationStatus::Valid
+        );
     }
 
     #[test]
@@ -2095,7 +2256,10 @@ mod tests {
             }
             CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
         }
-        assert!(errors.is_empty(), "Active credential should produce no errors");
+        assert!(
+            errors.is_empty(),
+            "Active credential should produce no errors"
+        );
     }
 
     #[test]
@@ -2150,7 +2314,10 @@ mod tests {
             }
             CredentialRevocationStatus::Active | CredentialRevocationStatus::Unknown => {}
         }
-        assert!(errors.is_empty(), "Unknown should be treated as active (fail-open)");
+        assert!(
+            errors.is_empty(),
+            "Unknown should be treated as active (fail-open)"
+        );
     }
 
     #[test]
@@ -2187,14 +2354,20 @@ mod tests {
         let mapped_revoked = match check_revoked.status {
             RevocationStatusMirror::Active => CredentialRevocationStatus::Active,
             RevocationStatusMirror::Revoked => CredentialRevocationStatus::Revoked(
-                check_revoked.reason.unwrap_or_else(|| "No reason provided".into()),
+                check_revoked
+                    .reason
+                    .unwrap_or_else(|| "No reason provided".into()),
             ),
             RevocationStatusMirror::Suspended => CredentialRevocationStatus::Suspended(
-                check_revoked.reason.unwrap_or_else(|| "No reason provided".into()),
+                check_revoked
+                    .reason
+                    .unwrap_or_else(|| "No reason provided".into()),
                 check_revoked.checked_at.to_string(),
             ),
         };
-        assert!(matches!(mapped_revoked, CredentialRevocationStatus::Revoked(ref r) if r == "Key compromised"));
+        assert!(
+            matches!(mapped_revoked, CredentialRevocationStatus::Revoked(ref r) if r == "Key compromised")
+        );
 
         // Revoked without reason (defaults to "No reason provided")
         let check_no_reason = RevocationCheckResult {
@@ -2206,21 +2379,32 @@ mod tests {
         let mapped_no_reason = match check_no_reason.status {
             RevocationStatusMirror::Active => CredentialRevocationStatus::Active,
             RevocationStatusMirror::Revoked => CredentialRevocationStatus::Revoked(
-                check_no_reason.reason.unwrap_or_else(|| "No reason provided".into()),
+                check_no_reason
+                    .reason
+                    .unwrap_or_else(|| "No reason provided".into()),
             ),
             RevocationStatusMirror::Suspended => CredentialRevocationStatus::Suspended(
-                check_no_reason.reason.unwrap_or_else(|| "No reason provided".into()),
+                check_no_reason
+                    .reason
+                    .unwrap_or_else(|| "No reason provided".into()),
                 check_no_reason.checked_at.to_string(),
             ),
         };
-        assert!(matches!(mapped_no_reason, CredentialRevocationStatus::Revoked(ref r) if r == "No reason provided"));
+        assert!(
+            matches!(mapped_no_reason, CredentialRevocationStatus::Revoked(ref r) if r == "No reason provided")
+        );
     }
 
     #[test]
     fn credential_status_response_mapping() {
         // Test the status → CredentialStatusResponse mapping (mirrors get_credential_status logic)
         let statuses = vec![
-            (CredentialRevocationStatus::Active, true, "active", None::<&str>),
+            (
+                CredentialRevocationStatus::Active,
+                true,
+                "active",
+                None::<&str>,
+            ),
             (
                 CredentialRevocationStatus::Revoked("Expired cert".into()),
                 false,
@@ -2251,13 +2435,17 @@ mod tests {
         let cases: Vec<(CredentialRevocationStatus, bool)> = vec![
             (CredentialRevocationStatus::Active, false),
             (CredentialRevocationStatus::Revoked("test".into()), true),
-            (CredentialRevocationStatus::Suspended("test".into(), "2026".into()), true),
+            (
+                CredentialRevocationStatus::Suspended("test".into(), "2026".into()),
+                true,
+            ),
             (CredentialRevocationStatus::Unknown, false),
         ];
         for (status, expected) in cases {
             let result = matches!(
                 status,
-                CredentialRevocationStatus::Revoked(_) | CredentialRevocationStatus::Suspended(_, _)
+                CredentialRevocationStatus::Revoked(_)
+                    | CredentialRevocationStatus::Suspended(_, _)
             );
             assert_eq!(result, expected, "is_revoked for {:?}", status);
         }
@@ -2299,12 +2487,22 @@ mod tests {
 
     #[test]
     fn schema_validation_status_equality() {
-        assert_eq!(SchemaValidationStatus::NoSchema, SchemaValidationStatus::NoSchema);
         assert_eq!(
-            SchemaValidationStatus::Validated { schema_name: "test".into() },
-            SchemaValidationStatus::Validated { schema_name: "test".into() }
+            SchemaValidationStatus::NoSchema,
+            SchemaValidationStatus::NoSchema
         );
-        assert_ne!(SchemaValidationStatus::NoSchema, SchemaValidationStatus::SchemaZomeUnavailable);
+        assert_eq!(
+            SchemaValidationStatus::Validated {
+                schema_name: "test".into()
+            },
+            SchemaValidationStatus::Validated {
+                schema_name: "test".into()
+            }
+        );
+        assert_ne!(
+            SchemaValidationStatus::NoSchema,
+            SchemaValidationStatus::SchemaZomeUnavailable
+        );
     }
 
     // --- Merkle tree for selective disclosure ---
@@ -2380,7 +2578,11 @@ mod tests {
                 i /= 2;
             }
 
-            assert_eq!(current, root, "Merkle proof should verify for claim '{}'", key);
+            assert_eq!(
+                current, root,
+                "Merkle proof should verify for claim '{}'",
+                key
+            );
         }
     }
 
@@ -2422,14 +2624,16 @@ fn sign_credential(vc: &VerifiableCredential) -> ExternResult<String> {
     let content_hash = compute_credential_hash(vc);
 
     // Sign with agent's ed25519 key via HDK
-    let signature = sign_raw(
-        agent_info()?.agent_initial_pubkey,
-        content_hash.clone(),
-    )?;
+    let signature = sign_raw(agent_info()?.agent_initial_pubkey, content_hash.clone())?;
 
     // Wrap in TaggedSignature for algorithm-tagged multibase encoding
-    let tagged = TaggedSignature::new(AlgorithmId::Ed25519, signature.as_ref().to_vec())
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Signature tagging error: {}", e))))?;
+    let tagged =
+        TaggedSignature::new(AlgorithmId::Ed25519, signature.as_ref().to_vec()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Signature tagging error: {}",
+                e
+            )))
+        })?;
     Ok(tagged.to_multibase())
 }
 
@@ -2445,16 +2649,19 @@ fn sign_credential(vc: &VerifiableCredential) -> ExternResult<String> {
 fn verify_credential_signature(vc: &VerifiableCredential) -> ExternResult<bool> {
     // Extract public key from issuer DID
     let issuer_did = vc.issuer.did();
-    let pubkey_str = issuer_did
-        .strip_prefix("did:mycelix:")
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid DID format: {}", issuer_did)
-        )))?;
+    let pubkey_str = issuer_did.strip_prefix("did:mycelix:").ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid DID format: {}",
+            issuer_did
+        )))
+    })?;
 
-    let pubkey = AgentPubKey::try_from(pubkey_str.to_string())
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid public key in DID '{}': {:?}", pubkey_str, e)
-        )))?;
+    let pubkey = AgentPubKey::try_from(pubkey_str.to_string()).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid public key in DID '{}': {:?}",
+            pubkey_str, e
+        )))
+    })?;
 
     // Compute expected content hash
     let content_hash = compute_credential_hash(vc);
@@ -2469,28 +2676,35 @@ fn verify_credential_signature(vc: &VerifiableCredential) -> ExternResult<bool> 
                         return Ok(false);
                     }
                     let sig = Signature::from(
-                        <[u8; 64]>::try_from(tagged_sig.signature_bytes.as_slice())
-                            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid signature length".into())))?
+                        <[u8; 64]>::try_from(tagged_sig.signature_bytes.as_slice()).map_err(
+                            |_| {
+                                wasm_error!(WasmErrorInner::Guest(
+                                    "Invalid signature length".into()
+                                ))
+                            },
+                        )?,
                     );
                     verify_signature(pubkey, sig, content_hash)
                 }
                 AlgorithmId::HybridEd25519MlDsa65 => {
                     // Verify Ed25519 component; PQC component verified off-chain
-                    let ed_bytes = tagged_sig.ed25519_component()
-                        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+                    let ed_bytes = tagged_sig.ed25519_component().ok_or_else(|| {
+                        wasm_error!(WasmErrorInner::Guest(
                             "Hybrid signature missing Ed25519 component".into()
-                        )))?;
+                        ))
+                    })?;
                     if ed_bytes.len() != 64 {
                         return Ok(false);
                     }
-                    let sig = Signature::from(
-                        <[u8; 64]>::try_from(ed_bytes)
-                            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid Ed25519 component".into())))?
-                    );
+                    let sig = Signature::from(<[u8; 64]>::try_from(ed_bytes).map_err(|_| {
+                        wasm_error!(WasmErrorInner::Guest("Invalid Ed25519 component".into()))
+                    })?);
                     verify_signature(pubkey, sig, content_hash)
                 }
-                AlgorithmId::MlDsa65 | AlgorithmId::MlDsa87
-                | AlgorithmId::SlhDsaSha2_128s | AlgorithmId::SlhDsaShake128s => {
+                AlgorithmId::MlDsa65
+                | AlgorithmId::MlDsa87
+                | AlgorithmId::SlhDsaSha2_128s
+                | AlgorithmId::SlhDsaShake128s => {
                     // Pure PQC: WASM cannot verify, accept structurally.
                     // Real verification happens via CLI/SDK (off-chain).
                     let expected_size = tagged_sig.algorithm.signature_size();
@@ -2504,17 +2718,18 @@ fn verify_credential_signature(vc: &VerifiableCredential) -> ExternResult<bool> 
         }
         Err(_) => {
             // Legacy fallback: try to decode as raw multibase (z + base58btc)
-            let signature_bytes = multibase_decode(&vc.proof.proof_value)
-                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+            let signature_bytes = multibase_decode(&vc.proof.proof_value).ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
                     "Invalid multibase signature encoding".into()
-                )))?;
+                ))
+            })?;
             if signature_bytes.len() != 64 {
                 return Ok(false);
             }
-            let signature = Signature::from(
-                <[u8; 64]>::try_from(signature_bytes.as_slice())
-                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid signature length".into())))?
-            );
+            let signature =
+                Signature::from(<[u8; 64]>::try_from(signature_bytes.as_slice()).map_err(
+                    |_| wasm_error!(WasmErrorInner::Guest("Invalid signature length".into())),
+                )?);
             verify_signature(pubkey, signature, content_hash)
         }
     }
@@ -2555,7 +2770,9 @@ enum RevocationStatusMirror {
 }
 
 /// Check credential revocation status via cross-zome call to the revocation coordinator
-fn check_credential_revocation_status(credential_id: &str) -> ExternResult<CredentialRevocationStatus> {
+fn check_credential_revocation_status(
+    credential_id: &str,
+) -> ExternResult<CredentialRevocationStatus> {
     let response = call(
         CallTargetCell::Local,
         ZomeName::new("revocation"),
@@ -2575,17 +2792,17 @@ fn check_credential_revocation_status(credential_id: &str) -> ExternResult<Crede
 
             match check.status {
                 RevocationStatusMirror::Active => Ok(CredentialRevocationStatus::Active),
-                RevocationStatusMirror::Revoked => {
-                    Ok(CredentialRevocationStatus::Revoked(
-                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
-                    ))
-                }
-                RevocationStatusMirror::Suspended => {
-                    Ok(CredentialRevocationStatus::Suspended(
-                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
-                        check.checked_at.to_string(),
-                    ))
-                }
+                RevocationStatusMirror::Revoked => Ok(CredentialRevocationStatus::Revoked(
+                    check
+                        .reason
+                        .unwrap_or_else(|| "No reason provided".to_string()),
+                )),
+                RevocationStatusMirror::Suspended => Ok(CredentialRevocationStatus::Suspended(
+                    check
+                        .reason
+                        .unwrap_or_else(|| "No reason provided".to_string()),
+                    check.checked_at.to_string(),
+                )),
             }
         }
         ZomeCallResponse::Unauthorized(_, _, _, _)
@@ -2598,9 +2815,9 @@ fn check_credential_revocation_status(credential_id: &str) -> ExternResult<Crede
             "Network error calling revocation zome: {}",
             err
         )))),
-        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
-            WasmErrorInner::Guest(format!("Countersigning error: {}", err))
-        )),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", err)
+        ))),
     }
 }
 
@@ -2626,7 +2843,8 @@ fn batch_check_credential_revocation_status(
         ZomeCallResponse::Ok(result) => {
             let checks: Vec<RevocationCheckResult> = result.decode().map_err(|e| {
                 wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode batch revocation response: {:?}", e
+                    "Failed to decode batch revocation response: {:?}",
+                    e
                 )))
             })?;
             Ok(checks
@@ -2634,10 +2852,14 @@ fn batch_check_credential_revocation_status(
                 .map(|check| match check.status {
                     RevocationStatusMirror::Active => CredentialRevocationStatus::Active,
                     RevocationStatusMirror::Revoked => CredentialRevocationStatus::Revoked(
-                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
+                        check
+                            .reason
+                            .unwrap_or_else(|| "No reason provided".to_string()),
                     ),
                     RevocationStatusMirror::Suspended => CredentialRevocationStatus::Suspended(
-                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
+                        check
+                            .reason
+                            .unwrap_or_else(|| "No reason provided".to_string()),
                         check.checked_at.to_string(),
                     ),
                 })
@@ -2646,14 +2868,18 @@ fn batch_check_credential_revocation_status(
         ZomeCallResponse::Unauthorized(_, _, _, _)
         | ZomeCallResponse::AuthenticationFailed(_, _) => {
             // Revocation zome not accessible — return Unknown for all
-            Ok(credential_ids.iter().map(|_| CredentialRevocationStatus::Unknown).collect())
+            Ok(credential_ids
+                .iter()
+                .map(|_| CredentialRevocationStatus::Unknown)
+                .collect())
         }
         ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Network error calling batch revocation: {}", err
+            "Network error calling batch revocation: {}",
+            err
         )))),
-        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
-            WasmErrorInner::Guest(format!("Countersigning error: {}", err))
-        )),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", err)
+        ))),
     }
 }
 

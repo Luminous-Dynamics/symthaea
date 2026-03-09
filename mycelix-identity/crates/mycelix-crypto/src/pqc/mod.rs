@@ -5,8 +5,8 @@
 //! wraps the reference C implementations from the NIST PQC standardization process.
 
 pub mod dilithium;
-pub mod sphincs;
+pub mod ed25519_native;
+pub mod encryption;
 pub mod hybrid;
 pub mod ml_kem;
-pub mod encryption;
-pub mod ed25519_native;
+pub mod sphincs;

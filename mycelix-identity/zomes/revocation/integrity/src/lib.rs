@@ -93,7 +93,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RevocationEntry(entry) => {
                     validate_create_revocation_entry(EntryCreationAction::Create(action), entry)
                 }
-                EntryTypes::RevocationList(list) => validate_create_revocation_list(EntryCreationAction::Create(action), list),
+                EntryTypes::RevocationList(list) => {
+                    validate_create_revocation_list(EntryCreationAction::Create(action), list)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry,

@@ -9,7 +9,9 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 #[hdk_extern]
 pub fn query_governance(input: QueryGovernanceInput) -> ExternResult<QueryGovernanceResult> {
     if input.source_happ.is_empty() || input.source_happ.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Source hApp must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Source hApp must be 1-256 characters".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -26,13 +28,17 @@ pub fn query_governance(input: QueryGovernanceInput) -> ExternResult<QueryGovern
     match input.query_type {
         GovernanceQueryType::ActiveProposals => get_active_proposals_internal(),
         GovernanceQueryType::ProposalById => {
-            let id = input.parameters.get("proposal_id")
+            let id = input
+                .parameters
+                .get("proposal_id")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             get_proposal_by_id_internal(id)
         }
         GovernanceQueryType::VotingEligibility => {
-            let did = input.parameters.get("did")
+            let did = input
+                .parameters
+                .get("did")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
             check_voting_eligibility_internal(did)
@@ -123,7 +129,11 @@ fn get_proposal_by_id_internal(id: &str) -> ExternResult<QueryGovernanceResult> 
 }
 
 fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceResult> {
-    match governance_utils::call_local_best_effort("councils", "get_member_councils", did.to_string())? {
+    match governance_utils::call_local_best_effort(
+        "councils",
+        "get_member_councils",
+        did.to_string(),
+    )? {
         Some(extern_io) => {
             if let Ok(councils) = extern_io.decode::<Vec<Record>>() {
                 let eligible = !councils.is_empty();
@@ -140,7 +150,9 @@ fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceR
             } else {
                 Ok(QueryGovernanceResult {
                     success: false,
-                    data: Some(serde_json::json!({"did": did, "eligible": false, "voting_power": 0.0})),
+                    data: Some(
+                        serde_json::json!({"did": did, "eligible": false, "voting_power": 0.0}),
+                    ),
                     error: Some("Could not decode council membership response".into()),
                 })
             }
@@ -156,8 +168,7 @@ fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceR
 /// Request execution from governance to another hApp
 #[hdk_extern]
 pub fn request_execution(input: RequestExecutionInput) -> ExternResult<Record> {
-    check_execution_request_input(&input)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+    check_execution_request_input(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     // Phi gate: execution requests require ProposalSubmission level (Φ ≥ 0.3)
     let agent_info = agent_info()?;
@@ -177,7 +188,12 @@ pub fn request_execution(input: RequestExecutionInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     let request = ExecutionRequest {
-        id: format!("exec:{}:{}:{}", input.proposal_id, input.target_happ, now.as_micros()),
+        id: format!(
+            "exec:{}:{}:{}",
+            input.proposal_id,
+            input.target_happ,
+            now.as_micros()
+        ),
         proposal_id: input.proposal_id.clone(),
         target_happ: input.target_happ.clone(),
         action: input.action.clone(),
@@ -219,8 +235,9 @@ pub fn request_execution(input: RequestExecutionInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Execution not found".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Execution not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -234,8 +251,7 @@ pub struct RequestExecutionInput {
 /// Broadcast governance event
 #[hdk_extern]
 pub fn broadcast_governance_event(input: BroadcastGovernanceEventInput) -> ExternResult<Record> {
-    check_broadcast_event_input(&input)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+    check_broadcast_event_input(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let now = sys_time()?;
 
@@ -331,11 +347,15 @@ pub fn get_recent_events(_: ()) -> ExternResult<Vec<Record>> {
 pub fn acknowledge_execution(input: AcknowledgeExecutionInput) -> ExternResult<bool> {
     // Input validation
     if input.execution_id.is_empty() || input.execution_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Execution ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Execution ID must be 1-256 characters".into()
+        )));
     }
     if let Some(ref result) = input.result {
         if result.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Result must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Result must be at most 4096 characters".into()
+            )));
         }
     }
 
@@ -421,10 +441,14 @@ pub struct AcknowledgeExecutionInput {
 pub fn publish_proposal_reference(input: PublishProposalReferenceInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if input.title.is_empty() || input.title.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Title must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Title must be 1-256 characters".into()
+        )));
     }
 
     // Check status before moving into struct
@@ -454,10 +478,9 @@ pub fn publish_proposal_reference(input: PublishProposalReferenceInput) -> Exter
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find proposal reference".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find proposal reference".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -478,20 +501,23 @@ pub struct PublishProposalReferenceInput {
 /// by the fund allocation system in the execution zome.
 #[hdk_extern]
 pub fn transfer_credits(input: TransferCreditsInput) -> ExternResult<Record> {
-    check_transfer_credits_input(&input)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+    check_transfer_credits_input(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     // Record the transfer as a governance event
     broadcast_governance_event(BroadcastGovernanceEventInput {
         event_type: GovernanceEventType::ProposalExecuted,
         proposal_id: None,
-        subject: format!("Credit transfer: {} -> {} ({} credits)", input.from, input.to, input.amount),
+        subject: format!(
+            "Credit transfer: {} -> {} ({} credits)",
+            input.from, input.to, input.amount
+        ),
         payload: serde_json::to_string(&serde_json::json!({
             "type": "transfer_credits",
             "from": input.from,
             "to": input.to,
             "amount": input.amount,
-        })).unwrap_or_default(),
+        }))
+        .unwrap_or_default(),
     })
 }
 

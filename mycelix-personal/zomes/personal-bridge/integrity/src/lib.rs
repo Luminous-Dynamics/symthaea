@@ -5,8 +5,7 @@
 
 use hdi::prelude::*;
 use mycelix_bridge_entry_types::{
-    BridgeQueryEntry, BridgeEventEntry,
-    validate_query_fields, validate_event_fields,
+    validate_event_fields, validate_query_fields, BridgeEventEntry, BridgeQueryEntry,
 };
 
 /// Anchor entry for deterministic link bases.
@@ -48,7 +47,10 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, action: _ }) => match app_entry {
+        FlatOp::StoreEntry(OpEntry::CreateEntry {
+            app_entry,
+            action: _,
+        }) => match app_entry {
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             EntryTypes::Query(query) => validate_query(&query),
             EntryTypes::Event(event) => validate_event(&event),

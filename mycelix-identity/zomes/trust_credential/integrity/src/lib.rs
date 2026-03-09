@@ -238,7 +238,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::AttestationRequest(req) => validate_create_request(action, req),
                 EntryTypes::TrustPresentation(pres) => validate_create_presentation(action, pres),
             },
-            OpEntry::UpdateEntry { app_entry, action, .. } => match app_entry {
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
                 EntryTypes::TrustCredential(cred) => validate_update_credential(action, cred),
                 EntryTypes::AttestationRequest(req) => validate_update_request(action, req),
                 EntryTypes::TrustPresentation(_) => Ok(ValidateCallbackResult::Invalid(
@@ -311,12 +313,10 @@ fn validate_create_credential(
     // Issuer must be the action author (prevent impersonation)
     let expected_issuer = format!("did:mycelix:{}", action.author);
     if cred.issuer_did != expected_issuer {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Issuer DID must match action author. Expected '{}', got '{}'",
-                expected_issuer, cred.issuer_did
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Issuer DID must match action author. Expected '{}', got '{}'",
+            expected_issuer, cred.issuer_did
+        )));
     }
 
     // Subject must be a valid DID

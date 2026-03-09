@@ -64,7 +64,10 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, action: _ }) => match app_entry {
+        FlatOp::StoreEntry(OpEntry::CreateEntry {
+            app_entry,
+            action: _,
+        }) => match app_entry {
             EntryTypes::Profile(profile) => validate_profile(&profile),
             EntryTypes::MasterKey(key) => validate_master_key(&key),
         },
@@ -151,7 +154,10 @@ mod tests {
     #[test]
     fn valid_profile_passes() {
         let p = make_profile("Alice");
-        assert!(matches!(validate_profile(&p).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_profile(&p).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]
@@ -197,19 +203,28 @@ mod tests {
     #[test]
     fn valid_signing_key_passes() {
         let k = make_key("primary", "signing");
-        assert!(matches!(validate_master_key(&k).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_master_key(&k).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]
     fn valid_encryption_key_passes() {
         let k = make_key("backup", "encryption");
-        assert!(matches!(validate_master_key(&k).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_master_key(&k).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]
     fn valid_credential_issuance_key_passes() {
         let k = make_key("issuer", "credential_issuance");
-        assert!(matches!(validate_master_key(&k).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_master_key(&k).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]

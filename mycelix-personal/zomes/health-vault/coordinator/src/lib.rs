@@ -11,7 +11,12 @@ use health_vault_integrity::*;
 pub fn create_health_record(record: HealthRecord) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::HealthRecord(record.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
-    create_link(agent.clone(), action_hash.clone(), LinkTypes::AgentToRecords, ())?;
+    create_link(
+        agent.clone(),
+        action_hash.clone(),
+        LinkTypes::AgentToRecords,
+        (),
+    )?;
 
     let type_anchor_hash = hash_entry(&EntryTypes::HealthRecord(HealthRecord {
         record_type: record.record_type.clone(),
@@ -20,7 +25,12 @@ pub fn create_health_record(record: HealthRecord) -> ExternResult<Record> {
         event_date: Timestamp::from_micros(0),
         updated_at: Timestamp::from_micros(0),
     }))?;
-    let _ = create_link(agent, type_anchor_hash, LinkTypes::RecordTypeToRecord, record.record_type.as_bytes().to_vec());
+    let _ = create_link(
+        agent,
+        type_anchor_hash,
+        LinkTypes::RecordTypeToRecord,
+        record.record_type.as_bytes().to_vec(),
+    );
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created health record".into()
@@ -59,8 +69,12 @@ pub fn get_my_records(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     let mut records = Vec::new();
     for link in links {
-        let target = ActionHash::try_from(link.target.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid link target: {:?}", e))))?;
+        let target = ActionHash::try_from(link.target.clone()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid link target: {:?}",
+                e
+            )))
+        })?;
         if let Some(record) = get(target, GetOptions::default())? {
             records.push(record);
         }
@@ -78,8 +92,12 @@ pub fn get_my_biometrics(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     let mut records = Vec::new();
     for link in links {
-        let target = ActionHash::try_from(link.target.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid link target: {:?}", e))))?;
+        let target = ActionHash::try_from(link.target.clone()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid link target: {:?}",
+                e
+            )))
+        })?;
         if let Some(record) = get(target, GetOptions::default())? {
             records.push(record);
         }
@@ -97,8 +115,12 @@ pub fn get_my_consents(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     let mut records = Vec::new();
     for link in links {
-        let target = ActionHash::try_from(link.target.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid link target: {:?}", e))))?;
+        let target = ActionHash::try_from(link.target.clone()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid link target: {:?}",
+                e
+            )))
+        })?;
         if let Some(record) = get(target, GetOptions::default())? {
             records.push(record);
         }

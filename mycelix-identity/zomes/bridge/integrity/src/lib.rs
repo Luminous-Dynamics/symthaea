@@ -160,17 +160,26 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
-                EntryTypes::HappRegistration(registration) => {
-                    validate_create_happ_registration(EntryCreationAction::Create(action), registration)
+                EntryTypes::HappRegistration(registration) => validate_create_happ_registration(
+                    EntryCreationAction::Create(action),
+                    registration,
+                ),
+                EntryTypes::IdentityQuery(query) => {
+                    validate_create_identity_query(EntryCreationAction::Create(action), query)
                 }
-                EntryTypes::IdentityQuery(query) => validate_create_identity_query(EntryCreationAction::Create(action), query),
                 EntryTypes::IdentityVerification(verification) => {
-                    validate_create_identity_verification(EntryCreationAction::Create(action), verification)
+                    validate_create_identity_verification(
+                        EntryCreationAction::Create(action),
+                        verification,
+                    )
                 }
-                EntryTypes::BridgeEvent(event) => validate_create_bridge_event(EntryCreationAction::Create(action), event),
-                EntryTypes::IdentityReputation(reputation) => {
-                    validate_create_identity_reputation(EntryCreationAction::Create(action), reputation)
+                EntryTypes::BridgeEvent(event) => {
+                    validate_create_bridge_event(EntryCreationAction::Create(action), event)
                 }
+                EntryTypes::IdentityReputation(reputation) => validate_create_identity_reputation(
+                    EntryCreationAction::Create(action),
+                    reputation,
+                ),
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -494,7 +503,10 @@ mod tests {
             matl_score: 0.5,
             registered_at: ts(0),
         };
-        assert!(reg.happ_id.is_empty(), "Empty ID should be rejected by validator");
+        assert!(
+            reg.happ_id.is_empty(),
+            "Empty ID should be rejected by validator"
+        );
     }
 
     #[test]
@@ -550,7 +562,10 @@ mod tests {
             (BridgeEventType::RecoveryInitiated, "\"RecoveryInitiated\""),
             (BridgeEventType::RecoveryCompleted, "\"RecoveryCompleted\""),
             (BridgeEventType::HappRegistered, "\"HappRegistered\""),
-            (BridgeEventType::MfaAssuranceChanged, "\"MfaAssuranceChanged\""),
+            (
+                BridgeEventType::MfaAssuranceChanged,
+                "\"MfaAssuranceChanged\"",
+            ),
             (BridgeEventType::DidRecovered, "\"DidRecovered\""),
         ];
         for (variant, expected) in variants {
@@ -589,7 +604,10 @@ mod tests {
 
     #[test]
     fn bridge_event_rejects_empty_subject() {
-        assert!("".is_empty(), "Empty subject should be rejected by validator");
+        assert!(
+            "".is_empty(),
+            "Empty subject should be rejected by validator"
+        );
         assert!(!"did:mycelix:abc".is_empty());
     }
 

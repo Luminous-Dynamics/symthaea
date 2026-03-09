@@ -12,7 +12,11 @@
 //!
 //! See `EligibilityProof` and `cast_verified_vote` for details.
 
-#![allow(clippy::manual_clamp, clippy::manual_range_contains, clippy::unnecessary_cast)]
+#![allow(
+    clippy::manual_clamp,
+    clippy::manual_range_contains,
+    clippy::unnecessary_cast
+)]
 
 use hdi::prelude::*;
 
@@ -71,8 +75,8 @@ impl ProposalTier {
     /// Get the required quorum percentage for this tier
     pub fn quorum_requirement(&self) -> f64 {
         match self {
-            ProposalTier::Basic => 0.15,        // 15% participation
-            ProposalTier::Major => 0.25,        // 25% participation
+            ProposalTier::Basic => 0.15,          // 15% participation
+            ProposalTier::Major => 0.25,          // 25% participation
             ProposalTier::Constitutional => 0.40, // 40% participation
         }
     }
@@ -80,8 +84,8 @@ impl ProposalTier {
     /// Get the approval threshold for this tier
     pub fn approval_threshold(&self) -> f64 {
         match self {
-            ProposalTier::Basic => 0.50,        // Simple majority
-            ProposalTier::Major => 0.60,        // 60% supermajority
+            ProposalTier::Basic => 0.50,          // Simple majority
+            ProposalTier::Major => 0.60,          // 60% supermajority
             ProposalTier::Constitutional => 0.67, // 2/3 supermajority
         }
     }
@@ -303,7 +307,10 @@ impl DelegationDecay {
                 let half_lives = elapsed_days / *half_life_days as f64;
                 0.5_f64.powf(half_lives)
             }
-            DelegationDecay::Step { step_interval_days, drop_per_step } => {
+            DelegationDecay::Step {
+                step_interval_days,
+                drop_per_step,
+            } => {
                 let steps = (elapsed_days / *step_interval_days as f64).floor() as u32;
                 let remaining = 1.0 - (*drop_per_step * steps as f64);
                 remaining.max(0.0)
@@ -835,7 +842,10 @@ impl ProposalReflection {
     /// Check if this reflection flags any concerns
     pub fn has_concerns(&self) -> bool {
         self.needs_review
-            || matches!(self.echo_chamber_risk, EchoChamberRiskLevel::High | EchoChamberRiskLevel::Critical)
+            || matches!(
+                self.echo_chamber_risk,
+                EchoChamberRiskLevel::High | EchoChamberRiskLevel::Critical
+            )
             || self.rapid_convergence_warning
             || self.fragmentation_warning
             || self.harmony_coverage < 0.3
@@ -852,10 +862,18 @@ impl ProposalReflection {
             EchoChamberRiskLevel::Low => {}
         }
 
-        if self.rapid_convergence_warning { severity += 2; }
-        if self.fragmentation_warning { severity += 2; }
-        if self.harmony_coverage < 0.3 { severity += 2; }
-        if self.centralization > 0.8 { severity += 1; }
+        if self.rapid_convergence_warning {
+            severity += 2;
+        }
+        if self.fragmentation_warning {
+            severity += 2;
+        }
+        if self.harmony_coverage < 0.3 {
+            severity += 2;
+        }
+        if self.centralization > 0.8 {
+            severity += 1;
+        }
 
         severity.min(10)
     }
@@ -928,14 +946,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::PhiWeightedVote(vote) => validate_create_phi_vote(action, vote),
                 EntryTypes::QuadraticVote(vote) => validate_create_quadratic_vote(action, vote),
                 EntryTypes::VoiceCredits(credits) => validate_create_voice_credits(action, credits),
-                EntryTypes::Delegation(delegation) => validate_create_delegation(action, delegation),
+                EntryTypes::Delegation(delegation) => {
+                    validate_create_delegation(action, delegation)
+                }
                 EntryTypes::VoteTally(tally) => validate_create_tally(action, tally),
                 EntryTypes::PhiWeightedTally(tally) => validate_create_phi_tally(action, tally),
                 EntryTypes::QuadraticTally(tally) => validate_create_quadratic_tally(action, tally),
-                EntryTypes::EligibilityProof(proof) => validate_create_eligibility_proof(action, proof),
+                EntryTypes::EligibilityProof(proof) => {
+                    validate_create_eligibility_proof(action, proof)
+                }
                 EntryTypes::VerifiedVote(vote) => validate_create_verified_vote(action, vote),
-                EntryTypes::ProofAttestation(attestation) => validate_create_proof_attestation(action, attestation),
-                EntryTypes::ProposalReflection(reflection) => validate_create_proposal_reflection(action, reflection),
+                EntryTypes::ProofAttestation(attestation) => {
+                    validate_create_proof_attestation(action, attestation)
+                }
+                EntryTypes::ProposalReflection(reflection) => {
+                    validate_create_proposal_reflection(action, reflection)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -944,7 +970,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 original_entry_hash: _,
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::Vote(_) | EntryTypes::PhiWeightedVote(_) | EntryTypes::QuadraticVote(_) | EntryTypes::VerifiedVote(_) => {
+                EntryTypes::Vote(_)
+                | EntryTypes::PhiWeightedVote(_)
+                | EntryTypes::QuadraticVote(_)
+                | EntryTypes::VerifiedVote(_) => {
                     // Votes cannot be updated once cast
                     Ok(ValidateCallbackResult::Invalid(
                         "Votes cannot be modified after casting".into(),
@@ -963,11 +992,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     ))
                 }
                 EntryTypes::VoiceCredits(credits) => validate_update_voice_credits(action, credits),
-                EntryTypes::Delegation(delegation) => validate_update_delegation(action, delegation),
+                EntryTypes::Delegation(delegation) => {
+                    validate_update_delegation(action, delegation)
+                }
                 EntryTypes::VoteTally(tally) => validate_update_tally(action, tally),
                 EntryTypes::PhiWeightedTally(tally) => validate_update_phi_tally(action, tally),
                 EntryTypes::QuadraticTally(tally) => validate_update_quadratic_tally(action, tally),
-                EntryTypes::ProposalReflection(reflection) => validate_update_proposal_reflection(action, reflection),
+                EntryTypes::ProposalReflection(reflection) => {
+                    validate_update_proposal_reflection(action, reflection)
+                }
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -1015,10 +1048,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 /// Validate vote creation
-fn validate_create_vote(
-    _action: Create,
-    vote: Vote,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_vote(_action: Create, vote: Vote) -> ExternResult<ValidateCallbackResult> {
     // Validate voter is a DID
     if !vote.voter.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1187,14 +1217,12 @@ fn validate_create_phi_vote(
 
     // Validate voter meets Φ threshold for this tier
     if !pw.meets_threshold(&vote.proposal_tier) {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Voter Φ score ({:.2}) does not meet threshold ({:.2}) for {:?} tier",
-                pw.phi_score,
-                vote.proposal_tier.phi_threshold(),
-                vote.proposal_tier
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Voter Φ score ({:.2}) does not meet threshold ({:.2}) for {:?} tier",
+            pw.phi_score,
+            vote.proposal_tier.phi_threshold(),
+            vote.proposal_tier
+        )));
     }
 
     // Validate delegator if delegated
@@ -1429,13 +1457,11 @@ fn validate_create_eligibility_proof(
 
     // Validate proof size (prevent DoS attacks)
     if proof.proof_bytes.len() > EligibilityProof::MAX_PROOF_SIZE {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Proof size {} exceeds maximum {}",
-                proof.proof_bytes.len(),
-                EligibilityProof::MAX_PROOF_SIZE
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Proof size {} exceeds maximum {}",
+            proof.proof_bytes.len(),
+            EligibilityProof::MAX_PROOF_SIZE
+        )));
     }
 
     // Validate proof bytes are not empty
@@ -1509,12 +1535,10 @@ fn validate_create_verified_vote(
     // Cap effective weight (prevents inflation attacks)
     const MAX_VERIFIED_VOTE_WEIGHT: f64 = 2.0;
     if vote.effective_weight > MAX_VERIFIED_VOTE_WEIGHT {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Effective weight {} exceeds maximum {}",
-                vote.effective_weight, MAX_VERIFIED_VOTE_WEIGHT
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Effective weight {} exceeds maximum {}",
+            vote.effective_weight, MAX_VERIFIED_VOTE_WEIGHT
+        )));
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -1958,8 +1982,14 @@ mod tests {
     #[test]
     fn test_zk_proposal_type_from_u8() {
         assert_eq!(ZkProposalType::from_u8(0), Some(ZkProposalType::Standard));
-        assert_eq!(ZkProposalType::from_u8(1), Some(ZkProposalType::Constitutional));
-        assert_eq!(ZkProposalType::from_u8(2), Some(ZkProposalType::ModelGovernance));
+        assert_eq!(
+            ZkProposalType::from_u8(1),
+            Some(ZkProposalType::Constitutional)
+        );
+        assert_eq!(
+            ZkProposalType::from_u8(2),
+            Some(ZkProposalType::ModelGovernance)
+        );
         assert_eq!(ZkProposalType::from_u8(3), Some(ZkProposalType::Emergency));
         assert_eq!(ZkProposalType::from_u8(4), Some(ZkProposalType::Treasury));
         assert_eq!(ZkProposalType::from_u8(5), Some(ZkProposalType::Membership));
@@ -1969,16 +1999,29 @@ mod tests {
 
     #[test]
     fn test_zk_proposal_type_from_tier() {
-        assert_eq!(ZkProposalType::from_tier(&ProposalTier::Basic), ZkProposalType::Standard);
-        assert_eq!(ZkProposalType::from_tier(&ProposalTier::Major), ZkProposalType::Treasury);
-        assert_eq!(ZkProposalType::from_tier(&ProposalTier::Constitutional), ZkProposalType::Constitutional);
+        assert_eq!(
+            ZkProposalType::from_tier(&ProposalTier::Basic),
+            ZkProposalType::Standard
+        );
+        assert_eq!(
+            ZkProposalType::from_tier(&ProposalTier::Major),
+            ZkProposalType::Treasury
+        );
+        assert_eq!(
+            ZkProposalType::from_tier(&ProposalTier::Constitutional),
+            ZkProposalType::Constitutional
+        );
     }
 
     // ========================================================================
     // EligibilityProof tests
     // ========================================================================
 
-    fn make_proof(eligible: bool, proposal_type: ZkProposalType, expires_at: Option<Timestamp>) -> EligibilityProof {
+    fn make_proof(
+        eligible: bool,
+        proposal_type: ZkProposalType,
+        expires_at: Option<Timestamp>,
+    ) -> EligibilityProof {
         EligibilityProof {
             id: "proof-1".to_string(),
             voter_did: "did:test:voter".to_string(),
@@ -2001,13 +2044,21 @@ mod tests {
 
     #[test]
     fn test_eligibility_proof_not_expired_future() {
-        let proof = make_proof(true, ZkProposalType::Standard, Some(Timestamp::from_micros(1_000_000)));
+        let proof = make_proof(
+            true,
+            ZkProposalType::Standard,
+            Some(Timestamp::from_micros(1_000_000)),
+        );
         assert!(!proof.is_expired(Timestamp::from_micros(500_000)));
     }
 
     #[test]
     fn test_eligibility_proof_expired() {
-        let proof = make_proof(true, ZkProposalType::Standard, Some(Timestamp::from_micros(1_000_000)));
+        let proof = make_proof(
+            true,
+            ZkProposalType::Standard,
+            Some(Timestamp::from_micros(1_000_000)),
+        );
         assert!(proof.is_expired(Timestamp::from_micros(1_000_001)));
     }
 
@@ -2155,7 +2206,14 @@ mod tests {
 
     #[test]
     fn test_has_concerns_critical_echo_chamber() {
-        let r = make_reflection(EchoChamberRiskLevel::Critical, false, false, 0.8, 0.3, false);
+        let r = make_reflection(
+            EchoChamberRiskLevel::Critical,
+            false,
+            false,
+            0.8,
+            0.3,
+            false,
+        );
         assert!(r.has_concerns());
     }
 
@@ -2185,7 +2243,14 @@ mod tests {
 
     #[test]
     fn test_concern_severity_moderate_echo() {
-        let r = make_reflection(EchoChamberRiskLevel::Moderate, false, false, 0.8, 0.3, false);
+        let r = make_reflection(
+            EchoChamberRiskLevel::Moderate,
+            false,
+            false,
+            0.8,
+            0.3,
+            false,
+        );
         assert_eq!(r.concern_severity(), 1);
     }
 

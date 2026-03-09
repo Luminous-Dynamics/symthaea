@@ -21,7 +21,7 @@ use mycelix_finance_types::CurrencyStatus;
 async fn test_create_and_activate_currency() {
     println!("Test 1.1: Create and Activate Currency");
 
-    let (mut conductor, _agents, apps) = setup_finance_conductor(1).await;
+    let (conductor, _agents, apps) = setup_finance_conductor(1).await;
     let cell = &apps[0].cells()[0];
     let zome = cell.zome("currency_mint");
 
@@ -58,7 +58,7 @@ async fn test_create_and_activate_currency() {
 async fn test_full_lifecycle() {
     println!("Test 1.2: Full Lifecycle");
 
-    let (mut conductor, _agents, apps) = setup_finance_conductor(1).await;
+    let (conductor, _agents, apps) = setup_finance_conductor(1).await;
     let cell = &apps[0].cells()[0];
     let zome = cell.zome("currency_mint");
 
@@ -110,7 +110,7 @@ async fn test_full_lifecycle() {
 async fn test_draft_cannot_retire() {
     println!("Test 1.3: Draft Cannot Retire");
 
-    let (mut conductor, _agents, apps) = setup_finance_conductor(1).await;
+    let (conductor, _agents, apps) = setup_finance_conductor(1).await;
     let cell = &apps[0].cells()[0];
     let zome = cell.zome("currency_mint");
 
@@ -138,7 +138,7 @@ async fn test_draft_cannot_retire() {
 async fn test_cancel_exchange_guards() {
     println!("Test 14.1: Cancel Exchange Guards");
 
-    let (mut conductor, agents, apps) = setup_finance_conductor(2).await;
+    let (conductor, agents, apps) = setup_finance_conductor(2).await;
     let cell_a = &apps[0].cells()[0];
     let zome_a = cell_a.zome("currency_mint");
     let bob_did = format!("did:mycelix:{}", agents[1]);
@@ -239,7 +239,7 @@ async fn test_cancel_exchange_guards() {
 async fn test_redundant_lifecycle_transitions() {
     println!("Test 14.2: Redundant Lifecycle Transitions");
 
-    let (mut conductor, _agents, apps) = setup_finance_conductor(1).await;
+    let (conductor, _agents, apps) = setup_finance_conductor(1).await;
     let cell = &apps[0].cells()[0];
     let zome = cell.zome("currency_mint");
 

@@ -1,8 +1,6 @@
 //! Demurrage application and compost redistribution.
 
-use currency_mint_integrity::*;
 use hdk::prelude::*;
-use mycelix_finance_shared::anchor_hash;
 use mycelix_finance_types::{compute_minted_demurrage, CurrencyStatus};
 
 use crate::helpers::*;
@@ -48,55 +46,20 @@ pub fn apply_minted_demurrage(input: ApplyDemurrageInput) -> ExternResult<Demurr
     let deduction = compute_minted_demurrage(bal.balance, def.params.demurrage_rate, elapsed);
 
     if deduction > 0 {
-        // Apply deduction by updating balance
-        let anchor_key = format!("mbal:{}:{}", input.currency_id, input.member_did);
-        let links = get_links(
-            LinkQuery::try_new(
-                anchor_hash(&anchor_key)?,
-                LinkTypes::CurrencyMemberToBalance,
-            )?,
-            GetStrategy::default(),
-        )?;
-
-        if let Some(link) = links.first() {
-            if let Some(link_hash) = link.target.clone().into_action_hash() {
-                if let Ok(record) = follow_update_chain(link_hash) {
-                    if let Some(mut updated_bal) = record
-                        .entry()
-                        .to_app_option::<MintedBalance>()
-                        .ok()
-                        .flatten()
-                    {
-                        updated_bal.balance -= deduction;
-                        updated_bal.last_activity = now;
-                        update_entry(record.action_address().clone(), &updated_bal)?;
-                    }
-                }
-            }
-        }
+        // Apply deduction to member balance
+        mutate_balance(&input.member_did, &input.currency_id, |b| {
+            b.balance -= deduction;
+            b.last_activity = now;
+        })?;
 
         // Credit deducted amount to compost pseudo-member to preserve zero-sum.
-        // The compost balance accumulates demurrage for future redistribution.
         let compost_did = format!("did:mycelix:__compost__:{}", input.currency_id);
-        let mut compost =
-            get_or_create_minted_balance(compost_did.clone(), input.currency_id.clone())?;
-        let compost_anchor = format!("mbal:{}:{}", input.currency_id, compost_did);
-        let compost_links = get_links(
-            LinkQuery::try_new(
-                anchor_hash(&compost_anchor)?,
-                LinkTypes::CurrencyMemberToBalance,
-            )?,
-            GetStrategy::default(),
-        )?;
-        if let Some(link) = compost_links.first() {
-            if let Some(link_hash) = link.target.clone().into_action_hash() {
-                if let Ok(record) = follow_update_chain(link_hash) {
-                    compost.balance += deduction;
-                    compost.last_activity = now;
-                    update_entry(record.action_address().clone(), &compost)?;
-                }
-            }
-        }
+        // Ensure compost balance entry exists
+        let _ = get_or_create_minted_balance(compost_did.clone(), input.currency_id.clone())?;
+        mutate_balance(&compost_did, &input.currency_id, |b| {
+            b.balance += deduction;
+            b.last_activity = now;
+        })?;
     }
 
     Ok(DemurrageResult {
@@ -220,57 +183,17 @@ pub fn redistribute_compost(currency_id: String) -> ExternResult<RedistributeCom
 
     // Credit each member
     for did in &member_dids {
-        let anchor_key = format!("mbal:{}:{}", currency_id, did);
-        let links = get_links(
-            LinkQuery::try_new(
-                anchor_hash(&anchor_key)?,
-                LinkTypes::CurrencyMemberToBalance,
-            )?,
-            GetStrategy::default(),
-        )?;
-        if let Some(link) = links.first() {
-            if let Some(link_hash) = link.target.clone().into_action_hash() {
-                if let Ok(record) = follow_update_chain(link_hash) {
-                    if let Some(mut bal) = record
-                        .entry()
-                        .to_app_option::<MintedBalance>()
-                        .ok()
-                        .flatten()
-                    {
-                        bal.balance += per_member;
-                        bal.last_activity = now;
-                        update_entry(record.action_address().clone(), &bal)?;
-                    }
-                }
-            }
-        }
+        mutate_balance(did, &currency_id, |b| {
+            b.balance += per_member;
+            b.last_activity = now;
+        })?;
     }
 
     // Debit compost
-    let compost_anchor = format!("mbal:{}:{}", currency_id, compost_did);
-    let compost_links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&compost_anchor)?,
-            LinkTypes::CurrencyMemberToBalance,
-        )?,
-        GetStrategy::default(),
-    )?;
-    if let Some(link) = compost_links.first() {
-        if let Some(link_hash) = link.target.clone().into_action_hash() {
-            if let Ok(record) = follow_update_chain(link_hash) {
-                if let Some(mut bal) = record
-                    .entry()
-                    .to_app_option::<MintedBalance>()
-                    .ok()
-                    .flatten()
-                {
-                    bal.balance -= total_distributed;
-                    bal.last_activity = now;
-                    update_entry(record.action_address().clone(), &bal)?;
-                }
-            }
-        }
-    }
+    mutate_balance(&compost_did, &currency_id, |b| {
+        b.balance -= total_distributed;
+        b.last_activity = now;
+    })?;
 
     Ok(RedistributeCompostResult {
         currency_id,

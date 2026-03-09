@@ -32,7 +32,10 @@ impl TaggedPublicKey {
                 actual: key_bytes.len(),
             });
         }
-        Ok(Self { algorithm, key_bytes })
+        Ok(Self {
+            algorithm,
+            key_bytes,
+        })
     }
 
     /// Encode as multibase string: `z` + base58btc(multicodec_prefix || key_bytes).
@@ -84,7 +87,10 @@ impl TaggedPublicKey {
                         actual: key_bytes.len(),
                     });
                 }
-                return Ok(Self { algorithm, key_bytes });
+                return Ok(Self {
+                    algorithm,
+                    key_bytes,
+                });
             }
         }
 
@@ -127,7 +133,10 @@ impl TaggedSignature {
                 actual: signature_bytes.len(),
             });
         }
-        Ok(Self { algorithm, signature_bytes })
+        Ok(Self {
+            algorithm,
+            signature_bytes,
+        })
     }
 
     /// Encode as multibase: `z` + base58btc(multicodec_prefix || signature_bytes).
@@ -232,10 +241,10 @@ impl TaggedSignature {
                     None
                 }
             }
-            AlgorithmId::MlDsa65 | AlgorithmId::MlDsa87
-            | AlgorithmId::SlhDsaSha2_128s | AlgorithmId::SlhDsaShake128s => {
-                Some(&self.signature_bytes)
-            }
+            AlgorithmId::MlDsa65
+            | AlgorithmId::MlDsa87
+            | AlgorithmId::SlhDsaSha2_128s
+            | AlgorithmId::SlhDsaShake128s => Some(&self.signature_bytes),
             _ => None,
         }
     }
@@ -387,9 +396,18 @@ mod tests {
         let json = serde_json::to_string(&envelope).unwrap();
 
         // Verify field names are camelCase (serde default for snake_case fields)
-        assert!(json.contains("kem_algorithm"), "JSON should contain kem_algorithm field");
-        assert!(json.contains("encapsulated_key"), "JSON should contain encapsulated_key field");
-        assert!(json.contains("recipient_key_id"), "JSON should contain recipient_key_id field");
+        assert!(
+            json.contains("kem_algorithm"),
+            "JSON should contain kem_algorithm field"
+        );
+        assert!(
+            json.contains("encapsulated_key"),
+            "JSON should contain encapsulated_key field"
+        );
+        assert!(
+            json.contains("recipient_key_id"),
+            "JSON should contain recipient_key_id field"
+        );
 
         // Deserialize back
         let decoded: EncryptedEnvelope = serde_json::from_str(&json).unwrap();

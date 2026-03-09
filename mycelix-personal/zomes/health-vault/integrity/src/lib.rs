@@ -76,7 +76,10 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, action: _ }) => match app_entry {
+        FlatOp::StoreEntry(OpEntry::CreateEntry {
+            app_entry,
+            action: _,
+        }) => match app_entry {
             EntryTypes::HealthRecord(record) => validate_health_record(&record),
             EntryTypes::Biometric(biometric) => validate_biometric(&biometric),
             EntryTypes::ConsentGrant(consent) => validate_consent(&consent),
@@ -92,8 +95,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 const VALID_RECORD_TYPES: &[&str] = &[
-    "allergy", "medication", "condition", "vaccination",
-    "surgery", "lab_result", "imaging", "visit_note",
+    "allergy",
+    "medication",
+    "condition",
+    "vaccination",
+    "surgery",
+    "lab_result",
+    "imaging",
+    "visit_note",
 ];
 
 fn validate_health_record(record: &HealthRecord) -> ExternResult<ValidateCallbackResult> {
@@ -122,8 +131,14 @@ fn validate_health_record(record: &HealthRecord) -> ExternResult<ValidateCallbac
 }
 
 const VALID_METRIC_TYPES: &[&str] = &[
-    "heart_rate", "blood_pressure", "temperature", "weight",
-    "blood_oxygen", "glucose", "steps", "sleep_hours",
+    "heart_rate",
+    "blood_pressure",
+    "temperature",
+    "weight",
+    "blood_oxygen",
+    "glucose",
+    "steps",
+    "sleep_hours",
 ];
 
 fn validate_biometric(biometric: &Biometric) -> ExternResult<ValidateCallbackResult> {
@@ -205,8 +220,12 @@ mod tests {
         for rt in VALID_RECORD_TYPES {
             let r = make_record(rt);
             assert!(
-                matches!(validate_health_record(&r).unwrap(), ValidateCallbackResult::Valid),
-                "record_type '{}' should be valid", rt
+                matches!(
+                    validate_health_record(&r).unwrap(),
+                    ValidateCallbackResult::Valid
+                ),
+                "record_type '{}' should be valid",
+                rt
             );
         }
     }
@@ -254,7 +273,10 @@ mod tests {
     #[test]
     fn valid_biometric_passes() {
         let b = make_biometric("heart_rate", 72.0);
-        assert!(matches!(validate_biometric(&b).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_biometric(&b).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]
@@ -299,7 +321,10 @@ mod tests {
     #[test]
     fn valid_consent_passes() {
         let c = make_consent();
-        assert!(matches!(validate_consent(&c).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_consent(&c).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]

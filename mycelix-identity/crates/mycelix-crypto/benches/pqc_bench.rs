@@ -5,15 +5,17 @@
 //! Covers keygen, sign, and verify for all 5 signature algorithms,
 //! plus ML-KEM-768 encapsulate/decapsulate and XChaCha20-Poly1305 AEAD.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
+use mycelix_crypto::pqc::dilithium::{
+    MlDsa65Signer, MlDsa65Verifier, MlDsa87Signer, MlDsa87Verifier,
+};
 use mycelix_crypto::pqc::ed25519_native::{Ed25519Signer, Ed25519Verifier};
-use mycelix_crypto::pqc::dilithium::{MlDsa65Signer, MlDsa65Verifier, MlDsa87Signer, MlDsa87Verifier};
-use mycelix_crypto::pqc::sphincs::{SlhDsaSha2128sSigner, SlhDsaSha2128sVerifier};
+use mycelix_crypto::pqc::encryption::XChaCha20Encryptor;
 use mycelix_crypto::pqc::hybrid::{HybridSigner, HybridVerifier};
 use mycelix_crypto::pqc::ml_kem::MlKem768KeyPair;
-use mycelix_crypto::pqc::encryption::XChaCha20Encryptor;
-use mycelix_crypto::traits::{Signer, Verifier, KeyEncapsulator, Encryptor};
+use mycelix_crypto::pqc::sphincs::{SlhDsaSha2128sSigner, SlhDsaSha2128sVerifier};
+use mycelix_crypto::traits::{Encryptor, KeyEncapsulator, Signer, Verifier};
 
 // ============================================================================
 // Key generation benchmarks
@@ -99,21 +101,33 @@ fn bench_verify(c: &mut Criterion) {
     let ed_pk = ed_signer.public_key();
     let ed_sig = ed_signer.sign(&msg).unwrap();
     group.bench_function("Ed25519", |b| {
-        b.iter(|| Ed25519Verifier.verify(black_box(&ed_pk), black_box(&msg), black_box(&ed_sig)).unwrap())
+        b.iter(|| {
+            Ed25519Verifier
+                .verify(black_box(&ed_pk), black_box(&msg), black_box(&ed_sig))
+                .unwrap()
+        })
     });
 
     let ml65_signer = MlDsa65Signer::generate();
     let ml65_pk = ml65_signer.public_key();
     let ml65_sig = ml65_signer.sign(&msg).unwrap();
     group.bench_function("ML-DSA-65", |b| {
-        b.iter(|| MlDsa65Verifier.verify(black_box(&ml65_pk), black_box(&msg), black_box(&ml65_sig)).unwrap())
+        b.iter(|| {
+            MlDsa65Verifier
+                .verify(black_box(&ml65_pk), black_box(&msg), black_box(&ml65_sig))
+                .unwrap()
+        })
     });
 
     let ml87_signer = MlDsa87Signer::generate();
     let ml87_pk = ml87_signer.public_key();
     let ml87_sig = ml87_signer.sign(&msg).unwrap();
     group.bench_function("ML-DSA-87", |b| {
-        b.iter(|| MlDsa87Verifier.verify(black_box(&ml87_pk), black_box(&msg), black_box(&ml87_sig)).unwrap())
+        b.iter(|| {
+            MlDsa87Verifier
+                .verify(black_box(&ml87_pk), black_box(&msg), black_box(&ml87_sig))
+                .unwrap()
+        })
     });
 
     let slh_signer = SlhDsaSha2128sSigner::generate();
@@ -121,7 +135,11 @@ fn bench_verify(c: &mut Criterion) {
     let slh_sig = slh_signer.sign(&msg).unwrap();
     group.sample_size(10);
     group.bench_function("SLH-DSA-SHA2-128s", |b| {
-        b.iter(|| SlhDsaSha2128sVerifier.verify(black_box(&slh_pk), black_box(&msg), black_box(&slh_sig)).unwrap())
+        b.iter(|| {
+            SlhDsaSha2128sVerifier
+                .verify(black_box(&slh_pk), black_box(&msg), black_box(&slh_sig))
+                .unwrap()
+        })
     });
     group.sample_size(100);
 
@@ -129,7 +147,15 @@ fn bench_verify(c: &mut Criterion) {
     let hybrid_pk = hybrid_signer.public_key();
     let hybrid_sig = hybrid_signer.sign(&msg).unwrap();
     group.bench_function("Hybrid-Ed25519-ML-DSA-65", |b| {
-        b.iter(|| HybridVerifier.verify(black_box(&hybrid_pk), black_box(&msg), black_box(&hybrid_sig)).unwrap())
+        b.iter(|| {
+            HybridVerifier
+                .verify(
+                    black_box(&hybrid_pk),
+                    black_box(&msg),
+                    black_box(&hybrid_sig),
+                )
+                .unwrap()
+        })
     });
 
     group.finish();

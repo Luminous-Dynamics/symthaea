@@ -5,8 +5,8 @@
 //! and selective disclosure. Credentials are stored privately;
 //! presentation is done via personal_bridge.
 
-use hdk::prelude::*;
 use credential_wallet_integrity::*;
+use hdk::prelude::*;
 use personal_types::{
     AttestationStatus, CredentialType, KVectorComponent, TrustScoreRange, TrustTier,
 };
@@ -20,7 +20,12 @@ use personal_types::{
 pub fn store_credential(credential: StoredCredential) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::StoredCredential(credential.clone()))?;
     let agent = agent_info()?.agent_initial_pubkey;
-    create_link(agent, action_hash.clone(), LinkTypes::AgentToCredentials, ())?;
+    create_link(
+        agent,
+        action_hash.clone(),
+        LinkTypes::AgentToCredentials,
+        (),
+    )?;
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve stored credential".into()
     )))
@@ -47,8 +52,12 @@ pub fn get_my_credentials(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     let mut records = Vec::new();
     for link in links {
-        let target = ActionHash::try_from(link.target.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid link target: {:?}", e))))?;
+        let target = ActionHash::try_from(link.target.clone()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid link target: {:?}",
+                e
+            )))
+        })?;
         if let Some(record) = get(target, GetOptions::default())? {
             records.push(record);
         }
@@ -58,7 +67,9 @@ pub fn get_my_credentials(_: ()) -> ExternResult<Vec<Record>> {
 
 /// Get credentials of a specific type.
 #[hdk_extern]
-pub fn get_credentials_by_type(credential_type: CredentialType) -> ExternResult<Vec<StoredCredential>> {
+pub fn get_credentials_by_type(
+    credential_type: CredentialType,
+) -> ExternResult<Vec<StoredCredential>> {
     let all = get_my_credentials(())?;
     let mut matched = Vec::new();
     for record in all {
@@ -499,7 +510,9 @@ pub struct RequestAttestationInput {
 /// that meets the request's requirements. Issues a trust credential and
 /// marks the request as Fulfilled.
 #[hdk_extern]
-pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<FulfillAttestationResult> {
+pub fn fulfill_attestation(
+    input: FulfillAttestationInput,
+) -> ExternResult<FulfillAttestationResult> {
     if input.request_id.is_empty() || input.request_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Request ID must be 1-256 characters".into()
@@ -708,10 +721,7 @@ pub fn decline_attestation(input: DeclineAttestationInput) -> ExternResult<Recor
 
     let mut declined_req = req;
     declined_req.status = AttestationStatus::Declined;
-    let action_hash = update_entry(
-        original_hash,
-        &EntryTypes::AttestationRequest(declined_req),
-    )?;
+    let action_hash = update_entry(original_hash, &EntryTypes::AttestationRequest(declined_req))?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated request".into()

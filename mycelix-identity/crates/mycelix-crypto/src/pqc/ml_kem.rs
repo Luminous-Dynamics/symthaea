@@ -30,11 +30,7 @@ impl MlKem768KeyPair {
 
     /// Get the public key as a TaggedPublicKey.
     pub fn public_key(&self) -> TaggedPublicKey {
-        TaggedPublicKey::new(
-            AlgorithmId::MlKem768,
-            self.public_key.as_bytes().to_vec(),
-        )
-        .unwrap()
+        TaggedPublicKey::new(AlgorithmId::MlKem768, self.public_key.as_bytes().to_vec()).unwrap()
     }
 }
 
@@ -43,10 +39,7 @@ impl KeyEncapsulator for MlKem768KeyPair {
         AlgorithmId::MlKem768
     }
 
-    fn encapsulate(
-        &self,
-        public_key: &TaggedPublicKey,
-    ) -> Result<(Vec<u8>, Vec<u8>), CryptoError> {
+    fn encapsulate(&self, public_key: &TaggedPublicKey) -> Result<(Vec<u8>, Vec<u8>), CryptoError> {
         if public_key.algorithm != AlgorithmId::MlKem768 {
             return Err(CryptoError::Validation(format!(
                 "Expected ML-KEM-768 key, got {:?}",

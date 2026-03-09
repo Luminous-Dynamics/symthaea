@@ -270,7 +270,10 @@ mod tests {
 
     #[test]
     fn trust_score_range_serde_roundtrip() {
-        let range = TrustScoreRange { lower: 0.3, upper: 0.7 };
+        let range = TrustScoreRange {
+            lower: 0.3,
+            upper: 0.7,
+        };
         let json = serde_json::to_string(&range).unwrap();
         let back: TrustScoreRange = serde_json::from_str(&json).unwrap();
         assert_eq!(back, range);

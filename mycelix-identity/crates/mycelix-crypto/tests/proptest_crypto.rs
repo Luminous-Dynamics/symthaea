@@ -7,13 +7,15 @@
 
 use mycelix_crypto::algorithm::AlgorithmId;
 use mycelix_crypto::envelope::{TaggedPublicKey, TaggedSignature};
+use mycelix_crypto::pqc::dilithium::{
+    MlDsa65Signer, MlDsa65Verifier, MlDsa87Signer, MlDsa87Verifier,
+};
 use mycelix_crypto::pqc::ed25519_native::{Ed25519Signer, Ed25519Verifier};
-use mycelix_crypto::pqc::dilithium::{MlDsa65Signer, MlDsa65Verifier, MlDsa87Signer, MlDsa87Verifier};
-use mycelix_crypto::pqc::sphincs::{SlhDsaSha2128sSigner, SlhDsaSha2128sVerifier};
+use mycelix_crypto::pqc::encryption::XChaCha20Encryptor;
 use mycelix_crypto::pqc::hybrid::{HybridSigner, HybridVerifier};
 use mycelix_crypto::pqc::ml_kem::MlKem768KeyPair;
-use mycelix_crypto::pqc::encryption::XChaCha20Encryptor;
-use mycelix_crypto::traits::{Signer, Verifier, KeyEncapsulator, Encryptor};
+use mycelix_crypto::pqc::sphincs::{SlhDsaSha2128sSigner, SlhDsaSha2128sVerifier};
+use mycelix_crypto::traits::{Encryptor, KeyEncapsulator, Signer, Verifier};
 use proptest::prelude::*;
 
 // ============================================================================
@@ -191,8 +193,16 @@ fn mldsa65_key_size_invariant() {
     let signer = MlDsa65Signer::generate();
     let pk = signer.public_key();
     let sig = signer.sign(b"test").unwrap();
-    assert_eq!(pk.key_bytes.len(), 1952, "ML-DSA-65 pubkey must be 1952 bytes");
-    assert_eq!(sig.signature_bytes.len(), 3309, "ML-DSA-65 sig must be 3309 bytes");
+    assert_eq!(
+        pk.key_bytes.len(),
+        1952,
+        "ML-DSA-65 pubkey must be 1952 bytes"
+    );
+    assert_eq!(
+        sig.signature_bytes.len(),
+        3309,
+        "ML-DSA-65 sig must be 3309 bytes"
+    );
 }
 
 #[test]
@@ -218,8 +228,16 @@ fn hybrid_key_size_invariant() {
     let signer = HybridSigner::generate();
     let pk = signer.public_key();
     let sig = signer.sign(b"test").unwrap();
-    assert_eq!(pk.key_bytes.len(), 32 + 1952, "Hybrid pubkey = Ed25519 + ML-DSA-65");
-    assert_eq!(sig.signature_bytes.len(), 64 + 3309, "Hybrid sig = Ed25519 + ML-DSA-65");
+    assert_eq!(
+        pk.key_bytes.len(),
+        32 + 1952,
+        "Hybrid pubkey = Ed25519 + ML-DSA-65"
+    );
+    assert_eq!(
+        sig.signature_bytes.len(),
+        64 + 3309,
+        "Hybrid sig = Ed25519 + ML-DSA-65"
+    );
 }
 
 // ============================================================================
@@ -480,8 +498,10 @@ fn pubkey_truncated_multibase_rejected() {
     // Should either error or produce a different key
     match result {
         Err(_) => {} // Expected
-        Ok(restored) => assert_ne!(restored.key_bytes, pk.key_bytes,
-            "Truncated multibase should not produce original key"),
+        Ok(restored) => assert_ne!(
+            restored.key_bytes, pk.key_bytes,
+            "Truncated multibase should not produce original key"
+        ),
     }
 }
 
@@ -494,7 +514,9 @@ fn sig_truncated_multibase_rejected() {
     let result = TaggedSignature::from_multibase(truncated);
     match result {
         Err(_) => {}
-        Ok(restored) => assert_ne!(restored.signature_bytes, sig.signature_bytes,
-            "Truncated multibase should not produce original sig"),
+        Ok(restored) => assert_ne!(
+            restored.signature_bytes, sig.signature_bytes,
+            "Truncated multibase should not produce original sig"
+        ),
     }
 }

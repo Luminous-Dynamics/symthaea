@@ -3,9 +3,9 @@
 //!
 //! Updated to use HDK 0.6 patterns
 
-use hdk::prelude::*;
 use did_registry_integrity::*;
-use mycelix_crypto::{AlgorithmId, TaggedPublicKey, CryptoError};
+use hdk::prelude::*;
+use mycelix_crypto::{AlgorithmId, CryptoError, TaggedPublicKey};
 
 /// API version for cross-zome compatibility detection.
 /// Increment when making breaking changes to extern signatures or types.
@@ -30,8 +30,15 @@ fn validate_multibase_key(key: &str) -> Result<AlgorithmId, String> {
     TaggedPublicKey::from_multibase(key)
         .map(|tagged| tagged.algorithm)
         .map_err(|e| match e {
-            CryptoError::InvalidKeyLength { algorithm, expected, actual } => {
-                format!("Invalid {} key length: expected {}, got {}", algorithm, expected, actual)
+            CryptoError::InvalidKeyLength {
+                algorithm,
+                expected,
+                actual,
+            } => {
+                format!(
+                    "Invalid {} key length: expected {}, got {}",
+                    algorithm, expected, actual
+                )
             }
             CryptoError::InvalidMultibase(msg) => format!("Invalid multibase key: {}", msg),
             CryptoError::Base58Decode(msg) => format!("Invalid base58btc encoding: {}", msg),
@@ -94,11 +101,17 @@ fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult
             Ok(())
         }
         ZomeCallResponse::NetworkError(err) => {
-            warn!("MFA zome network error: {} - DID created WITHOUT MFA state", err);
+            warn!(
+                "MFA zome network error: {} - DID created WITHOUT MFA state",
+                err
+            );
             Ok(())
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            warn!("MFA zome countersigning error: {} - DID created WITHOUT MFA state", err);
+            warn!(
+                "MFA zome countersigning error: {} - DID created WITHOUT MFA state",
+                err
+            );
             Ok(())
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
@@ -185,7 +198,9 @@ pub fn create_did() -> ExternResult<Record> {
     // Create default verification method
     let verification_method = VerificationMethod {
         id: format!("{}#keys-1", did_id),
-        type_: AlgorithmId::Ed25519.did_verification_method_type().to_string(),
+        type_: AlgorithmId::Ed25519
+            .did_verification_method_type()
+            .to_string(),
         controller: did_id.clone(),
         public_key_multibase: format!("z{}", agent_pub_key),
         algorithm: Some(AlgorithmId::Ed25519.as_u16()),
@@ -225,15 +240,15 @@ pub fn create_did() -> ExternResult<Record> {
     let payload = serde_json::json!({
         "did": did_id,
         "event": "did_created",
-    }).to_string();
+    })
+    .to_string();
     if let Err(e) = notify_bridge_of_did_event(&did_id, "DidCreated", &payload) {
         debug!("Failed to notify bridge of DID creation: {:?}", e);
     }
 
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created DID".into()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find created DID".into())
+    ))?;
 
     Ok(record)
 }
@@ -253,9 +268,8 @@ pub fn get_did_document(agent_pub_key: AgentPubKey) -> ExternResult<Option<Recor
     // Get the latest DID document
     let latest_link = links.into_iter().max_by_key(|l| l.timestamp);
     if let Some(link) = latest_link {
-        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         get(action_hash, GetOptions::default())
     } else {
         Ok(None)
@@ -272,11 +286,11 @@ pub fn resolve_did(did: String) -> ExternResult<Option<Record>> {
         )));
     }
 
-    let agent_str = did.strip_prefix("did:mycelix:")
+    let agent_str = did
+        .strip_prefix("did:mycelix:")
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid DID format".into())))?;
-    let agent_pub_key = AgentPubKey::try_from(agent_str).map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into()))
-    })?;
+    let agent_pub_key = AgentPubKey::try_from(agent_str)
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into())))?;
 
     get_did_document(agent_pub_key)
 }
@@ -287,20 +301,30 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
     // Input validation
     if let Some(ref methods) = input.verification_method {
         if methods.len() > 100 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Verification methods must not exceed 100 entries".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Verification methods must not exceed 100 entries".into()
+            )));
         }
         for method in methods {
             if method.id.is_empty() || method.id.len() > 256 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Verification method ID must be 1-256 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Verification method ID must be 1-256 characters".into()
+                )));
             }
             if method.type_.is_empty() || method.type_.len() > 256 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Verification method type must be 1-256 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Verification method type must be 1-256 characters".into()
+                )));
             }
             if method.controller.is_empty() || method.controller.len() > 256 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Verification method controller must be 1-256 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Verification method controller must be 1-256 characters".into()
+                )));
             }
             if method.public_key_multibase.is_empty() || method.public_key_multibase.len() > 4096 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Public key multibase must be 1-4096 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Public key multibase must be 1-4096 characters".into()
+                )));
             }
             // Note: multibase key format validation is handled by the individual
             // add functions (add_verification_method, add_key_agreement) which
@@ -311,27 +335,39 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
     }
     if let Some(ref auth) = input.authentication {
         if auth.len() > 100 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Authentication entries must not exceed 100".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Authentication entries must not exceed 100".into()
+            )));
         }
         for a in auth {
             if a.is_empty() || a.len() > 256 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Authentication entry must be 1-256 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Authentication entry must be 1-256 characters".into()
+                )));
             }
         }
     }
     if let Some(ref services) = input.service {
         if services.len() > 100 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Service endpoints must not exceed 100 entries".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Service endpoints must not exceed 100 entries".into()
+            )));
         }
         for svc in services {
             if svc.id.is_empty() || svc.id.len() > 256 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Service endpoint ID must be 1-256 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Service endpoint ID must be 1-256 characters".into()
+                )));
             }
             if svc.type_.is_empty() || svc.type_.len() > 256 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Service endpoint type must be 1-256 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Service endpoint type must be 1-256 characters".into()
+                )));
             }
             if svc.service_endpoint.is_empty() || svc.service_endpoint.len() > 4096 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Service endpoint URL must be 1-4096 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Service endpoint URL must be 1-4096 characters".into()
+                )));
             }
         }
     }
@@ -347,7 +383,9 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID entry".into()
+        )))?;
 
     let now = sys_time()?;
 
@@ -428,15 +466,15 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
         "did": current_did.id,
         "version": current_did.version + 1,
         "event": "did_updated",
-    }).to_string();
+    })
+    .to_string();
     if let Err(e) = notify_bridge_of_did_event(&current_did.id, "DidUpdated", &payload) {
         debug!("Failed to notify bridge of DID update: {:?}", e);
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated DID".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated DID".into()
+    )))
 }
 
 /// Input for updating a DID document
@@ -456,7 +494,9 @@ pub struct UpdateDidInput {
 pub fn deactivate_did(reason: String) -> ExternResult<Record> {
     // Input validation
     if reason.is_empty() || reason.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-4096 characters".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -470,7 +510,9 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID entry".into()
+        )))?;
 
     // Idempotent: if already deactivated, return the existing deactivation record
     if !is_did_active(current_did.id.clone())? {
@@ -481,12 +523,13 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         )?;
         if let Some(link) = deactivation_links.into_iter().max_by_key(|l| l.timestamp) {
             let existing_hash = ActionHash::try_from(link.target).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid deactivation link target".into()))
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid deactivation link target".into()
+                ))
             })?;
-            return get(existing_hash, GetOptions::default())?
-                .ok_or(wasm_error!(WasmErrorInner::Guest(
-                    "Deactivation record not found".into()
-                )));
+            return get(existing_hash, GetOptions::default())?.ok_or(wasm_error!(
+                WasmErrorInner::Guest("Deactivation record not found".into())
+            ));
         }
         // Fallback: links gone but DID is inactive (shouldn't happen)
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -524,14 +567,17 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         debug!("Failed to notify bridge of DID deactivation: {:?}", e);
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find deactivation record".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find deactivation record".into()
+    )))
 }
 
 /// Notify bridge of DID deactivation via cross-zome call
-fn notify_bridge_of_deactivation(did: &str, reason: &str, deactivated_at: Timestamp) -> ExternResult<()> {
+fn notify_bridge_of_deactivation(
+    did: &str,
+    reason: &str,
+    deactivated_at: Timestamp,
+) -> ExternResult<()> {
     #[derive(Serialize, Deserialize, Debug)]
     struct DidDeactivatedNotification {
         did: String,
@@ -572,7 +618,11 @@ fn notify_bridge_of_deactivation(did: &str, reason: &str, deactivated_at: Timest
 }
 
 /// Cascade-revoke all credentials issued by a deactivated DID via cross-zome call
-fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: Timestamp) -> ExternResult<()> {
+fn cascade_revoke_credentials_for_did(
+    did: &str,
+    reason: &str,
+    _deactivated_at: Timestamp,
+) -> ExternResult<()> {
     #[derive(Serialize, Deserialize, Debug)]
     struct BatchRevokeInput {
         credential_ids: Vec<String>,
@@ -599,9 +649,10 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
                     did, e
                 )))
             })?;
-            records.iter().filter_map(|r| {
-                r.action().entry_hash().map(|h| h.to_string())
-            }).collect()
+            records
+                .iter()
+                .filter_map(|r| r.action().entry_hash().map(|h| h.to_string()))
+                .collect()
         }
         ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -652,7 +703,10 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
 
     match response {
         ZomeCallResponse::Ok(_) => {
-            debug!("Successfully cascade-revoked credentials for deactivated DID: {}", did);
+            debug!(
+                "Successfully cascade-revoked credentials for deactivated DID: {}",
+                did
+            );
             Ok(())
         }
         ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
@@ -661,24 +715,19 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
                 zome, fn_name, did
             ))))
         }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Cascade batch revocation network error: {} did={}",
-                err, did
-            ))))
-        }
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cascade batch revocation network error: {} did={}",
+            err, did
+        )))),
         ZomeCallResponse::CountersigningSession(err) => {
             Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "Cascade batch revocation countersigning error: {} did={}",
                 err, did
             ))))
         }
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Cascade batch revocation auth failed: did={}",
-                did
-            ))))
-        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cascade batch revocation auth failed: did={}", did)
+        ))),
     }
 }
 
@@ -698,11 +747,11 @@ pub fn is_did_active(did: String) -> ExternResult<bool> {
         )));
     }
 
-    let agent_str = did.strip_prefix("did:mycelix:")
+    let agent_str = did
+        .strip_prefix("did:mycelix:")
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid DID format".into())))?;
-    let agent_pub_key = AgentPubKey::try_from(agent_str).map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into()))
-    })?;
+    let agent_pub_key = AgentPubKey::try_from(agent_str)
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into())))?;
 
     // Check for deactivation links - if any exist, DID is deactivated
     let deactivation_links = get_links(
@@ -729,11 +778,11 @@ pub fn get_did_deactivation(did: String) -> ExternResult<Option<DidDeactivation>
         )));
     }
 
-    let agent_str = did.strip_prefix("did:mycelix:")
+    let agent_str = did
+        .strip_prefix("did:mycelix:")
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid DID format".into())))?;
-    let agent_pub_key = AgentPubKey::try_from(agent_str).map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into()))
-    })?;
+    let agent_pub_key = AgentPubKey::try_from(agent_str)
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into())))?;
 
     // Get deactivation links
     let deactivation_links = get_links(
@@ -748,16 +797,17 @@ pub fn get_did_deactivation(did: String) -> ExternResult<Option<DidDeactivation>
     // Get the most recent deactivation record
     let latest_link = deactivation_links.into_iter().max_by_key(|l| l.timestamp);
     if let Some(link) = latest_link {
-        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
         if let Some(record) = get(action_hash, GetOptions::default())? {
             let deactivation: DidDeactivation = record
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid deactivation entry".into())))?;
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid deactivation entry".into()
+                )))?;
             return Ok(Some(deactivation));
         }
     }
@@ -770,13 +820,19 @@ pub fn get_did_deactivation(did: String) -> ExternResult<Option<DidDeactivation>
 pub fn add_service_endpoint(service: ServiceEndpoint) -> ExternResult<Record> {
     // Input validation
     if service.id.is_empty() || service.id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Service endpoint ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Service endpoint ID must be 1-256 characters".into()
+        )));
     }
     if service.type_.is_empty() || service.type_.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Service endpoint type must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Service endpoint type must be 1-256 characters".into()
+        )));
     }
     if service.service_endpoint.is_empty() || service.service_endpoint.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Service endpoint URL must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Service endpoint URL must be 1-4096 characters".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -789,7 +845,9 @@ pub fn add_service_endpoint(service: ServiceEndpoint) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID entry".into()
+        )))?;
 
     let mut services = current_did.service.clone();
     services.push(service);
@@ -815,7 +873,9 @@ pub fn remove_service_endpoint(service_id: String) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID entry".into()
+        )))?;
 
     let services: Vec<ServiceEndpoint> = current_did
         .service
@@ -836,23 +896,32 @@ pub fn remove_service_endpoint(service_id: String) -> ExternResult<Record> {
 pub fn add_verification_method(method: VerificationMethod) -> ExternResult<Record> {
     // Input validation
     if method.id.is_empty() || method.id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Verification method ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Verification method ID must be 1-256 characters".into()
+        )));
     }
     if method.type_.is_empty() || method.type_.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Verification method type must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Verification method type must be 1-256 characters".into()
+        )));
     }
     if method.controller.is_empty() || method.controller.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Verification method controller must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Verification method controller must be 1-256 characters".into()
+        )));
     }
     if method.public_key_multibase.is_empty() || method.public_key_multibase.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Public key multibase must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Public key multibase must be 1-4096 characters".into()
+        )));
     }
 
     // Validate multibase key format (algorithm-agnostic)
     if let Err(e) = validate_multibase_key(&method.public_key_multibase) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid multibase key: {}", e)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid multibase key: {}",
+            e
+        ))));
     }
 
     let agent_info = agent_info()?;
@@ -865,7 +934,9 @@ pub fn add_verification_method(method: VerificationMethod) -> ExternResult<Recor
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID entry".into()
+        )))?;
 
     let mut methods = current_did.verification_method.clone();
     methods.push(method);
@@ -921,7 +992,9 @@ pub fn add_key_agreement(method: VerificationMethod) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID entry".into()
+        )))?;
 
     // Add the KEM key as a verification method
     let mut methods = current_did.verification_method.clone();
@@ -985,9 +1058,10 @@ pub fn rotate_key(input: RotateKeyInput) -> ExternResult<Record> {
 
     // Validate the new key format
     if let Err(e) = validate_multibase_key(&input.new_method.public_key_multibase) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid new key: {}", e)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid new key: {}",
+            e
+        ))));
     }
 
     let agent_info = agent_info()?;
@@ -1000,7 +1074,9 @@ pub fn rotate_key(input: RotateKeyInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID entry".into()
+        )))?;
 
     // Find the old key
     let old_key_idx = current_did
@@ -1096,7 +1172,9 @@ pub fn rotate_key_agreement(input: RotateKeyAgreementInput) -> ExternResult<Reco
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID entry".into()
+        )))?;
 
     // Find the old KEM key in verification_method
     let old_key_idx = current_did
@@ -1211,7 +1289,8 @@ pub fn claim_recovered_did(input: ClaimRecoveredDidInput) -> ExternResult<Record
         ZomeCallResponse::Ok(result) => {
             let record: Option<Record> = result.decode().map_err(|e| {
                 wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode recovery request: {:?}", e
+                    "Failed to decode recovery request: {:?}",
+                    e
                 )))
             })?;
             let rec = record.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -1253,18 +1332,21 @@ pub fn claim_recovered_did(input: ClaimRecoveredDidInput) -> ExternResult<Record
     }
 
     // Parse original agent pubkey from DID for linking
-    let original_agent_str = input.did.strip_prefix("did:mycelix:")
+    let original_agent_str = input
+        .did
+        .strip_prefix("did:mycelix:")
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid DID format".into())))?;
-    let original_agent = AgentPubKey::try_from(original_agent_str).map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into()))
-    })?;
+    let original_agent = AgentPubKey::try_from(original_agent_str)
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into())))?;
 
     let now = sys_time()?;
 
     // Create new DID document controlled by the new agent
     let verification_method = VerificationMethod {
         id: format!("{}#recovery-key-1", input.did),
-        type_: AlgorithmId::Ed25519.did_verification_method_type().to_string(),
+        type_: AlgorithmId::Ed25519
+            .did_verification_method_type()
+            .to_string(),
         controller: input.did.clone(),
         public_key_multibase: format!("z{}", new_agent),
         algorithm: Some(AlgorithmId::Ed25519.as_u16()),
@@ -1308,10 +1390,9 @@ pub fn claim_recovered_did(input: ClaimRecoveredDidInput) -> ExternResult<Record
         debug!("Failed to auto-create MFA state for recovered DID: {:?}", e);
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find recovered DID document".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find recovered DID document".into()
+    )))
 }
 
 // =============================================================================
@@ -1331,8 +1412,8 @@ mod tests {
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        let alg = validate_multibase_key(&multibase)
-            .expect("Ed25519 multicodec key should validate");
+        let alg =
+            validate_multibase_key(&multibase).expect("Ed25519 multicodec key should validate");
         assert_eq!(alg, AlgorithmId::Ed25519);
     }
 
@@ -1359,8 +1440,8 @@ mod tests {
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        let alg = validate_multibase_key(&multibase)
-            .expect("ML-DSA-65 multicodec key should validate");
+        let alg =
+            validate_multibase_key(&multibase).expect("ML-DSA-65 multicodec key should validate");
         assert_eq!(alg, AlgorithmId::MlDsa65);
     }
 
@@ -1502,7 +1583,10 @@ mod tests {
 
         // Remove old key references
         auth.retain(|a| a != old_key_id);
-        assert!(auth.is_empty(), "All references to old key should be removed");
+        assert!(
+            auth.is_empty(),
+            "All references to old key should be removed"
+        );
 
         // Add new key
         if !auth.contains(&new_key_id.to_string()) {
@@ -1514,15 +1598,13 @@ mod tests {
     #[test]
     fn test_rotate_key_methods_update_logic() {
         // Simulate the methods update logic from rotate_key
-        let mut methods = vec![
-            VerificationMethod {
-                id: "#keys-1".into(),
-                type_: "Ed25519VerificationKey2020".into(),
-                controller: "did:mycelix:test".into(),
-                public_key_multibase: make_test_multibase_key(0xAA),
-                algorithm: None,
-            },
-        ];
+        let mut methods = vec![VerificationMethod {
+            id: "#keys-1".into(),
+            type_: "Ed25519VerificationKey2020".into(),
+            controller: "did:mycelix:test".into(),
+            public_key_multibase: make_test_multibase_key(0xAA),
+            algorithm: None,
+        }];
 
         let version = 1u32;
         let old_key_idx = 0;
@@ -1576,7 +1658,10 @@ mod tests {
 
         // Remove old key references
         ka.retain(|k| k != old_key_id);
-        assert!(ka.is_empty(), "All references to old KEM key should be removed");
+        assert!(
+            ka.is_empty(),
+            "All references to old KEM key should be removed"
+        );
 
         // Add new key
         if !ka.contains(&new_key_id.to_string()) {

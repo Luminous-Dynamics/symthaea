@@ -254,62 +254,26 @@ pub fn get_currency(currency_id: String) -> ExternResult<Option<CurrencyDefiniti
 /// Get all currencies created by a DAO.
 #[hdk_extern]
 pub fn get_dao_currencies(dao_did: String) -> ExternResult<Vec<CurrencyDefinition>> {
-    let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("dao-currencies:{}", dao_did))?,
-            LinkTypes::DaoToCurrencies,
-        )?,
-        GetStrategy::default(),
+    let entries = collect_linked_entries::<CurrencyDefinition>(
+        &format!("dao-currencies:{}", dao_did),
+        LinkTypes::DaoToCurrencies,
     )?;
-
-    let mut currencies = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(def) = record
-                    .entry()
-                    .to_app_option::<CurrencyDefinition>()
-                    .ok()
-                    .flatten()
-                {
-                    currencies.push(def);
-                }
-            }
-        }
-    }
-    Ok(currencies)
+    Ok(entries.into_iter().map(|(def, _)| def).collect())
 }
 
 /// List all Active currencies across all DAOs (global discovery).
 #[hdk_extern]
 pub fn list_active_currencies(_: ()) -> ExternResult<Vec<CurrencyDefinition>> {
-    let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash("all-active-currencies")?,
-            LinkTypes::DaoToCurrencies,
-        )?,
-        GetStrategy::default(),
+    let entries = collect_linked_entries::<CurrencyDefinition>(
+        "all-active-currencies",
+        LinkTypes::DaoToCurrencies,
     )?;
-
-    let mut currencies = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(def) = record
-                    .entry()
-                    .to_app_option::<CurrencyDefinition>()
-                    .ok()
-                    .flatten()
-                {
-                    // Only include actually Active currencies (link may be stale)
-                    if def.status == CurrencyStatus::Active {
-                        currencies.push(def);
-                    }
-                }
-            }
-        }
-    }
-    Ok(currencies)
+    // Only include actually Active currencies (link may be stale)
+    Ok(entries
+        .into_iter()
+        .map(|(def, _)| def)
+        .filter(|def| def.status == CurrencyStatus::Active)
+        .collect())
 }
 
 /// Search active currencies by name or symbol (case-insensitive substring match).
@@ -319,35 +283,19 @@ pub fn list_active_currencies(_: ()) -> ExternResult<Vec<CurrencyDefinition>> {
 #[hdk_extern]
 pub fn search_currencies(query: String) -> ExternResult<Vec<CurrencyDefinition>> {
     let query_lower = query.to_lowercase();
-    let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash("all-active-currencies")?,
-            LinkTypes::DaoToCurrencies,
-        )?,
-        GetStrategy::default(),
+    let entries = collect_linked_entries::<CurrencyDefinition>(
+        "all-active-currencies",
+        LinkTypes::DaoToCurrencies,
     )?;
-
-    let mut results = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(def) = record
-                    .entry()
-                    .to_app_option::<CurrencyDefinition>()
-                    .ok()
-                    .flatten()
-                {
-                    if def.status == CurrencyStatus::Active
-                        && (def.params.name.to_lowercase().contains(&query_lower)
-                            || def.params.symbol.to_lowercase().contains(&query_lower))
-                    {
-                        results.push(def);
-                    }
-                }
-            }
-        }
-    }
-    Ok(results)
+    Ok(entries
+        .into_iter()
+        .map(|(def, _)| def)
+        .filter(|def| {
+            def.status == CurrencyStatus::Active
+                && (def.params.name.to_lowercase().contains(&query_lower)
+                    || def.params.symbol.to_lowercase().contains(&query_lower))
+        })
+        .collect())
 }
 
 /// Amend the parameters of an existing currency.

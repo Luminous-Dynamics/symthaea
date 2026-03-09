@@ -52,20 +52,30 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
     // Input validation
     if proposal.title.is_empty() || proposal.title.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Title must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Title must be 1-256 characters".into()
+        )));
     }
     if proposal.description.is_empty() || proposal.description.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Description must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Description must be 1-4096 characters".into()
+        )));
     }
     if proposal.id.is_empty() || proposal.id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if proposal.author.is_empty() || proposal.author.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Author must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Author must be 1-256 characters".into()
+        )));
     }
     if let Some(ref url) = proposal.discussion_url {
         if url.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Discussion URL must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Discussion URL must be at most 4096 characters".into()
+            )));
         }
     }
 
@@ -124,10 +134,9 @@ pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created proposal".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created proposal".into()
+    )))
 }
 
 /// Get a proposal by ID (O(1) link-based lookup with chain scan fallback)
@@ -198,7 +207,10 @@ pub fn get_active_proposals(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_proposals_by_author(author_did: String) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("author:{}", author_did))?, LinkTypes::AuthorToProposal)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("author:{}", author_did))?,
+            LinkTypes::AuthorToProposal,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -224,11 +236,14 @@ pub fn get_proposals_by_author(author_did: String) -> ExternResult<Vec<Record>> 
 #[hdk_extern]
 pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> {
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
 
-    let current_record = get_proposal(input.proposal_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Proposal not found".into())))?;
+    let current_record = get_proposal(input.proposal_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Proposal not found".into())
+    ))?;
 
     let current_proposal: Proposal = current_record
         .entry()
@@ -242,14 +257,19 @@ pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> 
     let is_author_transition = matches!(
         (&current_proposal.status, &input.new_status),
         (ProposalStatus::Draft, ProposalStatus::Active)
-        | (ProposalStatus::Draft, ProposalStatus::Cancelled)
-        | (ProposalStatus::Active, ProposalStatus::Cancelled)
+            | (ProposalStatus::Draft, ProposalStatus::Cancelled)
+            | (ProposalStatus::Active, ProposalStatus::Cancelled)
     );
 
     if is_author_transition {
         let agent_info = agent_info()?;
-        let author_key = current_proposal.author.strip_prefix("did:mycelix:")
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid author DID format".into())))?;
+        let author_key =
+            current_proposal
+                .author
+                .strip_prefix("did:mycelix:")
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid author DID format".into()
+                )))?;
         if agent_info.agent_initial_pubkey.to_string() != author_key {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Only the proposal author can perform this status transition".into()
@@ -308,10 +328,9 @@ pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> 
         }
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated proposal".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated proposal".into()
+    )))
 }
 
 /// Input for updating proposal status
@@ -325,12 +344,15 @@ pub struct UpdateStatusInput {
 #[hdk_extern]
 pub fn cancel_proposal(proposal_id: String) -> ExternResult<Record> {
     if proposal_id.is_empty() || proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
 
     let agent_info = agent_info()?;
-    let current_record = get_proposal(proposal_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Proposal not found".into())))?;
+    let current_record = get_proposal(proposal_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Proposal not found".into())
+    ))?;
 
     let current_proposal: Proposal = current_record
         .entry()
@@ -341,8 +363,12 @@ pub fn cancel_proposal(proposal_id: String) -> ExternResult<Record> {
         )))?;
 
     // Verify author (simplified - would use DID lookup in production)
-    let author_key = current_proposal.author.strip_prefix("did:mycelix:")
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid author DID".into())))?;
+    let author_key = current_proposal
+        .author
+        .strip_prefix("did:mycelix:")
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid author DID".into()
+        )))?;
 
     if agent_info.agent_initial_pubkey.to_string() != author_key {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -364,21 +390,28 @@ pub fn cancel_proposal(proposal_id: String) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn finalize_proposal_with_signature(input: FinalizeWithSignatureInput) -> ExternResult<Record> {
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if input.signature_id.is_empty() || input.signature_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Signature ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Signature ID must be 1-256 characters".into()
+        )));
     }
 
     // Verify the proposal exists and is in Approved status
-    let current_record = get_proposal(input.proposal_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Proposal not found".into())))?;
+    let current_record = get_proposal(input.proposal_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Proposal not found".into())
+    ))?;
 
     let current_proposal: Proposal = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid proposal entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid proposal entry".into()
+        )))?;
 
     if current_proposal.status != ProposalStatus::Approved {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -389,7 +422,9 @@ pub fn finalize_proposal_with_signature(input: FinalizeWithSignatureInput) -> Ex
 
     // Verify threshold signature exists via cross-zome call
     let sig_io = governance_utils::call_local(
-        "threshold_signing", "get_proposal_signature", input.proposal_id.clone(),
+        "threshold_signing",
+        "get_proposal_signature",
+        input.proposal_id.clone(),
     )?;
     if let Ok(maybe_record) = sig_io.decode::<Option<Record>>() {
         if maybe_record.is_none() {
@@ -417,10 +452,9 @@ pub struct FinalizeWithSignatureInput {
 /// Generate next proposal ID
 #[hdk_extern]
 pub fn generate_proposal_id(_: ()) -> ExternResult<String> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::Proposal,
-        )?));
+    let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(
+        UnitEntryTypes::Proposal,
+    )?));
 
     let records = query(filter)?;
     let next_number = records.len() + 1;
@@ -448,23 +482,33 @@ use std::collections::{HashMap, HashSet};
 pub fn add_contribution(input: AddContributionInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if input.contributor_did.is_empty() || input.contributor_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Contributor DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Contributor DID must be 1-256 characters".into()
+        )));
     }
     if input.content.is_empty() || input.content.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Content must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Content must be 1-4096 characters".into()
+        )));
     }
     if let Some(ref parent_id) = input.parent_id {
         if parent_id.is_empty() || parent_id.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Parent ID must be 1-256 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Parent ID must be 1-256 characters".into()
+            )));
         }
     }
     if let Some(ref tags) = input.harmony_tags {
         for tag in tags {
             if tag.is_empty() || tag.len() > 256 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Harmony tag must be 1-256 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Harmony tag must be 1-256 characters".into()
+                )));
             }
         }
     }
@@ -522,10 +566,9 @@ pub fn add_contribution(input: AddContributionInput) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created contribution".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created contribution".into()
+    )))
 }
 
 /// Input for adding a discussion contribution
@@ -544,7 +587,10 @@ pub struct AddContributionInput {
 pub fn get_discussion(proposal_id: String) -> ExternResult<Vec<Record>> {
     let proposal_anchor = format!("discussion:{}", proposal_id);
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToContribution)?,
+        LinkQuery::try_new(
+            anchor_hash(&proposal_anchor)?,
+            LinkTypes::ProposalToContribution,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -648,7 +694,9 @@ pub fn reflect_on_discussion(proposal_id: String) -> ExternResult<Record> {
     for contribution in &contributions {
         for tag in &contribution.harmony_tags {
             *harmony_counts.entry(tag.clone()).or_insert(0) += 1;
-            harmony_examples.entry(tag.clone()).or_insert_with(|| contribution.id.clone());
+            harmony_examples
+                .entry(tag.clone())
+                .or_insert_with(|| contribution.id.clone());
         }
     }
 
@@ -709,9 +757,15 @@ pub fn reflect_on_discussion(proposal_id: String) -> ExternResult<Record> {
     // Voice concentration: Are few people dominating?
     let mut contribution_counts_by_person: HashMap<&String, u64> = HashMap::new();
     for c in &contributions {
-        *contribution_counts_by_person.entry(&c.contributor).or_insert(0) += 1;
+        *contribution_counts_by_person
+            .entry(&c.contributor)
+            .or_insert(0) += 1;
     }
-    let max_by_one = contribution_counts_by_person.values().max().copied().unwrap_or(0);
+    let max_by_one = contribution_counts_by_person
+        .values()
+        .max()
+        .copied()
+        .unwrap_or(0);
     let voice_concentration = if contribution_count > 0 && contributor_count > 1 {
         max_by_one as f64 / contribution_count as f64
     } else if contributor_count == 1 {
@@ -725,14 +779,17 @@ pub fn reflect_on_discussion(proposal_id: String) -> ExternResult<Record> {
 
     // Substantiveness score (simplified: based on avg content length and reply depth)
     let avg_content_length = if contribution_count > 0 {
-        contributions.iter().map(|c| c.content.len()).sum::<usize>() as f64 / contribution_count as f64
+        contributions.iter().map(|c| c.content.len()).sum::<usize>() as f64
+            / contribution_count as f64
     } else {
         0.0
     };
     let substantiveness_score = (
         (avg_content_length / 500.0).min(1.0) * 0.5 + // Length component
-        (max_thread_depth as f64 / 5.0).min(1.0) * 0.5   // Depth component
-    ).min(1.0);
+        (max_thread_depth as f64 / 5.0).min(1.0) * 0.5
+        // Depth component
+    )
+    .min(1.0);
 
     // === READINESS SIGNALS ===
     let discussion_saturated = contribution_count > 10 && cross_camp_engagement > 0.3;
@@ -823,10 +880,9 @@ pub fn reflect_on_discussion(proposal_id: String) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created reflection".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created reflection".into()
+    )))
 }
 
 /// Get all discussion reflections for a proposal
@@ -834,7 +890,10 @@ pub fn reflect_on_discussion(proposal_id: String) -> ExternResult<Record> {
 pub fn get_discussion_reflections(proposal_id: String) -> ExternResult<Vec<Record>> {
     let reflection_anchor = format!("disc_reflections:{}", proposal_id);
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&reflection_anchor)?, LinkTypes::ProposalToDiscussionReflection)?,
+        LinkQuery::try_new(
+            anchor_hash(&reflection_anchor)?,
+            LinkTypes::ProposalToDiscussionReflection,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -952,7 +1011,8 @@ fn calculate_cross_camp_engagement(contributions: &[DiscussionContribution]) -> 
     for c in contributions {
         if let Some(parent_id) = &c.parent_id {
             total_replies += 1;
-            if let (Some(my_stance), Some(parent_stance)) = (&c.stance, stance_by_id.get(parent_id)) {
+            if let (Some(my_stance), Some(parent_stance)) = (&c.stance, stance_by_id.get(parent_id))
+            {
                 let is_cross_camp = matches!(
                     (my_stance, parent_stance),
                     (Stance::Support, Stance::Oppose) | (Stance::Oppose, Stance::Support)
@@ -993,7 +1053,11 @@ fn identify_unaddressed_concerns(contributions: &[DiscussionContribution]) -> Ve
 mod tests {
     use super::*;
 
-    fn make_contribution(id: &str, parent: Option<&str>, stance: Option<Stance>) -> DiscussionContribution {
+    fn make_contribution(
+        id: &str,
+        parent: Option<&str>,
+        stance: Option<Stance>,
+    ) -> DiscussionContribution {
         DiscussionContribution {
             id: id.to_string(),
             proposal_id: "MIP-001".to_string(),
@@ -1022,7 +1086,11 @@ mod tests {
             make_contribution("b", None, None),
             make_contribution("c", None, None),
         ];
-        assert_eq!(calculate_max_thread_depth(&contribs), 0, "No replies means depth 0");
+        assert_eq!(
+            calculate_max_thread_depth(&contribs),
+            0,
+            "No replies means depth 0"
+        );
     }
 
     #[test]
@@ -1043,7 +1111,11 @@ mod tests {
             make_contribution("c", Some("b"), None),
             make_contribution("d", Some("c"), None),
         ];
-        assert_eq!(calculate_max_thread_depth(&contribs), 4, "Linear chain a→b→c→d = depth 4");
+        assert_eq!(
+            calculate_max_thread_depth(&contribs),
+            4,
+            "Linear chain a→b→c→d = depth 4"
+        );
     }
 
     #[test]
@@ -1084,16 +1156,18 @@ mod tests {
             make_contribution("a", None, Some(Stance::Support)),
             make_contribution("b", Some("a"), Some(Stance::Oppose)),
         ];
-        assert!((calculate_cross_camp_engagement(&contribs) - 1.0).abs() < 1e-10,
-            "100% of replies are cross-camp");
+        assert!(
+            (calculate_cross_camp_engagement(&contribs) - 1.0).abs() < 1e-10,
+            "100% of replies are cross-camp"
+        );
     }
 
     #[test]
     fn test_cross_camp_mixed() {
         let contribs = vec![
             make_contribution("a", None, Some(Stance::Support)),
-            make_contribution("b", Some("a"), Some(Stance::Oppose)),   // cross
-            make_contribution("c", Some("a"), Some(Stance::Support)),  // same
+            make_contribution("b", Some("a"), Some(Stance::Oppose)), // cross
+            make_contribution("c", Some("a"), Some(Stance::Support)), // same
         ];
         // 1 cross / 2 replies = 0.5
         assert!((calculate_cross_camp_engagement(&contribs) - 0.5).abs() < 1e-10);
@@ -1118,7 +1192,10 @@ mod tests {
             make_contribution("b", Some("a"), Some(Stance::Support)), // addresses concern
         ];
         let concerns = identify_unaddressed_concerns(&contribs);
-        assert!(concerns.is_empty(), "Opposition 'a' has a reply, so it's addressed");
+        assert!(
+            concerns.is_empty(),
+            "Opposition 'a' has a reply, so it's addressed"
+        );
     }
 
     #[test]
@@ -1133,11 +1210,12 @@ mod tests {
 
     #[test]
     fn test_unaddressed_concerns_support_not_flagged() {
-        let contribs = vec![
-            make_contribution("a", None, Some(Stance::Support)),
-        ];
+        let contribs = vec![make_contribution("a", None, Some(Stance::Support))];
         let concerns = identify_unaddressed_concerns(&contribs);
-        assert!(concerns.is_empty(), "Support contributions are never 'unaddressed concerns'");
+        assert!(
+            concerns.is_empty(),
+            "Support contributions are never 'unaddressed concerns'"
+        );
     }
 
     #[test]

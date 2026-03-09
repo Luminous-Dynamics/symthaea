@@ -3,8 +3,8 @@
 //!
 //! Updated to use HDK 0.6 patterns
 
-use hdk::prelude::*;
 use constitution_integrity::*;
+use hdk::prelude::*;
 
 /// Helper to get or create an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -28,10 +28,14 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 pub fn create_charter(charter: Charter) -> ExternResult<Record> {
     // Input validation
     if charter.id.is_empty() || charter.id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Charter ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Charter ID must be 1-256 characters".into()
+        )));
     }
     if charter.preamble.is_empty() || charter.preamble.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Preamble must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Preamble must be 1-4096 characters".into()
+        )));
     }
 
     // Gate: if a charter already exists, only allow versioned updates (from amendments).
@@ -69,10 +73,9 @@ pub fn create_charter(charter: Charter) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find charter".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find charter".into()
+    )))
 }
 
 /// Get the current charter
@@ -102,25 +105,37 @@ pub fn get_current_charter(_: ()) -> ExternResult<Option<Record>> {
 pub fn propose_amendment(input: ProposeAmendmentInput) -> ExternResult<Record> {
     // Input validation
     if input.new_text.is_empty() || input.new_text.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("New text must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "New text must be 1-4096 characters".into()
+        )));
     }
     if input.rationale.is_empty() || input.rationale.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Rationale must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Rationale must be 1-4096 characters".into()
+        )));
     }
     if input.proposer_did.is_empty() || input.proposer_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposer DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposer DID must be 1-256 characters".into()
+        )));
     }
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if let Some(ref article) = input.article {
         if article.is_empty() || article.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Article must be 1-256 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Article must be 1-256 characters".into()
+            )));
         }
     }
     if let Some(ref original_text) = input.original_text {
         if original_text.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Original text must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Original text must be at most 4096 characters".into()
+            )));
         }
     }
 
@@ -181,10 +196,9 @@ pub fn propose_amendment(input: ProposeAmendmentInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find amendment".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find amendment".into()
+    )))
 }
 
 /// Input for proposing an amendment
@@ -206,7 +220,9 @@ pub struct ProposeAmendmentInput {
 #[hdk_extern]
 pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
     if amendment_id.is_empty() || amendment_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Amendment ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Amendment ID must be 1-256 characters".into()
+        )));
     }
 
     // Find the amendment via O(1) link-based lookup (with chain scan fallback)
@@ -276,14 +292,23 @@ pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
     // adaptive threshold). We check that the proposal is Approved or the tally shows
     // consensus_reached.
     let tally_io = governance_utils::call_local(
-        "voting", "tally_votes", current_amendment.proposal_id.clone(),
+        "voting",
+        "tally_votes",
+        current_amendment.proposal_id.clone(),
     )?;
     if let Ok(result) = tally_io.decode::<serde_json::Value>() {
-        let approved = result.get("approved").and_then(|a| a.as_bool()).unwrap_or(false);
-        let quorum_reached = result.get("quorum_reached").and_then(|q| q.as_bool()).unwrap_or(false);
+        let approved = result
+            .get("approved")
+            .and_then(|a| a.as_bool())
+            .unwrap_or(false);
+        let quorum_reached = result
+            .get("quorum_reached")
+            .and_then(|q| q.as_bool())
+            .unwrap_or(false);
         if !approved || !quorum_reached {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Cannot ratify amendment: linked proposal vote did not pass or quorum not reached".into()
+                "Cannot ratify amendment: linked proposal vote did not pass or quorum not reached"
+                    .into()
             )));
         }
     }
@@ -313,10 +338,9 @@ pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
     // Apply amendment to charter
     apply_amendment_to_charter(&current_amendment)?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find ratified amendment".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find ratified amendment".into()
+    )))
 }
 
 /// Apply an amendment to a charter (pure logic — no HDK calls).
@@ -402,13 +426,17 @@ fn apply_amendment_pure(
             })
         }
         AmendmentType::ModifyRight => {
-            let rights: Vec<String> = charter.rights.iter().map(|r| {
-                if amendment.original_text.as_deref() == Some(r.as_str()) {
-                    amendment.new_text.clone()
-                } else {
-                    r.clone()
-                }
-            }).collect();
+            let rights: Vec<String> = charter
+                .rights
+                .iter()
+                .map(|r| {
+                    if amendment.original_text.as_deref() == Some(r.as_str()) {
+                        amendment.new_text.clone()
+                    } else {
+                        r.clone()
+                    }
+                })
+                .collect();
             Ok(Charter {
                 version: charter.version + 1,
                 rights,
@@ -417,9 +445,14 @@ fn apply_amendment_pure(
             })
         }
         AmendmentType::RemoveRight => {
-            let target = amendment.original_text.as_deref()
+            let target = amendment
+                .original_text
+                .as_deref()
                 .unwrap_or(&amendment.new_text);
-            let rights: Vec<String> = charter.rights.clone().into_iter()
+            let rights: Vec<String> = charter
+                .rights
+                .clone()
+                .into_iter()
                 .filter(|r| r != target)
                 .collect();
             Ok(Charter {
@@ -434,8 +467,9 @@ fn apply_amendment_pure(
 
 /// Apply an amendment to the charter (HDK wrapper)
 fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
-    let current_charter = get_current_charter(())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No charter found".into())))?;
+    let current_charter = get_current_charter(())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "No charter found".into()
+    )))?;
     let charter: Charter = current_charter
         .entry()
         .to_app_option()
@@ -459,13 +493,19 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
 pub fn set_parameter(input: SetParameterInput) -> ExternResult<Record> {
     // Input validation
     if input.name.is_empty() || input.name.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Parameter name must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Parameter name must be 1-256 characters".into()
+        )));
     }
     if input.value.is_empty() || input.value.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Parameter value must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Parameter value must be 1-4096 characters".into()
+        )));
     }
     if input.description.is_empty() || input.description.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Description must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Description must be 1-4096 characters".into()
+        )));
     }
 
     // Gate: existing parameters require a proposal_id (governance authorization)
@@ -503,10 +543,9 @@ pub fn set_parameter(input: SetParameterInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find parameter".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find parameter".into()
+    )))
 }
 
 /// Input for setting a parameter
@@ -540,22 +579,41 @@ pub fn update_parameter(input: UpdateParameterInput) -> ExternResult<Record> {
                     existing.value_type,
                     format!(
                         "Updated via governance action{}",
-                        input.proposal_id.as_ref().map_or(String::new(), |p| format!(" ({})", p))
+                        input
+                            .proposal_id
+                            .as_ref()
+                            .map_or(String::new(), |p| format!(" ({})", p))
                     ),
                     existing.min_value,
                     existing.max_value,
                 )
             } else {
-                (ParameterType::String, format!(
-                    "Created via governance action{}",
-                    input.proposal_id.as_ref().map_or(String::new(), |p| format!(" ({})", p))
-                ), None, None)
+                (
+                    ParameterType::String,
+                    format!(
+                        "Created via governance action{}",
+                        input
+                            .proposal_id
+                            .as_ref()
+                            .map_or(String::new(), |p| format!(" ({})", p))
+                    ),
+                    None,
+                    None,
+                )
             }
         } else {
-            (ParameterType::String, format!(
-                "Created via governance action{}",
-                input.proposal_id.as_ref().map_or(String::new(), |p| format!(" ({})", p))
-            ), None, None)
+            (
+                ParameterType::String,
+                format!(
+                    "Created via governance action{}",
+                    input
+                        .proposal_id
+                        .as_ref()
+                        .map_or(String::new(), |p| format!(" ({})", p))
+                ),
+                None,
+                None,
+            )
         };
 
     let result = set_parameter(SetParameterInput {
@@ -606,7 +664,9 @@ fn phi_config_field(param_name: &str) -> Option<&'static str> {
 /// warning signal but do NOT fail the parameter update. The constitution is the
 /// source of truth; the bridge config is a derived cache.
 fn sync_phi_parameter_to_bridge(param_name: &str, value: &str, proposal_id: Option<&str>) {
-    let Some(field_name) = phi_config_field(param_name) else { return };
+    let Some(field_name) = phi_config_field(param_name) else {
+        return;
+    };
 
     // Parse the value as f64 — all phi config fields are numeric
     let Ok(numeric_value) = value.parse::<f64>() else {
@@ -619,13 +679,21 @@ fn sync_phi_parameter_to_bridge(param_name: &str, value: &str, proposal_id: Opti
 
     // Build a partial update payload — only the changed field is set
     let mut payload = serde_json::Map::new();
-    payload.insert("proposal_id".into(), serde_json::json!(proposal_id.unwrap_or("constitution_sync")));
+    payload.insert(
+        "proposal_id".into(),
+        serde_json::json!(proposal_id.unwrap_or("constitution_sync")),
+    );
     payload.insert(field_name.into(), serde_json::json!(numeric_value));
 
     if governance_utils::call_local_best_effort(
-        "governance_bridge", "update_phi_config",
+        "governance_bridge",
+        "update_phi_config",
         serde_json::Value::Object(payload),
-    ).ok().flatten().is_none() {
+    )
+    .ok()
+    .flatten()
+    .is_none()
+    {
         let _ = emit_signal(serde_json::json!({
             "type": "PhiConfigSyncWarning",
             "message": format!("Could not sync '{}' to bridge", param_name),
@@ -637,7 +705,10 @@ fn sync_phi_parameter_to_bridge(param_name: &str, value: &str, proposal_id: Opti
 #[hdk_extern]
 pub fn get_parameter(name: String) -> ExternResult<Option<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("param:{}", name))?, LinkTypes::ParameterIndex)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("param:{}", name))?,
+            LinkTypes::ParameterIndex,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -734,7 +805,10 @@ mod tests {
 
         let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
         assert_eq!(result.version, 2);
-        assert_eq!(result.amendment_process, "3/4 supermajority with 30-day cooling");
+        assert_eq!(
+            result.amendment_process,
+            "3/4 supermajority with 30-day cooling"
+        );
         assert_eq!(result.preamble, charter.preamble); // unchanged
     }
 
@@ -914,9 +988,18 @@ mod tests {
     fn test_phi_config_field_mapping() {
         assert_eq!(phi_config_field("phi_basic"), Some("phi_basic"));
         assert_eq!(phi_config_field("phi_voting"), Some("phi_voting"));
-        assert_eq!(phi_config_field("phi_constitutional"), Some("phi_constitutional"));
-        assert_eq!(phi_config_field("min_voter_phi_standard"), Some("min_voter_phi_standard"));
-        assert_eq!(phi_config_field("max_voting_weight"), Some("max_voting_weight"));
+        assert_eq!(
+            phi_config_field("phi_constitutional"),
+            Some("phi_constitutional")
+        );
+        assert_eq!(
+            phi_config_field("min_voter_phi_standard"),
+            Some("min_voter_phi_standard")
+        );
+        assert_eq!(
+            phi_config_field("max_voting_weight"),
+            Some("max_voting_weight")
+        );
         // Non-phi parameters should return None
         assert_eq!(phi_config_field("quorum_threshold"), None);
         assert_eq!(phi_config_field("amendment_cooldown"), None);

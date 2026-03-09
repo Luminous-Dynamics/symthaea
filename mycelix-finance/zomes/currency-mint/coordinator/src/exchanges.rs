@@ -93,33 +93,18 @@ pub fn record_minted_exchange(input: RecordMintedExchangeInput) -> ExternResult<
     if def.params.max_exchanges_per_day > 0 {
         let day_ago =
             Timestamp::from_micros(now.as_micros().saturating_sub(24 * 3_600 * 1_000_000));
-        let exchange_links = get_links(
-            LinkQuery::try_new(
-                anchor_hash(&format!("mex:{}", input.currency_id))?,
-                LinkTypes::CurrencyToExchanges,
-            )?,
-            GetStrategy::default(),
+        let all_exchanges = collect_linked_entries::<MintedExchange>(
+            &format!("mex:{}", input.currency_id),
+            LinkTypes::CurrencyToExchanges,
         )?;
 
-        let mut today_count: u8 = 0;
-        for link in exchange_links {
-            if let Some(action_hash) = link.target.into_action_hash() {
-                if let Ok(record) = follow_update_chain(action_hash) {
-                    if let Some(ex) = record
-                        .entry()
-                        .to_app_option::<MintedExchange>()
-                        .ok()
-                        .flatten()
-                    {
-                        if ex.provider_did == provider_did
-                            && ex.timestamp.as_micros() >= day_ago.as_micros()
-                        {
-                            today_count = today_count.saturating_add(1);
-                        }
-                    }
-                }
-            }
-        }
+        let today_count: u8 = all_exchanges
+            .iter()
+            .filter(|(ex, _)| {
+                ex.provider_did == provider_did && ex.timestamp.as_micros() >= day_ago.as_micros()
+            })
+            .count()
+            .min(u8::MAX as usize) as u8;
 
         if today_count >= def.params.max_exchanges_per_day {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -266,63 +251,29 @@ pub fn confirm_minted_exchange(exchange_id: String) -> ExternResult<MintedExchan
 /// List pending (unconfirmed) exchanges for a currency.
 #[hdk_extern]
 pub fn list_pending_exchanges(currency_id: String) -> ExternResult<Vec<MintedExchange>> {
-    let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("mex:{}", currency_id))?,
-            LinkTypes::CurrencyToExchanges,
-        )?,
-        GetStrategy::default(),
+    let entries = collect_linked_entries::<MintedExchange>(
+        &format!("mex:{}", currency_id),
+        LinkTypes::CurrencyToExchanges,
     )?;
-
-    let mut pending = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    if !ex.confirmed {
-                        pending.push(ex);
-                    }
-                }
-            }
-        }
-    }
-    Ok(pending)
+    Ok(entries
+        .into_iter()
+        .map(|(ex, _)| ex)
+        .filter(|ex| !ex.confirmed)
+        .collect())
 }
 
 /// List pending exchanges awaiting confirmation by a specific receiver.
 #[hdk_extern]
 pub fn list_pending_for_receiver(receiver_did: String) -> ExternResult<Vec<MintedExchange>> {
-    let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("receiver-pending:{}", receiver_did))?,
-            LinkTypes::CurrencyToExchanges,
-        )?,
-        GetStrategy::default(),
+    let entries = collect_linked_entries::<MintedExchange>(
+        &format!("receiver-pending:{}", receiver_did),
+        LinkTypes::CurrencyToExchanges,
     )?;
-
-    let mut pending = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    if !ex.confirmed && ex.receiver_did == receiver_did {
-                        pending.push(ex);
-                    }
-                }
-            }
-        }
-    }
-    Ok(pending)
+    Ok(entries
+        .into_iter()
+        .map(|(ex, _)| ex)
+        .filter(|ex| !ex.confirmed && ex.receiver_did == receiver_did)
+        .collect())
 }
 
 /// Cancel an expired unconfirmed exchange.
@@ -395,35 +346,22 @@ pub fn get_exchange(exchange_id: String) -> ExternResult<Option<MintedExchange>>
 #[hdk_extern]
 pub fn get_currency_exchanges(input: PaginatedCurrencyInput) -> ExternResult<Vec<MintedExchange>> {
     let limit = input.limit.unwrap_or(100);
-    let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("mex:{}", input.currency_id))?,
-            LinkTypes::CurrencyToExchanges,
-        )?,
-        GetStrategy::default(),
+    let entries = collect_linked_entries::<MintedExchange>(
+        &format!("mex:{}", input.currency_id),
+        LinkTypes::CurrencyToExchanges,
     )?;
 
-    let mut exchanges = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    // Cursor filter: skip exchanges at or before the cursor
-                    if let Some(cursor) = &input.after_timestamp {
-                        if ex.timestamp.as_micros() <= cursor.as_micros() {
-                            continue;
-                        }
-                    }
-                    exchanges.push(ex);
-                }
+    let mut exchanges: Vec<MintedExchange> = entries
+        .into_iter()
+        .map(|(ex, _)| ex)
+        .filter(|ex| {
+            if let Some(cursor) = &input.after_timestamp {
+                ex.timestamp.as_micros() > cursor.as_micros()
+            } else {
+                true
             }
-        }
-    }
+        })
+        .collect();
 
     // Sort newest-first for consistent pagination
     exchanges.sort_by(|a, b| b.timestamp.as_micros().cmp(&a.timestamp.as_micros()));
@@ -437,37 +375,22 @@ pub fn get_currency_exchanges(input: PaginatedCurrencyInput) -> ExternResult<Vec
 #[hdk_extern]
 pub fn get_member_exchanges(input: GetMemberExchangesInput) -> ExternResult<Vec<MintedExchange>> {
     let limit = input.limit.unwrap_or(100);
-    let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash(&format!("mex:{}", input.currency_id))?,
-            LinkTypes::CurrencyToExchanges,
-        )?,
-        GetStrategy::default(),
+    let entries = collect_linked_entries::<MintedExchange>(
+        &format!("mex:{}", input.currency_id),
+        LinkTypes::CurrencyToExchanges,
     )?;
 
-    let mut exchanges = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.into_action_hash() {
-            if let Ok(record) = follow_update_chain(action_hash) {
-                if let Some(ex) = record
-                    .entry()
-                    .to_app_option::<MintedExchange>()
-                    .ok()
-                    .flatten()
-                {
-                    if ex.provider_did != input.member_did && ex.receiver_did != input.member_did {
-                        continue;
-                    }
-                    if let Some(cursor) = &input.after_timestamp {
-                        if ex.timestamp.as_micros() <= cursor.as_micros() {
-                            continue;
-                        }
-                    }
-                    exchanges.push(ex);
-                }
-            }
-        }
-    }
+    let mut exchanges: Vec<MintedExchange> = entries
+        .into_iter()
+        .map(|(ex, _)| ex)
+        .filter(|ex| {
+            (ex.provider_did == input.member_did || ex.receiver_did == input.member_did)
+                && input
+                    .after_timestamp
+                    .as_ref()
+                    .map_or(true, |cursor| ex.timestamp.as_micros() > cursor.as_micros())
+        })
+        .collect();
 
     exchanges.sort_by(|a, b| b.timestamp.as_micros().cmp(&a.timestamp.as_micros()));
     exchanges.truncate(limit);

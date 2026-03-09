@@ -10,48 +10,31 @@
 //! Cross-cluster callers (Civic, Commons) reach this bridge via
 //! `CallTargetCell::OtherRole("personal")`.
 
-use personal_bridge_integrity::*;
 use hdk::prelude::*;
 use mycelix_bridge_common::{
-    self as bridge,
-    DispatchInput, DispatchResult, CrossClusterDispatchInput,
-    ResolveQueryInput, EventTypeQuery, BridgeHealth,
-    RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
+    self as bridge, check_rate_limit_count, BridgeHealth, CrossClusterDispatchInput, DispatchInput,
+    DispatchResult, EventTypeQuery, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
 };
-use personal_types::{
-    CredentialType, CredentialPresentation, DisclosureScope,
-};
+use personal_bridge_integrity::*;
 #[cfg(test)]
 use personal_types::PresentationRequest;
+use personal_types::{CredentialPresentation, CredentialType, DisclosureScope};
 
 // ============================================================================
 // Allowed zome names — security boundary for dispatch
 // ============================================================================
 
-const ALLOWED_ZOMES: &[&str] = &[
-    "identity_vault",
-    "health_vault",
-    "credential_wallet",
-];
+const ALLOWED_ZOMES: &[&str] = &["identity_vault", "health_vault", "credential_wallet"];
 
 // Cross-cluster dispatch targets (what personal bridge can call in other clusters)
-const ALLOWED_COMMONS_ZOMES: &[&str] = &[
-    "commons_bridge",
-];
+const ALLOWED_COMMONS_ZOMES: &[&str] = &["commons_bridge"];
 
-const ALLOWED_CIVIC_ZOMES: &[&str] = &[
-    "civic_bridge",
-];
+const ALLOWED_CIVIC_ZOMES: &[&str] = &["civic_bridge"];
 
-const ALLOWED_GOVERNANCE_ZOMES: &[&str] = &[
-    "governance_bridge",
-];
+const ALLOWED_GOVERNANCE_ZOMES: &[&str] = &["governance_bridge"];
 
-const ALLOWED_IDENTITY_ZOMES: &[&str] = &[
-    "identity_bridge",
-    "did_registry",
-    "verifiable_credential",
-];
+const ALLOWED_IDENTITY_ZOMES: &[&str] =
+    &["identity_bridge", "did_registry", "verifiable_credential"];
 
 // ============================================================================
 // Helpers
@@ -85,12 +68,9 @@ fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
     let window_start_micros = now.as_micros() - (RATE_LIMIT_WINDOW_SECS * 1_000_000);
     let window_start = Timestamp::from_micros(window_start_micros);
 
-    let recent_count = links.iter()
-        .filter(|l| l.timestamp >= window_start)
-        .count();
+    let recent_count = links.iter().filter(|l| l.timestamp >= window_start).count();
 
-    check_rate_limit_count(recent_count)
-        .map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
+    check_rate_limit_count(recent_count).map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
 
     create_link(
         agent,
@@ -126,10 +106,20 @@ pub fn query_personal(query: PersonalQueryEntry) -> ExternResult<Record> {
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllQueries, ())?;
 
     let agent_anchor = ensure_anchor(&format!("agent_queries:{}", query.requester))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToQuery, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToQuery,
+        (),
+    )?;
 
     let domain_anchor = ensure_anchor(&format!("domain_queries:{}", query.domain))?;
-    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToQuery, ())?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToQuery,
+        (),
+    )?;
 
     // Attempt auto-dispatch
     if let Some(zome_name) = resolve_domain_zome(&query.domain) {
@@ -143,7 +133,8 @@ pub fn query_personal(query: PersonalQueryEntry) -> ExternResult<Record> {
         };
         if let Ok(result) = dispatch_call(dispatch) {
             if result.success {
-                let result_str = result.response
+                let result_str = result
+                    .response
                     .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
                     .unwrap_or_else(|| "null".to_string());
                 let _ = resolve_query(ResolveQueryInput {
@@ -182,7 +173,9 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid query entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid query entry".into()
+        )))?;
 
     let now = sys_time()?;
     query.result = Some(input.result);
@@ -218,13 +211,28 @@ pub fn broadcast_event(event: PersonalEventEntry) -> ExternResult<Record> {
     create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
 
     let type_anchor = ensure_anchor(&format!("event_type:{}:{}", event.domain, event.event_type))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::EventTypeToEvent,
+        (),
+    )?;
 
     let agent_anchor = ensure_anchor(&format!("agent_events:{}", event.source_agent))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToEvent,
+        (),
+    )?;
 
     let domain_anchor = ensure_anchor(&format!("domain_events:{}", event.domain))?;
-    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToEvent, ())?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToEvent,
+        (),
+    )?;
 
     let signal = BridgeEventSignal {
         signal_type: "personal_bridge_event".to_string(),
@@ -308,7 +316,8 @@ pub fn present_phi_credential(_: ()) -> ExternResult<CredentialPresentation> {
     let now = sys_time()?;
 
     if result.success {
-        let data = result.response
+        let data = result
+            .response
             .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
             .unwrap_or_else(|| "{}".to_string());
         Ok(CredentialPresentation {
@@ -341,7 +350,8 @@ pub fn present_identity_proof(fields: Vec<String>) -> ExternResult<CredentialPre
     let now = sys_time()?;
 
     if result.success {
-        let data = result.response
+        let data = result
+            .response
             .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
             .unwrap_or_else(|| "{}".to_string());
         Ok(CredentialPresentation {
@@ -372,7 +382,8 @@ pub fn present_k_vector(_: ()) -> ExternResult<CredentialPresentation> {
     let now = sys_time()?;
 
     if result.success {
-        let data = result.response
+        let data = result
+            .response
             .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
             .unwrap_or_else(|| "{}".to_string());
         Ok(CredentialPresentation {
@@ -434,10 +445,7 @@ pub fn submit_phi_attestation(input: SubmitPhiAttestationInput) -> ExternResult<
     );
 
     // Sign with the agent's Holochain Ed25519 key.
-    let signature = sign_raw(
-        info.agent_initial_pubkey,
-        message.into_bytes(),
-    )?;
+    let signature = sign_raw(info.agent_initial_pubkey, message.into_bytes())?;
 
     // Build the payload matching governance bridge's RecordPhiAttestationInput.
     #[derive(Serialize, Debug)]
@@ -808,7 +816,10 @@ mod tests {
 
     #[test]
     fn resolve_credential_domain() {
-        assert_eq!(resolve_domain_zome("credential").unwrap(), "credential_wallet");
+        assert_eq!(
+            resolve_domain_zome("credential").unwrap(),
+            "credential_wallet"
+        );
     }
 
     #[test]
@@ -826,7 +837,8 @@ mod tests {
             assert!(
                 ALLOWED_ZOMES.contains(&resolved.as_str()),
                 "resolve('{}') = '{}' not in ALLOWED_ZOMES",
-                domain, resolved
+                domain,
+                resolved
             );
         }
     }
@@ -960,7 +972,11 @@ mod tests {
     fn governance_allowlist_has_no_duplicates() {
         let mut seen = std::collections::HashSet::new();
         for zome in ALLOWED_GOVERNANCE_ZOMES {
-            assert!(seen.insert(zome), "Duplicate in ALLOWED_GOVERNANCE_ZOMES: '{}'", zome);
+            assert!(
+                seen.insert(zome),
+                "Duplicate in ALLOWED_GOVERNANCE_ZOMES: '{}'",
+                zome
+            );
         }
     }
 
@@ -985,7 +1001,11 @@ mod tests {
     fn identity_allowlist_has_no_duplicates() {
         let mut seen = std::collections::HashSet::new();
         for zome in ALLOWED_IDENTITY_ZOMES {
-            assert!(seen.insert(zome), "Duplicate in ALLOWED_IDENTITY_ZOMES: '{}'", zome);
+            assert!(
+                seen.insert(zome),
+                "Duplicate in ALLOWED_IDENTITY_ZOMES: '{}'",
+                zome
+            );
         }
     }
 

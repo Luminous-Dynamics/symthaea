@@ -302,16 +302,16 @@ pub fn check_update_proposal(original: &Proposal, updated: &Proposal) -> Result<
         let valid = matches!(
             (&original.status, &updated.status),
             (ProposalStatus::Draft, ProposalStatus::Active)
-            | (ProposalStatus::Draft, ProposalStatus::Cancelled)
-            | (ProposalStatus::Active, ProposalStatus::Ended)
-            | (ProposalStatus::Active, ProposalStatus::Cancelled)
-            | (ProposalStatus::Ended, ProposalStatus::Approved)
-            | (ProposalStatus::Ended, ProposalStatus::Rejected)
-            | (ProposalStatus::Approved, ProposalStatus::Signed)
-            | (ProposalStatus::Approved, ProposalStatus::Cancelled)
-            | (ProposalStatus::Signed, ProposalStatus::Executed)
-            | (ProposalStatus::Signed, ProposalStatus::Failed)
-            | (ProposalStatus::Signed, ProposalStatus::Cancelled)
+                | (ProposalStatus::Draft, ProposalStatus::Cancelled)
+                | (ProposalStatus::Active, ProposalStatus::Ended)
+                | (ProposalStatus::Active, ProposalStatus::Cancelled)
+                | (ProposalStatus::Ended, ProposalStatus::Approved)
+                | (ProposalStatus::Ended, ProposalStatus::Rejected)
+                | (ProposalStatus::Approved, ProposalStatus::Signed)
+                | (ProposalStatus::Approved, ProposalStatus::Cancelled)
+                | (ProposalStatus::Signed, ProposalStatus::Executed)
+                | (ProposalStatus::Signed, ProposalStatus::Failed)
+                | (ProposalStatus::Signed, ProposalStatus::Cancelled)
         );
         if !valid {
             return Err(format!(
@@ -391,9 +391,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::Proposal(proposal) => validate_create_proposal(action, proposal),
-                EntryTypes::ProposalAmendment(amendment) => validate_create_amendment(action, amendment),
-                EntryTypes::DiscussionContribution(contribution) => validate_create_contribution(action, contribution),
-                EntryTypes::DiscussionReflection(reflection) => validate_create_discussion_reflection(action, reflection),
+                EntryTypes::ProposalAmendment(amendment) => {
+                    validate_create_amendment(action, amendment)
+                }
+                EntryTypes::DiscussionContribution(contribution) => {
+                    validate_create_contribution(action, contribution)
+                }
+                EntryTypes::DiscussionReflection(reflection) => {
+                    validate_create_discussion_reflection(action, reflection)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -589,14 +595,18 @@ mod tests {
     fn test_proposal_description_not_empty() {
         let mut p = make_proposal();
         p.description = "".into();
-        assert!(check_create_proposal(&p).unwrap_err().contains("description"));
+        assert!(check_create_proposal(&p)
+            .unwrap_err()
+            .contains("description"));
     }
 
     #[test]
     fn test_proposal_voting_period_end_after_start() {
         let mut p = make_proposal();
         p.voting_ends = ts(500000); // before start
-        assert!(check_create_proposal(&p).unwrap_err().contains("Voting end"));
+        assert!(check_create_proposal(&p)
+            .unwrap_err()
+            .contains("Voting end"));
     }
 
     #[test]
@@ -642,8 +652,12 @@ mod tests {
             let mut updated = orig.clone();
             updated.status = to.clone();
             updated.version = orig.version + 1;
-            assert!(check_update_proposal(&orig, &updated).is_ok(),
-                "Transition {:?} -> {:?} should be valid", from, to);
+            assert!(
+                check_update_proposal(&orig, &updated).is_ok(),
+                "Transition {:?} -> {:?} should be valid",
+                from,
+                to
+            );
         }
     }
 
@@ -654,7 +668,9 @@ mod tests {
         let mut updated = orig.clone();
         updated.status = ProposalStatus::Active;
         updated.version = orig.version + 1;
-        assert!(check_update_proposal(&orig, &updated).unwrap_err().contains("Invalid status"));
+        assert!(check_update_proposal(&orig, &updated)
+            .unwrap_err()
+            .contains("Invalid status"));
     }
 
     #[test]
@@ -663,7 +679,9 @@ mod tests {
         let mut updated = orig.clone();
         updated.id = "MIP-999".into();
         updated.version = orig.version + 1;
-        assert!(check_update_proposal(&orig, &updated).unwrap_err().contains("proposal ID"));
+        assert!(check_update_proposal(&orig, &updated)
+            .unwrap_err()
+            .contains("proposal ID"));
     }
 
     #[test]
@@ -673,7 +691,9 @@ mod tests {
         let mut updated = orig.clone();
         updated.title = "Changed Title".into();
         updated.version = orig.version + 1;
-        assert!(check_update_proposal(&orig, &updated).unwrap_err().contains("content"));
+        assert!(check_update_proposal(&orig, &updated)
+            .unwrap_err()
+            .contains("content"));
     }
 
     #[test]
@@ -682,7 +702,9 @@ mod tests {
         let mut updated = orig.clone();
         updated.status = ProposalStatus::Active;
         updated.version = orig.version; // same version
-        assert!(check_update_proposal(&orig, &updated).unwrap_err().contains("Version"));
+        assert!(check_update_proposal(&orig, &updated)
+            .unwrap_err()
+            .contains("Version"));
     }
 
     // --- Amendment validation ---
@@ -724,8 +746,16 @@ mod tests {
             proposal_id: "MIP-001".into(),
             contributor: "did:mycelix:test".into(),
             content: "Some content".into(),
-            harmony_tags: vec!["a".into(), "b".into(), "c".into(), "d".into(),
-                               "e".into(), "f".into(), "g".into(), "h".into()],
+            harmony_tags: vec![
+                "a".into(),
+                "b".into(),
+                "c".into(),
+                "d".into(),
+                "e".into(),
+                "f".into(),
+                "g".into(),
+                "h".into(),
+            ],
             stance: None,
             parent_id: None,
             created_at: ts(1000000),
@@ -763,6 +793,8 @@ mod tests {
             readiness_reasoning: "Not ready".into(),
             summary: "Test reflection".into(),
         };
-        assert!(check_create_reflection(&r).unwrap_err().contains("Harmony diversity"));
+        assert!(check_create_reflection(&r)
+            .unwrap_err()
+            .contains("Harmony diversity"));
     }
 }

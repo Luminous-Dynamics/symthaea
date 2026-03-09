@@ -346,17 +346,24 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     validate_create_violation_report(action, report)
                 }
                 EntryTypes::PqAttestor(attestor) => validate_create_pq_attestor(action, attestor),
-                EntryTypes::DkgHashCommitment(commitment) => validate_create_hash_commitment(action, commitment),
+                EntryTypes::DkgHashCommitment(commitment) => {
+                    validate_create_hash_commitment(action, commitment)
+                }
                 EntryTypes::DkgHashReveal(reveal) => validate_create_hash_reveal(action, reveal),
             },
             OpEntry::UpdateEntry {
-                app_entry, action, original_action_hash, ..
+                app_entry,
+                action,
+                original_action_hash,
+                ..
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::SigningCommittee(committee) => {
                     validate_update_committee(action, committee)
                 }
-                EntryTypes::CommitteeMember(member) => validate_update_member(action, member, original_action_hash),
+                EntryTypes::CommitteeMember(member) => {
+                    validate_update_member(action, member, original_action_hash)
+                }
                 EntryTypes::ThresholdSignature(_) => Ok(ValidateCallbackResult::Invalid(
                     "Threshold signatures cannot be updated".into(),
                 )),
@@ -441,9 +448,10 @@ fn validate_create_committee(
     // Validate min_phi if set
     if let Some(min_phi) = committee.min_phi {
         if !(0.0..=1.0).contains(&min_phi) {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("min_phi must be between 0.0 and 1.0, got {}", min_phi),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "min_phi must be between 0.0 and 1.0, got {}",
+                min_phi
+            )));
         }
     }
 
@@ -562,12 +570,17 @@ fn validate_update_member(
     let original_member: CommitteeMember = original_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "Failed to deserialize original member: {}", e
-        ))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Original member record has no entry".into()
-        )))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original member: {}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Original member record has no entry".into()
+            ))
+        })?;
 
     // participant_id is immutable -- cannot change after creation
     if member.participant_id != original_member.participant_id {
@@ -626,9 +639,10 @@ pub fn check_signature_validity(sig: &ThresholdSignature) -> Result<(), String> 
             }
         }
         ThresholdSignatureAlgorithm::MlDsa65 => {
-            let pq_sig = sig.pq_signature.as_ref().ok_or(
-                "ML-DSA-65 algorithm requires pq_signature field".to_string(),
-            )?;
+            let pq_sig = sig
+                .pq_signature
+                .as_ref()
+                .ok_or("ML-DSA-65 algorithm requires pq_signature field".to_string())?;
             if pq_sig.len() != 3309 {
                 return Err(format!(
                     "ML-DSA-65 signature must be exactly 3309 bytes, got {}",
@@ -648,9 +662,10 @@ pub fn check_signature_validity(sig: &ThresholdSignature) -> Result<(), String> 
                 ));
             }
             // ML-DSA-65 part
-            let pq_sig = sig.pq_signature.as_ref().ok_or(
-                "Hybrid mode requires pq_signature field for ML-DSA-65".to_string(),
-            )?;
+            let pq_sig = sig
+                .pq_signature
+                .as_ref()
+                .ok_or("Hybrid mode requires pq_signature field for ML-DSA-65".to_string())?;
             if pq_sig.len() != 3309 {
                 return Err(format!(
                     "Hybrid ML-DSA-65 signature must be exactly 3309 bytes, got {}",
@@ -721,7 +736,8 @@ pub fn check_violation_report_validity(report: &DkgViolationReport) -> Result<()
     }
 
     // Penalty score must be in [0.0, 1.0]
-    if !report.penalty_score.is_finite() || report.penalty_score < 0.0 || report.penalty_score > 1.0 {
+    if !report.penalty_score.is_finite() || report.penalty_score < 0.0 || report.penalty_score > 1.0
+    {
         return Err(format!(
             "Penalty score must be between 0.0 and 1.0, got {}",
             report.penalty_score
@@ -968,10 +984,8 @@ mod tests {
 
     #[test]
     fn test_complete_committee_missing_public_key() {
-        let committee = make_test_committee_complete(
-            None,
-            vec![make_valid_commitment_set_bytes(2)],
-        );
+        let committee =
+            make_test_committee_complete(None, vec![make_valid_commitment_set_bytes(2)]);
         let result = check_committee_update_validity(&committee);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("must have a public key"));
@@ -981,10 +995,8 @@ mod tests {
     fn test_complete_committee_insufficient_commitments() {
         let pk = make_valid_public_key();
         // threshold=2 but only 1 commitment set
-        let committee = make_test_committee_complete(
-            Some(pk),
-            vec![make_valid_commitment_set_bytes(2)],
-        );
+        let committee =
+            make_test_committee_complete(Some(pk), vec![make_valid_commitment_set_bytes(2)]);
         let result = check_committee_update_validity(&committee);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Need at least 2"));
@@ -1020,7 +1032,9 @@ mod tests {
         sig.pq_signature = Some(vec![0u8; 100]); // too short
         let result = check_signature_validity(&sig);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("ML-DSA-65 signature must be exactly 3309"));
+        assert!(result
+            .unwrap_err()
+            .contains("ML-DSA-65 signature must be exactly 3309"));
     }
 
     #[test]
@@ -1162,7 +1176,8 @@ mod tests {
             assert!(
                 check_violation_report_validity(&report).is_ok(),
                 "Severity {:?} with penalty {} should be accepted",
-                severity, penalty
+                severity,
+                penalty
             );
         }
     }
@@ -1263,8 +1278,7 @@ mod tests {
         let n_members = 5usize;
 
         // Step 1: Run a real DKG ceremony
-        let config = feldman_dkg::DkgConfig::new(threshold, n_members)
-            .expect("valid DKG config");
+        let config = feldman_dkg::DkgConfig::new(threshold, n_members).expect("valid DKG config");
         let mut ceremony = feldman_dkg::DkgCeremony::new(config, 1000);
 
         let mut rng = StdRng::seed_from_u64(42);
@@ -1279,12 +1293,8 @@ mod tests {
         // Each participant generates a deal
         let mut participants: Vec<feldman_dkg::Participant> = (1..=(n_members as u32))
             .map(|i| {
-                feldman_dkg::Participant::new(
-                    feldman_dkg::ParticipantId(i),
-                    threshold,
-                    n_members,
-                )
-                .unwrap()
+                feldman_dkg::Participant::new(feldman_dkg::ParticipantId(i), threshold, n_members)
+                    .unwrap()
             })
             .collect();
 

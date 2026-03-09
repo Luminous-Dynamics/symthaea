@@ -37,7 +37,9 @@ impl TryFrom<SerializedBytes> for DidDocumentData {
 impl TryFrom<DidDocumentData> for SerializedBytes {
     type Error = SerializedBytesError;
     fn try_from(t: DidDocumentData) -> Result<Self, Self::Error> {
-        Ok(SerializedBytes::from(UnsafeBytes::from(holochain_serialized_bytes::encode(&t)?)))
+        Ok(SerializedBytes::from(UnsafeBytes::from(
+            holochain_serialized_bytes::encode(&t)?,
+        )))
     }
 }
 
@@ -340,12 +342,7 @@ pub fn query_identity(input: QueryIdentityInput) -> ExternResult<IdentityVerific
         };
         let query_hash = create_entry(&EntryTypes::IdentityQuery(query))?;
 
-        create_link(
-            did_hash,
-            query_hash,
-            LinkTypes::DidToQueries,
-            (),
-        )?;
+        create_link(did_hash, query_hash, LinkTypes::DidToQueries, ())?;
     }
 
     // Get DID details from did_registry (includes creation timestamp)
@@ -362,7 +359,10 @@ pub fn query_identity(input: QueryIdentityInput) -> ExternResult<IdentityVerific
     // Get MFA summary for enhanced verification
     let mfa_summary = get_mfa_summary_for_did(&input.did)?;
     let mfa_enrolled = mfa_summary.is_some();
-    let mfa_assurance_score = mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0);
+    let mfa_assurance_score = mfa_summary
+        .as_ref()
+        .map(|s| s.assurance_score)
+        .unwrap_or(0.0);
     let mfa_assurance_level = mfa_summary.as_ref().map(|s| s.assurance_level.clone());
     let mfa_factor_count = mfa_summary.as_ref().map(|s| s.factor_count).unwrap_or(0);
     let fl_eligible = mfa_summary.as_ref().map(|s| s.fl_eligible).unwrap_or(false);
@@ -533,12 +533,13 @@ fn get_did_details(did: &str) -> ExternResult<Option<DidDocumentData>> {
             })?;
 
             if let Some(rec) = record {
-                let did_doc: Option<DidDocumentData> = rec.entry().to_app_option().map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "Failed to deserialize DID document: {:?}",
-                        e
-                    )))
-                })?;
+                let did_doc: Option<DidDocumentData> =
+                    rec.entry().to_app_option().map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "Failed to deserialize DID document: {:?}",
+                            e
+                        )))
+                    })?;
                 Ok(did_doc)
             } else {
                 Ok(None)
@@ -615,9 +616,10 @@ pub fn report_reputation(input: ReportReputationInput) -> ExternResult<Record> {
 
     // Validate score bounds
     if input.score < 0.0 || input.score > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Reputation score must be between 0.0 and 1.0, got {}", input.score)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Reputation score must be between 0.0 and 1.0, got {}",
+            input.score
+        ))));
     }
 
     let now = sys_time()?;
@@ -736,7 +738,8 @@ fn get_aggregated_reputation(did: &str) -> ExternResult<f64> {
             {
                 // Exponential decay: weight = interactions * 2^(-age/half_life)
                 let age_micros = (now_micros - rep.last_updated.as_micros() as f64).max(0.0);
-                let decay = (-age_micros / REPUTATION_HALF_LIFE_MICROS * core::f64::consts::LN_2).exp();
+                let decay =
+                    (-age_micros / REPUTATION_HALF_LIFE_MICROS * core::f64::consts::LN_2).exp();
                 let effective_weight = rep.interactions as f64 * decay;
 
                 weighted_sum += rep.score * effective_weight;
@@ -917,7 +920,9 @@ pub struct MfaAssuranceChangedInput {
 /// Query identity with selective disclosure — only returns fields the caller requests.
 /// This respects privacy by limiting data exposure to what the requesting hApp actually needs.
 #[hdk_extern]
-pub fn query_identity_selective(input: SelectiveQueryInput) -> ExternResult<SelectiveIdentityResult> {
+pub fn query_identity_selective(
+    input: SelectiveQueryInput,
+) -> ExternResult<SelectiveIdentityResult> {
     let now = sys_time()?;
 
     if input.did.is_empty() || !input.did.starts_with("did:mycelix:") {
@@ -970,10 +975,17 @@ pub fn query_identity_selective(input: SelectiveQueryInput) -> ExternResult<Sele
     };
 
     // Resolve DID details if any DID-related field is requested
-    let needs_did = fields.iter().any(|f| matches!(f.as_str(),
-        "is_valid" | "is_deactivated" | "did_created" | "services" | "verification_methods"
-    ));
-    let did_details = if needs_did { get_did_details(&input.did)? } else { None };
+    let needs_did = fields.iter().any(|f| {
+        matches!(
+            f.as_str(),
+            "is_valid" | "is_deactivated" | "did_created" | "services" | "verification_methods"
+        )
+    });
+    let did_details = if needs_did {
+        get_did_details(&input.did)?
+    } else {
+        None
+    };
     let did_valid = did_details.is_some();
 
     if fields.iter().any(|f| f == "is_valid") {
@@ -991,35 +1003,54 @@ pub fn query_identity_selective(input: SelectiveQueryInput) -> ExternResult<Sele
 
     if fields.iter().any(|f| f == "services") {
         result.services = did_details.as_ref().map(|doc| {
-            doc.service.iter().map(|s| ServiceInfo {
-                id: s.id.clone(),
-                type_: s.type_.clone(),
-                endpoint: s.service_endpoint.clone(),
-            }).collect()
+            doc.service
+                .iter()
+                .map(|s| ServiceInfo {
+                    id: s.id.clone(),
+                    type_: s.type_.clone(),
+                    endpoint: s.service_endpoint.clone(),
+                })
+                .collect()
         });
     }
 
     if fields.iter().any(|f| f == "verification_methods") {
         result.verification_methods = did_details.as_ref().map(|doc| {
-            doc.verification_method.iter().map(|vm| VerificationMethodInfo {
-                id: vm.id.clone(),
-                type_: vm.type_.clone(),
-            }).collect()
+            doc.verification_method
+                .iter()
+                .map(|vm| VerificationMethodInfo {
+                    id: vm.id.clone(),
+                    type_: vm.type_.clone(),
+                })
+                .collect()
         });
     }
 
     // MFA fields — only call MFA zome if any MFA field is requested
-    let needs_mfa = fields.iter().any(|f| matches!(f.as_str(),
-        "mfa_enrolled" | "mfa_assurance_level" | "mfa_assurance_score"
-        | "mfa_factor_count" | "fl_eligible" | "matl_score"
-    ));
-    let mfa_summary = if needs_mfa { get_mfa_summary_for_did(&input.did)? } else { None };
+    let needs_mfa = fields.iter().any(|f| {
+        matches!(
+            f.as_str(),
+            "mfa_enrolled"
+                | "mfa_assurance_level"
+                | "mfa_assurance_score"
+                | "mfa_factor_count"
+                | "fl_eligible"
+                | "matl_score"
+        )
+    });
+    let mfa_summary = if needs_mfa {
+        get_mfa_summary_for_did(&input.did)?
+    } else {
+        None
+    };
 
     if fields.iter().any(|f| f == "mfa_enrolled") {
         result.mfa_enrolled = Some(mfa_summary.is_some());
     }
     if fields.iter().any(|f| f == "mfa_assurance_level") {
-        result.mfa_assurance_level = mfa_summary.as_ref().map(|s| format!("{:?}", s.assurance_level));
+        result.mfa_assurance_level = mfa_summary
+            .as_ref()
+            .map(|s| format!("{:?}", s.assurance_level));
     }
     if fields.iter().any(|f| f == "mfa_assurance_score") {
         result.mfa_assurance_score = mfa_summary.as_ref().map(|s| s.assurance_score);
@@ -1032,9 +1063,9 @@ pub fn query_identity_selective(input: SelectiveQueryInput) -> ExternResult<Sele
     }
 
     // Reputation-based fields
-    let needs_reputation = fields.iter().any(|f| matches!(f.as_str(),
-        "reputation_score" | "matl_score"
-    ));
+    let needs_reputation = fields
+        .iter()
+        .any(|f| matches!(f.as_str(), "reputation_score" | "matl_score"));
     let reputation = if needs_reputation {
         get_aggregated_reputation(&input.did)?
     } else {
@@ -1047,7 +1078,10 @@ pub fn query_identity_selective(input: SelectiveQueryInput) -> ExternResult<Sele
 
     if fields.iter().any(|f| f == "matl_score") {
         let mfa_enrolled = mfa_summary.is_some();
-        let mfa_score = mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0);
+        let mfa_score = mfa_summary
+            .as_ref()
+            .map(|s| s.assurance_score)
+            .unwrap_or(0.0);
         let matl = if mfa_enrolled {
             (reputation * REPUTATION_WEIGHT) + (mfa_score * MFA_WEIGHT)
         } else {
@@ -1166,7 +1200,10 @@ pub fn check_enhanced_trust(input: EnhancedTrustCheckInput) -> ExternResult<Enha
     let mfa_summary = get_mfa_summary_for_did(&input.did)?;
 
     let mfa_enrolled = mfa_summary.is_some();
-    let mfa_score = mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0);
+    let mfa_score = mfa_summary
+        .as_ref()
+        .map(|s| s.assurance_score)
+        .unwrap_or(0.0);
     let mfa_level = mfa_summary.as_ref().map(|s| s.assurance_level.clone());
     let fl_eligible = mfa_summary.as_ref().map(|s| s.fl_eligible).unwrap_or(false);
 
@@ -1246,7 +1283,11 @@ pub fn get_did_verification_status(did: String) -> ExternResult<DidVerificationS
     }
 
     let exists = verify_did_exists(&did)?;
-    let deactivated = if exists { is_did_deactivated(&did)? } else { false };
+    let deactivated = if exists {
+        is_did_deactivated(&did)?
+    } else {
+        false
+    };
     let mfa_summary = get_mfa_summary_for_did(&did)?;
 
     Ok(DidVerificationStatus {
@@ -1254,8 +1295,13 @@ pub fn get_did_verification_status(did: String) -> ExternResult<DidVerificationS
         exists,
         active: exists && !deactivated,
         mfa_enrolled: mfa_summary.is_some(),
-        mfa_assurance_level: mfa_summary.as_ref().map(|s| format!("{:?}", s.assurance_level)),
-        mfa_assurance_score: mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0),
+        mfa_assurance_level: mfa_summary
+            .as_ref()
+            .map(|s| format!("{:?}", s.assurance_level)),
+        mfa_assurance_score: mfa_summary
+            .as_ref()
+            .map(|s| s.assurance_score)
+            .unwrap_or(0.0),
     })
 }
 
@@ -1292,9 +1338,17 @@ pub fn get_mfa_assurance_level(did: String) -> ExternResult<MfaAssuranceLevelRes
     Ok(MfaAssuranceLevelResult {
         did,
         enrolled: mfa_summary.is_some(),
-        assurance_level: mfa_summary.as_ref().map(|s| format!("{:?}", s.assurance_level)),
-        assurance_score: mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0),
-        factor_count: mfa_summary.as_ref().map(|s| s.factor_count as u32).unwrap_or(0),
+        assurance_level: mfa_summary
+            .as_ref()
+            .map(|s| format!("{:?}", s.assurance_level)),
+        assurance_score: mfa_summary
+            .as_ref()
+            .map(|s| s.assurance_score)
+            .unwrap_or(0.0),
+        factor_count: mfa_summary
+            .as_ref()
+            .map(|s| s.factor_count as u32)
+            .unwrap_or(0),
         fl_eligible: mfa_summary.as_ref().map(|s| s.fl_eligible).unwrap_or(false),
     })
 }
@@ -1419,26 +1473,29 @@ fn get_community_trust_score(did: &str) -> ExternResult<f64> {
     for record in &credential_records {
         // Decode TrustCredential from the record — uses the integrity types
         // imported via trust_credential_integrity (available in this DNA)
-        let cred_data: Option<serde_json::Value> = record
-            .entry()
-            .as_option()
-            .and_then(|entry| {
-                serde_json::from_slice(
-                    &holochain_serialized_bytes::encode(entry)
-                        .unwrap_or_default(),
-                )
+        let cred_data: Option<serde_json::Value> = record.entry().as_option().and_then(|entry| {
+            serde_json::from_slice(&holochain_serialized_bytes::encode(entry).unwrap_or_default())
                 .ok()
-            });
+        });
 
         if let Some(cred) = cred_data {
             // Skip revoked or self-attested (issuer == subject)
-            let revoked = cred.get("revoked").and_then(|v| v.as_bool()).unwrap_or(true);
+            let revoked = cred
+                .get("revoked")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
             if revoked {
                 continue;
             }
 
-            let subject = cred.get("subject_did").and_then(|v| v.as_str()).unwrap_or("");
-            let issuer = cred.get("issuer_did").and_then(|v| v.as_str()).unwrap_or("");
+            let subject = cred
+                .get("subject_did")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let issuer = cred
+                .get("issuer_did")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if subject == issuer {
                 // Self-attestation: weight at 0.1 (low trust)
                 // but still count it
@@ -1484,8 +1541,7 @@ fn get_community_trust_score(did: &str) -> ExternResult<f64> {
                 .and_then(|v| v.get("0").and_then(|v| v.as_i64()))
                 .unwrap_or(0) as f64;
             let age_micros = (now_micros - issued_micros).max(0.0);
-            let decay =
-                (-age_micros / REPUTATION_HALF_LIFE_MICROS * core::f64::consts::LN_2).exp();
+            let decay = (-age_micros / REPUTATION_HALF_LIFE_MICROS * core::f64::consts::LN_2).exp();
 
             let effective_weight = attestor_weight * decay;
             weighted_sum += score * effective_weight;

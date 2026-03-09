@@ -11,9 +11,9 @@ use crate::envelope::EncryptedEnvelope;
 use crate::error::CryptoError;
 use crate::traits::Encryptor;
 
+use chacha20poly1305::aead::AeadCore;
 use chacha20poly1305::aead::{Aead, KeyInit, OsRng};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
-use chacha20poly1305::aead::AeadCore;
 use zeroize::Zeroizing;
 
 /// XChaCha20-Poly1305 encryptor with a pre-shared key.
@@ -66,9 +66,11 @@ impl Encryptor for XChaCha20Encryptor {
         _associated_data: &[u8],
         recipient_key_id: &str,
     ) -> Result<EncryptedEnvelope, CryptoError> {
-        let key_array: [u8; 32] = self.key.as_slice().try_into().map_err(|_| {
-            CryptoError::Validation("Key must be exactly 32 bytes".into())
-        })?;
+        let key_array: [u8; 32] = self
+            .key
+            .as_slice()
+            .try_into()
+            .map_err(|_| CryptoError::Validation("Key must be exactly 32 bytes".into()))?;
 
         let cipher = XChaCha20Poly1305::new(&key_array.into());
         let nonce = XChaCha20Poly1305::generate_nonce(&mut OsRng);
@@ -91,9 +93,11 @@ impl Encryptor for XChaCha20Encryptor {
         envelope: &EncryptedEnvelope,
         _associated_data: &[u8],
     ) -> Result<Vec<u8>, CryptoError> {
-        let key_array: [u8; 32] = self.key.as_slice().try_into().map_err(|_| {
-            CryptoError::Validation("Key must be exactly 32 bytes".into())
-        })?;
+        let key_array: [u8; 32] = self
+            .key
+            .as_slice()
+            .try_into()
+            .map_err(|_| CryptoError::Validation("Key must be exactly 32 bytes".into()))?;
 
         let cipher = XChaCha20Poly1305::new(&key_array.into());
 
@@ -145,7 +149,9 @@ mod tests {
         .unwrap();
 
         let plaintext = b"encrypted credential claims";
-        let envelope = encryptor.encrypt(plaintext, b"", "did:mycelix:abc#kem-1").unwrap();
+        let envelope = encryptor
+            .encrypt(plaintext, b"", "did:mycelix:abc#kem-1")
+            .unwrap();
 
         // Recipient decapsulates and decrypts
         let recipient_shared_secret = recipient.decapsulate(&encapsulated_key).unwrap();

@@ -672,7 +672,8 @@ impl HolisticVotingWeight {
         // Consciousness multiplier: ranges from CONSCIOUSNESS_BASE (level=0) to
         // CONSCIOUSNESS_BASE + CONSCIOUSNESS_PHI_FACTOR (level=1)
         // This gives high-consciousness voters up to 43% more influence
-        let consciousness_multiplier = CONSCIOUSNESS_BASE + CONSCIOUSNESS_PHI_FACTOR * consciousness_level;
+        let consciousness_multiplier =
+            CONSCIOUSNESS_BASE + CONSCIOUSNESS_PHI_FACTOR * consciousness_level;
 
         // Harmonic bonus: only positive alignment gives bonus
         // Negative alignment gives no penalty here (handled in threshold)
@@ -764,25 +765,25 @@ impl AdaptiveThreshold {
     pub fn for_proposal_type(proposal_type: &ProposalType) -> Self {
         match proposal_type {
             ProposalType::Standard => Self {
-                base_threshold: 0.51,      // Simple majority
-                min_voter_consciousness: GOV_BASIC,  // Basic consciousness
-                min_participation: 5,      // At least 5 voters
-                quorum: 0.20,              // 20% of eligible must vote
-                max_extension_secs: 86400, // 1 day extension max
+                base_threshold: 0.51,               // Simple majority
+                min_voter_consciousness: GOV_BASIC, // Basic consciousness
+                min_participation: 5,               // At least 5 voters
+                quorum: 0.20,                       // 20% of eligible must vote
+                max_extension_secs: 86400,          // 1 day extension max
             },
             ProposalType::Emergency => Self {
-                base_threshold: 0.60,      // Higher bar for emergency
+                base_threshold: 0.60,                  // Higher bar for emergency
                 min_voter_consciousness: GOV_PROPOSAL, // Proposal-level consciousness
-                min_participation: 3,      // Faster with fewer
-                quorum: 0.10,              // Lower quorum for speed
-                max_extension_secs: 3600,  // 1 hour max
+                min_participation: 3,                  // Faster with fewer
+                quorum: 0.10,                          // Lower quorum for speed
+                max_extension_secs: 3600,              // 1 hour max
             },
             ProposalType::Constitutional => Self {
-                base_threshold: 0.67,      // Supermajority required
+                base_threshold: 0.67,                              // Supermajority required
                 min_voter_consciousness: GOV_VOTER_CONSTITUTIONAL, // High consciousness required
-                min_participation: 10,     // Significant participation
-                quorum: 0.40,              // 40% must participate
-                max_extension_secs: 604800, // 1 week extension allowed
+                min_participation: 10,                             // Significant participation
+                quorum: 0.40,                                      // 40% must participate
+                max_extension_secs: 604800,                        // 1 week extension allowed
             },
         }
     }
@@ -897,49 +898,43 @@ impl FederatedReputation {
     /// - Governance: 30% (voting history, proposal success)
     pub fn calculate_aggregated(&self) -> f64 {
         // Identity score (15% max contribution)
-        let identity_score = (
-            self.identity_verification * 0.5 +
-            (self.credential_count.min(10) as f64 / 10.0) * 0.25 +
-            self.credential_quality * 0.25
-        ).clamp(0.0, 1.0);
+        let identity_score = (self.identity_verification * 0.5
+            + (self.credential_count.min(10) as f64 / 10.0) * 0.25
+            + self.credential_quality * 0.25)
+            .clamp(0.0, 1.0);
 
         // Knowledge score (25% max contribution)
-        let knowledge_score = (
-            self.epistemic_contributions * 0.4 +
-            self.factcheck_accuracy * 0.4 +
-            (self.dark_spots_resolved.min(20) as f64 / 20.0) * 0.2
-        ).clamp(0.0, 1.0);
+        let knowledge_score = (self.epistemic_contributions * 0.4
+            + self.factcheck_accuracy * 0.4
+            + (self.dark_spots_resolved.min(20) as f64 / 20.0) * 0.2)
+            .clamp(0.0, 1.0);
 
         // Finance score (5% max - DOMAIN BOUNDARY ENFORCED)
         // Per Commons Charter, economic activity cannot dominate governance
-        let finance_score = (
-            self.stake_weight * 0.4 +
-            self.payment_reliability * 0.3 +
-            self.escrow_completion_rate * 0.3
-        ).clamp(0.0, 1.0);
+        let finance_score = (self.stake_weight * 0.4
+            + self.payment_reliability * 0.3
+            + self.escrow_completion_rate * 0.3)
+            .clamp(0.0, 1.0);
 
         // Federated Learning score (25% max contribution)
-        let fl_score = (
-            self.pogq_score * 0.5 +
-            (self.fl_contributions.min(100) as f64 / 100.0) * 0.25 +
-            self.byzantine_clean_rate * 0.25
-        ).clamp(0.0, 1.0);
+        let fl_score = (self.pogq_score * 0.5
+            + (self.fl_contributions.min(100) as f64 / 100.0) * 0.25
+            + self.byzantine_clean_rate * 0.25)
+            .clamp(0.0, 1.0);
 
         // Governance score (30% max contribution)
-        let governance_score = (
-            self.voting_participation * 0.3 +
-            self.proposal_success_rate * 0.3 +
-            self.consensus_alignment * 0.4
-        ).clamp(0.0, 1.0);
+        let governance_score = (self.voting_participation * 0.3
+            + self.proposal_success_rate * 0.3
+            + self.consensus_alignment * 0.4)
+            .clamp(0.0, 1.0);
 
         // Weighted aggregation with domain boundary caps enforced
-        (
-            identity_score * DOMAIN_CAP_IDENTITY +
+        (identity_score * DOMAIN_CAP_IDENTITY +
             knowledge_score * DOMAIN_CAP_KNOWLEDGE +
             finance_score * DOMAIN_CAP_FINANCE +      // 5% cap enforced
             fl_score * DOMAIN_CAP_FL +
-            governance_score * DOMAIN_CAP_GOVERNANCE
-        ).clamp(0.0, 1.0)
+            governance_score * DOMAIN_CAP_GOVERNANCE)
+            .clamp(0.0, 1.0)
     }
 
     /// Create initial federated reputation for new participant
@@ -1322,7 +1317,9 @@ pub struct GovernanceConsciousnessConfig {
     pub changed_by_proposal: Option<String>,
 }
 
-fn default_max_voting_weight() -> f64 { 1.5 }
+fn default_max_voting_weight() -> f64 {
+    1.5
+}
 
 impl GovernanceConsciousnessConfig {
     /// Default configuration matching hardcoded values
@@ -1367,12 +1364,30 @@ impl GovernanceConsciousnessConfig {
 pub fn check_consciousness_config(config: &GovernanceConsciousnessConfig) -> Result<(), String> {
     let fields = [
         ("consciousness_gate_basic", config.consciousness_gate_basic),
-        ("consciousness_gate_proposal", config.consciousness_gate_proposal),
-        ("consciousness_gate_voting", config.consciousness_gate_voting),
-        ("consciousness_gate_constitutional", config.consciousness_gate_constitutional),
-        ("min_voter_consciousness_standard", config.min_voter_consciousness_standard),
-        ("min_voter_consciousness_emergency", config.min_voter_consciousness_emergency),
-        ("min_voter_consciousness_constitutional", config.min_voter_consciousness_constitutional),
+        (
+            "consciousness_gate_proposal",
+            config.consciousness_gate_proposal,
+        ),
+        (
+            "consciousness_gate_voting",
+            config.consciousness_gate_voting,
+        ),
+        (
+            "consciousness_gate_constitutional",
+            config.consciousness_gate_constitutional,
+        ),
+        (
+            "min_voter_consciousness_standard",
+            config.min_voter_consciousness_standard,
+        ),
+        (
+            "min_voter_consciousness_emergency",
+            config.min_voter_consciousness_emergency,
+        ),
+        (
+            "min_voter_consciousness_constitutional",
+            config.min_voter_consciousness_constitutional,
+        ),
     ];
     for (name, value) in &fields {
         if *value < 0.0 || *value > 1.0 {
@@ -1387,14 +1402,21 @@ pub fn check_consciousness_config(config: &GovernanceConsciousnessConfig) -> Res
         return Err("consciousness_gate_proposal must be <= consciousness_gate_voting".into());
     }
     if config.consciousness_gate_voting > config.consciousness_gate_constitutional {
-        return Err("consciousness_gate_voting must be <= consciousness_gate_constitutional".into());
+        return Err(
+            "consciousness_gate_voting must be <= consciousness_gate_constitutional".into(),
+        );
     }
     // Voter consciousness thresholds must be non-decreasing
     if config.min_voter_consciousness_standard > config.min_voter_consciousness_emergency {
-        return Err("min_voter_consciousness_standard must be <= min_voter_consciousness_emergency".into());
+        return Err(
+            "min_voter_consciousness_standard must be <= min_voter_consciousness_emergency".into(),
+        );
     }
     if config.min_voter_consciousness_emergency > config.min_voter_consciousness_constitutional {
-        return Err("min_voter_consciousness_emergency must be <= min_voter_consciousness_constitutional".into());
+        return Err(
+            "min_voter_consciousness_emergency must be <= min_voter_consciousness_constitutional"
+                .into(),
+        );
     }
     // Max voting weight must be positive and reasonable (0.5 to 5.0)
     if config.max_voting_weight < 0.5 || config.max_voting_weight > 5.0 {
@@ -1479,7 +1501,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::GovernanceQuery(query) => validate_create_query(action, query),
-                EntryTypes::ProposalReference(proposal) => validate_create_proposal_ref(action, proposal),
+                EntryTypes::ProposalReference(proposal) => {
+                    validate_create_proposal_ref(action, proposal)
+                }
                 EntryTypes::GovernanceBridgeEvent(event) => validate_create_event(action, event),
                 EntryTypes::ExecutionRequest(req) => validate_create_execution_req(action, req),
                 // Consciousness metrics validations
@@ -1509,7 +1533,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 EntryTypes::WeightedVote(vote) => validate_create_weighted_vote(action, vote),
                 EntryTypes::ConsensusRound(round) => validate_create_consensus_round(action, round),
-                EntryTypes::SlashingRecord(record) => validate_create_slashing_record(action, record),
+                EntryTypes::SlashingRecord(record) => {
+                    validate_create_slashing_record(action, record)
+                }
                 EntryTypes::GovernanceConsciousnessConfig(config) => {
                     match check_consciousness_config(&config) {
                         Ok(()) => Ok(ValidateCallbackResult::Valid),
@@ -1632,7 +1658,9 @@ fn validate_create_query(
     query: GovernanceQuery,
 ) -> ExternResult<ValidateCallbackResult> {
     if query.source_happ.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Source hApp required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Source hApp required".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1651,7 +1679,9 @@ fn validate_create_event(
     event: GovernanceBridgeEvent,
 ) -> ExternResult<ValidateCallbackResult> {
     if event.source_happ.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Source hApp required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Source hApp required".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1662,7 +1692,9 @@ fn validate_create_execution_req(
     req: ExecutionRequest,
 ) -> ExternResult<ValidateCallbackResult> {
     if req.target_happ.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Target hApp required".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Target hApp required".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -1801,9 +1833,7 @@ fn validate_create_consciousness_gate(
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate ID is present
     if gate.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Gate ID required".into(),
-        ));
+        return Ok(ValidateCallbackResult::Invalid("Gate ID required".into()));
     }
 
     // Validate agent DID format
@@ -1876,7 +1906,9 @@ fn validate_create_consciousness_history(
     }
 
     // Validate min <= avg <= peak
-    if history.min_consciousness > history.average_consciousness || history.average_consciousness > history.peak_consciousness {
+    if history.min_consciousness > history.average_consciousness
+        || history.average_consciousness > history.peak_consciousness
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Consciousness statistics must satisfy: min <= average <= peak".into(),
         ));
@@ -1935,9 +1967,10 @@ fn validate_create_value_alignment(
     // Validate harmony scores are in range
     for hs in &assessment.harmony_scores {
         if hs.score < -1.0 || hs.score > 1.0 {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("Harmony score for {} must be between -1.0 and 1.0", hs.harmony),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Harmony score for {} must be between -1.0 and 1.0",
+                hs.harmony
+            )));
         }
     }
 
@@ -1988,9 +2021,10 @@ fn validate_create_k_vector(
 
     for (name, value) in components {
         if value < 0.0 || value > 1.0 {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("{} must be between 0.0 and 1.0", name),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "{} must be between 0.0 and 1.0",
+                name
+            )));
         }
     }
 
@@ -2021,9 +2055,10 @@ fn validate_create_matl_score(
 
     for (name, value) in scores {
         if value < 0.0 || value > 1.0 {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("{} must be between 0.0 and 1.0", name),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "{} must be between 0.0 and 1.0",
+                name
+            )));
         }
     }
 
@@ -2061,9 +2096,10 @@ fn validate_create_federated_reputation(
 
     for (name, value) in scores {
         if value < 0.0 || value > 1.0 {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("{} must be between 0.0 and 1.0", name),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "{} must be between 0.0 and 1.0",
+                name
+            )));
         }
     }
 
@@ -2288,7 +2324,11 @@ mod consciousness_snapshot_tests {
     fn test_quality_score_calculation() {
         let snapshot = create_test_snapshot(0.5);
         let quality = snapshot.quality_score();
-        assert!((quality - 0.62).abs() < 0.001, "Quality score should be 0.62, got {}", quality);
+        assert!(
+            (quality - 0.62).abs() < 0.001,
+            "Quality score should be 0.62, got {}",
+            quality
+        );
     }
 
     #[test]
@@ -2343,27 +2383,51 @@ mod action_type_tests {
     #[test]
     fn test_consciousness_gates() {
         assert_eq!(GovernanceActionType::Basic.consciousness_gate(), 0.2);
-        assert_eq!(GovernanceActionType::ProposalSubmission.consciousness_gate(), 0.3);
+        assert_eq!(
+            GovernanceActionType::ProposalSubmission.consciousness_gate(),
+            0.3
+        );
         assert_eq!(GovernanceActionType::Voting.consciousness_gate(), 0.4);
-        assert_eq!(GovernanceActionType::Constitutional.consciousness_gate(), 0.6);
+        assert_eq!(
+            GovernanceActionType::Constitutional.consciousness_gate(),
+            0.6
+        );
     }
 
     #[test]
     fn test_descriptions() {
-        assert_eq!(GovernanceActionType::Basic.description(), "Basic participation");
-        assert_eq!(GovernanceActionType::ProposalSubmission.description(), "Proposal submission");
-        assert_eq!(GovernanceActionType::Voting.description(), "Voting on proposals");
-        assert_eq!(GovernanceActionType::Constitutional.description(), "Constitutional changes");
+        assert_eq!(
+            GovernanceActionType::Basic.description(),
+            "Basic participation"
+        );
+        assert_eq!(
+            GovernanceActionType::ProposalSubmission.description(),
+            "Proposal submission"
+        );
+        assert_eq!(
+            GovernanceActionType::Voting.description(),
+            "Voting on proposals"
+        );
+        assert_eq!(
+            GovernanceActionType::Constitutional.description(),
+            "Constitutional changes"
+        );
     }
 
     #[test]
     fn test_threshold_ordering() {
-        assert!(GovernanceActionType::Basic.consciousness_gate() <
-                GovernanceActionType::ProposalSubmission.consciousness_gate());
-        assert!(GovernanceActionType::ProposalSubmission.consciousness_gate() <
-                GovernanceActionType::Voting.consciousness_gate());
-        assert!(GovernanceActionType::Voting.consciousness_gate() <
-                GovernanceActionType::Constitutional.consciousness_gate());
+        assert!(
+            GovernanceActionType::Basic.consciousness_gate()
+                < GovernanceActionType::ProposalSubmission.consciousness_gate()
+        );
+        assert!(
+            GovernanceActionType::ProposalSubmission.consciousness_gate()
+                < GovernanceActionType::Voting.consciousness_gate()
+        );
+        assert!(
+            GovernanceActionType::Voting.consciousness_gate()
+                < GovernanceActionType::Constitutional.consciousness_gate()
+        );
     }
 }
 
@@ -2436,7 +2500,12 @@ mod consciousness_workflow_tests {
         let action_type = GovernanceActionType::Voting;
         let required = action_type.consciousness_gate();
 
-        assert!(phi >= required, "Φ {} should meet voting threshold {}", phi, required);
+        assert!(
+            phi >= required,
+            "Φ {} should meet voting threshold {}",
+            phi,
+            required
+        );
     }
 
     #[test]
@@ -2445,7 +2514,12 @@ mod consciousness_workflow_tests {
         let action_type = GovernanceActionType::Voting;
         let required = action_type.consciousness_gate();
 
-        assert!(phi < required, "Φ {} should NOT meet voting threshold {}", phi, required);
+        assert!(
+            phi < required,
+            "Φ {} should NOT meet voting threshold {}",
+            phi,
+            required
+        );
     }
 
     #[test]
@@ -2532,7 +2606,11 @@ mod k_vector_tests {
         // T = 0.25×0.8 + 0.15×0.7 + 0.20×0.9 + 0.15×0.6 + 0.05×0.5 + 0.10×0.4 + 0.05×0.7 + 0.05×0.3
         //   = 0.2 + 0.105 + 0.18 + 0.09 + 0.025 + 0.04 + 0.035 + 0.015 = 0.69
         let score = k.trust_score();
-        assert!((score - 0.69).abs() < 0.001, "Trust score should be 0.69, got {}", score);
+        assert!(
+            (score - 0.69).abs() < 0.001,
+            "Trust score should be 0.69, got {}",
+            score
+        );
     }
 
     #[test]
@@ -2540,7 +2618,11 @@ mod k_vector_tests {
         let k = create_test_k_vector();
         // Weight = 0.8² = 0.64
         let weight = k.voting_weight();
-        assert!((weight - 0.64).abs() < 0.001, "Voting weight should be 0.64, got {}", weight);
+        assert!(
+            (weight - 0.64).abs() < 0.001,
+            "Voting weight should be 0.64, got {}",
+            weight
+        );
     }
 
     #[test]
@@ -2563,10 +2645,8 @@ mod k_vector_tests {
 
     #[test]
     fn test_new_participant_defaults() {
-        let k = KVector::new_participant(
-            "did:mycelix:newuser".to_string(),
-            Timestamp::from_micros(0),
-        );
+        let k =
+            KVector::new_participant("did:mycelix:newuser".to_string(), Timestamp::from_micros(0));
         assert_eq!(k.k_r, 0.5);
         assert_eq!(k.k_a, 0.5);
         assert_eq!(k.k_i, 0.5);
@@ -2586,7 +2666,11 @@ mod matl_tests {
         // T = 0.4×PoGQ + 0.3×TCDM + 0.3×Entropy
         let score = MatlTrustScore::calculate(0.8, 0.6, 0.7);
         // = 0.4×0.8 + 0.3×0.6 + 0.3×0.7 = 0.32 + 0.18 + 0.21 = 0.71
-        assert!((score - 0.71).abs() < 0.001, "MATL score should be 0.71, got {}", score);
+        assert!(
+            (score - 0.71).abs() < 0.001,
+            "MATL score should be 0.71, got {}",
+            score
+        );
     }
 
     #[test]
@@ -2610,7 +2694,11 @@ mod matl_tests {
         // Holistic = 0.5×MATL + 0.3×K-Vector + 0.2×Φ
         // = 0.5×0.71 + 0.3×0.69 + 0.2×0.5 = 0.355 + 0.207 + 0.1 = 0.662
         let holistic = matl.holistic_score();
-        assert!((holistic - 0.662).abs() < 0.001, "Holistic score should be 0.662, got {}", holistic);
+        assert!(
+            (holistic - 0.662).abs() < 0.001,
+            "Holistic score should be 0.662, got {}",
+            holistic
+        );
     }
 }
 
@@ -2643,7 +2731,11 @@ mod consensus_participant_tests {
     fn test_success_rate() {
         let p = create_test_participant();
         let rate = p.success_rate();
-        assert!((rate - 0.95).abs() < 0.001, "Success rate should be 0.95, got {}", rate);
+        assert!(
+            (rate - 0.95).abs() < 0.001,
+            "Success rate should be 0.95, got {}",
+            rate
+        );
     }
 
     #[test]
@@ -2713,7 +2805,11 @@ mod consensus_round_tests {
         let mut round = create_test_round();
         round.weighted_approvals = 6.0;
         let pct = round.approval_percentage();
-        assert!((pct - 60.0).abs() < 0.001, "Approval should be 60%, got {}", pct);
+        assert!(
+            (pct - 60.0).abs() < 0.001,
+            "Approval should be 60%, got {}",
+            pct
+        );
     }
 
     #[test]
@@ -2754,11 +2850,11 @@ mod consensus_workflow_tests {
     fn test_weighted_voting_workflow() {
         // Simulate 5 validators voting with reputation² weighting
         let validators = vec![
-            (0.9_f64, VoteDecision::Approve),   // weight: 0.81
-            (0.8, VoteDecision::Approve),       // weight: 0.64
-            (0.6, VoteDecision::Reject),        // weight: 0.36
-            (0.4, VoteDecision::Reject),        // weight: 0.16
-            (0.2, VoteDecision::Abstain),       // weight: 0.04
+            (0.9_f64, VoteDecision::Approve), // weight: 0.81
+            (0.8, VoteDecision::Approve),     // weight: 0.64
+            (0.6, VoteDecision::Reject),      // weight: 0.36
+            (0.4, VoteDecision::Reject),      // weight: 0.16
+            (0.2, VoteDecision::Abstain),     // weight: 0.04
         ];
 
         let total_weight: f64 = validators.iter().map(|(r, _)| r.powi(2)).sum();
@@ -2795,11 +2891,11 @@ mod consensus_workflow_tests {
         // Test that low-reputation Byzantine validators can't influence consensus
         // 3 honest (high rep) vs 2 Byzantine (low rep)
         let validators = vec![
-            (0.9_f64, true),   // Honest: weight 0.81
-            (0.85, true),      // Honest: weight 0.7225
-            (0.8, true),       // Honest: weight 0.64
-            (0.3, false),      // Byzantine: weight 0.09
-            (0.2, false),      // Byzantine: weight 0.04
+            (0.9_f64, true), // Honest: weight 0.81
+            (0.85, true),    // Honest: weight 0.7225
+            (0.8, true),     // Honest: weight 0.64
+            (0.3, false),    // Byzantine: weight 0.09
+            (0.2, false),    // Byzantine: weight 0.04
         ];
 
         let total_weight: f64 = validators.iter().map(|(r, _)| r.powi(2)).sum();
@@ -2821,8 +2917,14 @@ mod consensus_workflow_tests {
         let byzantine_percentage = (byzantine_weight / total_weight) * 100.0;
         // 0.13 / 2.3025 * 100 = 5.64%
 
-        assert!(byzantine_percentage < 10.0, "Byzantine should have < 10% voting power");
-        assert!(honest_weight > total_weight * 0.55, "Honest validators should reach consensus alone");
+        assert!(
+            byzantine_percentage < 10.0,
+            "Byzantine should have < 10% voting power"
+        );
+        assert!(
+            honest_weight > total_weight * 0.55,
+            "Honest validators should reach consensus alone"
+        );
     }
 }
 
@@ -3104,7 +3206,11 @@ mod federated_reputation_tests {
         assert!(score >= 0.0 && score <= 1.0);
 
         // With good scores across the board, should be relatively high
-        assert!(score > 0.7, "Score should be > 0.7 with good metrics, got {}", score);
+        assert!(
+            score > 0.7,
+            "Score should be > 0.7 with good metrics, got {}",
+            score
+        );
     }
 
     #[test]
@@ -3130,7 +3236,11 @@ mod federated_reputation_tests {
         // Identity is 15% of total weight
         // Identity score = 1.0×0.5 + (5/10)×0.25 + 0.8×0.25 = 0.5 + 0.125 + 0.2 = 0.825
         // Total contribution = 0.825 × 0.15 = 0.12375
-        assert!(score > 0.1 && score < 0.2, "Identity-only score should be ~0.12, got {}", score);
+        assert!(
+            score > 0.1 && score < 0.2,
+            "Identity-only score should be ~0.12, got {}",
+            score
+        );
     }
 
     #[test]
@@ -3156,7 +3266,11 @@ mod federated_reputation_tests {
         let score = fed_rep.calculate_aggregated();
 
         // Knowledge is 20% of total weight
-        assert!(score > 0.1 && score < 0.25, "Knowledge-only score should be reasonable, got {}", score);
+        assert!(
+            score > 0.1 && score < 0.25,
+            "Knowledge-only score should be reasonable, got {}",
+            score
+        );
     }
 
     #[test]
@@ -3182,7 +3296,11 @@ mod federated_reputation_tests {
         let score = fed_rep.calculate_aggregated();
 
         // FL is 25% of total weight, PoGQ is 50% of FL
-        assert!(score > 0.15 && score < 0.30, "FL-only score should be ~0.2, got {}", score);
+        assert!(
+            score > 0.15 && score < 0.30,
+            "FL-only score should be ~0.2, got {}",
+            score
+        );
     }
 
     #[test]
@@ -3208,7 +3326,11 @@ mod federated_reputation_tests {
         let score = fed_rep.calculate_aggregated();
 
         // Governance is 25% of total weight
-        assert!(score > 0.15 && score < 0.25, "Governance-only score should be ~0.2, got {}", score);
+        assert!(
+            score > 0.15 && score < 0.25,
+            "Governance-only score should be ~0.2, got {}",
+            score
+        );
     }
 
     #[test]
@@ -3415,11 +3537,36 @@ mod consciousness_weighted_consensus_tests {
         }
 
         let validators = vec![
-            Validator { reputation: 0.9, phi: 0.8, alignment: 0.9, decision: VoteDecision::Approve },
-            Validator { reputation: 0.8, phi: 0.6, alignment: 0.7, decision: VoteDecision::Approve },
-            Validator { reputation: 0.7, phi: 0.4, alignment: -0.2, decision: VoteDecision::Reject },
-            Validator { reputation: 0.5, phi: 0.3, alignment: -0.5, decision: VoteDecision::Reject },
-            Validator { reputation: 0.3, phi: 0.2, alignment: 0.0, decision: VoteDecision::Abstain },
+            Validator {
+                reputation: 0.9,
+                phi: 0.8,
+                alignment: 0.9,
+                decision: VoteDecision::Approve,
+            },
+            Validator {
+                reputation: 0.8,
+                phi: 0.6,
+                alignment: 0.7,
+                decision: VoteDecision::Approve,
+            },
+            Validator {
+                reputation: 0.7,
+                phi: 0.4,
+                alignment: -0.2,
+                decision: VoteDecision::Reject,
+            },
+            Validator {
+                reputation: 0.5,
+                phi: 0.3,
+                alignment: -0.5,
+                decision: VoteDecision::Reject,
+            },
+            Validator {
+                reputation: 0.3,
+                phi: 0.2,
+                alignment: 0.0,
+                decision: VoteDecision::Abstain,
+            },
         ];
 
         let weights: Vec<(f64, VoteDecision)> = validators
@@ -3446,7 +3593,11 @@ mod consciousness_weighted_consensus_tests {
 
         // High-consciousness, aligned approvers should dominate
         let approval_ratio = weighted_approvals / total_weight;
-        assert!(approval_ratio > 0.5, "Approvals should be > 50%, got {}%", approval_ratio * 100.0);
+        assert!(
+            approval_ratio > 0.5,
+            "Approvals should be > 50%, got {}%",
+            approval_ratio * 100.0
+        );
     }
 
     #[test]
@@ -3495,19 +3646,25 @@ mod consciousness_weighted_consensus_tests {
         let low_score = low_fed.calculate_aggregated();
 
         // High federated score should be significantly higher
-        assert!(high_score > low_score * 2.0, "High fed ({}) should be much higher than low fed ({})", high_score, low_score);
+        assert!(
+            high_score > low_score * 2.0,
+            "High fed ({}) should be much higher than low fed ({})",
+            high_score,
+            low_score
+        );
     }
 
     #[test]
     fn test_consciousness_gates_protect_constitutional_votes() {
         // Only high-Φ agents should be able to vote on constitutional changes
         let agents = vec![
-            ("did:mycelix:sage", 0.7),    // Can vote on constitutional
-            ("did:mycelix:voter", 0.45),   // Can vote on standard/emergency, not constitutional
+            ("did:mycelix:sage", 0.7),      // Can vote on constitutional
+            ("did:mycelix:voter", 0.45),    // Can vote on standard/emergency, not constitutional
             ("did:mycelix:observer", 0.15), // Cannot vote at all
         ];
 
-        let constitutional_threshold = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
+        let constitutional_threshold =
+            AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
         let standard_threshold = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
 
         let can_vote_constitutional: Vec<&str> = agents
@@ -3561,7 +3718,11 @@ mod consciousness_weighted_consensus_tests {
         // Cooldown should significantly reduce influence
         assert!(cooldown_effective < normal_effective);
         let reduction = (normal_effective - cooldown_effective) / normal_effective * 100.0;
-        assert!(reduction > 20.0, "Cooldown should reduce influence by > 20%, got {}%", reduction);
+        assert!(
+            reduction > 20.0,
+            "Cooldown should reduce influence by > 20%, got {}%",
+            reduction
+        );
     }
 
     // --- GovernanceConsciousnessConfig ---
@@ -3578,25 +3739,58 @@ mod consciousness_weighted_consensus_tests {
     #[test]
     fn test_consciousness_config_defaults_match_hardcoded() {
         let config = default_config();
-        assert!((config.consciousness_gate_basic - GovernanceActionType::Basic.consciousness_gate()).abs() < f64::EPSILON);
-        assert!((config.consciousness_gate_proposal - GovernanceActionType::ProposalSubmission.consciousness_gate()).abs() < f64::EPSILON);
-        assert!((config.consciousness_gate_voting - GovernanceActionType::Voting.consciousness_gate()).abs() < f64::EPSILON);
-        assert!((config.consciousness_gate_constitutional - GovernanceActionType::Constitutional.consciousness_gate()).abs() < f64::EPSILON);
+        assert!(
+            (config.consciousness_gate_basic - GovernanceActionType::Basic.consciousness_gate())
+                .abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (config.consciousness_gate_proposal
+                - GovernanceActionType::ProposalSubmission.consciousness_gate())
+            .abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (config.consciousness_gate_voting - GovernanceActionType::Voting.consciousness_gate())
+                .abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (config.consciousness_gate_constitutional
+                - GovernanceActionType::Constitutional.consciousness_gate())
+            .abs()
+                < f64::EPSILON
+        );
     }
 
     #[test]
     fn test_consciousness_config_threshold_lookup() {
         let config = default_config();
-        assert!((config.consciousness_gate_for(&GovernanceActionType::Basic) - 0.2).abs() < f64::EPSILON);
-        assert!((config.consciousness_gate_for(&GovernanceActionType::Constitutional) - 0.6).abs() < f64::EPSILON);
+        assert!(
+            (config.consciousness_gate_for(&GovernanceActionType::Basic) - 0.2).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (config.consciousness_gate_for(&GovernanceActionType::Constitutional) - 0.6).abs()
+                < f64::EPSILON
+        );
     }
 
     #[test]
     fn test_consciousness_config_voter_consciousness_lookup() {
         let config = default_config();
-        assert!((config.min_voter_consciousness_for(&ProposalType::Standard) - 0.2).abs() < f64::EPSILON);
-        assert!((config.min_voter_consciousness_for(&ProposalType::Emergency) - 0.3).abs() < f64::EPSILON);
-        assert!((config.min_voter_consciousness_for(&ProposalType::Constitutional) - 0.5).abs() < f64::EPSILON);
+        assert!(
+            (config.min_voter_consciousness_for(&ProposalType::Standard) - 0.2).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (config.min_voter_consciousness_for(&ProposalType::Emergency) - 0.3).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (config.min_voter_consciousness_for(&ProposalType::Constitutional) - 0.5).abs()
+                < f64::EPSILON
+        );
     }
 
     #[test]
@@ -3616,7 +3810,9 @@ mod consciousness_weighted_consensus_tests {
         // Basic > ProposalSubmission violates ordering
         config.consciousness_gate_basic = 0.5;
         config.consciousness_gate_proposal = 0.3;
-        assert!(check_consciousness_config(&config).unwrap_err().contains("consciousness_gate_basic"));
+        assert!(check_consciousness_config(&config)
+            .unwrap_err()
+            .contains("consciousness_gate_basic"));
     }
 
     #[test]
@@ -3624,7 +3820,9 @@ mod consciousness_weighted_consensus_tests {
         let mut config = default_config();
         config.min_voter_consciousness_standard = 0.4;
         config.min_voter_consciousness_emergency = 0.3;
-        assert!(check_consciousness_config(&config).unwrap_err().contains("min_voter_consciousness_standard"));
+        assert!(check_consciousness_config(&config)
+            .unwrap_err()
+            .contains("min_voter_consciousness_standard"));
     }
 
     #[test]
@@ -3658,11 +3856,15 @@ mod consciousness_weighted_consensus_tests {
 
         // Too low
         config.max_voting_weight = 0.3;
-        assert!(check_consciousness_config(&config).unwrap_err().contains("max_voting_weight"));
+        assert!(check_consciousness_config(&config)
+            .unwrap_err()
+            .contains("max_voting_weight"));
 
         // Too high
         config.max_voting_weight = 6.0;
-        assert!(check_consciousness_config(&config).unwrap_err().contains("max_voting_weight"));
+        assert!(check_consciousness_config(&config)
+            .unwrap_err()
+            .contains("max_voting_weight"));
 
         // Valid custom value
         config.max_voting_weight = 2.0;

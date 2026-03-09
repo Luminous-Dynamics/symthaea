@@ -61,7 +61,10 @@ pub enum CouncilType {
     /// Geographic/regional council
     Regional { region: String },
     /// Working group (temporary, task-focused)
-    WorkingGroup { focus: String, expires: Option<Timestamp> },
+    WorkingGroup {
+        focus: String,
+        expires: Option<Timestamp>,
+    },
     /// Advisory council (no direct power, provides wisdom)
     Advisory,
     /// Emergency response council (elevated powers, time-limited)
@@ -530,9 +533,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::HolonicReflection(reflection) => {
                     validate_create_reflection(action, reflection)
                 }
-                EntryTypes::CouncilDecision(decision) => {
-                    validate_create_decision(action, decision)
-                }
+                EntryTypes::CouncilDecision(decision) => validate_create_decision(action, decision),
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -649,7 +650,9 @@ mod tests {
             id: "council-1".into(),
             name: "Test Council".into(),
             purpose: "Testing governance".into(),
-            council_type: CouncilType::Domain { domain: "test".into() },
+            council_type: CouncilType::Domain {
+                domain: "test".into(),
+            },
             parent_council_id: None,
             phi_threshold: 0.5,
             quorum: 0.6,
@@ -858,20 +861,35 @@ mod tests {
         assert_eq!(rt, CouncilType::Root);
 
         // Struct variant: TS sends {"type":"Domain","domain":"water"}
-        let json = serde_json::to_string(&CouncilType::Domain { domain: "water".into() }).unwrap();
+        let json = serde_json::to_string(&CouncilType::Domain {
+            domain: "water".into(),
+        })
+        .unwrap();
         assert!(json.contains(r#""type":"Domain""#));
         assert!(json.contains(r#""domain":"water""#));
         let rt: CouncilType = serde_json::from_str(&json).unwrap();
-        assert_eq!(rt, CouncilType::Domain { domain: "water".into() });
+        assert_eq!(
+            rt,
+            CouncilType::Domain {
+                domain: "water".into()
+            }
+        );
 
         // WorkingGroup with optional expires
         let json = serde_json::to_string(&CouncilType::WorkingGroup {
             focus: "testing".into(),
             expires: None,
-        }).unwrap();
+        })
+        .unwrap();
         assert!(json.contains(r#""type":"WorkingGroup""#));
         let rt: CouncilType = serde_json::from_str(&json).unwrap();
-        assert_eq!(rt, CouncilType::WorkingGroup { focus: "testing".into(), expires: None });
+        assert_eq!(
+            rt,
+            CouncilType::WorkingGroup {
+                focus: "testing".into(),
+                expires: None
+            }
+        );
     }
 
     #[test]
@@ -883,7 +901,8 @@ mod tests {
         // Struct variant: TS sends {"Delegate":{"from_council":"council-1"}}
         let json = serde_json::to_string(&MemberRole::Delegate {
             from_council: "council-1".into(),
-        }).unwrap();
+        })
+        .unwrap();
         assert!(json.contains(r#""Delegate""#));
         assert!(json.contains(r#""from_council":"council-1""#));
     }

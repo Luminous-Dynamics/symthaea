@@ -35,13 +35,22 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 #[hdk_extern]
 pub fn issue_trust_credential(input: IssueTrustCredentialInput) -> ExternResult<Record> {
     if input.subject_did.is_empty() || input.subject_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
     }
     if input.issuer_did.is_empty() || input.issuer_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Issuer DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer DID must be 1-256 characters".into()
+        )));
     }
-    if input.trust_score_lower < 0.0 || input.trust_score_upper > 1.0 || input.trust_score_lower > input.trust_score_upper {
-        return Err(wasm_error!(WasmErrorInner::Guest("Trust scores must be in [0.0, 1.0] with lower <= upper".into())));
+    if input.trust_score_lower < 0.0
+        || input.trust_score_upper > 1.0
+        || input.trust_score_lower > input.trust_score_upper
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Trust scores must be in [0.0, 1.0] with lower <= upper".into()
+        )));
     }
     let now = sys_time()?;
     let cred_id = format!("trust-cred:{}:{}", input.subject_did, now.as_micros());
@@ -108,10 +117,9 @@ pub fn issue_trust_credential(input: IssueTrustCredentialInput) -> ExternResult<
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find credential".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find credential".into()
+    )))
 }
 
 /// Input for issuing a trust credential
@@ -140,10 +148,17 @@ pub struct IssueTrustCredentialInput {
 #[hdk_extern]
 pub fn self_attest_trust(input: SelfAttestTrustInput) -> ExternResult<Record> {
     if input.self_did.is_empty() || input.self_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Self DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Self DID must be 1-256 characters".into()
+        )));
     }
-    if input.trust_score_lower < 0.0 || input.trust_score_upper > 1.0 || input.trust_score_lower > input.trust_score_upper {
-        return Err(wasm_error!(WasmErrorInner::Guest("Trust scores must be in [0.0, 1.0] with lower <= upper".into())));
+    if input.trust_score_lower < 0.0
+        || input.trust_score_upper > 1.0
+        || input.trust_score_lower > input.trust_score_upper
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Trust scores must be in [0.0, 1.0] with lower <= upper".into()
+        )));
     }
     // Self-attestation uses same issuance logic
 
@@ -180,13 +195,19 @@ pub struct SelfAttestTrustInput {
 #[hdk_extern]
 pub fn revoke_credential(input: RevokeCredentialInput) -> ExternResult<Record> {
     if input.credential_id.is_empty() || input.credential_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credential ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential ID must be 1-256 characters".into()
+        )));
     }
     if input.subject_did.is_empty() || input.subject_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
     }
     if input.reason.is_empty() || input.reason.len() > 2048 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-2048 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-2048 characters".into()
+        )));
     }
     // Get the credential
     let links = get_links(
@@ -204,7 +225,9 @@ pub fn revoke_credential(input: RevokeCredentialInput) -> ExternResult<Record> {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah.clone(), GetOptions::default())? {
-            if let Some(cred) = record.entry().to_app_option::<TrustCredential>()
+            if let Some(cred) = record
+                .entry()
+                .to_app_option::<TrustCredential>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if cred.id == input.credential_id && !cred.revoked {
@@ -218,9 +241,11 @@ pub fn revoke_credential(input: RevokeCredentialInput) -> ExternResult<Record> {
 
     let (original_hash, mut credential) = match (target_hash, target_cred) {
         (Some(ah), Some(c)) => (ah, c),
-        _ => return Err(wasm_error!(WasmErrorInner::Guest(
-            "Active credential not found".into()
-        ))),
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Active credential not found".into()
+            )))
+        }
     };
 
     // Verify caller is the issuer of this credential
@@ -240,10 +265,9 @@ pub fn revoke_credential(input: RevokeCredentialInput) -> ExternResult<Record> {
 
     let action_hash = update_entry(original_hash, &EntryTypes::TrustCredential(credential))?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find revoked credential".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find revoked credential".into()
+    )))
 }
 
 /// Input for revoking a credential
@@ -258,13 +282,19 @@ pub struct RevokeCredentialInput {
 #[hdk_extern]
 pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Record> {
     if input.credential_id.is_empty() || input.credential_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credential ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential ID must be 1-256 characters".into()
+        )));
     }
     if input.subject_did.is_empty() || input.subject_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
     }
     if input.purpose.is_empty() || input.purpose.len() > 2048 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Purpose must be 1-2048 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Purpose must be 1-2048 characters".into()
+        )));
     }
     let now = sys_time()?;
     let pres_id = format!("pres:{}:{}", input.subject_did, now.as_micros());
@@ -296,10 +326,9 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find presentation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find presentation".into()
+    )))
 }
 
 /// Input for creating a presentation
@@ -319,24 +348,39 @@ pub struct CreatePresentationInput {
 #[hdk_extern]
 pub fn request_attestation(input: RequestAttestationInput) -> ExternResult<Record> {
     if input.requester_did.is_empty() || input.requester_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Requester DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Requester DID must be 1-256 characters".into()
+        )));
     }
     if input.subject_did.is_empty() || input.subject_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
     }
     if input.purpose.is_empty() || input.purpose.len() > 2048 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Purpose must be 1-2048 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Purpose must be 1-2048 characters".into()
+        )));
     }
     if input.components.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("At least one component is required".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "At least one component is required".into()
+        )));
     }
     if let Some(score) = input.min_trust_score {
         if !(0.0..=1.0).contains(&score) {
-            return Err(wasm_error!(WasmErrorInner::Guest("Min trust score must be between 0.0 and 1.0".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Min trust score must be between 0.0 and 1.0".into()
+            )));
         }
     }
     let now = sys_time()?;
-    let req_id = format!("req:{}:{}:{}", input.requester_did, input.subject_did, now.as_micros());
+    let req_id = format!(
+        "req:{}:{}:{}",
+        input.requester_did,
+        input.subject_did,
+        now.as_micros()
+    );
 
     let request = AttestationRequest {
         id: req_id.clone(),
@@ -362,10 +406,9 @@ pub fn request_attestation(input: RequestAttestationInput) -> ExternResult<Recor
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find request".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find request".into()
+    )))
 }
 
 /// Input for requesting attestation
@@ -386,15 +429,26 @@ pub struct RequestAttestationInput {
 /// commitment and range proof that meets the request's requirements.
 /// This issues a trust credential and marks the request as Fulfilled.
 #[hdk_extern]
-pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<FulfillAttestationResult> {
+pub fn fulfill_attestation(
+    input: FulfillAttestationInput,
+) -> ExternResult<FulfillAttestationResult> {
     if input.request_id.is_empty() || input.request_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Request ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request ID must be 1-256 characters".into()
+        )));
     }
     if input.subject_did.is_empty() || input.subject_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
     }
-    if input.trust_score_lower < 0.0 || input.trust_score_upper > 1.0 || input.trust_score_lower > input.trust_score_upper {
-        return Err(wasm_error!(WasmErrorInner::Guest("Trust scores must be in [0.0, 1.0] with lower <= upper".into())));
+    if input.trust_score_lower < 0.0
+        || input.trust_score_upper > 1.0
+        || input.trust_score_lower > input.trust_score_upper
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Trust scores must be in [0.0, 1.0] with lower <= upper".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -413,7 +467,9 @@ pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<Fulfi
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah.clone(), GetOptions::default())? {
-            if let Some(req) = record.entry().to_app_option::<AttestationRequest>()
+            if let Some(req) = record
+                .entry()
+                .to_app_option::<AttestationRequest>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if req.id == input.request_id {
@@ -427,16 +483,19 @@ pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<Fulfi
 
     let (original_hash, req) = match (request_hash, request) {
         (Some(ah), Some(r)) => (ah, r),
-        _ => return Err(wasm_error!(WasmErrorInner::Guest(
-            "Attestation request not found".into()
-        ))),
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Attestation request not found".into()
+            )))
+        }
     };
 
     // Verify request is still pending
     if req.status != AttestationStatus::Pending {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Request is not pending (status: {:?})", req.status)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Request is not pending (status: {:?})",
+            req.status
+        ))));
     }
 
     // Verify the fulfiller matches the subject
@@ -463,19 +522,19 @@ pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<Fulfi
 
     if let Some(min_score) = req.min_trust_score {
         if input.trust_score_lower < min_score {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Trust score lower bound ({}) is below the requested minimum ({})",
-                    input.trust_score_lower, min_score)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Trust score lower bound ({}) is below the requested minimum ({})",
+                input.trust_score_lower, min_score
+            ))));
         }
     }
 
     if let Some(ref min_tier) = req.min_tier {
         if (mid_score) < min_tier.min_score() {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Trust tier {:?} does not meet the requested minimum {:?}",
-                    trust_tier, min_tier)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Trust tier {:?} does not meet the requested minimum {:?}",
+                trust_tier, min_tier
+            ))));
         }
     }
 
@@ -494,7 +553,10 @@ pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<Fulfi
     // Update request status to Fulfilled
     let mut fulfilled_req = req;
     fulfilled_req.status = AttestationStatus::Fulfilled;
-    update_entry(original_hash, &EntryTypes::AttestationRequest(fulfilled_req))?;
+    update_entry(
+        original_hash,
+        &EntryTypes::AttestationRequest(fulfilled_req),
+    )?;
 
     Ok(FulfillAttestationResult {
         credential_record,
@@ -525,10 +587,14 @@ pub struct FulfillAttestationResult {
 #[hdk_extern]
 pub fn decline_attestation(input: DeclineAttestationInput) -> ExternResult<Record> {
     if input.request_id.is_empty() || input.request_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Request ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request ID must be 1-256 characters".into()
+        )));
     }
     if input.subject_did.is_empty() || input.subject_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
     }
 
     // Find the request
@@ -545,7 +611,9 @@ pub fn decline_attestation(input: DeclineAttestationInput) -> ExternResult<Recor
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah.clone(), GetOptions::default())? {
-            if let Some(req) = record.entry().to_app_option::<AttestationRequest>()
+            if let Some(req) = record
+                .entry()
+                .to_app_option::<AttestationRequest>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if req.id == input.request_id && req.status == AttestationStatus::Pending {
@@ -559,9 +627,11 @@ pub fn decline_attestation(input: DeclineAttestationInput) -> ExternResult<Recor
 
     let (original_hash, req) = match (request_hash, request) {
         (Some(ah), Some(r)) => (ah, r),
-        _ => return Err(wasm_error!(WasmErrorInner::Guest(
-            "Pending attestation request not found".into()
-        ))),
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Pending attestation request not found".into()
+            )))
+        }
     };
 
     // Verify the decliner is the subject
@@ -576,10 +646,9 @@ pub fn decline_attestation(input: DeclineAttestationInput) -> ExternResult<Recor
     declined_req.status = AttestationStatus::Declined;
     let action_hash = update_entry(original_hash, &EntryTypes::AttestationRequest(declined_req))?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated request".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated request".into()
+    )))
 }
 
 /// Input for declining an attestation
@@ -593,7 +662,9 @@ pub struct DeclineAttestationInput {
 #[hdk_extern]
 pub fn get_pending_requests(subject_did: String) -> ExternResult<Vec<Record>> {
     if subject_did.is_empty() || subject_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
     }
     let now = sys_time()?;
     let subject_hash = anchor_hash(&format!("requests:{}", subject_did))?;
@@ -607,7 +678,9 @@ pub fn get_pending_requests(subject_did: String) -> ExternResult<Vec<Record>> {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah, GetOptions::default())? {
-            if let Some(req) = record.entry().to_app_option::<AttestationRequest>()
+            if let Some(req) = record
+                .entry()
+                .to_app_option::<AttestationRequest>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if req.status == AttestationStatus::Pending && now < req.expires_at {
@@ -624,7 +697,9 @@ pub fn get_pending_requests(subject_did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_subject_credentials(subject_did: String) -> ExternResult<Vec<Record>> {
     if subject_did.is_empty() || subject_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
     }
     let links = get_links(
         LinkQuery::try_new(
@@ -640,7 +715,9 @@ pub fn get_subject_credentials(subject_did: String) -> ExternResult<Vec<Record>>
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah, GetOptions::default())? {
             // Only include non-revoked credentials
-            if let Some(cred) = record.entry().to_app_option::<TrustCredential>()
+            if let Some(cred) = record
+                .entry()
+                .to_app_option::<TrustCredential>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if !cred.revoked {
@@ -670,7 +747,9 @@ pub fn get_credentials_by_tier(tier: TrustTier) -> ExternResult<Vec<Record>> {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah, GetOptions::default())? {
-            if let Some(cred) = record.entry().to_app_option::<TrustCredential>()
+            if let Some(cred) = record
+                .entry()
+                .to_app_option::<TrustCredential>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if !cred.revoked {
@@ -692,7 +771,9 @@ pub fn get_credentials_by_tier(tier: TrustTier) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResult> {
     if credential_id.is_empty() || credential_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credential ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential ID must be 1-256 characters".into()
+        )));
     }
     // Find the credential by searching subject links
     // We need to search all credentials since we only have credential_id
@@ -744,8 +825,8 @@ pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResu
     };
 
     // Check commitment format (must be exactly 32 bytes for SHA3-256)
-    let commitment_valid = cred.kvector_commitment.len() == 32
-        && cred.kvector_commitment.iter().any(|&b| b != 0); // reject all-zeros
+    let commitment_valid =
+        cred.kvector_commitment.len() == 32 && cred.kvector_commitment.iter().any(|&b| b != 0); // reject all-zeros
 
     // Validate score range is well-formed
     let range_valid = cred.trust_score_range.lower >= 0.0
@@ -755,24 +836,42 @@ pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResu
         && !cred.trust_score_range.upper.is_nan();
 
     // Check tier consistency: verify tier matches the score range
-    let mid_score = (cred.trust_score_range.lower as f64 + cred.trust_score_range.upper as f64) / 2.0;
+    let mid_score =
+        (cred.trust_score_range.lower as f64 + cred.trust_score_range.upper as f64) / 2.0;
     let expected_tier = TrustTier::from_score(mid_score);
     let tier_consistent = range_valid && cred.trust_tier == expected_tier;
 
     // Check proof format (must be non-empty for real proofs)
     let proof_format_valid = !cred.range_proof.is_empty();
 
-    let all_valid = not_revoked && not_expired && commitment_valid && range_valid && tier_consistent && proof_format_valid;
+    let all_valid = not_revoked
+        && not_expired
+        && commitment_valid
+        && range_valid
+        && tier_consistent
+        && proof_format_valid;
     let message = if all_valid {
         "On-chain verification passed. Run off-chain STARK verification for full proof.".to_string()
     } else {
         let mut issues = Vec::new();
-        if !not_revoked { issues.push("credential revoked"); }
-        if !not_expired { issues.push("credential expired"); }
-        if !commitment_valid { issues.push("invalid commitment"); }
-        if !range_valid { issues.push("malformed score range"); }
-        if !tier_consistent { issues.push("tier/range mismatch"); }
-        if !proof_format_valid { issues.push("empty proof"); }
+        if !not_revoked {
+            issues.push("credential revoked");
+        }
+        if !not_expired {
+            issues.push("credential expired");
+        }
+        if !commitment_valid {
+            issues.push("invalid commitment");
+        }
+        if !range_valid {
+            issues.push("malformed score range");
+        }
+        if !tier_consistent {
+            issues.push("tier/range mismatch");
+        }
+        if !proof_format_valid {
+            issues.push("empty proof");
+        }
         format!("Verification failed: {}", issues.join(", "))
     };
 
@@ -822,7 +921,12 @@ pub fn verify_credential_pure(
 
     let proof_format_valid = !range_proof.is_empty();
 
-    (commitment_valid, range_valid, tier_consistent, proof_format_valid)
+    (
+        commitment_valid,
+        range_valid,
+        tier_consistent,
+        proof_format_valid,
+    )
 }
 
 #[cfg(test)]
@@ -839,7 +943,10 @@ mod tests {
     fn test_valid_credential() {
         let (cv, rv, tc, pv) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.3, upper: 0.39 },
+            &TrustScoreRange {
+                lower: 0.3,
+                upper: 0.39,
+            },
             &TrustTier::Basic, // mid = 0.345 → Basic
             &[1, 2, 3],
         );
@@ -850,7 +957,10 @@ mod tests {
     fn test_commitment_too_short() {
         let (cv, _, _, _) = verify_credential_pure(
             &[1u8; 16],
-            &TrustScoreRange { lower: 0.0, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.0,
+                upper: 0.2,
+            },
             &TrustTier::Observer,
             &[1],
         );
@@ -861,7 +971,10 @@ mod tests {
     fn test_commitment_all_zeros() {
         let (cv, _, _, _) = verify_credential_pure(
             &[0u8; 32],
-            &TrustScoreRange { lower: 0.0, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.0,
+                upper: 0.2,
+            },
             &TrustTier::Observer,
             &[1],
         );
@@ -872,7 +985,10 @@ mod tests {
     fn test_range_invalid_nan() {
         let (_, rv, _, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: f32::NAN, upper: 0.5 },
+            &TrustScoreRange {
+                lower: f32::NAN,
+                upper: 0.5,
+            },
             &TrustTier::Basic,
             &[1],
         );
@@ -883,7 +999,10 @@ mod tests {
     fn test_range_inverted() {
         let (_, rv, _, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.8, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.8,
+                upper: 0.2,
+            },
             &TrustTier::Basic,
             &[1],
         );
@@ -894,7 +1013,10 @@ mod tests {
     fn test_range_exceeds_one() {
         let (_, rv, _, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.5, upper: 1.5 },
+            &TrustScoreRange {
+                lower: 0.5,
+                upper: 1.5,
+            },
             &TrustTier::Elevated,
             &[1],
         );
@@ -906,7 +1028,10 @@ mod tests {
         // mid = 0.5 → Standard, but claiming Guardian
         let (_, _, tc, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.4, upper: 0.59 },
+            &TrustScoreRange {
+                lower: 0.4,
+                upper: 0.59,
+            },
             &TrustTier::Guardian,
             &[1],
         );
@@ -917,7 +1042,10 @@ mod tests {
     fn test_tier_observer() {
         let (_, _, tc, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.0, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.0,
+                upper: 0.2,
+            },
             &TrustTier::Observer, // mid = 0.1 → Observer
             &[1],
         );
@@ -928,7 +1056,10 @@ mod tests {
     fn test_tier_guardian() {
         let (_, _, tc, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.85, upper: 0.95 },
+            &TrustScoreRange {
+                lower: 0.85,
+                upper: 0.95,
+            },
             &TrustTier::Guardian, // mid = 0.9 → Guardian
             &[1],
         );
@@ -939,7 +1070,10 @@ mod tests {
     fn test_tier_elevated() {
         let (_, _, tc, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.6, upper: 0.79 },
+            &TrustScoreRange {
+                lower: 0.6,
+                upper: 0.79,
+            },
             &TrustTier::Elevated, // mid = 0.695 → Elevated
             &[1],
         );
@@ -950,7 +1084,10 @@ mod tests {
     fn test_empty_proof() {
         let (_, _, _, pv) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.0, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.0,
+                upper: 0.2,
+            },
             &TrustTier::Observer,
             &[],
         );

@@ -23,7 +23,12 @@ pub struct DidDocument {
     /// Each entry is a DID URL fragment (e.g. "#kem-1") referencing a
     /// `VerificationMethod` with an ML-KEM public key. Recipients use this
     /// to look up the KEM key for encrypting data to this DID's owner.
-    #[serde(rename = "keyAgreement", alias = "key_agreement", default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        rename = "keyAgreement",
+        alias = "key_agreement",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub key_agreement: Vec<String>,
     /// Service endpoints
     pub service: Vec<ServiceEndpoint>,
@@ -95,28 +100,23 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
         FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action } => {
-                match app_entry {
-                    EntryTypes::DidDocument(did_doc) => {
-                        validate_create_did_document(EntryCreationAction::Create(action), did_doc)
-                    }
-                    EntryTypes::DidDeactivation(deactivation) => {
-                        validate_create_did_deactivation(EntryCreationAction::Create(action), deactivation)
-                    }
+            OpEntry::CreateEntry { app_entry, action } => match app_entry {
+                EntryTypes::DidDocument(did_doc) => {
+                    validate_create_did_document(EntryCreationAction::Create(action), did_doc)
                 }
-            }
-            OpEntry::UpdateEntry { app_entry, action, .. } => {
-                match app_entry {
-                    EntryTypes::DidDocument(did_doc) => {
-                        validate_update_did_document(action, did_doc)
-                    }
-                    EntryTypes::DidDeactivation(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Deactivation records cannot be updated".into(),
-                        ))
-                    }
-                }
-            }
+                EntryTypes::DidDeactivation(deactivation) => validate_create_did_deactivation(
+                    EntryCreationAction::Create(action),
+                    deactivation,
+                ),
+            },
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
+                EntryTypes::DidDocument(did_doc) => validate_update_did_document(action, did_doc),
+                EntryTypes::DidDeactivation(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Deactivation records cannot be updated".into(),
+                )),
+            },
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink { link_type, tag, .. } => {
@@ -319,8 +319,8 @@ mod tests {
         let msgpack_bytes = rmp_serde::to_vec(&old_vm).expect("msgpack serialize");
 
         // Deserialize into the new struct — alias attributes must accept snake_case.
-        let vm: VerificationMethod =
-            rmp_serde::from_slice(&msgpack_bytes).expect("msgpack deserialize into VerificationMethod");
+        let vm: VerificationMethod = rmp_serde::from_slice(&msgpack_bytes)
+            .expect("msgpack deserialize into VerificationMethod");
 
         assert_eq!(vm.id, "#key-1");
         assert_eq!(vm.type_, "Ed25519VerificationKey2020");
@@ -341,8 +341,8 @@ mod tests {
         });
 
         let msgpack_bytes = rmp_serde::to_vec(&old_se).expect("msgpack serialize");
-        let se: ServiceEndpoint =
-            rmp_serde::from_slice(&msgpack_bytes).expect("msgpack deserialize into ServiceEndpoint");
+        let se: ServiceEndpoint = rmp_serde::from_slice(&msgpack_bytes)
+            .expect("msgpack deserialize into ServiceEndpoint");
 
         assert_eq!(se.id, "svc-1");
         assert_eq!(se.type_, "LinkedDomains");
@@ -362,9 +362,18 @@ mod tests {
 
         let json = serde_json::to_value(&vm).expect("serialize to JSON");
         // Must use camelCase, not snake_case
-        assert!(json.get("publicKeyMultibase").is_some(), "expected camelCase 'publicKeyMultibase'");
-        assert!(json.get("type").is_some(), "expected 'type' (renamed from type_)");
-        assert!(json.get("public_key_multibase").is_none(), "snake_case key must not appear");
+        assert!(
+            json.get("publicKeyMultibase").is_some(),
+            "expected camelCase 'publicKeyMultibase'"
+        );
+        assert!(
+            json.get("type").is_some(),
+            "expected 'type' (renamed from type_)"
+        );
+        assert!(
+            json.get("public_key_multibase").is_none(),
+            "snake_case key must not appear"
+        );
         assert!(json.get("type_").is_none(), "type_ must not appear");
     }
 
@@ -392,25 +401,22 @@ mod tests {
 
         /// Valid multibase keys start with 'z' followed by base58btc characters.
         fn arb_multibase_key() -> impl Strategy<Value = String> {
-            prop::collection::vec(any::<u8>(), 32..=32)
-                .prop_map(|bytes| {
-                    let encoded = bs58::encode(&bytes)
-                        .with_alphabet(bs58::Alphabet::BITCOIN)
-                        .into_string();
-                    format!("z{}", encoded)
-                })
+            prop::collection::vec(any::<u8>(), 32..=32).prop_map(|bytes| {
+                let encoded = bs58::encode(&bytes)
+                    .with_alphabet(bs58::Alphabet::BITCOIN)
+                    .into_string();
+                format!("z{}", encoded)
+            })
         }
 
         /// Arbitrary verification method with valid fields.
         fn arb_verification_method() -> impl Strategy<Value = VerificationMethod> {
-            (arb_multibase_key(), any::<u16>()).prop_map(|(key, alg)| {
-                VerificationMethod {
-                    id: "#key-1".to_string(),
-                    type_: "Ed25519VerificationKey2020".to_string(),
-                    controller: "did:mycelix:test".to_string(),
-                    public_key_multibase: key,
-                    algorithm: Some(alg),
-                }
+            (arb_multibase_key(), any::<u16>()).prop_map(|(key, alg)| VerificationMethod {
+                id: "#key-1".to_string(),
+                type_: "Ed25519VerificationKey2020".to_string(),
+                controller: "did:mycelix:test".to_string(),
+                public_key_multibase: key,
+                algorithm: Some(alg),
             })
         }
 
@@ -528,9 +534,18 @@ mod tests {
 
         let json = serde_json::to_string(&vm).unwrap();
         // Should use camelCase in output
-        assert!(json.contains("\"type\""), "Should serialize as 'type', not 'type_'");
-        assert!(json.contains("\"publicKeyMultibase\""), "Should serialize as camelCase");
-        assert!(!json.contains("\"public_key_multibase\""), "Should NOT use snake_case in output");
+        assert!(
+            json.contains("\"type\""),
+            "Should serialize as 'type', not 'type_'"
+        );
+        assert!(
+            json.contains("\"publicKeyMultibase\""),
+            "Should serialize as camelCase"
+        );
+        assert!(
+            !json.contains("\"public_key_multibase\""),
+            "Should NOT use snake_case in output"
+        );
     }
 
     /// Old snake_case ServiceEndpoint MessagePack round-trip.
@@ -561,6 +576,9 @@ mod tests {
 
         let json = serde_json::to_string(&svc).unwrap();
         assert!(json.contains("\"serviceEndpoint\""), "Should use camelCase");
-        assert!(!json.contains("\"service_endpoint\""), "Should NOT use snake_case");
+        assert!(
+            !json.contains("\"service_endpoint\""),
+            "Should NOT use snake_case"
+        );
     }
 }

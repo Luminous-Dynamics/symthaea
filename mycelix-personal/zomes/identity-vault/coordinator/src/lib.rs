@@ -29,8 +29,12 @@ pub fn get_my_profile(_: ()) -> ExternResult<Option<Record>> {
         GetStrategy::Local,
     )?;
     if let Some(link) = links.last() {
-        let target = ActionHash::try_from(link.target.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid link target: {:?}", e))))?;
+        let target = ActionHash::try_from(link.target.clone()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid link target: {:?}",
+                e
+            )))
+        })?;
         get(target, GetOptions::default())
     } else {
         Ok(None)
@@ -58,8 +62,12 @@ pub fn get_my_keys(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     let mut records = Vec::new();
     for link in links {
-        let target = ActionHash::try_from(link.target.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid link target: {:?}", e))))?;
+        let target = ActionHash::try_from(link.target.clone()).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid link target: {:?}",
+                e
+            )))
+        })?;
         if let Some(record) = get(target, GetOptions::default())? {
             records.push(record);
         }
@@ -80,7 +88,9 @@ pub fn disclose_profile(fields: Vec<String>) -> ExternResult<String> {
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid profile entry".into())))?;
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid profile entry".into()
+                )))?;
             p
         }
         None => return Ok("{}".into()),
@@ -90,7 +100,10 @@ pub fn disclose_profile(fields: Vec<String>) -> ExternResult<String> {
     for field in &fields {
         match field.as_str() {
             "display_name" => {
-                disclosed.insert("display_name".into(), serde_json::Value::String(profile.display_name.clone()));
+                disclosed.insert(
+                    "display_name".into(),
+                    serde_json::Value::String(profile.display_name.clone()),
+                );
             }
             "bio" => {
                 if let Some(ref bio) = profile.bio {

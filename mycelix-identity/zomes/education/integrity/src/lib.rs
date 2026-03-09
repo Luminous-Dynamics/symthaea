@@ -66,7 +66,6 @@ pub enum AcademicCredentialStatus {
 #[derive(Clone, PartialEq)]
 pub struct AcademicCredential {
     // =========== W3C VC 2.0 Standard Fields ===========
-
     /// JSON-LD context (required: `https://www.w3.org/ns/credentials/v2`)
     #[serde(rename = "@context")]
     pub context: Vec<String>,
@@ -97,7 +96,6 @@ pub struct AcademicCredential {
     pub proof: AcademicProof,
 
     // =========== Mycelix Enhancements ===========
-
     /// ZK commitment: SHA-256(credential_id || subject_id || nonce)
     /// Enables selective disclosure without revealing full credential
     pub zk_commitment: Vec<u8>,
@@ -614,7 +612,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 EntryTypes::EpistemicClaimReference(_) => Ok(ValidateCallbackResult::Valid),
             },
-            OpEntry::UpdateEntry { app_entry, action, .. } => match app_entry {
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
                 EntryTypes::AcademicCredential(_) => Ok(ValidateCallbackResult::Invalid(
                     "Academic credentials cannot be updated (immutable)".into(),
                 )),
@@ -704,12 +704,18 @@ fn validate_create_academic_credential(
     }
 
     // Must include required types
-    if !cred.credential_type.contains(&"VerifiableCredential".to_string()) {
+    if !cred
+        .credential_type
+        .contains(&"VerifiableCredential".to_string())
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Credential type must include 'VerifiableCredential'".into(),
         ));
     }
-    if !cred.credential_type.contains(&"AcademicCredential".to_string()) {
+    if !cred
+        .credential_type
+        .contains(&"AcademicCredential".to_string())
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Credential type must include 'AcademicCredential'".into(),
         ));
@@ -1159,7 +1165,10 @@ mod tests {
         let issuer = InstitutionalIssuer {
             id: "did:dns:mit.edu".to_string(),
             name: "Massachusetts Institute of Technology".to_string(),
-            issuer_type: vec!["Organization".to_string(), "EducationalOrganization".to_string()],
+            issuer_type: vec![
+                "Organization".to_string(),
+                "EducationalOrganization".to_string(),
+            ],
             image: Some("https://mit.edu/logo.png".to_string()),
             location: Some(InstitutionLocation {
                 country: "US".to_string(),

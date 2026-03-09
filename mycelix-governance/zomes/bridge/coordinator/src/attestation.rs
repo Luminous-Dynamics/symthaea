@@ -11,7 +11,9 @@ use super::*;
 /// using their Holochain agent key. The signature is Ed25519-verified against
 /// the caller's public key before the entry is committed.
 #[hdk_extern]
-pub fn record_consciousness_attestation(input: RecordConsciousnessAttestationInput) -> ExternResult<Record> {
+pub fn record_consciousness_attestation(
+    input: RecordConsciousnessAttestationInput,
+) -> ExternResult<Record> {
     // Validate inputs
     if input.consciousness_level < 0.0 || input.consciousness_level > 1.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -39,13 +41,13 @@ pub fn record_consciousness_attestation(input: RecordConsciousnessAttestationInp
         "symthaea-consciousness-attestation:v1:{}:{:.6}:{}:{}",
         agent_did, input.consciousness_level, input.cycle_id, input.captured_at_us,
     );
-    let signature = Signature::from(
-        <[u8; 64]>::try_from(input.signature.as_slice()).map_err(|_| {
+    let signature = Signature::from(<[u8; 64]>::try_from(input.signature.as_slice()).map_err(
+        |_| {
             wasm_error!(WasmErrorInner::Guest(
                 "Signature must be exactly 64 bytes (Ed25519)".into()
             ))
-        })?,
-    );
+        },
+    )?);
     let valid = verify_signature_raw(
         agent_info.agent_initial_pubkey.clone(),
         signature,
@@ -79,8 +81,9 @@ pub fn record_consciousness_attestation(input: RecordConsciousnessAttestationInp
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Attestation not found".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Attestation not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -103,13 +106,17 @@ pub struct RecordConsciousnessAttestationInput {
 /// Falls back to legacy ConsciousnessSnapshot if no attestation exists.
 /// Returns a v2 result with provenance tracking.
 #[hdk_extern]
-pub fn verify_consciousness_gate_v2(input: VerifyGateInput) -> ExternResult<GateVerificationResultV2> {
+pub fn verify_consciousness_gate_v2(
+    input: VerifyGateInput,
+) -> ExternResult<GateVerificationResultV2> {
     let agent_info = agent_info()?;
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
     let required_consciousness = input.action_type.consciousness_gate();
 
     // Phase 1: Try to find latest ConsciousnessAttestation
-    if let Some((consciousness_level, consciousness_vector, _record)) = get_latest_agent_attestation(&agent_did)? {
+    if let Some((consciousness_level, consciousness_vector, _record)) =
+        get_latest_agent_attestation(&agent_did)?
+    {
         // Use C-Vector composite if available, otherwise fall back to scalar
         let effective_level = match &consciousness_vector {
             Some(cv) => cv.composite(),
@@ -137,14 +144,18 @@ pub fn verify_consciousness_gate_v2(input: VerifyGateInput) -> ExternResult<Gate
                             passed = false;
                             failure_reason = Some(format!(
                                 "True phi {:.2} below constitutional minimum {:.2}",
-                                cv.best_phi(), min_phi
+                                cv.best_phi(),
+                                min_phi
                             ));
                         }
                     }
                 }
 
                 // Voting actions require minimum coherence if configured
-                if matches!(input.action_type, GovernanceActionType::Voting | GovernanceActionType::Constitutional) {
+                if matches!(
+                    input.action_type,
+                    GovernanceActionType::Voting | GovernanceActionType::Constitutional
+                ) {
                     if let Some(min_coh) = config.min_coherence_voting {
                         if let Some(coh) = cv.coherence {
                             if coh < min_coh {

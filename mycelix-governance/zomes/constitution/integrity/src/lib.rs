@@ -294,7 +294,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Charter(charter) => {
                     validate_update_charter(action, charter, original_action_hash)
                 }
-                EntryTypes::Amendment(amendment) => validate_update_amendment(action, amendment, original_action_hash),
+                EntryTypes::Amendment(amendment) => {
+                    validate_update_amendment(action, amendment, original_action_hash)
+                }
                 EntryTypes::GovernanceParameter(param) => validate_update_parameter(action, param),
             },
             _ => Ok(ValidateCallbackResult::Valid),

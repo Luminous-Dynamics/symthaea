@@ -23,10 +23,12 @@ pub fn call_local(
     fn_name: &str,
     payload: impl serde::Serialize + std::fmt::Debug,
 ) -> ExternResult<ExternIO> {
-    let encoded = ExternIO::encode(payload)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-            format!("Failed to encode payload for {}::{}: {}", zome, fn_name, e)
-        )))?;
+    let encoded = ExternIO::encode(payload).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to encode payload for {}::{}: {}",
+            zome, fn_name, e
+        )))
+    })?;
 
     match call(
         CallTargetCell::Local,
@@ -36,12 +38,14 @@ pub fn call_local(
         encoded,
     )? {
         ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network error calling {}::{}: {}", zome, fn_name, e)
-        ))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Unexpected response from {}::{}: {:?}", zome, fn_name, other)
-        ))),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling {}::{}: {}",
+            zome, fn_name, e
+        )))),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Unexpected response from {}::{}: {:?}",
+            zome, fn_name, other
+        )))),
     }
 }
 
@@ -54,10 +58,12 @@ pub fn call_role(
     fn_name: &str,
     payload: impl serde::Serialize + std::fmt::Debug,
 ) -> ExternResult<ExternIO> {
-    let encoded = ExternIO::encode(payload)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-            format!("Failed to encode payload for {}::{}::{}: {}", role, zome, fn_name, e)
-        )))?;
+    let encoded = ExternIO::encode(payload).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to encode payload for {}::{}::{}: {}",
+            role, zome, fn_name, e
+        )))
+    })?;
 
     match call(
         CallTargetCell::OtherRole(role.into()),
@@ -67,12 +73,14 @@ pub fn call_role(
         encoded,
     )? {
         ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network error calling {}::{}::{}: {}", role, zome, fn_name, e)
-        ))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Unexpected response from {}::{}::{}: {:?}", role, zome, fn_name, other)
-        ))),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling {}::{}::{}: {}",
+            role, zome, fn_name, e
+        )))),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Unexpected response from {}::{}::{}: {:?}",
+            role, zome, fn_name, other
+        )))),
     }
 }
 
@@ -88,7 +96,10 @@ pub fn call_local_best_effort(
     match call_local(zome, fn_name, payload) {
         Ok(io) => Ok(Some(io)),
         Err(e) => {
-            debug!("Best-effort call to {}::{} failed (non-fatal): {:?}", zome, fn_name, e);
+            debug!(
+                "Best-effort call to {}::{} failed (non-fatal): {:?}",
+                zome, fn_name, e
+            );
             Ok(None)
         }
     }
@@ -106,7 +117,10 @@ pub fn call_role_best_effort(
     match call_role(role, zome, fn_name, payload) {
         Ok(io) => Ok(Some(io)),
         Err(e) => {
-            debug!("Best-effort call to {}::{}::{} failed (non-fatal): {:?}", role, zome, fn_name, e);
+            debug!(
+                "Best-effort call to {}::{}::{} failed (non-fatal): {:?}",
+                role, zome, fn_name, e
+            );
             Ok(None)
         }
     }

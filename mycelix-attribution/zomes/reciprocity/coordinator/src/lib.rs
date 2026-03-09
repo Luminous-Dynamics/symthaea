@@ -801,10 +801,7 @@ mod tests {
             pledge_count: 10,
             ratio: 0.1,
             weighted_score: 5.5,
-            pledge_type_counts: vec![
-                ("Financial".into(), 5),
-                ("DeveloperTime".into(), 5),
-            ],
+            pledge_type_counts: vec![("Financial".into(), 5), ("DeveloperTime".into(), 5)],
         };
         let json = serde_json::to_string(&score).unwrap();
         let back: StewardshipScore = serde_json::from_str(&json).unwrap();
@@ -922,7 +919,11 @@ mod tests {
     fn test_recency_weight_very_old() {
         // 10 years old
         let w = compute_recency_weight(3650.0);
-        assert!(w < 0.001, "very old pledge weight should be near 0, got {}", w);
+        assert!(
+            w < 0.001,
+            "very old pledge weight should be near 0, got {}",
+            w
+        );
     }
 
     #[test]

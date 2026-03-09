@@ -15,23 +15,23 @@
 
 #![allow(clippy::unnecessary_sort_by)]
 
-use hdk::prelude::*;
 use governance_bridge_integrity::*;
+use hdk::prelude::*;
 
-mod query;
-mod consciousness;
 mod attestation;
+mod consciousness;
+mod consciousness_config;
 mod consensus;
 mod cross_cluster;
-mod consciousness_config;
+mod query;
 mod validation;
 
-pub use query::*;
-pub use consciousness::*;
 pub use attestation::*;
+pub use consciousness::*;
+pub use consciousness_config::*;
 pub use consensus::*;
 pub use cross_cluster::*;
-pub use consciousness_config::*;
+pub use query::*;
 pub use validation::*;
 
 const GOVERNANCE_HAPP_ID: &str = "mycelix-governance";
@@ -99,9 +99,21 @@ fn get_latest_agent_attestation(
             {
                 let ts = record.action().timestamp();
                 match &latest {
-                    None => latest = Some((attestation.consciousness_level, attestation.consciousness_vector, record, ts)),
+                    None => {
+                        latest = Some((
+                            attestation.consciousness_level,
+                            attestation.consciousness_vector,
+                            record,
+                            ts,
+                        ))
+                    }
                     Some((_, _, _, prev_ts)) if ts > *prev_ts => {
-                        latest = Some((attestation.consciousness_level, attestation.consciousness_vector, record, ts));
+                        latest = Some((
+                            attestation.consciousness_level,
+                            attestation.consciousness_vector,
+                            record,
+                            ts,
+                        ));
                     }
                     _ => {}
                 }
@@ -162,9 +174,25 @@ fn get_latest_agent_snapshot(
 /// Scans a window of 5 words before the keyword for negation markers.
 fn is_negated(content_lower: &str, keyword: &str) -> bool {
     const NEGATION_MARKERS: &[&str] = &[
-        "not", "no", "never", "without", "lack", "against", "anti",
-        "eliminate", "destroy", "end", "remove", "ban", "block", "prevent",
-        "oppose", "reject", "deny", "undermine", "erode",
+        "not",
+        "no",
+        "never",
+        "without",
+        "lack",
+        "against",
+        "anti",
+        "eliminate",
+        "destroy",
+        "end",
+        "remove",
+        "ban",
+        "block",
+        "prevent",
+        "oppose",
+        "reject",
+        "deny",
+        "undermine",
+        "erode",
     ];
 
     // Find all occurrences of the keyword
@@ -176,7 +204,11 @@ fn is_negated(content_lower: &str, keyword: &str) -> bool {
         let window = &content_lower[window_start..abs_pos];
         let words: Vec<&str> = window.split_whitespace().collect();
         // Check last 5 words for negation
-        let check_words = if words.len() > 5 { &words[words.len() - 5..] } else { &words };
+        let check_words = if words.len() > 5 {
+            &words[words.len() - 5..]
+        } else {
+            &words
+        };
         for w in check_words {
             if NEGATION_MARKERS.iter().any(|neg| w.contains(neg)) {
                 return true;
@@ -198,14 +230,73 @@ fn calculate_harmony_scores(content: &str) -> Vec<HarmonyScore> {
 
     // Eight Harmonies with keyword-based scoring
     let harmonies = [
-        ("Resonant Coherence", vec!["integration", "wholeness", "coherent", "unified", "harmony"]),
-        ("Pan-Sentient Flourishing", vec!["flourishing", "wellbeing", "care", "compassion", "help", "nurture"]),
-        ("Integral Wisdom", vec!["wisdom", "truth", "knowledge", "understanding", "verify", "discern"]),
-        ("Infinite Play", vec!["creative", "play", "possibility", "experiment", "novel", "explore"]),
-        ("Universal Interconnectedness", vec!["connection", "network", "relationship", "web", "community"]),
-        ("Sacred Reciprocity", vec!["reciprocity", "balance", "exchange", "mutual", "fair", "equitable"]),
-        ("Evolutionary Progression", vec!["evolution", "growth", "progress", "development", "adapt"]),
-        ("Sacred Stillness", vec!["stillness", "rest", "contemplation", "reflection", "pause", "silence"]),
+        (
+            "Resonant Coherence",
+            vec!["integration", "wholeness", "coherent", "unified", "harmony"],
+        ),
+        (
+            "Pan-Sentient Flourishing",
+            vec![
+                "flourishing",
+                "wellbeing",
+                "care",
+                "compassion",
+                "help",
+                "nurture",
+            ],
+        ),
+        (
+            "Integral Wisdom",
+            vec![
+                "wisdom",
+                "truth",
+                "knowledge",
+                "understanding",
+                "verify",
+                "discern",
+            ],
+        ),
+        (
+            "Infinite Play",
+            vec![
+                "creative",
+                "play",
+                "possibility",
+                "experiment",
+                "novel",
+                "explore",
+            ],
+        ),
+        (
+            "Universal Interconnectedness",
+            vec!["connection", "network", "relationship", "web", "community"],
+        ),
+        (
+            "Sacred Reciprocity",
+            vec![
+                "reciprocity",
+                "balance",
+                "exchange",
+                "mutual",
+                "fair",
+                "equitable",
+            ],
+        ),
+        (
+            "Evolutionary Progression",
+            vec!["evolution", "growth", "progress", "development", "adapt"],
+        ),
+        (
+            "Sacred Stillness",
+            vec![
+                "stillness",
+                "rest",
+                "contemplation",
+                "reflection",
+                "pause",
+                "silence",
+            ],
+        ),
     ];
 
     harmonies
@@ -358,25 +449,42 @@ mod tests {
         let scores = calculate_harmony_scores("");
         assert_eq!(scores.len(), 8, "Should always return 8 harmony scores");
         for s in &scores {
-            assert!((s.score - 0.0).abs() < 1e-10, "{} should be 0.0 for empty content", s.harmony);
+            assert!(
+                (s.score - 0.0).abs() < 1e-10,
+                "{} should be 0.0 for empty content",
+                s.harmony
+            );
         }
     }
 
     #[test]
     fn test_harmony_scores_flourishing_keywords() {
-        let scores = calculate_harmony_scores("We care about flourishing and wellbeing of all beings");
-        let flourishing = scores.iter().find(|s| s.harmony == "Pan-Sentient Flourishing").unwrap();
-        assert!(flourishing.score > 0.0, "Should detect flourishing keywords");
+        let scores =
+            calculate_harmony_scores("We care about flourishing and wellbeing of all beings");
+        let flourishing = scores
+            .iter()
+            .find(|s| s.harmony == "Pan-Sentient Flourishing")
+            .unwrap();
+        assert!(
+            flourishing.score > 0.0,
+            "Should detect flourishing keywords"
+        );
         // "flourishing", "wellbeing", "care" = 3 keywords × 0.2 = 0.6
-        assert!((flourishing.score - 0.6).abs() < 1e-10, "Expected 0.6, got {}", flourishing.score);
+        assert!(
+            (flourishing.score - 0.6).abs() < 1e-10,
+            "Expected 0.6, got {}",
+            flourishing.score
+        );
     }
 
     #[test]
     fn test_harmony_scores_max_capped_at_1() {
-        let scores = calculate_harmony_scores(
-            "integration wholeness coherent unified resonance harmony"
-        );
-        let coherence = scores.iter().find(|s| s.harmony == "Resonant Coherence").unwrap();
+        let scores =
+            calculate_harmony_scores("integration wholeness coherent unified resonance harmony");
+        let coherence = scores
+            .iter()
+            .find(|s| s.harmony == "Resonant Coherence")
+            .unwrap();
         // "integration", "wholeness", "coherent", "unified" = 4 keywords × 0.2 = 0.8
         assert!(coherence.score <= 1.0, "Score should be capped at 1.0");
     }
@@ -386,23 +494,39 @@ mod tests {
         let scores = calculate_harmony_scores("We will destroy and harm and exclude others");
         // Every harmony gets negative score from "destroy", "harm", "exclude" = -0.9
         for s in &scores {
-            assert!(s.score < 0.0, "{} should be negative with harmful content, got {}", s.harmony, s.score);
+            assert!(
+                s.score < 0.0,
+                "{} should be negative with harmful content, got {}",
+                s.harmony,
+                s.score
+            );
         }
     }
 
     #[test]
     fn test_harmony_scores_case_insensitive() {
         let scores = calculate_harmony_scores("WISDOM and TRUTH for all");
-        let wisdom = scores.iter().find(|s| s.harmony == "Integral Wisdom").unwrap();
+        let wisdom = scores
+            .iter()
+            .find(|s| s.harmony == "Integral Wisdom")
+            .unwrap();
         assert!(wisdom.score > 0.0, "Should match uppercase keywords");
     }
 
     #[test]
     fn test_harmony_scores_mixed_positive_negative() {
-        let scores = calculate_harmony_scores("We seek wisdom and truth but may harm in the process");
-        let wisdom = scores.iter().find(|s| s.harmony == "Integral Wisdom").unwrap();
+        let scores =
+            calculate_harmony_scores("We seek wisdom and truth but may harm in the process");
+        let wisdom = scores
+            .iter()
+            .find(|s| s.harmony == "Integral Wisdom")
+            .unwrap();
         // "wisdom" + "truth" = 2×0.2 = 0.4, minus "harm" = -0.3 → net 0.1
-        assert!((wisdom.score - 0.1).abs() < 1e-10, "Expected 0.1, got {}", wisdom.score);
+        assert!(
+            (wisdom.score - 0.1).abs() < 1e-10,
+            "Expected 0.1, got {}",
+            wisdom.score
+        );
     }
 
     // --- is_negated (negation-awareness) ---
@@ -456,9 +580,16 @@ mod tests {
     fn test_harmony_negated_keyword_reduces_score() {
         // "not wisdom" should NOT give positive score to Integral Wisdom
         let scores = calculate_harmony_scores("We have not wisdom nor truth");
-        let wisdom = scores.iter().find(|s| s.harmony == "Integral Wisdom").unwrap();
+        let wisdom = scores
+            .iter()
+            .find(|s| s.harmony == "Integral Wisdom")
+            .unwrap();
         // "wisdom" negated (-0.15) + "truth" negated (-0.15) = -0.3
-        assert!(wisdom.score < 0.0, "Negated keywords should produce negative score, got {}", wisdom.score);
+        assert!(
+            wisdom.score < 0.0,
+            "Negated keywords should produce negative score, got {}",
+            wisdom.score
+        );
     }
 
     #[test]
@@ -467,12 +598,18 @@ mod tests {
         // because "fair" wasn't matched but other keywords were.
         // With negation: "destroy" is a negation marker for any following keyword.
         let scores = calculate_harmony_scores("We must destroy all fairness and balance");
-        let reciprocity = scores.iter().find(|s| s.harmony == "Sacred Reciprocity").unwrap();
+        let reciprocity = scores
+            .iter()
+            .find(|s| s.harmony == "Sacred Reciprocity")
+            .unwrap();
         // "fairness" doesn't match "fair" (substring), but "balance" matches
         // "destroy" negates "balance" → -0.15
         // Plus "destroy" is a global negative keyword (not negated) → -0.3
-        assert!(reciprocity.score < 0.0,
-            "Destroying fairness should score negative, got {}", reciprocity.score);
+        assert!(
+            reciprocity.score < 0.0,
+            "Destroying fairness should score negative, got {}",
+            reciprocity.score
+        );
     }
 
     #[test]
@@ -481,18 +618,28 @@ mod tests {
         let scores = calculate_harmony_scores("Our goal is to prevent harm and prevent damage");
         // All global negatives are negated → should NOT penalize
         for s in &scores {
-            assert!(s.score >= 0.0,
-                "{} should not be penalized by negated harm/damage, got {}", s.harmony, s.score);
+            assert!(
+                s.score >= 0.0,
+                "{} should not be penalized by negated harm/damage, got {}",
+                s.harmony,
+                s.score
+            );
         }
     }
 
     #[test]
     fn test_harmony_sacred_stillness_detected() {
         let scores = calculate_harmony_scores("We need stillness and contemplation for reflection");
-        let stillness = scores.iter().find(|s| s.harmony == "Sacred Stillness").unwrap();
+        let stillness = scores
+            .iter()
+            .find(|s| s.harmony == "Sacred Stillness")
+            .unwrap();
         // "stillness" + "contemplation" + "reflection" = 3 × 0.2 = 0.6
-        assert!((stillness.score - 0.6).abs() < 1e-10,
-            "Expected 0.6 for Sacred Stillness, got {}", stillness.score);
+        assert!(
+            (stillness.score - 0.6).abs() < 1e-10,
+            "Expected 0.6 for Sacred Stillness, got {}",
+            stillness.score
+        );
     }
 
     // --- determine_recommendation ---
@@ -533,23 +680,32 @@ mod tests {
     fn test_recommendation_strong_oppose_with_violations() {
         let violations = vec!["Charter violation".to_string()];
         let rec = determine_recommendation(0.9, 0.9, &violations);
-        assert_eq!(rec, GovernanceRecommendation::StrongOppose,
-            "Any violations should result in StrongOppose regardless of scores");
+        assert_eq!(
+            rec,
+            GovernanceRecommendation::StrongOppose,
+            "Any violations should result in StrongOppose regardless of scores"
+        );
     }
 
     #[test]
     fn test_recommendation_cannot_evaluate_low_authenticity() {
         let rec = determine_recommendation(0.9, 0.1, &[]);
-        assert_eq!(rec, GovernanceRecommendation::CannotEvaluate,
-            "Authenticity < 0.2 should be CannotEvaluate");
+        assert_eq!(
+            rec,
+            GovernanceRecommendation::CannotEvaluate,
+            "Authenticity < 0.2 should be CannotEvaluate"
+        );
     }
 
     #[test]
     fn test_recommendation_boundary_authenticity() {
         // Exactly at 0.2 boundary — should NOT be CannotEvaluate (< 0.2 triggers it)
         let rec = determine_recommendation(0.5, 0.2, &[]);
-        assert_ne!(rec, GovernanceRecommendation::CannotEvaluate,
-            "Authenticity exactly 0.2 should be evaluated");
+        assert_ne!(
+            rec,
+            GovernanceRecommendation::CannotEvaluate,
+            "Authenticity exactly 0.2 should be evaluated"
+        );
     }
 
     // --- check_snapshot_input ---
@@ -1011,20 +1167,31 @@ mod tests {
     #[test]
     fn test_action_type_thresholds() {
         assert!((GovernanceActionType::Basic.consciousness_gate() - 0.2).abs() < f64::EPSILON);
-        assert!((GovernanceActionType::ProposalSubmission.consciousness_gate() - 0.3).abs() < f64::EPSILON);
+        assert!(
+            (GovernanceActionType::ProposalSubmission.consciousness_gate() - 0.3).abs()
+                < f64::EPSILON
+        );
         assert!((GovernanceActionType::Voting.consciousness_gate() - 0.4).abs() < f64::EPSILON);
-        assert!((GovernanceActionType::Constitutional.consciousness_gate() - 0.6).abs() < f64::EPSILON);
+        assert!(
+            (GovernanceActionType::Constitutional.consciousness_gate() - 0.6).abs() < f64::EPSILON
+        );
     }
 
     #[test]
     fn test_action_type_ordering() {
         // Thresholds must be monotonically increasing
-        assert!(GovernanceActionType::Basic.consciousness_gate()
-            < GovernanceActionType::ProposalSubmission.consciousness_gate());
-        assert!(GovernanceActionType::ProposalSubmission.consciousness_gate()
-            < GovernanceActionType::Voting.consciousness_gate());
-        assert!(GovernanceActionType::Voting.consciousness_gate()
-            < GovernanceActionType::Constitutional.consciousness_gate());
+        assert!(
+            GovernanceActionType::Basic.consciousness_gate()
+                < GovernanceActionType::ProposalSubmission.consciousness_gate()
+        );
+        assert!(
+            GovernanceActionType::ProposalSubmission.consciousness_gate()
+                < GovernanceActionType::Voting.consciousness_gate()
+        );
+        assert!(
+            GovernanceActionType::Voting.consciousness_gate()
+                < GovernanceActionType::Constitutional.consciousness_gate()
+        );
     }
 
     // --- ConsciousnessSnapshot quality_score ---
@@ -1107,8 +1274,10 @@ mod tests {
             consciousness_vector: None,
             ..base.clone()
         };
-        assert!((base.quality_score() - with_extras.quality_score()).abs() < 1e-10,
-            "Valence and care should not affect quality score");
+        assert!(
+            (base.quality_score() - with_extras.quality_score()).abs() < 1e-10,
+            "Valence and care should not affect quality score"
+        );
     }
 
     #[test]
@@ -1126,9 +1295,9 @@ mod tests {
             source: "test".into(),
             consciousness_vector: None,
         };
-        assert!(snap.meets_threshold(&GovernanceActionType::Basic));       // 0.5 >= 0.2
+        assert!(snap.meets_threshold(&GovernanceActionType::Basic)); // 0.5 >= 0.2
         assert!(snap.meets_threshold(&GovernanceActionType::ProposalSubmission)); // 0.5 >= 0.3
-        assert!(snap.meets_threshold(&GovernanceActionType::Voting));      // 0.5 >= 0.4
+        assert!(snap.meets_threshold(&GovernanceActionType::Voting)); // 0.5 >= 0.4
         assert!(!snap.meets_threshold(&GovernanceActionType::Constitutional)); // 0.5 < 0.6
     }
 
@@ -1161,8 +1330,10 @@ mod tests {
         let w_neg = HolisticVotingWeight::calculate(0.8, 0.5, -1.0);
         let w_zero = HolisticVotingWeight::calculate(0.8, 0.5, 0.0);
         // Negative alignment is clamped to 0 in bonus, so both should be equal
-        assert!((w_neg.final_weight - w_zero.final_weight).abs() < 1e-10,
-            "Negative alignment should give same weight as zero alignment");
+        assert!(
+            (w_neg.final_weight - w_zero.final_weight).abs() < 1e-10,
+            "Negative alignment should give same weight as zero alignment"
+        );
     }
 
     #[test]
@@ -1217,8 +1388,14 @@ mod tests {
         let w = HolisticVotingWeight::calculate(0.8, 0.6, 0.3);
         assert!(!w.calculation_breakdown.is_empty());
         // Breakdown should contain the constant values
-        assert!(w.calculation_breakdown.contains("0.7"), "Should reference consciousness base");
-        assert!(w.calculation_breakdown.contains("0.3"), "Should reference phi factor");
+        assert!(
+            w.calculation_breakdown.contains("0.7"),
+            "Should reference consciousness base"
+        );
+        assert!(
+            w.calculation_breakdown.contains("0.3"),
+            "Should reference phi factor"
+        );
     }
 
     // --- AdaptiveThreshold ---
@@ -1296,9 +1473,13 @@ mod tests {
         // - Voter needs AdaptiveThreshold(Constitutional).min_voter_consciousness = 0.5
         // This is intentional: lower bar for voting than proposing
         let proposer_bar = GovernanceActionType::Constitutional.consciousness_gate();
-        let voter_bar = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional).min_voter_consciousness;
-        assert!(voter_bar < proposer_bar,
+        let voter_bar = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional)
+            .min_voter_consciousness;
+        assert!(
+            voter_bar < proposer_bar,
             "Constitutional voter bar ({}) should be lower than proposer bar ({})",
-            voter_bar, proposer_bar);
+            voter_bar,
+            proposer_bar
+        );
     }
 }

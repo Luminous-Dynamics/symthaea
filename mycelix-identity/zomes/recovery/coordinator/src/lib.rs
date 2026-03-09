@@ -50,22 +50,33 @@ fn verify_mfa_assurance_for_recovery(did: &str) -> ExternResult<bool> {
         ZomeCallResponse::Unauthorized(_, _, _, _) => {
             // MFA zome not installed — this is a configuration issue, not a security bypass.
             // Fail safe: deny rather than silently allow.
-            warn!("MFA zome unauthorized — denying recovery operation (MFA zome must be installed)");
+            warn!(
+                "MFA zome unauthorized — denying recovery operation (MFA zome must be installed)"
+            );
             Err(wasm_error!(WasmErrorInner::Guest(
-                "MFA verification unavailable (zome unauthorized). Recovery denied for safety.".into()
+                "MFA verification unavailable (zome unauthorized). Recovery denied for safety."
+                    .into()
             )))
         }
         ZomeCallResponse::NetworkError(err) => {
-            warn!("MFA zome network error: {} — denying recovery operation", err);
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("MFA verification failed (network error: {}). Retry later.", err)
-            )))
+            warn!(
+                "MFA zome network error: {} — denying recovery operation",
+                err
+            );
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "MFA verification failed (network error: {}). Retry later.",
+                err
+            ))))
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            warn!("MFA countersigning error: {} — denying recovery operation", err);
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!("MFA verification failed (countersigning: {}). Retry later.", err)
-            )))
+            warn!(
+                "MFA countersigning error: {} — denying recovery operation",
+                err
+            );
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "MFA verification failed (countersigning: {}). Retry later.",
+                err
+            ))))
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
             warn!("MFA authentication failed — denying recovery operation");
@@ -87,15 +98,19 @@ fn enroll_social_recovery_factor(did: &str, trustees: &[String]) -> ExternResult
         reason: String,
     }
 
-    let factor_id = format!("social_recovery:{}", &holo_hash::blake2b_256(did.as_bytes())
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>()[..16]);
+    let factor_id = format!(
+        "social_recovery:{}",
+        &holo_hash::blake2b_256(did.as_bytes())
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>()[..16]
+    );
 
     let metadata = serde_json::json!({
         "trustees": trustees,
         "trustee_count": trustees.len()
-    }).to_string();
+    })
+    .to_string();
 
     let input = EnrollFactorInput {
         did: did.to_string(),
@@ -120,7 +135,10 @@ fn enroll_social_recovery_factor(did: &str, trustees: &[String]) -> ExternResult
             Ok(())
         }
         ZomeCallResponse::NetworkError(err) => {
-            warn!("MFA network error during factor enrollment: {} - recovery setup WITHOUT MFA", err);
+            warn!(
+                "MFA network error during factor enrollment: {} - recovery setup WITHOUT MFA",
+                err
+            );
             Ok(())
         }
         ZomeCallResponse::CountersigningSession(err) => {
@@ -169,7 +187,10 @@ fn notify_bridge_of_recovery(did: &str, new_agent: &AgentPubKey) -> ExternResult
     match response {
         ZomeCallResponse::Ok(_) => Ok(()),
         _ => {
-            debug!("Bridge notification failed for recovery of {} - non-critical", did);
+            debug!(
+                "Bridge notification failed for recovery of {} - non-critical",
+                did
+            );
             Ok(())
         }
     }
@@ -190,21 +211,31 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
 #[hdk_extern]
 pub fn setup_recovery(input: SetupRecoveryInput) -> ExternResult<Record> {
     if input.did.is_empty() || input.did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DID must be 1-256 characters".into()
+        )));
     }
     if input.trustees.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("At least one trustee is required".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "At least one trustee is required".into()
+        )));
     }
     if input.trustees.len() > 50 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Maximum 50 trustees allowed".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Maximum 50 trustees allowed".into()
+        )));
     }
     for trustee in &input.trustees {
         if trustee.is_empty() || trustee.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Each trustee DID must be 1-256 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Each trustee DID must be 1-256 characters".into()
+            )));
         }
     }
     if input.threshold == 0 || input.threshold > input.trustees.len() as u32 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Threshold must be between 1 and the number of trustees".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Threshold must be between 1 and the number of trustees".into()
+        )));
     }
     let agent_info = agent_info()?;
     let now = sys_time()?;
@@ -246,10 +277,9 @@ pub fn setup_recovery(input: SetupRecoveryInput) -> ExternResult<Record> {
         debug!("Failed to enroll SocialRecovery factor in MFA: {:?}", e);
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find recovery config".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find recovery config".into()
+    )))
 }
 
 /// Input for setting up recovery
@@ -265,7 +295,9 @@ pub struct SetupRecoveryInput {
 #[hdk_extern]
 pub fn get_recovery_config(did: String) -> ExternResult<Option<Record>> {
     if did.is_empty() || did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DID must be 1-256 characters".into()
+        )));
     }
     let did_hash = string_to_entry_hash(&did);
     let links = get_links(
@@ -291,13 +323,19 @@ pub fn get_recovery_config(did: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
     if input.did.is_empty() || input.did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DID must be 1-256 characters".into()
+        )));
     }
     if input.initiator_did.is_empty() || input.initiator_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Initiator DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Initiator DID must be 1-256 characters".into()
+        )));
     }
     if input.reason.is_empty() || input.reason.len() > 2048 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-2048 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-2048 characters".into()
+        )));
     }
 
     // Rate limit: Only 1 active (Pending/Approved/ReadyToExecute) recovery request per DID
@@ -311,7 +349,9 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
             if let Ok(Some(record)) = get(action_hash, GetOptions::default()) {
                 if let Ok(Some(req)) = record.entry().to_app_option::<RecoveryRequest>() {
                     match req.status {
-                        RecoveryStatus::Pending | RecoveryStatus::Approved | RecoveryStatus::ReadyToExecute => {
+                        RecoveryStatus::Pending
+                        | RecoveryStatus::Approved
+                        | RecoveryStatus::ReadyToExecute => {
                             return Err(wasm_error!(WasmErrorInner::Guest(
                                 "An active recovery request already exists for this DID. Cancel it first.".into()
                             )));
@@ -324,10 +364,9 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
     }
 
     // Verify recovery config exists
-    let config_record = get_recovery_config(input.did.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "No recovery config found for this DID".into()
-        )))?;
+    let config_record = get_recovery_config(input.did.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("No recovery config found for this DID".into())
+    ))?;
 
     let config: RecoveryConfig = config_record
         .entry()
@@ -339,7 +378,10 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
 
     // Verify initiator is a trustee (constant-time to prevent timing side-channel)
     let is_trustee = config.trustees.iter().fold(0u8, |acc, trustee| {
-        acc | trustee.as_bytes().ct_eq(input.initiator_did.as_bytes()).unwrap_u8()
+        acc | trustee
+            .as_bytes()
+            .ct_eq(input.initiator_did.as_bytes())
+            .unwrap_u8()
     });
     if is_trustee == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -442,10 +484,9 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
         }
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find recovery request".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find recovery request".into()
+    )))
 }
 
 /// Input for initiating recovery
@@ -461,14 +502,20 @@ pub struct InitiateRecoveryInput {
 #[hdk_extern]
 pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<Record> {
     if input.request_id.is_empty() || input.request_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Request ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request ID must be 1-256 characters".into()
+        )));
     }
     if input.trustee_did.is_empty() || input.trustee_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Trustee DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Trustee DID must be 1-256 characters".into()
+        )));
     }
     if let Some(ref comment) = input.comment {
         if comment.len() > 2048 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Comment must be under 2048 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Comment must be under 2048 characters".into()
+            )));
         }
     }
 
@@ -497,9 +544,10 @@ pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<Record> {
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
             if existing_vote.trustee == input.trustee_did {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    format!("Trustee {} has already voted on this recovery request", input.trustee_did)
-                )));
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Trustee {} has already voted on this recovery request",
+                    input.trustee_did
+                ))));
             }
         }
     }
@@ -528,10 +576,9 @@ pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<Record> {
     // Check if threshold is reached
     check_and_update_request_status(input.request_id)?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find vote".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find vote".into()
+    )))
 }
 
 /// Input for voting on recovery
@@ -547,7 +594,9 @@ pub struct VoteOnRecoveryInput {
 #[hdk_extern]
 pub fn get_recovery_votes(request_id: String) -> ExternResult<Vec<Record>> {
     if request_id.is_empty() || request_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Request ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request ID must be 1-256 characters".into()
+        )));
     }
     let request_hash = string_to_entry_hash(&request_id);
     let links = get_links(
@@ -642,9 +691,8 @@ fn check_and_update_request_status(request_id: String) -> ExternResult<()> {
     if approve_count >= config.threshold {
         // Threshold reached — approve and set time lock
         let now = sys_time()?;
-        let time_lock_expires = Timestamp::from_micros(
-            now.as_micros() as i64 + (config.time_lock as i64 * 1_000_000),
-        );
+        let time_lock_expires =
+            Timestamp::from_micros(now.as_micros() as i64 + (config.time_lock as i64 * 1_000_000));
 
         let approved_request = RecoveryRequest {
             id: current_request.id,
@@ -773,7 +821,9 @@ mod tests {
 #[hdk_extern]
 pub fn execute_recovery(request_id: String) -> ExternResult<Record> {
     if request_id.is_empty() || request_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Request ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request ID must be 1-256 characters".into()
+        )));
     }
     // Find the request
     let filter = ChainQueryFilter::new()
@@ -872,17 +922,18 @@ pub fn execute_recovery(request_id: String) -> ExternResult<Record> {
     // This two-step pattern is required by Holochain's agent-centric architecture:
     // only the new agent can create entries on their own source chain.
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find completed request".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find completed request".into()
+    )))
 }
 
 /// Cancel a recovery request (owner only, before execution)
 #[hdk_extern]
 pub fn cancel_recovery(request_id: String) -> ExternResult<Record> {
     if request_id.is_empty() || request_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Request ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request ID must be 1-256 characters".into()
+        )));
     }
     let agent_info = agent_info()?;
 
@@ -922,10 +973,9 @@ pub fn cancel_recovery(request_id: String) -> ExternResult<Record> {
         )))?;
 
     // Get recovery config to verify owner
-    let config_record = get_recovery_config(current_request.did.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Recovery config not found".into()
-        )))?;
+    let config_record = get_recovery_config(current_request.did.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Recovery config not found".into())
+    ))?;
 
     let config: RecoveryConfig = config_record
         .entry()
@@ -966,10 +1016,9 @@ pub fn cancel_recovery(request_id: String) -> ExternResult<Record> {
         &EntryTypes::RecoveryRequest(cancelled_request),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find cancelled request".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find cancelled request".into()
+    )))
 }
 
 /// Get a specific recovery request by ID
@@ -1006,7 +1055,9 @@ pub fn get_recovery_request(request_id: String) -> ExternResult<Option<Record>> 
 #[hdk_extern]
 pub fn get_trustee_responsibilities(trustee_did: String) -> ExternResult<Vec<Record>> {
     if trustee_did.is_empty() || trustee_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Trustee DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Trustee DID must be 1-256 characters".into()
+        )));
     }
     let trustee_hash = string_to_entry_hash(&trustee_did);
     let links = get_links(

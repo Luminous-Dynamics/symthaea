@@ -334,31 +334,105 @@ pub(crate) fn compute_demurrage(balance: i32, rate: f64, elapsed_secs: u64) -> i
     compute_minted_demurrage(balance, rate, elapsed_secs)
 }
 
+/// Collect all entries of type `T` reachable via links from an anchor.
+///
+/// Follows the update chain for each link target, deserializes to `T`,
+/// and returns all successfully decoded entries with their latest action hash.
+/// Silently skips links that can't be resolved (deleted entries, network errors).
+pub(crate) fn collect_linked_entries<T: TryFrom<SerializedBytes>>(
+    anchor: &str,
+    link_type: LinkTypes,
+) -> ExternResult<Vec<(T, ActionHash)>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(anchor)?, link_type)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut entries = Vec::new();
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Ok(record) = follow_update_chain(action_hash) {
+                if let Some(entry) = record.entry().to_app_option::<T>().ok().flatten() {
+                    entries.push((entry, record.action_address().clone()));
+                }
+            }
+        }
+    }
+    Ok(entries)
+}
+
+/// Mutate a member's balance entry in-place via a closure.
+///
+/// Follows the update chain to the latest balance record, applies `f` to the
+/// deserialized `MintedBalance`, and writes the update. Returns the updated balance.
+/// No-ops if the balance link doesn't exist (returns Ok(None)).
+pub(crate) fn mutate_balance(
+    member_did: &str,
+    currency_id: &str,
+    f: impl FnOnce(&mut MintedBalance),
+) -> ExternResult<Option<MintedBalance>> {
+    let anchor_key = format!("mbal:{}:{}", currency_id, member_did);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&anchor_key)?,
+            LinkTypes::CurrencyMemberToBalance,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let Some(link) = links.first() else {
+        return Ok(None);
+    };
+    let Some(link_hash) = link.target.clone().into_action_hash() else {
+        return Ok(None);
+    };
+    let record = follow_update_chain(link_hash)?;
+    let Some(mut bal) = record
+        .entry()
+        .to_app_option::<MintedBalance>()
+        .ok()
+        .flatten()
+    else {
+        return Ok(None);
+    };
+
+    f(&mut bal);
+    update_entry(record.action_address().clone(), &bal)?;
+    Ok(Some(bal))
+}
+
+/// Maximum update chain depth before we bail out.
+/// Prevents unbounded network calls on entries with pathological update histories.
+const MAX_UPDATE_CHAIN_DEPTH: usize = 256;
+
 /// Recursively follow the Holochain update chain from an original action hash
 /// to find the latest version of a record. Each `update_entry` creates a new
 /// action that is recorded as an update of its predecessor.
+///
+/// Stops after [`MAX_UPDATE_CHAIN_DEPTH`] hops to prevent unbounded traversal.
 pub(crate) fn follow_update_chain(action_hash: ActionHash) -> ExternResult<Record> {
     let mut current_hash = action_hash;
-    loop {
+    for _ in 0..MAX_UPDATE_CHAIN_DEPTH {
         let details = get_details(current_hash.clone(), GetOptions::default())?.ok_or(
-            wasm_error!(WasmErrorInner::Guest("Currency record not found".into())),
+            wasm_error!(WasmErrorInner::Guest("Record not found".into())),
         )?;
         match details {
             Details::Record(record_details) => {
                 if let Some(latest_update) = record_details.updates.last() {
-                    // Continue following the chain
                     current_hash = latest_update.action_address().clone();
                 } else {
-                    // No more updates — this is the latest
                     return Ok(record_details.record);
                 }
             }
             _ => {
-                // Fallback: just get the record directly
                 return get(current_hash, GetOptions::default())?.ok_or(wasm_error!(
-                    WasmErrorInner::Guest("Currency record not found".into())
+                    WasmErrorInner::Guest("Record not found".into())
                 ));
             }
         }
     }
+    // Reached max depth — return whatever we have at the current hash
+    get(current_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Update chain exceeded maximum depth".into()
+    )))
 }

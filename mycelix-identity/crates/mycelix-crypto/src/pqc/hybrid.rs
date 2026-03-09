@@ -8,9 +8,9 @@
 use crate::algorithm::AlgorithmId;
 use crate::envelope::{TaggedPublicKey, TaggedSignature};
 use crate::error::CryptoError;
-use crate::traits::{Signer, Verifier};
-use crate::pqc::ed25519_native::{Ed25519Signer, Ed25519Verifier};
 use crate::pqc::dilithium::{MlDsa65Signer, MlDsa65Verifier};
+use crate::pqc::ed25519_native::{Ed25519Signer, Ed25519Verifier};
+use crate::traits::{Signer, Verifier};
 use zeroize::Zeroizing;
 
 /// Hybrid signer that produces dual Ed25519 + ML-DSA-65 signatures.
@@ -60,12 +60,15 @@ impl HybridSigner {
                 actual: public_key_bytes.len(),
             });
         }
-        let ed_sk: [u8; 32] = secret_key_bytes[..32]
-            .try_into()
-            .map_err(|_| CryptoError::Validation("Hybrid secret key too short for Ed25519 component".into()))?;
+        let ed_sk: [u8; 32] = secret_key_bytes[..32].try_into().map_err(|_| {
+            CryptoError::Validation("Hybrid secret key too short for Ed25519 component".into())
+        })?;
         let ed = Ed25519Signer::from_bytes(&ed_sk);
         let mldsa = MlDsa65Signer::from_bytes(&public_key_bytes[32..], &secret_key_bytes[32..])?;
-        Ok(Self { ed25519: ed, mldsa65: mldsa })
+        Ok(Self {
+            ed25519: ed,
+            mldsa65: mldsa,
+        })
     }
 }
 
@@ -127,14 +130,10 @@ impl Verifier for HybridVerifier {
             });
         }
 
-        let ed_pk = TaggedPublicKey::new(
-            AlgorithmId::Ed25519,
-            public_key.key_bytes[..32].to_vec(),
-        )?;
-        let pqc_pk = TaggedPublicKey::new(
-            AlgorithmId::MlDsa65,
-            public_key.key_bytes[32..].to_vec(),
-        )?;
+        let ed_pk =
+            TaggedPublicKey::new(AlgorithmId::Ed25519, public_key.key_bytes[..32].to_vec())?;
+        let pqc_pk =
+            TaggedPublicKey::new(AlgorithmId::MlDsa65, public_key.key_bytes[32..].to_vec())?;
 
         // Split signature: Ed25519 (64) || ML-DSA-65 (rest)
         let ed_component = signature

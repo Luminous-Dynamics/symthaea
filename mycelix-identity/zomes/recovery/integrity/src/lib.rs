@@ -129,7 +129,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RecoveryRequest(request) => {
                     validate_create_recovery_request(EntryCreationAction::Create(action), request)
                 }
-                EntryTypes::RecoveryVote(vote) => validate_create_recovery_vote(EntryCreationAction::Create(action), vote),
+                EntryTypes::RecoveryVote(vote) => {
+                    validate_create_recovery_vote(EntryCreationAction::Create(action), vote)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -489,7 +491,10 @@ mod tests {
     /// Generate a valid trustee list (3-7 unique DID strings).
     fn arb_trustee_list() -> impl Strategy<Value = Vec<String>> {
         (3usize..=7).prop_flat_map(|count| {
-            proptest::collection::vec("[a-zA-Z0-9]{8,16}".prop_map(|s| format!("did:mycelix:{}", s)), count)
+            proptest::collection::vec(
+                "[a-zA-Z0-9]{8,16}".prop_map(|s| format!("did:mycelix:{}", s)),
+                count,
+            )
         })
     }
 

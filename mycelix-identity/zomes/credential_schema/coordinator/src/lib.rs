@@ -3,8 +3,8 @@
 //!
 //! Updated to use HDK 0.6 patterns
 
-use hdk::prelude::*;
 use credential_schema_integrity::*;
+use hdk::prelude::*;
 
 /// Create a deterministic entry hash from a string identifier
 /// This is used for link bases when we need to link from string IDs
@@ -31,31 +31,49 @@ pub fn create_schema(schema: CredentialSchema) -> ExternResult<Record> {
 
     // Input validation
     if schema.id.is_empty() || schema.id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Schema ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Schema ID must be 1-256 characters".into()
+        )));
     }
     if schema.name.is_empty() || schema.name.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Schema name must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Schema name must be 1-256 characters".into()
+        )));
     }
     if schema.description.is_empty() || schema.description.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Schema description must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Schema description must be 1-4096 characters".into()
+        )));
     }
     if schema.version.is_empty() || schema.version.len() > 64 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Version must be 1-64 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Version must be 1-64 characters".into()
+        )));
     }
     if schema.author.is_empty() || schema.author.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Author must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Author must be 1-256 characters".into()
+        )));
     }
     if schema.schema.is_empty() || schema.schema.len() > 65536 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Schema JSON must be 1-65536 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Schema JSON must be 1-65536 characters".into()
+        )));
     }
     if schema.required_fields.len() > 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Required fields must not exceed 100 entries".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Required fields must not exceed 100 entries".into()
+        )));
     }
     if schema.optional_fields.len() > 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Optional fields must not exceed 100 entries".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Optional fields must not exceed 100 entries".into()
+        )));
     }
     if schema.credential_type.is_empty() || schema.credential_type.len() > 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credential type must have 1-100 entries".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential type must have 1-100 entries".into()
+        )));
     }
 
     let action_hash = create_entry(&EntryTypes::CredentialSchema(schema.clone()))?;
@@ -69,10 +87,9 @@ pub fn create_schema(schema: CredentialSchema) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created schema".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created schema".into()
+    )))
 }
 
 /// Get schema by ID
@@ -113,9 +130,8 @@ pub fn get_schemas_by_author(author_did: String) -> ExternResult<Vec<Record>> {
 
     let mut schemas = Vec::new();
     for link in links {
-        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(action_hash, GetOptions::default())? {
             schemas.push(record);
         }
@@ -129,47 +145,64 @@ pub fn get_schemas_by_author(author_did: String) -> ExternResult<Vec<Record>> {
 pub fn update_schema(input: UpdateSchemaInput) -> ExternResult<Record> {
     // Input validation
     if input.schema_id.is_empty() || input.schema_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Schema ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Schema ID must be 1-256 characters".into()
+        )));
     }
     if let Some(ref name) = input.name {
         if name.is_empty() || name.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Name must be 1-256 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Name must be 1-256 characters".into()
+            )));
         }
     }
     if let Some(ref description) = input.description {
         if description.is_empty() || description.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Description must be 1-4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Description must be 1-4096 characters".into()
+            )));
         }
     }
     if let Some(ref version) = input.version {
         if version.is_empty() || version.len() > 64 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Version must be 1-64 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Version must be 1-64 characters".into()
+            )));
         }
     }
     if let Some(ref schema) = input.schema {
         if schema.is_empty() || schema.len() > 65536 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Schema JSON must be 1-65536 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Schema JSON must be 1-65536 characters".into()
+            )));
         }
     }
     if let Some(ref fields) = input.required_fields {
         if fields.len() > 100 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Required fields must not exceed 100 entries".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Required fields must not exceed 100 entries".into()
+            )));
         }
     }
     if let Some(ref fields) = input.optional_fields {
         if fields.len() > 100 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Optional fields must not exceed 100 entries".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Optional fields must not exceed 100 entries".into()
+            )));
         }
     }
 
-    let current_record = get_schema(input.schema_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Schema not found".into())))?;
+    let current_record = get_schema(input.schema_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Schema not found".into())
+    ))?;
 
     let current_schema: CredentialSchema = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid schema entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid schema entry".into()
+        )))?;
 
     // Capability guard: only the schema author can update it
     let caller = agent_info()?.agent_initial_pubkey;
@@ -189,10 +222,16 @@ pub fn update_schema(input: UpdateSchemaInput) -> ExternResult<Record> {
         version: input.version.unwrap_or(current_schema.version),
         author: current_schema.author,
         schema: input.schema.unwrap_or(current_schema.schema),
-        required_fields: input.required_fields.unwrap_or(current_schema.required_fields),
-        optional_fields: input.optional_fields.unwrap_or(current_schema.optional_fields),
+        required_fields: input
+            .required_fields
+            .unwrap_or(current_schema.required_fields),
+        optional_fields: input
+            .optional_fields
+            .unwrap_or(current_schema.optional_fields),
         credential_type: current_schema.credential_type,
-        default_expiration: input.default_expiration.unwrap_or(current_schema.default_expiration),
+        default_expiration: input
+            .default_expiration
+            .unwrap_or(current_schema.default_expiration),
         revocable: current_schema.revocable,
         active: input.active.unwrap_or(current_schema.active),
         created: current_schema.created,
@@ -204,10 +243,9 @@ pub fn update_schema(input: UpdateSchemaInput) -> ExternResult<Record> {
         &EntryTypes::CredentialSchema(updated_schema),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated schema".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated schema".into()
+    )))
 }
 
 /// Input for updating a schema
@@ -238,17 +276,25 @@ pub fn endorse_schema(input: EndorseSchemaInput) -> ExternResult<Record> {
 
     // Input validation
     if input.schema_id.is_empty() || input.schema_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Schema ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Schema ID must be 1-256 characters".into()
+        )));
     }
     if input.endorser_did.is_empty() || input.endorser_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Endorser DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Endorser DID must be 1-256 characters".into()
+        )));
     }
     if !(0.0..=1.0).contains(&input.trust_level) {
-        return Err(wasm_error!(WasmErrorInner::Guest("Trust level must be between 0.0 and 1.0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Trust level must be between 0.0 and 1.0".into()
+        )));
     }
     if let Some(ref comment) = input.comment {
         if comment.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Comment must not exceed 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Comment must not exceed 4096 characters".into()
+            )));
         }
     }
 
@@ -265,8 +311,9 @@ pub fn endorse_schema(input: EndorseSchemaInput) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::SchemaEndorsement(endorsement))?;
 
     // Link schema to endorsement
-    let schema_record = get_schema(input.schema_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Schema not found".into())))?;
+    let schema_record = get_schema(input.schema_id)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Schema not found".into()
+    )))?;
 
     create_link(
         schema_record.action_address().clone(),
@@ -275,10 +322,9 @@ pub fn endorse_schema(input: EndorseSchemaInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find endorsement".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find endorsement".into()
+    )))
 }
 
 /// Input for endorsing a schema
@@ -293,8 +339,9 @@ pub struct EndorseSchemaInput {
 /// Get all endorsements for a schema
 #[hdk_extern]
 pub fn get_schema_endorsements(schema_id: String) -> ExternResult<Vec<Record>> {
-    let schema_record = get_schema(schema_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Schema not found".into())))?;
+    let schema_record = get_schema(schema_id)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Schema not found".into()
+    )))?;
 
     let links = get_links(
         LinkQuery::try_new(
@@ -306,9 +353,8 @@ pub fn get_schema_endorsements(schema_id: String) -> ExternResult<Vec<Record>> {
 
     let mut endorsements = Vec::new();
     for link in links {
-        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-        })?;
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(action_hash, GetOptions::default())? {
             endorsements.push(record);
         }

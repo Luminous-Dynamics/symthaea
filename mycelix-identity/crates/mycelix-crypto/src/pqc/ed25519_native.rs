@@ -5,9 +5,9 @@ use crate::envelope::{TaggedPublicKey, TaggedSignature};
 use crate::error::CryptoError;
 use crate::traits::{Signer, Verifier};
 
-use ed25519_dalek::{Signature, SigningKey, VerifyingKey};
 use ed25519_dalek::Signer as DalekSigner;
 use ed25519_dalek::Verifier as DalekVerifier;
+use ed25519_dalek::{Signature, SigningKey, VerifyingKey};
 use zeroize::Zeroizing;
 
 /// Ed25519 signer backed by ed25519-dalek.
@@ -75,15 +75,13 @@ impl Verifier for Ed25519Verifier {
             )));
         }
 
-        let vk_bytes: [u8; 32] = public_key
-            .key_bytes
-            .as_slice()
-            .try_into()
-            .map_err(|_| CryptoError::InvalidKeyLength {
+        let vk_bytes: [u8; 32] = public_key.key_bytes.as_slice().try_into().map_err(|_| {
+            CryptoError::InvalidKeyLength {
                 algorithm: "Ed25519VerificationKey2020",
                 expected: 32,
                 actual: public_key.key_bytes.len(),
-            })?;
+            }
+        })?;
 
         let vk = VerifyingKey::from_bytes(&vk_bytes)
             .map_err(|e| CryptoError::Validation(format!("Invalid Ed25519 public key: {}", e)))?;

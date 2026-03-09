@@ -328,11 +328,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::CredentialRequest(req) => {
                     validate_create_credential_request(EntryCreationAction::Create(action), req)
                 }
-                EntryTypes::EncryptedEntry(entry) => {
-                    validate_create_encrypted_entry(entry)
-                }
+                EntryTypes::EncryptedEntry(entry) => validate_create_encrypted_entry(entry),
             },
-            OpEntry::UpdateEntry { app_entry, action, .. } => match app_entry {
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
                 EntryTypes::CredentialRequest(req) => {
                     validate_update_credential_request(action, req)
                 }
@@ -416,7 +416,10 @@ fn validate_create_verifiable_credential(
     }
 
     // Validate type includes VerifiableCredential
-    if !vc.credential_type.contains(&"VerifiableCredential".to_string()) {
+    if !vc
+        .credential_type
+        .contains(&"VerifiableCredential".to_string())
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Credential type must include 'VerifiableCredential'".into(),
         ));
@@ -459,7 +462,10 @@ fn validate_create_verifiable_presentation(
     vp: VerifiablePresentation,
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate type includes VerifiablePresentation
-    if !vp.presentation_type.contains(&"VerifiablePresentation".to_string()) {
+    if !vp
+        .presentation_type
+        .contains(&"VerifiablePresentation".to_string())
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Presentation type must include 'VerifiablePresentation'".into(),
         ));
@@ -605,9 +611,7 @@ fn validate_update_credential_request(
 }
 
 /// Validate encrypted entry creation
-fn validate_create_encrypted_entry(
-    entry: EncryptedEntry,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_encrypted_entry(entry: EncryptedEntry) -> ExternResult<ValidateCallbackResult> {
     // Validate entry type tag is non-empty
     if entry.entry_type_tag.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -617,12 +621,10 @@ fn validate_create_encrypted_entry(
 
     // Validate nonce length (XChaCha20-Poly1305 requires 24 bytes)
     if entry.nonce.len() != 24 {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Nonce must be 24 bytes (XChaCha20-Poly1305), got {}",
-                entry.nonce.len()
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Nonce must be 24 bytes (XChaCha20-Poly1305), got {}",
+            entry.nonce.len()
+        )));
     }
 
     // Validate ciphertext is non-empty (minimum: 16-byte Poly1305 tag)
@@ -633,9 +635,7 @@ fn validate_create_encrypted_entry(
     }
 
     // Validate recipient key ID is a DID URL or "self"
-    if entry.recipient_key_id != "self"
-        && !entry.recipient_key_id.starts_with("did:")
-    {
+    if entry.recipient_key_id != "self" && !entry.recipient_key_id.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
             "recipient_key_id must be 'self' or a DID URL".into(),
         ));
@@ -701,13 +701,28 @@ mod tests {
 
         // W3C fields must be camelCase
         assert!(json.contains("\"@context\""), "Must have @context");
-        assert!(json.contains("\"validFrom\""), "Must have validFrom not valid_from");
-        assert!(json.contains("\"validUntil\""), "Must have validUntil not valid_until");
-        assert!(json.contains("\"credentialSubject\""), "Must have credentialSubject");
-        assert!(json.contains("\"credentialSchema\""), "Must have credentialSchema");
+        assert!(
+            json.contains("\"validFrom\""),
+            "Must have validFrom not valid_from"
+        );
+        assert!(
+            json.contains("\"validUntil\""),
+            "Must have validUntil not valid_until"
+        );
+        assert!(
+            json.contains("\"credentialSubject\""),
+            "Must have credentialSubject"
+        );
+        assert!(
+            json.contains("\"credentialSchema\""),
+            "Must have credentialSchema"
+        );
         assert!(json.contains("\"proofPurpose\""), "Must have proofPurpose");
         assert!(json.contains("\"proofValue\""), "Must have proofValue");
-        assert!(json.contains("\"verificationMethod\""), "Must have verificationMethod");
+        assert!(
+            json.contains("\"verificationMethod\""),
+            "Must have verificationMethod"
+        );
 
         // Must NOT contain snake_case versions
         assert!(!json.contains("\"valid_from\""));
@@ -826,7 +841,10 @@ mod tests {
 
     #[test]
     fn vc_type_must_include_verifiable_credential() {
-        let types = vec!["VerifiableCredential".to_string(), "DegreeCredential".to_string()];
+        let types = vec![
+            "VerifiableCredential".to_string(),
+            "DegreeCredential".to_string(),
+        ];
         assert!(types.contains(&"VerifiableCredential".to_string()));
         let bad_types = vec!["DegreeCredential".to_string()];
         assert!(!bad_types.contains(&"VerifiableCredential".to_string()));
@@ -960,7 +978,7 @@ mod tests {
     fn encrypted_entry_self_encryption() {
         let entry = EncryptedEntry {
             entry_type_tag: "DerivedContent".into(),
-            kem_algorithm: 0xF030, // self-encrypt
+            kem_algorithm: 0xF030,    // self-encrypt
             encapsulated_key: vec![], // empty for self-encryption
             nonce: vec![0u8; 24],
             ciphertext: vec![42u8; 32],

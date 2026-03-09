@@ -111,9 +111,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::CredentialSchema(schema) => {
                     validate_create_credential_schema(EntryCreationAction::Create(action), schema)
                 }
-                EntryTypes::SchemaEndorsement(endorsement) => {
-                    validate_create_schema_endorsement(EntryCreationAction::Create(action), endorsement)
-                }
+                EntryTypes::SchemaEndorsement(endorsement) => validate_create_schema_endorsement(
+                    EntryCreationAction::Create(action),
+                    endorsement,
+                ),
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -348,7 +349,10 @@ mod tests {
 
     #[test]
     fn credential_schema_rejects_non_semver_version() {
-        assert!(!"v1".contains('.'), "Versions without dots should be rejected");
+        assert!(
+            !"v1".contains('.'),
+            "Versions without dots should be rejected"
+        );
         assert!("1.0.0".contains('.'));
         assert!("0.1".contains('.'));
     }

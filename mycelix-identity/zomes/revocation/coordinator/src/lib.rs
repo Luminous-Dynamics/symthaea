@@ -25,13 +25,19 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
 pub fn revoke_credential(input: RevokeInput) -> ExternResult<Record> {
     // Input validation
     if input.credential_id.is_empty() || input.credential_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credential ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential ID must be 1-256 characters".into()
+        )));
     }
     if input.issuer_did.is_empty() || input.issuer_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Issuer DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer DID must be 1-256 characters".into()
+        )));
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-4096 characters".into()
+        )));
     }
 
     // Verify caller is the issuer
@@ -75,10 +81,9 @@ pub fn revoke_credential(input: RevokeInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find revocation entry".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find revocation entry".into()
+    )))
 }
 
 /// Input for revoking a credential
@@ -95,13 +100,19 @@ pub struct RevokeInput {
 pub fn suspend_credential(input: SuspendInput) -> ExternResult<Record> {
     // Input validation
     if input.credential_id.is_empty() || input.credential_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credential ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential ID must be 1-256 characters".into()
+        )));
     }
     if input.issuer_did.is_empty() || input.issuer_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Issuer DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer DID must be 1-256 characters".into()
+        )));
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-4096 characters".into()
+        )));
     }
 
     // Verify caller is the issuer
@@ -136,10 +147,9 @@ pub fn suspend_credential(input: SuspendInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find suspension entry".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find suspension entry".into()
+    )))
 }
 
 /// Input for suspending a credential
@@ -156,13 +166,19 @@ pub struct SuspendInput {
 pub fn reinstate_credential(input: ReinstateInput) -> ExternResult<Record> {
     // Input validation
     if input.credential_id.is_empty() || input.credential_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credential ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential ID must be 1-256 characters".into()
+        )));
     }
     if input.issuer_did.is_empty() || input.issuer_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Issuer DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer DID must be 1-256 characters".into()
+        )));
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-4096 characters".into()
+        )));
     }
 
     // Verify caller is the issuer
@@ -190,10 +206,9 @@ pub fn reinstate_credential(input: ReinstateInput) -> ExternResult<Record> {
             "No revocation entry found".into()
         )))?;
 
-    let current_record = get(current_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Revocation entry not found".into()
-        )))?;
+    let current_record = get(current_action_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Revocation entry not found".into())),
+    )?;
 
     let current_entry: RevocationEntry = current_record
         .entry()
@@ -222,12 +237,14 @@ pub fn reinstate_credential(input: ReinstateInput) -> ExternResult<Record> {
         suspension_end: None,
     };
 
-    let action_hash = update_entry(current_action_hash, &EntryTypes::RevocationEntry(reinstated))?;
+    let action_hash = update_entry(
+        current_action_hash,
+        &EntryTypes::RevocationEntry(reinstated),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find reinstated entry".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find reinstated entry".into()
+    )))
 }
 
 /// Input for reinstating a credential
@@ -307,10 +324,14 @@ pub fn check_revocation_status(credential_id: String) -> ExternResult<Revocation
 
 /// Batch check multiple credentials
 #[hdk_extern]
-pub fn batch_check_revocation(credential_ids: Vec<String>) -> ExternResult<Vec<RevocationCheckResult>> {
+pub fn batch_check_revocation(
+    credential_ids: Vec<String>,
+) -> ExternResult<Vec<RevocationCheckResult>> {
     // Input validation
     if credential_ids.len() > 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Batch check must not exceed 100 credential IDs".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Batch check must not exceed 100 credential IDs".into()
+        )));
     }
 
     let mut results = Vec::new();
@@ -347,10 +368,14 @@ pub fn get_revocations_by_issuer(issuer_did: String) -> ExternResult<Vec<Record>
 #[hdk_extern]
 pub fn create_revocation_list(input: CreateRevocationListInput) -> ExternResult<Record> {
     if input.id.is_empty() || input.id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("List ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "List ID must be 1-256 characters".into()
+        )));
     }
     if input.issuer_did.is_empty() || !input.issuer_did.starts_with("did:") {
-        return Err(wasm_error!(WasmErrorInner::Guest("Issuer must be a valid DID".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer must be a valid DID".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -383,8 +408,9 @@ pub fn create_revocation_list(input: CreateRevocationListInput) -> ExternResult<
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find revocation list".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find revocation list".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -439,16 +465,24 @@ pub fn get_issuer_revocation_lists(issuer_did: String) -> ExternResult<Vec<Recor
 #[hdk_extern]
 pub fn batch_revoke_credentials(input: BatchRevokeInput) -> ExternResult<BatchRevokeResult> {
     if input.credential_ids.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Must provide at least one credential ID".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Must provide at least one credential ID".into()
+        )));
     }
     if input.credential_ids.len() > 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Batch revoke must not exceed 100 credentials".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Batch revoke must not exceed 100 credentials".into()
+        )));
     }
     if input.issuer_did.is_empty() || !input.issuer_did.starts_with("did:") {
-        return Err(wasm_error!(WasmErrorInner::Guest("Issuer must be a valid DID".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer must be a valid DID".into()
+        )));
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-4096 characters".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -512,16 +546,24 @@ pub struct BatchItemError {
 #[hdk_extern]
 pub fn batch_suspend_credentials(input: BatchSuspendInput) -> ExternResult<BatchRevokeResult> {
     if input.credential_ids.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Must provide at least one credential ID".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Must provide at least one credential ID".into()
+        )));
     }
     if input.credential_ids.len() > 100 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Batch suspend must not exceed 100 credentials".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Batch suspend must not exceed 100 credentials".into()
+        )));
     }
     if input.issuer_did.is_empty() || !input.issuer_did.starts_with("did:") {
-        return Err(wasm_error!(WasmErrorInner::Guest("Issuer must be a valid DID".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer must be a valid DID".into()
+        )));
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Reason must be 1-4096 characters".into()
+        )));
     }
 
     let mut revoked = Vec::new();
@@ -596,19 +638,25 @@ fn add_to_revocation_list(
     let action_hash = match latest_link {
         Some(link) => ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?,
-        None => return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Revocation list '{}' not found", list_id)
-        ))),
+        None => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Revocation list '{}' not found",
+                list_id
+            ))))
+        }
     };
 
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Revocation list record not found".into())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Revocation list record not found".into())
+    ))?;
 
     let mut list: RevocationList = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid revocation list entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid revocation list entry".into()
+        )))?;
 
     // Verify issuer owns this list
     if list.issuer != issuer_did {
@@ -618,7 +666,8 @@ fn add_to_revocation_list(
     }
 
     // Enforce max entries to prevent unbounded list growth
-    let new_unique: Vec<&String> = credential_ids.iter()
+    let new_unique: Vec<&String> = credential_ids
+        .iter()
         .filter(|id| !list.revoked.contains(id))
         .collect();
 
@@ -626,7 +675,10 @@ fn add_to_revocation_list(
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Revocation list '{}' would exceed maximum of {} entries ({} current + {} new). \
              Create a new revocation list for additional revocations.",
-            list_id, MAX_REVOCATION_LIST_ENTRIES, list.revoked.len(), new_unique.len()
+            list_id,
+            MAX_REVOCATION_LIST_ENTRIES,
+            list.revoked.len(),
+            new_unique.len()
         ))));
     }
 
@@ -707,21 +759,13 @@ mod tests {
     #[test]
     fn suspended_exactly_at_end_becomes_active() {
         let end = 1_000_000_000_000i64;
-        let result = resolve_suspension_status(
-            &RevocationStatus::Suspended,
-            Some(end),
-            end,
-        );
+        let result = resolve_suspension_status(&RevocationStatus::Suspended, Some(end), end);
         assert_eq!(result, RevocationStatus::Active);
     }
 
     #[test]
     fn suspended_no_end_stays_suspended() {
-        let result = resolve_suspension_status(
-            &RevocationStatus::Suspended,
-            None,
-            999_999_999_999,
-        );
+        let result = resolve_suspension_status(&RevocationStatus::Suspended, None, 999_999_999_999);
         assert_eq!(result, RevocationStatus::Suspended);
     }
 
@@ -737,11 +781,7 @@ mod tests {
 
     #[test]
     fn active_stays_active() {
-        let result = resolve_suspension_status(
-            &RevocationStatus::Active,
-            None,
-            0,
-        );
+        let result = resolve_suspension_status(&RevocationStatus::Active, None, 0);
         assert_eq!(result, RevocationStatus::Active);
     }
 
@@ -883,7 +923,13 @@ mod tests {
 
     #[test]
     fn max_revocation_list_entries_is_reasonable() {
-        assert!(MAX_REVOCATION_LIST_ENTRIES >= 1_000, "Must allow at least 1K entries");
-        assert!(MAX_REVOCATION_LIST_ENTRIES <= 100_000, "Must not exceed 100K entries (DHT size)");
+        assert!(
+            MAX_REVOCATION_LIST_ENTRIES >= 1_000,
+            "Must allow at least 1K entries"
+        );
+        assert!(
+            MAX_REVOCATION_LIST_ENTRIES <= 100_000,
+            "Must not exceed 100K entries (DHT size)"
+        );
     }
 }

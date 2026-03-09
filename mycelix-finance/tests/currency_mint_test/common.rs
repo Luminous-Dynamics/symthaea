@@ -203,16 +203,6 @@ pub fn test_params_with_confirmation(name: &str, symbol: &str) -> MintedCurrency
     p
 }
 
-pub fn test_params_with_rate_limit(
-    name: &str,
-    symbol: &str,
-    max_per_day: u8,
-) -> MintedCurrencyParams {
-    let mut p = test_params(name, symbol);
-    p.max_exchanges_per_day = max_per_day;
-    p
-}
-
 // ── Conductor setup helper ────────────────────────────────────────────────
 
 /// Set up a SweetConductor with `agent_count` agents and the finance DNA installed.

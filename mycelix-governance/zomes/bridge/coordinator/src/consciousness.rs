@@ -10,8 +10,7 @@ use super::*;
 /// Used to establish consciousness state before governance actions.
 #[hdk_extern]
 pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult<Record> {
-    check_snapshot_input(&input)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+    check_snapshot_input(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let now = sys_time()?;
     let agent_info = agent_info()?;
@@ -57,8 +56,9 @@ pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Snapshot not found".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Snapshot not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -89,7 +89,11 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
     let dynamic_threshold = get_dynamic_consciousness_gate(&input.action_type)?;
 
     let (_snapshot, snapshot_id, consciousness_level) = match latest_snapshot {
-        Some((_record, snap)) => (Some(snap.clone()), snap.id.clone(), snap.consciousness_level),
+        Some((_record, snap)) => (
+            Some(snap.clone()),
+            snap.id.clone(),
+            snap.consciousness_level,
+        ),
         None => {
             // No snapshot available - gate fails
             let gate = ConsciousnessGate {
@@ -204,8 +208,7 @@ pub struct GateVerificationResult {
 /// using the agent's current consciousness state.
 #[hdk_extern]
 pub fn assess_value_alignment(input: AssessAlignmentInput) -> ExternResult<Record> {
-    check_alignment_input(&input)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+    check_alignment_input(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let now = sys_time()?;
     let agent_info = agent_info()?;
@@ -227,8 +230,8 @@ pub fn assess_value_alignment(input: AssessAlignmentInput) -> ExternResult<Recor
     let harmony_scores = calculate_harmony_scores(&input.proposal_content);
 
     // Calculate overall alignment
-    let overall_alignment: f64 = harmony_scores.iter().map(|h| h.score).sum::<f64>()
-        / harmony_scores.len() as f64;
+    let overall_alignment: f64 =
+        harmony_scores.iter().map(|h| h.score).sum::<f64>() / harmony_scores.len() as f64;
 
     // Detect violations (scores below threshold)
     let violations: Vec<String> = harmony_scores
@@ -249,7 +252,12 @@ pub fn assess_value_alignment(input: AssessAlignmentInput) -> ExternResult<Recor
 
     // Create assessment entry
     let assessment = ValueAlignmentAssessment {
-        id: format!("alignment:{}:{}:{}", agent_did, input.proposal_id, now.as_micros()),
+        id: format!(
+            "alignment:{}:{}:{}",
+            agent_did,
+            input.proposal_id,
+            now.as_micros()
+        ),
         agent_did: agent_did.clone(),
         proposal_id: input.proposal_id.clone(),
         overall_alignment,
@@ -279,8 +287,9 @@ pub fn assess_value_alignment(input: AssessAlignmentInput) -> ExternResult<Recor
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Assessment not found".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Assessment not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]

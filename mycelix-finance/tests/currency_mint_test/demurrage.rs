@@ -285,7 +285,7 @@ async fn test_redistribute_compost() {
         result.total_redistributed >= 0,
         "Redistributed must be non-negative"
     );
-    assert!(result.recipients >= 0, "Recipients must be non-negative");
+    // result.recipients is u32 — always non-negative by type
     println!(
         "  - Redistributed: {} to {} recipients (per_member={})",
         result.total_redistributed, result.recipients, result.per_member_amount

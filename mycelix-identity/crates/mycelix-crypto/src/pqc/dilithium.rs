@@ -67,11 +67,7 @@ impl Signer for MlDsa65Signer {
     }
 
     fn public_key(&self) -> TaggedPublicKey {
-        TaggedPublicKey::new(
-            AlgorithmId::MlDsa65,
-            self.public_key.as_bytes().to_vec(),
-        )
-        .unwrap()
+        TaggedPublicKey::new(AlgorithmId::MlDsa65, self.public_key.as_bytes().to_vec()).unwrap()
     }
 }
 
@@ -165,11 +161,7 @@ impl Signer for MlDsa87Signer {
     }
 
     fn public_key(&self) -> TaggedPublicKey {
-        TaggedPublicKey::new(
-            AlgorithmId::MlDsa87,
-            self.public_key.as_bytes().to_vec(),
-        )
-        .unwrap()
+        TaggedPublicKey::new(AlgorithmId::MlDsa87, self.public_key.as_bytes().to_vec()).unwrap()
     }
 }
 

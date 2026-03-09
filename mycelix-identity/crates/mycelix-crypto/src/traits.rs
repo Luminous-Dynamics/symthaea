@@ -39,10 +39,7 @@ pub trait KeyEncapsulator {
     fn algorithm(&self) -> AlgorithmId;
 
     /// Encapsulate: given recipient's public key, produce (kem_ciphertext, shared_secret).
-    fn encapsulate(
-        &self,
-        public_key: &TaggedPublicKey,
-    ) -> Result<(Vec<u8>, Vec<u8>), CryptoError>;
+    fn encapsulate(&self, public_key: &TaggedPublicKey) -> Result<(Vec<u8>, Vec<u8>), CryptoError>;
 
     /// Decapsulate: recover shared_secret from KEM ciphertext using private key.
     fn decapsulate(&self, ciphertext: &[u8]) -> Result<Vec<u8>, CryptoError>;

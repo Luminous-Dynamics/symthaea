@@ -389,18 +389,17 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::MfaState(state) => {
                     validate_create_mfa_state(EntryCreationAction::Create(action), state)
                 }
-                EntryTypes::FactorEnrollment(enrollment) => {
-                    validate_create_factor_enrollment(EntryCreationAction::Create(action), enrollment)
-                }
+                EntryTypes::FactorEnrollment(enrollment) => validate_create_factor_enrollment(
+                    EntryCreationAction::Create(action),
+                    enrollment,
+                ),
                 EntryTypes::FactorVerification(verification) => {
                     validate_create_factor_verification(
                         EntryCreationAction::Create(action),
                         verification,
                     )
                 }
-                EntryTypes::EncryptedEntry(entry) => {
-                    validate_create_encrypted_entry(entry)
-                }
+                EntryTypes::EncryptedEntry(entry) => validate_create_encrypted_entry(entry),
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -642,9 +641,7 @@ fn validate_create_factor_verification(
 }
 
 /// Validate encrypted entry creation
-fn validate_create_encrypted_entry(
-    entry: EncryptedEntry,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_encrypted_entry(entry: EncryptedEntry) -> ExternResult<ValidateCallbackResult> {
     // Validate entry type tag is non-empty
     if entry.entry_type_tag.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -654,12 +651,10 @@ fn validate_create_encrypted_entry(
 
     // Validate nonce length (XChaCha20-Poly1305 requires 24 bytes)
     if entry.nonce.len() != 24 {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Nonce must be 24 bytes (XChaCha20-Poly1305), got {}",
-                entry.nonce.len()
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Nonce must be 24 bytes (XChaCha20-Poly1305), got {}",
+            entry.nonce.len()
+        )));
     }
 
     // Validate ciphertext is non-empty (minimum: 16-byte Poly1305 tag)
@@ -670,9 +665,7 @@ fn validate_create_encrypted_entry(
     }
 
     // Validate recipient key ID is a DID URL or "self"
-    if entry.recipient_key_id != "self"
-        && !entry.recipient_key_id.starts_with("did:")
-    {
+    if entry.recipient_key_id != "self" && !entry.recipient_key_id.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
             "recipient_key_id must be 'self' or a DID URL".into(),
         ));
@@ -708,15 +701,39 @@ mod tests {
 
     #[test]
     fn test_factor_type_categories() {
-        assert_eq!(FactorType::PrimaryKeyPair.category(), FactorCategory::Cryptographic);
-        assert_eq!(FactorType::HardwareKey.category(), FactorCategory::Cryptographic);
+        assert_eq!(
+            FactorType::PrimaryKeyPair.category(),
+            FactorCategory::Cryptographic
+        );
+        assert_eq!(
+            FactorType::HardwareKey.category(),
+            FactorCategory::Cryptographic
+        );
         assert_eq!(FactorType::Biometric.category(), FactorCategory::Biometric);
-        assert_eq!(FactorType::SocialRecovery.category(), FactorCategory::SocialProof);
-        assert_eq!(FactorType::ReputationAttestation.category(), FactorCategory::SocialProof);
-        assert_eq!(FactorType::GitcoinPassport.category(), FactorCategory::ExternalVerification);
-        assert_eq!(FactorType::VerifiableCredential.category(), FactorCategory::ExternalVerification);
-        assert_eq!(FactorType::RecoveryPhrase.category(), FactorCategory::Knowledge);
-        assert_eq!(FactorType::SecurityQuestions.category(), FactorCategory::Knowledge);
+        assert_eq!(
+            FactorType::SocialRecovery.category(),
+            FactorCategory::SocialProof
+        );
+        assert_eq!(
+            FactorType::ReputationAttestation.category(),
+            FactorCategory::SocialProof
+        );
+        assert_eq!(
+            FactorType::GitcoinPassport.category(),
+            FactorCategory::ExternalVerification
+        );
+        assert_eq!(
+            FactorType::VerifiableCredential.category(),
+            FactorCategory::ExternalVerification
+        );
+        assert_eq!(
+            FactorType::RecoveryPhrase.category(),
+            FactorCategory::Knowledge
+        );
+        assert_eq!(
+            FactorType::SecurityQuestions.category(),
+            FactorCategory::Knowledge
+        );
     }
 
     // =========================================================================
@@ -783,7 +800,10 @@ mod tests {
         let strength = factor.current_strength(now);
         // Biometric decay rate is 0.008/day, much faster than primary key
         // After 30 days: exp(-0.008 * 30) ≈ 0.79
-        assert!(strength < 0.85, "Biometric should decay faster than primary key");
+        assert!(
+            strength < 0.85,
+            "Biometric should decay faster than primary key"
+        );
         assert!(strength > 0.7, "Biometric shouldn't decay too quickly");
     }
 
@@ -818,7 +838,10 @@ mod tests {
             effective_strength: 1.0,
             active: true,
         };
-        assert!(!fresh_factor.needs_reverification(now), "Fresh factor shouldn't need reverification");
+        assert!(
+            !fresh_factor.needs_reverification(now),
+            "Fresh factor shouldn't need reverification"
+        );
 
         // Old factor - needs reverification (400 days, past the 365-day threshold)
         let old_verified = test_timestamp(400);
@@ -831,7 +854,10 @@ mod tests {
             effective_strength: 1.0,
             active: true,
         };
-        assert!(old_factor.needs_reverification(now), "Old factor should need reverification");
+        assert!(
+            old_factor.needs_reverification(now),
+            "Old factor should need reverification"
+        );
     }
 
     #[test]
@@ -948,7 +974,10 @@ mod tests {
         let (level, strength, categories) = state.calculate_assurance(now);
         // 3 factors from 3 categories: Cryptographic (1.0), ExternalVerification (0.8), Biometric (0.8)
         // Total: 2.6, Categories: 3 → Verified (needs 2.0+ strength and 2+ categories)
-        assert!(level >= AssuranceLevel::Verified, "Should be at least Verified with 3 factors from 3 categories");
+        assert!(
+            level >= AssuranceLevel::Verified,
+            "Should be at least Verified with 3 factors from 3 categories"
+        );
         assert_eq!(categories, 3);
         assert!(strength >= 2.0);
     }
@@ -1008,7 +1037,10 @@ mod tests {
         let (level, strength, categories) = state.calculate_assurance(now);
         // 4 factors: PrimaryKey(1.0) + HardwareKey(1.2) + GitcoinPassport(0.8) + SocialRecovery(0.9) = 3.9
         // Categories: Cryptographic, ExternalVerification, SocialProof = 3
-        assert!(level >= AssuranceLevel::HighlyAssured, "Should be HighlyAssured with 3.9 strength and 3 categories");
+        assert!(
+            level >= AssuranceLevel::HighlyAssured,
+            "Should be HighlyAssured with 3.9 strength and 3 categories"
+        );
         assert!(categories >= 3);
         assert!(strength >= 3.0);
     }
@@ -1078,7 +1110,10 @@ mod tests {
         let strength = factor.current_strength(now);
         // Grace: 14 days, Decay time: 186 days, Rate: 0.012
         // strength = exp(-0.012 * 186) ≈ 0.11
-        assert!(strength < 0.3, "Very stale factor should be below 0.3 threshold");
+        assert!(
+            strength < 0.3,
+            "Very stale factor should be below 0.3 threshold"
+        );
     }
 
     #[test]
@@ -1120,9 +1155,15 @@ mod tests {
         };
 
         // The integrity validation should accept counter values > 1.0
-        assert!(verification.new_strength >= 0.0, "Counter must be non-negative");
+        assert!(
+            verification.new_strength >= 0.0,
+            "Counter must be non-negative"
+        );
         // Previously this would have been rejected by the > 1.0 check
-        assert!(verification.new_strength > 1.0, "Counter values > 1.0 are valid for WebAuthn");
+        assert!(
+            verification.new_strength > 1.0,
+            "Counter values > 1.0 are valid for WebAuthn"
+        );
     }
 
     #[test]
@@ -1137,7 +1178,10 @@ mod tests {
             new_strength: -0.5,
         };
 
-        assert!(verification.new_strength < 0.0, "Negative strength should fail validation");
+        assert!(
+            verification.new_strength < 0.0,
+            "Negative strength should fail validation"
+        );
     }
 
     // =========================================================================
@@ -1331,7 +1375,10 @@ mod tests {
         let high_counter: u32 = 16_777_216;
         let as_f32 = high_counter as f32;
         let back_to_u32 = as_f32 as u32;
-        assert_eq!(back_to_u32, high_counter, "Counter at f32 precision boundary");
+        assert_eq!(
+            back_to_u32, high_counter,
+            "Counter at f32 precision boundary"
+        );
 
         // One above the boundary: precision loss
         let over_boundary: u32 = 16_777_217;

@@ -75,8 +75,9 @@ pub fn bootstrap_consciousness_config(_: ()) -> ExternResult<Record> {
         let link = links.into_iter().max_by_key(|l| l.timestamp).unwrap();
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        return get(action_hash, GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Config not found".into())));
+        return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Config not found".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -84,7 +85,9 @@ pub fn bootstrap_consciousness_config(_: ()) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::GovernanceConsciousnessConfig(config))?;
 
-    create_entry(&EntryTypes::Anchor(Anchor(CONSCIOUSNESS_CONFIG_ANCHOR.to_string())))?;
+    create_entry(&EntryTypes::Anchor(Anchor(
+        CONSCIOUSNESS_CONFIG_ANCHOR.to_string(),
+    )))?;
     create_link(
         anchor,
         action_hash.clone(),
@@ -92,8 +95,9 @@ pub fn bootstrap_consciousness_config(_: ()) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Config not found after creation".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Config not found after creation".into()
+    )))
 }
 
 /// Update consciousness configuration via governance proposal.
@@ -112,26 +116,43 @@ pub fn update_consciousness_config(input: UpdateConsciousnessConfigInput) -> Ext
     let mut config = get_current_consciousness_config()?;
 
     // Apply only the fields that are provided
-    if let Some(v) = input.consciousness_gate_basic { config.consciousness_gate_basic = v; }
-    if let Some(v) = input.consciousness_gate_proposal { config.consciousness_gate_proposal = v; }
-    if let Some(v) = input.consciousness_gate_voting { config.consciousness_gate_voting = v; }
-    if let Some(v) = input.consciousness_gate_constitutional { config.consciousness_gate_constitutional = v; }
-    if let Some(v) = input.min_voter_consciousness_standard { config.min_voter_consciousness_standard = v; }
-    if let Some(v) = input.min_voter_consciousness_emergency { config.min_voter_consciousness_emergency = v; }
-    if let Some(v) = input.min_voter_consciousness_constitutional { config.min_voter_consciousness_constitutional = v; }
-    if let Some(v) = input.max_voting_weight { config.max_voting_weight = v; }
+    if let Some(v) = input.consciousness_gate_basic {
+        config.consciousness_gate_basic = v;
+    }
+    if let Some(v) = input.consciousness_gate_proposal {
+        config.consciousness_gate_proposal = v;
+    }
+    if let Some(v) = input.consciousness_gate_voting {
+        config.consciousness_gate_voting = v;
+    }
+    if let Some(v) = input.consciousness_gate_constitutional {
+        config.consciousness_gate_constitutional = v;
+    }
+    if let Some(v) = input.min_voter_consciousness_standard {
+        config.min_voter_consciousness_standard = v;
+    }
+    if let Some(v) = input.min_voter_consciousness_emergency {
+        config.min_voter_consciousness_emergency = v;
+    }
+    if let Some(v) = input.min_voter_consciousness_constitutional {
+        config.min_voter_consciousness_constitutional = v;
+    }
+    if let Some(v) = input.max_voting_weight {
+        config.max_voting_weight = v;
+    }
 
     config.updated_at = now;
     config.changed_by_proposal = Some(input.proposal_id);
 
     // Validate (range + monotonicity) — this is also checked by integrity validation
-    check_consciousness_config(&config)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+    check_consciousness_config(&config).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let action_hash = create_entry(&EntryTypes::GovernanceConsciousnessConfig(config))?;
 
     let anchor = anchor_hash(CONSCIOUSNESS_CONFIG_ANCHOR)?;
-    create_entry(&EntryTypes::Anchor(Anchor(CONSCIOUSNESS_CONFIG_ANCHOR.to_string())))?;
+    create_entry(&EntryTypes::Anchor(Anchor(
+        CONSCIOUSNESS_CONFIG_ANCHOR.to_string(),
+    )))?;
     create_link(
         anchor,
         action_hash.clone(),
@@ -139,8 +160,9 @@ pub fn update_consciousness_config(input: UpdateConsciousnessConfigInput) -> Ext
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Config not found after update".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Config not found after update".into()
+    )))
 }
 
 /// Get the current consciousness configuration

@@ -7,8 +7,8 @@
 
 #![allow(clippy::manual_is_multiple_of, clippy::manual_clamp)]
 
-use hdk::prelude::*;
 use councils_integrity::*;
+use hdk::prelude::*;
 
 // ============================================================================
 // REAL-TIME SIGNALS
@@ -71,8 +71,9 @@ fn emit_council_signal(signal: CouncilSignal) -> ExternResult<()> {
 fn require_council_member(council_id: &str) -> ExternResult<AgentPubKey> {
     let caller = agent_info()?.agent_initial_pubkey;
 
-    let council_record = get_council_by_id(council_id.to_string())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let council_record = get_council_by_id(council_id.to_string())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let council_hash = council_record.action_hashed().hash.clone();
     let links = get_links(
@@ -144,23 +145,35 @@ pub struct CreateCouncilInput {
 pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
     // Input validation
     if input.name.is_empty() || input.name.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Council name must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Council name must be 1-256 characters".into()
+        )));
     }
     if input.purpose.is_empty() || input.purpose.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Council purpose must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Council purpose must be 1-4096 characters".into()
+        )));
     }
     if input.phi_threshold < 0.0 || input.phi_threshold > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Phi threshold must be between 0.0 and 1.0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Phi threshold must be between 0.0 and 1.0".into()
+        )));
     }
     if input.quorum <= 0.0 || input.quorum > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Quorum must be between 0.0 (exclusive) and 1.0 (inclusive)".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Quorum must be between 0.0 (exclusive) and 1.0 (inclusive)".into()
+        )));
     }
     if input.supermajority <= 0.0 || input.supermajority > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Supermajority must be between 0.0 (exclusive) and 1.0 (inclusive)".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Supermajority must be between 0.0 (exclusive) and 1.0 (inclusive)".into()
+        )));
     }
     if let Some(ref parent_id) = input.parent_council_id {
         if parent_id.is_empty() || parent_id.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Parent council ID must be 1-256 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Parent council ID must be 1-256 characters".into()
+            )));
         }
     }
 
@@ -193,20 +206,24 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
 
         match committee_check {
             Ok(ZomeCallResponse::Ok(extern_io)) => {
-                let maybe_record: Option<Record> = extern_io.decode()
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                        format!("Failed to decode committee response: {}", e)
-                    )))?;
+                let maybe_record: Option<Record> = extern_io.decode().map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Failed to decode committee response: {}",
+                        e
+                    )))
+                })?;
                 if maybe_record.is_none() {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        format!("Signing committee '{}' not found", committee_id)
-                    )));
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Signing committee '{}' not found",
+                        committee_id
+                    ))));
                 }
             }
             Ok(ZomeCallResponse::NetworkError(e)) => {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    format!("Network error verifying committee: {}", e)
-                )));
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Network error verifying committee: {}",
+                    e
+                ))));
             }
             _ => {
                 // Threshold-signing zome not installed — allow creation with warning
@@ -214,7 +231,8 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
                     council_id: id.clone(),
                     old_status: "none".into(),
                     new_status: format!(
-                        "warning:threshold_signing_unavailable:committee_id={}", committee_id
+                        "warning:threshold_signing_unavailable:committee_id={}",
+                        committee_id
                     ),
                 });
             }
@@ -239,8 +257,9 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::Council(council.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created council".into())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created council".into())
+    ))?;
 
     // Link from root anchor
     let all_councils_hash = anchor_hash("all_councils")?;
@@ -345,8 +364,9 @@ pub fn get_all_councils(_: ()) -> ExternResult<Vec<Record>> {
 /// Get child councils
 #[hdk_extern]
 pub fn get_child_councils(council_id: String) -> ExternResult<Vec<Record>> {
-    let parent_record = get_council_by_id(council_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let parent_record = get_council_by_id(council_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let parent_hash = parent_record.action_hashed().hash.clone();
 
@@ -384,35 +404,42 @@ pub struct JoinCouncilInput {
 pub fn join_council(input: JoinCouncilInput) -> ExternResult<Record> {
     // Input validation
     if input.council_id.is_empty() || input.council_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Council ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Council ID must be 1-256 characters".into()
+        )));
     }
     if input.member_did.is_empty() || input.member_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Member DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member DID must be 1-256 characters".into()
+        )));
     }
     if input.phi_score < 0.0 || input.phi_score > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Phi score must be between 0.0 and 1.0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Phi score must be between 0.0 and 1.0".into()
+        )));
     }
 
     let timestamp = sys_time()?;
 
     // Get council to verify it exists and check phi threshold
-    let council_record = get_council_by_id(input.council_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let council_record = get_council_by_id(input.council_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let council: Council = council_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid council entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid council entry".into()
+        )))?;
 
     // Verify phi threshold
     if input.phi_score < council.phi_threshold {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Phi score {} below council threshold {}",
-                input.phi_score, council.phi_threshold
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Phi score {} below council threshold {}",
+            input.phi_score, council.phi_threshold
+        ))));
     }
 
     // Calculate voting weight (phi-weighted)
@@ -427,7 +454,9 @@ pub fn join_council(input: JoinCouncilInput) -> ExternResult<Record> {
 
     let membership_id = format!(
         "membership-{}-{}-{}",
-        input.council_id, input.member_did, timestamp.as_micros()
+        input.council_id,
+        input.member_did,
+        timestamp.as_micros()
     );
 
     // Capture role string for signal before moving
@@ -447,8 +476,9 @@ pub fn join_council(input: JoinCouncilInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::CouncilMembership(membership))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created membership".into())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created membership".into())
+    ))?;
 
     // Link council to member
     let council_hash = council_record.action_hashed().hash.clone();
@@ -484,8 +514,9 @@ pub fn join_council(input: JoinCouncilInput) -> ExternResult<Record> {
 /// Get council members
 #[hdk_extern]
 pub fn get_council_members(council_id: String) -> ExternResult<Vec<Record>> {
-    let council_record = get_council_by_id(council_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let council_record = get_council_by_id(council_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let council_hash = council_record.action_hashed().hash.clone();
 
@@ -520,14 +551,17 @@ pub fn reflect_on_council(council_id: String) -> ExternResult<Record> {
     let timestamp = sys_time()?;
 
     // Get council
-    let council_record = get_council_by_id(council_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let council_record = get_council_by_id(council_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let council: Council = council_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid council entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid council entry".into()
+        )))?;
 
     // Get members
     let member_records = get_council_members(council_id.clone())?;
@@ -597,8 +631,7 @@ pub fn reflect_on_council(council_id: String) -> ExternResult<Record> {
         },
     ];
 
-    let harmony_coverage = harmony_presence.iter().map(|h| h.presence).sum::<f64>()
-        / 8.0; // 8 harmonies total
+    let harmony_coverage = harmony_presence.iter().map(|h| h.presence).sum::<f64>() / 8.0; // 8 harmonies total
 
     let absent_harmonies = vec![
         "InfinitePlay".to_string(),
@@ -631,7 +664,10 @@ pub fn reflect_on_council(council_id: String) -> ExternResult<Record> {
         risk_factors.push(RiskFactor {
             category: RiskCategory::HarmonyGap,
             severity: 1.0 - harmony_coverage,
-            description: format!("{} harmonies absent from deliberation", absent_harmonies.len()),
+            description: format!(
+                "{} harmonies absent from deliberation",
+                absent_harmonies.len()
+            ),
         });
     }
 
@@ -682,11 +718,7 @@ pub fn reflect_on_council(council_id: String) -> ExternResult<Record> {
         &risk_factors,
     );
 
-    let reflection_id = format!(
-        "reflection-{}-{}",
-        council_id,
-        timestamp.as_micros()
-    );
+    let reflection_id = format!("reflection-{}-{}", council_id, timestamp.as_micros());
 
     let reflection = HolonicReflection {
         id: reflection_id,
@@ -699,13 +731,13 @@ pub fn reflect_on_council(council_id: String) -> ExternResult<Record> {
         phi_distribution,
         participation_rate,
         decisions_last_30_days: 0, // Would need decision tracking
-        average_consensus: 0.75, // Placeholder
-        contention_ratio: 0.1, // Placeholder
+        average_consensus: 0.75,   // Placeholder
+        contention_ratio: 0.1,     // Placeholder
         implementation_rate: 0.85, // Placeholder
         child_count,
         child_health,
         parent_coherence: council.parent_council_id.as_ref().map(|_| 0.8), // Placeholder
-        collaboration_score: 0.6, // Placeholder
+        collaboration_score: 0.6,                                          // Placeholder
         harmony_presence,
         harmony_coverage,
         absent_harmonies,
@@ -724,8 +756,9 @@ pub fn reflect_on_council(council_id: String) -> ExternResult<Record> {
     let signal_risk_count = reflection.risk_factors.len();
 
     let action_hash = create_entry(&EntryTypes::HolonicReflection(reflection))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created reflection".into())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created reflection".into())
+    ))?;
 
     // Link council to reflection
     let council_hash = council_record.action_hashed().hash.clone();
@@ -751,8 +784,9 @@ pub fn reflect_on_council(council_id: String) -> ExternResult<Record> {
 /// Get council reflections
 #[hdk_extern]
 pub fn get_council_reflections(council_id: String) -> ExternResult<Vec<Record>> {
-    let council_record = get_council_by_id(council_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let council_record = get_council_by_id(council_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let council_hash = council_record.action_hashed().hash.clone();
 
@@ -818,19 +852,28 @@ pub struct HolonicTreeNode {
     pub reflection_summary: Option<String>,
 }
 
-fn build_holonic_tree(council_id: String, depth: u8, max_depth: u8) -> ExternResult<HolonicTreeNode> {
+fn build_holonic_tree(
+    council_id: String,
+    depth: u8,
+    max_depth: u8,
+) -> ExternResult<HolonicTreeNode> {
     if depth > max_depth {
-        return Err(wasm_error!(WasmErrorInner::Guest("Max depth exceeded".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Max depth exceeded".into()
+        )));
     }
 
-    let council_record = get_council_by_id(council_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let council_record = get_council_by_id(council_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let council: Council = council_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid council entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid council entry".into()
+        )))?;
 
     let members = get_council_members(council_id.clone())?;
 
@@ -932,12 +975,7 @@ fn aggregate_child_health(child_records: &[Record]) -> ExternResult<AggregateChi
     let mut children_needing_attention = Vec::new();
 
     for record in child_records {
-        if let Some(council) = record
-            .entry()
-            .to_app_option::<Council>()
-            .ok()
-            .flatten()
-        {
+        if let Some(council) = record.entry().to_app_option::<Council>().ok().flatten() {
             match council.status {
                 CouncilStatus::Active => {
                     // Fetch actual health from latest reflection
@@ -997,9 +1035,7 @@ fn calculate_health_score(
     risk_factors: &[RiskFactor],
 ) -> f64 {
     // Base score from key metrics
-    let base_score = (participation_rate * 0.25)
-        + (average_phi * 0.25)
-        + (harmony_coverage * 0.25);
+    let base_score = (participation_rate * 0.25) + (average_phi * 0.25) + (harmony_coverage * 0.25);
 
     // Add child health contribution
     let child_contribution = match child_health {
@@ -1107,21 +1143,31 @@ pub struct RecordDecisionInput {
 pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
     // Input validation
     if input.council_id.is_empty() || input.council_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Council ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Council ID must be 1-256 characters".into()
+        )));
     }
     if input.title.is_empty() || input.title.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Decision title must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Decision title must be 1-256 characters".into()
+        )));
     }
     if input.content.is_empty() || input.content.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Decision content must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Decision content must be 1-4096 characters".into()
+        )));
     }
     if let Some(ref proposal_id) = input.proposal_id {
         if proposal_id.is_empty() || proposal_id.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Proposal ID must be 1-256 characters".into()
+            )));
         }
     }
     if input.phi_weighted_result < 0.0 || input.phi_weighted_result > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Phi weighted result must be between 0.0 and 1.0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Phi weighted result must be between 0.0 and 1.0".into()
+        )));
     }
 
     // Authorization: only active council members can record decisions
@@ -1130,14 +1176,17 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
     let timestamp = sys_time()?;
 
     // Get council to verify existence
-    let council_record = get_council_by_id(input.council_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let council_record = get_council_by_id(input.council_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let council: Council = council_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid council entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid council entry".into()
+        )))?;
 
     // Determine if decision passed
     let threshold = match input.decision_type {
@@ -1154,7 +1203,8 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
             if needs_signature {
                 // Check for verified signature via cross-zome call
                 if let Some(extern_io) = governance_utils::call_local_best_effort(
-                    "threshold_signing", "get_proposal_signature",
+                    "threshold_signing",
+                    "get_proposal_signature",
                     input.proposal_id.clone().unwrap_or_default(),
                 )? {
                     if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
@@ -1171,11 +1221,7 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
         }
     }
 
-    let decision_id = format!(
-        "decision-{}-{}",
-        input.council_id,
-        timestamp.as_micros()
-    );
+    let decision_id = format!("decision-{}-{}", input.council_id, timestamp.as_micros());
 
     // Capture signal data before moving
     let signal_council_id = input.council_id.clone();
@@ -1205,17 +1251,13 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::CouncilDecision(decision))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to get created decision".into())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Failed to get created decision".into())
+    ))?;
 
     // Link council to decision
     let council_hash = council_record.action_hashed().hash.clone();
-    create_link(
-        council_hash,
-        action_hash,
-        LinkTypes::CouncilToDecision,
-        (),
-    )?;
+    create_link(council_hash, action_hash, LinkTypes::CouncilToDecision, ())?;
 
     // Emit real-time signal for connected clients
     let _ = emit_council_signal(CouncilSignal::DecisionRecorded {
@@ -1232,8 +1274,9 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
 /// Get council decisions
 #[hdk_extern]
 pub fn get_council_decisions(council_id: String) -> ExternResult<Vec<Record>> {
-    let council_record = get_council_by_id(council_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+    let council_record = get_council_by_id(council_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Council not found".into())
+    ))?;
 
     let council_hash = council_record.action_hashed().hash.clone();
 
@@ -1287,27 +1330,34 @@ pub fn get_member_councils(member_did: String) -> ExternResult<Vec<Record>> {
 /// has a `signing_committee_id` set and the committee exists.
 #[hdk_extern]
 pub fn get_council_signing_committee(council_id: String) -> ExternResult<Option<Record>> {
-    let council_record = get_council_by_id(council_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            format!("Council '{}' not found", council_id)
-        )))?;
+    let council_record = get_council_by_id(council_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest(format!("Council '{}' not found", council_id))
+    ))?;
 
     let council: Council = council_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Council entry missing".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Council entry missing".into()
+        )))?;
 
     let Some(committee_id) = council.signing_committee_id else {
         return Ok(None);
     };
 
     // Cross-zome fetch from threshold-signing (best-effort: zome may not be installed)
-    match governance_utils::call_local_best_effort("threshold_signing", "get_committee", committee_id)? {
-        Some(extern_io) => extern_io.decode()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
-                format!("Failed to decode committee: {}", e)
-            ))),
+    match governance_utils::call_local_best_effort(
+        "threshold_signing",
+        "get_committee",
+        committee_id,
+    )? {
+        Some(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode committee: {}",
+                e
+            )))
+        }),
         None => Ok(None),
     }
 }
@@ -1327,12 +1377,7 @@ pub fn get_committee_council(committee_id: String) -> ExternResult<Option<Record
     for link in links {
         if let Some(target) = link.target.into_action_hash() {
             if let Some(record) = get(target, GetOptions::default())? {
-                if let Some(council) = record
-                    .entry()
-                    .to_app_option::<Council>()
-                    .ok()
-                    .flatten()
-                {
+                if let Some(council) = record.entry().to_app_option::<Council>().ok().flatten() {
                     if council.signing_committee_id.as_deref() == Some(committee_id.as_str()) {
                         return Ok(Some(record));
                     }
@@ -1436,7 +1481,9 @@ mod tests {
             id: "child".into(),
             name: "Child".into(),
             purpose: "Sub-council".into(),
-            council_type: CouncilType::Domain { domain: "treasury".into() },
+            council_type: CouncilType::Domain {
+                domain: "treasury".into(),
+            },
             parent_council_id: Some("root".into()),
             phi_threshold: 0.5,
             quorum: 0.6,
@@ -1532,8 +1579,15 @@ mod tests {
         let score = calculate_health_score(0.8, 0.6, 0.5, &Some(child_health.clone()), &[]);
         // base = 0.475, child = 0.367 * 0.25 = 0.092
         // total ≈ 0.567
-        assert!(score < 0.625, "Dormant children should reduce score below no-dormant case");
-        assert!(score > 0.4, "Score should still be reasonable, got {}", score);
+        assert!(
+            score < 0.625,
+            "Dormant children should reduce score below no-dormant case"
+        );
+        assert!(
+            score > 0.4,
+            "Score should still be reasonable, got {}",
+            score
+        );
     }
 
     #[test]
@@ -1549,7 +1603,11 @@ mod tests {
         let score = calculate_health_score(0.8, 0.6, 0.5, &Some(child_health), &[]);
         // base = 0.475, child = 0.1 * 0.25 = 0.025
         // total ≈ 0.500
-        assert!(score < 0.55, "Suspended children should heavily drag down score, got {}", score);
+        assert!(
+            score < 0.55,
+            "Suspended children should heavily drag down score, got {}",
+            score
+        );
     }
 
     // =========================================================================
@@ -1601,7 +1659,9 @@ mod tests {
             id: "council-1".into(),
             name: "Community Council".into(),
             purpose: "Governance".into(),
-            council_type: CouncilType::Domain { domain: "general".into() },
+            council_type: CouncilType::Domain {
+                domain: "general".into(),
+            },
             parent_council_id: None,
             phi_threshold: 0.5,
             quorum: 0.6,
@@ -1618,9 +1678,8 @@ mod tests {
     #[test]
     fn test_summary_thriving() {
         let council = make_council();
-        let summary = generate_reflection_summary(
-            &council, 15, 0.85, &VitalityTrend::Thriving, &[],
-        );
+        let summary =
+            generate_reflection_summary(&council, 15, 0.85, &VitalityTrend::Thriving, &[]);
         assert!(summary.contains("Community Council"));
         assert!(summary.contains("15 members"));
         assert!(summary.contains("thriving"));
@@ -1631,16 +1690,13 @@ mod tests {
     #[test]
     fn test_summary_critical_with_risks() {
         let council = make_council();
-        let risks = vec![
-            RiskFactor {
-                category: RiskCategory::Participation,
-                severity: 0.8,
-                description: "Very low participation".into(),
-            },
-        ];
-        let summary = generate_reflection_summary(
-            &council, 3, 0.25, &VitalityTrend::Critical, &risks,
-        );
+        let risks = vec![RiskFactor {
+            category: RiskCategory::Participation,
+            severity: 0.8,
+            description: "Very low participation".into(),
+        }];
+        let summary =
+            generate_reflection_summary(&council, 3, 0.25, &VitalityTrend::Critical, &risks);
         assert!(summary.contains("critical"));
         assert!(summary.contains("25%"));
         assert!(summary.contains("1 risk factors"));
@@ -1650,18 +1706,15 @@ mod tests {
     #[test]
     fn test_summary_declining() {
         let council = make_council();
-        let summary = generate_reflection_summary(
-            &council, 8, 0.55, &VitalityTrend::Declining, &[],
-        );
+        let summary =
+            generate_reflection_summary(&council, 8, 0.55, &VitalityTrend::Declining, &[]);
         assert!(summary.contains("decline"));
     }
 
     #[test]
     fn test_summary_stable() {
         let council = make_council();
-        let summary = generate_reflection_summary(
-            &council, 10, 0.70, &VitalityTrend::Stable, &[],
-        );
+        let summary = generate_reflection_summary(&council, 10, 0.70, &VitalityTrend::Stable, &[]);
         assert!(summary.contains("stable"));
     }
 }

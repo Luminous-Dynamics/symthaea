@@ -8,10 +8,10 @@
 //! for privacy-preserving trust attestations with ZKP proofs.
 
 use hdi::prelude::*;
-use serde::{Deserialize, Serialize};
 use personal_types::{
     AttestationStatus, CredentialType, KVectorComponent, TrustScoreRange, TrustTier,
 };
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // Generic Credential Storage
@@ -196,7 +196,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::AttestationRequest(req) => validate_create_request(req),
                 EntryTypes::TrustPresentation(pres) => validate_create_presentation(pres),
             },
-            OpEntry::UpdateEntry { app_entry, action, .. } => match app_entry {
+            OpEntry::UpdateEntry {
+                app_entry, action, ..
+            } => match app_entry {
                 EntryTypes::StoredCredential(cred) => validate_credential(&cred),
                 EntryTypes::CredentialProof(proof) => validate_proof(&proof),
                 EntryTypes::TrustCredential(cred) => validate_update_trust_credential(action, cred),
@@ -316,12 +318,10 @@ fn validate_create_trust_credential(
     // Issuer must be the action author (prevent impersonation)
     let expected_issuer = format!("did:mycelix:{}", action.author);
     if cred.issuer_did != expected_issuer {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Issuer DID must match action author. Expected '{}', got '{}'",
-                expected_issuer, cred.issuer_did
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Issuer DID must match action author. Expected '{}', got '{}'",
+            expected_issuer, cred.issuer_did
+        )));
     }
 
     // Subject must be a valid DID
@@ -621,14 +621,18 @@ pub fn verify_credential_pure(
         && trust_score_range.upper <= 1.0
         && trust_score_range.lower <= trust_score_range.upper;
 
-    let mid_score =
-        (trust_score_range.lower as f64 + trust_score_range.upper as f64) / 2.0;
+    let mid_score = (trust_score_range.lower as f64 + trust_score_range.upper as f64) / 2.0;
     let expected_tier = TrustTier::from_score(mid_score);
     let tier_consistent = range_valid && *trust_tier == expected_tier;
 
     let proof_format_valid = !range_proof.is_empty();
 
-    (commitment_valid, range_valid, tier_consistent, proof_format_valid)
+    (
+        commitment_valid,
+        range_valid,
+        tier_consistent,
+        proof_format_valid,
+    )
 }
 
 // ============================================================================
@@ -670,13 +674,19 @@ mod tests {
     #[test]
     fn valid_identity_credential_passes() {
         let c = make_credential(CredentialType::Identity);
-        assert!(matches!(validate_credential(&c).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credential(&c).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]
     fn valid_fl_credential_passes() {
         let c = make_credential(CredentialType::FederatedLearning);
-        assert!(matches!(validate_credential(&c).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_credential(&c).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]
@@ -712,7 +722,10 @@ mod tests {
     #[test]
     fn valid_proof_passes() {
         let p = make_proof();
-        assert!(matches!(validate_proof(&p).unwrap(), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            validate_proof(&p).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]
@@ -767,7 +780,10 @@ mod tests {
     fn verify_valid_trust_credential() {
         let (cv, rv, tc, pv) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.3, upper: 0.39 },
+            &TrustScoreRange {
+                lower: 0.3,
+                upper: 0.39,
+            },
             &TrustTier::Basic, // mid = 0.345 → Basic
             &[1, 2, 3],
         );
@@ -778,7 +794,10 @@ mod tests {
     fn verify_commitment_too_short() {
         let (cv, _, _, _) = verify_credential_pure(
             &[1u8; 16],
-            &TrustScoreRange { lower: 0.0, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.0,
+                upper: 0.2,
+            },
             &TrustTier::Observer,
             &[1],
         );
@@ -789,7 +808,10 @@ mod tests {
     fn verify_commitment_all_zeros() {
         let (cv, _, _, _) = verify_credential_pure(
             &[0u8; 32],
-            &TrustScoreRange { lower: 0.0, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.0,
+                upper: 0.2,
+            },
             &TrustTier::Observer,
             &[1],
         );
@@ -800,7 +822,10 @@ mod tests {
     fn verify_range_invalid_nan() {
         let (_, rv, _, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: f32::NAN, upper: 0.5 },
+            &TrustScoreRange {
+                lower: f32::NAN,
+                upper: 0.5,
+            },
             &TrustTier::Basic,
             &[1],
         );
@@ -811,7 +836,10 @@ mod tests {
     fn verify_range_inverted() {
         let (_, rv, _, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.8, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.8,
+                upper: 0.2,
+            },
             &TrustTier::Basic,
             &[1],
         );
@@ -822,7 +850,10 @@ mod tests {
     fn verify_range_exceeds_one() {
         let (_, rv, _, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.5, upper: 1.5 },
+            &TrustScoreRange {
+                lower: 0.5,
+                upper: 1.5,
+            },
             &TrustTier::Elevated,
             &[1],
         );
@@ -834,7 +865,10 @@ mod tests {
         // mid = 0.5 → Standard, but claiming Guardian
         let (_, _, tc, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.4, upper: 0.59 },
+            &TrustScoreRange {
+                lower: 0.4,
+                upper: 0.59,
+            },
             &TrustTier::Guardian,
             &[1],
         );
@@ -845,7 +879,10 @@ mod tests {
     fn verify_tier_observer() {
         let (_, _, tc, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.0, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.0,
+                upper: 0.2,
+            },
             &TrustTier::Observer, // mid = 0.1 → Observer
             &[1],
         );
@@ -856,7 +893,10 @@ mod tests {
     fn verify_tier_guardian() {
         let (_, _, tc, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.85, upper: 0.95 },
+            &TrustScoreRange {
+                lower: 0.85,
+                upper: 0.95,
+            },
             &TrustTier::Guardian, // mid = 0.9 → Guardian
             &[1],
         );
@@ -867,7 +907,10 @@ mod tests {
     fn verify_tier_elevated() {
         let (_, _, tc, _) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.6, upper: 0.79 },
+            &TrustScoreRange {
+                lower: 0.6,
+                upper: 0.79,
+            },
             &TrustTier::Elevated, // mid = 0.695 → Elevated
             &[1],
         );
@@ -878,7 +921,10 @@ mod tests {
     fn verify_empty_proof() {
         let (_, _, _, pv) = verify_credential_pure(
             &valid_commitment(),
-            &TrustScoreRange { lower: 0.0, upper: 0.2 },
+            &TrustScoreRange {
+                lower: 0.0,
+                upper: 0.2,
+            },
             &TrustTier::Observer,
             &[],
         );
@@ -893,7 +939,10 @@ mod tests {
             issuer_did: "did:mycelix:bob".into(),
             kvector_commitment: valid_commitment(),
             range_proof: vec![1, 2, 3],
-            trust_score_range: TrustScoreRange { lower: 0.4, upper: 0.6 },
+            trust_score_range: TrustScoreRange {
+                lower: 0.4,
+                upper: 0.6,
+            },
             trust_tier: TrustTier::Standard,
             issued_at: Timestamp::from_micros(1_000_000),
             expires_at: None,
@@ -933,7 +982,10 @@ mod tests {
             credential_id: "trust-cred:alice:456".into(),
             subject_did: "did:mycelix:alice".into(),
             disclosed_tier: TrustTier::Standard,
-            disclosed_range: Some(TrustScoreRange { lower: 0.4, upper: 0.6 }),
+            disclosed_range: Some(TrustScoreRange {
+                lower: 0.4,
+                upper: 0.6,
+            }),
             presentation_proof: vec![1, 2, 3],
             verifier_did: Some("did:mycelix:governance".into()),
             purpose: "voting eligibility".into(),
@@ -973,32 +1025,43 @@ mod tests {
     #[test]
     fn verify_credential_pure_rejects_nan_scores() {
         let commitment = vec![1u8; 32];
-        let range = TrustScoreRange { lower: f32::NAN, upper: 0.5 };
-        let (_, range_valid, _, _) = verify_credential_pure(
-            &commitment, &range, &TrustTier::Basic, &[1, 2, 3],
-        );
+        let range = TrustScoreRange {
+            lower: f32::NAN,
+            upper: 0.5,
+        };
+        let (_, range_valid, _, _) =
+            verify_credential_pure(&commitment, &range, &TrustTier::Basic, &[1, 2, 3]);
         assert!(!range_valid, "NaN lower should fail range validation");
 
-        let range2 = TrustScoreRange { lower: 0.3, upper: f32::NAN };
-        let (_, range_valid2, _, _) = verify_credential_pure(
-            &commitment, &range2, &TrustTier::Basic, &[1, 2, 3],
-        );
+        let range2 = TrustScoreRange {
+            lower: 0.3,
+            upper: f32::NAN,
+        };
+        let (_, range_valid2, _, _) =
+            verify_credential_pure(&commitment, &range2, &TrustTier::Basic, &[1, 2, 3]);
         assert!(!range_valid2, "NaN upper should fail range validation");
     }
 
     #[test]
     fn verify_credential_pure_rejects_infinity_scores() {
         let commitment = vec![1u8; 32];
-        let range = TrustScoreRange { lower: f32::INFINITY, upper: 0.5 };
-        let (_, range_valid, _, _) = verify_credential_pure(
-            &commitment, &range, &TrustTier::Basic, &[1, 2, 3],
-        );
+        let range = TrustScoreRange {
+            lower: f32::INFINITY,
+            upper: 0.5,
+        };
+        let (_, range_valid, _, _) =
+            verify_credential_pure(&commitment, &range, &TrustTier::Basic, &[1, 2, 3]);
         assert!(!range_valid, "Infinity lower should fail range validation");
 
-        let range2 = TrustScoreRange { lower: 0.3, upper: f32::NEG_INFINITY };
-        let (_, range_valid2, _, _) = verify_credential_pure(
-            &commitment, &range2, &TrustTier::Basic, &[1, 2, 3],
+        let range2 = TrustScoreRange {
+            lower: 0.3,
+            upper: f32::NEG_INFINITY,
+        };
+        let (_, range_valid2, _, _) =
+            verify_credential_pure(&commitment, &range2, &TrustTier::Basic, &[1, 2, 3]);
+        assert!(
+            !range_valid2,
+            "Negative infinity upper should fail range validation"
         );
-        assert!(!range_valid2, "Negative infinity upper should fail range validation");
     }
 }

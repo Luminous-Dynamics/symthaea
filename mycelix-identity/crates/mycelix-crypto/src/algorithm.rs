@@ -107,8 +107,8 @@ impl AlgorithmId {
     pub const fn signature_size(&self) -> usize {
         match self {
             Self::Ed25519 => 64,
-            Self::MlDsa65 => 3309,   // FIPS 204 ML-DSA-65
-            Self::MlDsa87 => 4627,   // FIPS 204 ML-DSA-87
+            Self::MlDsa65 => 3309, // FIPS 204 ML-DSA-65
+            Self::MlDsa87 => 4627, // FIPS 204 ML-DSA-87
             Self::SlhDsaSha2_128s | Self::SlhDsaShake128s => 7856,
             Self::HybridEd25519MlDsa65 => 64 + 3309, // Ed25519 sig || ML-DSA-65 sig
             Self::MlKem768 | Self::MlKem1024 | Self::XChaCha20Poly1305 => 0,
@@ -174,7 +174,10 @@ mod tests {
     fn ed25519_constants() {
         let alg = AlgorithmId::Ed25519;
         assert_eq!(alg.multicodec_prefix(), [0xed, 0x01]);
-        assert_eq!(alg.did_verification_method_type(), "Ed25519VerificationKey2020");
+        assert_eq!(
+            alg.did_verification_method_type(),
+            "Ed25519VerificationKey2020"
+        );
         assert_eq!(alg.cryptosuite(), "eddsa-rdfc-2022");
         assert_eq!(alg.public_key_size(), 32);
         assert_eq!(alg.signature_size(), 64);

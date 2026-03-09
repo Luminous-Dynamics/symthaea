@@ -8,8 +8,8 @@
 //!
 //! Part of the Mycelix Identity system.
 
-use hdk::prelude::*;
 use education_integrity::*;
+use hdk::prelude::*;
 
 // ============================================================================
 // Credential Issuance
@@ -131,7 +131,9 @@ pub fn create_academic_credential(
 
 /// Get academic credential by action hash
 #[hdk_extern]
-pub fn get_academic_credential(action_hash: ActionHash) -> ExternResult<Option<AcademicCredential>> {
+pub fn get_academic_credential(
+    action_hash: ActionHash,
+) -> ExternResult<Option<AcademicCredential>> {
     match get(action_hash, GetOptions::default())? {
         Some(record) => {
             let credential: AcademicCredential = record
@@ -154,7 +156,10 @@ pub fn get_credentials_by_institution(institution_did: String) -> ExternResult<V
         GetStrategy::default(),
     )?;
 
-    Ok(links.into_iter().filter_map(|l| ActionHash::try_from(l.target).ok()).collect())
+    Ok(links
+        .into_iter()
+        .filter_map(|l| ActionHash::try_from(l.target).ok())
+        .collect())
 }
 
 /// Get credentials by subject DID
@@ -166,7 +171,10 @@ pub fn get_credentials_by_subject(subject_did: String) -> ExternResult<Vec<Actio
         GetStrategy::default(),
     )?;
 
-    Ok(links.into_iter().filter_map(|l| ActionHash::try_from(l.target).ok()).collect())
+    Ok(links
+        .into_iter()
+        .filter_map(|l| ActionHash::try_from(l.target).ok())
+        .collect())
 }
 
 // ============================================================================
@@ -473,7 +481,11 @@ pub fn record_dns_did_verification(
         dnssec_status: input.dnssec_status,
         resolved_did: input.resolved_did,
         verification_record,
-        error: if verified { None } else { Some("DID mismatch".to_string()) },
+        error: if verified {
+            None
+        } else {
+            Some("DID mismatch".to_string())
+        },
     })
 }
 
@@ -491,9 +503,7 @@ pub struct RequestRevocationInput {
 }
 
 #[hdk_extern]
-pub fn request_academic_revocation(
-    input: RequestRevocationInput,
-) -> ExternResult<ActionHash> {
+pub fn request_academic_revocation(input: RequestRevocationInput) -> ExternResult<ActionHash> {
     let agent_info = agent_info()?;
     let requester_did = format!("did:key:{}", agent_info.agent_initial_pubkey);
 
@@ -606,7 +616,9 @@ fn generate_batch_id() -> ExternResult<String> {
     let hash = hasher.finalize();
 
     let bytes: [u8; 8] = hash[0..8].try_into().map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest("Hash slice conversion failed".to_string()))
+        wasm_error!(WasmErrorInner::Guest(
+            "Hash slice conversion failed".to_string()
+        ))
     })?;
     Ok(format!("batch-{:016x}", u64::from_le_bytes(bytes)))
 }
@@ -674,9 +686,7 @@ pub fn publish_credential_as_epistemic_claim(
 ) -> ExternResult<PublishCredentialAsClaimOutput> {
     // Retrieve the credential
     let credential = get_academic_credential(input.credential_action_hash.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Credential not found".to_string()
-        )))?;
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Credential not found".to_string())))?;
 
     // Build the knowledge graph triple
     let subject = credential.credential_subject.id.clone();
@@ -692,15 +702,13 @@ pub fn publish_credential_as_epistemic_claim(
         "issuer_did": credential.issuer.id,
         "credential_id": credential.id,
         "schema": credential.mycelix_schema_id,
-    }).to_string();
+    })
+    .to_string();
 
     let now = sys_time()?;
 
     // Generate a deterministic claim ID
-    let claim_id = format!(
-        "ext:mycelix-identity:{}:{}",
-        subject, now.as_micros()
-    );
+    let claim_id = format!("ext:mycelix-identity:{}:{}", subject, now.as_micros());
 
     // Store the epistemic claim reference locally
     let claim_ref = EpistemicClaimReference {
@@ -761,13 +769,22 @@ pub fn publish_credential_as_epistemic_claim(
         bridge_input,
     ) {
         Ok(ZomeCallResponse::Ok(_)) => {
-            debug!("Successfully registered credential {} as epistemic claim in knowledge bridge", credential.id);
+            debug!(
+                "Successfully registered credential {} as epistemic claim in knowledge bridge",
+                credential.id
+            );
         }
         Ok(other) => {
-            debug!("Knowledge bridge call returned non-OK: {:?} (claim stored locally)", other);
+            debug!(
+                "Knowledge bridge call returned non-OK: {:?} (claim stored locally)",
+                other
+            );
         }
         Err(e) => {
-            debug!("Knowledge bridge not available: {} (claim stored locally for later sync)", e);
+            debug!(
+                "Knowledge bridge not available: {} (claim stored locally for later sync)",
+                e
+            );
         }
     }
 
@@ -878,9 +895,18 @@ mod tests {
 
     #[test]
     fn parse_bachelor_variants() {
-        assert_eq!(parse_degree_type("Bachelor of Science"), DegreeType::Bachelor);
-        assert_eq!(parse_degree_type("B.S. in Computer Science"), DegreeType::Bachelor);
-        assert_eq!(parse_degree_type("B.A. English Literature"), DegreeType::Bachelor);
+        assert_eq!(
+            parse_degree_type("Bachelor of Science"),
+            DegreeType::Bachelor
+        );
+        assert_eq!(
+            parse_degree_type("B.S. in Computer Science"),
+            DegreeType::Bachelor
+        );
+        assert_eq!(
+            parse_degree_type("B.A. English Literature"),
+            DegreeType::Bachelor
+        );
         assert_eq!(parse_degree_type("BACHELOR"), DegreeType::Bachelor);
     }
 
@@ -893,34 +919,61 @@ mod tests {
 
     #[test]
     fn parse_doctorate_variants() {
-        assert_eq!(parse_degree_type("Doctor of Philosophy"), DegreeType::Doctorate);
-        assert_eq!(parse_degree_type("Ph.D. in Mathematics"), DegreeType::Doctorate);
-        assert_eq!(parse_degree_type("PhD Computer Science"), DegreeType::Doctorate);
+        assert_eq!(
+            parse_degree_type("Doctor of Philosophy"),
+            DegreeType::Doctorate
+        );
+        assert_eq!(
+            parse_degree_type("Ph.D. in Mathematics"),
+            DegreeType::Doctorate
+        );
+        assert_eq!(
+            parse_degree_type("PhD Computer Science"),
+            DegreeType::Doctorate
+        );
     }
 
     #[test]
     fn parse_associate() {
-        assert_eq!(parse_degree_type("Associate of Science"), DegreeType::Associate);
+        assert_eq!(
+            parse_degree_type("Associate of Science"),
+            DegreeType::Associate
+        );
         assert_eq!(parse_degree_type("A.S. Nursing"), DegreeType::Associate);
-        assert_eq!(parse_degree_type("A.A. Liberal Arts"), DegreeType::Associate);
+        assert_eq!(
+            parse_degree_type("A.A. Liberal Arts"),
+            DegreeType::Associate
+        );
     }
 
     #[test]
     fn parse_certificate() {
-        assert_eq!(parse_degree_type("Certificate in Data Analytics"), DegreeType::Certificate);
+        assert_eq!(
+            parse_degree_type("Certificate in Data Analytics"),
+            DegreeType::Certificate
+        );
     }
 
     #[test]
     fn parse_high_school() {
-        assert_eq!(parse_degree_type("High School Diploma"), DegreeType::HighSchool);
-        assert_eq!(parse_degree_type("Diploma from High School"), DegreeType::HighSchool);
+        assert_eq!(
+            parse_degree_type("High School Diploma"),
+            DegreeType::HighSchool
+        );
+        assert_eq!(
+            parse_degree_type("Diploma from High School"),
+            DegreeType::HighSchool
+        );
     }
 
     #[test]
     fn parse_professional() {
         assert_eq!(parse_degree_type("J.D. Law"), DegreeType::Professional);
         assert_eq!(parse_degree_type("M.D. Medicine"), DegreeType::Professional);
-        assert_eq!(parse_degree_type("Professional Degree"), DegreeType::Professional);
+        assert_eq!(
+            parse_degree_type("Professional Degree"),
+            DegreeType::Professional
+        );
     }
 
     #[test]

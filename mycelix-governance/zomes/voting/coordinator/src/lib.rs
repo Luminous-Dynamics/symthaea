@@ -125,7 +125,12 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// multiple times on the same proposal under different DIDs.
 fn enforce_agent_vote_limit(proposal_id: &str, vote_type: &str) -> ExternResult<AgentPubKey> {
     let caller = agent_info()?.agent_initial_pubkey;
-    let agent_key = format!("{}:{}:{}", vote_type, hex::encode(caller.get_raw_39()), proposal_id);
+    let agent_key = format!(
+        "{}:{}:{}",
+        vote_type,
+        hex::encode(caller.get_raw_39()),
+        proposal_id
+    );
     let existing = get_links(
         LinkQuery::try_new(anchor_hash(&agent_key)?, LinkTypes::VoterToVote)?,
         GetStrategy::default(),
@@ -139,9 +144,18 @@ fn enforce_agent_vote_limit(proposal_id: &str, vote_type: &str) -> ExternResult<
 }
 
 /// Record agent's vote for dedup tracking (call after creating vote entry)
-fn record_agent_vote(proposal_id: &str, vote_type: &str, vote_hash: ActionHash) -> ExternResult<()> {
+fn record_agent_vote(
+    proposal_id: &str,
+    vote_type: &str,
+    vote_hash: ActionHash,
+) -> ExternResult<()> {
     let caller = agent_info()?.agent_initial_pubkey;
-    let agent_key = format!("{}:{}:{}", vote_type, hex::encode(caller.get_raw_39()), proposal_id);
+    let agent_key = format!(
+        "{}:{}:{}",
+        vote_type,
+        hex::encode(caller.get_raw_39()),
+        proposal_id
+    );
     create_entry(&EntryTypes::Anchor(Anchor(agent_key.clone())))?;
     create_link(
         anchor_hash(&agent_key)?,
@@ -174,7 +188,9 @@ fn verify_record_author(record: &Record) -> ExternResult<AgentPubKey> {
 /// could vote on expired proposals.
 fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
     if let Some(extern_io) = governance_utils::call_local_best_effort(
-        "proposals", "get_proposal", proposal_id.to_string(),
+        "proposals",
+        "get_proposal",
+        proposal_id.to_string(),
     )? {
         if let Ok(Some(record)) = extern_io.decode::<Option<Record>>() {
             if let Some(proposal) = record
@@ -200,7 +216,8 @@ fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
     }
     // Proposals zome unavailable or returned unparseable data — fail closed
     Err(wasm_error!(WasmErrorInner::Guest(
-        "Cannot verify voting period: proposals zome unavailable. Voting rejected (fail-closed).".into()
+        "Cannot verify voting period: proposals zome unavailable. Voting rejected (fail-closed)."
+            .into()
     )))
 }
 
@@ -222,14 +239,20 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if input.voter_did.is_empty() || input.voter_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must be 1-256 characters".into()
+        )));
     }
     if let Some(ref reason) = input.reason {
         if reason.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Reason must be at most 4096 characters".into()
+            )));
         }
     }
 
@@ -240,11 +263,15 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
     // Puppet accounts without consciousness assessment cannot vote.
     // This gates on identity verification + consciousness profile (4D: identity/reputation/community/engagement).
     if let Some(extern_io) = governance_utils::call_local_best_effort(
-        "governance_bridge", "verify_consciousness_gate",
+        "governance_bridge",
+        "verify_consciousness_gate",
         serde_json::json!({"action_type": "Voting", "action_id": input.proposal_id.clone()}),
     )? {
         if let Ok(result) = extern_io.decode::<serde_json::Value>() {
-            let has_credential = result.get("has_credential").and_then(|v| v.as_bool()).unwrap_or(false);
+            let has_credential = result
+                .get("has_credential")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             if !has_credential {
                 return Err(wasm_error!(WasmErrorInner::Guest(
                     "Voting requires a valid consciousness credential. Complete identity verification first.".into()
@@ -268,7 +295,9 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
         let ah = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah, GetOptions::default())? {
-            if let Some(existing_vote) = record.entry().to_app_option::<Vote>()
+            if let Some(existing_vote) = record
+                .entry()
+                .to_app_option::<Vote>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if existing_vote.proposal_id == input.proposal_id {
@@ -282,7 +311,12 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
     }
 
     let now = sys_time()?;
-    let vote_id = format!("vote:{}:{}:{}", input.proposal_id, input.voter_did, now.as_micros());
+    let vote_id = format!(
+        "vote:{}:{}:{}",
+        input.proposal_id,
+        input.voter_did,
+        now.as_micros()
+    );
 
     // Calculate vote weight (would integrate with MATL in production)
     let weight = calculate_vote_weight(&input.voter_did)?;
@@ -324,10 +358,9 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
     // Record agent-level vote binding for Sybil prevention
     record_agent_vote(&input.proposal_id, "agent_vote", action_hash.clone())?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find vote".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find vote".into()
+    )))
 }
 
 /// Input for casting a vote
@@ -390,7 +423,8 @@ pub fn compute_vote_weight(phi_weight: &PhiWeight) -> f64 {
         CONSCIOUSNESS_BASE + CONSCIOUSNESS_PHI_FACTOR * phi_weight.phi_score.clamp(0.0, 1.0)
     };
 
-    let participation_bonus = 1.0 + PARTICIPATION_FACTOR * phi_weight.participation_score.clamp(0.0, 1.0);
+    let participation_bonus =
+        1.0 + PARTICIPATION_FACTOR * phi_weight.participation_score.clamp(0.0, 1.0);
 
     // Domain boundary enforcement: stake contributes at most 5% per Commons Charter
     let stake_modifier = 1.0 + STAKE_MAX_BONUS * phi_weight.stake_weight.clamp(0.0, 1.0);
@@ -433,7 +467,14 @@ pub fn compute_tally_result(
         && decisive_weight > 0.0
         && (votes_for / decisive_weight) >= approval_threshold;
 
-    (votes_for, votes_against, abstentions, total_weight, quorum_reached, approved)
+    (
+        votes_for,
+        votes_against,
+        abstentions,
+        total_weight,
+        quorum_reached,
+        approved,
+    )
 }
 
 /// Calculate vote weight using holistic weight calculation
@@ -456,14 +497,20 @@ fn calculate_vote_weight(voter_did: &str) -> ExternResult<f64> {
 pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if input.voter_did.is_empty() || input.voter_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must be 1-256 characters".into()
+        )));
     }
     if let Some(ref reason) = input.reason {
         if reason.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Reason must be at most 4096 characters".into()
+            )));
         }
     }
 
@@ -483,7 +530,9 @@ pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
         let ah = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah, GetOptions::default())? {
-            if let Some(existing_vote) = record.entry().to_app_option::<PhiWeightedVote>()
+            if let Some(existing_vote) = record
+                .entry()
+                .to_app_option::<PhiWeightedVote>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if existing_vote.proposal_id == input.proposal_id {
@@ -497,7 +546,12 @@ pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
     }
 
     let now = sys_time()?;
-    let vote_id = format!("phi_vote:{}:{}:{}", input.proposal_id, input.voter_did, now.as_micros());
+    let vote_id = format!(
+        "phi_vote:{}:{}:{}",
+        input.proposal_id,
+        input.voter_did,
+        now.as_micros()
+    );
 
     // Get voter's Φ weight (integrates with consciousness metrics bridge)
     let phi_weight = get_voter_phi_weight(&input.voter_did)?;
@@ -570,10 +624,9 @@ pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
         is_phi_weighted: true,
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find Φ-weighted vote".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find Φ-weighted vote".into()
+    )))
 }
 
 /// Input for casting a Φ-weighted vote
@@ -634,7 +687,10 @@ fn get_voter_phi_weight(voter_did: &str) -> ExternResult<PhiWeight> {
 fn query_consciousness_phi(voter_did: &str) -> ExternResult<(Option<f64>, PhiProvenance)> {
     // Phase A: Try cross-cluster call to personal_bridge for Phi credential
     if let Some(extern_io) = governance_utils::call_role_best_effort(
-        "personal", "personal_bridge", "present_phi_credential", (),
+        "personal",
+        "personal_bridge",
+        "present_phi_credential",
+        (),
     )? {
         if let Ok(presentation) = extern_io.decode::<serde_json::Value>() {
             if let Some(data_str) = presentation.get("disclosed_data").and_then(|d| d.as_str()) {
@@ -649,7 +705,8 @@ fn query_consciousness_phi(voter_did: &str) -> ExternResult<(Option<f64>, PhiPro
 
     // Phase B: Try local governance bridge for attestation/snapshot
     if let Some(extern_io) = governance_utils::call_local_best_effort(
-        "governance_bridge", "verify_consciousness_gate_v2",
+        "governance_bridge",
+        "verify_consciousness_gate_v2",
         serde_json::json!({"agent_did": voter_did, "action_type": "Voting"}),
     )? {
         if let Ok(gate) = extern_io.decode::<serde_json::Value>() {
@@ -680,7 +737,10 @@ fn query_consciousness_phi(voter_did: &str) -> ExternResult<(Option<f64>, PhiPro
 fn query_k_vector_trust(_voter_did: &str) -> ExternResult<f64> {
     // Try cross-cluster call to personal_bridge for K-vector credential
     if let Some(extern_io) = governance_utils::call_role_best_effort(
-        "personal", "personal_bridge", "present_k_vector", (),
+        "personal",
+        "personal_bridge",
+        "present_k_vector",
+        (),
     )? {
         if let Ok(presentation) = extern_io.decode::<serde_json::Value>() {
             if let Some(data_str) = presentation.get("disclosed_data").and_then(|d| d.as_str()) {
@@ -760,25 +820,28 @@ fn query_domain_reputation(_voter_did: &str) -> ExternResult<f64> {
 pub fn cast_delegated_phi_vote(input: CastDelegatedPhiVoteInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if input.delegate_did.is_empty() || input.delegate_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Delegate DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Delegate DID must be 1-256 characters".into()
+        )));
     }
     if let Some(ref reason) = input.reason {
         if reason.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Reason must be at most 4096 characters".into()
+            )));
         }
     }
 
     let now = sys_time()?;
 
     // Resolve delegation chain
-    let (effective_weight, delegation_chain) = resolve_delegation_chain(
-        &input.delegate_did,
-        &input.tier,
-        now,
-    )?;
+    let (effective_weight, delegation_chain) =
+        resolve_delegation_chain(&input.delegate_did, &input.tier, now)?;
 
     let vote_id = format!(
         "phi_delegated:{}:{}:{}",
@@ -817,10 +880,9 @@ pub fn cast_delegated_phi_vote(input: CastDelegatedPhiVoteInput) -> ExternResult
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find delegated Φ vote".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find delegated Φ vote".into()
+    )))
 }
 
 /// Input for casting a delegated Φ vote
@@ -879,7 +941,10 @@ fn resolve_delegation_chain_inner(
     // Get delegations pointing to this delegate
     let delegate_anchor = format!("delegate:{}", delegate_did);
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&delegate_anchor)?, LinkTypes::DelegateToDelegation)?,
+        LinkQuery::try_new(
+            anchor_hash(&delegate_anchor)?,
+            LinkTypes::DelegateToDelegation,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -970,17 +1035,23 @@ fn resolve_delegation_chain_inner(
 pub fn cast_quadratic_vote(input: CastQuadraticVoteInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     // Agent-level Sybil prevention: one agent, one quadratic vote per proposal
     let _caller = enforce_agent_vote_limit(&input.proposal_id, "agent_qv")?;
 
     if input.voter_did.is_empty() || input.voter_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must be 1-256 characters".into()
+        )));
     }
     if let Some(ref reason) = input.reason {
         if reason.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Reason must be at most 4096 characters".into()
+            )));
         }
     }
 
@@ -1043,10 +1114,9 @@ pub fn cast_quadratic_vote(input: CastQuadraticVoteInput) -> ExternResult<Record
     // Record agent-level vote binding for Sybil prevention
     record_agent_vote(&input.proposal_id, "agent_qv", action_hash.clone())?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find quadratic vote".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find quadratic vote".into()
+    )))
 }
 
 /// Input for casting a quadratic vote
@@ -1073,8 +1143,9 @@ fn get_voter_credits(voter_did: &str) -> ExternResult<VoiceCredits> {
     let mut best: Option<VoiceCredits> = None;
 
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into()))
+        })?;
 
         if let Some(record) = get(action_hash, GetOptions::default())? {
             if let Some(credits) = record
@@ -1113,8 +1184,9 @@ fn spend_voter_credits(voter_did: &str, amount: u64) -> ExternResult<()> {
 
     // Find the active credits entry and its action hash for update
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into()))
+        })?;
 
         if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
             if let Some(credits) = record
@@ -1156,20 +1228,28 @@ fn spend_voter_credits(voter_did: &str, amount: u64) -> ExternResult<()> {
 #[hdk_extern]
 pub fn allocate_voice_credits(input: AllocateCreditsInput) -> ExternResult<Record> {
     if input.owner_did.is_empty() || input.owner_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Owner DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Owner DID must be 1-256 characters".into()
+        )));
     }
     if input.amount == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credit amount must be at least 1".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credit amount must be at least 1".into()
+        )));
     }
     if input.amount > 10_000 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credit amount cannot exceed 10,000".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credit amount cannot exceed 10,000".into()
+        )));
     }
 
     let now = sys_time()?;
 
     // period_end must be in the future
     if input.period_end <= now {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credit period end must be in the future".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credit period end must be in the future".into()
+        )));
     }
 
     let credits = VoiceCredits {
@@ -1193,10 +1273,9 @@ pub fn allocate_voice_credits(input: AllocateCreditsInput) -> ExternResult<Recor
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find voice credits".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find voice credits".into()
+    )))
 }
 
 /// Input for allocating voice credits
@@ -1211,7 +1290,9 @@ pub struct AllocateCreditsInput {
 #[hdk_extern]
 pub fn query_voice_credits(voter_did: String) -> ExternResult<VoiceCredits> {
     if voter_did.is_empty() || voter_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must be 1-256 characters".into()
+        )));
     }
     get_voter_credits(&voter_did)
 }
@@ -1225,21 +1306,31 @@ pub fn query_voice_credits(voter_did: String) -> ExternResult<VoiceCredits> {
 pub fn create_delegation(input: CreateDelegationInput) -> ExternResult<Record> {
     // Input validation
     if input.delegator_did.is_empty() || input.delegator_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Delegator DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Delegator DID must be 1-256 characters".into()
+        )));
     }
     if input.delegate_did.is_empty() || input.delegate_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Delegate DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Delegate DID must be 1-256 characters".into()
+        )));
     }
     if input.delegator_did == input.delegate_did {
-        return Err(wasm_error!(WasmErrorInner::Guest("Cannot delegate to self".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot delegate to self".into()
+        )));
     }
     if input.percentage <= 0.0 || input.percentage > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Percentage must be between 0 (exclusive) and 1 (inclusive)".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Percentage must be between 0 (exclusive) and 1 (inclusive)".into()
+        )));
     }
     if let Some(ref topics) = input.topics {
         for topic in topics {
             if topic.is_empty() || topic.len() > 256 {
-                return Err(wasm_error!(WasmErrorInner::Guest("Topic must be 1-256 characters".into())));
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Topic must be 1-256 characters".into()
+                )));
             }
         }
     }
@@ -1285,10 +1376,9 @@ pub fn create_delegation(input: CreateDelegationInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find delegation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find delegation".into()
+    )))
 }
 
 /// Input for creating a delegation
@@ -1311,8 +1401,9 @@ pub fn renew_delegation(input: RenewDelegationInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Get current delegation
-    let original_record = get(input.original_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Delegation not found".into())))?;
+    let original_record = get(input.original_action_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Delegation not found".into())),
+    )?;
 
     // Authorization: only the original author can renew a delegation
     verify_record_author(&original_record)?;
@@ -1321,7 +1412,9 @@ pub fn renew_delegation(input: RenewDelegationInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid delegation".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid delegation".into()
+        )))?;
 
     // Reset renewal timestamp
     delegation.renewed = now;
@@ -1336,12 +1429,14 @@ pub fn renew_delegation(input: RenewDelegationInput) -> ExternResult<Record> {
         delegation.percentage = new_percentage;
     }
 
-    let action_hash = update_entry(input.original_action_hash, &EntryTypes::Delegation(delegation))?;
+    let action_hash = update_entry(
+        input.original_action_hash,
+        &EntryTypes::Delegation(delegation),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find renewed delegation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find renewed delegation".into()
+    )))
 }
 
 /// Input for renewing a delegation
@@ -1355,8 +1450,9 @@ pub struct RenewDelegationInput {
 #[hdk_extern]
 pub fn revoke_delegation(input: RevokeDelegationInput) -> ExternResult<Record> {
     // Get current delegation
-    let original_record = get(input.original_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Delegation not found".into())))?;
+    let original_record = get(input.original_action_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Delegation not found".into())),
+    )?;
 
     // Authorization: only the original author can revoke a delegation
     verify_record_author(&original_record)?;
@@ -1365,17 +1461,21 @@ pub fn revoke_delegation(input: RevokeDelegationInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid delegation".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid delegation".into()
+        )))?;
 
     // Mark as inactive
     delegation.active = false;
 
-    let action_hash = update_entry(input.original_action_hash, &EntryTypes::Delegation(delegation))?;
+    let action_hash = update_entry(
+        input.original_action_hash,
+        &EntryTypes::Delegation(delegation),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find revoked delegation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find revoked delegation".into()
+    )))
 }
 
 /// Input for revoking a delegation
@@ -1391,7 +1491,10 @@ pub fn get_effective_delegations(voter_did: String) -> ExternResult<Vec<Effectiv
     let delegator_anchor = format!("delegator:{}", voter_did);
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&delegator_anchor)?, LinkTypes::DelegatorToDelegation)?,
+        LinkQuery::try_new(
+            anchor_hash(&delegator_anchor)?,
+            LinkTypes::DelegatorToDelegation,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -1438,7 +1541,10 @@ pub struct EffectiveDelegation {
 #[hdk_extern]
 pub fn get_proposal_votes(proposal_id: String) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("proposal:{}", proposal_id))?, LinkTypes::ProposalToVote)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("proposal:{}", proposal_id))?,
+            LinkTypes::ProposalToVote,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -1470,19 +1576,29 @@ pub struct TallyVotesInput {
 #[hdk_extern]
 pub fn tally_votes(input: TallyVotesInput) -> ExternResult<Record> {
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
 
     let tier = input.tier.unwrap_or(ProposalTier::Major);
-    let quorum_threshold = input.quorum_override.unwrap_or_else(|| tier.quorum_requirement());
-    let approval_threshold = input.approval_override.unwrap_or_else(|| tier.approval_threshold());
+    let quorum_threshold = input
+        .quorum_override
+        .unwrap_or_else(|| tier.quorum_requirement());
+    let approval_threshold = input
+        .approval_override
+        .unwrap_or_else(|| tier.approval_threshold());
 
     // Validate overrides
     if quorum_threshold < 0.0 || quorum_threshold > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Quorum threshold must be between 0 and 1".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Quorum threshold must be between 0 and 1".into()
+        )));
     }
     if approval_threshold < 0.0 || approval_threshold > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Approval threshold must be between 0 and 1".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Approval threshold must be between 0 and 1".into()
+        )));
     }
 
     let vote_records = get_proposal_votes(input.proposal_id.clone())?;
@@ -1511,7 +1627,9 @@ pub fn tally_votes(input: TallyVotesInput) -> ExternResult<Record> {
 
     // Avoid division by zero when no decisive votes cast
     let decisive_weight = votes_for + votes_against;
-    let approved = quorum_reached && decisive_weight > 0.0 && (votes_for / decisive_weight) >= approval_threshold;
+    let approved = quorum_reached
+        && decisive_weight > 0.0
+        && (votes_for / decisive_weight) >= approval_threshold;
 
     let now = sys_time()?;
 
@@ -1539,17 +1657,18 @@ pub fn tally_votes(input: TallyVotesInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find tally".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find tally".into()
+    )))
 }
 
 /// Tally Φ-weighted votes for a proposal
 #[hdk_extern]
 pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
 
     let proposal_anchor = format!("phi_proposal:{}", input.proposal_id);
@@ -1649,7 +1768,11 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
     }
 
     let total_phi_weight = phi_votes_for + phi_votes_against + phi_abstentions;
-    let average_phi = if voter_count > 0 { total_phi / voter_count as f64 } else { 0.0 };
+    let average_phi = if voter_count > 0 {
+        total_phi / voter_count as f64
+    } else {
+        0.0
+    };
 
     // Get thresholds from tier
     let quorum_requirement = input.tier.quorum_requirement();
@@ -1760,7 +1883,9 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
             "new_status": "Approved",
         });
         let _ = governance_utils::call_local_best_effort(
-            "proposals", "update_proposal_status", status_input,
+            "proposals",
+            "update_proposal_status",
+            status_input,
         );
 
         // Emit signal requesting threshold signature from committee members
@@ -1776,7 +1901,9 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         // invalidate the tally — timelock can be created manually if needed.
         let duration_hours = input.tier.timelock_duration_hours();
         let proposal_actions = match governance_utils::call_local_best_effort(
-            "proposals", "get_proposal", input.proposal_id.clone(),
+            "proposals",
+            "get_proposal",
+            input.proposal_id.clone(),
         )? {
             Some(io) => {
                 if let Ok(Some(record)) = io.decode::<Option<Record>>() {
@@ -1801,7 +1928,9 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         });
 
         if let Some(_io) = governance_utils::call_local_best_effort(
-            "execution", "create_timelock", timelock_input,
+            "execution",
+            "create_timelock",
+            timelock_input,
         )? {
             let _ = emit_governance_signal(GovernanceSignal::TimelockCreated {
                 proposal_id: input.proposal_id.clone(),
@@ -1812,10 +1941,9 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         }
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find Φ-weighted tally".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find Φ-weighted tally".into()
+    )))
 }
 
 /// Input for tallying Φ-weighted votes
@@ -1832,12 +1960,17 @@ pub struct TallyPhiVotesInput {
 #[hdk_extern]
 pub fn tally_quadratic_votes(input: TallyQuadraticVotesInput) -> ExternResult<Record> {
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
 
     let proposal_anchor = format!("qv_proposal:{}", input.proposal_id);
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToQuadraticVote)?,
+        LinkQuery::try_new(
+            anchor_hash(&proposal_anchor)?,
+            LinkTypes::ProposalToQuadraticVote,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -1905,10 +2038,9 @@ pub fn tally_quadratic_votes(input: TallyQuadraticVotesInput) -> ExternResult<Re
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find quadratic tally".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find quadratic tally".into()
+    )))
 }
 
 /// Input for tallying quadratic votes
@@ -1922,7 +2054,10 @@ pub struct TallyQuadraticVotesInput {
 #[hdk_extern]
 pub fn get_proposal_tally(proposal_id: String) -> ExternResult<Option<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("tally:{}", proposal_id))?, LinkTypes::ProposalToTally)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("tally:{}", proposal_id))?,
+            LinkTypes::ProposalToTally,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -1944,7 +2079,10 @@ pub fn get_proposal_tally(proposal_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_phi_tally(proposal_id: String) -> ExternResult<Option<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("phi_tally:{}", proposal_id))?, LinkTypes::ProposalToPhiTally)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("phi_tally:{}", proposal_id))?,
+            LinkTypes::ProposalToPhiTally,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -1966,7 +2104,10 @@ pub fn get_phi_tally(proposal_id: String) -> ExternResult<Option<Record>> {
 #[hdk_extern]
 pub fn get_quadratic_tally(proposal_id: String) -> ExternResult<Option<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&format!("qv_tally:{}", proposal_id))?, LinkTypes::ProposalToQuadraticTally)?,
+        LinkQuery::try_new(
+            anchor_hash(&format!("qv_tally:{}", proposal_id))?,
+            LinkTypes::ProposalToQuadraticTally,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -2006,22 +2147,28 @@ pub fn get_quadratic_tally(proposal_id: String) -> ExternResult<Option<Record>> 
 #[hdk_extern]
 pub fn store_eligibility_proof(input: StoreEligibilityProofInput) -> ExternResult<Record> {
     if input.voter_did.is_empty() || input.voter_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must be 1-256 characters".into()
+        )));
     }
     if input.voter_commitment.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter commitment must not be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter commitment must not be empty".into()
+        )));
     }
     if input.proof_bytes.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proof bytes must not be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proof bytes must not be empty".into()
+        )));
     }
 
     let now = sys_time()?;
     let proof_id = format!("eligibility:{}:{}", input.voter_did, now.as_micros());
 
     // Calculate expiration
-    let expires_at = input.validity_hours.map(|hours| {
-        Timestamp::from_micros(now.as_micros() + hours as i64 * 60 * 60 * 1_000_000)
-    });
+    let expires_at = input
+        .validity_hours
+        .map(|hours| Timestamp::from_micros(now.as_micros() + hours as i64 * 60 * 60 * 1_000_000));
 
     let proof = EligibilityProof {
         id: proof_id,
@@ -2048,10 +2195,9 @@ pub fn store_eligibility_proof(input: StoreEligibilityProofInput) -> ExternResul
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find stored proof".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find stored proof".into()
+    )))
 }
 
 /// Input for storing an eligibility proof
@@ -2094,27 +2240,34 @@ pub struct StoreEligibilityProofInput {
 pub fn cast_verified_vote(input: CastVerifiedVoteInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if input.voter_did.is_empty() || input.voter_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must be 1-256 characters".into()
+        )));
     }
     if input.voter_commitment.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter commitment must not be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter commitment must not be empty".into()
+        )));
     }
     if let Some(ref reason) = input.reason {
         if reason.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Reason must be at most 4096 characters".into()
+            )));
         }
     }
 
     let now = sys_time()?;
 
     // Fetch the eligibility proof
-    let proof_record = get(input.eligibility_proof_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Eligibility proof not found".into()
-        )))?;
+    let proof_record = get(input.eligibility_proof_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Eligibility proof not found".into())),
+    )?;
 
     let proof: EligibilityProof = proof_record
         .entry()
@@ -2208,10 +2361,9 @@ pub fn cast_verified_vote(input: CastVerifiedVoteInput) -> ExternResult<Record> 
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find verified vote".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find verified vote".into()
+    )))
 }
 
 /// Input for casting a verified vote
@@ -2262,7 +2414,10 @@ pub fn get_verified_votes(proposal_id: String) -> ExternResult<Vec<Record>> {
     let proposal_anchor = format!("verified_proposal:{}", proposal_id);
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToVerifiedVote)?,
+        LinkQuery::try_new(
+            anchor_hash(&proposal_anchor)?,
+            LinkTypes::ProposalToVerifiedVote,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -2285,7 +2440,10 @@ pub fn get_voter_proofs(voter_did: String) -> ExternResult<Vec<Record>> {
     let voter_anchor = format!("voter_proofs:{}", voter_did);
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&voter_anchor)?, LinkTypes::VoterToEligibilityProof)?,
+        LinkQuery::try_new(
+            anchor_hash(&voter_anchor)?,
+            LinkTypes::VoterToEligibilityProof,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -2423,29 +2581,42 @@ pub struct VerifiedVoteTally {
 pub fn store_proof_attestation(input: StoreAttestationInput) -> ExternResult<Record> {
     // Input validation
     if input.proof_hash.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proof hash must not be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proof hash must not be empty".into()
+        )));
     }
     if input.voter_commitment.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter commitment must not be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter commitment must not be empty".into()
+        )));
     }
     if input.verifier_pubkey.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Verifier pubkey must not be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Verifier pubkey must not be empty".into()
+        )));
     }
     if input.signature.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Signature must not be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Signature must not be empty".into()
+        )));
     }
     if input.security_level.is_empty() || input.security_level.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Security level must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Security level must be 1-256 characters".into()
+        )));
     }
 
     let now = sys_time()?;
-    let attestation_id = format!("attestation:{}:{}", hex::encode(&input.proof_hash[..8]), now.as_micros());
+    let attestation_id = format!(
+        "attestation:{}:{}",
+        hex::encode(&input.proof_hash[..8]),
+        now.as_micros()
+    );
 
     // Calculate expiration
     let validity_hours = input.validity_hours.unwrap_or(24);
-    let expires_at = Timestamp::from_micros(
-        now.as_micros() + validity_hours as i64 * 60 * 60 * 1_000_000
-    );
+    let expires_at =
+        Timestamp::from_micros(now.as_micros() + validity_hours as i64 * 60 * 60 * 1_000_000);
 
     let attestation = ProofAttestation {
         id: attestation_id,
@@ -2482,10 +2653,9 @@ pub fn store_proof_attestation(input: StoreAttestationInput) -> ExternResult<Rec
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find stored attestation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find stored attestation".into()
+    )))
 }
 
 /// Input for storing a proof attestation
@@ -2551,7 +2721,10 @@ pub fn get_verifier_attestations(verifier_pubkey: Vec<u8>) -> ExternResult<Vec<R
     let verifier_anchor = format!("verifier:{}", hex::encode(&verifier_pubkey));
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&verifier_anchor)?, LinkTypes::VerifierToAttestation)?,
+        LinkQuery::try_new(
+            anchor_hash(&verifier_anchor)?,
+            LinkTypes::VerifierToAttestation,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -2577,17 +2750,25 @@ pub fn get_verifier_attestations(verifier_pubkey: Vec<u8>) -> ExternResult<Vec<R
 pub fn cast_attested_vote(input: CastAttestedVoteInput) -> ExternResult<Record> {
     // Input validation
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proposal ID must be 1-256 characters".into()
+        )));
     }
     if input.voter_did.is_empty() || input.voter_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter DID must be 1-256 characters".into()
+        )));
     }
     if input.voter_commitment.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Voter commitment must not be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter commitment must not be empty".into()
+        )));
     }
     if let Some(ref reason) = input.reason {
         if reason.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Reason must be at most 4096 characters".into()
+            )));
         }
     }
 
@@ -2596,15 +2777,15 @@ pub fn cast_attested_vote(input: CastAttestedVoteInput) -> ExternResult<Record> 
     // First check that the proof has a valid attestation
     if !has_valid_attestation(input.eligibility_proof_hash.clone())? {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Proof does not have a valid attestation - wait for verifier or request verification".into()
+            "Proof does not have a valid attestation - wait for verifier or request verification"
+                .into()
         )));
     }
 
     // Fetch the eligibility proof
-    let proof_record = get(input.eligibility_proof_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Eligibility proof not found".into()
-        )))?;
+    let proof_record = get(input.eligibility_proof_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Eligibility proof not found".into())),
+    )?;
 
     let proof: EligibilityProof = proof_record
         .entry()
@@ -2696,10 +2877,9 @@ pub fn cast_attested_vote(input: CastAttestedVoteInput) -> ExternResult<Record> 
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find attested vote".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find attested vote".into()
+    )))
 }
 
 /// Input for casting an attested vote
@@ -2725,9 +2905,8 @@ pub struct CastAttestedVoteInput {
 // not what SHOULD BE. They help the group see itself clearly.
 
 use mycelix_core_types::{
-    GovernanceAdapter, GovernanceVoter, GovernanceVote,
-    VoteChoice as CoreVoteChoice, EchoChamberRisk, TopologyType, TrendDirection as CoreTrend,
-    Harmony,
+    EchoChamberRisk, GovernanceAdapter, GovernanceVote, GovernanceVoter, Harmony, TopologyType,
+    TrendDirection as CoreTrend, VoteChoice as CoreVoteChoice,
 };
 
 /// Generate a collective mirror reflection for a proposal
@@ -2756,28 +2935,34 @@ pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record
     let votes = gather_proposal_votes(&input.proposal_id)?;
 
     // Convert to CollectiveMirror format
-    let gov_voters: Vec<GovernanceVoter> = voters.iter().map(|v| GovernanceVoter {
-        did: v.voter.clone(),
-        phi: v.phi_weight.phi_score,
-        k_trust: v.phi_weight.k_trust,
-        stake_weight: v.phi_weight.stake_weight,
-        participation_score: v.phi_weight.participation_score,
-        domain_reputation: v.phi_weight.domain_reputation,
-        delegated_to: None, // Would need to look up from delegation entries
-        delegated_from: Vec::new(),
-    }).collect();
+    let gov_voters: Vec<GovernanceVoter> = voters
+        .iter()
+        .map(|v| GovernanceVoter {
+            did: v.voter.clone(),
+            phi: v.phi_weight.phi_score,
+            k_trust: v.phi_weight.k_trust,
+            stake_weight: v.phi_weight.stake_weight,
+            participation_score: v.phi_weight.participation_score,
+            domain_reputation: v.phi_weight.domain_reputation,
+            delegated_to: None, // Would need to look up from delegation entries
+            delegated_from: Vec::new(),
+        })
+        .collect();
 
-    let gov_votes: Vec<GovernanceVote> = votes.iter().map(|v| GovernanceVote {
-        voter_did: v.voter.clone(),
-        choice: match v.choice {
-            VoteChoice::For => CoreVoteChoice::For,
-            VoteChoice::Against => CoreVoteChoice::Against,
-            VoteChoice::Abstain => CoreVoteChoice::Abstain,
-        },
-        effective_weight: v.effective_weight,
-        harmony_rationale: None, // Would need additional data
-        timestamp: v.voted_at.as_micros() as u64,
-    }).collect();
+    let gov_votes: Vec<GovernanceVote> = votes
+        .iter()
+        .map(|v| GovernanceVote {
+            voter_did: v.voter.clone(),
+            choice: match v.choice {
+                VoteChoice::For => CoreVoteChoice::For,
+                VoteChoice::Against => CoreVoteChoice::Against,
+                VoteChoice::Abstain => CoreVoteChoice::Abstain,
+            },
+            effective_weight: v.effective_weight,
+            harmony_rationale: None, // Would need additional data
+            timestamp: v.voted_at.as_micros() as u64,
+        })
+        .collect();
 
     // Run the full CollectiveMirror analysis
     let core_reflection = GovernanceAdapter::analyze_proposal_voting(
@@ -2791,7 +2976,10 @@ pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record
     let reflection_id = format!("reflection:{}:{}", input.proposal_id, now.as_micros());
 
     // Extract absent harmonies - filter those with presence < 0.3
-    let absent_harmonies: Vec<String> = core_reflection.group_reflection.shadow.absent_harmonies
+    let absent_harmonies: Vec<String> = core_reflection
+        .group_reflection
+        .shadow
+        .absent_harmonies
         .iter()
         .filter(|ah| ah.presence < 0.3)
         .map(|ah| harmony_to_string(&ah.harmony))
@@ -2799,7 +2987,10 @@ pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record
 
     // Calculate harmony coverage from absent_harmonies
     let total_harmonies = 8.0; // The Eight Harmonies
-    let absent_count = core_reflection.group_reflection.shadow.absent_harmonies
+    let absent_count = core_reflection
+        .group_reflection
+        .shadow
+        .absent_harmonies
         .iter()
         .filter(|ah| ah.presence < 0.3)
         .count() as f64;
@@ -2807,7 +2998,10 @@ pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record
 
     // Determine if agreement is verified (inverse of echo chamber risk)
     let agreement_verified = matches!(
-        core_reflection.group_reflection.signal_integrity.echo_chamber_risk,
+        core_reflection
+            .group_reflection
+            .signal_integrity
+            .echo_chamber_risk,
         EchoChamberRisk::Low
     );
 
@@ -2818,24 +3012,54 @@ pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record
         voter_count: gov_voters.len() as u64,
 
         // Topology
-        topology_pattern: convert_topology_type(&core_reflection.group_reflection.topology.topology_type),
+        topology_pattern: convert_topology_type(
+            &core_reflection.group_reflection.topology.topology_type,
+        ),
         centralization: core_reflection.group_reflection.topology.centralization,
-        cluster_count: core_reflection.group_reflection.topology.cluster_count.min(255) as u8,
+        cluster_count: core_reflection
+            .group_reflection
+            .topology
+            .cluster_count
+            .min(255) as u8,
 
         // Shadow
         absent_harmonies,
         harmony_coverage,
 
         // Signal Integrity
-        average_epistemic_level: core_reflection.group_reflection.signal_integrity.epistemic_level,
-        echo_chamber_risk: convert_echo_chamber_risk(&core_reflection.group_reflection.signal_integrity.echo_chamber_risk),
+        average_epistemic_level: core_reflection
+            .group_reflection
+            .signal_integrity
+            .epistemic_level,
+        echo_chamber_risk: convert_echo_chamber_risk(
+            &core_reflection
+                .group_reflection
+                .signal_integrity
+                .echo_chamber_risk,
+        ),
         agreement_verified,
 
         // Trajectory
-        agreement_trend: convert_trend_direction(&core_reflection.group_reflection.trajectory.agreement_direction),
-        centralization_trend: convert_trend_direction(&core_reflection.group_reflection.trajectory.centralization_direction),
-        rapid_convergence_warning: core_reflection.group_reflection.trajectory.rapid_convergence_warning,
-        fragmentation_warning: core_reflection.group_reflection.trajectory.fragmentation_warning,
+        agreement_trend: convert_trend_direction(
+            &core_reflection
+                .group_reflection
+                .trajectory
+                .agreement_direction,
+        ),
+        centralization_trend: convert_trend_direction(
+            &core_reflection
+                .group_reflection
+                .trajectory
+                .centralization_direction,
+        ),
+        rapid_convergence_warning: core_reflection
+            .group_reflection
+            .trajectory
+            .rapid_convergence_warning,
+        fragmentation_warning: core_reflection
+            .group_reflection
+            .trajectory
+            .fragmentation_warning,
 
         // Vote Summary
         votes_for: core_reflection.vote_summary.for_count as u64,
@@ -2845,7 +3069,8 @@ pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record
         polarization: core_reflection.vote_summary.polarization,
 
         // Prompts & Interventions
-        suggested_interventions: core_reflection.suggested_interventions
+        suggested_interventions: core_reflection
+            .suggested_interventions
             .iter()
             .map(|i| i.name.clone())
             .collect(),
@@ -2883,10 +3108,9 @@ pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record
         health_score: health_score_signal,
     });
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find stored reflection".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find stored reflection".into()
+    )))
 }
 
 /// Input for reflecting on a proposal
@@ -2901,7 +3125,10 @@ pub fn get_proposal_reflections(proposal_id: String) -> ExternResult<Vec<Record>
     let proposal_anchor = format!("reflection_proposal:{}", proposal_id);
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToReflection)?,
+        LinkQuery::try_new(
+            anchor_hash(&proposal_anchor)?,
+            LinkTypes::ProposalToReflection,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -3051,8 +3278,14 @@ mod tests {
     #[test]
     fn test_max_delegation_chain_depth_is_bounded() {
         // Safety: absolute depth limit prevents unbounded recursion
-        assert!(MAX_DELEGATION_CHAIN_DEPTH <= 20, "Chain depth limit should be reasonable");
-        assert!(MAX_DELEGATION_CHAIN_DEPTH >= 2, "Chain depth must allow at least 2 levels");
+        assert!(
+            MAX_DELEGATION_CHAIN_DEPTH <= 20,
+            "Chain depth limit should be reasonable"
+        );
+        assert!(
+            MAX_DELEGATION_CHAIN_DEPTH >= 2,
+            "Chain depth must allow at least 2 levels"
+        );
     }
 
     #[test]
@@ -3064,8 +3297,14 @@ mod tests {
         visited.insert("did:charlie".to_string());
 
         // If we encounter alice again, the visited check prevents infinite loop
-        assert!(visited.contains("did:alice"), "Cycle to alice should be detected");
-        assert!(!visited.contains("did:dave"), "Non-visited node should not be blocked");
+        assert!(
+            visited.contains("did:alice"),
+            "Cycle to alice should be detected"
+        );
+        assert!(
+            !visited.contains("did:dave"),
+            "Non-visited node should not be blocked"
+        );
     }
 
     #[test]
@@ -3075,7 +3314,11 @@ mod tests {
         for depth in 0..max_depth {
             assert!(depth < max_depth, "Depth {} should be allowed", depth);
         }
-        assert!(max_depth >= max_depth, "Depth {} should be blocked", max_depth);
+        assert!(
+            max_depth >= max_depth,
+            "Depth {} should be blocked",
+            max_depth
+        );
     }
 
     #[test]
@@ -3104,7 +3347,10 @@ mod tests {
         assert!((b_delegated - 0.5).abs() < 1e-10);
         assert!((c_transitive - 0.4).abs() < 1e-10);
         // Weight decays through chain — prevents infinite accumulation
-        assert!(c_transitive < b_delegated, "Transitive weight must attenuate");
+        assert!(
+            c_transitive < b_delegated,
+            "Transitive weight must attenuate"
+        );
     }
 
     #[test]
@@ -3115,7 +3361,10 @@ mod tests {
         visited.insert(delegate_did.to_string());
 
         // Self-delegation would be caught immediately
-        assert!(visited.contains(delegate_did), "Self-delegation must be prevented");
+        assert!(
+            visited.contains(delegate_did),
+            "Self-delegation must be prevented"
+        );
     }
 
     #[test]
@@ -3144,10 +3393,17 @@ mod tests {
         chain.push("did:C".to_string());
 
         // Step 4: Transitive - find A → C delegation — CYCLE DETECTED
-        assert!(visited.contains("did:A"), "Cycle back to A must be detected");
+        assert!(
+            visited.contains("did:A"),
+            "Cycle back to A must be detected"
+        );
         // The cycle is broken — A is not double-counted
 
-        assert_eq!(chain.len(), 3, "Chain should contain A, B, C (no duplicates)");
+        assert_eq!(
+            chain.len(),
+            3,
+            "Chain should contain A, B, C (no duplicates)"
+        );
     }
 
     #[test]
@@ -3173,7 +3429,10 @@ mod tests {
         assert_eq!(after_spend.remaining, 75);
         assert_eq!(after_spend.allocated, 100);
         // Integrity invariant: remaining == allocated - spent
-        assert_eq!(after_spend.remaining, after_spend.allocated - after_spend.spent);
+        assert_eq!(
+            after_spend.remaining,
+            after_spend.allocated - after_spend.spent
+        );
     }
 
     #[test]
@@ -3202,10 +3461,20 @@ mod tests {
         assert!((ProposalTier::Constitutional.approval_threshold() - 0.67).abs() < 1e-10);
 
         // Ensure ordering: Constitutional > Major > Basic for both thresholds
-        assert!(ProposalTier::Constitutional.quorum_requirement() > ProposalTier::Major.quorum_requirement());
-        assert!(ProposalTier::Major.quorum_requirement() > ProposalTier::Basic.quorum_requirement());
-        assert!(ProposalTier::Constitutional.approval_threshold() > ProposalTier::Major.approval_threshold());
-        assert!(ProposalTier::Major.approval_threshold() > ProposalTier::Basic.approval_threshold());
+        assert!(
+            ProposalTier::Constitutional.quorum_requirement()
+                > ProposalTier::Major.quorum_requirement()
+        );
+        assert!(
+            ProposalTier::Major.quorum_requirement() > ProposalTier::Basic.quorum_requirement()
+        );
+        assert!(
+            ProposalTier::Constitutional.approval_threshold()
+                > ProposalTier::Major.approval_threshold()
+        );
+        assert!(
+            ProposalTier::Major.approval_threshold() > ProposalTier::Basic.approval_threshold()
+        );
     }
 
     #[test]
@@ -3228,7 +3497,10 @@ mod tests {
             ..expired.clone()
         };
 
-        assert!(expired.period_end <= now, "Expired credits should be filtered out");
+        assert!(
+            expired.period_end <= now,
+            "Expired credits should be filtered out"
+        );
         assert!(active.period_end > now, "Active credits should be returned");
     }
 
@@ -3247,7 +3519,12 @@ mod tests {
         }
     }
 
-    fn make_phi_weight_unavailable(k: f64, stake: f64, participation: f64, domain: f64) -> PhiWeight {
+    fn make_phi_weight_unavailable(
+        k: f64,
+        stake: f64,
+        participation: f64,
+        domain: f64,
+    ) -> PhiWeight {
         PhiWeight {
             phi_score: 0.0,
             phi_provenance: PhiProvenance::Unavailable,
@@ -3264,7 +3541,11 @@ mod tests {
         // phi=0.1, provenance=Unavailable, k=0.1, stake=0, participation=0, domain=0
         // 0.1² × 1.0 (neutral — Unavailable) × 1.0 × 1.0 × 1.0 = 0.01
         // Floored to 0.1 by minimum clamp
-        assert!((w - 0.1).abs() < 1e-10, "Default participant should get minimum weight 0.1, got {}", w);
+        assert!(
+            (w - 0.1).abs() < 1e-10,
+            "Default participant should get minimum weight 0.1, got {}",
+            w
+        );
     }
 
     #[test]
@@ -3276,7 +3557,11 @@ mod tests {
         // stake_modifier = 1.0 + 0.05×0.5 = 1.025
         // domain_modifier = 1.0 + 0.1×0.6 = 1.06
         // 0.64 × 0.97 × 1.07 × 1.025 × 1.06 ≈ 0.7221...
-        assert!(w > 0.7 && w < 0.8, "High consciousness voter should get ~0.72, got {}", w);
+        assert!(
+            w > 0.7 && w < 0.8,
+            "High consciousness voter should get ~0.72, got {}",
+            w
+        );
         assert!(w <= MAX_VOTING_WEIGHT, "Should not exceed cap");
     }
 
@@ -3284,7 +3569,11 @@ mod tests {
     fn test_compute_vote_weight_maximum_everything() {
         let w = compute_vote_weight(&make_phi_weight(1.0, 1.0, 1.0, 1.0, 1.0));
         // 1.0 × 1.0 × 1.1 × 1.05 × 1.1 = 1.2705
-        assert!(w > 1.2 && w <= MAX_VOTING_WEIGHT, "Max voter should get ~1.27, got {}", w);
+        assert!(
+            w > 1.2 && w <= MAX_VOTING_WEIGHT,
+            "Max voter should get ~1.27, got {}",
+            w
+        );
     }
 
     #[test]
@@ -3293,7 +3582,10 @@ mod tests {
         // the same result as all-1.0 (theoretical max ~1.2705, well below cap)
         let w = compute_vote_weight(&make_phi_weight(5.0, 5.0, 5.0, 5.0, 5.0));
         let w_max = compute_vote_weight(&make_phi_weight(1.0, 1.0, 1.0, 1.0, 1.0));
-        assert!((w - w_max).abs() < 1e-10, "Out-of-range inputs should clamp to max valid");
+        assert!(
+            (w - w_max).abs() < 1e-10,
+            "Out-of-range inputs should clamp to max valid"
+        );
         assert!(w <= MAX_VOTING_WEIGHT, "Should never exceed cap");
     }
 
@@ -3301,7 +3593,10 @@ mod tests {
     fn test_compute_vote_weight_zero_reputation() {
         let w = compute_vote_weight(&make_phi_weight(0.9, 0.0, 0.5, 0.5, 0.5));
         // reputation²=0, so everything multiplied by 0
-        assert!((w - 0.1).abs() < 1e-10, "Zero reputation should give minimum weight");
+        assert!(
+            (w - 0.1).abs() < 1e-10,
+            "Zero reputation should give minimum weight"
+        );
     }
 
     #[test]
@@ -3310,7 +3605,11 @@ mod tests {
         let high_stake = compute_vote_weight(&make_phi_weight(0.5, 0.8, 1.0, 0.5, 0.5));
         let ratio = high_stake / low_stake;
         // Stake modifier ranges from 1.0 to 1.05 — max 5% increase
-        assert!(ratio <= 1.06, "Stake should contribute at most ~5% bonus, ratio was {}", ratio);
+        assert!(
+            ratio <= 1.06,
+            "Stake should contribute at most ~5% bonus, ratio was {}",
+            ratio
+        );
     }
 
     #[test]
@@ -3319,7 +3618,11 @@ mod tests {
         let w = compute_vote_weight(&make_phi_weight_unavailable(0.8, 0.5, 0.7, 0.6));
         // reputation²=0.64, consciousness=1.0, participation=1.07, stake=1.025, domain=1.06
         // 0.64 × 1.0 × 1.07 × 1.025 × 1.06 ≈ 0.7443...
-        assert!(w > 0.7 && w < 0.8, "Unavailable phi should get ~0.74 (neutral consciousness), got {}", w);
+        assert!(
+            w > 0.7 && w < 0.8,
+            "Unavailable phi should get ~0.74 (neutral consciousness), got {}",
+            w
+        );
     }
 
     #[test]
@@ -3330,8 +3633,10 @@ mod tests {
         // Attested: consciousness_multiplier = 0.7 + 0.3×0.9 = 0.97
         // Unavailable: consciousness_multiplier = 1.0
         // Both are reasonable weights; unavailable is actually slightly higher because 1.0 > 0.97
-        assert!((attested - unavailable).abs() > 0.001,
-            "Attested and unavailable should produce different weights");
+        assert!(
+            (attested - unavailable).abs() > 0.001,
+            "Attested and unavailable should produce different weights"
+        );
     }
 
     // ========================================================================
@@ -3356,10 +3661,7 @@ mod tests {
 
     #[test]
     fn test_tally_quorum_not_met() {
-        let votes = vec![
-            (VoteChoice::For, 0.3),
-            (VoteChoice::Against, 0.1),
-        ];
+        let votes = vec![(VoteChoice::For, 0.3), (VoteChoice::Against, 0.1)];
         let (_, _, _, _, quorum, approved) = compute_tally_result(&votes, 1.0, 0.5);
         assert!(!quorum, "Total weight 0.4 < quorum 1.0");
         assert!(!approved, "Cannot approve without quorum");
@@ -3367,10 +3669,7 @@ mod tests {
 
     #[test]
     fn test_tally_rejected() {
-        let votes = vec![
-            (VoteChoice::For, 0.2),
-            (VoteChoice::Against, 0.8),
-        ];
+        let votes = vec![(VoteChoice::For, 0.2), (VoteChoice::Against, 0.8)];
         let (_, _, _, _, quorum, approved) = compute_tally_result(&votes, 0.5, 0.5);
         assert!(quorum, "Total weight 1.0 >= quorum 0.5");
         assert!(!approved, "For 0.2 / 1.0 = 20% < 50%");
@@ -3378,10 +3677,7 @@ mod tests {
 
     #[test]
     fn test_tally_abstentions_dont_count_for_approval() {
-        let votes = vec![
-            (VoteChoice::For, 0.3),
-            (VoteChoice::Abstain, 10.0),
-        ];
+        let votes = vec![(VoteChoice::For, 0.3), (VoteChoice::Abstain, 10.0)];
         let (_, _, _, tw, quorum, approved) = compute_tally_result(&votes, 1.0, 0.5);
         assert!((tw - 10.3).abs() < 1e-10);
         assert!(quorum);
@@ -3401,17 +3697,11 @@ mod tests {
     #[test]
     fn test_tally_supermajority_threshold() {
         // 2/3 supermajority requirement (Constitutional tier)
-        let votes = vec![
-            (VoteChoice::For, 0.65),
-            (VoteChoice::Against, 0.35),
-        ];
+        let votes = vec![(VoteChoice::For, 0.65), (VoteChoice::Against, 0.35)];
         let (_, _, _, _, _, approved) = compute_tally_result(&votes, 0.5, 0.67);
         assert!(!approved, "65% < 67% supermajority");
 
-        let votes2 = vec![
-            (VoteChoice::For, 0.68),
-            (VoteChoice::Against, 0.32),
-        ];
+        let votes2 = vec![(VoteChoice::For, 0.68), (VoteChoice::Against, 0.32)];
         let (_, _, _, _, _, approved2) = compute_tally_result(&votes2, 0.5, 0.67);
         assert!(approved2, "68% >= 67% supermajority");
     }
@@ -3440,8 +3730,10 @@ mod tests {
         };
         let w_attested = compute_vote_weight(&attested);
         let w_snapshot = compute_vote_weight(&snapshot);
-        assert!((w_attested - w_snapshot).abs() < 1e-10,
-            "Attested and Snapshot with same Phi should produce identical weights");
+        assert!(
+            (w_attested - w_snapshot).abs() < 1e-10,
+            "Attested and Snapshot with same Phi should produce identical weights"
+        );
     }
 
     #[test]
@@ -3465,8 +3757,10 @@ mod tests {
         };
         let w1 = compute_vote_weight(&unavailable_with_phi);
         let w2 = compute_vote_weight(&unavailable_zero_phi);
-        assert!((w1 - w2).abs() < 1e-10,
-            "Unavailable provenance should produce same weight regardless of phi_score");
+        assert!(
+            (w1 - w2).abs() < 1e-10,
+            "Unavailable provenance should produce same weight regardless of phi_score"
+        );
     }
 
     #[test]
@@ -3481,8 +3775,10 @@ mod tests {
         // This is correct: the formula rewards participation+reputation, Phi modulates
         // But phi=1.0 would give 1.0 (same as neutral), so Phi > ~1.0 is needed to exceed
         // The key insight: unavailable is NOT penalized, it's neutral
-        assert!(w_high > 0.0 && w_neutral > 0.0,
-            "Both should produce positive weights");
+        assert!(
+            w_high > 0.0 && w_neutral > 0.0,
+            "Both should produce positive weights"
+        );
     }
 
     #[test]
@@ -3493,9 +3789,12 @@ mod tests {
         let w_low = compute_vote_weight(&low_phi);
         let w_neutral = compute_vote_weight(&unavailable);
         // consciousness_multiplier: 0.7 + 0.3×0.1 = 0.73 vs 1.0
-        assert!(w_low < w_neutral,
+        assert!(
+            w_low < w_neutral,
             "Low attested Phi (0.1) should produce lower weight than neutral ({} vs {})",
-            w_low, w_neutral);
+            w_low,
+            w_neutral
+        );
     }
 
     #[test]
@@ -3504,12 +3803,22 @@ mod tests {
         let voters: Vec<(PhiWeight, VoteChoice)> = vec![
             (make_phi_weight(0.8, 0.9, 0.5, 0.7, 0.6), VoteChoice::For),
             (make_phi_weight(0.6, 0.7, 0.3, 0.5, 0.4), VoteChoice::For),
-            (make_phi_weight(0.3, 0.5, 0.2, 0.4, 0.3), VoteChoice::Against),
-            (make_phi_weight_unavailable(0.8, 0.4, 0.6, 0.5), VoteChoice::For),
-            (make_phi_weight_unavailable(0.6, 0.3, 0.5, 0.4), VoteChoice::Against),
+            (
+                make_phi_weight(0.3, 0.5, 0.2, 0.4, 0.3),
+                VoteChoice::Against,
+            ),
+            (
+                make_phi_weight_unavailable(0.8, 0.4, 0.6, 0.5),
+                VoteChoice::For,
+            ),
+            (
+                make_phi_weight_unavailable(0.6, 0.3, 0.5, 0.4),
+                VoteChoice::Against,
+            ),
         ];
 
-        let weighted_votes: Vec<(VoteChoice, f64)> = voters.iter()
+        let weighted_votes: Vec<(VoteChoice, f64)> = voters
+            .iter()
             .map(|(pw, choice)| (choice.clone(), compute_vote_weight(pw)))
             .collect();
 
@@ -3521,8 +3830,14 @@ mod tests {
         assert!(va > 0.0, "Against votes should have positive weight");
 
         // Count provenance: 3 attested, 2 unavailable → phi_coverage = 0.6
-        let enhanced = voters.iter().filter(|(pw, _)| pw.phi_provenance != PhiProvenance::Unavailable).count();
-        let reputation_only = voters.iter().filter(|(pw, _)| pw.phi_provenance == PhiProvenance::Unavailable).count();
+        let enhanced = voters
+            .iter()
+            .filter(|(pw, _)| pw.phi_provenance != PhiProvenance::Unavailable)
+            .count();
+        let reputation_only = voters
+            .iter()
+            .filter(|(pw, _)| pw.phi_provenance == PhiProvenance::Unavailable)
+            .count();
         assert_eq!(enhanced, 3);
         assert_eq!(reputation_only, 2);
         let coverage = enhanced as f64 / voters.len() as f64;
@@ -3533,9 +3848,18 @@ mod tests {
     fn test_provenance_all_unavailable_still_works() {
         // Governance should function even with zero Phi data
         let voters: Vec<(VoteChoice, f64)> = vec![
-            (VoteChoice::For, compute_vote_weight(&make_phi_weight_unavailable(0.9, 0.5, 0.8, 0.7))),
-            (VoteChoice::For, compute_vote_weight(&make_phi_weight_unavailable(0.7, 0.3, 0.6, 0.5))),
-            (VoteChoice::Against, compute_vote_weight(&make_phi_weight_unavailable(0.5, 0.2, 0.4, 0.3))),
+            (
+                VoteChoice::For,
+                compute_vote_weight(&make_phi_weight_unavailable(0.9, 0.5, 0.8, 0.7)),
+            ),
+            (
+                VoteChoice::For,
+                compute_vote_weight(&make_phi_weight_unavailable(0.7, 0.3, 0.6, 0.5)),
+            ),
+            (
+                VoteChoice::Against,
+                compute_vote_weight(&make_phi_weight_unavailable(0.5, 0.2, 0.4, 0.3)),
+            ),
         ];
 
         let (vf, va, _, tw, quorum, approved) = compute_tally_result(&voters, 0.5, 0.5);
@@ -3549,9 +3873,13 @@ mod tests {
     fn test_phi_weight_serde_backward_compat() {
         // PhiWeight without phi_provenance should deserialize as Unavailable
         let json = r#"{"phi_score":0.5,"k_trust":0.8,"stake_weight":0.3,"participation_score":0.6,"domain_reputation":0.4}"#;
-        let pw: PhiWeight = serde_json::from_str(json).expect("should deserialize without phi_provenance");
-        assert_eq!(pw.phi_provenance, PhiProvenance::Unavailable,
-            "Missing phi_provenance should default to Unavailable");
+        let pw: PhiWeight =
+            serde_json::from_str(json).expect("should deserialize without phi_provenance");
+        assert_eq!(
+            pw.phi_provenance,
+            PhiProvenance::Unavailable,
+            "Missing phi_provenance should default to Unavailable"
+        );
     }
 
     // =========================================================================
@@ -3576,8 +3904,10 @@ mod tests {
         //
         // This is a design-level test — actual behavior is tested in sweettests.
         let fail_closed_doc = "fail-closed";
-        assert_eq!(fail_closed_doc, "fail-closed",
-            "verify_voting_period must be fail-closed (reject when uncertain)");
+        assert_eq!(
+            fail_closed_doc, "fail-closed",
+            "verify_voting_period must be fail-closed (reject when uncertain)"
+        );
     }
 
     #[test]
@@ -3593,6 +3923,9 @@ mod tests {
         // Layer 3 prevents puppet accounts that pass layers 1+2 by creating
         // many agent keys without going through consciousness assessment.
         let defense_layers = 3u8;
-        assert_eq!(defense_layers, 3, "Three defense layers against Sybil attacks");
+        assert_eq!(
+            defense_layers, 3,
+            "Three defense layers against Sybil attacks"
+        );
     }
 }

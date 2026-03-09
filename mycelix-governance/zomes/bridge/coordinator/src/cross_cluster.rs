@@ -40,12 +40,14 @@ pub fn dispatch_personal_call(input: DispatchPersonalCallInput) -> ExternResult<
         input.payload,
     )? {
         ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network error calling personal cluster: {}", e)
-        ))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Personal cluster call failed: {:?}", other)
-        ))),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling personal cluster: {}",
+            e
+        )))),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Personal cluster call failed: {:?}",
+            other
+        )))),
     }
 }
 
@@ -80,11 +82,8 @@ pub fn request_identity_proof(_: ()) -> ExternResult<ExternIO> {
 // =============================================================================
 
 /// Allowed zomes in the identity cluster that governance can call
-const ALLOWED_IDENTITY_ZOMES: &[&str] = &[
-    "identity_bridge",
-    "did_registry",
-    "verifiable_credential",
-];
+const ALLOWED_IDENTITY_ZOMES: &[&str] =
+    &["identity_bridge", "did_registry", "verifiable_credential"];
 
 /// Dispatch a call to the identity cluster via OtherRole
 #[hdk_extern]
@@ -110,12 +109,14 @@ pub fn dispatch_identity_call(input: DispatchIdentityCallInput) -> ExternResult<
         input.payload,
     )? {
         ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network error calling identity cluster: {}", e)
-        ))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Identity cluster call failed: {:?}", other)
-        ))),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling identity cluster: {}",
+            e
+        )))),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Identity cluster call failed: {:?}",
+            other
+        )))),
     }
 }
 
@@ -165,12 +166,7 @@ pub fn verify_governance_credential(credential_id: String) -> ExternResult<Exter
 /// that require stronger identity verification.
 #[hdk_extern]
 pub fn check_voter_trust(input: CheckVoterTrustInput) -> ExternResult<ExternIO> {
-    governance_utils::call_role(
-        "identity",
-        "identity_bridge",
-        "check_enhanced_trust",
-        input,
-    )
+    governance_utils::call_role("identity", "identity_bridge", "check_enhanced_trust", input)
 }
 
 /// Input for enhanced trust verification of a governance participant

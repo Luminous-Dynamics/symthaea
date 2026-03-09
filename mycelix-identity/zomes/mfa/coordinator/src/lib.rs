@@ -16,9 +16,9 @@
 
 use hdk::prelude::*;
 use mfa_integrity::*;
-use sha2::{Sha256, Digest};
-use subtle::ConstantTimeEq;
 use mycelix_crypto::AlgorithmId;
+use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 
 // =============================================================================
 // RATE LIMITING CONFIGURATION
@@ -48,23 +48,24 @@ fn verify_did_exists(did: &str) -> ExternResult<bool> {
     // Decode the response
     match response {
         ZomeCallResponse::Ok(extern_io) => {
-            let result: Option<Record> = extern_io.decode().map_err(|e| {
-                wasm_error!(WasmErrorInner::Serialize(e))
-            })?;
+            let result: Option<Record> = extern_io
+                .decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Serialize(e)))?;
             Ok(result.is_some())
         }
-        ZomeCallResponse::Unauthorized(..) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Unauthorized cross-zome call".into())))
-        }
-        ZomeCallResponse::NetworkError(e) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Network error: {}", e))))
-        }
-        ZomeCallResponse::CountersigningSession(e) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Countersigning error: {}", e))))
-        }
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Authentication failed for cross-zome call".into())))
-        }
+        ZomeCallResponse::Unauthorized(..) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized cross-zome call".into()
+        ))),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error: {}",
+            e
+        )))),
+        ZomeCallResponse::CountersigningSession(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", e)
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed for cross-zome call".into()
+        ))),
     }
 }
 
@@ -334,12 +335,7 @@ pub fn create_mfa_state(input: CreateMfaStateInput) -> ExternResult<MfaStateOutp
     };
     let enrollment_hash = create_entry(&EntryTypes::FactorEnrollment(enrollment))?;
 
-    create_link(
-        did_hash,
-        enrollment_hash,
-        LinkTypes::DidToEnrollments,
-        (),
-    )?;
+    create_link(did_hash, enrollment_hash, LinkTypes::DidToEnrollments, ())?;
 
     let assurance = AssuranceOutput {
         level: AssuranceLevel::Basic,
@@ -424,7 +420,10 @@ pub fn enroll_factor(input: EnrollFactorInput) -> ExternResult<MfaStateOutput> {
     };
 
     // Update the entry
-    let action_hash = update_entry(current_hash.clone(), &EntryTypes::MfaState(new_state.clone()))?;
+    let action_hash = update_entry(
+        current_hash.clone(),
+        &EntryTypes::MfaState(new_state.clone()),
+    )?;
 
     // Link old to new for history
     create_link(
@@ -446,12 +445,7 @@ pub fn enroll_factor(input: EnrollFactorInput) -> ExternResult<MfaStateOutput> {
     let enrollment_hash = create_entry(&EntryTypes::FactorEnrollment(enrollment))?;
 
     let did_hash = string_to_entry_hash(&input.did);
-    create_link(
-        did_hash,
-        enrollment_hash,
-        LinkTypes::DidToEnrollments,
-        (),
-    )?;
+    create_link(did_hash, enrollment_hash, LinkTypes::DidToEnrollments, ())?;
 
     // Notify bridge if assurance level changed
     if old_level != level {
@@ -529,7 +523,10 @@ pub fn revoke_factor(input: RevokeFactorInput) -> ExternResult<MfaStateOutput> {
     };
 
     // Update the entry
-    let action_hash = update_entry(current_hash.clone(), &EntryTypes::MfaState(new_state.clone()))?;
+    let action_hash = update_entry(
+        current_hash.clone(),
+        &EntryTypes::MfaState(new_state.clone()),
+    )?;
 
     // Link old to new for history
     create_link(
@@ -551,12 +548,7 @@ pub fn revoke_factor(input: RevokeFactorInput) -> ExternResult<MfaStateOutput> {
     let enrollment_hash = create_entry(&EntryTypes::FactorEnrollment(enrollment))?;
 
     let did_hash = string_to_entry_hash(&input.did);
-    create_link(
-        did_hash,
-        enrollment_hash,
-        LinkTypes::DidToEnrollments,
-        (),
-    )?;
+    create_link(did_hash, enrollment_hash, LinkTypes::DidToEnrollments, ())?;
 
     // Notify bridge if assurance level changed
     if old_level != level {
@@ -630,12 +622,7 @@ pub fn verify_factor(input: VerifyFactorInput) -> ExternResult<MfaStateOutput> {
 
         // Link from factor_id hash for per-factor rate limiting (security questions, etc.)
         let factor_hash = string_to_entry_hash(&input.factor_id);
-        let _ = create_link(
-            factor_hash,
-            fail_hash,
-            LinkTypes::DidToVerifications,
-            (),
-        );
+        let _ = create_link(factor_hash, fail_hash, LinkTypes::DidToVerifications, ());
 
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Factor verification failed".into()
@@ -663,7 +650,10 @@ pub fn verify_factor(input: VerifyFactorInput) -> ExternResult<MfaStateOutput> {
     };
 
     // Update the entry
-    let action_hash = update_entry(current_hash.clone(), &EntryTypes::MfaState(new_state.clone()))?;
+    let action_hash = update_entry(
+        current_hash.clone(),
+        &EntryTypes::MfaState(new_state.clone()),
+    )?;
 
     // Link old to new for history
     create_link(
@@ -678,11 +668,17 @@ pub fn verify_factor(input: VerifyFactorInput) -> ExternResult<MfaStateOutput> {
     // so that parse_last_counter_from_metadata() can retrieve it for replay protection.
     let stored_strength = if new_factors[factor_idx].factor_type == FactorType::HardwareKey {
         // Extract counter from proof for storage
-        if let Some(VerificationProof::WebAuthn { authenticator_data, .. }) = &input.proof {
+        if let Some(VerificationProof::WebAuthn {
+            authenticator_data, ..
+        }) = &input.proof
+        {
             if let Some(auth_data) = base64_decode(authenticator_data) {
                 if auth_data.len() >= 37 {
                     let counter = u32::from_be_bytes([
-                        auth_data[33], auth_data[34], auth_data[35], auth_data[36]
+                        auth_data[33],
+                        auth_data[34],
+                        auth_data[35],
+                        auth_data[36],
                     ]);
                     counter as f32
                 } else {
@@ -773,10 +769,7 @@ fn hex_nibble(c: u8) -> Option<u8> {
 /// 3. Decode data_hash from hex → 32-byte SHA-256 hash
 /// 4. Verify freshness (attestation within 1 hour)
 /// 5. Verify Ed25519 signature via HDK
-fn verify_oracle_attestation(
-    attestation: &OracleAttestation,
-    context: &str,
-) -> ExternResult<bool> {
+fn verify_oracle_attestation(attestation: &OracleAttestation, context: &str) -> ExternResult<bool> {
     // Decode oracle public key (base64 → 39-byte AgentPubKey)
     let pubkey_bytes = base64_decode(&attestation.oracle_pubkey).ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(format!(
@@ -812,7 +805,9 @@ fn verify_oracle_attestation(
     }
 
     let sig_arr: [u8; 64] = sig_bytes.try_into().map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest("Failed to convert signature bytes".into()))
+        wasm_error!(WasmErrorInner::Guest(
+            "Failed to convert signature bytes".into()
+        ))
     })?;
     let signature = Signature::from(sig_arr);
 
@@ -865,37 +860,23 @@ fn verify_factor_proof(
             verify_primary_key_pair(factor_id, proof, challenge, agent_pub_key)
         }
 
-        FactorType::HardwareKey => {
-            verify_hardware_key(factor_id, proof, challenge)
-        }
+        FactorType::HardwareKey => verify_hardware_key(factor_id, proof, challenge),
 
-        FactorType::Biometric => {
-            verify_biometric(factor_id, proof)
-        }
+        FactorType::Biometric => verify_biometric(factor_id, proof),
 
-        FactorType::GitcoinPassport => {
-            verify_gitcoin_passport(proof)
-        }
+        FactorType::GitcoinPassport => verify_gitcoin_passport(proof),
 
-        FactorType::VerifiableCredential => {
-            verify_verifiable_credential(factor_id, proof)
-        }
+        FactorType::VerifiableCredential => verify_verifiable_credential(factor_id, proof),
 
-        FactorType::SocialRecovery => {
-            verify_social_recovery(factor_id, proof, challenge)
-        }
+        FactorType::SocialRecovery => verify_social_recovery(factor_id, proof, challenge),
 
-        FactorType::SecurityQuestions => {
-            verify_security_questions(factor_id, proof)
-        }
+        FactorType::SecurityQuestions => verify_security_questions(factor_id, proof),
 
         FactorType::RecoveryPhrase => {
             verify_recovery_phrase(factor_id, proof, challenge, agent_pub_key)
         }
 
-        FactorType::ReputationAttestation => {
-            verify_reputation_attestation(proof, challenge)
-        }
+        FactorType::ReputationAttestation => verify_reputation_attestation(proof, challenge),
     }
 }
 
@@ -921,7 +902,10 @@ fn verify_primary_key_pair(
     };
 
     // Verify factor_id matches the agent's key (constant-time comparison)
-    let id_matches: bool = factor_id.as_bytes().ct_eq(expected_key_hash.as_bytes()).into();
+    let id_matches: bool = factor_id
+        .as_bytes()
+        .ct_eq(expected_key_hash.as_bytes())
+        .into();
     if !id_matches {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Factor ID does not match agent's public key".into()
@@ -950,7 +934,9 @@ fn verify_primary_key_pair(
 
     // Decode base64 signature
     let sig_bytes = base64_decode(signature).ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest("Invalid base64 signature encoding".into()))
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid base64 signature encoding".into()
+        ))
     })?;
 
     // Algorithm dispatch: check signature length to determine algorithm
@@ -961,14 +947,18 @@ fn verify_primary_key_pair(
     if sig_bytes.len() == ed25519_size {
         // Pure Ed25519 verification via HDK
         let signature_arr: [u8; 64] = sig_bytes.try_into().map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Failed to convert signature bytes".into()))
+            wasm_error!(WasmErrorInner::Guest(
+                "Failed to convert signature bytes".into()
+            ))
         })?;
         let hdk_signature = Signature::from(signature_arr);
         verify_signature(agent_pub_key.clone(), hdk_signature, message_to_verify)
     } else if sig_bytes.len() == hybrid_size {
         // Hybrid: verify Ed25519 component (first 64 bytes), PQC verified off-chain
         let ed_bytes: [u8; 64] = sig_bytes[..64].try_into().map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Failed to extract Ed25519 component".into()))
+            wasm_error!(WasmErrorInner::Guest(
+                "Failed to extract Ed25519 component".into()
+            ))
         })?;
         let hdk_signature = Signature::from(ed_bytes);
         verify_signature(agent_pub_key.clone(), hdk_signature, message_to_verify)
@@ -1007,7 +997,8 @@ fn verify_hardware_key(
         authenticator_data,
         client_data_hash,
         signature,
-    }) = proof else {
+    }) = proof
+    else {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "WebAuthn proof required for HardwareKey verification".into()
         )));
@@ -1015,15 +1006,18 @@ fn verify_hardware_key(
 
     // Decode authenticator data (base64 encoded)
     let auth_data = base64_decode(authenticator_data).ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest("Invalid authenticator_data encoding".into()))
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid authenticator_data encoding".into()
+        ))
     })?;
 
     // Verify authenticator_data minimum length (37 bytes minimum)
     // Structure: rpIdHash (32) + flags (1) + signCount (4) = 37 bytes minimum
     if auth_data.len() < 37 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Authenticator data too short: {} bytes (minimum 37)", auth_data.len())
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Authenticator data too short: {} bytes (minimum 37)",
+            auth_data.len()
+        ))));
     }
 
     // Extract and verify flags byte (offset 32)
@@ -1036,9 +1030,7 @@ fn verify_hardware_key(
     }
 
     // Extract counter (bytes 33-36, big-endian)
-    let counter = u32::from_be_bytes([
-        auth_data[33], auth_data[34], auth_data[35], auth_data[36]
-    ]);
+    let counter = u32::from_be_bytes([auth_data[33], auth_data[34], auth_data[35], auth_data[36]]);
 
     // SECURITY: Verify counter is strictly monotonically increasing to prevent replay attacks.
     // Parse last_counter from factor metadata (stored as JSON during enrollment/verification).
@@ -1049,13 +1041,11 @@ fn verify_hardware_key(
         // We use the factor_id to look up the factor's stored metadata
         let last_counter = parse_last_counter_from_metadata(factor_id);
         if counter <= last_counter {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!(
-                    "WebAuthn counter replay detected: received {} but last verified counter was {}. \
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "WebAuthn counter replay detected: received {} but last verified counter was {}. \
                      Counter must be strictly increasing.",
-                    counter, last_counter
-                )
-            )));
+                counter, last_counter
+            ))));
         }
         // Note: After successful verification, the caller (verify_factor) must update
         // the factor metadata with the new counter value via update_factor_metadata().
@@ -1063,14 +1053,17 @@ fn verify_hardware_key(
 
     // Decode client data hash
     let client_hash = base64_decode(client_data_hash).ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest("Invalid client_data_hash encoding".into()))
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid client_data_hash encoding".into()
+        ))
     })?;
 
     // Client data hash should be 32 bytes (SHA-256)
     if client_hash.len() != 32 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid client_data_hash length: expected 32, got {}", client_hash.len())
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid client_data_hash length: expected 32, got {}",
+            client_hash.len()
+        ))));
     }
 
     // SECURITY: Challenge is REQUIRED for WebAuthn assertions to prevent replay attacks.
@@ -1078,7 +1071,8 @@ fn verify_hardware_key(
     let expected_challenge = challenge.as_ref().ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(
             "Challenge required for WebAuthn verification. \
-             Use generate_verification_challenge() first.".into()
+             Use generate_verification_challenge() first."
+                .into()
         ))
     })?;
 
@@ -1120,13 +1114,17 @@ fn verify_hardware_key(
 
     // Decode signature
     let sig_bytes = base64_decode(signature).ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest("Invalid WebAuthn signature encoding".into()))
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid WebAuthn signature encoding".into()
+        ))
     })?;
 
     // Verify signature over authenticator_data || client_data_hash
     // The factor_id should contain the credential public key (COSE format, base64 encoded)
     let credential_pubkey = base64_decode(factor_id).ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest("Invalid credential public key in factor_id".into()))
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid credential public key in factor_id".into()
+        ))
     })?;
 
     // Construct signed data: authenticator_data || client_data_hash
@@ -1178,7 +1176,9 @@ fn verify_hardware_key(
         if pubkey_bytes.len() == 39 {
             let agent_key = AgentPubKey::from_raw_39(pubkey_bytes);
             let ed_bytes: [u8; 64] = sig_bytes[..64].try_into().map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Failed to extract Ed25519 component".into()))
+                wasm_error!(WasmErrorInner::Guest(
+                    "Failed to extract Ed25519 component".into()
+                ))
             })?;
             return verify_signature(agent_key, Signature::from(ed_bytes), data_hash);
         }
@@ -1192,13 +1192,14 @@ fn verify_hardware_key(
     }
 
     // Reject unsupported key types
-    Err(wasm_error!(WasmErrorInner::Guest(
-        format!(
-            "Unsupported WebAuthn key type: signature length {} bytes, key length {} bytes. \
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "Unsupported WebAuthn key type: signature length {} bytes, key length {} bytes. \
              Supported: Ed25519 (64/32), Hybrid ({}/32), ML-DSA-65 ({}/1952).",
-            sig_bytes.len(), credential_pubkey.len(), hybrid_sig_size, pqc_sig_size
-        )
-    )))
+        sig_bytes.len(),
+        credential_pubkey.len(),
+        hybrid_sig_size,
+        pqc_sig_size
+    ))))
 }
 
 /// Verify biometric challenge response
@@ -1223,7 +1224,12 @@ fn verify_hardware_key(
 /// 3. Future: Verify device attestation certificate chain when WebAuthn extensions
 ///    for biometric binding become available in Holochain's WASM runtime.
 fn verify_biometric(factor_id: &str, proof: &Option<VerificationProof>) -> ExternResult<bool> {
-    let Some(VerificationProof::BiometricChallenge { template_hash, response, oracle_attestation }) = proof else {
+    let Some(VerificationProof::BiometricChallenge {
+        template_hash,
+        response,
+        oracle_attestation,
+    }) = proof
+    else {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "BiometricChallenge proof required for Biometric verification".into()
         )));
@@ -1268,7 +1274,13 @@ fn verify_biometric(factor_id: &str, proof: &Option<VerificationProof>) -> Exter
 /// - Timestamp within 24 hours (freshness requirement)
 /// - At least one stamp present
 fn verify_gitcoin_passport(proof: &Option<VerificationProof>) -> ExternResult<bool> {
-    let Some(VerificationProof::GitcoinPassport { score, checked_at, stamps, oracle_attestation }) = proof else {
+    let Some(VerificationProof::GitcoinPassport {
+        score,
+        checked_at,
+        stamps,
+        oracle_attestation,
+    }) = proof
+    else {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "GitcoinPassport proof required for Gitcoin Passport verification".into()
         )));
@@ -1281,23 +1293,19 @@ fn verify_gitcoin_passport(proof: &Option<VerificationProof>) -> ExternResult<bo
     let age = now_micros.saturating_sub(*checked_at);
 
     if age > twenty_four_hours_micros {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Gitcoin Passport score is stale: checked {} hours ago (max 24 hours)",
-                age / (3600 * 1_000_000)
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Gitcoin Passport score is stale: checked {} hours ago (max 24 hours)",
+            age / (3600 * 1_000_000)
+        ))));
     }
 
     // Verify score meets FL eligibility threshold (15.0)
     const FL_ELIGIBILITY_THRESHOLD: f64 = 15.0;
     if *score < FL_ELIGIBILITY_THRESHOLD {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Gitcoin Passport score too low: {:.2} (minimum {:.1} for FL eligibility)",
-                score, FL_ELIGIBILITY_THRESHOLD
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Gitcoin Passport score too low: {:.2} (minimum {:.1} for FL eligibility)",
+            score, FL_ELIGIBILITY_THRESHOLD
+        ))));
     }
 
     // Verify at least one stamp is present
@@ -1324,12 +1332,16 @@ fn verify_gitcoin_passport(proof: &Option<VerificationProof>) -> ExternResult<bo
 /// Note: Full cryptographic signature verification requires cross-zome call
 /// to the verifiable_credential zome, which is not yet wired. This function
 /// verifies structural validity and issuer binding as a minimum security baseline.
-fn verify_verifiable_credential(factor_id: &str, proof: &Option<VerificationProof>) -> ExternResult<bool> {
+fn verify_verifiable_credential(
+    factor_id: &str,
+    proof: &Option<VerificationProof>,
+) -> ExternResult<bool> {
     let Some(VerificationProof::VerifiableCredential {
         credential,
         issuer,
         credential_type,
-    }) = proof else {
+    }) = proof
+    else {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "VerifiableCredential proof required".into()
         )));
@@ -1344,9 +1356,10 @@ fn verify_verifiable_credential(factor_id: &str, proof: &Option<VerificationProo
 
     // Validate issuer DID format
     if !issuer.starts_with("did:") {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid issuer DID format: {}", issuer)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid issuer DID format: {}",
+            issuer
+        ))));
     }
 
     // Validate credential type is specified
@@ -1387,14 +1400,13 @@ fn verify_verifiable_credential(factor_id: &str, proof: &Option<VerificationProo
             // verifiable_credential zome not available - fail closed
             Err(wasm_error!(WasmErrorInner::Guest(
                 "Credential verification unavailable: verifiable_credential zome not accessible. \
-                 Cannot accept unverified credentials.".into()
+                 Cannot accept unverified credentials."
+                    .into()
             )))
         }
-        _ => {
-            Err(wasm_error!(WasmErrorInner::Guest(
-                "Unexpected response from verifiable_credential zome".into()
-            )))
-        }
+        _ => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unexpected response from verifiable_credential zome".into()
+        ))),
     }
 }
 
@@ -1412,7 +1424,8 @@ fn verify_social_recovery(
     let Some(VerificationProof::SocialRecovery {
         guardian_signatures,
         threshold,
-    }) = proof else {
+    }) = proof
+    else {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "SocialRecovery proof required".into()
         )));
@@ -1427,12 +1440,11 @@ fn verify_social_recovery(
 
     // Check we have enough signatures
     if (guardian_signatures.len() as u32) < *threshold {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Insufficient guardian signatures: {} provided, {} required",
-                guardian_signatures.len(), threshold
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Insufficient guardian signatures: {} provided, {} required",
+            guardian_signatures.len(),
+            threshold
+        ))));
     }
 
     let now_micros = sys_time()?.as_micros() as u64;
@@ -1455,9 +1467,10 @@ fn verify_social_recovery(
 
         // Check for duplicate guardians
         if seen_guardians.contains(&attestation.guardian_did) {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Duplicate guardian signature from: {}", attestation.guardian_did)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Duplicate guardian signature from: {}",
+                attestation.guardian_did
+            ))));
         }
         seen_guardians.push(attestation.guardian_did.clone());
 
@@ -1494,7 +1507,8 @@ fn verify_social_recovery(
                             }
                         } else if sig_bytes.len() == hybrid_size {
                             // Hybrid: verify Ed25519 component (first 64 bytes)
-                            let ed_bytes: [u8; 64] = sig_bytes[..64].try_into().unwrap_or([0u8; 64]);
+                            let ed_bytes: [u8; 64] =
+                                sig_bytes[..64].try_into().unwrap_or([0u8; 64]);
                             let sig = Signature::from(ed_bytes);
                             if verify_signature(guardian_key, sig, msg_bytes).unwrap_or(false) {
                                 valid_count += 1;
@@ -1512,7 +1526,8 @@ fn verify_social_recovery(
             // Accepting unchallenged signatures enables replay attacks.
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Challenge required for social recovery verification. \
-                 Cannot verify guardian signatures without a challenge to prevent replay attacks.".into()
+                 Cannot verify guardian signatures without a challenge to prevent replay attacks."
+                    .into()
             )));
         }
     }
@@ -1523,19 +1538,18 @@ fn verify_social_recovery(
         let max_ts = timestamps.iter().max().copied().unwrap_or(0);
         if max_ts - min_ts > coordination_window_micros {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Guardian signatures not coordinated - must be within 10 minutes of each other".into()
+                "Guardian signatures not coordinated - must be within 10 minutes of each other"
+                    .into()
             )));
         }
     }
 
     // Check threshold met
     if valid_count < *threshold {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Insufficient valid guardian signatures: {} valid, {} required",
-                valid_count, threshold
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Insufficient valid guardian signatures: {} valid, {} required",
+            valid_count, threshold
+        ))));
     }
 
     Ok(true)
@@ -1581,17 +1595,13 @@ fn verify_security_questions(
             for link in verification_links {
                 if let Some(action_hash) = link.target.into_action_hash() {
                     if let Ok(Some(record)) = get(action_hash, GetOptions::default()) {
-                        if let Ok(Some(verification)) = record
-                            .entry()
-                            .to_app_option::<FactorVerification>()
+                        if let Ok(Some(verification)) =
+                            record.entry().to_app_option::<FactorVerification>()
                         {
                             // Check if this is a recent failure for this specific factor
-                            if verification.factor_id == factor_id
-                                && !verification.success
-                            {
-                                let age = now_micros.saturating_sub(
-                                    verification.timestamp.as_micros() as u64
-                                );
+                            if verification.factor_id == factor_id && !verification.success {
+                                let age = now_micros
+                                    .saturating_sub(verification.timestamp.as_micros() as u64);
                                 if age < RATE_LIMIT_WINDOW_MICROS {
                                     recent_failures += 1;
                                 }
@@ -1602,13 +1612,11 @@ fn verify_security_questions(
             }
 
             if recent_failures >= MAX_FAILED_ATTEMPTS {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    format!(
-                        "Too many failed attempts ({} in last 15 minutes). \
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Too many failed attempts ({} in last 15 minutes). \
                          Security questions locked. Try again later.",
-                        recent_failures
-                    )
-                )));
+                    recent_failures
+                ))));
             }
         }
         // If link query fails (e.g., no verifications yet), proceed with verification
@@ -1693,7 +1701,9 @@ fn verify_recovery_phrase(
             // Decode the expected public key from factor_id
             // For recovery phrase, factor_id is the public key derived from the phrase
             let derived_pubkey = base64_decode(factor_id).ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest("Invalid factor_id encoding for recovery phrase".into()))
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid factor_id encoding for recovery phrase".into()
+                ))
             })?;
 
             // Decode signature
@@ -1734,12 +1744,11 @@ fn verify_recovery_phrase(
                 return Ok(true);
             }
 
-            Err(wasm_error!(WasmErrorInner::Guest(
-                format!(
-                    "Invalid recovery phrase key/signature: key {} bytes, sig {} bytes",
-                    derived_pubkey.len(), sig_bytes.len()
-                )
-            )))
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid recovery phrase key/signature: key {} bytes, sig {} bytes",
+                derived_pubkey.len(),
+                sig_bytes.len()
+            ))))
         }
 
         _ => Err(wasm_error!(WasmErrorInner::Guest(
@@ -1763,7 +1772,8 @@ fn verify_reputation_attestation(
     let Some(VerificationProof::SocialRecovery {
         guardian_signatures,
         threshold,
-    }) = proof else {
+    }) = proof
+    else {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "SocialRecovery proof required for ReputationAttestation verification".into()
         )));
@@ -1774,7 +1784,8 @@ fn verify_reputation_attestation(
     let expected_challenge = challenge.as_ref().ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(
             "Challenge required for ReputationAttestation verification. \
-             Use generate_verification_challenge() first.".into()
+             Use generate_verification_challenge() first."
+                .into()
         ))
     })?;
 
@@ -1799,9 +1810,10 @@ fn verify_reputation_attestation(
 
         // Check for duplicate attestors
         if seen_attestors.contains(&attestation.guardian_did) {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Duplicate attestation from: {}", attestation.guardian_did)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Duplicate attestation from: {}",
+                attestation.guardian_did
+            ))));
         }
         seen_attestors.push(attestation.guardian_did.clone());
 
@@ -1895,9 +1907,8 @@ fn parse_last_counter_from_metadata(factor_id: &str) -> u32 {
         for link in verification_links {
             if let Some(action_hash) = link.target.into_action_hash() {
                 if let Ok(Some(record)) = get(action_hash, GetOptions::default()) {
-                    if let Ok(Some(verification)) = record
-                        .entry()
-                        .to_app_option::<FactorVerification>()
+                    if let Ok(Some(verification)) =
+                        record.entry().to_app_option::<FactorVerification>()
                     {
                         if verification.factor_id == factor_id && verification.success {
                             // The new_strength field stores the counter as a float
@@ -1960,7 +1971,9 @@ fn base64_decode(s: &str) -> Option<Vec<u8>> {
 
 /// Generate a verification challenge for a factor
 #[hdk_extern]
-pub fn generate_verification_challenge(input: GenerateChallengeInput) -> ExternResult<VerificationChallenge> {
+pub fn generate_verification_challenge(
+    input: GenerateChallengeInput,
+) -> ExternResult<VerificationChallenge> {
     let now = sys_time()?;
     let agent_info = agent_info()?;
 
@@ -2006,9 +2019,7 @@ pub struct VerificationChallenge {
 /// Get verification instructions for a factor type
 fn get_verification_instructions(factor_type: &FactorType) -> String {
     match factor_type {
-        FactorType::PrimaryKeyPair => {
-            "Sign the challenge with your primary key pair.".into()
-        }
+        FactorType::PrimaryKeyPair => "Sign the challenge with your primary key pair.".into(),
         FactorType::HardwareKey => {
             "Tap your hardware security key to complete WebAuthn verification.".into()
         }
@@ -2027,12 +2038,8 @@ fn get_verification_instructions(factor_type: &FactorType) -> String {
         FactorType::ReputationAttestation => {
             "Request attestation from community members who can vouch for your identity.".into()
         }
-        FactorType::SecurityQuestions => {
-            "Answer your security questions correctly.".into()
-        }
-        FactorType::RecoveryPhrase => {
-            "Enter your recovery phrase to verify identity.".into()
-        }
+        FactorType::SecurityQuestions => "Answer your security questions correctly.".into(),
+        FactorType::RecoveryPhrase => "Enter your recovery phrase to verify identity.".into(),
     }
 }
 
@@ -2127,8 +2134,7 @@ pub fn check_fl_eligibility(did: String) -> ExternResult<FlEligibilityResult> {
     }
 
     if !categories.contains(&FactorCategory::ExternalVerification) {
-        denial_reasons
-            .push("Missing ExternalVerification factor (Gitcoin Passport or VC)".into());
+        denial_reasons.push("Missing ExternalVerification factor (Gitcoin Passport or VC)".into());
     }
 
     // Check for stale factors
@@ -2198,7 +2204,10 @@ fn notify_bridge_of_assurance_change(
             Ok(())
         }
         ZomeCallResponse::NetworkError(err) => {
-            debug!("Network error notifying bridge of assurance change: {}", err);
+            debug!(
+                "Network error notifying bridge of assurance change: {}",
+                err
+            );
             Ok(())
         }
         ZomeCallResponse::CountersigningSession(err) => {
@@ -2255,23 +2264,23 @@ pub fn get_mfa_summary(did: String) -> ExternResult<Option<MfaSummary>> {
 
             // Check for external verification
             let has_external = state.factors.iter().any(|f| {
-                f.active && matches!(
-                    f.factor_type,
-                    FactorType::GitcoinPassport | FactorType::VerifiableCredential
-                )
+                f.active
+                    && matches!(
+                        f.factor_type,
+                        FactorType::GitcoinPassport | FactorType::VerifiableCredential
+                    )
             });
 
             // Check FL eligibility (simplified)
             let has_crypto = state.factors.iter().any(|f| {
-                f.active && matches!(
-                    f.factor_type,
-                    FactorType::PrimaryKeyPair | FactorType::HardwareKey
-                )
+                f.active
+                    && matches!(
+                        f.factor_type,
+                        FactorType::PrimaryKeyPair | FactorType::HardwareKey
+                    )
             });
 
-            let fl_eligible = level >= AssuranceLevel::Verified
-                && has_crypto
-                && has_external;
+            let fl_eligible = level >= AssuranceLevel::Verified && has_crypto && has_external;
 
             Ok(Some(MfaSummary {
                 did: state.did,
@@ -2462,10 +2471,10 @@ mod tests {
     fn three_categories_reaches_highly_assured() {
         let now = Timestamp::from_micros(1_700_000_000_000_000);
         let factors = vec![
-            fresh_factor(FactorType::PrimaryKeyPair, "key1", now),   // Crypto: 1.0
-            fresh_factor(FactorType::HardwareKey, "hw1", now),       // Crypto: 1.2
-            fresh_factor(FactorType::Biometric, "bio1", now),        // Bio: 0.8
-            fresh_factor(FactorType::SocialRecovery, "soc1", now),   // Social: 0.9
+            fresh_factor(FactorType::PrimaryKeyPair, "key1", now), // Crypto: 1.0
+            fresh_factor(FactorType::HardwareKey, "hw1", now),     // Crypto: 1.2
+            fresh_factor(FactorType::Biometric, "bio1", now),      // Bio: 0.8
+            fresh_factor(FactorType::SocialRecovery, "soc1", now), // Social: 0.9
         ];
         let (level, strength, cats) = calculate_assurance_internal(&factors, now);
         // total = 1.0 + 1.2 + 0.8 + 0.9 = 3.9, categories = 3
@@ -2478,11 +2487,11 @@ mod tests {
     fn four_categories_reaches_constitutionally_critical() {
         let now = Timestamp::from_micros(1_700_000_000_000_000);
         let factors = vec![
-            fresh_factor(FactorType::PrimaryKeyPair, "key1", now),      // Crypto: 1.0
-            fresh_factor(FactorType::HardwareKey, "hw1", now),          // Crypto: 1.2
-            fresh_factor(FactorType::Biometric, "bio1", now),           // Bio: 0.8
-            fresh_factor(FactorType::SocialRecovery, "soc1", now),      // Social: 0.9
-            fresh_factor(FactorType::GitcoinPassport, "gp1", now),      // External: 0.8
+            fresh_factor(FactorType::PrimaryKeyPair, "key1", now), // Crypto: 1.0
+            fresh_factor(FactorType::HardwareKey, "hw1", now),     // Crypto: 1.2
+            fresh_factor(FactorType::Biometric, "bio1", now),      // Bio: 0.8
+            fresh_factor(FactorType::SocialRecovery, "soc1", now), // Social: 0.9
+            fresh_factor(FactorType::GitcoinPassport, "gp1", now), // External: 0.8
         ];
         let (level, strength, cats) = calculate_assurance_internal(&factors, now);
         // total = 1.0 + 1.2 + 0.8 + 0.9 + 0.8 = 4.7, categories = 4
@@ -2495,7 +2504,7 @@ mod tests {
     fn decayed_factor_below_threshold_excluded() {
         // Factor verified long ago — should have decayed below 0.3 threshold
         let verified_at = Timestamp::from_micros(1_000_000_000_000_000); // ~2001
-        let now = Timestamp::from_micros(1_700_000_000_000_000);          // ~2023
+        let now = Timestamp::from_micros(1_700_000_000_000_000); // ~2023
         let factors = vec![EnrolledFactor {
             factor_type: FactorType::ReputationAttestation, // fast decay: 0.012/day
             factor_id: "rep1".into(),
@@ -2539,25 +2548,53 @@ mod tests {
 
     #[test]
     fn factor_type_categories() {
-        assert_eq!(FactorType::PrimaryKeyPair.category(), FactorCategory::Cryptographic);
-        assert_eq!(FactorType::HardwareKey.category(), FactorCategory::Cryptographic);
+        assert_eq!(
+            FactorType::PrimaryKeyPair.category(),
+            FactorCategory::Cryptographic
+        );
+        assert_eq!(
+            FactorType::HardwareKey.category(),
+            FactorCategory::Cryptographic
+        );
         assert_eq!(FactorType::Biometric.category(), FactorCategory::Biometric);
-        assert_eq!(FactorType::SocialRecovery.category(), FactorCategory::SocialProof);
-        assert_eq!(FactorType::ReputationAttestation.category(), FactorCategory::SocialProof);
-        assert_eq!(FactorType::GitcoinPassport.category(), FactorCategory::ExternalVerification);
-        assert_eq!(FactorType::VerifiableCredential.category(), FactorCategory::ExternalVerification);
-        assert_eq!(FactorType::RecoveryPhrase.category(), FactorCategory::Knowledge);
-        assert_eq!(FactorType::SecurityQuestions.category(), FactorCategory::Knowledge);
+        assert_eq!(
+            FactorType::SocialRecovery.category(),
+            FactorCategory::SocialProof
+        );
+        assert_eq!(
+            FactorType::ReputationAttestation.category(),
+            FactorCategory::SocialProof
+        );
+        assert_eq!(
+            FactorType::GitcoinPassport.category(),
+            FactorCategory::ExternalVerification
+        );
+        assert_eq!(
+            FactorType::VerifiableCredential.category(),
+            FactorCategory::ExternalVerification
+        );
+        assert_eq!(
+            FactorType::RecoveryPhrase.category(),
+            FactorCategory::Knowledge
+        );
+        assert_eq!(
+            FactorType::SecurityQuestions.category(),
+            FactorCategory::Knowledge
+        );
     }
 
     #[test]
     fn factor_type_base_weights() {
         // All weights should be positive
         let types = [
-            FactorType::PrimaryKeyPair, FactorType::HardwareKey,
-            FactorType::Biometric, FactorType::SocialRecovery,
-            FactorType::ReputationAttestation, FactorType::GitcoinPassport,
-            FactorType::VerifiableCredential, FactorType::RecoveryPhrase,
+            FactorType::PrimaryKeyPair,
+            FactorType::HardwareKey,
+            FactorType::Biometric,
+            FactorType::SocialRecovery,
+            FactorType::ReputationAttestation,
+            FactorType::GitcoinPassport,
+            FactorType::VerifiableCredential,
+            FactorType::RecoveryPhrase,
             FactorType::SecurityQuestions,
         ];
         for ft in &types {
@@ -2570,10 +2607,14 @@ mod tests {
     #[test]
     fn factor_decay_configs_valid() {
         let types = [
-            FactorType::PrimaryKeyPair, FactorType::HardwareKey,
-            FactorType::Biometric, FactorType::SocialRecovery,
-            FactorType::ReputationAttestation, FactorType::GitcoinPassport,
-            FactorType::VerifiableCredential, FactorType::RecoveryPhrase,
+            FactorType::PrimaryKeyPair,
+            FactorType::HardwareKey,
+            FactorType::Biometric,
+            FactorType::SocialRecovery,
+            FactorType::ReputationAttestation,
+            FactorType::GitcoinPassport,
+            FactorType::VerifiableCredential,
+            FactorType::RecoveryPhrase,
             FactorType::SecurityQuestions,
         ];
         for ft in &types {
@@ -2689,7 +2730,12 @@ mod tests {
         }"#;
         let proof: VerificationProof = serde_json::from_str(json).unwrap();
         match proof {
-            VerificationProof::GitcoinPassport { score, stamps, oracle_attestation, .. } => {
+            VerificationProof::GitcoinPassport {
+                score,
+                stamps,
+                oracle_attestation,
+                ..
+            } => {
                 assert!((score - 25.0).abs() < 0.01);
                 assert_eq!(stamps.len(), 2);
                 assert!(oracle_attestation.is_none());
@@ -2715,7 +2761,9 @@ mod tests {
         }"#;
         let proof: VerificationProof = serde_json::from_str(json).unwrap();
         match proof {
-            VerificationProof::GitcoinPassport { oracle_attestation, .. } => {
+            VerificationProof::GitcoinPassport {
+                oracle_attestation, ..
+            } => {
                 assert!(oracle_attestation.is_some());
                 assert_eq!(oracle_attestation.unwrap().oracle_pubkey, "dGVzdA==");
             }
@@ -2733,7 +2781,9 @@ mod tests {
         }"#;
         let proof: VerificationProof = serde_json::from_str(json).unwrap();
         match proof {
-            VerificationProof::BiometricChallenge { oracle_attestation, .. } => {
+            VerificationProof::BiometricChallenge {
+                oracle_attestation, ..
+            } => {
                 assert!(oracle_attestation.is_none());
             }
             _ => panic!("Wrong variant"),

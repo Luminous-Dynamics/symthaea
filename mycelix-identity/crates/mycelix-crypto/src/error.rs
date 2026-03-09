@@ -35,11 +35,27 @@ pub enum CryptoError {
 impl fmt::Display for CryptoError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CryptoError::InvalidKeyLength { algorithm, expected, actual } => {
-                write!(f, "Invalid key length for {}: expected {}, got {}", algorithm, expected, actual)
+            CryptoError::InvalidKeyLength {
+                algorithm,
+                expected,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "Invalid key length for {}: expected {}, got {}",
+                    algorithm, expected, actual
+                )
             }
-            CryptoError::InvalidSignatureLength { algorithm, expected, actual } => {
-                write!(f, "Invalid signature length for {}: expected {}, got {}", algorithm, expected, actual)
+            CryptoError::InvalidSignatureLength {
+                algorithm,
+                expected,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "Invalid signature length for {}: expected {}, got {}",
+                    algorithm, expected, actual
+                )
             }
             CryptoError::UnsupportedAlgorithm(id) => {
                 write!(f, "Unsupported algorithm ID: {:#06x}", id)
@@ -47,7 +63,10 @@ impl fmt::Display for CryptoError {
             CryptoError::InvalidMultibase(msg) => {
                 write!(f, "Invalid multibase encoding: {}", msg)
             }
-            CryptoError::MulticodecMismatch { expected_prefix, actual_prefix } => {
+            CryptoError::MulticodecMismatch {
+                expected_prefix,
+                actual_prefix,
+            } => {
                 write!(
                     f,
                     "Multicodec prefix mismatch: expected [{:#04x}, {:#04x}], got [{:#04x}, {:#04x}]",

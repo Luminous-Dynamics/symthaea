@@ -77,7 +77,9 @@ pub fn register_consensus_participant(_: ()) -> ExternResult<Record> {
     )?;
 
     // Link to active participants
-    create_entry(&EntryTypes::Anchor(Anchor("active_participants".to_string())))?;
+    create_entry(&EntryTypes::Anchor(Anchor(
+        "active_participants".to_string(),
+    )))?;
     create_link(
         anchor_hash("active_participants")?,
         participant_hash.clone(),
@@ -85,21 +87,25 @@ pub fn register_consensus_participant(_: ()) -> ExternResult<Record> {
         (),
     )?;
 
-    get(participant_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Participant not found".into())))
+    get(participant_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Participant not found".into()
+    )))
 }
 
 /// Calculate holistic vote weight for a proposal
 ///
 /// Computes the full holistic weight: Reputation² × (0.7 + 0.3 × Φ) × (1 + 0.2 × HarmonicAlignment)
 #[hdk_extern]
-pub fn calculate_holistic_vote_weight(input: CalculateWeightInput) -> ExternResult<HolisticVotingWeight> {
+pub fn calculate_holistic_vote_weight(
+    input: CalculateWeightInput,
+) -> ExternResult<HolisticVotingWeight> {
     let agent_info = agent_info()?;
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
 
     // Get participant's current state
-    let participant = get_agent_participant(&agent_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not registered as participant".into())))?;
+    let participant = get_agent_participant(&agent_did)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Not registered as participant".into())
+    ))?;
 
     // Get latest consciousness Φ
     let phi = match get_latest_agent_snapshot(&agent_did)? {
@@ -128,16 +134,16 @@ pub struct CalculateWeightInput {
 /// Verifies consciousness gate before allowing the vote.
 #[hdk_extern]
 pub fn cast_weighted_vote(input: CastWeightedVoteInput) -> ExternResult<WeightedVoteResult> {
-    check_weighted_vote_input(&input)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
+    check_weighted_vote_input(&input).map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let now = sys_time()?;
     let agent_info = agent_info()?;
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
 
     // Get participant's current state
-    let participant = get_agent_participant(&agent_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not registered as participant".into())))?;
+    let participant = get_agent_participant(&agent_did)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Not registered as participant".into())
+    ))?;
 
     // Check if participant can vote
     if !participant.can_vote() {
@@ -180,7 +186,12 @@ pub fn cast_weighted_vote(input: CastWeightedVoteInput) -> ExternResult<Weighted
 
     // Create the vote
     let vote = WeightedVote {
-        id: format!("vote:{}:{}:{}", agent_did, input.proposal_id, now.as_micros()),
+        id: format!(
+            "vote:{}:{}:{}",
+            agent_did,
+            input.proposal_id,
+            now.as_micros()
+        ),
         proposal_id: input.proposal_id.clone(),
         round: input.round,
         voter_did: agent_did.clone(),
@@ -259,8 +270,9 @@ pub fn get_participant_status(_: ()) -> ExternResult<ParticipantStatus> {
     let agent_info = agent_info()?;
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
 
-    let participant = get_agent_participant(&agent_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not registered as participant".into())))?;
+    let participant = get_agent_participant(&agent_did)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Not registered as participant".into())
+    ))?;
 
     // Get latest consciousness Φ
     let current_phi = match get_latest_agent_snapshot(&agent_did)? {
@@ -274,14 +286,16 @@ pub fn get_participant_status(_: ()) -> ExternResult<ParticipantStatus> {
 
     // Check voting eligibility using dynamic (configurable) thresholds
     let consciousness_config = get_current_consciousness_config()?;
-    let can_vote_standard = participant.can_vote() &&
-        current_phi >= consciousness_config.min_voter_consciousness_for(&ProposalType::Standard);
+    let can_vote_standard = participant.can_vote()
+        && current_phi >= consciousness_config.min_voter_consciousness_for(&ProposalType::Standard);
 
-    let can_vote_emergency = participant.can_vote() &&
-        current_phi >= consciousness_config.min_voter_consciousness_for(&ProposalType::Emergency);
+    let can_vote_emergency = participant.can_vote()
+        && current_phi
+            >= consciousness_config.min_voter_consciousness_for(&ProposalType::Emergency);
 
-    let can_vote_constitutional = participant.can_vote() &&
-        current_phi >= consciousness_config.min_voter_consciousness_for(&ProposalType::Constitutional);
+    let can_vote_constitutional = participant.can_vote()
+        && current_phi
+            >= consciousness_config.min_voter_consciousness_for(&ProposalType::Constitutional);
 
     Ok(ParticipantStatus {
         agent_did,
@@ -339,8 +353,10 @@ pub fn update_federated_reputation(input: UpdateFederatedReputationInput) -> Ext
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
 
     // Get current federated reputation
-    let (current_record, mut fed_rep) = get_agent_federated_reputation(&agent_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No federated reputation found".into())))?;
+    let (current_record, mut fed_rep) =
+        get_agent_federated_reputation(&agent_did)?.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No federated reputation found".into()
+        )))?;
 
     // Update only the fields that are provided, with domain boundary clamping
     // All f64 scores are clamped to [0.0, 1.0] to prevent manipulation
@@ -409,8 +425,9 @@ pub fn update_federated_reputation(input: UpdateFederatedReputationInput) -> Ext
         &EntryTypes::FederatedReputation(fed_rep),
     )?;
 
-    get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated reputation not found".into())))
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Updated reputation not found".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
