@@ -314,7 +314,7 @@ impl CanaryTest for MoralAlgebraDeterminismCanary {
     }
 
     fn run(&self) -> Result<(), CanaryFailure> {
-        use crate::hdc::moral_algebra::{MoralAlgebra, Magnitude};
+        use crate::hdc::moral_algebra::{Magnitude, MoralAlgebra};
 
         let algebra = MoralAlgebra::new();
 
@@ -374,11 +374,11 @@ impl CanaryTest for HdcEncodingCanary {
     }
 
     fn run(&self) -> Result<(), CanaryFailure> {
-        use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
         use symthaea_core::hdc::encoder_config::EncoderConfig;
+        use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
 
         let config = EncoderConfig::default();
-        let encoder = match PredictiveHdcEncoder::new(config) {
+        let mut encoder = match PredictiveHdcEncoder::new(config) {
             Ok(e) => e,
             Err(e) => {
                 return Err(CanaryFailure {
@@ -394,7 +394,7 @@ impl CanaryTest for HdcEncodingCanary {
         let hv1 = encoder.encode("integrity canary test input");
         let hv2 = encoder.encode("integrity canary test input");
 
-        if hv1.0 != hv2.0 {
+        if hv1.hdv != hv2.hdv {
             return Err(CanaryFailure {
                 canary_name: self.name(),
                 expected: "identical encoding for identical input".into(),
@@ -405,7 +405,7 @@ impl CanaryTest for HdcEncodingCanary {
 
         // Encode a different string — must produce a DIFFERENT BinaryHV
         let hv3 = encoder.encode("completely different canary input");
-        if hv1.0 == hv3.0 {
+        if hv1.hdv == hv3.hdv {
             return Err(CanaryFailure {
                 canary_name: self.name(),
                 expected: "different input produces different encoding".into(),
