@@ -59,7 +59,7 @@ pub struct AttestationRegistry {
     records: Vec<AttestationRecord>,
     /// Closures that re-compute the hash for each registered structure.
     /// Indexed in parallel with `records`.
-    hashers: Vec<Box<dyn Fn() -> [u8; 32] + Send>>,
+    hashers: Vec<Box<dyn Fn() -> [u8; 32] + Send + Sync>>,
 }
 
 impl AttestationRegistry {
@@ -80,7 +80,7 @@ impl AttestationRegistry {
         &mut self,
         name: &'static str,
         initial_hash: [u8; 32],
-        hasher: Box<dyn Fn() -> [u8; 32] + Send>,
+        hasher: Box<dyn Fn() -> [u8; 32] + Send + Sync>,
     ) {
         self.records.push(AttestationRecord {
             name,
