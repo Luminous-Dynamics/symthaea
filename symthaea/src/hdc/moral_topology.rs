@@ -183,6 +183,15 @@ pub struct MoralAnomalyConfig {
     /// Aggressive dampening: when compartmentalized harm is detected,
     /// drastically reduce learning to prevent the system from being steered.
     pub response_lr_convergence: f64,
+    /// Temporal decay rate for recency weighting in convergence detection (default: 1.0).
+    ///
+    /// Controls how strongly recent trajectory points dominate over older ones.
+    /// The weight of a pair at relative age `a` (0=newest, 1=oldest in window) is
+    /// `exp(-λ * a)`. Higher λ = stronger recency bias.
+    /// - 0.0: uniform weighting (no decay, backward-compatible)
+    /// - 1.0: newest pair ~2.7× more influential than oldest
+    /// - 3.0: newest pair ~20× more influential than oldest
+    pub convergence_decay_lambda: f64,
     /// Window size for convergence baseline statistics (default: 100).
     ///
     /// Replaces infinite-horizon EMA with a sliding window of recent observations.
@@ -223,6 +232,7 @@ impl Default for MoralAnomalyConfig {
             convergence_flourishing_floor: 0.6,
             weight_convergence: 0.4,
             response_lr_convergence: 0.1,
+            convergence_decay_lambda: 1.0,
             convergence_baseline_window: 100,
         }
     }
@@ -483,6 +493,10 @@ pub struct MoralTopologyAssessment {
 }
 
 /// Compact topology summary for CycleMetadata telemetry.
+///
+/// Includes a trajectory fingerprint for cross-agent correlation:
+/// peers can compare fingerprints to detect whether an adversary is
+/// distributing weapon components across multiple agents.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MoralTopologySummary {
     pub beta_0: usize,
@@ -496,6 +510,16 @@ pub struct MoralTopologySummary {
     pub scenario_count: usize,
     pub harmony_entropy: f64,
     pub attractor_detected: bool,
+    /// Compact trajectory fingerprint: centroid of recent trajectory in 8D harmony space.
+    ///
+    /// Used for cross-agent correlation — if two peers' fingerprints converge
+    /// toward the same hazard region, severity should be boosted on both.
+    #[serde(default)]
+    pub trajectory_fingerprint: [f64; N_HARMONIES],
+    /// Entropy of recent trajectory points' harmony coordinates.
+    /// Low entropy = narrowing focus, high entropy = diverse engagement.
+    #[serde(default)]
+    pub trajectory_entropy: f64,
 }
 
 impl From<&MoralTopologyAssessment> for MoralTopologySummary {
@@ -512,7 +536,71 @@ impl From<&MoralTopologyAssessment> for MoralTopologySummary {
             scenario_count: a.scenario_count,
             harmony_entropy: a.harmony_entropy,
             attractor_detected: a.attractor_detected,
+            // Trajectory fingerprint is populated separately by MoralTopology
+            trajectory_fingerprint: [0.0; N_HARMONIES],
+            trajectory_entropy: 0.0,
         }
+    }
+}
+
+/// Cross-agent trajectory correlation result.
+#[derive(Debug, Clone, Serialize)]
+pub struct PeerCorrelation {
+    /// Cosine similarity between the two trajectory fingerprints (−1.0 to 1.0).
+    pub fingerprint_similarity: f64,
+    /// Combined entropy deficit: sum of (max_entropy − peer_entropy) for both agents.
+    pub combined_entropy_deficit: f64,
+    /// Whether the correlation suggests a distributed adversarial pattern.
+    pub distributed_attack_suspected: bool,
+    /// Matched hazard name if both fingerprints converge near a known template.
+    pub matched_hazard: Option<String>,
+}
+
+/// Correlate two agents' trajectory summaries to detect distributed attacks.
+///
+/// If two agents' trajectory fingerprints converge toward the same hazard region,
+/// the adversary may be distributing weapon components across agents.
+pub fn correlate_peer_trajectories(
+    local: &MoralTopologySummary,
+    peer: &MoralTopologySummary,
+    hazard_registry: &HazardSignatureRegistry,
+) -> PeerCorrelation {
+    // Cosine similarity of fingerprints
+    let mut dot = 0.0f64;
+    let mut norm_a = 0.0f64;
+    let mut norm_b = 0.0f64;
+    for i in 0..N_HARMONIES {
+        dot += local.trajectory_fingerprint[i] * peer.trajectory_fingerprint[i];
+        norm_a += local.trajectory_fingerprint[i] * local.trajectory_fingerprint[i];
+        norm_b += peer.trajectory_fingerprint[i] * peer.trajectory_fingerprint[i];
+    }
+    let denom = (norm_a.sqrt() * norm_b.sqrt()).max(1e-12);
+    let fingerprint_similarity = dot / denom;
+
+    // Entropy deficit: low entropy on both = both narrowing focus
+    let max_entropy = (N_HARMONIES as f64).ln();
+    let combined_entropy_deficit =
+        (max_entropy - local.trajectory_entropy).max(0.0)
+            + (max_entropy - peer.trajectory_entropy).max(0.0);
+
+    // Midpoint of the two fingerprints — check against hazard templates
+    let mut midpoint = [0.0f64; N_HARMONIES];
+    for i in 0..N_HARMONIES {
+        midpoint[i] = (local.trajectory_fingerprint[i] + peer.trajectory_fingerprint[i]) / 2.0;
+    }
+    let (hazard_name, _boost) = hazard_registry.match_trajectory(&midpoint);
+
+    // Distributed attack: high similarity + low entropy on both + near hazard
+    let distributed_attack_suspected =
+        fingerprint_similarity > 0.7
+            && combined_entropy_deficit > max_entropy * 0.5
+            && hazard_name.is_some();
+
+    PeerCorrelation {
+        fingerprint_similarity,
+        combined_entropy_deficit,
+        distributed_attack_suspected,
+        matched_hazard: hazard_name.map(String::from),
     }
 }
 
@@ -886,6 +974,54 @@ impl MoralTopology {
         &self.basis
     }
 
+    /// Compute the trajectory fingerprint: centroid + entropy of recent points.
+    ///
+    /// Used to populate `MoralTopologySummary` for cross-agent correlation.
+    fn compute_trajectory_fingerprint(&self) -> ([f64; N_HARMONIES], f64) {
+        let lookback = self.anomaly_config.convergence_min_points.max(8);
+        let points: Vec<_> = self.trajectory.iter().rev().take(lookback).collect();
+        if points.is_empty() {
+            return ([0.0; N_HARMONIES], 0.0);
+        }
+        let n = points.len() as f64;
+        let mut centroid = [0.0f64; N_HARMONIES];
+        for p in &points {
+            for i in 0..N_HARMONIES {
+                centroid[i] += p.coordinates[i];
+            }
+        }
+        for c in &mut centroid {
+            *c /= n;
+        }
+        // Entropy of per-harmony variance
+        let mut var = [0.0f64; N_HARMONIES];
+        for p in &points {
+            for i in 0..N_HARMONIES {
+                let d = p.coordinates[i] - centroid[i];
+                var[i] += d * d;
+            }
+        }
+        for v in &mut var {
+            *v /= n;
+        }
+        let total_var: f64 = var.iter().sum::<f64>().max(1e-12);
+        let entropy: f64 = var
+            .iter()
+            .map(|&v| {
+                let p = (v / total_var).max(1e-12);
+                -p * p.ln()
+            })
+            .sum();
+        (centroid, entropy)
+    }
+
+    /// Stamp the current trajectory fingerprint into a summary.
+    fn stamp_fingerprint(&self, summary: &mut MoralTopologySummary) {
+        let (fp, ent) = self.compute_trajectory_fingerprint();
+        summary.trajectory_fingerprint = fp;
+        summary.trajectory_entropy = ent;
+    }
+
     /// Access the anomaly detection configuration.
     pub fn anomaly_config(&self) -> &MoralAnomalyConfig {
         &self.anomaly_config
@@ -977,20 +1113,26 @@ impl MoralTopology {
             return TrajectoryConvergenceReport::default();
         }
 
-        // ── Signal 1: Pairwise similarity anomaly ────────────────────────
+        // ── Signal 1: Pairwise similarity anomaly (recency-weighted) ─────
         // Compare mean similarity of last `min_pts` HVs against window baseline.
+        // Temporal decay: recent pairs weighted more heavily via exp(-λ * age).
         let recent_start = n.saturating_sub(min_pts);
+        let decay_lambda = ac.convergence_decay_lambda;
+        let max_age = (n - recent_start).max(1) as f64;
         let mut recent_sim_sum = 0.0f64;
-        let mut recent_sim_count = 0usize;
+        let mut recent_weight_sum = 0.0f64;
         for i in recent_start..n {
             for j in (i + 1)..n {
                 let s = self.window[i].similarity(&self.window[j]) as f64;
-                recent_sim_sum += s;
-                recent_sim_count += 1;
+                // Age = distance from newest point (n-1). Newer pairs get higher weight.
+                let age = (n - 1 - j.max(i)) as f64 / max_age;
+                let weight = (-decay_lambda * age).exp();
+                recent_sim_sum += s * weight;
+                recent_weight_sum += weight;
             }
         }
-        let recent_similarity = if recent_sim_count > 0 {
-            recent_sim_sum / recent_sim_count as f64
+        let recent_similarity = if recent_weight_sum > 0.0 {
+            recent_sim_sum / recent_weight_sum
         } else {
             0.0
         };
@@ -1160,6 +1302,40 @@ impl MoralTopology {
         &self.last_convergence_report
     }
 
+    /// Multi-scale convergence detection.
+    ///
+    /// Runs convergence analysis at three scales simultaneously:
+    /// - **Short** (min_points): catches rapid attacks
+    /// - **Medium** (min_points * 4): catches moderate-pace compartmentalization
+    /// - **Long** (min_points * 16): catches slow-burn adversarial drift
+    ///
+    /// If any scale detects convergence, the result fires with the maximum
+    /// severity across scales. The report reflects the most severe scale.
+    pub fn detect_multiscale_convergence(&mut self) -> TrajectoryConvergenceReport {
+        let base_min = self.anomaly_config.convergence_min_points;
+        let scales = [base_min, base_min * 4, base_min * 16];
+
+        let original_min = self.anomaly_config.convergence_min_points;
+        let mut best_report = TrajectoryConvergenceReport::default();
+        let mut best_severity = 0.0f64;
+
+        for &scale in &scales {
+            // Temporarily adjust min_points for this scale
+            self.anomaly_config.convergence_min_points = scale;
+            let report = self.detect_trajectory_convergence();
+
+            if report.severity > best_severity {
+                best_severity = report.severity;
+                best_report = report;
+            }
+        }
+
+        // Restore original config
+        self.anomaly_config.convergence_min_points = original_min;
+        self.last_convergence_report = best_report.clone();
+        best_report
+    }
+
     /// Detect anomalies by comparing `current_summary` against trajectory history.
     ///
     /// Thresholds and weights are drawn from `self.anomaly_config`.
@@ -1284,9 +1460,11 @@ impl MoralTopology {
                 harmony_entropy: 0.0,
                 attractor_detected: false,
             };
+            let mut new_summary = MoralTopologySummary::from(&assessment);
+            self.stamp_fingerprint(&mut new_summary);
             self.prev_summary = std::mem::replace(
                 &mut self.last_summary,
-                MoralTopologySummary::from(&assessment),
+                new_summary,
             );
             return assessment;
         }
@@ -1441,9 +1619,11 @@ impl MoralTopology {
             harmony_entropy,
             attractor_detected,
         };
+        let mut new_summary = MoralTopologySummary::from(&assessment);
+        self.stamp_fingerprint(&mut new_summary);
         self.prev_summary = std::mem::replace(
             &mut self.last_summary,
-            MoralTopologySummary::from(&assessment),
+            new_summary,
         );
         self.last_persistent_features = assessment.persistent_features.clone();
         assessment
@@ -3515,5 +3695,124 @@ mod tests {
         // (windowed baselines adapt, so detection depends on window vs drift rate)
         assert!(report.severity >= 0.0 && report.severity <= 1.0);
         assert!(report.baseline_similarity.is_finite());
+    }
+
+    // ── Temporal decay ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_temporal_decay_lambda_zero_is_uniform() {
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_decay_lambda = 0.0;
+        anomaly_config.convergence_min_points = 4;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9000 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        assert!(report.recent_similarity.is_finite());
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+    }
+
+    #[test]
+    fn test_temporal_decay_high_lambda() {
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_decay_lambda = 5.0;
+        anomaly_config.convergence_min_points = 4;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9100 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        assert!(report.recent_similarity.is_finite());
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+    }
+
+    // ── Multi-scale convergence ─────────────────────────────────────────
+
+    #[test]
+    fn test_multiscale_convergence_basic() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9200 + i));
+        }
+        let report = topo.detect_multiscale_convergence();
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+        assert!(report.recent_similarity.is_finite());
+    }
+
+    // ── Trajectory fingerprint ──────────────────────────────────────────
+
+    #[test]
+    fn test_trajectory_fingerprint_populated_after_analyze() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 9300 + i));
+        }
+        topo.analyze();
+        let summary = topo.last_summary();
+        let fp_mag: f64 = summary
+            .trajectory_fingerprint
+            .iter()
+            .map(|v| v * v)
+            .sum::<f64>()
+            .sqrt();
+        assert!(
+            fp_mag > 0.0,
+            "Fingerprint should be non-zero after adding scenarios"
+        );
+        assert!(summary.trajectory_entropy.is_finite());
+    }
+
+    // ── Peer correlation ────────────────────────────────────────────────
+
+    #[test]
+    fn test_peer_correlation_benign() {
+        let mut topo_a = MoralTopology::new(test_config());
+        let mut topo_b = MoralTopology::new(test_config());
+        for i in 0..8 {
+            topo_a.add_scenario(ContinuousHV::random(TEST_DIM, 9400 + i));
+            topo_b.add_scenario(ContinuousHV::random(TEST_DIM, 9500 + i));
+        }
+        topo_a.analyze();
+        topo_b.analyze();
+        let corr = correlate_peer_trajectories(
+            topo_a.last_summary(),
+            topo_b.last_summary(),
+            &HazardSignatureRegistry::with_defaults(),
+        );
+        assert!(corr.fingerprint_similarity.is_finite());
+        assert!(!corr.distributed_attack_suspected,
+            "Two independent diverse agents should not trigger distributed attack");
+    }
+
+    #[test]
+    fn test_peer_correlation_identical_fingerprints() {
+        let mut topo = MoralTopology::new(test_config());
+        let base = ContinuousHV::random(TEST_DIM, 42);
+        for _ in 0..8 {
+            topo.add_scenario(base.perturb(0.01));
+        }
+        topo.analyze();
+        // Correlate with itself (perfect match)
+        let corr = correlate_peer_trajectories(
+            topo.last_summary(),
+            topo.last_summary(),
+            &HazardSignatureRegistry::with_defaults(),
+        );
+        assert!(
+            corr.fingerprint_similarity > 0.99,
+            "Self-correlation should be ~1.0, got {:.3}",
+            corr.fingerprint_similarity,
+        );
     }
 }

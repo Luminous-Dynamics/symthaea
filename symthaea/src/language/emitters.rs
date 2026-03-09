@@ -47,6 +47,26 @@ pub(crate) struct ParsedSignature {
     pub(crate) _is_method: bool, // has &self or &mut self
 }
 
+/// Split a string on `delim` only at nesting depth 0 (respects `<>`, `()`, `{}`).
+fn split_at_depth_zero(s: &str, delim: char) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    for (i, ch) in s.char_indices() {
+        match ch {
+            '<' | '(' | '{' => depth += 1,
+            '>' | ')' | '}' => depth -= 1,
+            c if c == delim && depth == 0 => {
+                parts.push(&s[start..i]);
+                start = i + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    parts.push(&s[start..]);
+    parts
+}
+
 /// Parse a Rust function signature string like "fn foo(a: i32, b: &str) -> String"
 fn parse_rust_signature(sig: &str) -> Option<ParsedSignature> {
     let sig = sig.trim();
@@ -64,13 +84,31 @@ fn parse_rust_signature(sig: &str) -> Option<ParsedSignature> {
     let paren_start = after_fn.find('(')?;
     let name = after_fn[..paren_start].trim().to_string();
 
-    let paren_end = after_fn.rfind(')')?;
+    // Find the matching ')' for the parameter list by tracking nesting depth.
+    // rfind(')') breaks on return types containing tuples like Vec<(i32, i32)>.
+    let mut depth = 0i32;
+    let mut paren_end = None;
+    for (i, ch) in after_fn[paren_start..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    paren_end = Some(paren_start + i);
+                    break;
+                }
+            }
+            _ => {}
+        }
+    }
+    let paren_end = paren_end?;
     let params_str = &after_fn[paren_start + 1..paren_end];
 
-    // Parse params
+    // Parse params — split on commas at depth 0 (handles nested generics like Vec<i32>)
     let mut params = Vec::new();
     let mut _is_method = false;
-    for param in params_str.split(',') {
+    let param_tokens = split_at_depth_zero(params_str, ',');
+    for param in &param_tokens {
         let param = param.trim();
         if param.is_empty() {
             continue;
@@ -100,6 +138,17 @@ fn parse_rust_signature(sig: &str) -> Option<ParsedSignature> {
         return_type,
         _is_method,
     })
+}
+
+/// Extract the Ok type from a Result<T, E> string, e.g. "Result<i32, String>" → "i32".
+fn extract_result_ok_type(ret: &str) -> Option<&str> {
+    let inner = ret.strip_prefix("Result<")?.strip_suffix('>')?;
+    // Split at depth-0 comma to get the Ok type
+    let parts = split_at_depth_zero(inner, ',');
+    if parts.is_empty() {
+        return None;
+    }
+    Some(parts[0].trim())
 }
 
 /// Parse field definitions from purpose/constraints text.
@@ -449,7 +498,7 @@ fn infer_rust_body(
     if purpose_lower.contains("zip") {
         if params.len() == 2 {
             return format!(
-                "{}.iter().zip({}.iter()).collect()",
+                "{}.into_iter().zip({}.into_iter()).collect()",
                 params[0].0, params[1].0
             );
         }
@@ -457,7 +506,7 @@ fn infer_rust_body(
     // Enumerate
     if purpose_lower.contains("enumerate") || purpose_lower.contains("with index") {
         if params.len() == 1 {
-            return format!("{}.iter().enumerate().collect()", params[0].0);
+            return format!("{}.into_iter().enumerate().collect()", params[0].0);
         }
     }
     // Take first N
@@ -559,7 +608,14 @@ fn infer_rust_body(
         if params.len() == 1
             && (purpose_lower.contains("parse") || purpose_lower.contains("convert"))
         {
-            return format!("{}.parse().map_err(|e| e.to_string())", params[0].0);
+            // Extract the Ok type from Result<T, ...> for turbofish
+            let turbofish = extract_result_ok_type(ret)
+                .map(|t| format!("::<{}>", t))
+                .unwrap_or_default();
+            return format!(
+                "{}.parse{}().map_err(|e| e.to_string())",
+                params[0].0, turbofish
+            );
         }
         if purpose_lower.contains("read") || purpose_lower.contains("file") {
             return "std::fs::read_to_string(path).map_err(|e| e.to_string())".to_string();
@@ -711,7 +767,13 @@ fn infer_rust_body(
         || purpose_lower.contains("from string")
     {
         if params.len() == 1 && (params[0].1.contains("str") || params[0].1.contains("String")) {
-            return format!("{}.parse().unwrap_or_default()", params[0].0);
+            // Add turbofish if return type is known and concrete
+            let turbofish = if !ret.is_empty() && ret != "()" && !ret.contains("Result") && !ret.contains("Option") {
+                format!("::<{}>", ret)
+            } else {
+                String::new()
+            };
+            return format!("{}.parse{}().unwrap_or_default()", params[0].0, turbofish);
         }
     }
     // to_vec / to_vector
@@ -870,6 +932,8 @@ fn infer_composed_body(
     let mut needs_collect = true;
     let mut iter_chain = Vec::new();
 
+    let mut needs_dedup = false;
+
     for (tag, fragment) in &chain_parts {
         match *tag {
             "sort" => {
@@ -877,16 +941,11 @@ fn infer_composed_body(
             }
             "dedup" => {
                 needs_sort_first = true; // dedup requires sorted
-                iter_chain.push(".dedup()".to_string());
+                needs_dedup = true; // dedup() is a Vec method, not an iterator adapter
             }
             "map" => {
-                if purpose.contains("double") {
-                    iter_chain.push(".map(|x| x * 2)".to_string());
-                } else if purpose.contains("square") {
-                    iter_chain.push(".map(|x| x * x)".to_string());
-                } else {
-                    iter_chain.push(".map(|x| /* transform */)".to_string());
-                }
+                let body = infer_map_closure(purpose);
+                iter_chain.push(format!(".map(|x| {})", body));
             }
             "take" => {
                 // Try to extract N from purpose
@@ -907,10 +966,15 @@ fn infer_composed_body(
                 iter_chain.push(format!(".collect::<Vec<_>>()"));
                 needs_collect = false;
                 // Return the join expression
+                let dedup_line = if needs_dedup {
+                    "\n    tmp.dedup();"
+                } else {
+                    ""
+                };
                 let sort_prefix = if needs_sort_first {
                     format!(
-                        "let mut tmp = {}.to_vec();\n    tmp.sort();\n    tmp.iter()",
-                        p0
+                        "let mut tmp = {}.to_vec();\n    tmp.sort();{}\n    tmp.iter()",
+                        p0, dedup_line
                     )
                 } else {
                     format!("{}.iter()", p0)
@@ -942,15 +1006,20 @@ fn infer_composed_body(
     let chain: String = iter_chain.iter().map(|s| s.as_str()).collect::<String>();
 
     if needs_sort_first {
-        // Sort requires mutation, so we need a let binding
+        // Sort (and optionally dedup) require mutation, so we need a let binding
+        let dedup_line = if needs_dedup {
+            "\n    tmp.dedup();"
+        } else {
+            ""
+        };
         let collect = if needs_collect { ".collect()" } else { "" };
         Some(format!(
-            "let mut tmp = {}.to_vec();\n    tmp.sort();\n    tmp.iter().cloned(){}{}",
-            p0, chain, collect
+            "let mut tmp = {}.to_vec();\n    tmp.sort();{}\n    tmp.into_iter(){}{}",
+            p0, dedup_line, chain, collect
         ))
     } else {
         let collect = if needs_collect { ".collect()" } else { "" };
-        Some(format!("{}.iter().cloned(){}{}", p0, chain, collect))
+        Some(format!("{}.into_iter(){}{}", p0, chain, collect))
     }
 }
 
@@ -989,6 +1058,76 @@ fn extract_number_from_text(text: &str) -> Option<usize> {
         }
     }
     None
+}
+
+/// Infer a filter closure body from the purpose description.
+fn infer_filter_closure(purpose: &str) -> &'static str {
+    if purpose.contains("even") {
+        return "*x % 2 == 0";
+    }
+    if purpose.contains("odd") {
+        return "*x % 2 != 0";
+    }
+    if purpose.contains("positive") {
+        return "*x > 0";
+    }
+    if purpose.contains("negative") {
+        return "*x < 0";
+    }
+    if purpose.contains("non-zero") || purpose.contains("nonzero") {
+        return "*x != 0";
+    }
+    if purpose.contains("zero") {
+        return "*x == 0";
+    }
+    if purpose.contains("prime") {
+        return "*x > 1 && (2..=(*x as f64).sqrt() as i32).all(|d| *x % d != 0)";
+    }
+    if purpose.contains("empty") {
+        return "!x.is_empty()";
+    }
+    "true /* TODO: specify condition */"
+}
+
+/// Infer a map/transform closure body from purpose.
+fn infer_map_closure(purpose: &str) -> &'static str {
+    if purpose.contains("double") {
+        return "x * 2";
+    }
+    if purpose.contains("square") {
+        return "x * x";
+    }
+    if purpose.contains("triple") {
+        return "x * 3";
+    }
+    if purpose.contains("negate") {
+        return "-x";
+    }
+    if purpose.contains("absolute") || purpose.contains("abs") {
+        return "x.abs()";
+    }
+    if purpose.contains("string") || purpose.contains("to_string") {
+        return "x.to_string()";
+    }
+    if purpose.contains("increment") || purpose.contains("add 1") {
+        return "x + 1";
+    }
+    if purpose.contains("decrement") || purpose.contains("subtract 1") {
+        return "x - 1";
+    }
+    if purpose.contains("half") || purpose.contains("halve") {
+        return "x / 2";
+    }
+    if purpose.contains("uppercase") {
+        return "x.to_uppercase()";
+    }
+    if purpose.contains("lowercase") {
+        return "x.to_lowercase()";
+    }
+    if purpose.contains("length") || purpose.contains("len") {
+        return "x.len()";
+    }
+    "*x /* TODO: specify transform */"
 }
 
 /// Compose multiple atomic patterns into multi-step algorithms.

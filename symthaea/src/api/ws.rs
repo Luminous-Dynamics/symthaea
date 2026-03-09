@@ -18,7 +18,7 @@ use std::sync::Arc;
 use symthaea_core::hdc::consciousness_topology::PersistentFeature;
 use tokio::sync::Mutex;
 
-use crate::hdc::moral_topology::PersistenceDiagram;
+use crate::hdc::moral_topology::{ConvergenceExplanation, PersistenceDiagram, SignalBreakdown};
 use symthaea_types::N_HARMONIES;
 
 use super::demo_runner::DemoRunner;
@@ -185,6 +185,9 @@ pub struct DemoCycleData {
     /// Matched hazard signature template name.
     #[serde(default)]
     pub moral_matched_hazard: Option<String>,
+    /// Human-readable convergence explanation (populated when convergence detected or severity > 0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moral_convergence_explanation: Option<ConvergenceExplanation>,
 
     // ── Vision Manifold Telemetry ──
     /// Whether the vision manifold is active this cycle.
@@ -291,6 +294,7 @@ impl DemoCycleData {
         sf64(&mut self.moral_circularity);
         sf64(&mut self.moral_drift);
         sf64(&mut self.moral_anomaly_score);
+        sf64(&mut self.moral_convergence_severity);
         sf64(&mut self.consciousness_weight_variance);
         sf64(&mut self.structural_micro_phi);
         sf64(&mut self.structural_meso_phi);

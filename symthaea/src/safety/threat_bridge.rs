@@ -10,7 +10,7 @@
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
 use super::gate::{safety_gate, SafetyGateResult};
-use symthaea_physics::threat::{ThreatLevel, ThreatOutput};
+use symthaea_physics::threat::{ThreatFepAction, ThreatLevel, ThreatOutput};
 
 /// Adapter that translates Threat Assessment outputs into Safety Agent inputs.
 pub struct ThreatSafetyAdapter {

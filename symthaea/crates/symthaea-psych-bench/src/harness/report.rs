@@ -566,7 +566,7 @@ impl BenchmarkReport {
 
         for (metric_key, baseline_key, baselines) in &mappings {
             if let Some(metric) = result.metrics.get(*metric_key) {
-                if let Some(baseline) = baselines.get(baseline_key) {
+                if let Some(baseline) = baselines.get(*baseline_key) {
                     comps.push((
                         metric_key.to_string(),
                         Self::make_comparison(metric, baseline),
@@ -1049,6 +1049,10 @@ impl BenchmarkReport {
             || benchmark.contains("Motor")
             || benchmark.contains("Language")
             || benchmark.contains("Social")
+            || benchmark.contains("Consciousness")
+            || benchmark.contains("Binding")
+            || benchmark.contains("Speech")
+            || benchmark.contains("Substrate")
         {
             comps
         } else {
@@ -1349,6 +1353,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("ChangeDetection") => "set_size_4::accuracy",
         b if b.contains("SerialRecall") => "list_7::primacy_index",
         b if b.contains("SpatialUpdating") => "overall_accuracy",
+        b if b.contains("TemporalOrder") => "discrimination_slope",
         b if b.contains("Binding") => "overall_binding_accuracy",
         b if b.contains("DigitSpan") => "forward_span",
         b if b.contains("EmotionalStroop") => "emotional_interference",
@@ -1434,7 +1439,6 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("MismatchNegativity") => "detection_accuracy",
         b if b.contains("ChangeBlindness") => "detection_with_disruption",
         b if b.contains("ProprioceptiveDrift") => "drift_difference",
-        b if b.contains("TemporalOrder") => "discrimination_slope",
         b if b.contains("PhonemeDiscrimination") => "categorical_perception_index",
         b if b.contains("SubstrateTransfer") => "transfer_fidelity",
         _ => "overall_accuracy",
@@ -1573,6 +1577,8 @@ impl BenchmarkReport {
             let key = key_metric_for_benchmark(&result.benchmark);
 
             let comparisons = self.find_comparisons(result, &bl);
+
+            // Debug: log domains with no comparisons for key metric
 
             if let Some((_, comp)) = comparisons.iter().find(|(k, _)| k == key) {
                 if let Some(z) = comp.z_score {

@@ -1053,8 +1053,9 @@ mod tests {
 
     #[test]
     fn test_hamming_similarity_raw_half_matching() {
+        // 0xF0 = 11110000, 0x00 = 00000000 → XOR = 11110000 → 4 bits differ per byte = half
         let a = [0xF0_u8; 64];
-        let b = [0x0F_u8; 64];
+        let b = [0x00_u8; 64];
         let sim = hamming_similarity_raw(&a, &b);
         assert!(
             (sim - 0.5).abs() < f32::EPSILON,
