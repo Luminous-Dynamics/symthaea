@@ -1685,7 +1685,7 @@ impl Symthaea {
 
             // Item 6 (Phase 3i): Structured prompt assembly for LLM completion.
             // Organize notes into clear sections so the LLM gets a well-formed prompt.
-            let mut notes = generated.notes;
+            let mut notes = generated.notes.clone();
 
             if needs_llm {
                 // Section: CONSTRAINTS from spec + algorithm detection

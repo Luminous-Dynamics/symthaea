@@ -35,6 +35,8 @@ pub struct AttestationRecord {
     pub baseline_time: Instant,
     /// Most recent verification result.
     pub last_verification: Option<VerificationResult>,
+    /// Number of consecutive verification failures (for drift vs corruption detection).
+    pub consecutive_failures: usize,
 }
 
 /// Result of a single verification check.
@@ -87,6 +89,7 @@ impl AttestationRegistry {
             baseline_hash: initial_hash,
             baseline_time: Instant::now(),
             last_verification: None,
+            consecutive_failures: 0,
         });
         self.hashers.push(hasher);
     }
@@ -103,6 +106,7 @@ impl AttestationRegistry {
             baseline_hash: hash,
             baseline_time: Instant::now(),
             last_verification: None,
+            consecutive_failures: 0,
         });
         // Snapshot-only: re-verification returns the baseline (can't re-hash without access)
         let frozen = hash;
@@ -125,12 +129,23 @@ impl AttestationRegistry {
                 cycle,
             });
             if !passed {
+                // Track consecutive failures for drift detection
+                record.consecutive_failures += 1;
+                let severity = if record.consecutive_failures >= 3 {
+                    "CRITICAL"
+                } else {
+                    "DRIFT"
+                };
                 failures.push(format!(
-                    "Attestation FAILED for '{}': baseline {:x?} != current {:x?}",
+                    "Attestation {} for '{}' (streak {}): baseline {:x?} != current {:x?}",
+                    severity,
                     record.name,
+                    record.consecutive_failures,
                     &record.baseline_hash[..8],
                     &current_hash[..8],
                 ));
+            } else {
+                record.consecutive_failures = 0;
             }
         }
         failures
@@ -244,7 +259,7 @@ mod tests {
         );
         let failures = reg.verify_all(1);
         assert_eq!(failures.len(), 1);
-        assert!(failures[0].contains("FAILED"));
+        assert!(failures[0].contains("DRIFT"));
     }
 
     #[test]

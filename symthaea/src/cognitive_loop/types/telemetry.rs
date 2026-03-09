@@ -1366,6 +1366,9 @@ pub struct EthicalTelemetry {
     /// Trajectory convergence severity in \[0.0, 1.0\].
     #[serde(default)]
     pub moral_convergence_severity: f64,
+    /// Name of matched hazard signature template (e.g. "weaponization"), if any.
+    #[serde(default)]
+    pub moral_matched_hazard: Option<String>,
     /// Harmony entropy (moral breadth): Shannon entropy of harmony variance distribution.
     /// Range: [0, ln(8)] ≈ [0, 2.08]. Higher = broader moral engagement.
     #[serde(default)]

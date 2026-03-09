@@ -452,6 +452,7 @@ pub fn generate_pulse_html(
     write_cognitive_pane(&mut html, cognitive);
     write_butlin_pane(&mut html, butlin);
     write_substrate_pane(&mut html, substrate);
+    write_integrity_pane(&mut html, &current.integrity);
     write_narrative_pane(&mut html, narrative);
     if !timeline.is_empty() {
         write_timeline_pane(&mut html, timeline, current);
@@ -1861,7 +1862,54 @@ fn write_substrate_pane(html: &mut String, substrate: &SubstrateInfo) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Pane 7: Narrative / Inner Voice
+// Pane 7b: Integrity Shield
+// ═══════════════════════════════════════════════════════════════════════════════
+
+fn write_integrity_pane(html: &mut String, integrity: &IntegrityInfo) {
+    // Overall status: green if all pass, yellow for drift, red for critical
+    let (status_label, status_color) = if integrity.has_critical {
+        ("CRITICAL", "#e74c3c")
+    } else if !integrity.attestation_passed || !integrity.canaries_passed {
+        ("WARNING", "#f39c12")
+    } else {
+        ("VERIFIED", "#2ecc71")
+    };
+
+    let _ = write!(html, r##"<div class="pane">
+<h2>Integrity Shield</h2>
+<div style="text-align:center;margin-bottom:12px">
+  <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:{color};box-shadow:0 0 12px {color};margin-right:8px;vertical-align:middle"></span>
+  <span style="color:{color};font-weight:bold;font-size:1.1em;vertical-align:middle">{label}</span>
+</div>
+<table style="width:100%;font-size:0.88em">
+<tr><td>Attestation</td><td style="text-align:right">{attest}</td></tr>
+<tr><td>Temporal</td><td style="text-align:right">{temporal}</td></tr>
+<tr><td>Canaries</td><td style="text-align:right">{canaries}</td></tr>
+<tr><td style="color:#8a9a8a">Registered</td><td style="text-align:right;color:#8a9a8a">{att_count} attestations, {can_count} canaries</td></tr>
+</table>
+"##,
+        color = status_color,
+        label = status_label,
+        attest = if integrity.attestation_passed { "&#x2705;" } else { "&#x274C;" },
+        temporal = if integrity.temporal_passed { "&#x2705;" } else { "&#x274C;" },
+        canaries = if integrity.canaries_passed { "&#x2705;" } else { "&#x274C;" },
+        att_count = integrity.attestation_count,
+        can_count = integrity.canary_count,
+    );
+
+    if integrity.anomaly_count > 0 {
+        let _ = write!(html,
+            r#"<p style="color:#e74c3c;font-size:0.85em;margin-top:8px">{} anomal{} detected</p>"#,
+            integrity.anomaly_count,
+            if integrity.anomaly_count == 1 { "y" } else { "ies" },
+        );
+    }
+
+    html.push_str("</div>\n");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Pane 8: Narrative / Inner Voice
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn write_narrative_pane(html: &mut String, narrative: &Narrative) {

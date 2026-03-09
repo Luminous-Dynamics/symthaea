@@ -537,9 +537,9 @@ impl CognitiveLoopService {
             {
                 let allostatic = self.neuromod.bath.allostatic_load;
                 let coherence = 1.0 - allostatic as f64;
-                self.master_equation.embodiment_factor.update_interoceptive(
-                    coherence, coherence,
-                );
+                self.master_equation
+                    .embodiment_factor
+                    .update_interoceptive(coherence, coherence);
             }
 
             // Wire narrative coherence with lightweight episodes (every 5 cycles)

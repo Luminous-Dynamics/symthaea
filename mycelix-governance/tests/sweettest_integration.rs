@@ -800,7 +800,7 @@ pub struct SigningCommittee {
 pub struct CommitteeMember {
     pub committee_id: String,
     pub participant_id: u32,
-    pub agent: String,
+    pub agent: AgentPubKey,
     pub member_did: String,
     pub trust_score: f64,
     pub public_share: Option<Vec<u8>>,
@@ -923,10 +923,9 @@ pub struct ReportViolationInput {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SignatureShare {
-    pub id: String,
     pub signature_id: String,
     pub participant_id: u32,
-    pub agent: String,
+    pub signer: AgentPubKey,
     pub share: Vec<u8>,
     pub content_hash: Vec<u8>,
     pub submitted_at: Timestamp,

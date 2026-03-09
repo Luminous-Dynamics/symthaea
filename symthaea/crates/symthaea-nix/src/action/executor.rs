@@ -859,7 +859,8 @@ mod tests {
 
     #[test]
     fn test_custom_auto_classify_search() {
-        let cmd = NixOSCommand::custom_auto("nix", vec!["search".into(), "nixpkgs".into(), "vim".into()]);
+        let cmd =
+            NixOSCommand::custom_auto("nix", vec!["search".into(), "nixpkgs".into(), "vim".into()]);
         assert_eq!(cmd.safety_level(), SafetyLevel::ReadOnly);
     }
 

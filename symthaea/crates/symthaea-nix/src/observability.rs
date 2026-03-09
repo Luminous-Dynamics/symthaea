@@ -76,11 +76,8 @@ impl Metrics {
             )
             .map_err(|e| MetricsInitError(format!("consciousness_level: {e}")))?,
 
-            phi_value: register_gauge!(
-                "phi_value",
-                "Current Phi (integrated information) value"
-            )
-            .map_err(|e| MetricsInitError(format!("phi_value: {e}")))?,
+            phi_value: register_gauge!("phi_value", "Current Phi (integrated information) value")
+                .map_err(|e| MetricsInitError(format!("phi_value: {e}")))?,
 
             gate_vetoes_total: register_counter!(
                 "gate_vetoes_total",
@@ -88,11 +85,8 @@ impl Metrics {
             )
             .map_err(|e| MetricsInitError(format!("gate_vetoes_total: {e}")))?,
 
-            free_energy: register_gauge!(
-                "free_energy",
-                "Current free energy of the world model"
-            )
-            .map_err(|e| MetricsInitError(format!("free_energy: {e}")))?,
+            free_energy: register_gauge!("free_energy", "Current free energy of the world model")
+                .map_err(|e| MetricsInitError(format!("free_energy: {e}")))?,
 
             anomalies_total: register_counter!(
                 "anomalies_total",
@@ -121,9 +115,8 @@ impl Metrics {
     /// use `try_global()` instead.
     pub fn global() -> &'static Metrics {
         METRICS.get_or_init(|| {
-            Self::try_new().unwrap_or_else(|e| {
-                panic!("Fatal: cannot register prometheus metrics: {e}")
-            })
+            Self::try_new()
+                .unwrap_or_else(|e| panic!("Fatal: cannot register prometheus metrics: {e}"))
         })
     }
 

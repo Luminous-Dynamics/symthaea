@@ -303,9 +303,7 @@ impl Curriculum {
             CurriculumType::Rust => Self::builtin_rust(),
             CurriculumType::RustAdvanced => Self::builtin_rust_advanced(),
             CurriculumType::Holochain => Self::builtin_holochain(),
-            CurriculumType::CodeGeneration => {
-                super::code_curriculum::code_generation_curriculum()
-            }
+            CurriculumType::CodeGeneration => super::code_curriculum::code_generation_curriculum(),
             CurriculumType::CodeGenerationAdvanced => {
                 super::code_curriculum::code_generation_advanced_curriculum()
             }

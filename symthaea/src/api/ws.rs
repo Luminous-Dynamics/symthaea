@@ -182,6 +182,9 @@ pub struct DemoCycleData {
     /// Trajectory convergence severity [0.0, 1.0].
     #[serde(default)]
     pub moral_convergence_severity: f64,
+    /// Matched hazard signature template name.
+    #[serde(default)]
+    pub moral_matched_hazard: Option<String>,
 
     // ── Vision Manifold Telemetry ──
     /// Whether the vision manifold is active this cycle.

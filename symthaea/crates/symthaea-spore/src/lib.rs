@@ -16,10 +16,10 @@
 //! ```text
 //! SporeEngine owns:
 //!   HdcLtcUnifiedNetwork (HDC-CfC neurons)
-//!   ConsciousnessEquationV2 (Phi computation)
+//!   MasterConsciousnessEquation (Phi computation)
 //!   NeuromodulatorBath (DA/NE/5-HT/Oxytocin)
-//!   SubstrateManager (feasibility scoring)
-//!   MoralAlgebra (ethical reasoning)
+//!   EightHarmonies (ethical framework)
+//!   SubstrateValidation (epistemic honesty)
 //! ```
 //!
 //! ## Usage (Rust)
@@ -30,7 +30,9 @@
 //! let config = SporeConfig::default();
 //! let mut engine = SporeEngine::new(config);
 //! let result = engine.cycle("hello world");
-//! println!("Phi: {}", result.phi);
+//! println!("Consciousness: {} [{}]",
+//!     result.consciousness_level,
+//!     result.epistemic_status.evidence_level);
 //! ```
 
 #![deny(unsafe_code)]

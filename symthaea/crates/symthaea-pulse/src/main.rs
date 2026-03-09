@@ -184,6 +184,39 @@ pub struct Narrative {
     pub selected_strategy: String,
 }
 
+/// Integrity status for the Pulse card.
+#[derive(Serialize, Deserialize)]
+pub struct IntegrityInfo {
+    /// Whether all BLAKE3 attestation hashes matched.
+    pub attestation_passed: bool,
+    /// Whether temporal consistency (wall clock vs CfC delta_t) passed.
+    pub temporal_passed: bool,
+    /// Whether all behavioral canaries returned expected results.
+    pub canaries_passed: bool,
+    /// Total number of anomalies detected.
+    pub anomaly_count: usize,
+    /// Whether any anomaly has Critical severity.
+    pub has_critical: bool,
+    /// Number of registered canaries.
+    pub canary_count: usize,
+    /// Number of registered attestations.
+    pub attestation_count: usize,
+}
+
+impl Default for IntegrityInfo {
+    fn default() -> Self {
+        Self {
+            attestation_passed: true,
+            temporal_passed: true,
+            canaries_passed: true,
+            anomaly_count: 0,
+            has_critical: false,
+            canary_count: 0,
+            attestation_count: 0,
+        }
+    }
+}
+
 /// Full JSON-serializable pulse snapshot for comparison mode.
 #[derive(Serialize, Deserialize)]
 pub struct PulseSnapshot {
@@ -195,6 +228,8 @@ pub struct PulseSnapshot {
     pub substrate: SubstrateInfo,
     pub narrative: Narrative,
     pub sparkline: Vec<SparklinePoint>,
+    #[serde(default)]
+    pub integrity: IntegrityInfo,
 }
 
 /// Computed delta between two pulse snapshots for the comparison view.
@@ -987,6 +1022,15 @@ fn main() -> Result<()> {
         substrate,
         narrative,
         sparkline,
+        integrity: IntegrityInfo {
+            attestation_passed: last.metadata.integrity.attestation_passed,
+            temporal_passed: last.metadata.integrity.temporal_passed,
+            canaries_passed: last.metadata.integrity.canaries_passed,
+            anomaly_count: last.metadata.integrity.anomaly_count,
+            has_critical: last.metadata.integrity.has_critical,
+            canary_count: 6,       // 6 built-in canaries
+            attestation_count: 3,  // safety thresholds + consciousness weights + receptor sensitivities
+        },
     };
 
     if let Some(json_path) = &args.json {
@@ -1220,6 +1264,15 @@ fn main() -> Result<()> {
                     selected_strategy: wm.selected_strategy.clone(),
                 },
                 sparkline: watch_sparkline,
+                integrity: IntegrityInfo {
+                    attestation_passed: wm.integrity.attestation_passed,
+                    temporal_passed: wm.integrity.temporal_passed,
+                    canaries_passed: wm.integrity.canaries_passed,
+                    anomaly_count: wm.integrity.anomaly_count,
+                    has_critical: wm.integrity.has_critical,
+                    canary_count: 6,
+                    attestation_count: 3,
+                },
             };
 
             // Delta against previous snapshot

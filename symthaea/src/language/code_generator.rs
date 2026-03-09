@@ -164,7 +164,10 @@ impl ControlFlowInfo {
                 continue;
             }
             if prev_was_terminator && !trimmed.starts_with('}') && !trimmed.starts_with("//") {
-                warnings.push(format!("UNREACHABLE_CODE: line {} after return/break", i + 1));
+                warnings.push(format!(
+                    "UNREACHABLE_CODE: line {} after return/break",
+                    i + 1
+                ));
                 prev_was_terminator = false;
             }
             prev_was_terminator = trimmed.starts_with("return ")
@@ -184,12 +187,17 @@ impl ControlFlowInfo {
 
         // Check that non-unit functions end with an expression
         if !is_unit_return {
-            let last_expr = lines.iter().rev()
-                .find(|l| { let t = l.trim(); !t.is_empty() && t != "}" && !t.starts_with("//") });
+            let last_expr = lines.iter().rev().find(|l| {
+                let t = l.trim();
+                !t.is_empty() && t != "}" && !t.starts_with("//")
+            });
             if let Some(last) = last_expr {
                 let t = last.trim();
                 if t.ends_with(';') && !t.starts_with("return") {
-                    warnings.push("MISSING_RETURN: last line is statement but return type is non-unit".to_string());
+                    warnings.push(
+                        "MISSING_RETURN: last line is statement but return type is non-unit"
+                            .to_string(),
+                    );
                 }
             }
         }
@@ -197,36 +205,53 @@ impl ControlFlowInfo {
         Self { warnings }
     }
 
-    pub fn is_clean(&self) -> bool { self.warnings.is_empty() }
+    pub fn is_clean(&self) -> bool {
+        self.warnings.is_empty()
+    }
 }
 
 /// Nested Rust type parser.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ParsedType {
     Simple(String),
-    Generic { base: String, params: Vec<ParsedType> },
+    Generic {
+        base: String,
+        params: Vec<ParsedType>,
+    },
     Tuple(Vec<ParsedType>),
-    Reference { mutable: bool, inner: Box<ParsedType> },
+    Reference {
+        mutable: bool,
+        inner: Box<ParsedType>,
+    },
 }
 
 impl ParsedType {
     pub fn parse(s: &str) -> Self {
         let s = s.trim();
         if s.starts_with("&mut ") {
-            return ParsedType::Reference { mutable: true, inner: Box::new(Self::parse(&s[5..])) };
+            return ParsedType::Reference {
+                mutable: true,
+                inner: Box::new(Self::parse(&s[5..])),
+            };
         }
         if s.starts_with('&') {
-            return ParsedType::Reference { mutable: false, inner: Box::new(Self::parse(&s[1..])) };
+            return ParsedType::Reference {
+                mutable: false,
+                inner: Box::new(Self::parse(&s[1..])),
+            };
         }
         if s.starts_with('(') && s.ends_with(')') {
-            let parts = split_type_params(&s[1..s.len()-1]);
+            let parts = split_type_params(&s[1..s.len() - 1]);
             return ParsedType::Tuple(parts.into_iter().map(|p| Self::parse(&p)).collect());
         }
         if let Some(angle) = s.find('<') {
             if s.ends_with('>') {
                 let base = s[..angle].to_string();
-                let parts = split_type_params(&s[angle+1..s.len()-1]);
-                return ParsedType::Generic { base, params: parts.into_iter().map(|p| Self::parse(&p)).collect() };
+                let parts = split_type_params(&s[angle + 1..s.len() - 1]);
+                return ParsedType::Generic {
+                    base,
+                    params: parts.into_iter().map(|p| Self::parse(&p)).collect(),
+                };
             }
         }
         ParsedType::Simple(s.to_string())
@@ -242,7 +267,10 @@ impl ParsedType {
     }
 
     pub fn is_collection(&self) -> bool {
-        matches!(self.base_name(), "Vec" | "HashSet" | "BTreeSet" | "VecDeque")
+        matches!(
+            self.base_name(),
+            "Vec" | "HashSet" | "BTreeSet" | "VecDeque"
+        )
     }
 
     pub fn is_map(&self) -> bool {
@@ -250,7 +278,10 @@ impl ParsedType {
     }
 
     pub fn inner_type(&self) -> Option<&ParsedType> {
-        match self { ParsedType::Generic { params, .. } => params.first(), _ => None }
+        match self {
+            ParsedType::Generic { params, .. } => params.first(),
+            _ => None,
+        }
     }
 }
 
@@ -260,10 +291,22 @@ fn split_type_params(s: &str) -> Vec<String> {
     let mut current = String::new();
     for ch in s.chars() {
         match ch {
-            '<' => { depth += 1; current.push(ch); }
-            '>' => { depth -= 1; current.push(ch); }
-            '(' => { paren += 1; current.push(ch); }
-            ')' => { paren -= 1; current.push(ch); }
+            '<' => {
+                depth += 1;
+                current.push(ch);
+            }
+            '>' => {
+                depth -= 1;
+                current.push(ch);
+            }
+            '(' => {
+                paren += 1;
+                current.push(ch);
+            }
+            ')' => {
+                paren -= 1;
+                current.push(ch);
+            }
             ',' if depth == 0 && paren == 0 => {
                 parts.push(current.trim().to_string());
                 current = String::new();
@@ -272,7 +315,9 @@ fn split_type_params(s: &str) -> Vec<String> {
         }
     }
     let last = current.trim().to_string();
-    if !last.is_empty() { parts.push(last); }
+    if !last.is_empty() {
+        parts.push(last);
+    }
     parts
 }
 
@@ -286,42 +331,162 @@ pub struct CompileErrorFix {
 
 pub fn diagnose_compile_error(stderr: &str) -> Vec<CompileErrorFix> {
     let patterns: &[(&str, &str, &str)] = &[
-        ("expected expression, found `)`", "Empty closure body — need concrete expression", "empty_closure"),
-        ("type annotations needed", "Add explicit type with turbofish ::<Type>", "type_inference"),
-        ("no method named", "Method doesn't exist — check .iter() or different method", "wrong_method"),
-        ("expected one of `,` or `>`", "Type parameter syntax error — tuple/generic nesting", "type_syntax"),
-        ("mismatched types", "Return type mismatch — check .cloned()/.copied()/conversion", "type_mismatch"),
-        ("cannot borrow", "Borrow error — try .clone() or restructure ownership", "borrow_error"),
-        ("use of moved value", "Value moved — use .clone() or avoid double use", "moved_value"),
-        ("cannot find value", "Variable not in scope — check spelling or add let", "undefined_var"),
-        ("cannot find type", "Type not imported — add use or fully qualify", "undefined_type"),
-        ("the trait bound", "Missing trait impl — may need derive or implement", "missing_trait"),
-        ("lifetime", "Lifetime issue — consider owned types", "lifetime"),
+        (
+            "expected expression, found `)`",
+            "Empty closure body — need concrete expression",
+            "empty_closure",
+        ),
+        (
+            "type annotations needed",
+            "Add explicit type with turbofish ::<Type>",
+            "type_inference",
+        ),
+        (
+            "no method named",
+            "Method doesn't exist — check .iter() or different method",
+            "wrong_method",
+        ),
+        (
+            "expected one of `,` or `>`",
+            "Type parameter syntax error — tuple/generic nesting",
+            "type_syntax",
+        ),
+        (
+            "mismatched types",
+            "Return type mismatch — check .cloned()/.copied()/conversion",
+            "type_mismatch",
+        ),
+        (
+            "cannot borrow",
+            "Borrow error — try .clone() or restructure ownership",
+            "borrow_error",
+        ),
+        (
+            "use of moved value",
+            "Value moved — use .clone() or avoid double use",
+            "moved_value",
+        ),
+        (
+            "cannot find value",
+            "Variable not in scope — check spelling or add let",
+            "undefined_var",
+        ),
+        (
+            "cannot find type",
+            "Type not imported — add use or fully qualify",
+            "undefined_type",
+        ),
+        (
+            "the trait bound",
+            "Missing trait impl — may need derive or implement",
+            "missing_trait",
+        ),
+        (
+            "lifetime",
+            "Lifetime issue — consider owned types",
+            "lifetime",
+        ),
     ];
-    patterns.iter()
+    patterns
+        .iter()
         .filter(|(p, _, _)| stderr.contains(p))
-        .map(|(p, h, c)| CompileErrorFix { error_pattern: p, fix_hint: h, category: c })
+        .map(|(p, h, c)| CompileErrorFix {
+            error_pattern: p,
+            fix_hint: h,
+            category: c,
+        })
         .collect()
 }
 
 fn is_rust_keyword(word: &str) -> bool {
     matches!(
         word,
-        "fn" | "let" | "mut" | "if" | "else" | "for" | "in" | "while"
-            | "loop" | "match" | "return" | "break" | "continue" | "pub"
-            | "use" | "mod" | "struct" | "enum" | "trait" | "impl" | "self"
-            | "super" | "crate" | "as" | "ref" | "true" | "false" | "type"
-            | "where" | "async" | "await" | "move" | "dyn" | "const"
-            | "static" | "extern" | "unsafe" | "iter" | "map" | "filter"
-            | "collect" | "clone" | "len" | "push" | "new" | "some"
-            | "none" | "ok" | "err" | "vec" | "format" | "println"
-            | "assert" | "assert_eq" | "todo" | "unimplemented" | "unwrap"
-            | "expect" | "cloned" | "into" | "from" | "default" | "sum"
-            | "product" | "min" | "max" | "sort" | "rev" | "take"
-            | "skip" | "zip" | "entry" | "or_insert" | "contains"
-            | "is_empty" | "to_string" | "to_vec" | "to_lowercase"
-            | "to_uppercase" | "trim" | "chars" | "lines" | "split"
-            | "join" | "replace" | "starts_with" | "ends_with"
+        "fn" | "let"
+            | "mut"
+            | "if"
+            | "else"
+            | "for"
+            | "in"
+            | "while"
+            | "loop"
+            | "match"
+            | "return"
+            | "break"
+            | "continue"
+            | "pub"
+            | "use"
+            | "mod"
+            | "struct"
+            | "enum"
+            | "trait"
+            | "impl"
+            | "self"
+            | "super"
+            | "crate"
+            | "as"
+            | "ref"
+            | "true"
+            | "false"
+            | "type"
+            | "where"
+            | "async"
+            | "await"
+            | "move"
+            | "dyn"
+            | "const"
+            | "static"
+            | "extern"
+            | "unsafe"
+            | "iter"
+            | "map"
+            | "filter"
+            | "collect"
+            | "clone"
+            | "len"
+            | "push"
+            | "new"
+            | "some"
+            | "none"
+            | "ok"
+            | "err"
+            | "vec"
+            | "format"
+            | "println"
+            | "assert"
+            | "assert_eq"
+            | "todo"
+            | "unimplemented"
+            | "unwrap"
+            | "expect"
+            | "cloned"
+            | "into"
+            | "from"
+            | "default"
+            | "sum"
+            | "product"
+            | "min"
+            | "max"
+            | "sort"
+            | "rev"
+            | "take"
+            | "skip"
+            | "zip"
+            | "entry"
+            | "or_insert"
+            | "contains"
+            | "is_empty"
+            | "to_string"
+            | "to_vec"
+            | "to_lowercase"
+            | "to_uppercase"
+            | "trim"
+            | "chars"
+            | "lines"
+            | "split"
+            | "join"
+            | "replace"
+            | "starts_with"
+            | "ends_with"
     )
 }
 
@@ -567,9 +732,7 @@ impl CodeGenerator {
         }
 
         if source.contains(".len()") && !ret_type.is_empty() {
-            if !ret_type.contains("usize")
-                && !ret_type.contains("u32")
-                && !ret_type.contains("i32")
+            if !ret_type.contains("usize") && !ret_type.contains("u32") && !ret_type.contains("i32")
             {
                 warnings.push(format!(
                     "TYPE_HINT: .len() returns usize but return type is '{}'",
@@ -737,7 +900,9 @@ impl CodeGenerator {
 
         // Control-flow validation
         if spec.language == "rust" && !source.contains("todo!") {
-            let ret_type = spec.signature.as_deref()
+            let ret_type = spec
+                .signature
+                .as_deref()
                 .and_then(|s| super::emitters::parse_rust_signature_pub(s))
                 .and_then(|p| p.return_type);
             let cf = ControlFlowInfo::analyze_rust(&source, ret_type.as_deref());
@@ -1051,10 +1216,7 @@ impl CodeGenerator {
                     ));
                 }
 
-                lines.push(format!(
-                    "// Phi (integration): {:.3}",
-                    primitive_result.phi
-                ));
+                lines.push(format!("// Phi (integration): {:.3}", primitive_result.phi));
 
                 lines.join("\n")
             }

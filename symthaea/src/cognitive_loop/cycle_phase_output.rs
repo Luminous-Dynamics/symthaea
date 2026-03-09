@@ -230,6 +230,7 @@ impl CognitiveLoopService {
                     && moral_anomaly_report.fragmentation_increase,
                 moral_trajectory_convergence: moral_anomaly_report.trajectory_convergence,
                 moral_convergence_severity: moral_anomaly_report.convergence_severity,
+                moral_matched_hazard: moral_anomaly_report.matched_hazard.clone(),
                 moral_anomaly_response_applied: self.config.enable_moral_anomaly_response
                     && self.ethics_engine.last_topology_fresh()
                     && moral_anomaly_report.anomaly_score > 0.0,
@@ -501,31 +502,33 @@ impl CognitiveLoopService {
         }
 
         // ── Session 12 telemetry ──
-        metadata.epistemic_conflict_exploration = feedback.reasoning.epistemic_conflict_count > 2
-            && self.stats.total_cycles > 20;
-        metadata.phenomenal_fragmentation_recovery = feedback.self_model.phenomenal_fragmented
-            && self.stats.total_cycles > 15;
-        metadata.temporal_discontinuity_recovery = feedback.self_model.temporal_discontinuity
-            && self.stats.total_cycles > 15;
-        metadata.binding_attention_modulated = (feedback.self_model.cross_modal_binding_strength > 0.7
+        metadata.epistemic_conflict_exploration =
+            feedback.reasoning.epistemic_conflict_count > 2 && self.stats.total_cycles > 20;
+        metadata.phenomenal_fragmentation_recovery =
+            feedback.self_model.phenomenal_fragmented && self.stats.total_cycles > 15;
+        metadata.temporal_discontinuity_recovery =
+            feedback.self_model.temporal_discontinuity && self.stats.total_cycles > 15;
+        metadata.binding_attention_modulated = (feedback.self_model.cross_modal_binding_strength
+            > 0.7
             || feedback.self_model.cross_modal_binding_strength < 0.3)
             && self.stats.total_cycles > 10;
         metadata.resonator_semantic_lr_mod = (dynamics.resonator.resonator_best_sim > 0.8
-            || (dynamics.resonator.resonator_best_sim < 0.3 && dynamics.resonator.resonator_best_sim > 0.0))
+            || (dynamics.resonator.resonator_best_sim < 0.3
+                && dynamics.resonator.resonator_best_sim > 0.0))
             && self.stats.total_cycles > 10;
 
         // ── Session 13 telemetry ──
-        metadata.fep_td_converged = self.carryover.quality.consecutive_low_td_error > 10
-            && self.stats.total_cycles > 30;
-        metadata.confidence_rising_dampen = dynamics.neuromod.confidence_velocity > 0.02
-            && self.stats.total_cycles > 15;
+        metadata.fep_td_converged =
+            self.carryover.quality.consecutive_low_td_error > 10 && self.stats.total_cycles > 30;
+        metadata.confidence_rising_dampen =
+            dynamics.neuromod.confidence_velocity > 0.02 && self.stats.total_cycles > 15;
         metadata.flow_lr_boost = self.flow_state.in_flow && self.flow_state.intensity > 0.5;
-        metadata.fep_efficiency_boost = dynamics.fep.fep_accuracy > 0.5
-            && dynamics.fep.fep_complexity < 0.5;
+        metadata.fep_efficiency_boost =
+            dynamics.fep.fep_accuracy > 0.5 && dynamics.fep.fep_complexity < 0.5;
         metadata.attention_overload_threshold = dynamics.attention.attention_budget_exceeded
             && self.stats.attention_budget_exceeded_count > 1;
-        metadata.quality_exploration_floor = self.carryover.quality.consecutive_high_quality > 10
-            && self.stats.total_cycles > 30;
+        metadata.quality_exploration_floor =
+            self.carryover.quality.consecutive_high_quality > 10 && self.stats.total_cycles > 30;
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self

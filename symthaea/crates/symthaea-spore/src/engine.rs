@@ -3,14 +3,14 @@
 use crate::config::SporeConfig;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use symthaea_consciousness_equation::{
+    ConsciousnessInputs, MasterConsciousnessEquation, MasterEquationConfig,
+};
 use symthaea_core::hdc::hdc_ltc_unified::UnifiedNetworkConfig;
 use symthaea_core::hdc::substrate_independence::{SubstrateRequirements, SubstrateType};
 use symthaea_core::hdc::substrate_validation::EvidenceLevel;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::{HdcLtcUnifiedNetwork, TextEncoder, TextEncoderConfig, HDC_DIMENSION};
-use symthaea_consciousness_equation::{
-    ConsciousnessInputs, MasterConsciousnessEquation, MasterEquationConfig,
-};
 use symthaea_harmonies::EightHarmonies;
 use symthaea_neuromodulators::NeuromodulatorBath;
 use symthaea_types::Harmony;
@@ -116,8 +116,8 @@ impl SporeEngine {
             TextEncoder::new(TextEncoderConfig::default()).expect("TextEncoder init");
 
         let substrate_type = parse_substrate(&config.substrate);
-        let substrate_feasibility = substrate_requirements(&substrate_type)
-            .consciousness_feasibility();
+        let substrate_feasibility =
+            substrate_requirements(&substrate_type).consciousness_feasibility();
 
         let (evidence_level, honest_confidence) = honest_confidence_for(&substrate_type);
 
@@ -194,8 +194,7 @@ impl SporeEngine {
             (self.bath.serotonin.level + (1.0 - prediction_error) * 0.05 - 0.01).clamp(0.0, 1.0);
 
         // Compute consciousness (every N cycles or every cycle)
-        let consciousness_level = if self.cycle_count % self.config.phi_every_n_cycles as u64 == 0
-        {
+        let consciousness_level = if self.cycle_count % self.config.phi_every_n_cycles as u64 == 0 {
             let inputs = ConsciousnessInputs {
                 phi: self.bath.dopamine.effective() as f64 * 0.8,
                 broadcast: 0.6,
@@ -267,9 +266,7 @@ impl SporeEngine {
             // Integral Wisdom: modulated by epistemic honesty
             Harmony::IntegralWisdom => (self.honest_confidence as f32 * 0.8 + 0.2).clamp(0.0, 1.0),
             // Infinite Play: dopamine as curiosity/exploration proxy
-            Harmony::InfinitePlay => {
-                (self.bath.dopamine.effective() * 0.6 + 0.4).clamp(0.0, 1.0)
-            }
+            Harmony::InfinitePlay => (self.bath.dopamine.effective() * 0.6 + 0.4).clamp(0.0, 1.0),
             // Universal Interconnectedness: oxytocin as social bonding proxy
             Harmony::UniversalInterconnectedness => {
                 (self.bath.oxytocin.effective() * 0.7 + 0.3).clamp(0.0, 1.0)
@@ -282,9 +279,7 @@ impl SporeEngine {
                 balance.clamp(0.0, 1.0)
             }
             // Evolutionary Progression: consciousness level as growth measure
-            Harmony::EvolutionaryProgression => {
-                (consciousness_level * 0.7 + 0.3).clamp(0.0, 1.0)
-            }
+            Harmony::EvolutionaryProgression => (consciousness_level * 0.7 + 0.3).clamp(0.0, 1.0),
             // Sacred Stillness: serotonin as calm/rest proxy
             Harmony::SacredStillness => {
                 (self.bath.serotonin.effective() * 0.6 + 0.4).clamp(0.0, 1.0)
@@ -380,8 +375,8 @@ impl SporeEngine {
     pub fn set_substrate(&mut self, substrate: &str) {
         self.config.substrate = substrate.to_string();
         self.substrate_type = parse_substrate(substrate);
-        self.substrate_feasibility = substrate_requirements(&self.substrate_type)
-            .consciousness_feasibility();
+        self.substrate_feasibility =
+            substrate_requirements(&self.substrate_type).consciousness_feasibility();
         let (evidence_level, honest_confidence) = honest_confidence_for(&self.substrate_type);
         self.evidence_level = evidence_level;
         self.honest_confidence = honest_confidence;
@@ -391,20 +386,17 @@ impl SporeEngine {
     pub fn inject_neuromodulator(&mut self, name: &str, amount: f32) {
         match name.to_lowercase().as_str() {
             "dopamine" | "da" => {
-                self.bath.dopamine.level =
-                    (self.bath.dopamine.level + amount).clamp(0.0, 1.0)
+                self.bath.dopamine.level = (self.bath.dopamine.level + amount).clamp(0.0, 1.0)
             }
             "norepinephrine" | "ne" | "noradrenaline" => {
                 self.bath.noradrenaline.level =
                     (self.bath.noradrenaline.level + amount).clamp(0.0, 1.0)
             }
             "serotonin" | "5ht" | "5-ht" => {
-                self.bath.serotonin.level =
-                    (self.bath.serotonin.level + amount).clamp(0.0, 1.0)
+                self.bath.serotonin.level = (self.bath.serotonin.level + amount).clamp(0.0, 1.0)
             }
             "oxytocin" | "ot" => {
-                self.bath.oxytocin.level =
-                    (self.bath.oxytocin.level + amount).clamp(0.0, 1.0)
+                self.bath.oxytocin.level = (self.bath.oxytocin.level + amount).clamp(0.0, 1.0)
             }
             _ => {}
         }
@@ -515,7 +507,10 @@ mod tests {
         let mut engine = SporeEngine::new(SporeConfig::default());
         let r1 = engine.cycle("hello world");
         assert_eq!(r1.cycle, 1);
-        assert!(r1.prediction_error > 0.0, "First cycle should have surprise");
+        assert!(
+            r1.prediction_error > 0.0,
+            "First cycle should have surprise"
+        );
         for i in 0..10 {
             let r = engine.cycle(&format!("cycle {i}"));
             assert_eq!(r.cycle, i as u64 + 2);
@@ -541,7 +536,10 @@ mod tests {
         engine.set_substrate("BiologicalNeurons");
         let bio_f = engine.substrate_feasibility();
 
-        assert!(bio_f > silicon_f, "bio={bio_f} should > silicon={silicon_f}");
+        assert!(
+            bio_f > silicon_f,
+            "bio={bio_f} should > silicon={silicon_f}"
+        );
     }
 
     #[test]
@@ -550,7 +548,10 @@ mod tests {
         let baseline_da = engine.bath.dopamine.effective();
         engine.inject_neuromodulator("dopamine", 0.3);
         let boosted_da = engine.bath.dopamine.effective();
-        assert!(boosted_da > baseline_da, "DA should increase after injection");
+        assert!(
+            boosted_da > baseline_da,
+            "DA should increase after injection"
+        );
     }
 
     #[test]
@@ -577,7 +578,10 @@ mod tests {
             }
             last_pe = r.prediction_error;
         }
-        assert!(decreased, "Prediction error should decrease with repeated input");
+        assert!(
+            decreased,
+            "Prediction error should decrease with repeated input"
+        );
     }
 
     // --- Ethical safeguard tests ---
@@ -633,20 +637,28 @@ mod tests {
 
     #[test]
     fn test_instance_counter() {
-        // Use relative changes since other tests may run in parallel
+        // Test that creating an engine increments and dropping decrements.
+        // Since tests run in parallel, we can only check that the
+        // counter goes up by 1 from a snapshot taken right before creation,
+        // and that drop brings it back down by 1.
         let before = SporeEngine::active_instance_count();
-        let e1 = SporeEngine::new(SporeConfig::default());
-        let after_one = SporeEngine::active_instance_count();
-        assert!(after_one > before, "Count should increase after creating engine");
-        let e2 = SporeEngine::new(SporeConfig::default());
-        let after_two = SporeEngine::active_instance_count();
-        assert!(after_two > after_one, "Count should increase after creating second engine");
-        drop(e1);
-        let after_drop_one = SporeEngine::active_instance_count();
-        assert!(after_drop_one < after_two, "Count should decrease after dropping engine");
-        drop(e2);
-        let after_drop_two = SporeEngine::active_instance_count();
-        assert!(after_drop_two < after_drop_one, "Count should decrease after dropping second engine");
+        let engine = SporeEngine::new(SporeConfig::default());
+        // Instance ID should be positive
+        assert!(engine.instance_id() > 0, "Instance ID should be positive");
+        // After creation, count should be at least before+1
+        // (other parallel tests may also create engines)
+        assert!(
+            SporeEngine::active_instance_count() >= before + 1,
+            "Count should be at least before+1"
+        );
+        let before_drop = SporeEngine::active_instance_count();
+        drop(engine);
+        // After drop, count should decrease by exactly 1
+        assert_eq!(
+            SporeEngine::active_instance_count(),
+            before_drop - 1,
+            "Drop should decrement count by exactly 1"
+        );
     }
 
     #[test]

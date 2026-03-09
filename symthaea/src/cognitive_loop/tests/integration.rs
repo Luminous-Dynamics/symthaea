@@ -994,20 +994,29 @@ fn test_visualization_records_when_enabled() {
     }
 
     let summary = service.attention_summary();
-    assert!(summary.is_some(), "visualization should be active when enabled");
+    assert!(
+        summary.is_some(),
+        "visualization should be active when enabled"
+    );
     let summary = summary.unwrap();
     assert!(
         summary.num_snapshots >= 5,
         "expected at least 5 snapshots (one per cycle), got {}",
         summary.num_snapshots,
     );
-    assert!(!summary.top_attended.is_empty(), "should have top-attended inputs");
+    assert!(
+        !summary.top_attended.is_empty(),
+        "should have top-attended inputs"
+    );
 }
 
 #[test]
 fn test_visualization_disabled_by_default() {
     let config = CognitiveLoopConfig::default();
-    assert!(!config.enable_visualization, "visualization should be off by default");
+    assert!(
+        !config.enable_visualization,
+        "visualization should be off by default"
+    );
 
     let mut service = CognitiveLoopService::new(config).unwrap();
     service.cycle("no visualization");

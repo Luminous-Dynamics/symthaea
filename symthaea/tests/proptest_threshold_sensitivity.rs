@@ -171,22 +171,13 @@ fn assert_metadata_sane(
     )?;
 
     // FEP signals: all finite
-    assert_finite_f64(
-        m.fep.fep_accuracy,
-        &format!("fep_accuracy@cycle{cycle}"),
-    )?;
+    assert_finite_f64(m.fep.fep_accuracy, &format!("fep_accuracy@cycle{cycle}"))?;
     assert_finite_f64(
         m.fep.fep_complexity,
         &format!("fep_complexity@cycle{cycle}"),
     )?;
-    assert_finite_f64(
-        m.fep.fep_surprise,
-        &format!("fep_surprise@cycle{cycle}"),
-    )?;
-    assert_finite_f64(
-        m.fep.fep_td_error,
-        &format!("fep_td_error@cycle{cycle}"),
-    )?;
+    assert_finite_f64(m.fep.fep_surprise, &format!("fep_surprise@cycle{cycle}"))?;
+    assert_finite_f64(m.fep.fep_td_error, &format!("fep_td_error@cycle{cycle}"))?;
     assert_finite_f64(
         m.fep.fep_pragmatic_value,
         &format!("fep_pragmatic_value@cycle{cycle}"),

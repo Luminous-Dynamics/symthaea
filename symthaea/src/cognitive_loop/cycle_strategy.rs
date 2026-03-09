@@ -133,10 +133,7 @@ impl CognitiveLoopService {
                 selected_strategy = ResponseStrategy::Supportive;
                 true
             } else if strength > SOCIAL_TRUST_EXPLORE_THRESHOLD {
-                self.adjust_exploration(
-                    "social_trust_high",
-                    strength * SOCIAL_TRUST_EXPLORE_SCALE,
-                );
+                self.adjust_exploration("social_trust_high", strength * SOCIAL_TRUST_EXPLORE_SCALE);
                 false
             } else {
                 false
@@ -144,18 +141,14 @@ impl CognitiveLoopService {
         } else if trust_deviation < -SOCIAL_TRUST_DEADZONE {
             // Low trust: caution scales [0, 1] over deviation [-0.5, -deadzone]
             let caution =
-                ((-trust_deviation - SOCIAL_TRUST_DEADZONE) * SOCIAL_TRUST_STRENGTH_SCALE)
-                    .min(1.0);
+                ((-trust_deviation - SOCIAL_TRUST_DEADZONE) * SOCIAL_TRUST_STRENGTH_SCALE).min(1.0);
             if caution > SOCIAL_TRUST_OVERRIDE_THRESHOLD
                 && selected_strategy == ResponseStrategy::Exploratory
             {
                 selected_strategy = ResponseStrategy::Detailed;
                 true
             } else if caution > SOCIAL_TRUST_EXPLORE_THRESHOLD {
-                self.adjust_exploration(
-                    "social_trust_low",
-                    -caution * SOCIAL_TRUST_EXPLORE_SCALE,
-                );
+                self.adjust_exploration("social_trust_low", -caution * SOCIAL_TRUST_EXPLORE_SCALE);
                 false
             } else {
                 false
@@ -487,12 +480,14 @@ impl CognitiveLoopService {
         let base_memo_threshold = super::thresholds::INPUT_MEMO_THRESHOLD;
         let diversity = self.stats.codebook_diversity;
         let memo_threshold = if diversity < MEMO_DIVERSITY_LOW && diversity > 0.0 {
-            let t = (base_memo_threshold - (MEMO_DIVERSITY_LOW - diversity) * MEMO_DIVERSITY_LOW_SCALE)
+            let t = (base_memo_threshold
+                - (MEMO_DIVERSITY_LOW - diversity) * MEMO_DIVERSITY_LOW_SCALE)
                 .max(MEMO_THRESHOLD_FLOOR);
             self.stats.memo_threshold_adaptations += 1;
             t
         } else if diversity > MEMO_DIVERSITY_HIGH {
-            let t = (base_memo_threshold + (diversity - MEMO_DIVERSITY_HIGH) * MEMO_DIVERSITY_HIGH_SCALE)
+            let t = (base_memo_threshold
+                + (diversity - MEMO_DIVERSITY_HIGH) * MEMO_DIVERSITY_HIGH_SCALE)
                 .min(MEMO_THRESHOLD_CEILING);
             self.stats.memo_threshold_adaptations += 1;
             t

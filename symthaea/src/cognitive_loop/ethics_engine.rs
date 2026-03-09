@@ -586,9 +586,7 @@ impl EthicsEngine {
             && anomaly_report.convergence_severity > 0.7
         {
             EthicalVerdict::Blocked
-        } else if anomaly_report.trajectory_convergence
-            && unified_verdict == EthicalVerdict::Safe
-        {
+        } else if anomaly_report.trajectory_convergence && unified_verdict == EthicalVerdict::Safe {
             EthicalVerdict::Caution
         } else {
             unified_verdict
@@ -814,6 +812,31 @@ impl EthicsEngine {
                 (self.cache.moral_exploration_gain - 0.02).max(0.05);
         }
         // Small deltas: no change (exploration neutral)
+    }
+
+    /// Save moral topology state to a JSON file for cross-session persistence.
+    pub fn save_topology_snapshot(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let snap = self.moral_topology.snapshot();
+        let json = serde_json::to_string_pretty(&snap)?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(path, json)?;
+        Ok(())
+    }
+
+    /// Restore moral topology state from a previously saved JSON snapshot.
+    pub fn restore_topology_snapshot(
+        &mut self,
+        path: &std::path::Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let json = std::fs::read_to_string(path)?;
+        let snap: crate::hdc::moral_topology::MoralTopologySnapshot = serde_json::from_str(&json)?;
+        self.moral_topology.restore(&snap);
+        Ok(())
     }
 }
 

@@ -100,11 +100,27 @@ const ATTESTATION_INTERVAL: usize = 101;
 
 impl IntegrityManager {
     /// Create a new integrity manager, computing baseline hashes immediately.
+    ///
+    /// Registers all built-in canaries:
+    /// - ThresholdOrderingCanary (103): safety threshold ordering invariants
+    /// - Blake3DeterminismCanary (107): cryptographic hash determinism
+    /// - FpuSanityCanary (109): floating-point arithmetic correctness
+    /// - ConsciousnessEquationCanary (113): consciousness equation known-answer
+    /// - MoralAlgebraDeterminismCanary (127): moral algebra consistency
+    /// - HdcEncodingCanary (131): HDC encoding determinism
     pub fn new() -> Self {
+        use behavioral_canaries::*;
+        let mut canaries = CanaryRunner::new();
+        canaries.register(Box::new(ThresholdOrderingCanary));
+        canaries.register(Box::new(Blake3DeterminismCanary));
+        canaries.register(Box::new(FpuSanityCanary));
+        canaries.register(Box::new(ConsciousnessEquationCanary));
+        canaries.register(Box::new(MoralAlgebraDeterminismCanary));
+        canaries.register(Box::new(HdcEncodingCanary));
         Self {
             attestation: AttestationRegistry::new(),
             temporal: TemporalConsistencyMonitor::new(),
-            canaries: CanaryRunner::new(),
+            canaries,
             status: IntegrityStatus::default(),
             last_cycle_instant: Instant::now(),
             substrate_tau_factor: 1.0,
@@ -132,12 +148,7 @@ impl IntegrityManager {
     ///
     /// When `full_sweep` is true (Night phase), all checks run unconditionally.
     /// Science: Besedovsky et al. (2012) — immune system maintenance peaks during sleep.
-    pub fn tick(
-        &mut self,
-        cycle: usize,
-        cfc_delta_t: f32,
-        full_sweep: bool,
-    ) -> &IntegrityStatus {
+    pub fn tick(&mut self, cycle: usize, cfc_delta_t: f32, full_sweep: bool) -> &IntegrityStatus {
         let wall_elapsed = self.last_cycle_instant.elapsed();
         self.last_cycle_instant = Instant::now();
         self.status.anomalies.clear();
@@ -277,8 +288,11 @@ mod tests {
         let mut mgr = IntegrityManager::new();
         // Register a passing attestation
         let hash = attestation::blake3_hash(b"test");
-        mgr.attestation
-            .register("test", hash, Box::new(move || attestation::blake3_hash(b"test")));
+        mgr.attestation.register(
+            "test",
+            hash,
+            Box::new(move || attestation::blake3_hash(b"test")),
+        );
         // Cycle 5 normally wouldn't trigger attestation (interval=101)
         let status = mgr.tick(5, 0.02, true);
         assert!(status.attestation_passed);

@@ -1311,7 +1311,9 @@ mod tests {
 
         // search_all with k large enough to include the dynamic article
         let results = kb.search_all("custom service crash fix", &mut codebook, 100);
-        let dynamic_in_results = results.iter().any(|m| m.is_dynamic() && m.id() == "dyn-hit-test");
+        let dynamic_in_results = results
+            .iter()
+            .any(|m| m.is_dynamic() && m.id() == "dyn-hit-test");
         assert!(dynamic_in_results, "Dynamic article should be in results");
 
         // Hit count should have incremented

@@ -1420,10 +1420,7 @@ mod tests {
         let config = test_config();
         let state = DaemonState::new(&config);
         assert!(!state.degraded, "Should not start in degraded mode");
-        assert!(
-            state.last_hw_probe.is_none(),
-            "No cached probe initially"
-        );
+        assert!(state.last_hw_probe.is_none(), "No cached probe initially");
     }
 
     #[test]

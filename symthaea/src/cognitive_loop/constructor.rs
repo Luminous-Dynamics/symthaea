@@ -719,7 +719,9 @@ impl CognitiveLoopService {
                 None
             },
             attention_visualizer: if enable_visualization {
-                Some(crate::visualization::AttentionVisualizer::with_max_history(500))
+                Some(crate::visualization::AttentionVisualizer::with_max_history(
+                    500,
+                ))
             } else {
                 None
             },
@@ -790,9 +792,7 @@ impl CognitiveLoopService {
             },
             #[cfg(feature = "full_consciousness")]
             enactive: EnactiveCognition::new(),
-            biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(
-                timezone_offset_hours,
-            ),
+            biorhythm_mgr: super::biorhythm_manager::BiorhythmManager::new(timezone_offset_hours),
             phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
             experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),

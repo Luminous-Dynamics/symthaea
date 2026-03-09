@@ -623,15 +623,9 @@ impl ConsciousPipeline {
                 .and_then(|r| r.plan.actions.first())
                 .map(|a| a.rationale.clone()),
             #[cfg(feature = "nix-mind")]
-            nix_causal_edge_count: self
-                .nix_hook
-                .as_ref()
-                .map(|hook| hook.causal_edge_count()),
+            nix_causal_edge_count: self.nix_hook.as_ref().map(|hook| hook.causal_edge_count()),
             #[cfg(feature = "nix-mind")]
-            nix_causal_surprise: self
-                .nix_hook
-                .as_ref()
-                .map(|hook| hook.causal_surprise()),
+            nix_causal_surprise: self.nix_hook.as_ref().map(|hook| hook.causal_surprise()),
             processing_time_ms,
         })
     }
