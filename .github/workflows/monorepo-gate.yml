@@ -1,0 +1,139 @@
+name: Monorepo Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paths:
+    runs-on: ubuntu-latest
+    outputs:
+      symthaea: ${{ steps.filter.outputs.symthaea }}
+      mycelix: ${{ steps.filter.outputs.mycelix }}
+      sdk-ts: ${{ steps.filter.outputs.sdk-ts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            symthaea:
+              - 'symthaea/**'
+            mycelix:
+              - 'mycelix-*/**'
+            sdk-ts:
+              - 'mycelix-workspace/sdk-ts/**'
+
+  symthaea-gate:
+    needs: paths
+    if: needs.paths.outputs.symthaea == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: symthaea-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: symthaea-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config libssl-dev
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --no-deps -- -D warnings
+
+      - name: Tests
+        run: cargo test --lib
+
+  mycelix-gate:
+    needs: paths
+    if: needs.paths.outputs.mycelix == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy, rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-commons/target
+            mycelix-civic/target
+            mycelix-hearth/target
+          key: mycelix-${{ hashFiles('mycelix-workspace/**/Cargo.lock') }}
+          restore-keys: mycelix-
+
+      - name: Format check - commons
+        run: cargo fmt --check --manifest-path mycelix-commons/Cargo.toml
+
+      - name: Format check - civic
+        run: cargo fmt --check --manifest-path mycelix-civic/Cargo.toml
+
+      - name: Format check - hearth
+        run: cargo fmt --check --manifest-path mycelix-hearth/Cargo.toml
+
+      - name: Clippy - commons
+        run: cargo clippy --no-deps --manifest-path mycelix-commons/Cargo.toml -- -D warnings
+
+      - name: Clippy - civic
+        run: cargo clippy --no-deps --manifest-path mycelix-civic/Cargo.toml -- -D warnings
+
+      - name: Clippy - hearth
+        run: cargo clippy --no-deps --manifest-path mycelix-hearth/Cargo.toml -- -D warnings
+
+      - name: Test - commons
+        run: cargo test --workspace --manifest-path mycelix-commons/Cargo.toml
+
+  sdk-ts-gate:
+    needs: paths
+    if: needs.paths.outputs.sdk-ts == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/sdk-ts
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mycelix-workspace/sdk-ts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
