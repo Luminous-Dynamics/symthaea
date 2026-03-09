@@ -41,13 +41,14 @@ pub enum Manner {
 /// Place of articulation: Where is the constriction?
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Place {
-    Bilabial,    // Both lips (p, b, m)
-    Labiodental, // Lower lip + upper teeth (f, v)
-    Dental,      // Tongue + teeth (th, dh)
-    Alveolar,    // Tongue + alveolar ridge (t, d, n, s, z, l, r)
-    Palatal,     // Tongue + hard palate (sh, zh, ch, jh, y)
-    Velar,       // Tongue back + soft palate (k, g, ng)
-    Glottal,     // Glottis (h)
+    Bilabial,     // Both lips (p, b, m)
+    Labiodental,  // Lower lip + upper teeth (f, v)
+    Dental,       // Tongue + teeth (th, dh)
+    Alveolar,     // Tongue + alveolar ridge (t, d, n, s, z, l)
+    PostAlveolar, // Tongue behind alveolar ridge (r)
+    Palatal,      // Tongue + hard palate (sh, zh, ch, jh, y)
+    Velar,        // Tongue back + soft palate (k, g, ng)
+    Glottal,      // Glottis (h)
     // Vowel places (tongue position)
     Front,   // Front vowels (iy, ih, ey, eh, ae)
     Central, // Central vowels (ah, er)
@@ -320,7 +321,7 @@ impl ArticulatoryMapper {
             ArticulatoryFeatures {
                 voicing: Voicing::Voiced,
                 manner: Manner::Liquid,
-                place: Place::Alveolar, // Approximant, but alveolar region
+                place: Place::PostAlveolar, // Approximant, postalveolar region
                 height: None,
                 roundness: None,
             },
@@ -583,6 +584,7 @@ pub struct ArticulatoryHDC {
     hv_labiodental: HV16,
     hv_dental: HV16,
     hv_alveolar: HV16,
+    hv_postalveolar: HV16,
     hv_palatal: HV16,
     hv_velar: HV16,
     hv_glottal: HV16,
@@ -628,6 +630,7 @@ impl ArticulatoryHDC {
         let hv_labiodental = Self::random_hv(4002);
         let hv_dental = Self::random_hv(4003);
         let hv_alveolar = Self::random_hv(4004);
+        let hv_postalveolar = Self::random_hv(4011);
         let hv_palatal = Self::random_hv(4005);
         let hv_velar = Self::random_hv(4006);
         let hv_glottal = Self::random_hv(4007);
@@ -660,6 +663,7 @@ impl ArticulatoryHDC {
             hv_labiodental,
             hv_dental,
             hv_alveolar,
+            hv_postalveolar,
             hv_palatal,
             hv_velar,
             hv_glottal,
@@ -740,6 +744,7 @@ impl ArticulatoryHDC {
             Place::Labiodental => &self.hv_labiodental,
             Place::Dental => &self.hv_dental,
             Place::Alveolar => &self.hv_alveolar,
+            Place::PostAlveolar => &self.hv_postalveolar,
             Place::Palatal => &self.hv_palatal,
             Place::Velar => &self.hv_velar,
             Place::Glottal => &self.hv_glottal,
@@ -807,6 +812,7 @@ impl ArticulatoryHDC {
             Place::Labiodental => &self.hv_labiodental,
             Place::Dental => &self.hv_dental,
             Place::Alveolar => &self.hv_alveolar,
+            Place::PostAlveolar => &self.hv_postalveolar,
             Place::Palatal => &self.hv_palatal,
             Place::Velar => &self.hv_velar,
             Place::Glottal => &self.hv_glottal,

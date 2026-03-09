@@ -62,7 +62,9 @@ impl RmeBenchmark {
         let easy_rate = 0.50; // 50% easy, 50% hard
 
         // Time pressure: reduces deliberation time (Baron-Cohen et al., 2001).
-        let noise_level: f32 = 0.25 + config.time_pressure as f32 * 0.15;
+        // Difficulty increases decision noise (harder to discriminate subtle emotions).
+        let difficulty_noise: f32 = config.difficulty as f32 * 0.20;
+        let noise_level: f32 = 0.25 + config.time_pressure as f32 * 0.15 + difficulty_noise;
         // Encoding noise degrades emotion recognition signal
         let noise_degrade: f32 = config.effective_noise() as f32 * 0.4;
 

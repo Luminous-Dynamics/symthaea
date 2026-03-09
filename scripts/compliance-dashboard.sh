@@ -139,12 +139,15 @@ if ! $JSON_MODE; then
     echo -e "${BOLD}Governance Enforcement${RESET}"
 fi
 
-# Check governance hook is installed
+# Check governance hook is installed (skip in CI — hooks are local dev tools)
 HOOK_STATUS="PASS"
-if [ -f "../.git/hooks/commit-msg" ] && grep -q "check-class-a-changes" "../.git/hooks/commit-msg" 2>/dev/null; then
-    HOOK_STATUS="PASS"
-else
-    HOOK_STATUS="FAIL"
+if [ -z "$CI" ]; then
+    GIT_DIR=$(git rev-parse --git-dir 2>/dev/null || echo ".git")
+    if [ -f "$GIT_DIR/hooks/commit-msg" ] && grep -q "check-class-a-changes" "$GIT_DIR/hooks/commit-msg" 2>/dev/null; then
+        HOOK_STATUS="PASS"
+    else
+        HOOK_STATUS="FAIL"
+    fi
 fi
 SUITE_STATUS["Commit-msg governance hook"]=$HOOK_STATUS
 if ! $JSON_MODE; then

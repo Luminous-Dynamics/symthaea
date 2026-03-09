@@ -44,19 +44,25 @@ pub fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
     if sigma <= 0.0 {
         return;
     }
-    // Simple Box-Muller transform with deterministic seed per element.
-    // Uses a hash-based seed so repeated calls with different gradient values
-    // produce different noise, while being reproducible.
-    for (i, g) in gradient.iter_mut().enumerate() {
-        // Mix the element index and current value into a pseudo-random seed
-        let seed = (i as u64)
-            .wrapping_mul(6364136223846793005)
-            .wrapping_add(g.to_bits() as u64)
-            .wrapping_mul(2862933555777941757);
-        let u1 = ((seed & 0xFFFFFFFF) as f64 + 1.0) / (0x100000000u64 as f64);
-        let u2 = (((seed >> 32) & 0xFFFFFFFF) as f64 + 1.0) / (0x100000000u64 as f64);
-        let z = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos();
-        *g += (sigma as f64 * z) as f32;
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+
+    let mut i = 0;
+    while i + 1 < gradient.len() {
+        let u1: f32 = rng.gen::<f32>().max(f32::EPSILON);
+        let u2: f32 = rng.gen();
+        let r = (-2.0 * u1.ln()).sqrt();
+        let theta = 2.0 * std::f32::consts::PI * u2;
+        gradient[i] += sigma * r * theta.cos();
+        gradient[i + 1] += sigma * r * theta.sin();
+        i += 2;
+    }
+    if i < gradient.len() {
+        let u1: f32 = rng.gen::<f32>().max(f32::EPSILON);
+        let u2: f32 = rng.gen();
+        let r = (-2.0 * u1.ln()).sqrt();
+        let theta = 2.0 * std::f32::consts::PI * u2;
+        gradient[i] += sigma * r * theta.cos();
     }
 }
 

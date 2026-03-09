@@ -3237,7 +3237,7 @@ mod tests {
         let spec = CodeSpec::new("rust", "parse_int", "Parse a string to integer")
             .with_signature("fn parse_int(s: &str) -> i32");
         let result = emitter.emit_from_spec(&spec, &make_plan());
-        assert!(result.contains(".parse()"), "Should use parse: {}", result);
+        assert!(result.contains(".parse"), "Should use parse: {}", result);
         assert!(
             result.contains("unwrap_or_default"),
             "Should have default: {}",

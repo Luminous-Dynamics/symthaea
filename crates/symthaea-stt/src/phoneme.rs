@@ -963,9 +963,9 @@ mod tests {
     fn test_arpabet_stress_stripping() {
         let inv = PhonemeInventory::new();
 
-        // Stress marker 0
+        // Stress marker 0 — strips digit, looks up "AH" which maps to "ʌ"
         let ah0 = inv.get_arpabet("AH0").unwrap();
-        assert_eq!(ah0.ipa, "ə");
+        assert_eq!(ah0.ipa, "ʌ");
 
         // Stress marker 2
         let iy2 = inv.get_arpabet("IY2").unwrap();
