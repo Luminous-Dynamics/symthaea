@@ -564,6 +564,10 @@ pub struct CognitiveLoopService {
     /// When enabled, infers user cognitive load, frustration, and engagement from input text.
     user_state: Option<crate::user_state_inference::UserStateInference>,
 
+    /// Physiology coherence field — consciousness integration via hormone modulation.
+    /// Tracks coherence state, applies hormone effects from neuromod bath each cycle.
+    coherence_field: Option<crate::physiology::CoherenceField>,
+
     /// Virtual body adapter for embodied cognition.
     /// When enabled, maps cognitive signals to interoceptive states and produces
     /// a phi_modulation factor that scales consciousness from somatic feedback.
