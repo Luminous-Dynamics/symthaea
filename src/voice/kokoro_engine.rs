@@ -43,7 +43,7 @@ impl Default for KokoroConfig {
 /// Kokoro TTS Engine wrapping an ONNX Runtime session.
 pub struct KokoroEngine {
     #[cfg(feature = "voice-tts")]
-    session: ort::Session,
+    session: ort::session::Session,
     #[cfg(feature = "voice-tts")]
     voices: Vec<Vec<f32>>,
     config: KokoroConfig,
@@ -86,8 +86,8 @@ impl KokoroEngine {
         };
 
         // Create ONNX Runtime session
-        let session = match ort::Session::builder()
-            .and_then(|builder| builder.with_model_from_file(&model_path))
+        let session = match ort::session::Session::builder()
+            .and_then(|builder: ort::session::SessionBuilder| builder.with_model_from_file(&model_path))
         {
             Ok(session) => session,
             Err(e) => {
@@ -158,11 +158,18 @@ impl KokoroEngine {
 
         let speed_array = ndarray::Array1::from_vec(vec![1.0f32]);
 
-        // Run inference
+        // Run inference — convert ndarrays to ort::Value for ort 2.0 API
+        let input_ids_value =
+            ort::value::Value::from_array(input_ids_array).ok()?;
+        let style_value =
+            ort::value::Value::from_array(style_array).ok()?;
+        let speed_value =
+            ort::value::Value::from_array(speed_array).ok()?;
+
         let outputs = match self.session.run(ort::inputs![
-            "input_ids" => input_ids_array,
-            "style" => style_array,
-            "speed" => speed_array,
+            "input_ids" => input_ids_value,
+            "style" => style_value,
+            "speed" => speed_value,
         ]) {
             Ok(outputs) => outputs,
             Err(e) => {
