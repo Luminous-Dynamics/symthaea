@@ -279,7 +279,10 @@ jobs:
             pkg-config \
             libssl-dev \
             libasound2-dev \
-            libdbus-1-dev
+            libdbus-1-dev \
+            protobuf-compiler \
+            libclang-dev \
+            libespeak-ng-dev
 
       - name: Test with feature ${{ matrix.features }}
         run: cargo test --features "${{ matrix.features }}"
@@ -413,7 +416,14 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            protobuf-compiler \
+            libclang-dev \
+            libespeak-ng-dev
 
       - name: Check feature combination ${{ matrix.features }}
         run: cargo check --features "${{ matrix.features }}"
