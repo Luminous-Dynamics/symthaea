@@ -78,7 +78,8 @@ jobs:
             pkg-config \
             libssl-dev \
             libasound2-dev \
-            libdbus-1-dev
+            libdbus-1-dev \
+            protobuf-compiler
 
       - name: Run clippy
         run: cargo clippy --all-features -- -D warnings
