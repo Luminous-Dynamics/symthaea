@@ -46,7 +46,11 @@ pub fn suggest_similar(name: &str, max: usize) -> Vec<(&'static str, &'static st
         })
         .collect();
     scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
-    scored.into_iter().take(max).map(|(_, a, p)| (a, p)).collect()
+    scored
+        .into_iter()
+        .take(max)
+        .map(|(_, a, p)| (a, p))
+        .collect()
 }
 
 /// Software categories for browsing.
@@ -69,7 +73,7 @@ pub enum Category {
     Network,
     FileManagers,
     Virtualization,
-    Passwords,
+    CredentialManagers,
     Backup,
     Scientific,
 }
@@ -77,24 +81,80 @@ pub enum Category {
 /// Get representative packages for a category.
 pub fn category_packages(cat: Category) -> &'static [&'static str] {
     match cat {
-        Category::Browsers => &["chrome", "firefox", "brave", "opera", "vivaldi", "edge", "tor", "librewolf"],
-        Category::Editors => &["vscode", "vim", "neovim", "emacs", "sublime", "helix", "zed"],
+        Category::Browsers => &[
+            "chrome",
+            "firefox",
+            "brave",
+            "opera",
+            "vivaldi",
+            "edge",
+            "tor",
+            "librewolf",
+        ],
+        Category::Editors => &[
+            "vscode", "vim", "neovim", "emacs", "sublime", "helix", "zed",
+        ],
         Category::Terminals => &["alacritty", "kitty", "wezterm", "foot", "zellij"],
         Category::Development => &["git", "docker", "kubectl", "terraform", "ansible"],
         Category::Languages => &["python", "node", "rust", "go", "java", "ruby", "php"],
         Category::Databases => &["postgres", "mysql", "mongodb", "redis", "sqlite", "duckdb"],
-        Category::Cloud => &["kubernetes", "terraform", "ansible", "aws", "gcloud", "azure"],
-        Category::Media => &["vlc", "mpv", "spotify", "obs", "ffmpeg", "handbrake", "kdenlive"],
-        Category::Graphics => &["gimp", "inkscape", "krita", "blender", "darktable", "freecad"],
-        Category::Office => &["libreoffice", "latex", "pandoc", "obsidian", "calibre", "zathura"],
-        Category::Communication => &["slack", "discord", "teams", "zoom", "telegram", "signal", "element"],
+        Category::Cloud => &[
+            "kubernetes",
+            "terraform",
+            "ansible",
+            "aws",
+            "gcloud",
+            "azure",
+        ],
+        Category::Media => &[
+            "vlc",
+            "mpv",
+            "spotify",
+            "obs",
+            "ffmpeg",
+            "handbrake",
+            "kdenlive",
+        ],
+        Category::Graphics => &[
+            "gimp",
+            "inkscape",
+            "krita",
+            "blender",
+            "darktable",
+            "freecad",
+        ],
+        Category::Office => &[
+            "libreoffice",
+            "latex",
+            "pandoc",
+            "obsidian",
+            "calibre",
+            "zathura",
+        ],
+        Category::Communication => &[
+            "slack", "discord", "teams", "zoom", "telegram", "signal", "element",
+        ],
         Category::System => &["htop", "btop", "tmux", "zsh", "fzf", "ripgrep", "bat", "fd"],
-        Category::Security => &["nmap", "wireshark", "metasploit", "burpsuite", "clamav", "gpg"],
-        Category::Gaming => &["steam", "lutris", "wine", "retroarch", "minecraft", "heroic"],
+        Category::Security => &[
+            "nmap",
+            "wireshark",
+            "metasploit",
+            "burpsuite",
+            "clamav",
+            "gpg",
+        ],
+        Category::Gaming => &[
+            "steam",
+            "lutris",
+            "wine",
+            "retroarch",
+            "minecraft",
+            "heroic",
+        ],
         Category::Network => &["curl", "wget", "httpie", "rsync", "mosh", "filezilla"],
         Category::FileManagers => &["nautilus", "dolphin", "thunar", "ranger", "nnn", "lf", "mc"],
         Category::Virtualization => &["virtualbox", "qemu", "virt-manager", "podman", "lxc"],
-        Category::Passwords => &["bitwarden", "keepassxc", "pass", "gopass", "1password"],
+        Category::CredentialManagers => &["bitwarden", "keepassxc", "pass", "gopass", "1password"],
         Category::Backup => &["syncthing", "restic", "borg", "rclone", "timeshift"],
         Category::Scientific => &["jupyter", "octave", "gnuplot", "rstudio", "maxima"],
     }
@@ -732,13 +792,20 @@ mod tests {
 
     #[test]
     fn test_alias_count() {
-        assert!(ALIASES.len() >= 500, "Expected 500+ aliases, got {}", ALIASES.len());
+        assert!(
+            ALIASES.len() >= 500,
+            "Expected 500+ aliases, got {}",
+            ALIASES.len()
+        );
     }
 
     #[test]
     fn test_jetbrains_mapping() {
         assert_eq!(resolve_alias("intellij"), Some("jetbrains.idea-community"));
-        assert_eq!(resolve_alias("pycharm"), Some("jetbrains.pycharm-community"));
+        assert_eq!(
+            resolve_alias("pycharm"),
+            Some("jetbrains.pycharm-community")
+        );
         assert_eq!(resolve_alias("goland"), Some("jetbrains.goland"));
     }
 
