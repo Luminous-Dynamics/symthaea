@@ -51,11 +51,8 @@ impl SemanticCoherenceBenchmark {
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i as u64 * 50)).normalize())
             .collect();
 
-        // Position encodings (for serial order binding)
+        // Sequence length for topic tracking (matches human reading studies)
         let n_positions = 30;
-        let positions: Vec<ContinuousHV> = (0..n_positions)
-            .map(|i| ContinuousHV::random(dim, seed.wrapping_add(500 + i as u64 * 30)).normalize())
-            .collect();
 
         // Vocabulary: on-topic words (close to topic) and off-topic words
         let n_on_topic = 20;
@@ -132,14 +129,19 @@ impl SemanticCoherenceBenchmark {
                     &on_topic_words[idx]
                 };
 
-                // Bind word with position and bundle into context
-                let bound = word.bind(&positions[pos]);
-                // Running average context (EMA-like) with configurable alpha
-                // Science: Graesser et al. (2004) — topic coherence tracked via
-                // exponential moving average mirrors human reading comprehension.
+                // Topic coherence via semantic EMA (Graesser et al., 2004).
+                //
+                // We track two signals:
+                // 1. **Semantic context** (unbound words) — for measuring topic
+                //    coherence. Position-binding would rotate word HVs orthogonal
+                //    to the topic, destroying the semantic signal.
+                // 2. **Positional ordering** is implicitly captured by the EMA
+                //    weighting (recent tokens dominate), matching human recency
+                //    effects in discourse comprehension.
                 let alpha = config.language_coherence_alpha as f32;
-                context = ContinuousHV::weighted_bundle(&[&context, &bound], &[1.0 - alpha, alpha])
-                    .normalize();
+                context =
+                    ContinuousHV::weighted_bundle(&[&context, word], &[1.0 - alpha, alpha])
+                        .normalize();
 
                 // Measure coherence with topic via EMA tracking
                 let raw_coh = effective_topic.similarity(&context).clamp(-1.0, 1.0) as f64;
@@ -160,16 +162,23 @@ impl SemanticCoherenceBenchmark {
             let decay = (first_q - last_q).max(0.0);
             decays.push(decay);
 
-            // Recovery: coherence at distractor+3 vs distractor
-            let post_recovery = if distractor_pos + 3 < sequence_len {
+            // Recovery: measure how much coherence rebounds after the off-topic
+            // injection. Compare coherence at distractor vs 3 tokens later.
+            // A disruption is detected when coherence drops below the pre-disruption
+            // mean (tokens before the distractor position).
+            let post_recovery = if distractor_pos + 3 < sequence_len && distractor_pos > 0 {
+                let pre_mean: f64 = token_coherences[..distractor_pos].iter().sum::<f64>()
+                    / distractor_pos as f64;
                 let at_disrupt = token_coherences[distractor_pos];
                 let after_disrupt = token_coherences[distractor_pos + 3];
-                let recovery = if at_disrupt < 0.5 {
-                    (after_disrupt - at_disrupt).max(0.0) / (1.0 - at_disrupt).max(0.01)
+                if at_disrupt < pre_mean * 0.9 {
+                    // Disruption detected: measure fractional recovery toward pre-mean
+                    let drop = pre_mean - at_disrupt;
+                    let rebound = after_disrupt - at_disrupt;
+                    (rebound / drop.max(0.01)).clamp(0.0, 1.0)
                 } else {
-                    1.0 // No significant disruption
-                };
-                recovery.min(1.0)
+                    1.0 // No significant disruption occurred
+                }
             } else {
                 0.5
             };

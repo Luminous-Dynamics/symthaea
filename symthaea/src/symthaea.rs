@@ -1793,6 +1793,25 @@ impl Symthaea {
                 plan_steps = generated.plan_steps.len(),
                 "Phase 3.6: CfC code plan injected into structured thought"
             );
+
+            // SSM distillation: cache high-quality native generations as training targets
+            if !needs_llm {
+                if let crate::language::code_intent::CodeIntent::Create { ref spec, .. } = intent {
+                    if let Some((_hv, src, quality)) =
+                        self.code_generator.distillation_target(spec, &generated)
+                    {
+                        if self.code_generation_cache.len() >= 32 {
+                            self.code_generation_cache.remove(0);
+                        }
+                        self.code_generation_cache.push((spec.purpose.clone(), src));
+                        tracing::debug!(
+                            target: "symthaea::code",
+                            quality = quality,
+                            "SSM distillation target cached"
+                        );
+                    }
+                }
+            }
         }
 
         // ====================================================================

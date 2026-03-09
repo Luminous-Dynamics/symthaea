@@ -17,7 +17,6 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::trial_analysis::TrialOutcome;
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
-use crate::wm::ssm_temporal::SsmTemporalBackend;
 use std::collections::BTreeMap;
 use symthaea_core::hdc::ContinuousHV;
 
@@ -52,9 +51,13 @@ impl SrttBenchmark {
         // Repeating sequence: 4-2-3-1-3-2-4-1 (8-element, Nissen & Bullemer style)
         let sequence = [3, 1, 2, 0, 2, 1, 3, 0]; // 0-indexed positions
 
-        // Transition model: predict next position from current
-        // SSM temporal backend accumulates transition learning
-        let mut ssm = SsmTemporalBackend::new(-0.10, 4);
+        // Transition memory: HDC-based associative memory that learns
+        // position-to-position transitions via bind-and-accumulate.
+        // Each transition (prev → current) is stored as prev ⊗ current,
+        // bundled into a single transition memory HV.
+        // Retrieval: unbind prev from memory → similarity with each position
+        // reveals the predicted next position (Nissen & Bullemer, 1987).
+        let mut transition_memory = ContinuousHV::zero(dim);
 
         // Time pressure: raises response noise (Willingham et al., 1989).
         let noise_level: f32 = 0.20 + config.time_pressure as f32 * 0.15;
@@ -63,20 +66,27 @@ impl SrttBenchmark {
         let trials_per_block = 24; // 3 repetitions of 8-element sequence
         let test_trials = 24; // final block: sequence vs random
 
-        // Training phase: build sequence knowledge
+        // Training phase: build sequence knowledge via HDC transition binding
         let mut prev_pos: Option<usize> = None;
+        let learning_rate: f32 = 0.15; // EMA rate for transition accumulation
         for _block in 0..training_blocks {
             for step in 0..trials_per_block {
                 let pos_idx = sequence[step % sequence.len()];
 
                 if let Some(prev) = prev_pos {
-                    // Encode transition: prev -> current
-                    let transition_strength: f32 = positions[prev].similarity(&positions[pos_idx]);
-                    ssm.step(transition_strength.max(0.0));
+                    // Encode transition: prev ⊗ current (binding associates the pair)
+                    let transition = positions[prev].bind(&positions[pos_idx]);
+                    // Accumulate into transition memory (EMA-like)
+                    transition_memory = ContinuousHV::weighted_bundle(
+                        &[&transition_memory, &transition],
+                        &[1.0 - learning_rate, learning_rate],
+                    );
                 }
                 prev_pos = Some(pos_idx);
             }
         }
+        // Normalize for clean retrieval
+        transition_memory = transition_memory.normalize();
 
         // Test phase: sequence block
         let mut seq_correct = 0u32;
@@ -87,20 +97,29 @@ impl SrttBenchmark {
             let pos_idx = sequence[step % sequence.len()];
             let stimulus = &positions[pos_idx];
 
-            // Prediction from SSM (accumulated transition knowledge)
-            let ssm_activation = ssm.step(0.0);
+            // Prediction from transition memory:
+            // If we know prev, unbind it from memory to retrieve predicted next.
+            // prediction = transition_memory ⊗ prev (unbinding)
+            // Then similarity(prediction, pos_i) gives transition strength to each position.
+            let prediction_boost: f32 = if let Some(prev) = prev_pos {
+                let prediction = transition_memory.bind(&positions[prev]);
+                // How well does the prediction match the actual stimulus?
+                prediction.similarity(stimulus).max(0.0)
+            } else {
+                0.0
+            };
 
             // Response selection: match stimulus to positions
             let mut best_sim = f32::NEG_INFINITY;
             let mut best_idx = 0;
             for (i, pos) in positions.iter().enumerate() {
-                // Encoding noise degrades motor sequence learning signal
                 let noise_degrade = config.effective_noise() as f32 * 0.4;
                 let mut sim = stimulus.similarity(pos) * (1.0 - noise_degrade);
-                // SSM boost for predicted transitions
-                if let Some(prev) = prev_pos {
-                    let transition_sim = positions[prev].similarity(pos) * (1.0 - noise_degrade);
-                    sim += ssm_activation * transition_sim * 0.3;
+                // Prediction boost: learned transitions speed response to expected position
+                if prev_pos.is_some() {
+                    let pred = transition_memory.bind(&positions[prev_pos.unwrap()]);
+                    let pred_sim = pred.similarity(pos).max(0.0);
+                    sim += pred_sim * 0.4;
                 }
                 xor_shift(&mut rng);
                 let noise = (rng % 10000) as f32 / 10000.0 * noise_level;
@@ -115,11 +134,11 @@ impl SrttBenchmark {
                 seq_correct += 1;
             }
 
-            // RT: faster for predictable sequences (SSM activation reduces RT)
+            // RT: faster for predictable sequences (prediction boost reduces RT)
             let base_rt = 6.0;
-            let ssm_speedup = ssm_activation as f64 * 2.0;
+            let pred_speedup = prediction_boost as f64 * 3.0; // Strong sequence = faster RT
             let tp_speedup = config.time_pressure * 1.5;
-            seq_rt_sum += (base_rt - ssm_speedup - tp_speedup).max(1.0);
+            seq_rt_sum += (base_rt - pred_speedup - tp_speedup).max(1.0);
 
             prev_pos = Some(pos_idx);
         }

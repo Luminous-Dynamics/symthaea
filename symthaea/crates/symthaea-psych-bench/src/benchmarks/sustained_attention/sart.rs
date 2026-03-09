@@ -60,8 +60,10 @@ impl SartBenchmark {
         let tp_noise: f32 = (0.10 + config.time_pressure as f32 * 0.15)
             / diff_model.signal_multiplier(config.difficulty) as f32;
 
-        // Automatic response tendency builds over go trials (monotone increase)
-        let mut response_tendency: f32 = 0.5;
+        // Automatic response tendency builds over go trials.
+        // Starts moderate — the system begins cautious and becomes more
+        // impulsive with repeated go trials (Robertson et al., 1997).
+        let mut response_tendency: f32 = 0.40;
         let tendency_growth: f32 =
             0.003 * diff_model.temperature_multiplier(config.difficulty) as f32;
 
@@ -95,6 +97,13 @@ impl SartBenchmark {
                 commission_total += 1;
                 if respond {
                     commission += 1; // commission error
+                    // Failed inhibition: response tendency remains high
+                    // (error-related negativity effect — Hester et al., 2005)
+                } else {
+                    // Successful inhibition: temporarily suppresses automatic
+                    // response tendency (post-inhibition slowing, Robertson et al., 1997).
+                    // This models the "attention reset" after catching a target.
+                    response_tendency = (response_tendency - 0.08).max(0.3);
                 }
             } else {
                 go_total += 1;
@@ -113,7 +122,7 @@ impl SartBenchmark {
 
             // Vigilance decrement: every 50 trials, attention lapses slightly
             if trial > 0 && trial % 50 == 0 {
-                response_tendency = (response_tendency + 0.02).min(0.95);
+                response_tendency = (response_tendency + 0.015).min(0.95);
             }
         }
 

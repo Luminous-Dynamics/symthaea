@@ -979,5 +979,43 @@ fn test_ni1_moral_shift_drops_consciousness() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// VISUALIZATION INTEGRATION TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_visualization_records_when_enabled() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_visualization = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Run a few cycles to produce attention snapshots
+    for _ in 0..5 {
+        service.cycle("test visualization recording");
+    }
+
+    let summary = service.attention_summary();
+    assert!(summary.is_some(), "visualization should be active when enabled");
+    let summary = summary.unwrap();
+    assert!(
+        summary.num_snapshots >= 5,
+        "expected at least 5 snapshots (one per cycle), got {}",
+        summary.num_snapshots,
+    );
+    assert!(!summary.top_attended.is_empty(), "should have top-attended inputs");
+}
+
+#[test]
+fn test_visualization_disabled_by_default() {
+    let config = CognitiveLoopConfig::default();
+    assert!(!config.enable_visualization, "visualization should be off by default");
+
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    service.cycle("no visualization");
+
+    let summary = service.attention_summary();
+    assert!(summary.is_none(), "no visualizer when disabled");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // v0.6.1 FEEDBACK LOOP TESTS
 // ═══════════════════════════════════════════════════════════════════════════════

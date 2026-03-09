@@ -301,6 +301,45 @@ pub const RESONATOR_LOW_ERROR_THRESHOLD: f32 = 0.2;
 /// Resonator low error → confidence boost scale.
 pub const RESONATOR_LOW_ERROR_CONFIDENCE_SCALE: f32 = 0.03;
 
+/// Resonator consolidation threshold: high similarity → familiar pattern.
+pub const RESONATOR_CONSOLIDATION_THRESHOLD: f32 = 0.7;
+
+/// LR scale when resonator detects familiar (consolidated) pattern.
+pub const RESONATOR_FAMILIAR_LR_SCALE: f32 = 0.85;
+
+/// Resonator novelty threshold: low similarity → novel input.
+pub const RESONATOR_NOVEL_THRESHOLD: f32 = 0.3;
+
+/// LR scale when resonator detects novel (unfamiliar) pattern.
+pub const RESONATOR_NOVEL_LR_SCALE: f32 = 1.15;
+
+/// LR scale when attention budget is persistently exceeded (cognitive overload).
+pub const ATTENTION_BUDGET_GATED_LR_SCALE: f32 = 0.7;
+
+/// Structural Phi bottleneck threshold — poor integration above this value.
+pub const STRUCTURAL_BOTTLENECK_THRESHOLD: f32 = 0.6;
+
+/// LR scale when structural bottleneck is high (protect against fragmentation).
+pub const STRUCTURAL_BOTTLENECK_LR_SCALE: f32 = 0.8;
+
+/// Structural emergence confidence threshold — synergistic self-organization.
+pub const STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD: f32 = 0.4;
+
+/// Confidence boost when structural emergence is high.
+pub const STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST: f32 = 0.05;
+
+/// Causal attention strength threshold for boost activation.
+pub const CAUSAL_ATTENTION_STRENGTH_THRESHOLD: f32 = 0.3;
+
+/// Confidence scale for causal attention boost.
+pub const CAUSAL_ATTENTION_CONFIDENCE_SCALE: f32 = 0.04;
+
+/// LR scale when world-model sensory mismatch is detected.
+pub const WM_MISMATCH_LR_SCALE: f32 = 0.75;
+
+/// Confidence scale (dampen) when world-model sensory mismatch is detected.
+pub const WM_MISMATCH_CONFIDENCE_SCALE: f32 = 0.9;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // PHENOMENAL BINDING
 // ═══════════════════════════════════════════════════════════════════════════════

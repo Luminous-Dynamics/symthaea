@@ -740,10 +740,10 @@ impl CognitiveLoopService {
         // High emergence = synergistic self-organization → boost confidence.
         // Science: Oizumi et al. (2014) — bottleneck constrains information flow;
         // Mediano et al. (2022) — high emergence = synergistic information.
-        if struct_bn > STRUCTURAL_BOTTLENECK_THRESHOLD && self.stats.total_cycles > 15 {
+        if struct_bn > STRUCTURAL_BOTTLENECK_THRESHOLD as f64 && self.stats.total_cycles > 15 {
             self.scale_lr("structural_bottleneck", STRUCTURAL_BOTTLENECK_LR_SCALE);
         }
-        if struct_er > STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD && self.stats.total_cycles > 15 {
+        if struct_er > STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD as f64 && self.stats.total_cycles > 15 {
             self.adjust_confidence("structural_emergence", STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST);
         }
 

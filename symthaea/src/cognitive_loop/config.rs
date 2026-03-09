@@ -346,6 +346,19 @@ pub struct CognitiveLoopConfig {
     /// Enable negation detection for moral evaluation preprocessing.
     pub enable_negation_detection: bool,
 
+    /// Enable attention visualization recording.
+    /// When true, the cognitive loop records attention snapshots each cycle
+    /// (phi-attention weights, saliency, binding coherence) into an
+    /// `AttentionVisualizer` for ASCII heatmaps, JSON export, and flow graphs.
+    /// Default: false.
+    pub enable_visualization: bool,
+
+    /// Enable soul alignment evaluation each cycle.
+    /// When true, the SoulState is constructed and evaluate_alignment() is called
+    /// during the consciousness phase, recording alignment scores in telemetry.
+    /// Default: false.
+    pub enable_soul_alignment: bool,
+
     /// Enable primitive consciousness decomposition for explainable consciousness.
     pub enable_primitive_consciousness: bool,
 
@@ -611,6 +624,8 @@ impl Default for CognitiveLoopConfig {
             enable_contextual_weights: false,
             enable_phi_attention: false,
             enable_negation_detection: false,
+            enable_visualization: false,
+            enable_soul_alignment: false,
             enable_primitive_consciousness: false,
             enable_safety_gateway: true,
             enable_metacognitive_monitoring: false,
@@ -781,6 +796,8 @@ impl ConsciousnessProfile {
         config.enable_contextual_weights = false;
         config.enable_phi_attention = false;
         config.enable_negation_detection = false;
+        config.enable_visualization = false;
+        config.enable_soul_alignment = false;
         config.enable_primitive_consciousness = false;
         config.enable_resonator_recall = false;
         config.enable_psi_attestation = false;
@@ -848,6 +865,8 @@ impl ConsciousnessProfile {
                 config.episodic_replay = true;
                 config.enable_psi_attestation = true;
                 config.enable_user_state_inference = true;
+                config.enable_visualization = true;
+                config.enable_soul_alignment = true;
             }
         }
     }
@@ -894,6 +913,7 @@ impl CognitiveLoopConfig {
             self.enable_psi_attestation,
             self.causal_enhancement,
             self.episodic_replay,
+            self.enable_soul_alignment,
         ];
         bools.iter().filter(|&&b| b).count()
     }

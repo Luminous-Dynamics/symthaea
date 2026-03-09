@@ -720,6 +720,24 @@ mod tests {
     }
 
     #[test]
+    fn soul_alignment_computed_when_enabled() {
+        let mut config = CognitiveLoopConfig::default();
+        config.enable_soul_alignment = true;
+        let mut s = CognitiveLoopService::new(config).unwrap();
+        let r = s.cycle("resonance and flourishing");
+        assert!(r.metadata.ethics.soul_alignment.is_finite());
+        assert!(s.soul.is_some());
+    }
+
+    #[test]
+    fn soul_alignment_zero_when_disabled() {
+        let mut s = make_service();
+        let r = s.cycle("test without soul");
+        assert_eq!(r.metadata.ethics.soul_alignment, 0.0);
+        assert!(s.soul.is_none());
+    }
+
+    #[test]
     fn output_wisdom_hv_correct_size() {
         let mut s = make_service();
         let r = s.cycle("wisdom hv");

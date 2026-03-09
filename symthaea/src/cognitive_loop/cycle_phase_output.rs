@@ -925,6 +925,39 @@ impl CognitiveLoopService {
             tracing::trace!("Phase C integration: {}", integrated);
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // Visualization: record attention/saliency/binding snapshot
+        // ═══════════════════════════════════════════════════════════════════════
+        if let Some(ref mut viz) = self.attention_visualizer {
+            let snapshot = crate::visualization::AttentionSnapshot::new(
+                vec![
+                    "phi_attention".into(),
+                    "prediction_error".into(),
+                    "coherence".into(),
+                    "binding_strength".into(),
+                    "consciousness".into(),
+                ],
+                vec![
+                    perception.encoding.phi_attention_weight as f64,
+                    dynamics.core.prediction_error as f64,
+                    dynamics.core.coherence as f64,
+                    feedback.self_model.cross_modal_binding_strength as f64,
+                    feedback.consciousness.equation_v2_consciousness,
+                ],
+                vec![
+                    perception.encoding.phi_attention_weight,
+                    dynamics.core.prediction_error.clamp(0.0, 1.0),
+                    dynamics.core.coherence,
+                    feedback.self_model.cross_modal_binding_strength,
+                    feedback.consciousness.equation_v2_consciousness as f32,
+                ],
+                1.0,
+            )
+            .with_metadata("cycle", &self.stats.total_cycles.to_string())
+            .with_metadata("depth", &format!("{:?}", self.cognitive_depth));
+            viz.record(snapshot);
+        }
+
         CycleResult {
             output: dynamics.core.output.clone(),
             prediction_error: dynamics.core.prediction_error,
