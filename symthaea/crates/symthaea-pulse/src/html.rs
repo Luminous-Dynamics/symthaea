@@ -16,8 +16,8 @@ use symthaea_psych_bench::harness::cognitive_profile::CognitiveProfile;
 use symthaea_types::N_HARMONIES;
 
 use crate::{
-    Anomaly, MoralCompass, Narrative, NeuroBath, PulseDelta, PulseSnapshot, SparklinePoint,
-    SubstrateInfo, Vitals,
+    Anomaly, IntegrityInfo, MoralCompass, Narrative, NeuroBath, PulseDelta, PulseSnapshot,
+    SparklinePoint, SubstrateInfo, Vitals,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
