@@ -143,6 +143,167 @@ impl DataflowInfo {
     }
 }
 
+/// Lightweight control-flow analysis for generated Rust code.
+#[derive(Debug, Clone, Default)]
+pub struct ControlFlowInfo {
+    pub warnings: Vec<String>,
+}
+
+impl ControlFlowInfo {
+    pub fn analyze_rust(source: &str, return_type: Option<&str>) -> Self {
+        let mut warnings = Vec::new();
+        let lines: Vec<&str> = source.lines().collect();
+        let ret = return_type.unwrap_or("");
+        let is_unit_return = ret.is_empty() || ret == "()" || ret == "-> ()";
+
+        // Check for unreachable code after return/break/continue
+        let mut prev_was_terminator = false;
+        for (i, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with("//") || trimmed == "}" || trimmed == "{" {
+                continue;
+            }
+            if prev_was_terminator && !trimmed.starts_with('}') && !trimmed.starts_with("//") {
+                warnings.push(format!("UNREACHABLE_CODE: line {} after return/break", i + 1));
+                prev_was_terminator = false;
+            }
+            prev_was_terminator = trimmed.starts_with("return ")
+                || trimmed == "return;"
+                || trimmed.starts_with("break")
+                || trimmed.starts_with("continue");
+        }
+
+        // Check if-without-else when return type is non-unit
+        if !is_unit_return {
+            let if_count = lines.iter().filter(|l| l.trim().starts_with("if ")).count();
+            let else_count = lines.iter().filter(|l| l.trim().contains("else")).count();
+            if if_count > 0 && else_count == 0 {
+                warnings.push("MISSING_ELSE: non-unit return but if-without-else".to_string());
+            }
+        }
+
+        // Check that non-unit functions end with an expression
+        if !is_unit_return {
+            let last_expr = lines.iter().rev()
+                .find(|l| { let t = l.trim(); !t.is_empty() && t != "}" && !t.starts_with("//") });
+            if let Some(last) = last_expr {
+                let t = last.trim();
+                if t.ends_with(';') && !t.starts_with("return") {
+                    warnings.push("MISSING_RETURN: last line is statement but return type is non-unit".to_string());
+                }
+            }
+        }
+
+        Self { warnings }
+    }
+
+    pub fn is_clean(&self) -> bool { self.warnings.is_empty() }
+}
+
+/// Nested Rust type parser.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParsedType {
+    Simple(String),
+    Generic { base: String, params: Vec<ParsedType> },
+    Tuple(Vec<ParsedType>),
+    Reference { mutable: bool, inner: Box<ParsedType> },
+}
+
+impl ParsedType {
+    pub fn parse(s: &str) -> Self {
+        let s = s.trim();
+        if s.starts_with("&mut ") {
+            return ParsedType::Reference { mutable: true, inner: Box::new(Self::parse(&s[5..])) };
+        }
+        if s.starts_with('&') {
+            return ParsedType::Reference { mutable: false, inner: Box::new(Self::parse(&s[1..])) };
+        }
+        if s.starts_with('(') && s.ends_with(')') {
+            let parts = split_type_params(&s[1..s.len()-1]);
+            return ParsedType::Tuple(parts.into_iter().map(|p| Self::parse(&p)).collect());
+        }
+        if let Some(angle) = s.find('<') {
+            if s.ends_with('>') {
+                let base = s[..angle].to_string();
+                let parts = split_type_params(&s[angle+1..s.len()-1]);
+                return ParsedType::Generic { base, params: parts.into_iter().map(|p| Self::parse(&p)).collect() };
+            }
+        }
+        ParsedType::Simple(s.to_string())
+    }
+
+    pub fn base_name(&self) -> &str {
+        match self {
+            ParsedType::Simple(s) => s,
+            ParsedType::Generic { base, .. } => base,
+            ParsedType::Tuple(_) => "()",
+            ParsedType::Reference { inner, .. } => inner.base_name(),
+        }
+    }
+
+    pub fn is_collection(&self) -> bool {
+        matches!(self.base_name(), "Vec" | "HashSet" | "BTreeSet" | "VecDeque")
+    }
+
+    pub fn is_map(&self) -> bool {
+        matches!(self.base_name(), "HashMap" | "BTreeMap")
+    }
+
+    pub fn inner_type(&self) -> Option<&ParsedType> {
+        match self { ParsedType::Generic { params, .. } => params.first(), _ => None }
+    }
+}
+
+fn split_type_params(s: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let (mut depth, mut paren) = (0i32, 0i32);
+    let mut current = String::new();
+    for ch in s.chars() {
+        match ch {
+            '<' => { depth += 1; current.push(ch); }
+            '>' => { depth -= 1; current.push(ch); }
+            '(' => { paren += 1; current.push(ch); }
+            ')' => { paren -= 1; current.push(ch); }
+            ',' if depth == 0 && paren == 0 => {
+                parts.push(current.trim().to_string());
+                current = String::new();
+            }
+            _ => current.push(ch),
+        }
+    }
+    let last = current.trim().to_string();
+    if !last.is_empty() { parts.push(last); }
+    parts
+}
+
+/// Maps rustc error patterns to fix hints for error-driven pattern refinement.
+#[derive(Debug, Clone)]
+pub struct CompileErrorFix {
+    pub error_pattern: &'static str,
+    pub fix_hint: &'static str,
+    pub category: &'static str,
+}
+
+pub fn diagnose_compile_error(stderr: &str) -> Vec<CompileErrorFix> {
+    let patterns: &[(&str, &str, &str)] = &[
+        ("expected expression, found `)`", "Empty closure body — need concrete expression", "empty_closure"),
+        ("type annotations needed", "Add explicit type with turbofish ::<Type>", "type_inference"),
+        ("no method named", "Method doesn't exist — check .iter() or different method", "wrong_method"),
+        ("expected one of `,` or `>`", "Type parameter syntax error — tuple/generic nesting", "type_syntax"),
+        ("mismatched types", "Return type mismatch — check .cloned()/.copied()/conversion", "type_mismatch"),
+        ("cannot borrow", "Borrow error — try .clone() or restructure ownership", "borrow_error"),
+        ("use of moved value", "Value moved — use .clone() or avoid double use", "moved_value"),
+        ("cannot find value", "Variable not in scope — check spelling or add let", "undefined_var"),
+        ("cannot find type", "Type not imported — add use or fully qualify", "undefined_type"),
+        ("the trait bound", "Missing trait impl — may need derive or implement", "missing_trait"),
+        ("lifetime", "Lifetime issue — consider owned types", "lifetime"),
+    ];
+    patterns.iter()
+        .filter(|(p, _, _)| stderr.contains(p))
+        .map(|(p, h, c)| CompileErrorFix { error_pattern: p, fix_hint: h, category: c })
+        .collect()
+}
+
 fn is_rust_keyword(word: &str) -> bool {
     matches!(
         word,
@@ -570,6 +731,17 @@ impl CodeGenerator {
         if spec.language == "rust" && !source.contains("todo!") {
             let type_warnings = Self::validate_types(spec, &source);
             for w in type_warnings {
+                notes.push(w);
+            }
+        }
+
+        // Control-flow validation
+        if spec.language == "rust" && !source.contains("todo!") {
+            let ret_type = spec.signature.as_deref()
+                .and_then(|s| super::emitters::parse_rust_signature_pub(s))
+                .and_then(|p| p.return_type);
+            let cf = ControlFlowInfo::analyze_rust(&source, ret_type.as_deref());
+            for w in cf.warnings {
                 notes.push(w);
             }
         }

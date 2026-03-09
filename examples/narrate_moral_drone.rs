@@ -160,7 +160,7 @@ fn main() {
         // Arousal from noradrenaline (alertness/stress)
         let arousal = (m.neuromod.noradrenaline_effective as f32 / 1.5).clamp(0.0, 1.0);
         let pred_err = result.prediction_error.clamp(0.0, 2.0);
-        let efe = (m.fep.expected_free_energy as f32).clamp(0.0, 5.0);
+        let efe = (m.fep.fep_surprise as f32).clamp(0.0, 5.0);
 
         println!(
             "  {:30} {:6.3} {:7.3} {:7.3} {:7.3} {:7.3}",

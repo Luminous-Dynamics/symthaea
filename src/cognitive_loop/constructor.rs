@@ -466,6 +466,9 @@ impl CognitiveLoopService {
         #[cfg(feature = "ssm_language")]
         let broca_genesis_phrase = config.genesis_phrase.clone();
 
+        let enable_visualization = config.enable_visualization;
+        let enable_soul_alignment = config.enable_soul_alignment;
+
         Ok(Self {
             config,
             encoder,
@@ -707,11 +710,19 @@ impl CognitiveLoopService {
                 hierarchical_free_energy,
             },
             narrative_gwt,
-            soul: Some(crate::soul::Soul::new(crate::soul::SoulConfig {
-                dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
-                ..Default::default()
-            })),
-            attention_visualizer: Some(crate::visualization::AttentionVisualizer::new()),
+            soul: if enable_soul_alignment {
+                Some(crate::soul::Soul::new(crate::soul::SoulConfig {
+                    dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
+                    ..Default::default()
+                }))
+            } else {
+                None
+            },
+            attention_visualizer: if enable_visualization {
+                Some(crate::visualization::AttentionVisualizer::with_max_history(500))
+            } else {
+                None
+            },
             social_mgr: super::SocialManager::new(enable_primitive_consciousness),
             user_state: if enable_user_state {
                 Some(crate::user_state_inference::UserStateInference::new())
