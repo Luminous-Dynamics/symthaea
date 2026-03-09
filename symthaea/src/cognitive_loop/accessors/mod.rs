@@ -599,15 +599,17 @@ mod tests {
     // ── Attention visualization ────────────────────────────────────────
 
     #[test]
-    fn attention_summary_present() {
+    fn attention_summary_none_before_cycle() {
         let s = make_service();
-        assert!(s.attention_summary().is_some());
+        // Attention visualizer is only populated after cycles run
+        assert!(s.attention_summary().is_none());
     }
 
     #[test]
-    fn attention_heatmap_present() {
+    fn attention_heatmap_none_before_cycle() {
         let s = make_service();
-        assert!(s.attention_heatmap().is_some());
+        // Attention heatmap requires attention data from cycles
+        assert!(s.attention_heatmap().is_none());
     }
 
     // ── HDC bridge dimension ──────────────────────────────────────────

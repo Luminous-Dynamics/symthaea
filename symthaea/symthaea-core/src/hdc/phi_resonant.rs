@@ -432,7 +432,9 @@ impl ResonantPhiCalculator {
 
         if use_parallel {
             #[cfg(feature = "parallel")]
-            { return self.resonance_step_parallel(current_state, similarity_matrix); }
+            {
+                self.resonance_step_parallel(current_state, similarity_matrix)
+            }
             #[cfg(not(feature = "parallel"))]
             unreachable!()
         } else {
@@ -559,7 +561,9 @@ impl ResonantPhiCalculator {
 
         if use_parallel {
             #[cfg(feature = "parallel")]
-            { return self.compute_energy_parallel(state, similarity_matrix); }
+            {
+                self.compute_energy_parallel(state, similarity_matrix)
+            }
             #[cfg(not(feature = "parallel"))]
             unreachable!()
         } else {
@@ -747,7 +751,7 @@ impl ResonantPhiCalculator {
         if use_parallel {
             #[cfg(feature = "parallel")]
             {
-                return (0..n)
+                (0..n)
                     .into_par_iter()
                     .map(|i| {
                         let mut row_sum = 0.0;
@@ -756,7 +760,7 @@ impl ResonantPhiCalculator {
                         }
                         row_sum
                     })
-                    .sum();
+                    .sum()
             }
             #[cfg(not(feature = "parallel"))]
             unreachable!()
