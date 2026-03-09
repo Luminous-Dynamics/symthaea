@@ -3691,7 +3691,7 @@ mod tests {
         let report = topo.detect_trajectory_convergence();
         let explanation = report.explain(&topo.anomaly_config);
         assert!(!explanation.detected);
-        assert_eq!(explanation.signals.len(), 3);
+        assert_eq!(explanation.signals.len(), 4);
         assert!(explanation.summary.contains("No convergence"));
     }
 
@@ -3712,7 +3712,7 @@ mod tests {
         }
         let report = topo.detect_trajectory_convergence();
         let explanation = report.explain(&anomaly_config);
-        assert_eq!(explanation.signals.len(), 3);
+        assert_eq!(explanation.signals.len(), 4);
         assert!(explanation.summary.len() > 10);
         // At least check the explanation has the right severity
         assert!((explanation.severity - report.severity).abs() < f64::EPSILON);
