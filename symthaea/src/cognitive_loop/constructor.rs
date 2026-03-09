@@ -400,6 +400,7 @@ impl CognitiveLoopService {
         };
 
         let enable_user_state = config.enable_user_state_inference;
+        let enable_coherence_field = config.enable_coherence_field;
         #[cfg(feature = "nurture")]
         let enable_nurture_attachment = config.enable_nurture_attachment;
         let enable_resonator_recall = config.enable_resonator_recall;
@@ -728,6 +729,13 @@ impl CognitiveLoopService {
             social_mgr: super::SocialManager::new(enable_primitive_consciousness),
             user_state: if enable_user_state {
                 Some(crate::user_state_inference::UserStateInference::new())
+            } else {
+                None
+            },
+            coherence_field: if enable_coherence_field {
+                Some(crate::physiology::CoherenceField::new(
+                    crate::physiology::CoherenceConfig::default(),
+                ))
             } else {
                 None
             },

@@ -562,4 +562,165 @@ mod tests {
         CausalMindBridge::sync_edges(&mut mind, &edges);
         assert!(mind.link_count() > 0);
     }
+
+    #[test]
+    fn test_outcome_failure_valence() {
+        let bridge = NixActorBridge::new();
+        let mut engine = NixActiveInference::new();
+        let dim = engine.world_model().system_state().dim();
+        let state_after = ContinuousHV::random(dim, 42);
+
+        let messages = bridge.report_outcome(
+            &mut engine,
+            "install broken-pkg",
+            EpisodeOutcome::Failure("build failed".into()),
+            state_after,
+        );
+
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].kind, NixMessageKind::ActionOutcome);
+        assert!(messages[0].metadata["valence"].contains("-1.0"));
+        assert!(messages[0].metadata["outcome"].contains("failure"));
+    }
+
+    #[test]
+    fn test_outcome_partial_success_valence() {
+        let bridge = NixActorBridge::new();
+        let mut engine = NixActiveInference::new();
+        let dim = engine.world_model().system_state().dim();
+
+        let messages = bridge.report_outcome(
+            &mut engine,
+            "rebuild",
+            EpisodeOutcome::PartialSuccess("warnings".into()),
+            ContinuousHV::random(dim, 1),
+        );
+
+        assert_eq!(messages[0].metadata["valence"], "0.30");
+        assert!(messages[0].metadata["outcome"].contains("partial"));
+    }
+
+    #[test]
+    fn test_outcome_rollback_valence() {
+        let bridge = NixActorBridge::new();
+        let mut engine = NixActiveInference::new();
+        let dim = engine.world_model().system_state().dim();
+
+        let messages = bridge.report_outcome(
+            &mut engine,
+            "upgrade",
+            EpisodeOutcome::RolledBack("reverted".into()),
+            ContinuousHV::random(dim, 1),
+        );
+
+        assert!(messages[0].metadata["valence"].contains("-0.5"));
+        assert!(messages[0].metadata["outcome"].contains("rollback"));
+    }
+
+    #[test]
+    fn test_causal_edge_metadata_populated() {
+        let bridge = NixActorBridge::new();
+        let edges = vec![
+            CausalEdge {
+                from: "a".into(),
+                to: "b".into(),
+                direction: CausalDirection::Forward,
+                confidence: 0.9,
+            },
+            CausalEdge {
+                from: "c".into(),
+                to: "d".into(),
+                direction: CausalDirection::Forward,
+                confidence: 0.5,
+            },
+        ];
+
+        let messages = bridge.report_causal_edges(&edges);
+        assert_eq!(messages.len(), 1);
+        assert_eq!(messages[0].metadata["edge_count"], "2");
+        assert!(messages[0].metadata.contains_key("edge_0"));
+        assert!(messages[0].metadata.contains_key("edge_1"));
+        assert!(messages[0].summary.contains("2 causal edges"));
+    }
+
+    #[test]
+    fn test_process_input_goal_metadata() {
+        let bridge = NixActorBridge::new();
+        let mut engine = NixActiveInference::new();
+
+        let (_plan, messages) = bridge.process_input(&mut engine, "remove firefox");
+        let goal_msg = messages
+            .iter()
+            .find(|m| m.kind == NixMessageKind::GoalUpdate)
+            .expect("Should have GoalUpdate message");
+
+        assert_eq!(goal_msg.metadata["input"], "remove firefox");
+        assert!(goal_msg.metadata.contains_key("confidence"));
+        assert_eq!(goal_msg.from_role, NixActorRoles::SENSOR);
+        assert_eq!(goal_msg.to_role, NixActorRoles::PROCESSOR);
+    }
+
+    #[test]
+    fn test_process_input_produces_action_plan() {
+        let bridge = NixActorBridge::new();
+        let mut engine = NixActiveInference::new();
+
+        let (_plan, messages) = bridge.process_input(&mut engine, "install nginx");
+        let plan_msg = messages
+            .iter()
+            .find(|m| m.kind == NixMessageKind::ActionPlan);
+        assert!(
+            plan_msg.is_some(),
+            "Should produce ActionPlan message for actionable input"
+        );
+        if let Some(pm) = plan_msg {
+            assert!(pm.metadata.contains_key("action"));
+            assert!(pm.metadata.contains_key("efe"));
+            assert!(pm.metadata.contains_key("needs_clarification"));
+        }
+    }
+
+    #[test]
+    fn test_snapshot_after_learning() {
+        let bridge = NixActorBridge::new();
+        let mut engine = NixActiveInference::new();
+        let dim = engine.world_model().system_state().dim();
+
+        // Learn some transitions
+        bridge.report_outcome(
+            &mut engine,
+            "install vim",
+            EpisodeOutcome::Success,
+            ContinuousHV::random(dim, 1),
+        );
+
+        let state = bridge.snapshot(&engine);
+        assert_eq!(state.episode_count, 1);
+        assert!(state.learned_actions > 0);
+    }
+
+    #[test]
+    fn test_causal_mind_bridge_query_why() {
+        let mut mind = symthaea_core::hdc::causal_mind::CausalMind::new();
+        CausalMindBridge::seed_from_patterns(&mut mind);
+
+        let explanations = CausalMindBridge::query_why(&mind, "services.xserver.enable");
+        // May or may not find explanations depending on seeded patterns
+        for (explanation, strength) in &explanations {
+            assert!(!explanation.is_empty());
+            assert!(strength.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_causal_mind_bridge_query_what_if() {
+        let mut mind = symthaea_core::hdc::causal_mind::CausalMind::new();
+        CausalMindBridge::seed_from_patterns(&mut mind);
+
+        let predictions = CausalMindBridge::query_what_if(&mind, "services.nginx.enable");
+        for (prediction, prob) in &predictions {
+            assert!(!prediction.is_empty());
+            assert!(prob.is_finite());
+        }
+    }
 }

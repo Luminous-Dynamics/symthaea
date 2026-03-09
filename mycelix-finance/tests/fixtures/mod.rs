@@ -4,8 +4,6 @@
 //! for testing the Mycelix Finance Holochain zomes.
 
 use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetAgents, SweetCell};
-use holochain_types::prelude::*;
-use serde::{Deserialize, Serialize};
 
 // Re-export zome types for tests
 pub use payments_integrity::*;
