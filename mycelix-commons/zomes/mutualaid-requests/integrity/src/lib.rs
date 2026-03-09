@@ -406,7 +406,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hdi::prelude::*;
 
     // Factory functions for valid test data
 

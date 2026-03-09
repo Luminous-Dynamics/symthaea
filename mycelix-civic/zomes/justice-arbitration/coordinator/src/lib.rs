@@ -336,10 +336,6 @@ pub fn get_arbitrator_cases(arbitrator_did: String) -> ExternResult<Vec<Record>>
 mod tests {
     use super::*;
 
-    fn ts() -> Timestamp {
-        Timestamp::from_micros(0)
-    }
-
     // ========================================================================
     // Coordinator input struct serde roundtrip tests
     // ========================================================================

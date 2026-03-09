@@ -7,8 +7,8 @@ use hearth_coordinator_common::{records_from_links, require_membership};
 use hearth_stories_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 // ============================================================================
@@ -253,9 +253,9 @@ pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
 pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<()> {
     require_consciousness(&requirement_for_proposal(), "add_to_collection")?;
     // Fetch the collection to get its hearth_hash for membership check
-    let record = get(input.collection_hash.clone(), GetOptions::default())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Collection not found".into())),
-    )?;
+    let record = get(input.collection_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Collection not found".into())
+    ))?;
     let collection: StoryCollection = record
         .entry()
         .to_app_option()
@@ -331,8 +331,10 @@ pub fn observe_tradition(tradition_hash: ActionHash) -> ExternResult<Record> {
 
     tradition.last_observed = Some(now);
 
-    let updated_hash =
-        update_entry(tradition_hash.clone(), &EntryTypes::FamilyTradition(tradition))?;
+    let updated_hash = update_entry(
+        tradition_hash.clone(),
+        &EntryTypes::FamilyTradition(tradition),
+    )?;
 
     emit_signal(&HearthSignal::TraditionObserved {
         tradition_hash,
@@ -571,12 +573,18 @@ mod tests {
         // After observation, timestamp is set
         let now = Timestamp::from_micros(1_000_000);
         tradition.last_observed = Some(now);
-        assert_eq!(tradition.last_observed, Some(Timestamp::from_micros(1_000_000)));
+        assert_eq!(
+            tradition.last_observed,
+            Some(Timestamp::from_micros(1_000_000))
+        );
 
         // Second observation updates the timestamp
         let later = Timestamp::from_micros(2_000_000);
         tradition.last_observed = Some(later);
-        assert_eq!(tradition.last_observed, Some(Timestamp::from_micros(2_000_000)));
+        assert_eq!(
+            tradition.last_observed,
+            Some(Timestamp::from_micros(2_000_000))
+        );
     }
 
     #[test]

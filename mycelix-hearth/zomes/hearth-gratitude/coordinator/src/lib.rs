@@ -7,8 +7,8 @@ use hearth_coordinator_common::{get_latest_record, records_from_links, require_m
 use hearth_gratitude_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 // ============================================================================
@@ -615,9 +615,7 @@ mod tests {
             let json = serde_json::to_string(&sig).unwrap();
             let back: HearthSignal = serde_json::from_str(&json).unwrap();
             match back {
-                HearthSignal::GratitudeExpressed {
-                    gratitude_type, ..
-                } => {
+                HearthSignal::GratitudeExpressed { gratitude_type, .. } => {
                     assert_eq!(gratitude_type, gt);
                 }
                 _ => panic!("Expected GratitudeExpressed signal"),

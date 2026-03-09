@@ -8,8 +8,8 @@ use hearth_coordinator_common::{records_from_links, require_guardian, require_me
 use hearth_milestones_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 // ============================================================================
@@ -177,7 +177,10 @@ pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
         transition.recategorization_blocked = false;
     }
 
-    let updated_hash = update_entry(transition_hash.clone(), &EntryTypes::LifeTransition(transition))?;
+    let updated_hash = update_entry(
+        transition_hash.clone(),
+        &EntryTypes::LifeTransition(transition),
+    )?;
 
     emit_signal(&HearthSignal::TransitionAdvanced {
         transition_hash,
@@ -228,7 +231,10 @@ pub fn complete_transition(transition_hash: ActionHash) -> ExternResult<Record> 
     transition.recategorization_blocked = false;
     transition.completed_at = Some(now);
 
-    let updated_hash = update_entry(transition_hash.clone(), &EntryTypes::LifeTransition(transition))?;
+    let updated_hash = update_entry(
+        transition_hash.clone(),
+        &EntryTypes::LifeTransition(transition),
+    )?;
 
     emit_signal(&HearthSignal::TransitionAdvanced {
         transition_hash,
@@ -616,9 +622,7 @@ mod tests {
         let json = serde_json::to_string(&sig).unwrap();
         let back: HearthSignal = serde_json::from_str(&json).unwrap();
         match back {
-            HearthSignal::MilestoneRecorded {
-                milestone_type, ..
-            } => {
+            HearthSignal::MilestoneRecorded { milestone_type, .. } => {
                 assert_eq!(milestone_type, MilestoneType::Birth);
             }
             _ => panic!("Expected MilestoneRecorded signal"),
@@ -635,9 +639,7 @@ mod tests {
         let json = serde_json::to_string(&sig).unwrap();
         let back: HearthSignal = serde_json::from_str(&json).unwrap();
         match back {
-            HearthSignal::MilestoneRecorded {
-                milestone_type, ..
-            } => {
+            HearthSignal::MilestoneRecorded { milestone_type, .. } => {
                 assert_eq!(milestone_type, MilestoneType::Custom("Adoption Day".into()));
             }
             _ => panic!("Expected MilestoneRecorded signal"),

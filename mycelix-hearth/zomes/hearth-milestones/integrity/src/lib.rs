@@ -633,7 +633,9 @@ mod tests {
     fn phase_rank_ordering() {
         assert!(phase_rank(&TransitionPhase::PreLiminal) < phase_rank(&TransitionPhase::Liminal));
         assert!(phase_rank(&TransitionPhase::Liminal) < phase_rank(&TransitionPhase::PostLiminal));
-        assert!(phase_rank(&TransitionPhase::PostLiminal) < phase_rank(&TransitionPhase::Integrated));
+        assert!(
+            phase_rank(&TransitionPhase::PostLiminal) < phase_rank(&TransitionPhase::Integrated)
+        );
     }
 
     #[test]

@@ -11,9 +11,8 @@ use hearth_coordinator_common::{
 };
 use hearth_types::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement,
     gate_consciousness, requirement_for_basic, requirement_for_constitutional,
-    requirement_for_voting,
+    requirement_for_voting, GovernanceEligibility, GovernanceRequirement,
 };
 
 // ============================================================================
@@ -209,9 +208,9 @@ pub fn approve_capability(input: ApproveCapabilityInput) -> ExternResult<Record>
     let now = sys_time()?;
 
     // Get the request to find its hearth_hash for guardian verification
-    let request_record = get_latest_record(input.request_hash.clone())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Autonomy request not found".into())),
-    )?;
+    let request_record = get_latest_record(input.request_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Autonomy request not found".into())
+    ))?;
     let mut request: AutonomyRequest = request_record
         .entry()
         .to_app_option()
@@ -297,9 +296,9 @@ pub fn advance_tier(input: AdvanceTierInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Get the current profile (follow update chain)
-    let profile_record = get_latest_record(input.profile_hash.clone())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Autonomy profile not found".into())),
-    )?;
+    let profile_record = get_latest_record(input.profile_hash.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Autonomy profile not found".into())
+    ))?;
 
     let profile: AutonomyProfile = profile_record
         .entry()
@@ -457,7 +456,10 @@ pub fn progress_transition(transition_hash: ActionHash) -> ExternResult<Record> 
         }
     }
 
-    let updated_hash = update_entry(transition_hash.clone(), &EntryTypes::TierTransition(transition))?;
+    let updated_hash = update_entry(
+        transition_hash.clone(),
+        &EntryTypes::TierTransition(transition),
+    )?;
 
     emit_signal(&HearthSignal::TransitionProgressed {
         transition_hash: transition_hash.clone(),
@@ -759,31 +761,70 @@ mod tests {
 
     #[test]
     fn valid_single_step_advancement() {
-        assert!(is_valid_tier_advancement(&AutonomyTier::Dependent, &AutonomyTier::Supervised));
-        assert!(is_valid_tier_advancement(&AutonomyTier::Supervised, &AutonomyTier::Guided));
-        assert!(is_valid_tier_advancement(&AutonomyTier::Guided, &AutonomyTier::SemiAutonomous));
-        assert!(is_valid_tier_advancement(&AutonomyTier::SemiAutonomous, &AutonomyTier::Autonomous));
+        assert!(is_valid_tier_advancement(
+            &AutonomyTier::Dependent,
+            &AutonomyTier::Supervised
+        ));
+        assert!(is_valid_tier_advancement(
+            &AutonomyTier::Supervised,
+            &AutonomyTier::Guided
+        ));
+        assert!(is_valid_tier_advancement(
+            &AutonomyTier::Guided,
+            &AutonomyTier::SemiAutonomous
+        ));
+        assert!(is_valid_tier_advancement(
+            &AutonomyTier::SemiAutonomous,
+            &AutonomyTier::Autonomous
+        ));
     }
 
     #[test]
     fn valid_multi_step_advancement() {
-        assert!(is_valid_tier_advancement(&AutonomyTier::Dependent, &AutonomyTier::Guided));
-        assert!(is_valid_tier_advancement(&AutonomyTier::Dependent, &AutonomyTier::Autonomous));
-        assert!(is_valid_tier_advancement(&AutonomyTier::Supervised, &AutonomyTier::Autonomous));
+        assert!(is_valid_tier_advancement(
+            &AutonomyTier::Dependent,
+            &AutonomyTier::Guided
+        ));
+        assert!(is_valid_tier_advancement(
+            &AutonomyTier::Dependent,
+            &AutonomyTier::Autonomous
+        ));
+        assert!(is_valid_tier_advancement(
+            &AutonomyTier::Supervised,
+            &AutonomyTier::Autonomous
+        ));
     }
 
     #[test]
     fn same_tier_not_valid_advancement() {
-        assert!(!is_valid_tier_advancement(&AutonomyTier::Dependent, &AutonomyTier::Dependent));
-        assert!(!is_valid_tier_advancement(&AutonomyTier::Guided, &AutonomyTier::Guided));
-        assert!(!is_valid_tier_advancement(&AutonomyTier::Autonomous, &AutonomyTier::Autonomous));
+        assert!(!is_valid_tier_advancement(
+            &AutonomyTier::Dependent,
+            &AutonomyTier::Dependent
+        ));
+        assert!(!is_valid_tier_advancement(
+            &AutonomyTier::Guided,
+            &AutonomyTier::Guided
+        ));
+        assert!(!is_valid_tier_advancement(
+            &AutonomyTier::Autonomous,
+            &AutonomyTier::Autonomous
+        ));
     }
 
     #[test]
     fn backward_advancement_rejected() {
-        assert!(!is_valid_tier_advancement(&AutonomyTier::Supervised, &AutonomyTier::Dependent));
-        assert!(!is_valid_tier_advancement(&AutonomyTier::Autonomous, &AutonomyTier::Guided));
-        assert!(!is_valid_tier_advancement(&AutonomyTier::SemiAutonomous, &AutonomyTier::Supervised));
+        assert!(!is_valid_tier_advancement(
+            &AutonomyTier::Supervised,
+            &AutonomyTier::Dependent
+        ));
+        assert!(!is_valid_tier_advancement(
+            &AutonomyTier::Autonomous,
+            &AutonomyTier::Guided
+        ));
+        assert!(!is_valid_tier_advancement(
+            &AutonomyTier::SemiAutonomous,
+            &AutonomyTier::Supervised
+        ));
     }
 
     // ====================================================================
@@ -944,8 +985,16 @@ mod tests {
         // Dependent: minimal caps
         let dependent_caps: Vec<String> = vec!["play_inside".into()];
         let dependent_restrict: Vec<String> = vec!["use_stove".into(), "drive_car".into()];
-        assert!(is_capability_granted("play_inside", &dependent_caps, &dependent_restrict));
-        assert!(!is_capability_granted("use_stove", &dependent_caps, &dependent_restrict));
+        assert!(is_capability_granted(
+            "play_inside",
+            &dependent_caps,
+            &dependent_restrict
+        ));
+        assert!(!is_capability_granted(
+            "use_stove",
+            &dependent_caps,
+            &dependent_restrict
+        ));
 
         // Autonomous: full caps, no restrictions
         let autonomous_caps: Vec<String> = vec![
@@ -955,8 +1004,16 @@ mod tests {
             "manage_finances".into(),
         ];
         let autonomous_restrict: Vec<String> = vec![];
-        assert!(is_capability_granted("drive_car", &autonomous_caps, &autonomous_restrict));
-        assert!(is_capability_granted("manage_finances", &autonomous_caps, &autonomous_restrict));
+        assert!(is_capability_granted(
+            "drive_car",
+            &autonomous_caps,
+            &autonomous_restrict
+        ));
+        assert!(is_capability_granted(
+            "manage_finances",
+            &autonomous_caps,
+            &autonomous_restrict
+        ));
     }
 
     #[test]
@@ -1076,9 +1133,21 @@ mod tests {
             "manage_finances".into(),
             "go_out_alone".into(),
         ];
-        assert!(is_capability_granted("play_inside", &dep_caps, &dep_restrict));
-        assert!(!is_capability_granted("use_stove", &dep_caps, &dep_restrict));
-        assert!(!is_capability_granted("drive_car", &dep_caps, &dep_restrict));
+        assert!(is_capability_granted(
+            "play_inside",
+            &dep_caps,
+            &dep_restrict
+        ));
+        assert!(!is_capability_granted(
+            "use_stove",
+            &dep_caps,
+            &dep_restrict
+        ));
+        assert!(!is_capability_granted(
+            "drive_car",
+            &dep_caps,
+            &dep_restrict
+        ));
 
         // Supervised tier: 2 capabilities, 3 restrictions
         let sup_caps: Vec<String> = vec!["play_inside".into(), "use_stove".into()];
@@ -1087,9 +1156,17 @@ mod tests {
             "manage_finances".into(),
             "go_out_alone".into(),
         ];
-        assert!(is_capability_granted("play_inside", &sup_caps, &sup_restrict));
+        assert!(is_capability_granted(
+            "play_inside",
+            &sup_caps,
+            &sup_restrict
+        ));
         assert!(is_capability_granted("use_stove", &sup_caps, &sup_restrict));
-        assert!(!is_capability_granted("drive_car", &sup_caps, &sup_restrict));
+        assert!(!is_capability_granted(
+            "drive_car",
+            &sup_caps,
+            &sup_restrict
+        ));
 
         // Guided tier: 3 capabilities, 2 restrictions
         let gui_caps: Vec<String> = vec![
@@ -1098,8 +1175,16 @@ mod tests {
             "go_out_alone".into(),
         ];
         let gui_restrict: Vec<String> = vec!["drive_car".into(), "manage_finances".into()];
-        assert!(is_capability_granted("go_out_alone", &gui_caps, &gui_restrict));
-        assert!(!is_capability_granted("drive_car", &gui_caps, &gui_restrict));
+        assert!(is_capability_granted(
+            "go_out_alone",
+            &gui_caps,
+            &gui_restrict
+        ));
+        assert!(!is_capability_granted(
+            "drive_car",
+            &gui_caps,
+            &gui_restrict
+        ));
 
         // SemiAutonomous tier: 4 capabilities, 1 restriction
         let semi_caps: Vec<String> = vec![
@@ -1109,8 +1194,16 @@ mod tests {
             "drive_car".into(),
         ];
         let semi_restrict: Vec<String> = vec!["manage_finances".into()];
-        assert!(is_capability_granted("drive_car", &semi_caps, &semi_restrict));
-        assert!(!is_capability_granted("manage_finances", &semi_caps, &semi_restrict));
+        assert!(is_capability_granted(
+            "drive_car",
+            &semi_caps,
+            &semi_restrict
+        ));
+        assert!(!is_capability_granted(
+            "manage_finances",
+            &semi_caps,
+            &semi_restrict
+        ));
 
         // Autonomous tier: 5 capabilities, 0 restrictions
         let auto_caps: Vec<String> = vec![
@@ -1121,8 +1214,16 @@ mod tests {
             "manage_finances".into(),
         ];
         let auto_restrict: Vec<String> = vec![];
-        assert!(is_capability_granted("manage_finances", &auto_caps, &auto_restrict));
-        assert!(is_capability_granted("drive_car", &auto_caps, &auto_restrict));
+        assert!(is_capability_granted(
+            "manage_finances",
+            &auto_caps,
+            &auto_restrict
+        ));
+        assert!(is_capability_granted(
+            "drive_car",
+            &auto_caps,
+            &auto_restrict
+        ));
 
         // Verify capability count grows monotonically
         assert!(dep_caps.len() < sup_caps.len());
@@ -1145,7 +1246,10 @@ mod tests {
         let mut phase = TransitionPhase::PreLiminal;
 
         // PreLiminal: can progress, recategorization should be blocked
-        assert!(can_progress_phase(&phase), "PreLiminal should be progressable");
+        assert!(
+            can_progress_phase(&phase),
+            "PreLiminal should be progressable"
+        );
 
         // Advance to Liminal
         phase = next_transition_phase(&phase).expect("PreLiminal should have a next phase");
@@ -1155,7 +1259,10 @@ mod tests {
         // Advance to PostLiminal
         phase = next_transition_phase(&phase).expect("Liminal should have a next phase");
         assert_eq!(phase, TransitionPhase::PostLiminal);
-        assert!(can_progress_phase(&phase), "PostLiminal should be progressable");
+        assert!(
+            can_progress_phase(&phase),
+            "PostLiminal should be progressable"
+        );
 
         // Advance to Integrated
         phase = next_transition_phase(&phase).expect("PostLiminal should have a next phase");

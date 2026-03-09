@@ -1801,9 +1801,7 @@ mod tests {
         assert!(json.contains("MilestoneRecorded"));
         let back: HearthSignal = serde_json::from_str(&json).unwrap();
         match back {
-            HearthSignal::MilestoneRecorded {
-                milestone_type, ..
-            } => {
+            HearthSignal::MilestoneRecorded { milestone_type, .. } => {
                 assert_eq!(milestone_type, MilestoneType::Marriage);
             }
             _ => panic!("Wrong variant"),

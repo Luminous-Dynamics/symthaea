@@ -18,11 +18,10 @@ use hearth_types::{
     SeveranceSummaryData, WeeklyDigest,
 };
 use mycelix_bridge_common::{
-    self as bridge, check_rate_limit_count, BridgeHealth, CrossClusterDispatchInput, DispatchInput,
-    DispatchResult, EventTypeQuery, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
-    ConsciousnessCredential, ConsciousnessTier, GateAuditInput,
-    GovernanceAuditFilter, GovernanceAuditResult,
-    needs_refresh,
+    self as bridge, check_rate_limit_count, needs_refresh, BridgeHealth, ConsciousnessCredential,
+    ConsciousnessTier, CrossClusterDispatchInput, DispatchInput, DispatchResult, EventTypeQuery,
+    GateAuditInput, GovernanceAuditFilter, GovernanceAuditResult, ResolveQueryInput,
+    RATE_LIMIT_WINDOW_SECS,
 };
 
 // ============================================================================
@@ -325,11 +324,21 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
 
     // Event type index
     let type_anchor = ensure_anchor(&format!("event_type:governance_gate:{}", input.action_name))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::EventTypeToEvent,
+        (),
+    )?;
 
     // Agent index
     let agent_anchor = ensure_anchor(&format!("agent_events:{}", agent))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToEvent,
+        (),
+    )?;
 
     // Domain index
     let domain_anchor = ensure_anchor("domain_events:governance_gate")?;
@@ -340,7 +349,9 @@ pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
 
 /// Query governance gate audit events with filtering.
 #[hdk_extern]
-pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult<GovernanceAuditResult> {
+pub fn get_governance_audit_trail(
+    filter: GovernanceAuditFilter,
+) -> ExternResult<GovernanceAuditResult> {
     let domain_anchor = anchor_hash("domain_events:governance_gate")?;
     let links = get_links(
         LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
@@ -353,21 +364,31 @@ pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult
             if let Ok(Some(event)) = record.entry().to_app_option::<HearthEventEntry>() {
                 if let Ok(audit) = serde_json::from_str::<GateAuditInput>(&event.payload) {
                     if let Some(ref action) = filter.action_name {
-                        if &audit.action_name != action { continue; }
+                        if &audit.action_name != action {
+                            continue;
+                        }
                     }
                     if let Some(ref zome) = filter.zome_name {
-                        if &audit.zome_name != zome { continue; }
+                        if &audit.zome_name != zome {
+                            continue;
+                        }
                     }
                     if let Some(eligible) = filter.eligible {
-                        if audit.eligible != eligible { continue; }
+                        if audit.eligible != eligible {
+                            continue;
+                        }
                     }
                     if let Some(from_us) = filter.from_us {
                         let event_us = event.created_at.as_micros();
-                        if event_us < from_us { continue; }
+                        if event_us < from_us {
+                            continue;
+                        }
                     }
                     if let Some(to_us) = filter.to_us {
                         let event_us = event.created_at.as_micros();
-                        if event_us > to_us { continue; }
+                        if event_us > to_us {
+                            continue;
+                        }
                     }
                     entries.push(audit);
                 }
@@ -375,7 +396,10 @@ pub fn get_governance_audit_trail(filter: GovernanceAuditFilter) -> ExternResult
         }
     }
     let total = entries.len() as u32;
-    Ok(GovernanceAuditResult { entries, total_matched: total })
+    Ok(GovernanceAuditResult {
+        entries,
+        total_matched: total,
+    })
 }
 
 // ============================================================================
@@ -797,24 +821,41 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
         }
     }
 
-    let link = links.into_iter().max_by_key(|l| l.timestamp)
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No credential cache links found".into())))?;
-    let target = link.target.into_action_hash().ok_or_else(||
-        wasm_error!(WasmErrorInner::Guest("Invalid credential cache link target".into())))?;
+    let link = links
+        .into_iter()
+        .max_by_key(|l| l.timestamp)
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "No credential cache links found".into()
+            ))
+        })?;
+    let target = link.target.into_action_hash().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid credential cache link target".into()
+        ))
+    })?;
 
     if let Some(record) = get_latest_record(target)? {
-        let cached: CachedCredentialEntry = record.entry()
+        let cached: CachedCredentialEntry = record
+            .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in cached credential record".into())))?;
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "No entry in cached credential record".into()
+                ))
+            })?;
 
         if cached.did == did {
             let now = sys_time()?.as_micros();
             if now - cached.cached_at_us < CREDENTIAL_CACHE_TTL_US {
-                let credential: ConsciousnessCredential = serde_json::from_str(&cached.credential_json)
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-                        "Credential cache decode error: {}", e
-                    ))))?;
+                let credential: ConsciousnessCredential =
+                    serde_json::from_str(&cached.credential_json).map_err(|e| {
+                        wasm_error!(WasmErrorInner::Guest(format!(
+                            "Credential cache decode error: {}",
+                            e
+                        )))
+                    })?;
                 // Check credential expiry — don't serve expired credentials from cache
                 if credential.is_expired(now as u64) {
                     return Ok(None);
@@ -830,10 +871,12 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
 /// Store a consciousness credential in the local cache.
 fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
     let now = sys_time()?.as_micros();
-    let json = serde_json::to_string(credential)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "Credential cache encode error: {}", e
-        ))))?;
+    let json = serde_json::to_string(credential).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Credential cache encode error: {}",
+            e
+        )))
+    })?;
 
     let entry = CachedCredentialEntry {
         did: credential.did.clone(),
@@ -862,7 +905,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
         // Proactive refresh — attempt inline refresh, fall back to cached if it fails
         let now_us = sys_time()?.as_micros() as u64;
         if needs_refresh(&cached, now_us) {
-            debug!("Credential nearing expiry, attempting proactive refresh for {}", cached.did);
+            debug!(
+                "Credential nearing expiry, attempting proactive refresh for {}",
+                cached.did
+            );
             if let Ok(ZomeCallResponse::Ok(response)) = call(
                 CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
                 ZomeName::new("identity_bridge"),
@@ -912,14 +958,17 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
             // Identity role unavailable (single-DNA mode or network partition).
             // Return a permissive fallback credential so single-cluster operations
             // can proceed. In production, the identity role will provide real scores.
-            debug!("Identity role unavailable, using fallback consciousness credential for {}", did);
+            debug!(
+                "Identity role unavailable, using fallback consciousness credential for {}",
+                did
+            );
             let now_us = sys_time()?.as_micros() as u64;
             ConsciousnessCredential::from_unified_consciousness(
                 did.clone(),
-                0.5,   // unified_consciousness — mid-range default
-                0.5,   // identity — above Participant threshold (0.25)
-                0.5,   // reputation
-                0.5,   // community
+                0.5, // unified_consciousness — mid-range default
+                0.5, // identity — above Participant threshold (0.25)
+                0.5, // reputation
+                0.5, // community
                 "did:mycelix:hearth-bridge-fallback".to_string(),
                 now_us,
             )
@@ -938,7 +987,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
     // Proactive refresh check (covers edge case: identity issued a short-lived credential)
     let now_us = sys_time()?.as_micros() as u64;
     if needs_refresh(&credential, now_us) {
-        debug!("Freshly-issued credential nearing expiry, attempting proactive refresh for {}", credential.did);
+        debug!(
+            "Freshly-issued credential nearing expiry, attempting proactive refresh for {}",
+            credential.did
+        );
         if let Ok(ZomeCallResponse::Ok(response)) = call(
             CallTargetCell::OtherRole(IDENTITY_ROLE.into()),
             ZomeName::new("identity_bridge"),
@@ -966,7 +1018,10 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
 /// existing cached credential (or a fallback if no cache exists).
 #[hdk_extern]
 pub fn refresh_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
-    debug!("hearth-bridge: refreshing consciousness credential for {}", did);
+    debug!(
+        "hearth-bridge: refreshing consciousness credential for {}",
+        did
+    );
 
     // Attempt cross-cluster call to identity bridge
     let payload = ExternIO::encode(did.clone())
@@ -996,7 +1051,10 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
         }
         _ => {
             // Identity cluster unreachable — return existing cached credential if available
-            debug!("hearth-bridge: identity cluster unreachable during refresh for {}", did);
+            debug!(
+                "hearth-bridge: identity cluster unreachable during refresh for {}",
+                did
+            );
             if let Some(cached) = get_cached_credential(&did)? {
                 return Ok(cached);
             }
@@ -1004,7 +1062,10 @@ pub fn refresh_consciousness_credential(did: String) -> ExternResult<Consciousne
             let now_us = sys_time()?.as_micros() as u64;
             ConsciousnessCredential::from_unified_consciousness(
                 did.clone(),
-                0.0, 0.0, 0.0, 0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
                 "did:mycelix:hearth-bridge-fallback".to_string(),
                 now_us,
             )

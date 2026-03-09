@@ -8,8 +8,7 @@ use hearth_coordinator_common::{get_latest_record, records_from_links, require_m
 use hearth_rhythms_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic,
+    gate_consciousness, requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
 };
 
 // ============================================================================
@@ -590,7 +589,10 @@ mod tests {
         p.expected_return = Some(Timestamp::from_micros(5_000_000));
         let json = serde_json::to_string(&p).unwrap();
         let back: PresenceStatus = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.expected_return, Some(Timestamp::from_micros(5_000_000)));
+        assert_eq!(
+            back.expected_return,
+            Some(Timestamp::from_micros(5_000_000))
+        );
         assert_eq!(back.status, PresenceStatusType::Away);
     }
 
@@ -1050,10 +1052,7 @@ mod tests {
         let mut p = make_presence(fake_agent(), PresenceStatusType::Away);
         assert!(p.expected_return.is_none());
         p.expected_return = Some(Timestamp::from_micros(10_000_000));
-        assert_eq!(
-            p.expected_return,
-            Some(Timestamp::from_micros(10_000_000))
-        );
+        assert_eq!(p.expected_return, Some(Timestamp::from_micros(10_000_000)));
     }
 
     // ========================================================================
@@ -1118,16 +1117,8 @@ mod tests {
         let target_a = fake_agent_b();
         let target_b = fake_agent_c();
 
-        assert!(!can_set_presence_for(
-            &guest,
-            &target_a,
-            &MemberRole::Guest
-        ));
-        assert!(!can_set_presence_for(
-            &guest,
-            &target_b,
-            &MemberRole::Guest
-        ));
+        assert!(!can_set_presence_for(&guest, &target_a, &MemberRole::Guest));
+        assert!(!can_set_presence_for(&guest, &target_b, &MemberRole::Guest));
         // Self-set always works
         assert!(can_set_presence_for(&guest, &guest, &MemberRole::Guest));
     }

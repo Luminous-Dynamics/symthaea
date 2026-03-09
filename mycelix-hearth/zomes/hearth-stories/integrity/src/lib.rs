@@ -343,7 +343,9 @@ fn validate_collection(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_collection_update(collection: &StoryCollection) -> ExternResult<ValidateCallbackResult> {
+fn validate_collection_update(
+    collection: &StoryCollection,
+) -> ExternResult<ValidateCallbackResult> {
     if collection.name.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Collection name cannot be empty".into(),
@@ -758,10 +760,7 @@ mod tests {
         let result = validate_collection(action, collection).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(
-                    msg,
-                    "Collection description must be <= 4096 characters"
-                );
+                assert_eq!(msg, "Collection description must be <= 4096 characters");
             }
             _ => panic!("Expected Invalid result"),
         }
@@ -840,10 +839,7 @@ mod tests {
         let result = validate_tradition(action, tradition).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(
-                    msg,
-                    "Tradition description must be <= 4096 characters"
-                );
+                assert_eq!(msg, "Tradition description must be <= 4096 characters");
             }
             _ => panic!("Expected Invalid result"),
         }
@@ -866,10 +862,7 @@ mod tests {
         let result = validate_tradition(action, tradition).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
-                assert_eq!(
-                    msg,
-                    "Tradition instructions must be <= 16384 characters"
-                );
+                assert_eq!(msg, "Tradition instructions must be <= 16384 characters");
             }
             _ => panic!("Expected Invalid result"),
         }

@@ -8,9 +8,8 @@ use hearth_coordinator_common::{get_latest_record, records_from_links};
 use hearth_kinship_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, requirement_for_voting,
     GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_basic, requirement_for_proposal,
-    requirement_for_voting,
 };
 
 // ============================================================================
@@ -1512,7 +1511,11 @@ mod tests {
         let agent_e = AgentPubKey::from_raw_36(vec![5u8; 36]);
 
         let memberships = vec![
-            make_membership(&fake_agent_a(), MemberRole::Founder, MembershipStatus::Active),
+            make_membership(
+                &fake_agent_a(),
+                MemberRole::Founder,
+                MembershipStatus::Active,
+            ),
             make_membership(&fake_agent_b(), MemberRole::Elder, MembershipStatus::Active),
             make_membership(&agent_c, MemberRole::Adult, MembershipStatus::Active),
             make_membership(&agent_d, MemberRole::Youth, MembershipStatus::Active),
@@ -1520,8 +1523,14 @@ mod tests {
         ];
 
         // Check each member's vote weight
-        assert_eq!(find_member_vote_weight(&fake_agent_a(), &memberships), 10000);
-        assert_eq!(find_member_vote_weight(&fake_agent_b(), &memberships), 10000);
+        assert_eq!(
+            find_member_vote_weight(&fake_agent_a(), &memberships),
+            10000
+        );
+        assert_eq!(
+            find_member_vote_weight(&fake_agent_b(), &memberships),
+            10000
+        );
         assert_eq!(find_member_vote_weight(&agent_c, &memberships), 10000);
         assert_eq!(find_member_vote_weight(&agent_d, &memberships), 5000);
         assert_eq!(find_member_vote_weight(&agent_e, &memberships), 0);
@@ -1555,7 +1564,10 @@ mod tests {
 
         // Day 30: significant decay
         let day30 = decayed_strength(initial, 30);
-        assert!(day30 < day7, "Bond should decay significantly after 30 days");
+        assert!(
+            day30 < day7,
+            "Bond should decay significantly after 30 days"
+        );
 
         // Day 90: heavy decay
         let day90 = decayed_strength(initial, 90);
@@ -1663,7 +1675,11 @@ mod tests {
 
         let memberships = vec![
             // Active founder
-            make_membership(&fake_agent_a(), MemberRole::Founder, MembershipStatus::Active),
+            make_membership(
+                &fake_agent_a(),
+                MemberRole::Founder,
+                MembershipStatus::Active,
+            ),
             // Departed elder (should not be found)
             make_membership(
                 &fake_agent_b(),
@@ -1694,7 +1710,10 @@ mod tests {
         );
 
         // Vote weight reflects the same: departed member gets 0
-        assert_eq!(find_member_vote_weight(&fake_agent_a(), &memberships), 10000);
+        assert_eq!(
+            find_member_vote_weight(&fake_agent_a(), &memberships),
+            10000
+        );
         assert_eq!(
             find_member_vote_weight(&fake_agent_b(), &memberships),
             0,

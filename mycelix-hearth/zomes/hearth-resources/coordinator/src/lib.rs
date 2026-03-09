@@ -8,8 +8,8 @@ use hearth_coordinator_common::{decode_zome_response, get_latest_record};
 use hearth_resources_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement, gate_consciousness,
-    requirement_for_basic, requirement_for_proposal,
+    gate_consciousness, requirement_for_basic, requirement_for_proposal, GovernanceEligibility,
+    GovernanceRequirement,
 };
 
 // ============================================================================

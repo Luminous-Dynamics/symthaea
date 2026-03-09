@@ -3,12 +3,13 @@
 //! care swaps, and meal planning.
 
 use hdk::prelude::*;
-use hearth_coordinator_common::{decode_zome_response, get_latest_record, records_from_links, require_membership};
 use hearth_care_integrity::*;
+use hearth_coordinator_common::{
+    decode_zome_response, get_latest_record, records_from_links, require_membership,
+};
 use hearth_types::*;
 use mycelix_bridge_common::{
-    GovernanceEligibility, GovernanceRequirement,
-    gate_consciousness, requirement_for_basic,
+    gate_consciousness, requirement_for_basic, GovernanceEligibility, GovernanceRequirement,
 };
 
 // ============================================================================
@@ -1001,17 +1002,8 @@ mod tests {
 
         // Verify we have exactly 3 meals per day
         for day in &days {
-            let day_meals: Vec<_> = back
-                .meals
-                .iter()
-                .filter(|m| m.day == *day)
-                .collect();
-            assert_eq!(
-                day_meals.len(),
-                3,
-                "{} should have exactly 3 meals",
-                day
-            );
+            let day_meals: Vec<_> = back.meals.iter().filter(|m| m.day == *day).collect();
+            assert_eq!(day_meals.len(), 3, "{} should have exactly 3 meals", day);
         }
     }
 

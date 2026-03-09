@@ -4,10 +4,8 @@
 //! Uses shared bridge entry types from mycelix-bridge-entry-types.
 
 use hdi::prelude::*;
-use mycelix_bridge_entry_types::{
-    BridgeEventEntry, BridgeQueryEntry, validate_cached_credential,
-};
 pub use mycelix_bridge_entry_types::CachedCredentialEntry;
+use mycelix_bridge_entry_types::{validate_cached_credential, BridgeEventEntry, BridgeQueryEntry};
 
 /// Anchor entry for deterministic link bases.
 #[hdk_entry_helper]
@@ -59,7 +57,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::BridgeEvent(event) => validate_event(&event),
             EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
         },
-        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, original_action_hash, .. }) => match app_entry {
+        FlatOp::StoreEntry(OpEntry::UpdateEntry {
+            app_entry,
+            original_action_hash,
+            ..
+        }) => match app_entry {
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Invalid(
                 "Anchor cannot be updated once created".into(),
             )),
