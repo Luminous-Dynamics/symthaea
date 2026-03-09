@@ -59,6 +59,7 @@ impl FusionSafetyAdapter {
             } else {
                 0.0
             },
+            integrity_critical: false,
         }
     }
 

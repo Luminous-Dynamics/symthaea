@@ -77,6 +77,7 @@ impl NuclearSafetyAdapter {
             consciousness_level: confidence,
             prediction_error: 1.0 - confidence,
             temporal_coherence: temporal_coherence.clamp(0.0, 1.0),
+            integrity_critical: false,
         }
     }
 

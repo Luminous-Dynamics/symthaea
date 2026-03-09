@@ -91,6 +91,7 @@ impl WaterSafetyAdapter {
             consciousness_level: potability,
             prediction_error: fe,
             temporal_coherence: coherence,
+            integrity_critical: false,
         }
     }
 
