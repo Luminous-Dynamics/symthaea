@@ -320,4 +320,150 @@ mod tests {
             .unwrap();
         assert!(nginx_pkg.related_packages.contains(&"nginx".to_string()));
     }
+
+    #[test]
+    fn test_parse_invalid_json() {
+        let result = parse_nixos_options("not json at all");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to parse"));
+    }
+
+    #[test]
+    fn test_parse_empty_object() {
+        let schemas = parse_nixos_options("{}").unwrap();
+        assert!(schemas.is_empty());
+    }
+
+    #[test]
+    fn test_missing_type_defaults_unknown() {
+        let json = r#"{ "my.option": { "description": "no type field" } }"#;
+        let schemas = parse_nixos_options(json).unwrap();
+        assert_eq!(schemas.len(), 1);
+        assert_eq!(schemas[0].option_type, "unknown");
+    }
+
+    #[test]
+    fn test_default_value_variants() {
+        let json = r#"{
+            "a": { "type": "bool", "default": true, "description": "" },
+            "b": { "type": "string", "default": "hello", "description": "" },
+            "c": { "type": "int", "default": 42, "description": "" },
+            "d": { "type": "null", "description": "" }
+        }"#;
+        let schemas = parse_nixos_options(json).unwrap();
+        let a = schemas.iter().find(|s| s.name == "a").unwrap();
+        assert_eq!(a.default.as_deref(), Some("true"));
+        let b = schemas.iter().find(|s| s.name == "b").unwrap();
+        assert_eq!(b.default.as_deref(), Some("hello"));
+        let c = schemas.iter().find(|s| s.name == "c").unwrap();
+        assert_eq!(c.default.as_deref(), Some("42"));
+        let d = schemas.iter().find(|s| s.name == "d").unwrap();
+        assert!(d.default.is_none());
+    }
+
+    #[test]
+    fn test_schema_accessors() {
+        let schema = NixOptionSchema {
+            name: "services.postgresql.enable".to_string(),
+            option_type: "bool".to_string(),
+            default: None,
+            description: "Enable PostgreSQL".to_string(),
+            related_packages: vec![],
+            declarations: vec![],
+        };
+        assert!(schema.is_enable_option());
+        assert_eq!(schema.module_prefix(), "services");
+        assert_eq!(schema.service_name(), Some("postgresql"));
+        assert_eq!(
+            schema.path_components(),
+            vec!["services", "postgresql", "enable"]
+        );
+    }
+
+    #[test]
+    fn test_non_service_has_no_service_name() {
+        let schema = NixOptionSchema {
+            name: "boot.loader.grub.enable".to_string(),
+            option_type: "bool".to_string(),
+            default: None,
+            description: "".to_string(),
+            related_packages: vec![],
+            declarations: vec![],
+        };
+        assert!(schema.is_enable_option());
+        assert_eq!(schema.service_name(), None);
+    }
+
+    #[test]
+    fn test_is_package_list_variants() {
+        let pkg_list = NixOptionSchema {
+            name: "environment.systemPackages".to_string(),
+            option_type: "listOf package".to_string(),
+            default: None,
+            description: "".to_string(),
+            related_packages: vec![],
+            declarations: vec![],
+        };
+        assert!(pkg_list.is_package_list());
+
+        let non_list = NixOptionSchema {
+            name: "services.nginx.enable".to_string(),
+            option_type: "bool".to_string(),
+            default: None,
+            description: "".to_string(),
+            related_packages: vec![],
+            declarations: vec![],
+        };
+        assert!(!non_list.is_package_list());
+    }
+
+    #[test]
+    fn test_programs_related_packages() {
+        let json = r#"{
+            "programs.firefox.enable": {
+                "type": "bool",
+                "default": false,
+                "description": "Enable Firefox via pkgs.firefox-unwrapped."
+            }
+        }"#;
+        let schemas = parse_nixos_options(json).unwrap();
+        assert!(schemas[0].related_packages.contains(&"firefox".to_string()));
+        assert!(schemas[0]
+            .related_packages
+            .contains(&"firefox-unwrapped".to_string()));
+    }
+
+    #[test]
+    fn test_cache_len_and_is_empty() {
+        let cache = OptionSchemaCache::new();
+        // Bundled options should be loaded
+        assert!(!cache.is_empty());
+        assert!(cache.len() >= 100);
+    }
+
+    #[test]
+    fn test_cache_with_refresh_interval() {
+        let cache =
+            OptionSchemaCache::new().with_refresh_interval(std::time::Duration::from_secs(60));
+        assert!(!cache.is_empty());
+    }
+
+    #[test]
+    fn test_cache_schemas_returns_slice() {
+        let mut cache = OptionSchemaCache::new();
+        let schemas = cache.schemas();
+        assert!(!schemas.is_empty());
+        // All schemas should have non-empty names
+        for s in schemas {
+            assert!(!s.name.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_sorted_output() {
+        let schemas = parse_nixos_options(sample_json()).unwrap();
+        for w in schemas.windows(2) {
+            assert!(w[0].name <= w[1].name, "Results should be sorted by name");
+        }
+    }
 }

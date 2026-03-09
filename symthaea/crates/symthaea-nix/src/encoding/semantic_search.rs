@@ -165,4 +165,86 @@ mod tests {
         let results = search_options_by_vector(&hv, &mut codebook, &paths, 2);
         assert_eq!(results.len(), 2);
     }
+
+    #[test]
+    fn test_search_empty_paths() {
+        let mut codebook = NixCodebook::new();
+        let results = search_options("nginx", &mut codebook, &[], 5);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_top_k_zero() {
+        let mut codebook = NixCodebook::new();
+        let paths = ["services.nginx.enable"];
+        let results = search_options("nginx", &mut codebook, &paths, 0);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_top_k_exceeds_paths() {
+        let mut codebook = NixCodebook::new();
+        let paths = ["services.nginx.enable", "boot.loader.grub.enable"];
+        let results = search_options("nginx", &mut codebook, &paths, 100);
+        // Should return all paths, not more
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_search_single_char_query() {
+        let mut codebook = NixCodebook::new();
+        let paths = ["services.nginx.enable"];
+        let results = search_options("x", &mut codebook, &paths, 5);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].similarity.is_finite());
+    }
+
+    #[test]
+    fn test_search_by_vector_empty_paths() {
+        let mut codebook = NixCodebook::new();
+        let hv = ContinuousHV::random(16384, 42);
+        let results = search_options_by_vector(&hv, &mut codebook, &[], 5);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_by_vector_top_k_zero() {
+        let mut codebook = NixCodebook::new();
+        let paths = ["services.nginx.enable"];
+        let hv = codebook.get_or_create("nginx").clone();
+        let results = search_options_by_vector(&hv, &mut codebook, &paths, 0);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_results_sorted_descending() {
+        let mut codebook = NixCodebook::new();
+        let paths = [
+            "services.nginx.enable",
+            "services.postgresql.enable",
+            "networking.firewall.enable",
+            "boot.loader.grub.enable",
+        ];
+        let results = search_options("firewall networking", &mut codebook, &paths, 4);
+        for w in results.windows(2) {
+            assert!(
+                w[0].similarity >= w[1].similarity,
+                "Results should be sorted descending: {} >= {}",
+                w[0].similarity,
+                w[1].similarity
+            );
+        }
+    }
+
+    #[test]
+    fn test_match_reason_populated() {
+        let mut codebook = NixCodebook::new();
+        let paths = ["services.nginx.enable"];
+        let results = search_options("nginx", &mut codebook, &paths, 1);
+        assert!(!results[0].match_reason.is_empty());
+
+        let hv = codebook.get_or_create("nginx").clone();
+        let results2 = search_options_by_vector(&hv, &mut codebook, &paths, 1);
+        assert!(results2[0].match_reason.contains("Vector similarity"));
+    }
 }
