@@ -1142,6 +1142,15 @@ name = "precognition_demo"
 [[example]]
 name = "autonomous_forge_demo"
 
+# Genesis paper / physics demos (require genesis sub-crates)
+[[example]]
+name = "genesis_paper_data"
+required-features = ["genesis"]
+
+[[example]]
+name = "genesis_physics_demo"
+required-features = ["physics"]
+
 # Soak tests (long-running validation)
 [[example]]
 name = "soak_discovery_pipeline"

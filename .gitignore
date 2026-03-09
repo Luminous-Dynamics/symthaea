@@ -58,6 +58,7 @@ archive/
 **/data/**
 !**/data/
 !crates/symthaea-broca/data/broca-vocab-*.json
+!crates/symthaea-stt/data/mini_cmudict.txt
 !src/voice/data/cmudict.dict
 models/
 results/

@@ -123,24 +123,11 @@ info "Copying Cargo.toml with standalone fixups..."
 if ! $DRY_RUN; then
     cp "${SYMTHAEA_DIR}/Cargo.toml" "${STANDALONE_REPO}/Cargo.toml"
 
-    # Fix mycelix-fl-core: comment out monorepo path, use stub
-    sed -i \
-        's|^mycelix-fl-core = { path = "\.\./mycelix-workspace/.*|# &\nmycelix-fl-core = { path = "stubs/mycelix-fl-core", optional = true }|' \
+    # Fix external path deps → stub crates (match any quoted path)
+    sed -i 's|^mycelix-fl-core = { path = "[^"]*"|mycelix-fl-core = { path = "stubs/mycelix-fl-core"|' \
         "${STANDALONE_REPO}/Cargo.toml"
 
-    # Fix mycelix-sdk: comment out monorepo path, use stub
-    sed -i \
-        's|^mycelix-sdk = { path = "\.\./mycelix-workspace/.*|# &\nmycelix-sdk = { path = "stubs/mycelix-sdk", optional = true, default-features = false, features = ["standalone"] }|' \
-        "${STANDALONE_REPO}/Cargo.toml"
-
-    # Fix mycelix feature definition (ensure it references stubs correctly)
-    sed -i \
-        's|^mycelix = \["mycelix-fl-core".*|mycelix = ["mycelix-fl-core", "sha3"]       # Standalone: uses stubs/|' \
-        "${STANDALONE_REPO}/Cargo.toml"
-
-    # Fix mycelix_sdk feature definition
-    sed -i \
-        's|^mycelix_sdk = \["mycelix".*|mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]  # Standalone: uses stubs/|' \
+    sed -i 's|^mycelix-sdk = { path = "[^"]*"|mycelix-sdk = { path = "stubs/mycelix-sdk"|' \
         "${STANDALONE_REPO}/Cargo.toml"
 
     info "Cargo.toml fixups applied"
