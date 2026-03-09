@@ -155,7 +155,7 @@ symthaea-observability = { path = "crates/symthaea-observability", optional = tr
 symthaea-support = { path = "crates/symthaea-support", optional = true }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
-mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
+mycelix-fl-core = { path = "stubs/mycelix-fl-core", optional = true }
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/symthaea-stt", optional = true }
@@ -246,7 +246,7 @@ futures = { version = "0.3", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
 uuid = { workspace = true }  # Week 3: Enabled for Goal IDs
-mycelix-sdk = { path = "../mycelix-workspace/sdk-ts/../sdk", optional = true, default-features = false, features = ["standalone"] }
+mycelix-sdk = { path = "stubs/mycelix-sdk", optional = true, default-features = false, features = ["standalone"] }
 sha3 = { version = "0.10", optional = true }  # For gradient hashing
 
 # Web Research & Epistemic Verification (Track 6)

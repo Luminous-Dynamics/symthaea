@@ -1,0 +1,12 @@
+[package]
+name = "mycelix-fl-core"
+version = "0.1.0"
+edition = "2021"
+description = "Stub crate for symthaea standalone builds"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[features]
+default = ["std"]
+std = []
