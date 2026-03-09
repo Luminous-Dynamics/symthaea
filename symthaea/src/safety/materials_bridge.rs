@@ -59,6 +59,7 @@ impl MaterialSafetyAdapter {
             consciousness_level: remaining,
             prediction_error: 1.0 - similarity,
             temporal_coherence: similarity,
+            integrity_critical: false,
         }
     }
 

@@ -39,6 +39,7 @@ impl StrategicMaterialsSafetyAdapter {
             consciousness_level: (1.0 - free_energy as f32).clamp(0.0, 1.0),
             prediction_error: free_energy as f32,
             temporal_coherence: 0.5,
+            integrity_critical: false,
         };
         self.agent.assess(metrics)
     }

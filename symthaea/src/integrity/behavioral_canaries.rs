@@ -316,7 +316,7 @@ impl CanaryTest for MoralAlgebraDeterminismCanary {
     fn run(&self) -> Result<(), CanaryFailure> {
         use crate::hdc::moral_algebra::{Magnitude, MoralAlgebra};
 
-        let algebra = MoralAlgebra::new();
+        let algebra = MoralAlgebra::new(512);
 
         // Proportional justice: equal effort and reward should be judged as just.
         // This is a deterministic computation (no randomness, no learned state).
@@ -374,10 +374,11 @@ impl CanaryTest for HdcEncodingCanary {
     }
 
     fn run(&self) -> Result<(), CanaryFailure> {
-        use symthaea_core::hdc::encoder_config::EncoderConfig;
-        use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
+        use symthaea_core::hdc::predictive_encoder::{
+            PredictiveEncoderConfig, PredictiveHdcEncoder,
+        };
 
-        let config = EncoderConfig::default();
+        let config = PredictiveEncoderConfig::default();
         let mut encoder = match PredictiveHdcEncoder::new(config) {
             Ok(e) => e,
             Err(e) => {

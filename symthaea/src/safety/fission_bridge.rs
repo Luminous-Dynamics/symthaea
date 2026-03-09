@@ -10,7 +10,7 @@
 
 use super::agent::{SafetyAgent, SafetyAssessment, SafetyLevel, SafetyMetrics};
 use super::gate::{safety_gate, SafetyGateResult};
-use symthaea_physics::fission::{FissionFepAction, FissionOutput, FissionSafetyLevel};
+use symthaea_physics::fission::{FissionOutput, FissionSafetyLevel};
 
 /// Adapter that translates Fission reactor outputs into Safety Agent inputs.
 pub struct FissionSafetyAdapter {
@@ -47,6 +47,7 @@ impl FissionSafetyAdapter {
             } else {
                 0.0
             },
+            integrity_critical: false,
         }
     }
 
