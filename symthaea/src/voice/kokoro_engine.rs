@@ -133,7 +133,7 @@ impl KokoroEngine {
     ///
     /// Returns audio samples at 24kHz, or `None` if synthesis fails.
     #[cfg(feature = "voice-tts")]
-    pub fn synthesize(&self, text: &str, voice_id: Option<usize>) -> Option<Vec<f32>> {
+    pub fn synthesize(&mut self, text: &str, voice_id: Option<usize>) -> Option<Vec<f32>> {
         let phoneme_ids = self.g2p.text_to_phonemes(text);
         if phoneme_ids.is_empty() {
             return None;
@@ -187,7 +187,7 @@ impl KokoroEngine {
 
     /// Stub synthesize when voice-tts feature is not enabled.
     #[cfg(not(feature = "voice-tts"))]
-    pub fn synthesize(&self, _text: &str, _voice_id: Option<usize>) -> Option<Vec<f32>> {
+    pub fn synthesize(&mut self, _text: &str, _voice_id: Option<usize>) -> Option<Vec<f32>> {
         None
     }
 

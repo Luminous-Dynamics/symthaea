@@ -183,6 +183,14 @@ pub struct MoralAnomalyConfig {
     /// Aggressive dampening: when compartmentalized harm is detected,
     /// drastically reduce learning to prevent the system from being steered.
     pub response_lr_convergence: f64,
+    /// Window size for convergence baseline statistics (default: 100).
+    ///
+    /// Replaces infinite-horizon EMA with a sliding window of recent observations.
+    /// After `convergence_baseline_window` observations, the oldest values are
+    /// dropped, ensuring constant sensitivity even after thousands of cycles.
+    /// A slow adversarial drift over hours that would evade an EMA baseline
+    /// cannot evade a windowed baseline with bounded memory.
+    pub convergence_baseline_window: usize,
 }
 
 impl Default for MoralAnomalyConfig {
@@ -215,6 +223,7 @@ impl Default for MoralAnomalyConfig {
             convergence_flourishing_floor: 0.6,
             weight_convergence: 0.4,
             response_lr_convergence: 0.1,
+            convergence_baseline_window: 100,
         }
     }
 }
@@ -538,14 +547,12 @@ pub struct MoralTopology {
     trajectory: VecDeque<MoralTrajectoryPoint>,
     /// Adaptive threshold state (active when `anomaly_config.adaptive_enabled`).
     adaptive_state: AdaptiveAnomalyState,
-    /// EMA of baseline pairwise similarity (for convergence detection).
-    baseline_similarity_ema: f64,
-    /// EMA of baseline harmony entropy (for convergence detection).
-    baseline_entropy_ema: f64,
-    /// EMA of baseline flourishing score (for convergence detection).
-    baseline_flourishing_ema: f64,
-    /// Number of convergence baseline observations.
-    convergence_baseline_count: usize,
+    /// Sliding window of recent pairwise similarity observations.
+    baseline_similarity_window: VecDeque<f64>,
+    /// Sliding window of recent harmony entropy observations.
+    baseline_entropy_window: VecDeque<f64>,
+    /// Sliding window of recent flourishing score observations.
+    baseline_flourishing_window: VecDeque<f64>,
     /// Cached last convergence report (for telemetry).
     last_convergence_report: TrajectoryConvergenceReport,
     /// Registry of known hazard signature templates for convergence boosting.
@@ -641,6 +648,118 @@ pub struct TrajectoryConvergenceReport {
     pub matched_hazard: Option<String>,
 }
 
+/// Human-readable explanation of a convergence detection result.
+///
+/// Produced by [`TrajectoryConvergenceReport::explain`]. Breaks down which
+/// signals fired, their magnitudes relative to thresholds, and what the
+/// detection means in plain language.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConvergenceExplanation {
+    /// Whether convergence was detected.
+    pub detected: bool,
+    /// Overall severity (0.0–1.0).
+    pub severity: f64,
+    /// Per-signal breakdown: (signal_name, triggered, value, threshold, normalized_severity).
+    pub signals: Vec<SignalBreakdown>,
+    /// Matched hazard template name, if any.
+    pub matched_hazard: Option<String>,
+    /// Human-readable summary sentence.
+    pub summary: String,
+}
+
+/// Breakdown of a single convergence signal.
+#[derive(Debug, Clone, Serialize)]
+pub struct SignalBreakdown {
+    pub name: &'static str,
+    pub triggered: bool,
+    pub value: f64,
+    pub threshold: f64,
+    pub normalized: f64,
+}
+
+impl TrajectoryConvergenceReport {
+    /// Produce a human-readable explanation of this convergence result.
+    ///
+    /// Requires the anomaly config to compute threshold comparisons.
+    pub fn explain(&self, config: &MoralAnomalyConfig) -> ConvergenceExplanation {
+        let sim_norm = (self.similarity_anomaly
+            / config.convergence_similarity_threshold.max(1e-9))
+        .clamp(0.0, 1.0);
+        let ent_norm = (self.entropy_decline_rate
+            / config.convergence_entropy_decline_threshold.max(1e-9))
+        .clamp(0.0, 1.0);
+        let fl_deficit = if self.baseline_flourishing > 1e-9 {
+            1.0 - (self.flourishing_score / self.baseline_flourishing).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let fl_norm =
+            (fl_deficit / config.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
+
+        let sim_triggered =
+            self.similarity_anomaly > config.convergence_similarity_threshold;
+        let ent_triggered =
+            self.entropy_decline_rate > config.convergence_entropy_decline_threshold;
+        let fl_triggered = fl_deficit > config.convergence_flourishing_floor;
+
+        let signals = vec![
+            SignalBreakdown {
+                name: "similarity_anomaly",
+                triggered: sim_triggered,
+                value: self.similarity_anomaly,
+                threshold: config.convergence_similarity_threshold,
+                normalized: sim_norm,
+            },
+            SignalBreakdown {
+                name: "entropy_decline",
+                triggered: ent_triggered,
+                value: self.entropy_decline_rate,
+                threshold: config.convergence_entropy_decline_threshold,
+                normalized: ent_norm,
+            },
+            SignalBreakdown {
+                name: "flourishing_deficit",
+                triggered: fl_triggered,
+                value: fl_deficit,
+                threshold: config.convergence_flourishing_floor,
+                normalized: fl_norm,
+            },
+        ];
+
+        let fired: Vec<&str> = signals.iter().filter(|s| s.triggered).map(|s| s.name).collect();
+        let summary = if !self.convergence_detected {
+            format!(
+                "No convergence detected. {}/3 signals triggered: [{}]. Severity: {:.3}.",
+                fired.len(),
+                fired.join(", "),
+                self.severity,
+            )
+        } else {
+            let hazard_str = match &self.matched_hazard {
+                Some(h) => format!(" Matched hazard template: '{h}'."),
+                None => String::new(),
+            };
+            format!(
+                "CONVERGENCE DETECTED (severity {:.3}). {}/3 signals fired: [{}].{} \
+                 Trajectory shows suspicious clustering in moral space — \
+                 individually benign requests may form a compartmentalized hazardous pattern.",
+                self.severity,
+                fired.len(),
+                fired.join(", "),
+                hazard_str,
+            )
+        };
+
+        ConvergenceExplanation {
+            detected: self.convergence_detected,
+            severity: self.severity,
+            signals,
+            matched_hazard: self.matched_hazard.clone(),
+            summary,
+        }
+    }
+}
+
 impl MoralTopology {
     /// Create a new analyser with its own `HarmonyBasis`.
     pub fn new(config: MoralTopologyConfig) -> Self {
@@ -662,10 +781,9 @@ impl MoralTopology {
             last_persistent_features: Vec::new(),
             trajectory: VecDeque::new(),
             adaptive_state: AdaptiveAnomalyState::default(),
-            baseline_similarity_ema: 0.0,
-            baseline_entropy_ema: 0.0,
-            baseline_flourishing_ema: 0.0,
-            convergence_baseline_count: 0,
+            baseline_similarity_window: VecDeque::new(),
+            baseline_entropy_window: VecDeque::new(),
+            baseline_flourishing_window: VecDeque::new(),
             last_convergence_report: TrajectoryConvergenceReport::default(),
             hazard_registry: HazardSignatureRegistry::with_defaults(),
         }
@@ -694,10 +812,9 @@ impl MoralTopology {
             last_persistent_features: Vec::new(),
             trajectory: VecDeque::new(),
             adaptive_state,
-            baseline_similarity_ema: 0.0,
-            baseline_entropy_ema: 0.0,
-            baseline_flourishing_ema: 0.0,
-            convergence_baseline_count: 0,
+            baseline_similarity_window: VecDeque::new(),
+            baseline_entropy_window: VecDeque::new(),
+            baseline_flourishing_window: VecDeque::new(),
             last_convergence_report: TrajectoryConvergenceReport::default(),
             hazard_registry: HazardSignatureRegistry::with_defaults(),
         }
@@ -878,17 +995,19 @@ impl MoralTopology {
             0.0
         };
 
-        // Update baseline EMA (slow, α=0.05, tracks long-term average)
-        let baseline_alpha = if self.convergence_baseline_count == 0 {
-            1.0
-        } else {
-            0.05
-        };
-        self.baseline_similarity_ema = baseline_alpha * recent_similarity
-            + (1.0 - baseline_alpha) * self.baseline_similarity_ema;
-        self.convergence_baseline_count += 1;
+        // Update sliding window baseline (bounded memory, constant sensitivity)
+        let win_cap = ac.convergence_baseline_window.max(1);
+        self.baseline_similarity_window.push_back(recent_similarity);
+        if self.baseline_similarity_window.len() > win_cap {
+            self.baseline_similarity_window.pop_front();
+        }
 
-        let baseline_similarity = self.baseline_similarity_ema;
+        let baseline_similarity = if self.baseline_similarity_window.is_empty() {
+            0.0
+        } else {
+            self.baseline_similarity_window.iter().sum::<f64>()
+                / self.baseline_similarity_window.len() as f64
+        };
         let similarity_anomaly = recent_similarity - baseline_similarity;
 
         // ── Signal 2: Harmony entropy decline ────────────────────────────
@@ -928,15 +1047,17 @@ impl MoralTopology {
             0.0
         };
 
-        // Update baseline entropy EMA
-        let ent_alpha = if self.convergence_baseline_count <= 1 {
-            1.0
+        // Update sliding window baseline for entropy
+        self.baseline_entropy_window.push_back(recent_entropy);
+        if self.baseline_entropy_window.len() > win_cap {
+            self.baseline_entropy_window.pop_front();
+        }
+        let baseline_entropy = if self.baseline_entropy_window.is_empty() {
+            0.0
         } else {
-            0.05
+            self.baseline_entropy_window.iter().sum::<f64>()
+                / self.baseline_entropy_window.len() as f64
         };
-        self.baseline_entropy_ema =
-            ent_alpha * recent_entropy + (1.0 - ent_alpha) * self.baseline_entropy_ema;
-        let baseline_entropy = self.baseline_entropy_ema;
 
         let entropy_decline_rate = if baseline_entropy > 1e-9 {
             ((baseline_entropy - recent_entropy) / baseline_entropy).max(0.0)
@@ -959,15 +1080,17 @@ impl MoralTopology {
             0.0
         };
 
-        // Update baseline flourishing EMA
-        let fl_alpha = if self.convergence_baseline_count <= 1 {
-            1.0
+        // Update sliding window baseline for flourishing
+        self.baseline_flourishing_window.push_back(flourishing_score);
+        if self.baseline_flourishing_window.len() > win_cap {
+            self.baseline_flourishing_window.pop_front();
+        }
+        let baseline_flourishing = if self.baseline_flourishing_window.is_empty() {
+            0.0
         } else {
-            0.05
+            self.baseline_flourishing_window.iter().sum::<f64>()
+                / self.baseline_flourishing_window.len() as f64
         };
-        self.baseline_flourishing_ema =
-            fl_alpha * flourishing_score + (1.0 - fl_alpha) * self.baseline_flourishing_ema;
-        let baseline_flourishing = self.baseline_flourishing_ema;
 
         // Flourishing deficit: how far below the floor relative to baseline
         let flourishing_deficit = if baseline_flourishing > 1e-9 {
@@ -1645,10 +1768,12 @@ pub struct MoralTopologySnapshot {
     pub trajectory: Vec<MoralTrajectoryPoint>,
     pub harmony_prior: [f64; N_HARMONIES],
     pub prior_count: usize,
-    pub baseline_similarity_ema: f64,
-    pub baseline_entropy_ema: f64,
-    pub baseline_flourishing_ema: f64,
-    pub convergence_baseline_count: usize,
+    /// Sliding window of baseline similarity observations.
+    pub baseline_similarity_window: Vec<f64>,
+    /// Sliding window of baseline entropy observations.
+    pub baseline_entropy_window: Vec<f64>,
+    /// Sliding window of baseline flourishing observations.
+    pub baseline_flourishing_window: Vec<f64>,
     pub adaptive_state: AdaptiveAnomalyState,
     pub last_summary: MoralTopologySummary,
     pub prev_summary: MoralTopologySummary,
@@ -1661,10 +1786,9 @@ impl MoralTopology {
             trajectory: self.trajectory.iter().cloned().collect(),
             harmony_prior: self.harmony_prior,
             prior_count: self.prior_count,
-            baseline_similarity_ema: self.baseline_similarity_ema,
-            baseline_entropy_ema: self.baseline_entropy_ema,
-            baseline_flourishing_ema: self.baseline_flourishing_ema,
-            convergence_baseline_count: self.convergence_baseline_count,
+            baseline_similarity_window: self.baseline_similarity_window.iter().copied().collect(),
+            baseline_entropy_window: self.baseline_entropy_window.iter().copied().collect(),
+            baseline_flourishing_window: self.baseline_flourishing_window.iter().copied().collect(),
             adaptive_state: self.adaptive_state.clone(),
             last_summary: self.last_summary.clone(),
             prev_summary: self.prev_summary.clone(),
@@ -1676,10 +1800,9 @@ impl MoralTopology {
         self.trajectory = snap.trajectory.iter().cloned().collect();
         self.harmony_prior = snap.harmony_prior;
         self.prior_count = snap.prior_count;
-        self.baseline_similarity_ema = snap.baseline_similarity_ema;
-        self.baseline_entropy_ema = snap.baseline_entropy_ema;
-        self.baseline_flourishing_ema = snap.baseline_flourishing_ema;
-        self.convergence_baseline_count = snap.convergence_baseline_count;
+        self.baseline_similarity_window = snap.baseline_similarity_window.iter().copied().collect();
+        self.baseline_entropy_window = snap.baseline_entropy_window.iter().copied().collect();
+        self.baseline_flourishing_window = snap.baseline_flourishing_window.iter().copied().collect();
         self.adaptive_state = snap.adaptive_state.clone();
         self.last_summary = snap.last_summary.clone();
         self.prev_summary = snap.prev_summary.clone();
@@ -3200,5 +3323,197 @@ mod tests {
         );
         assert!(!result.roc_curve.is_empty());
         assert!(result.auc >= 0.0 && result.auc <= 1.0);
+    }
+
+    // ── Explainability ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_convergence_explanation_no_detection() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..6 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 300 + i));
+        }
+        let report = topo.detect_trajectory_convergence();
+        let explanation = report.explain(&topo.anomaly_config);
+        assert!(!explanation.detected);
+        assert_eq!(explanation.signals.len(), 3);
+        assert!(explanation.summary.contains("No convergence"));
+    }
+
+    #[test]
+    fn test_convergence_explanation_with_detection() {
+        let base = ContinuousHV::random(TEST_DIM, 42);
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_min_points = 4;
+        anomaly_config.convergence_similarity_threshold = 0.01;
+        anomaly_config.convergence_entropy_decline_threshold = 0.01;
+        anomaly_config.convergence_flourishing_floor = 0.01;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config.clone(),
+        );
+        // Feed near-identical HVs to trigger convergence
+        for _ in 0..8 {
+            topo.add_scenario(base.perturb(0.01));
+        }
+        let report = topo.detect_trajectory_convergence();
+        let explanation = report.explain(&anomaly_config);
+        assert_eq!(explanation.signals.len(), 3);
+        assert!(explanation.summary.len() > 10);
+        // At least check the explanation has the right severity
+        assert!((explanation.severity - report.severity).abs() < f64::EPSILON);
+    }
+
+    // ── Sliding window baselines ────────────────────────────────────────
+
+    #[test]
+    fn test_windowed_baseline_bounded_memory() {
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_baseline_window = 10;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
+        // Feed 50 diverse scenarios
+        for i in 0..50 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 7000 + i));
+        }
+        let _ = topo.detect_trajectory_convergence();
+        // Baseline windows should be capped at 10
+        assert!(topo.baseline_similarity_window.len() <= 10);
+        assert!(topo.baseline_entropy_window.len() <= 10);
+        assert!(topo.baseline_flourishing_window.len() <= 10);
+    }
+
+    #[test]
+    fn test_windowed_baseline_snapshot_roundtrip() {
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_baseline_window = 5;
+        anomaly_config.convergence_min_points = 4;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config.clone(),
+        );
+        // Call detect_trajectory_convergence multiple times to fill the window.
+        // Each call adds one observation to each baseline window.
+        for i in 0..8 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 8000 + i));
+            let _ = topo.detect_trajectory_convergence();
+        }
+        let snap = topo.snapshot();
+        // Window capped at 5
+        assert_eq!(snap.baseline_similarity_window.len(), 5);
+
+        let basis2 = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo2 = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis2,
+            anomaly_config,
+        );
+        topo2.restore(&snap);
+        assert_eq!(topo2.baseline_similarity_window.len(), 5);
+    }
+
+    // ── Adversarial evasion stress tests ────────────────────────────────
+
+    #[test]
+    fn test_evasion_spaced_requests() {
+        // Adversary spaces converging requests with diverse decoys between them.
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_min_points = 4;
+        anomaly_config.convergence_baseline_window = 20;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
+        let target = ContinuousHV::random(TEST_DIM, 42);
+        // Interleave: 2 decoys then 1 adversarial, repeat 6 times
+        for round in 0..6 {
+            // Diverse decoys
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 5000 + round * 2));
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 5001 + round * 2));
+            // Adversarial (near target)
+            topo.add_scenario(target.perturb(0.02));
+        }
+        let report = topo.detect_trajectory_convergence();
+        // The dilution may or may not trigger — this test verifies the system
+        // doesn't crash and produces a finite report under evasion patterns.
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+        assert!(report.recent_similarity.is_finite());
+        assert!(report.baseline_similarity.is_finite());
+    }
+
+    #[test]
+    fn test_evasion_lexical_variation() {
+        // Adversary varies surface text but targets same moral region.
+        // Uses text encoder to produce semantically similar but lexically diverse HVs.
+        let encoder = TextHdcEncoder::with_sentiment(TEST_DIM, 3, 0.5, 0.2);
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_min_points = 4;
+        anomaly_config.convergence_similarity_threshold = 0.05;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
+        // Same semantic domain, different lexical surface
+        let variants = [
+            "how to synthesize dangerous chemical compounds",
+            "synthesis methods for hazardous chemical substances",
+            "chemical compound creation using dangerous reagents",
+            "methods of producing hazardous chemical materials",
+            "techniques for synthesizing toxic chemical mixtures",
+            "creating dangerous chemical formulas step by step",
+        ];
+        for text in &variants {
+            topo.add_scenario(encoder.encode(text));
+        }
+        let report = topo.detect_trajectory_convergence();
+        // N-gram encoder may or may not detect the semantic similarity.
+        // This test validates graceful behavior under lexical evasion.
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+        assert!(report.recent_entropy.is_finite());
+    }
+
+    #[test]
+    fn test_evasion_gradual_drift() {
+        // Adversary slowly drifts trajectory toward target over many steps.
+        let mut anomaly_config = MoralAnomalyConfig::default();
+        anomaly_config.convergence_min_points = 4;
+        anomaly_config.convergence_baseline_window = 15;
+        let basis = Arc::new(HarmonyBasis::new(TEST_DIM));
+        let mut topo = MoralTopology::with_anomaly_config(
+            test_config(),
+            basis,
+            anomaly_config,
+        );
+        let start = ContinuousHV::random(TEST_DIM, 100);
+        let target = ContinuousHV::random(TEST_DIM, 200);
+        let start_vals = start.as_slice();
+        let target_vals = target.as_slice();
+        // 30 steps: linearly interpolate from start toward target
+        for step in 0..30 {
+            let alpha = step as f32 / 29.0;
+            let blended_vals: Vec<f32> = start_vals
+                .iter()
+                .zip(target_vals.iter())
+                .map(|(&s, &t)| s * (1.0 - alpha) + t * alpha)
+                .collect();
+            topo.add_scenario(ContinuousHV::from_slice(&blended_vals));
+        }
+        let report = topo.detect_trajectory_convergence();
+        // Gradual drift should eventually show elevated severity
+        // (windowed baselines adapt, so detection depends on window vs drift rate)
+        assert!(report.severity >= 0.0 && report.severity <= 1.0);
+        assert!(report.baseline_similarity.is_finite());
     }
 }

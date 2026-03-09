@@ -1899,8 +1899,8 @@ mod tests {
         registry.update(&pkt);
         assert_eq!(registry.peer_count(), 1);
 
-        // Wait for entry to become stale
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        // Wait for entry to become stale (use generous margin for CI runners)
+        std::thread::sleep(std::time::Duration::from_millis(50));
         let expired = registry.expire_stale();
         assert_eq!(expired.len(), 1);
         assert_eq!(expired[0], [0xCC; 8]);

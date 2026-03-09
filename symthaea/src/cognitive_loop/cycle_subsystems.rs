@@ -617,7 +617,9 @@ impl CognitiveLoopService {
         let (empathic_compassion, empathic_tone_adj) =
             if let Some(ref mut empathy) = self.primitive_tier.empathic_unification {
                 if self.stats.total_cycles % 11 == 0 {
-                    let context = crate::user_state_inference::ContextKind::Task;
+                    let context = self.user_state.as_ref()
+                        .map(|usi| usi.state().context)
+                        .unwrap_or(crate::user_state_inference::ContextKind::Task);
                     let response = empathy.process(input, context);
                     (response.compassion, response.patience_adjustment)
                 } else {

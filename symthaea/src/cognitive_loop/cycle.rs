@@ -64,6 +64,12 @@ impl CognitiveLoopService {
         }
         let mut module_timings = super::ModuleTimings::default();
 
+        // User state inference: process input to update context, frustration, cognitive load
+        // Science: adaptive UI via inferred cognitive state (Ritter et al. 2019)
+        if let Some(ref mut usi) = self.user_state {
+            usi.process(input, false);
+        }
+
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 1: PERCEPTION
         // Safety checks, encoding, moral evaluation, strategy, urgency

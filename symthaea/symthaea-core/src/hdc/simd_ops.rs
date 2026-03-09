@@ -888,6 +888,7 @@ fn bundle_chunk_large(
 }
 
 /// Optimized scalar bundle with better cache locality
+#[cfg(target_arch = "x86_64")]
 #[inline]
 fn bundle_scalar_optimized(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
     let n = vectors.len();

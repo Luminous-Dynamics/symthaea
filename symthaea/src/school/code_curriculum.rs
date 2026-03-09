@@ -4,7 +4,7 @@
 //! from simple arithmetic function bodies to cross-language synthesis
 //! and self-correcting compilation loops.
 
-use super::curriculum::{Curriculum, CurriculumBuilder};
+use super::curriculum::Curriculum;
 use super::objective::{Difficulty, Domain, LearningObjective};
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -341,6 +341,61 @@ pub const WM_MISMATCH_LR_SCALE: f32 = 0.75;
 pub const WM_MISMATCH_CONFIDENCE_SCALE: f32 = 0.9;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MCE BOTTLENECK → SUBSYSTEM MODULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// LR boost when MCE bottleneck is the targeted subsystem.
+/// Science: Tononi (2004) — consciousness limited by minimum dimension;
+/// boosting the bottleneck is the highest-leverage intervention.
+pub const MCE_BOTTLENECK_LR_BOOST: f32 = 1.08;
+
+/// Confidence boost when MCE bottleneck is NOT integration (system is well-integrated).
+pub const MCE_NON_BOTTLENECK_CONFIDENCE_BOOST: f32 = 0.005;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MORAL SCORE → MEMORY PRIORITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Moral salience threshold for boosted episodic consolidation.
+/// Science: Zak (2012) — moral narratives enhance oxytocin → memory consolidation.
+pub const MORAL_CONSOLIDATION_THRESHOLD: f32 = 0.3;
+
+/// Consolidation threshold reduction per unit of moral salience.
+/// Lowers the consciousness-EMA threshold for triggering consolidation.
+pub const MORAL_CONSOLIDATION_EASE: f64 = 0.15;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COHERENCE VELOCITY → ATTENTION BUDGET
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Coherence velocity threshold for attention budget scaling.
+/// Science: Bar (2009) — sudden coherence collapse demands attention reallocation.
+pub const COHERENCE_VELOCITY_BUDGET_THRESHOLD: f32 = 0.05;
+
+/// Attention budget contraction when coherence is dropping fast.
+/// Preserve budget when the brain is losing grip (value < 1.0 contracts).
+pub const COHERENCE_VELOCITY_BUDGET_CONTRACT: f64 = 0.85;
+
+/// Attention budget expansion when coherence is rising.
+/// Can afford more budget when model confidence is growing (value > 1.0 expands).
+pub const COHERENCE_VELOCITY_BUDGET_EXPAND: f64 = 1.10;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOMEOSTASIS → NEUROMODULATOR CALIBRATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Homeostasis efficiency overshoot threshold → recalibrate neuromods.
+/// Science: Turrigiano (2008) — sustained homeostatic failure triggers
+/// recalibration of baseline transmitter levels.
+pub const HOMEOSTASIS_RECALIBRATE_HIGH: f32 = 1.15;
+
+/// Homeostasis efficiency undershoot threshold → boost neuromods.
+pub const HOMEOSTASIS_RECALIBRATE_LOW: f32 = 0.85;
+
+/// Neuromodulator baseline adjustment step per cycle of mistuning.
+pub const HOMEOSTASIS_NEUROMOD_STEP: f32 = 0.01;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // PHENOMENAL BINDING
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -2131,5 +2186,32 @@ mod tests {
             EXPLORATION_SCALE_MIDPOINT
         );
         assert!(EXPLORATION_SCALE_SENSITIVITY > 0.0);
+    }
+
+    #[test]
+    fn test_mce_bottleneck_params() {
+        assert!(MCE_BOTTLENECK_LR_BOOST > 1.0 && MCE_BOTTLENECK_LR_BOOST < 1.5);
+        assert!(MCE_NON_BOTTLENECK_CONFIDENCE_BOOST > 0.0 && MCE_NON_BOTTLENECK_CONFIDENCE_BOOST < 0.05);
+    }
+
+    #[test]
+    fn test_moral_consolidation_params() {
+        assert!(MORAL_CONSOLIDATION_THRESHOLD > 0.0 && MORAL_CONSOLIDATION_THRESHOLD < 1.0);
+        assert!(MORAL_CONSOLIDATION_EASE > 0.0 && MORAL_CONSOLIDATION_EASE < 0.5);
+    }
+
+    #[test]
+    fn test_coherence_velocity_budget_params() {
+        assert!(COHERENCE_VELOCITY_BUDGET_THRESHOLD > 0.0);
+        assert!(COHERENCE_VELOCITY_BUDGET_CONTRACT < 1.0, "Contract must reduce budget");
+        assert!(COHERENCE_VELOCITY_BUDGET_EXPAND > 1.0, "Expand must increase budget");
+    }
+
+    #[test]
+    fn test_homeostasis_recalibration_params() {
+        assert!(HOMEOSTASIS_RECALIBRATE_LOW < 1.0 && HOMEOSTASIS_RECALIBRATE_LOW > 0.0);
+        assert!(HOMEOSTASIS_RECALIBRATE_HIGH > 1.0);
+        assert!(HOMEOSTASIS_RECALIBRATE_LOW < HOMEOSTASIS_RECALIBRATE_HIGH);
+        assert!(HOMEOSTASIS_NEUROMOD_STEP > 0.0 && HOMEOSTASIS_NEUROMOD_STEP < 0.1);
     }
 }

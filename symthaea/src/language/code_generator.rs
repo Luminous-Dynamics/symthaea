@@ -1516,4 +1516,82 @@ mod tests {
         assert!(result.source.contains("timeout"));
         assert!(result.source.contains("Result<()>"));
     }
+
+    #[test]
+    fn test_control_flow_unreachable() {
+        let source = "return 42;\nlet x = 10;";
+        let cf = ControlFlowInfo::analyze_rust(source, Some("i32"));
+        assert!(!cf.is_clean(), "Should detect unreachable code");
+        assert!(cf.warnings.iter().any(|w| w.contains("UNREACHABLE")));
+    }
+
+    #[test]
+    fn test_control_flow_missing_else() {
+        let source = "if x > 0 {\n    x\n}";
+        let cf = ControlFlowInfo::analyze_rust(source, Some("i32"));
+        assert!(cf.warnings.iter().any(|w| w.contains("MISSING_ELSE")));
+    }
+
+    #[test]
+    fn test_control_flow_clean() {
+        let source = "x + y";
+        let cf = ControlFlowInfo::analyze_rust(source, Some("i32"));
+        assert!(cf.is_clean());
+    }
+
+    #[test]
+    fn test_parsed_type_simple() {
+        assert_eq!(ParsedType::parse("i32"), ParsedType::Simple("i32".to_string()));
+    }
+
+    #[test]
+    fn test_parsed_type_generic() {
+        let t = ParsedType::parse("Vec<i32>");
+        match t {
+            ParsedType::Generic { ref base, ref params } => {
+                assert_eq!(base, "Vec");
+                assert_eq!(params.len(), 1);
+                assert_eq!(params[0], ParsedType::Simple("i32".to_string()));
+            }
+            _ => panic!("Expected Generic, got {:?}", t),
+        }
+    }
+
+    #[test]
+    fn test_parsed_type_nested() {
+        let t = ParsedType::parse("HashMap<String, Vec<f64>>");
+        match t {
+            ParsedType::Generic { ref base, ref params } => {
+                assert_eq!(base, "HashMap");
+                assert_eq!(params.len(), 2);
+                assert!(matches!(&params[1], ParsedType::Generic { base, .. } if base == "Vec"));
+            }
+            _ => panic!("Expected Generic, got {:?}", t),
+        }
+    }
+
+    #[test]
+    fn test_parsed_type_tuple() {
+        let t = ParsedType::parse("(i32, String)");
+        match t {
+            ParsedType::Tuple(ref parts) => {
+                assert_eq!(parts.len(), 2);
+            }
+            _ => panic!("Expected Tuple, got {:?}", t),
+        }
+    }
+
+    #[test]
+    fn test_diagnose_compile_error() {
+        let fixes = diagnose_compile_error("error: expected expression, found `)`");
+        assert!(!fixes.is_empty());
+        assert_eq!(fixes[0].category, "empty_closure");
+
+        let fixes2 = diagnose_compile_error("error[E0308]: mismatched types");
+        assert!(!fixes2.is_empty());
+        assert_eq!(fixes2[0].category, "type_mismatch");
+
+        let fixes3 = diagnose_compile_error("all good, no errors");
+        assert!(fixes3.is_empty());
+    }
 }

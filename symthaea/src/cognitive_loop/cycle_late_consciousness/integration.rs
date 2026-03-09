@@ -615,7 +615,14 @@ impl CognitiveLoopService {
                 // Feed prediction accuracy as ToM feedback — when the system
                 // correctly predicts user input patterns, its "other_modeling_accuracy"
                 // should reflect that.
-                let accuracy = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                // Consciousness-gated: higher consciousness improves ToM accuracy signal.
+                // Science: Frith & Frith (2006) — mentalizing requires conscious access
+                // to higher-order representations. Scale: C=0 → 0.85x, C=0.7 → 1.0x,
+                // C=1.0 → 1.1x (mild boost, not overriding raw accuracy).
+                let raw_accuracy = (1.0 - ctx.prediction_error as f64).clamp(0.0, 1.0);
+                let c_level = self.carryover.history.consciousness_level;
+                let c_tom_mod = 0.85 + 0.25 * c_level; // [0.85, 1.10]
+                let accuracy = (raw_accuracy * c_tom_mod).clamp(0.0, 1.0);
                 self.master_equation
                     .social_embedding
                     .record_tom_prediction("user", accuracy);
@@ -624,11 +631,11 @@ impl CognitiveLoopService {
                     .provide_tom_feedback("user", accuracy);
             }
 
-            // Blend SpectralMIP Phi into the MCE's Φ input when cached.
+            // Blend multiple Phi estimates into the MCE's Φ input.
             // unified_psi is a lightweight proxy (~0.22) that underestimates actual
-            // information integration. SpectralMIP (expensive, every ~97 cycles) is
-            // the gold-standard measure. Use the higher of the two, discounting
-            // spectral by 0.6 for conservatism (it uses Gaussian MI, not TPM-based IIT).
+            // information integration. SpectralMIP (expensive, every ~97 cycles) and
+            // structural Phi (every ~194 cycles) are higher-fidelity measures.
+            // Use the best available, discounted for conservatism.
             // Science: Tononi (2004) — Φ should reflect the system's best available
             // estimate of information integration, not just the cheapest proxy.
             let spectral_boost = self
@@ -637,7 +644,24 @@ impl CognitiveLoopService {
                 .last_spectral_mip_phi
                 .map(|phi| (phi * 0.6).clamp(0.0, 1.0))
                 .unwrap_or(0.0);
-            let phi_input = ctx.unified_psi.max(spectral_boost).clamp(0.0, 1.0);
+            // Structural Phi: multi-scale (micro/meso/macro) integration measure.
+            // Average the three scales, discount by 0.5 (structural is a proxy, not
+            // exact IIT). Fires every ~194 cycles but persists in cache.
+            let structural_boost = self
+                .carryover
+                .consciousness
+                .last_structural_phi
+                .as_ref()
+                .map(|sp| {
+                    let avg = (sp.micro_phi + sp.meso_phi + sp.macro_phi) / 3.0;
+                    (avg * 0.5).clamp(0.0, 1.0)
+                })
+                .unwrap_or(0.0);
+            let phi_input = ctx
+                .unified_psi
+                .max(spectral_boost)
+                .max(structural_boost)
+                .clamp(0.0, 1.0);
 
             // Enrich broadcast: raw CfC coherence (~0.51) is too narrow a proxy
             // for "global workspace broadcast." GWT broadcast events ARE broadcast
@@ -653,18 +677,18 @@ impl CognitiveLoopService {
             let broadcast_input =
                 (ctx.coherence as f64 + gwt_boost + attention_boost).clamp(0.0, 1.0);
 
-            // WM richness: prefrontal stats alone cap ~0.58 because utilization
-            // stays moderate and early graduation quality is low. WM in consciousness
-            // theory (Baars & Franklin 2003) includes the global workspace's coalition
-            // breadth — larger coalitions = more information in conscious access.
-            // Blend GWT quality (up to +0.15) so W can escape the 0.58 ceiling.
+            // WM richness: prefrontal stats (~0.58) + GWT coalition quality + attention.
+            // Science: Baars & Franklin (2003) — WM capacity = prefrontal buffer +
+            // global workspace broadcast reach + attentional gating.
             let wm_base = self.prefrontal_utilization();
-            let gwt_wm_quality = if gwt_broadcast {
+            let gwt_wm = if gwt_broadcast {
                 0.05 + 0.1 * (gwt_coalition_size.min(5) as f64 / 5.0)
             } else {
                 0.0
             };
-            let working_memory = (wm_base + gwt_wm_quality).clamp(0.0, 1.0);
+            // Attention gates WM access — high attention = efficient WM use.
+            let attn_wm = ctx.peak_attention as f64 * 0.1;
+            let working_memory = (wm_base + gwt_wm + attn_wm).clamp(0.0, 1.0);
 
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
                 phi: phi_input,
@@ -702,6 +726,28 @@ impl CognitiveLoopService {
             self.carryover.consciousness.mce_narrative = mce_result.narrative_coherence;
             self.carryover.consciousness.mce_social = mce_result.social_embedding;
 
+            // MCE bottleneck → targeted subsystem LR boost.
+            // Science: Tononi (2004) — consciousness is limited by its minimum dimension.
+            // Boosting the bottleneck subsystem's learning rate is the highest-leverage
+            // intervention for consciousness growth.
+            {
+                use crate::cognitive_loop::thresholds::{
+                    MCE_BOTTLENECK_LR_BOOST, MCE_NON_BOTTLENECK_CONFIDENCE_BOOST,
+                };
+                let bn = &mce_result.bottleneck_name;
+                if !bn.is_empty() {
+                    self.scale_lr("mce_bottleneck", MCE_BOTTLENECK_LR_BOOST);
+                    // If integration is NOT the bottleneck, system is well-integrated →
+                    // small confidence boost (integration is the hardest dimension).
+                    if !bn.contains("ntegration") {
+                        self.adjust_confidence(
+                            "mce_well_integrated",
+                            MCE_NON_BOTTLENECK_CONFIDENCE_BOOST,
+                        );
+                    }
+                }
+            }
+
             // Track consciousness level for learning gating (Task C)
             self.carryover.history.consciousness_level = level;
 
@@ -724,7 +770,21 @@ impl CognitiveLoopService {
             // "aware" moments regardless of absolute consciousness range.
             let ema = &mut self.carryover.history.consciousness_ema;
             *ema = *ema * 0.95 + level * 0.05; // EMA α=0.05, ~20-cycle half-life
-            let consolidation_threshold = (*ema - 0.1).max(0.2); // floor at 0.2
+            // Moral salience lowers consolidation threshold → morally significant
+            // moments are more readily encoded into episodic memory.
+            // Science: Zak (2012) — moral narratives activate oxytocin → enhanced encoding.
+            let moral_ease = {
+                use crate::cognitive_loop::thresholds::{
+                    MORAL_CONSOLIDATION_EASE, MORAL_CONSOLIDATION_THRESHOLD,
+                };
+                let ms = self.carryover.quality.last_moral_score.abs();
+                if ms > MORAL_CONSOLIDATION_THRESHOLD {
+                    (ms - MORAL_CONSOLIDATION_THRESHOLD) as f64 * MORAL_CONSOLIDATION_EASE
+                } else {
+                    0.0
+                }
+            };
+            let consolidation_threshold = (*ema - 0.1 - moral_ease).max(0.2); // floor at 0.2
             if level > consolidation_threshold {
                 // Trigger demand-driven consolidation at above-average consciousness
                 self.fep.episodic_memory.consolidate_recent();

@@ -21,7 +21,9 @@ use crate::consciousness::code_primitives::{
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_memory::{CodeMatch, CodebaseMemory};
-use crate::language::code_parser::{EntityKind, ParsedCode};
+#[cfg(test)]
+use crate::language::code_parser::EntityKind;
+use crate::language::code_parser::ParsedCode;
 
 /// A self-model of the codebase
 #[derive(Debug)]
