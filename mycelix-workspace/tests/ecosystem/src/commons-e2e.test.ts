@@ -57,7 +57,7 @@ describe('Commons Cluster E2E', () => {
     it('should register a property and register a building', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: COMMONS_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: COMMONS_HAPP_PATH } },
         ]);
 
         // Register a property in the property registry
@@ -102,7 +102,7 @@ describe('Commons Cluster E2E', () => {
     it('should define a watershed and submit a quality reading', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: COMMONS_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: COMMONS_HAPP_PATH } },
         ]);
 
         // Define a watershed
@@ -153,8 +153,8 @@ describe('Commons Cluster E2E', () => {
     it('should create care circle and post mutual aid need', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice, bob] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: COMMONS_HAPP_PATH } },
-          { appBundleSource: { path: COMMONS_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: COMMONS_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: COMMONS_HAPP_PATH } },
         ]);
 
         // Alice creates a care circle
@@ -199,7 +199,7 @@ describe('Commons Cluster E2E', () => {
     it('should register a plot and create a market', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: COMMONS_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: COMMONS_HAPP_PATH } },
         ]);
 
         // Register a food production plot
@@ -237,7 +237,7 @@ describe('Commons Cluster E2E', () => {
     it('should create a route and post a ride offer', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: COMMONS_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: COMMONS_HAPP_PATH } },
         ]);
 
         // First register a vehicle (needed for ride offer)
@@ -290,7 +290,7 @@ describe('Commons Cluster E2E', () => {
     it('should successfully call commons bridge health check', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: COMMONS_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: COMMONS_HAPP_PATH } },
         ]);
 
         // Call the commons bridge for health check

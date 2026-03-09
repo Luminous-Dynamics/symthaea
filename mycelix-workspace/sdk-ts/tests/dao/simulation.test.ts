@@ -176,9 +176,7 @@ describe('GovernanceSimulator', () => {
   });
 
   describe('simulateSybilAttack', () => {
-    // Note: simulateSybilAttack has a bug where it doesn't pass votingMechanism
-    // to inner simulateProposal call. Skipping until fixed.
-    it.skip('should simulate sybil attack scenarios', async () => {
+    it('should simulate sybil attack scenarios', async () => {
       const sim = createSimulator({
         agentCount: 50,
         iterations: 5,
@@ -186,13 +184,18 @@ describe('GovernanceSimulator', () => {
       });
 
       const results = await sim.simulateSybilAttack({
-        attackerPercentage: 0.2,
-        sybilIdentities: 10,
-        targetChoice: 'No',
+        proposalType: 'TreasuryAllocation',
+        votingMechanism: { Quadratic: { budget_per_voter: 100, approval_threshold: 0.5 } },
+        classification: { e: 'E2', n: 'N1', m: 'M2', override_from_default: false },
+        attackerCount: 10,
+        attackerSybilScore: 0.8,
       });
 
       expect(results).toBeDefined();
       expect(typeof results).toBe('object');
+      expect(results.basePassRate).toBeGreaterThanOrEqual(0);
+      expect(results.attackPassRate).toBeGreaterThanOrEqual(0);
+      expect(typeof results.attackEffectiveness).toBe('number');
     });
   });
 

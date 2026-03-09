@@ -44,7 +44,7 @@ describe('Finance Cluster E2E', () => {
     it('should initialize a SAP balance for a new member', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: FINANCE_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: FINANCE_HAPP_PATH } },
         ]);
 
         const memberDid = `did:mycelix:${alice.agentPubKey}`;
@@ -64,8 +64,8 @@ describe('Finance Cluster E2E', () => {
     it('should record a time exchange between two agents', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice, bob] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: FINANCE_HAPP_PATH } },
-          { appBundleSource: { path: FINANCE_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: FINANCE_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: FINANCE_HAPP_PATH } },
         ]);
 
         const bobDid = `did:mycelix:${bob.agentPubKey}`;
@@ -91,7 +91,7 @@ describe('Finance Cluster E2E', () => {
     it('should create and query a treasury', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: FINANCE_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: FINANCE_HAPP_PATH } },
         ]);
 
         const aliceDid = `did:mycelix:${alice.agentPubKey}`;
@@ -113,7 +113,7 @@ describe('Finance Cluster E2E', () => {
     it('should create a staking position', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: FINANCE_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: FINANCE_HAPP_PATH } },
         ]);
 
         const aliceDid = `did:mycelix:${alice.agentPubKey}`;
@@ -132,7 +132,7 @@ describe('Finance Cluster E2E', () => {
     it('should initialize a member MYCEL state', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: FINANCE_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: FINANCE_HAPP_PATH } },
         ]);
 
         const aliceDid = `did:mycelix:${alice.agentPubKey}`;
@@ -156,10 +156,10 @@ describe('Finance Cluster E2E', () => {
     it('should return bridge health status', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: FINANCE_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: FINANCE_HAPP_PATH } },
         ]);
 
-        const health = await callZome(alice, 'finance_bridge', 'health_check', null);
+        const health = await callZome<{ healthy: boolean; zomes: string[] }>(alice, 'finance_bridge', 'health_check', null);
         expect(health).toBeDefined();
         expect(health.healthy).toBe(true);
         expect(health.zomes).toContain('payments');

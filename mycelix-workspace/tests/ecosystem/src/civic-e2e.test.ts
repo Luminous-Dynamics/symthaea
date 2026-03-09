@@ -44,8 +44,8 @@ describe('Civic Cluster E2E', () => {
     it('should file a case and submit evidence', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice, bob] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: CIVIC_HAPP_PATH } },
-          { appBundleSource: { path: CIVIC_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: CIVIC_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: CIVIC_HAPP_PATH } },
         ]);
 
         // Alice files a case via file_case(Case)
@@ -96,8 +96,8 @@ describe('Civic Cluster E2E', () => {
     it('should declare disaster and register resources', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice, bob] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: CIVIC_HAPP_PATH } },
-          { appBundleSource: { path: CIVIC_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: CIVIC_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: CIVIC_HAPP_PATH } },
         ]);
 
         // Alice declares a disaster via declare_disaster(DeclareDisasterInput)
@@ -139,8 +139,8 @@ describe('Civic Cluster E2E', () => {
     it('should publish article and add fact check', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice, bob] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: CIVIC_HAPP_PATH } },
-          { appBundleSource: { path: CIVIC_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: CIVIC_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: CIVIC_HAPP_PATH } },
         ]);
 
         // Alice publishes an article via publish(PublishInput)
@@ -195,7 +195,7 @@ describe('Civic Cluster E2E', () => {
     it('should initiate restorative circle', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: CIVIC_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: CIVIC_HAPP_PATH } },
         ]);
 
         // Create a restorative circle via create_circle(RestorativeCircle)
@@ -231,7 +231,7 @@ describe('Civic Cluster E2E', () => {
     it('should return bridge health status', async () => {
       await runScenario(async (scenario: Scenario) => {
         const [alice] = await scenario.addPlayersWithApps([
-          { appBundleSource: { path: CIVIC_HAPP_PATH } },
+          { appBundleSource: { type: 'path', value: CIVIC_HAPP_PATH } },
         ]);
 
         const health = await callZome(alice, 'civic_bridge', 'health_check', null);
