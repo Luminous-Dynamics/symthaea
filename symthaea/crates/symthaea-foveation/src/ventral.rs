@@ -12,6 +12,7 @@ use crate::types::{FoveationRequest, FoveationResult, RecognizedContent, Routing
 /// Ventral stream pipeline that converts pixel crops to semantic HDC vectors.
 ///
 /// Dispatches to either a stub (hash-based) or real (SigLIP-backed) backend.
+#[allow(private_interfaces)]
 pub enum VentralPipeline {
     /// Hash-based stub backend (no model files required).
     Stub {
@@ -199,7 +200,7 @@ fn pixel_contrast(pixels: &[u8]) -> f32 {
 /// Deterministic hash of pixel data (djb2-like).
 fn pixel_hash(pixels: &[u8]) -> u64 {
     let mut hash: u64 = 5381;
-    let step = 16.max(1);
+    let step = 16;
     for &byte in pixels.iter().step_by(step) {
         hash = hash.wrapping_mul(33).wrapping_add(byte as u64);
     }
@@ -226,6 +227,7 @@ impl StubJLProjector {
     ///
     /// Uses a seeded Rademacher matrix (±1 entries via xorshift) to project
     /// the embedding to `self.dim` dimensions. O(dim × emb_len).
+    #[allow(dead_code)]
     pub(crate) fn project_embedding(&self, embedding: &[f32]) -> ContinuousHV {
         if embedding.is_empty() {
             return ContinuousHV::zero(self.dim);

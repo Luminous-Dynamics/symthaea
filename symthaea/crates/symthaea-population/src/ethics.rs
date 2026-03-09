@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
-use symthaea_types::{Harmony, N_HARMONIES};
+use symthaea_types::Harmony;
 
 use crate::governance::PopulationDecision;
 use crate::types::Population;

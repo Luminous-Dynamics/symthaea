@@ -36,6 +36,15 @@
 //! *architectural constraints on generation* (per-token logit gating),
 //! not just prompt instructions that a model might ignore.
 
+// Allow lints that are pervasive in Mamba/SSM numerical code
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_borrow)]
+#![allow(clippy::excessive_precision)]
+#![allow(clippy::manual_div_ceil)]
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::unnecessary_map_or)]
+
 pub mod checkpoint;
 pub mod controller;
 pub mod encoder;

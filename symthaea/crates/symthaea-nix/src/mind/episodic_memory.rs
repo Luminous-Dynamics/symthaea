@@ -334,10 +334,10 @@ mod tests {
         mem.record(make_episode(2, EpisodeOutcome::Success, 0.5));
         mem.record(make_episode(10, EpisodeOutcome::Success, 0.5));
 
-        // "action_1" should match exactly one
-        let results = mem.retrieve_by_action("action_1");
+        // "action_2" matches exactly one (no substring overlap with action_1 or action_10)
+        let results = mem.retrieve_by_action("action_2");
         assert_eq!(results.len(), 1);
-        assert_eq!(results[0].action, "action_1");
+        assert_eq!(results[0].action, "action_2");
     }
 
     #[test]
