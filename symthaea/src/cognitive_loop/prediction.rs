@@ -38,14 +38,21 @@ impl CognitiveLoopService {
             }
         };
 
-        // Scale prediction horizons by substrate tau_factor and PE-adaptive factor.
-        // Clamp the combined scale to prevent extreme horizons under edge conditions
-        // (e.g., very fast substrate + very low PE → unreasonably long planning).
+        // Consciousness-gated horizon expansion: higher consciousness permits
+        // longer planning horizons (virtuous cycle: C↑ → horizon↑ → prediction↑ → K↑ → C↑).
+        // Science: Baars (2002) — conscious access enables extended temporal integration.
+        // Scale: C=0 → 0.9 (mild contraction), C=0.7 → 1.07, C=1.0 → 1.15 (15% expansion).
+        let consciousness_horizon_mod =
+            0.9 + 0.25 * self.carryover.history.consciousness_level as f32;
+
+        // Scale prediction horizons by substrate tau_factor, PE-adaptive factor,
+        // and consciousness modulation. Clamp to prevent extreme horizons.
         use crate::cognitive_loop::thresholds::{
             PREDICTION_HORIZON_MAX_SCALE, PREDICTION_HORIZON_MIN_SCALE,
         };
-        let combined_scale = (self.substrate_manager.tau_factor * pe_horizon_scale)
-            .clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE);
+        let combined_scale =
+            (self.substrate_manager.tau_factor * pe_horizon_scale * consciousness_horizon_mod)
+                .clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE);
         let effective_horizons: Vec<f32> = self
             .config
             .cfc_config

@@ -129,18 +129,22 @@ impl IntegrityManager {
     /// - Attestation: every 101 cycles
     /// - Temporal: every cycle (lightweight)
     /// - Canaries: individual intervals (103, 107, 109, 113)
+    ///
+    /// When `full_sweep` is true (Night phase), all checks run unconditionally.
+    /// Science: Besedovsky et al. (2012) — immune system maintenance peaks during sleep.
     pub fn tick(
         &mut self,
         cycle: usize,
         cfc_delta_t: f32,
+        full_sweep: bool,
     ) -> &IntegrityStatus {
         let wall_elapsed = self.last_cycle_instant.elapsed();
         self.last_cycle_instant = Instant::now();
         self.status.anomalies.clear();
         self.status.last_check_cycle = cycle;
 
-        // Attestation (every 101 cycles)
-        if cycle % ATTESTATION_INTERVAL == 0 && cycle > 0 {
+        // Attestation (every 101 cycles, or every cycle during full sweep)
+        if full_sweep || (cycle % ATTESTATION_INTERVAL == 0 && cycle > 0) {
             let failures = self.attestation.verify_all(cycle);
             self.status.attestation_passed = failures.is_empty();
             for failure in failures {
@@ -166,8 +170,12 @@ impl IntegrityManager {
             self.status.temporal_passed = true;
         }
 
-        // Behavioral canaries (individual co-prime intervals)
-        let canary_failures = self.canaries.run_due(cycle);
+        // Behavioral canaries (individual co-prime intervals, or all during full sweep)
+        let canary_failures = if full_sweep {
+            self.canaries.run_all(cycle)
+        } else {
+            self.canaries.run_due(cycle)
+        };
         self.status.canaries_passed = canary_failures.is_empty();
         for failure in canary_failures {
             let severity = match failure.severity {
@@ -259,8 +267,36 @@ mod tests {
     #[test]
     fn test_tick_on_non_check_cycle_is_clean() {
         let mut mgr = IntegrityManager::new();
-        let status = mgr.tick(5, 0.02);
+        let status = mgr.tick(5, 0.02, false);
         assert!(status.attestation_passed);
         assert!(status.temporal_passed);
+    }
+
+    #[test]
+    fn test_full_sweep_runs_attestation_on_any_cycle() {
+        let mut mgr = IntegrityManager::new();
+        // Register a passing attestation
+        let hash = attestation::blake3_hash(b"test");
+        mgr.attestation
+            .register("test", hash, Box::new(move || attestation::blake3_hash(b"test")));
+        // Cycle 5 normally wouldn't trigger attestation (interval=101)
+        let status = mgr.tick(5, 0.02, true);
+        assert!(status.attestation_passed);
+        // Verify the attestation actually ran (last_verification populated)
+        assert!(mgr.attestation.records()[0].last_verification.is_some());
+    }
+
+    #[test]
+    fn test_full_sweep_detects_tampering() {
+        let mut mgr = IntegrityManager::new();
+        let baseline = attestation::blake3_hash(b"original");
+        mgr.attestation.register(
+            "tampered",
+            baseline,
+            Box::new(move || attestation::blake3_hash(b"modified")),
+        );
+        let status = mgr.tick(1, 0.02, true);
+        assert!(!status.attestation_passed);
+        assert!(mgr.has_critical_anomaly());
     }
 }

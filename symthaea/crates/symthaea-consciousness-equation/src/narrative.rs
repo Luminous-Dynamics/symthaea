@@ -202,8 +202,18 @@ impl NarrativeCoherence {
     }
 
     /// Compute narrative coherence factor N
+    ///
+    /// N = autobiographical_integration × future_simulation_depth × experience_maturity
+    ///
+    /// Experience maturity: a narrative becomes more coherent as more episodes
+    /// accumulate — more material for causal linking, theme detection, and
+    /// autobiographical structure. Ramps from 0.6 (no episodes) to 1.0 (50+ episodes).
+    /// Science: Conway & Pleydell-Pearce (2000) — autobiographical memory coherence
+    /// grows with the density of retrievable episodes.
     pub fn compute(&self) -> f64 {
-        self.autobiographical_integration * self.future_simulation_depth
+        let episode_count = self.episodes.len() as f64;
+        let experience_maturity = (0.6 + 0.4 * (episode_count / 50.0).min(1.0)).min(1.0);
+        self.autobiographical_integration * self.future_simulation_depth * experience_maturity
     }
 
     /// Get autobiographical integration score

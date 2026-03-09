@@ -202,4 +202,48 @@ mod tests {
         assert_eq!(bin, "systemctl");
         assert_eq!(args, vec!["reload", "nginx.service"]);
     }
+
+    #[test]
+    fn test_normalize_preserves_socket_suffix() {
+        assert_eq!(ServiceManager::normalize_name("cups.socket"), "cups.socket");
+        assert_eq!(
+            ServiceManager::normalize_name("sshd.service"),
+            "sshd.service"
+        );
+        assert_eq!(ServiceManager::normalize_name("tmp.mount"), "tmp.mount");
+        assert_eq!(
+            ServiceManager::normalize_name("fstrim.timer"),
+            "fstrim.timer"
+        );
+    }
+
+    #[test]
+    fn test_all_commands_safety_level() {
+        let cmds = [
+            ServiceManager::start("nginx"),
+            ServiceManager::stop("nginx"),
+            ServiceManager::restart("nginx"),
+            ServiceManager::reload("nginx"),
+            ServiceManager::enable("nginx"),
+            ServiceManager::disable("nginx"),
+        ];
+        for cmd in &cmds {
+            assert_eq!(
+                cmd.safety_level(),
+                SafetyLevel::SystemModify,
+                "All service lifecycle commands should be SystemModify"
+            );
+        }
+    }
+
+    #[test]
+    fn test_commands_use_normalized_names() {
+        let cmd = ServiceManager::stop("docker");
+        let (_, args) = cmd.to_command();
+        assert_eq!(args[1], "docker.service");
+
+        let cmd = ServiceManager::stop("docker.socket");
+        let (_, args) = cmd.to_command();
+        assert_eq!(args[1], "docker.socket");
+    }
 }

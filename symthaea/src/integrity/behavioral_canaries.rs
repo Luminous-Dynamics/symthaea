@@ -77,6 +77,17 @@ impl CanaryRunner {
         failures
     }
 
+    /// Run ALL canaries unconditionally (full sweep). Used during Night phase.
+    pub fn run_all(&self, _cycle: usize) -> Vec<CanaryFailure> {
+        let mut failures = Vec::new();
+        for canary in &self.canaries {
+            if let Err(failure) = canary.run() {
+                failures.push(failure);
+            }
+        }
+        failures
+    }
+
     /// Number of registered canaries.
     pub fn len(&self) -> usize {
         self.canaries.len()

@@ -41,6 +41,9 @@ use super::thresholds::{
     TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
     UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
     UNIFIED_QUALITY_PREDICTION_WEIGHT,
+    ATTENTION_BUDGET_GATED_LR_SCALE,
+    STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
+    STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -328,6 +331,11 @@ impl CognitiveLoopService {
 
         let attention_budget_gated = dynamics.attention.attention_budget_exceeded
             && self.stats.attention_budget_exceeded_count > 3;
+        // Attention budget persistently exceeded → slow learning (cognitive overload).
+        // Science: Lavie (2005) — perceptual load theory: high load degrades encoding.
+        if attention_budget_gated {
+            self.scale_lr("attention_budget_gated", ATTENTION_BUDGET_GATED_LR_SCALE);
+        }
 
         // ── Track 5a: Epistemic gate → actual information gating ─────────────
         let mut epistemic_coherence_gated = false;
@@ -727,6 +735,18 @@ impl CognitiveLoopService {
             } else {
                 (0.0, 0.0, 0.0, 0.0, 0.0, 0)
             };
+        // Structural Phi → behavioral coupling:
+        // High bottleneck = poor integration → slow LR (protect against fragmentation).
+        // High emergence = synergistic self-organization → boost confidence.
+        // Science: Oizumi et al. (2014) — bottleneck constrains information flow;
+        // Mediano et al. (2022) — high emergence = synergistic information.
+        if struct_bn > STRUCTURAL_BOTTLENECK_THRESHOLD && self.stats.total_cycles > 15 {
+            self.scale_lr("structural_bottleneck", STRUCTURAL_BOTTLENECK_LR_SCALE);
+        }
+        if struct_er > STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD && self.stats.total_cycles > 15 {
+            self.adjust_confidence("structural_emergence", STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST);
+        }
+
         let consciousness_weights = consciousness_output.current_weights;
         let consciousness_weight_variance = consciousness_output.weight_variance;
         let convergence_state = format!("{:?}", consciousness_output.convergence_state);

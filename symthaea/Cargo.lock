@@ -6263,11 +6263,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "139ef39800118c7683f2fd3c98c1b23c09ae076556b435f8e9064ae108aaeeec"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "r-efi",
  "rand_core 0.10.0",
  "wasip2",
  "wasip3",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -14689,13 +14691,16 @@ name = "symthaea-spore"
 version = "0.1.0"
 dependencies = [
  "getrandom 0.2.17",
+ "getrandom 0.4.1",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
  "symthaea-consciousness-equation",
  "symthaea-core",
+ "symthaea-harmonies",
  "symthaea-neuromodulators",
  "symthaea-types",
+ "uuid",
  "wasm-bindgen",
 ]
 
@@ -16192,6 +16197,7 @@ version = "1.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ef224d01f8c31f8c11c90290766fd622fb0a7d7025b9589d4a34a36ccf35b28"
 dependencies = [
+ "getrandom 0.4.1",
  "rand 0.10.0",
 ]
 

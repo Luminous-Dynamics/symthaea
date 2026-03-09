@@ -459,7 +459,7 @@ mod tests {
             moral_free_energy: f64::NEG_INFINITY,
             valence: f32::NAN,
             mesh_compression_ratio: f64::NAN,
-            harmony_coordinates: [1.0, f64::NAN, 0.5, f64::INFINITY, 0.3, 0.2, 0.1],
+            harmony_coordinates: [1.0, f64::NAN, 0.5, f64::INFINITY, 0.3, 0.2, 0.1, 0.8],
             ..Default::default()
         };
         data.sanitize_finite();

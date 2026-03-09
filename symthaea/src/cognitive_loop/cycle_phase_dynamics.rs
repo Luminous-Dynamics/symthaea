@@ -82,6 +82,10 @@ use super::thresholds::{
     HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP, HORIZON_SLOPE_CONTRACT_RATE,
     HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE, HORIZON_SLOPE_THRESHOLD,
     PREDICTION_HORIZON_MAX_SCALE, PREDICTION_HORIZON_MIN_SCALE,
+    RESONATOR_CONSOLIDATION_THRESHOLD, RESONATOR_FAMILIAR_LR_SCALE,
+    RESONATOR_NOVEL_LR_SCALE, RESONATOR_NOVEL_THRESHOLD,
+    CAUSAL_ATTENTION_CONFIDENCE_SCALE, CAUSAL_ATTENTION_STRENGTH_THRESHOLD,
+    WM_MISMATCH_LR_SCALE, WM_MISMATCH_CONFIDENCE_SCALE,
     WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
@@ -536,20 +540,23 @@ impl CognitiveLoopService {
             }
         }
 
-        if resonator_best_sim > 0.5 {
+        // Resonator similarity → unified consolidation response.
+        // High similarity = familiar pattern → lock precision + slow LR (consolidate).
+        // Low similarity = novel pattern → fast LR (rapid encoding).
+        // Unified threshold prevents contradictory signals (precision lock without LR slow).
+        // Science: McClelland et al. (1995) — complementary learning systems.
+        if resonator_best_sim > RESONATOR_CONSOLIDATION_THRESHOLD {
             self.fep.agent.precision.prior_precision = (self.fep.agent.precision.prior_precision
-                + (resonator_best_sim - 0.5) as f64 * 0.1)
+                + (resonator_best_sim - RESONATOR_CONSOLIDATION_THRESHOLD as f32) as f64 * 0.1)
                 .min(2.0);
-        }
-        // Session 12 Item 8: Resonator similarity → semantic memory LR.
-        // High similarity (familiar pattern) → consolidate (slow LR).
-        // Low similarity (novel) → learn fast (boost LR).
-        // Science: McClelland et al. (1995) — complementary learning systems:
-        // familiar → hippocampal consolidation (slow); novel → fast encoding.
-        if resonator_best_sim > 0.8 && self.stats.total_cycles > 10 {
-            self.scale_lr("resonator_familiar", 0.95);
-        } else if resonator_best_sim < 0.3 && resonator_best_sim > 0.0 && self.stats.total_cycles > 10 {
-            self.scale_lr("resonator_novel", 1.05);
+            if self.stats.total_cycles > 10 {
+                self.scale_lr("resonator_familiar", RESONATOR_FAMILIAR_LR_SCALE);
+            }
+        } else if resonator_best_sim < RESONATOR_NOVEL_THRESHOLD
+            && resonator_best_sim > 0.0
+            && self.stats.total_cycles > 10
+        {
+            self.scale_lr("resonator_novel", RESONATOR_NOVEL_LR_SCALE);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -988,6 +995,11 @@ impl CognitiveLoopService {
         self.adaptive_behavior.attention_sensitivity *= goal_attention_bias;
         if wm_sensory_mismatch {
             self.adaptive_behavior.attention_sensitivity *= 1.08;
+            // Sensory-abstract mismatch → slow consolidation + dampen confidence.
+            // Hierarchical decomposition is breaking → protect abstract representations.
+            // Science: Friston (2010) — hierarchical level misalignment = high free energy.
+            self.scale_lr("wm_sensory_mismatch", WM_MISMATCH_LR_SCALE);
+            self.scale_confidence("wm_sensory_mismatch", WM_MISMATCH_CONFIDENCE_SCALE);
         }
 
         // 10d. Update prediction confidence
@@ -1982,7 +1994,7 @@ impl CognitiveLoopService {
                                 .map(|(_, &v)| v)
                         })
                         .fold(0.0f64, f64::max);
-                    if top_strength > 0.3 {
+                    if top_strength > CAUSAL_ATTENTION_STRENGTH_THRESHOLD as f64 {
                         top_strength as f32
                     } else {
                         0.0
@@ -1997,7 +2009,12 @@ impl CognitiveLoopService {
             0.0
         };
         if causal_attention_boost > 0.0 {
-            self.adjust_confidence("causal_attention", causal_attention_boost * 0.05);
+            // Amplified from ×0.05 to be behaviorally meaningful.
+            // Science: Pearl (2000) — strong causal structure justifies confidence.
+            self.adjust_confidence(
+                "causal_attention",
+                causal_attention_boost * CAUSAL_ATTENTION_CONFIDENCE_SCALE,
+            );
         }
 
         // ── Broca SSM language generation + feedback ─────────────────────────

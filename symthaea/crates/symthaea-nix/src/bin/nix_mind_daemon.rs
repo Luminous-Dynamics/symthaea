@@ -879,23 +879,41 @@ fn main() -> ! {
     #[cfg(feature = "observability")]
     {
         let metrics_port = config.metrics_port;
-        // Eagerly initialize the global metrics registry.
-        let _ = Metrics::global();
-        std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .expect("tokio runtime for metrics server");
-            rt.block_on(async {
-                if let Err(e) = symthaea_nix::observability::serve_metrics(metrics_port).await {
-                    eprintln!("nix-mind-daemon: metrics server failed: {}", e);
-                }
-            });
-        });
-        eprintln!(
-            "nix-mind-daemon: Prometheus metrics endpoint on port {}",
-            metrics_port
-        );
+        // Eagerly initialize the global metrics registry (fallible).
+        match Metrics::try_global() {
+            Ok(_) => {
+                std::thread::spawn(move || {
+                    let rt = match tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                    {
+                        Ok(rt) => rt,
+                        Err(e) => {
+                            eprintln!(
+                                "nix-mind-daemon: cannot create tokio runtime for metrics: {e}"
+                            );
+                            return;
+                        }
+                    };
+                    rt.block_on(async {
+                        if let Err(e) =
+                            symthaea_nix::observability::serve_metrics(metrics_port).await
+                        {
+                            eprintln!("nix-mind-daemon: metrics server failed: {e}");
+                        }
+                    });
+                });
+                eprintln!(
+                    "nix-mind-daemon: Prometheus metrics endpoint on port {}",
+                    metrics_port
+                );
+            }
+            Err(e) => {
+                eprintln!(
+                    "nix-mind-daemon: metrics initialization failed, running without metrics: {e}"
+                );
+            }
+        }
     }
 
     // Restore persisted working memory

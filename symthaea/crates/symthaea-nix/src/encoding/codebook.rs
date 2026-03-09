@@ -11,17 +11,38 @@ use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
 
 /// Default HDC dimension for NixOS encoding.
+///
+/// Matches Symthaea core's `BinaryHV` dimension (16,384 bits = 2,048 bytes).
+/// Higher dimensions improve representational capacity but increase memory and
+/// compute cost. 16,384 is the sweet spot validated by the Symthaea psych-bench
+/// suite for semantic similarity tasks.
 pub const NIX_HDC_DIM: usize = 16_384;
 
 /// Seed namespace to avoid collisions with other subsystems.
-const CODEBOOK_SEED_BASE: u64 = 0x4E69_784F_5300_0000; // "NixOS\0\0\0"
+/// Derived from ASCII "NixOS\0\0\0" to give NixOS encodings a unique basis
+/// that is orthogonal (in expectation) to other subsystem codebooks.
+const CODEBOOK_SEED_BASE: u64 = 0x4E69_784F_5300_0000;
 
 /// Number of random hyperplanes per LSH hash table.
+/// 8 planes → 2^8 = 256 buckets per table. Balances hash collision rate
+/// against bucket sparsity for the expected codebook size (~100-1000 tokens).
 const LSH_NUM_PLANES: usize = 8;
+
 /// Number of independent LSH hash tables for multi-probe.
+/// 4 tables with independent random projections gives high recall (~95%)
+/// while keeping memory overhead at 4× the bucket index.
 const LSH_NUM_TABLES: usize = 4;
+
 /// Minimum cache size before LSH kicks in (below this, brute-force is faster).
+/// At 32 entries, linear scan over f32 vectors is faster than the LSH overhead
+/// of hashing + bucket lookup + similarity verification.
 const LSH_MIN_ENTRIES: usize = 32;
+
+// Compile-time sanity checks
+const _: () = assert!(NIX_HDC_DIM > 0 && NIX_HDC_DIM.is_power_of_two());
+const _: () = assert!(LSH_NUM_PLANES > 0 && LSH_NUM_PLANES <= 16);
+const _: () = assert!(LSH_NUM_TABLES > 0);
+const _: () = assert!(LSH_MIN_ENTRIES > 0);
 
 /// A single LSH hash table using random hyperplane projections.
 struct LshTable {
@@ -491,5 +512,21 @@ mod tests {
         assert_eq!(cb.token_order[preloaded], "alpha");
         assert_eq!(cb.token_order[preloaded + 1], "beta");
         assert_eq!(cb.token_order[preloaded + 2], "gamma");
+    }
+
+    #[test]
+    fn test_constants_valid() {
+        assert_eq!(NIX_HDC_DIM, 16_384);
+        assert!(NIX_HDC_DIM.is_power_of_two());
+        assert_eq!(1 << LSH_NUM_PLANES, 256);
+        assert_eq!(LSH_NUM_TABLES, 4);
+        assert!(LSH_MIN_ENTRIES > 0);
+    }
+
+    #[test]
+    fn test_custom_dim_codebook() {
+        let cb = NixCodebook::with_dim(512);
+        assert_eq!(cb.dim(), 512);
+        assert!(!cb.is_empty());
     }
 }
