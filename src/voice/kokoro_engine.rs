@@ -85,9 +85,9 @@ impl KokoroEngine {
             }
         };
 
-        // Create ONNX Runtime session
+        // Create ONNX Runtime session (ort 2.0 API)
         let session = match ort::session::Session::builder()
-            .and_then(|builder: ort::session::SessionBuilder| builder.with_model_from_file(&model_path))
+            .and_then(|builder| builder.with_model_from_file(&model_path))
         {
             Ok(session) => session,
             Err(e) => {
@@ -142,34 +142,15 @@ impl KokoroEngine {
         let voice_idx = voice_id.unwrap_or(self.config.default_voice);
         let voice_embed = self.voices.get(voice_idx).or_else(|| self.voices.first())?;
 
-        // Prepare input tensors
+        // Prepare input tensors for ort 2.0 API (raw slices + shapes)
         let seq_len = phoneme_ids.len();
-
-        // Kokoro expects:
-        // - input_ids: [1, seq_len] i64
-        // - style: [1, 256] f32  (voice embedding)
-        // - speed: [1] f32
         let input_ids: Vec<i64> = phoneme_ids.iter().map(|&id| id as i64).collect();
-
-        let input_ids_array = ndarray::Array2::from_shape_vec((1, seq_len), input_ids).ok()?;
-
-        let style_array =
-            ndarray::Array2::from_shape_vec((1, voice_embed.len()), voice_embed.clone()).ok()?;
-
-        let speed_array = ndarray::Array1::from_vec(vec![1.0f32]);
-
-        // Run inference — convert ndarrays to ort::Value for ort 2.0 API
-        let input_ids_value =
-            ort::value::Value::from_array(input_ids_array).ok()?;
-        let style_value =
-            ort::value::Value::from_array(style_array).ok()?;
-        let speed_value =
-            ort::value::Value::from_array(speed_array).ok()?;
+        let style: Vec<f32> = voice_embed.clone();
 
         let outputs = match self.session.run(ort::inputs![
-            "input_ids" => input_ids_value,
-            "style" => style_value,
-            "speed" => speed_value,
+            "input_ids" => (vec![1_i64, seq_len as i64], input_ids.as_slice()),
+            "style" => (vec![1_i64, voice_embed.len() as i64], style.as_slice()),
+            "speed" => (vec![1_i64], vec![1.0f32].as_slice()),
         ]) {
             Ok(outputs) => outputs,
             Err(e) => {
@@ -180,8 +161,8 @@ impl KokoroEngine {
 
         // Extract audio output
         if let Some(output) = outputs.get("audio") {
-            if let Ok(tensor) = output.try_extract_tensor::<f32>() {
-                let samples: Vec<f32> = tensor.iter().copied().collect();
+            if let Ok(tensor) = output.try_extract_raw_tensor::<f32>() {
+                let samples: Vec<f32> = tensor.1.to_vec();
                 if !samples.is_empty() {
                     return Some(samples);
                 }
@@ -190,8 +171,8 @@ impl KokoroEngine {
 
         // Try alternative output name
         if let Some((_, output)) = outputs.iter().next() {
-            if let Ok(tensor) = output.try_extract_tensor::<f32>() {
-                let samples: Vec<f32> = tensor.iter().copied().collect();
+            if let Ok(tensor) = output.try_extract_raw_tensor::<f32>() {
+                let samples: Vec<f32> = tensor.1.to_vec();
                 if !samples.is_empty() {
                     return Some(samples);
                 }

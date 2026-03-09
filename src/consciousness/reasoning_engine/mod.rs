@@ -466,6 +466,7 @@ mod tests {
             tool: None,
             recent_utility: 0.5,
             cycle_id: 1,
+            neuromod_exploration_mod: 1.0,
         }
     }
 
