@@ -255,7 +255,7 @@ impl G2PConverter {
             Ok(phoneme_strings) => {
                 let mut ids = Vec::new();
                 for phoneme_str in phoneme_strings {
-                    ids.extend(self.vocab.ipa_to_phoneme_ids(&phoneme_str));
+                    ids.extend(self._vocab.ipa_to_phoneme_ids(&phoneme_str));
                     ids.push(self.silence_id); // silence between sentences
                 }
                 Some(ids)
