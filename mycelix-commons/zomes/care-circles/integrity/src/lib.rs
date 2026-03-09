@@ -344,7 +344,6 @@ fn validate_create_membership(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hdi::prelude::*;
 
     // Factory functions
 

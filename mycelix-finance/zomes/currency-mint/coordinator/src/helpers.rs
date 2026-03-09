@@ -341,9 +341,7 @@ pub(crate) fn follow_update_chain(action_hash: ActionHash) -> ExternResult<Recor
     let mut current_hash = action_hash;
     loop {
         let details = get_details(current_hash.clone(), GetOptions::default())?.ok_or(
-            wasm_error!(WasmErrorInner::Guest(
-                "Currency record not found".into()
-            )),
+            wasm_error!(WasmErrorInner::Guest("Currency record not found".into())),
         )?;
         match details {
             Details::Record(record_details) => {
@@ -357,11 +355,9 @@ pub(crate) fn follow_update_chain(action_hash: ActionHash) -> ExternResult<Recor
             }
             _ => {
                 // Fallback: just get the record directly
-                return get(current_hash, GetOptions::default())?.ok_or(
-                    wasm_error!(WasmErrorInner::Guest(
-                        "Currency record not found".into()
-                    )),
-                );
+                return get(current_hash, GetOptions::default())?.ok_or(wasm_error!(
+                    WasmErrorInner::Guest("Currency record not found".into())
+                ));
             }
         }
     }

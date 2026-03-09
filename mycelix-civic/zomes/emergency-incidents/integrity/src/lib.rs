@@ -1429,8 +1429,8 @@ mod tests {
         link_type: LinkTypes,
         tag: Vec<u8>,
     ) -> ExternResult<ValidateCallbackResult> {
-        let base = AnyLinkableHash::from(EntryHash::from_raw_36(vec![0; 36]));
-        let target = AnyLinkableHash::from(EntryHash::from_raw_36(vec![0; 36]));
+        let _base = AnyLinkableHash::from(EntryHash::from_raw_36(vec![0; 36]));
+        let _target = AnyLinkableHash::from(EntryHash::from_raw_36(vec![0; 36]));
         let link_tag = LinkTag(tag);
 
         // Replicate the validation logic from the validate function
