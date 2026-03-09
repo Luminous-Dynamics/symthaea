@@ -6,7 +6,6 @@
 
 use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
-use holochain::sweettest::*;
 
 /// Test 10.1: Active currencies appear in list and search; suspended/retired don't
 #[tokio::test(flavor = "multi_thread")]
@@ -14,17 +13,7 @@ use holochain::sweettest::*;
 async fn test_discovery_active_only() {
     println!("Test 10.1: Discovery — Active Only");
 
-    let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
-    let dna = SweetDnaFile::from_bundle(&dna_path)
-        .await
-        .expect("Load DNA");
-    let mut conductor = SweetConductor::from_standard_config().await;
-    let agents = SweetAgents::get(conductor.keystore(), 1).await;
-    let apps = conductor
-        .setup_app_for_agents("mycelix-finance", &agents, &[dna])
-        .await
-        .expect("Install app");
-
+    let (conductor, _agents, apps) = setup_finance_conductor(1).await;
     let cell = &apps[0].cells()[0];
     let zome = cell.zome("currency_mint");
 

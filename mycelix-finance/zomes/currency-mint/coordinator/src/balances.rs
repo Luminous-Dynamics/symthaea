@@ -2,7 +2,6 @@
 
 use currency_mint_integrity::*;
 use hdk::prelude::*;
-use mycelix_finance_shared::anchor_hash;
 use mycelix_finance_types::CurrencyStatus;
 
 use crate::helpers::*;

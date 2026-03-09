@@ -339,7 +339,7 @@ pub(crate) fn compute_demurrage(balance: i32, rate: f64, elapsed_secs: u64) -> i
 /// Follows the update chain for each link target, deserializes to `T`,
 /// and returns all successfully decoded entries with their latest action hash.
 /// Silently skips links that can't be resolved (deleted entries, network errors).
-pub(crate) fn collect_linked_entries<T: TryFrom<SerializedBytes>>(
+pub(crate) fn collect_linked_entries<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
     anchor: &str,
     link_type: LinkTypes,
 ) -> ExternResult<Vec<(T, ActionHash)>> {
