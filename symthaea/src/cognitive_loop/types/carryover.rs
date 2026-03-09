@@ -227,6 +227,12 @@ pub(crate) struct QualityMetrics {
     /// Hysteresis relaxation factor (1.0 = full, decays toward HYSTERESIS_RELAXATION_FLOOR).
     /// Science: Kelso (1995) — sustained stability permits relaxed mode boundaries.
     pub(crate) hysteresis_factor: f32,
+    /// Consecutive cycles with zero harmonic interferences (for recovery grace period).
+    pub(crate) interference_free_cycles: u32,
+    /// Consecutive cycles with low FEP TD error (for convergence detection).
+    pub(crate) consecutive_low_td_error: u32,
+    /// Consecutive cycles with high unified quality (for exploration floor).
+    pub(crate) consecutive_high_quality: u32,
 }
 
 impl Default for QualityMetrics {
@@ -262,6 +268,9 @@ impl Default for QualityMetrics {
             homeostasis_efficiency: 1.0,
             crash_freeze_remaining: 0,
             hysteresis_factor: 1.0,
+            interference_free_cycles: 0,
+            consecutive_low_td_error: 0,
+            consecutive_high_quality: 0,
         }
     }
 }

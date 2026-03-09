@@ -29,6 +29,7 @@
 
 use crate::consciousness::fep_active_inference::{MotorCommandType, Observation};
 use ndarray::Array1;
+#[cfg(feature = "parallel")]
 use rayon::join as rayon_join;
 use std::borrow::Cow;
 use std::time::Instant;
@@ -77,6 +78,10 @@ use super::thresholds::{
     THALAMIC_REFLEX_BUDGET_SCALE, THALAMIC_REFLEX_LR_FACTOR, THALAMIC_REFLEX_SALIENCE,
     TRAINING_BASE_IMPORTANCE, TRANSITION_COST_MAX_EFFECT, TRANSITION_COST_STRENGTH_SCALE,
     TRANSITION_COST_THRESHOLD, WORLD_MODEL_SPONGINESS_THRESHOLD, WORLD_MODEL_SPONGY_LR_SCALE,
+    HORIZON_PE_CONTRACT_RATE, HORIZON_PE_CONTRACT_THRESHOLD, HORIZON_PE_EXPAND_RATE,
+    HORIZON_PE_EXPAND_THRESHOLD, HORIZON_SLOPE_CONTRACT_CAP, HORIZON_SLOPE_CONTRACT_RATE,
+    HORIZON_SLOPE_EXPAND_CAP, HORIZON_SLOPE_EXPAND_RATE, HORIZON_SLOPE_THRESHOLD,
+    PREDICTION_HORIZON_MAX_SCALE, PREDICTION_HORIZON_MIN_SCALE,
     WORLD_MODEL_STIFFNESS_LR_SCALE, WORLD_MODEL_STIFFNESS_THRESHOLD,
 };
 #[cfg(feature = "vision-manifold")]
@@ -748,6 +753,33 @@ impl CognitiveLoopService {
             }
         };
 
+        // Prediction horizon → CfC temporal integration depth.
+        // Clark (2013): high PE → contract horizons (focus near-term);
+        // low PE → expand horizons (exploit stability for planning).
+        // This complements FEP surprise tau (Friston 2010) — they work in synergy:
+        // FEP surprise drives fast dynamics, horizon scale drives planning depth.
+        let prediction_horizon_tau = {
+            let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
+            let pe_scale = if pe > HORIZON_PE_CONTRACT_THRESHOLD {
+                1.0 - (pe - HORIZON_PE_CONTRACT_THRESHOLD) * HORIZON_PE_CONTRACT_RATE
+            } else if pe < HORIZON_PE_EXPAND_THRESHOLD {
+                1.0 + (HORIZON_PE_EXPAND_THRESHOLD - pe) * HORIZON_PE_EXPAND_RATE
+            } else {
+                1.0
+            };
+            let slope = perception.urgency.error_slope;
+            let slope_scale = if slope > HORIZON_SLOPE_THRESHOLD {
+                1.0 - (slope - HORIZON_SLOPE_THRESHOLD).min(HORIZON_SLOPE_CONTRACT_CAP)
+                    * HORIZON_SLOPE_CONTRACT_RATE
+            } else if slope < -HORIZON_SLOPE_THRESHOLD {
+                1.0 + (-slope - HORIZON_SLOPE_THRESHOLD).min(HORIZON_SLOPE_EXPAND_CAP)
+                    * HORIZON_SLOPE_EXPAND_RATE
+            } else {
+                1.0
+            };
+            (pe_scale * slope_scale).clamp(PREDICTION_HORIZON_MIN_SCALE, PREDICTION_HORIZON_MAX_SCALE)
+        };
+
         let delta_t = self.config.cfc_config.delta_t
             * resonance_tau_factor
             * arousal_tau_factor
@@ -755,6 +787,7 @@ impl CognitiveLoopService {
             * arousal_recovery_tau_factor
             * fep_tau_factor
             * coherence_velocity_tau_factor
+            * prediction_horizon_tau
             * self
                 .somatic_bridge
                 .to_interoceptive_signals()
@@ -1128,6 +1161,15 @@ impl CognitiveLoopService {
                     let _ = enhancer.run_discovery();
                 }
             }
+            self.carryover.quality.consecutive_low_td_error = 0;
+        } else if fep_td_error.abs() < 0.01 {
+            self.carryover.quality.consecutive_low_td_error =
+                self.carryover.quality.consecutive_low_td_error.saturating_add(1);
+        }
+        // Session 13 Item 3: Sustained low TD error → model converged → dampen exploration.
+        // Science: Sutton & Barto (2018) — convergent TD signals indicate policy stability.
+        if self.carryover.quality.consecutive_low_td_error > 10 && self.stats.total_cycles > 30 {
+            self.scale_exploration("fep_td_converged", 0.97);
         }
 
         // ── Track 5e: Causal graph → attention weighting ─────────────────
@@ -1145,6 +1187,14 @@ impl CognitiveLoopService {
                         "causal_graph_dense",
                         (avg_confidence as f32 - 0.5) * 0.03,
                     );
+                } else if edge_count >= 3 && avg_confidence > 0.4 {
+                    // Session 13 Item 1: Fill dead zone for moderate causal density.
+                    // 3-5 edges with decent confidence = emerging structure → small boost.
+                    // Science: Pearl (2000) — partial causal knowledge still informative.
+                    self.adjust_confidence(
+                        "causal_graph_emerging",
+                        (avg_confidence as f32 - 0.4) * 0.01,
+                    );
                 }
                 if edge_count < 2 && self.stats.total_cycles > 200 {
                     self.adjust_exploration("sparse_causal_graph", 0.02);
@@ -1161,6 +1211,10 @@ impl CognitiveLoopService {
             self.adaptive_behavior.learning_rate_multiplier =
                 (self.adaptive_behavior.learning_rate_multiplier * 1.1).min(2.0);
             self.adaptive_behavior.exploration_factor *= 0.8;
+            // Session 13 Item 6: Wire FEP efficiency into proposal system.
+            // High accuracy + low complexity = efficient model → boost confidence.
+            // Science: Friston (2010) — low complexity = good model evidence.
+            self.adjust_confidence("fep_efficient", 0.01);
         }
         let surprise_thresh = reflection_thresholds.surprise as f64;
         if fep_surprise > surprise_thresh {
@@ -1214,6 +1268,13 @@ impl CognitiveLoopService {
         let sht_crash_dip = neuromod_result.sht_crash_dip;
         let exploration_sht_drain = neuromod_result.exploration_sht_drain;
         let confidence_velocity = neuromod_result.confidence_velocity;
+        // Session 13 Item 4: Rising confidence → dampen exploration.
+        // Positive velocity = model converging → exploit learned knowledge.
+        // Science: Daw et al. (2006) — confidence trajectory gates explore/exploit trade-off.
+        if confidence_velocity > 0.02 && self.stats.total_cycles > 15 {
+            let dampen = (1.0 - confidence_velocity * 0.1).max(0.95);
+            self.scale_exploration("confidence_rising", dampen);
+        }
         let unified_psi = neuromod_result.unified_psi;
         let guiding_question = neuromod_result.guiding_question;
         let dominant_harmonic = neuromod_result.dominant_harmonic;
@@ -1439,6 +1500,12 @@ impl CognitiveLoopService {
         let attention_budget_exceeded = attention_budget_elapsed_us > attention_budget_us;
         if attention_budget_exceeded {
             self.stats.attention_budget_exceeded_count += 1;
+            // Session 13 Item 7: Budget exceeded → raise threshold (be more selective).
+            // Overloaded system should require stronger signals before full processing.
+            // Science: Lavie (2005) — perceptual load theory: high load raises selection threshold.
+            if self.stats.attention_budget_exceeded_count > 1 {
+                self.scale_threshold("attention_overload", 1.1);
+            }
             if self.stats.attention_budget_exceeded_count > 3 {
                 tracing::warn!(
                     elapsed_us = attention_budget_elapsed_us,
@@ -1953,7 +2020,8 @@ impl CognitiveLoopService {
                 && broca_novelty
                 && self.stats.total_cycles % broca_min_spacing != 0;
             if broca_should_generate {
-                if let Some(ref mut broca) = self.broca_manager {
+                // Generate in a scoped borrow, then apply feedback outside
+                let broca_feedback = if let Some(ref mut broca) = self.broca_manager {
                     let signals = super::broca_bridge::BrocaConsciousnessSignals {
                         epistemic_confidence: self.carryover.quality.last_epistemic_confidence,
                         emotional_valence: self.emotion_contagion.prosody_valence(),
@@ -1995,26 +2063,6 @@ impl CognitiveLoopService {
                             self.stats.broca_low_quality_streak = 0;
                         }
 
-                        // Coherence feedback: high Broca coherence → confidence boost
-                        if result.final_coherence > 0.7 {
-                            self.adjust_confidence(
-                                "broca_coherent",
-                                (result.final_coherence - 0.7) * 0.03,
-                            );
-                        } else if result.final_coherence < 0.3 {
-                            self.scale_confidence(
-                                "broca_incoherent",
-                                1.0 - (0.3 - result.final_coherence) * 0.05,
-                            );
-                        }
-
-                        // Quality-driven LR modulation: high quality → slight LR boost
-                        // Science: successful articulation reinforces associated representations
-                        if broca_quality > 0.6 {
-                            let lr_boost = 1.0 + (broca_quality - 0.6) * 0.1; // [1.0, 1.04]
-                            self.scale_lr("broca_quality", lr_boost);
-                        }
-
                         // Adaptive consciousness gating: raise threshold after
                         // sustained low quality (3+ consecutive poor generations).
                         // Science: Hickok & Poeppel (2007) — speech production
@@ -2025,41 +2073,81 @@ impl CognitiveLoopService {
                         } else if self.stats.broca_quality_ema > 0.7
                             && broca.consciousness_threshold > 0.1
                         {
-                            // Relax threshold when quality is consistently high
                             broca.consciousness_threshold =
                                 (broca.consciousness_threshold - 0.02).max(0.1);
-                        }
-
-                        // Veto feedback: triggered veto → dampen exploration
-                        if result.veto_triggered {
-                            self.scale_exploration("broca_veto", 0.95);
-                        }
-
-                        // Semantic PE → FEP: language reconstruction error as
-                        // additional surprise signal (closes language-perception loop).
-                        #[cfg(feature = "liquid-mamba")]
-                        if result.semantic_pe > 0.1 {
-                            let sem_obs = Observation::from_consciousness_state(
-                                result.semantic_pe as f64,
-                                0.1,
-                                coherence as f64,
-                                effective_lr as f64,
-                            );
-                            self.fep.agent.perceive(&sem_obs);
                         }
 
                         // Populate telemetry
                         broca.last_telemetry.quality = broca_quality;
                         broca.last_telemetry.long_coherence = result.long_coherence;
                         broca.last_telemetry.semantic_pe = semantic_pe;
+
+                        // Return feedback values to apply after borrow ends
+                        #[cfg(feature = "liquid-mamba")]
+                        let deferred_semantic_pe = result.semantic_pe;
+                        #[cfg(not(feature = "liquid-mamba"))]
+                        let deferred_semantic_pe = 0.0_f32;
+
+                        Some((
+                            result.final_coherence,
+                            broca_quality,
+                            result.veto_triggered,
+                            deferred_semantic_pe,
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                // Apply deferred feedback outside the broca_manager borrow
+                if let Some((final_coherence, broca_quality, veto_triggered, deferred_sem_pe)) = broca_feedback {
+                    // Coherence feedback: high Broca coherence → confidence boost
+                    if final_coherence > 0.7 {
+                        self.adjust_confidence(
+                            "broca_coherent",
+                            (final_coherence - 0.7) * 0.03,
+                        );
+                    } else if final_coherence < 0.3 {
+                        self.scale_confidence(
+                            "broca_incoherent",
+                            1.0 - (0.3 - final_coherence) * 0.05,
+                        );
                     }
 
-                    // Broca quality → attention budget: successful articulation
-                    // reduces sensory search need (Levelt 1989 — monitoring loop).
-                    if self.stats.broca_quality_ema > 0.7 {
-                        let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15; // [0.955, 1.0]
-                        self.scale_confidence("broca_attention_contract", contraction);
+                    // Quality-driven LR modulation: high quality → slight LR boost
+                    // Science: successful articulation reinforces associated representations
+                    if broca_quality > 0.6 {
+                        let lr_boost = 1.0 + (broca_quality - 0.6) * 0.1; // [1.0, 1.04]
+                        self.scale_lr("broca_quality", lr_boost);
                     }
+
+                    // Veto feedback: triggered veto → dampen exploration
+                    if veto_triggered {
+                        self.scale_exploration("broca_veto", 0.95);
+                    }
+
+                    // Semantic PE → FEP: language reconstruction error as
+                    // additional surprise signal (closes language-perception loop).
+                    let _ = deferred_sem_pe; // suppress unused warning when liquid-mamba disabled
+                    #[cfg(feature = "liquid-mamba")]
+                    if deferred_sem_pe > 0.1 {
+                        let sem_obs = Observation::from_consciousness_state(
+                            deferred_sem_pe as f64,
+                            0.1,
+                            coherence as f64,
+                            effective_lr as f64,
+                        );
+                        self.fep.agent.perceive(&sem_obs);
+                    }
+                }
+
+                // Broca quality → attention budget: successful articulation
+                // reduces sensory search need (Levelt 1989 — monitoring loop).
+                if self.stats.broca_quality_ema > 0.7 {
+                    let contraction = 1.0 - (self.stats.broca_quality_ema - 0.7) * 0.15; // [0.955, 1.0]
+                    self.scale_confidence("broca_attention_contract", contraction);
                 }
             }
         }
@@ -2127,8 +2215,8 @@ impl CognitiveLoopService {
                 wm_importance_boost: pp_wm_importance_boost + pp_thalamic_salience,
             };
 
-            rayon_join(
-                || {
+            {
+                let semantic_fn = || {
                     helpers::parallel_semantic_causal(
                         semantic_memory,
                         causal_enhancer,
@@ -2138,8 +2226,8 @@ impl CognitiveLoopService {
                         prediction_error,
                         pp_total_cycles,
                     )
-                },
-                || {
+                };
+                let episodic_fn = || {
                     helpers::parallel_episodic_learning(
                         episodic_memory,
                         resonator_memory,
@@ -2150,8 +2238,12 @@ impl CognitiveLoopService {
                         &episodic_ctx,
                         cycle_learning_result,
                     )
-                },
-            )
+                };
+                #[cfg(feature = "parallel")]
+                { rayon_join(semantic_fn, episodic_fn) }
+                #[cfg(not(feature = "parallel"))]
+                { (semantic_fn(), episodic_fn()) }
+            }
         };
         // Apply memory context boost to confidence after rayon::join (deferred from parallel branch)
         if memory_confidence_boost.abs() > f32::EPSILON {
@@ -2243,6 +2335,7 @@ impl CognitiveLoopService {
             epistemic_uncertainty,
             aleatoric_uncertainty,
             fep_tau_factor,
+            prediction_horizon_tau,
             causal_world_model_edges: if self
                 .causal_enhancer
                 .as_ref()

@@ -405,32 +405,9 @@ impl CognitiveLoopService {
             theta_phase: ((self.stats.total_cycles as f64 * super::thresholds::THETA_PHASE_ADVANCE)
                 % (2.0 * std::f64::consts::PI)) as f32,
             temporal_binding_strength: perception.encoding.temporal_binding_strength,
-            prediction_horizon_scale: {
-                // Match prediction.rs: PE-adaptive × substrate tau × trend, clamped.
-                let pe = self.stats.avg_prediction_error.clamp(0.0, 1.0);
-                let pe_scale = if pe > 0.3 {
-                    1.0 - (pe - 0.3) * 0.6
-                } else if pe < 0.05 {
-                    1.0 + (0.05 - pe) * 6.0
-                } else {
-                    1.0
-                };
-                // Error slope → horizon adjustment: rising errors shorten horizons
-                // (focus near-term), falling errors lengthen them (exploit stability).
-                // Clark (2013): predictive brain adjusts temporal scope to match uncertainty.
-                let slope = perception.urgency.error_slope;
-                let slope_scale = if slope > 0.02 {
-                    1.0 - (slope - 0.02).min(0.1) * 2.0 // up to -20%
-                } else if slope < -0.02 {
-                    1.0 + (-slope - 0.02).min(0.1) * 1.5 // up to +15%
-                } else {
-                    1.0
-                };
-                (self.substrate_manager.tau_factor * pe_scale * slope_scale).clamp(
-                    super::thresholds::PREDICTION_HORIZON_MIN_SCALE,
-                    super::thresholds::PREDICTION_HORIZON_MAX_SCALE,
-                )
-            },
+            // Prediction horizon now computed in dynamics phase and applied to CfC delta_t.
+            // Telemetry reports the same value for observability.
+            prediction_horizon_scale: dynamics.prediction_horizon_tau,
             fep_tau_factor: dynamics.fep_tau_factor,
             causal_world_model_edges: dynamics.causal_world_model_edges,
             epistemic_budget_scale: dynamics.epistemic_budget_scale,
@@ -536,6 +513,19 @@ impl CognitiveLoopService {
         metadata.resonator_semantic_lr_mod = (dynamics.resonator.resonator_best_sim > 0.8
             || (dynamics.resonator.resonator_best_sim < 0.3 && dynamics.resonator.resonator_best_sim > 0.0))
             && self.stats.total_cycles > 10;
+
+        // ── Session 13 telemetry ──
+        metadata.fep_td_converged = self.carryover.quality.consecutive_low_td_error > 10
+            && self.stats.total_cycles > 30;
+        metadata.confidence_rising_dampen = dynamics.neuromod.confidence_velocity > 0.02
+            && self.stats.total_cycles > 15;
+        metadata.flow_lr_boost = self.flow_state.in_flow && self.flow_state.intensity > 0.5;
+        metadata.fep_efficiency_boost = dynamics.fep.fep_accuracy > 0.5
+            && dynamics.fep.fep_complexity < 0.5;
+        metadata.attention_overload_threshold = dynamics.attention.attention_budget_exceeded
+            && self.stats.attention_budget_exceeded_count > 1;
+        metadata.quality_exploration_floor = self.carryover.quality.consecutive_high_quality > 10
+            && self.stats.total_cycles > 30;
 
         // ── GWT handler telemetry ──
         metadata.gwt_memory_consolidation_requested = self

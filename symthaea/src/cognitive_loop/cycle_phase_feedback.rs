@@ -265,17 +265,28 @@ impl CognitiveLoopService {
                     .subsystem_lr_factor
                     .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
                 self.stats.harmonic_interference_mod_count += 1;
+                self.carryover.quality.interference_free_cycles = 0;
                 -dampen
             } else if harmonic_interferences == 0 {
-                self.carryover.learning.subsystem_lr_factor *= 1.0 + HARMONIC_ALL_CLEAR_BOOST;
-                self.carryover.learning.subsystem_lr_factor = self
-                    .carryover
-                    .learning
-                    .subsystem_lr_factor
-                    .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
-                self.stats.harmonic_interference_mod_count += 1;
-                HARMONIC_ALL_CLEAR_BOOST
+                self.carryover.quality.interference_free_cycles =
+                    self.carryover.quality.interference_free_cycles.saturating_add(1);
+                // Session 13 Item 2: Grace period before harmonic all-clear boost.
+                // Require 3 consecutive interference-free cycles to prevent LR whiplash.
+                // Science: Kelso (1995) — stability requires sustained absence of perturbation.
+                if self.carryover.quality.interference_free_cycles >= 3 {
+                    self.carryover.learning.subsystem_lr_factor *= 1.0 + HARMONIC_ALL_CLEAR_BOOST;
+                    self.carryover.learning.subsystem_lr_factor = self
+                        .carryover
+                        .learning
+                        .subsystem_lr_factor
+                        .clamp(SUBSYSTEM_LR_FACTOR_MIN, SUBSYSTEM_LR_FACTOR_MAX);
+                    self.stats.harmonic_interference_mod_count += 1;
+                    HARMONIC_ALL_CLEAR_BOOST
+                } else {
+                    0.0
+                }
             } else {
+                self.carryover.quality.interference_free_cycles = 0;
                 0.0
             };
 
@@ -1004,6 +1015,31 @@ impl CognitiveLoopService {
                     .subsystem_lr_factor
                     .clamp(QUALITY_LR_CLAMP_MIN, QUALITY_LR_CLAMP_MAX);
             }
+        }
+
+        // Session 13 Item 5: Flow state → subsystem LR modulation.
+        // Flow = optimal learning zone → gently boost subsystem learning.
+        // Science: Csikszentmihalyi (1990) — flow maximizes skill acquisition.
+        if self.flow_state.in_flow && self.flow_state.intensity > 0.5 {
+            self.carryover.learning.subsystem_lr_factor *= 1.05;
+            self.carryover.learning.subsystem_lr_factor = self
+                .carryover
+                .learning
+                .subsystem_lr_factor
+                .clamp(QUALITY_LR_CLAMP_MIN, QUALITY_LR_CLAMP_MAX);
+        }
+
+        // Session 13 Item 8: Sustained high quality → exploration floor.
+        // Prevent total convergence when system is performing well.
+        // Science: Dayan & Sejnowski (1996) — minimum exploration prevents local optima.
+        if unified_quality_score > 0.7 {
+            self.carryover.quality.consecutive_high_quality =
+                self.carryover.quality.consecutive_high_quality.saturating_add(1);
+        } else {
+            self.carryover.quality.consecutive_high_quality = 0;
+        }
+        if self.carryover.quality.consecutive_high_quality > 10 && self.stats.total_cycles > 30 {
+            self.adjust_exploration("quality_floor", 0.01);
         }
 
         // Session 12 Item 4: Epistemic conflict → exploration boost.

@@ -884,6 +884,21 @@ impl CognitiveLoopService {
                     super::thresholds::DOMINANCE_DEFAULT,
                     super::thresholds::POLICY_SOFT_THRESHOLD,
                 ]);
+                // Register baseline receptor sensitivities for tamper detection (#2)
+                // Tolerance/withdrawal dynamics change these over time, but the baseline
+                // (all 1.0 at startup) is the critical invariant — deviation at startup
+                // means binary patching or memory corruption.
+                im.register_receptor_sensitivities(&[
+                    1.0, // dopamine
+                    1.0, // noradrenaline
+                    1.0, // serotonin
+                    1.0, // acetylcholine
+                    1.0, // GABA
+                    1.0, // oxytocin
+                    1.0, // glutamate
+                    1.0, // adenosine
+                    1.0, // endocannabinoid
+                ]);
                 // Apply substrate tau factor for temporal consistency scaling (#3)
                 im.set_substrate_tau_factor(substrate_tau_for_integrity);
                 im

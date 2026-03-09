@@ -73,6 +73,17 @@ pub(super) struct PerceptionPhaseResult {
     pub(super) startup_suppressed: bool,
     pub(super) startup_warmup_progress: f32,
     pub(super) negation_detected: f32,
+    // Vision manifold fields (only present when feature is enabled)
+    #[cfg(feature = "vision-manifold")]
+    pub(super) vision_mean_surprise: f32,
+    #[cfg(feature = "vision-manifold")]
+    pub(super) cross_manifold_prediction_error: f32,
+    #[cfg(feature = "vision-manifold")]
+    pub(super) vision_horizon_errors: Vec<f32>,
+    #[cfg(feature = "vision-manifold")]
+    pub(super) scene_recognized: bool,
+    #[cfg(feature = "vision-manifold")]
+    pub(super) vision_telemetry: Option<symthaea_vision_manifold::VisionTelemetry>,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -191,6 +202,7 @@ pub(super) struct DynamicsPhaseResult {
     pub(super) epistemic_uncertainty: f32,
     pub(super) aleatoric_uncertainty: f32,
     pub(super) fep_tau_factor: f32,
+    pub(super) prediction_horizon_tau: f32,
     pub(super) causal_world_model_edges: usize,
     pub(super) epistemic_budget_scale: f32,
     // Session 11: crash detector telemetry

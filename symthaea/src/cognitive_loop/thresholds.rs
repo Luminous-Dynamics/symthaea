@@ -366,6 +366,37 @@ pub const PREDICTION_HORIZON_MIN_SCALE: f32 = 0.3;
 /// Prevents extremely long horizons under low PE + fast substrate.
 pub const PREDICTION_HORIZON_MAX_SCALE: f32 = 2.0;
 
+/// PE threshold above which prediction horizon contracts (focus near-term).
+/// Science: Clark (2013) — high prediction error narrows temporal scope.
+pub const HORIZON_PE_CONTRACT_THRESHOLD: f32 = 0.3;
+
+/// Contraction rate: how much horizons shrink per unit PE above threshold.
+/// At PE=1.0, scale = 1.0 - (0.7 × 0.6) = 0.58 (42% contraction).
+pub const HORIZON_PE_CONTRACT_RATE: f32 = 0.6;
+
+/// PE threshold below which prediction horizon expands (exploit stability).
+/// Science: Buzsáki (2006) — stable states permit longer integration windows.
+pub const HORIZON_PE_EXPAND_THRESHOLD: f32 = 0.05;
+
+/// Expansion rate: how much horizons expand per unit PE below threshold.
+/// At PE=0.0, scale = 1.0 + (0.05 × 6.0) = 1.30 (30% expansion).
+pub const HORIZON_PE_EXPAND_RATE: f32 = 6.0;
+
+/// Error slope threshold for horizon contraction (rising errors → shorter horizons).
+pub const HORIZON_SLOPE_THRESHOLD: f32 = 0.02;
+
+/// Max error slope effect for contraction (caps at 20% reduction).
+pub const HORIZON_SLOPE_CONTRACT_CAP: f32 = 0.1;
+
+/// Contraction multiplier for rising error slopes.
+pub const HORIZON_SLOPE_CONTRACT_RATE: f32 = 2.0;
+
+/// Max error slope effect for expansion (caps at 15% increase).
+pub const HORIZON_SLOPE_EXPAND_CAP: f32 = 0.1;
+
+/// Expansion multiplier for falling error slopes.
+pub const HORIZON_SLOPE_EXPAND_RATE: f32 = 1.5;
+
 /// Sustained low-coherence cycle threshold for exploration boost.
 /// Basis: Schmidhuber (2010) — curiosity from persistent model confusion.
 pub const LOW_COHERENCE_EXPLORATION_THRESHOLD: u32 = 10;
@@ -1806,6 +1837,20 @@ mod tests {
         assert!(LOW_COHERENCE_EXPLORATION_THRESHOLD > 0);
         assert!(LOW_COHERENCE_EXPLORATION_BOOST > 0.0);
         assert!(LOW_COHERENCE_EXPLORATION_BOOST < 0.1); // don't over-explore
+        // Prediction horizon PE-adaptive scaling
+        assert!(HORIZON_PE_CONTRACT_THRESHOLD > 0.0 && HORIZON_PE_CONTRACT_THRESHOLD < 1.0);
+        assert!(HORIZON_PE_CONTRACT_RATE > 0.0 && HORIZON_PE_CONTRACT_RATE <= 1.0);
+        assert!(HORIZON_PE_EXPAND_THRESHOLD > 0.0 && HORIZON_PE_EXPAND_THRESHOLD < HORIZON_PE_CONTRACT_THRESHOLD);
+        assert!(HORIZON_PE_EXPAND_RATE > 0.0);
+        assert!(HORIZON_SLOPE_THRESHOLD > 0.0);
+        assert!(HORIZON_SLOPE_CONTRACT_CAP > 0.0);
+        assert!(HORIZON_SLOPE_CONTRACT_RATE > 0.0);
+        assert!(HORIZON_SLOPE_EXPAND_CAP > 0.0);
+        assert!(HORIZON_SLOPE_EXPAND_RATE > 0.0);
+        // At max PE, contraction stays above floor
+        let worst_pe_scale = 1.0 - (1.0 - HORIZON_PE_CONTRACT_THRESHOLD) * HORIZON_PE_CONTRACT_RATE;
+        assert!(worst_pe_scale > PREDICTION_HORIZON_MIN_SCALE,
+            "PE contraction ({}) would breach floor ({})", worst_pe_scale, PREDICTION_HORIZON_MIN_SCALE);
     }
 
     #[test]
