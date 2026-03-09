@@ -517,6 +517,51 @@ impl BenchmarkReport {
                 "arc_transfer_similarity",
                 &bl.reasoning,
             ),
+            // Mismatch Negativity (Attention)
+            ("detection_accuracy", "mmn_detection_accuracy", &bl.attention),
+            ("false_alarm_rate", "mmn_false_alarm_rate", &bl.attention),
+            (
+                "attentional_independence",
+                "mmn_attentional_independence",
+                &bl.attention,
+            ),
+            // Change Blindness (Metacognition)
+            (
+                "detection_with_disruption",
+                "cb_detection_with_disruption",
+                &bl.metacognition,
+            ),
+            (
+                "attention_benefit",
+                "cb_attention_benefit",
+                &bl.metacognition,
+            ),
+            // Proprioceptive Drift (Motor)
+            ("synchronous_drift", "synchronous_drift", &bl.motor),
+            ("drift_difference", "drift_difference", &bl.motor),
+            ("ownership_rate", "ownership_rate", &bl.motor),
+            // Blindsight (Consciousness)
+            ("supraliminal_accuracy", "supraliminal_accuracy", &bl.consciousness),
+            ("subliminal_accuracy", "subliminal_accuracy", &bl.consciousness),
+            ("awareness_dissociation", "awareness_dissociation", &bl.consciousness),
+            // Temporal Order (Binding)
+            ("simultaneity_window", "simultaneity_window", &bl.binding),
+            ("discrimination_slope", "discrimination_slope", &bl.binding),
+            ("asymptotic_accuracy", "asymptotic_accuracy", &bl.binding),
+            // Phoneme Discrimination (Speech)
+            (
+                "cross_boundary_accuracy",
+                "cross_boundary_accuracy",
+                &bl.speech,
+            ),
+            (
+                "categorical_perception_index",
+                "categorical_perception_index",
+                &bl.speech,
+            ),
+            // Substrate Transfer
+            ("transfer_fidelity", "transfer_fidelity", &bl.substrate),
+            ("phi_preservation", "phi_preservation", &bl.substrate),
         ];
 
         for (metric_key, baseline_key, baselines) in &mappings {
@@ -1384,6 +1429,14 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("BehavioralKnockout") => "da_ko_lr_d",
         b if b.contains("ConsciousnessPharmacology") => "psychedelic_proxy_peak",
         b if b.contains("MetacognitiveIgnition") => "spontaneous_tracking_score",
+        // New benchmarks (Mar 2026)
+        b if b.contains("Blindsight") || b.contains("BlindSight") => "subliminal_accuracy",
+        b if b.contains("MismatchNegativity") => "detection_accuracy",
+        b if b.contains("ChangeBlindness") => "detection_with_disruption",
+        b if b.contains("ProprioceptiveDrift") => "drift_difference",
+        b if b.contains("TemporalOrder") => "discrimination_slope",
+        b if b.contains("PhonemeDiscrimination") => "categorical_perception_index",
+        b if b.contains("SubstrateTransfer") => "transfer_fidelity",
         _ => "overall_accuracy",
     }
 }
@@ -1429,6 +1482,9 @@ pub fn is_lower_better(metric_key: &str) -> bool {
             | "trials_to_criterion"
             | "restless_bandit_regret"
             | "lapse_rate"
+            | "false_alarm_rate"
+            | "simultaneity_window"
+            | "degradation_gradient"
     )
 }
 

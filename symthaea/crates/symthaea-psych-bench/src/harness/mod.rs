@@ -191,8 +191,10 @@ mod tests {
         // Instantiate all 67 benchmarks and verify each has provenance
         use crate::benchmarks::affect::*;
         use crate::benchmarks::attention::*;
+        use crate::benchmarks::binding::*;
         use crate::benchmarks::butlin::*;
         use crate::benchmarks::cogbench::*;
+        use crate::benchmarks::consciousness::*;
         use crate::benchmarks::creativity::*;
         use crate::benchmarks::executive::*;
         use crate::benchmarks::inhibition::*;
@@ -202,6 +204,8 @@ mod tests {
         use crate::benchmarks::motor::*;
         use crate::benchmarks::reasoning::*;
         use crate::benchmarks::social::*;
+        use crate::benchmarks::speech::*;
+        use crate::benchmarks::substrate::*;
         use crate::benchmarks::sustained_attention::*;
         use crate::benchmarks::tombench::*;
         use crate::benchmarks::worm::*;
@@ -246,6 +250,7 @@ mod tests {
             // Metacognition
             Box::new(MetacognitiveCalibrationBenchmark),
             Box::new(FeelingOfKnowingBenchmark),
+            Box::new(ChangeBlindnessBenchmark),
             // Affect
             Box::new(EmotionalStroopBenchmark),
             Box::new(MoodCongruentRecallBenchmark),
@@ -261,6 +266,7 @@ mod tests {
             // Attention
             Box::new(AttentionalBlinkBenchmark),
             Box::new(VisualSearchBenchmark),
+            Box::new(MismatchNegativityBenchmark),
             // Reasoning
             Box::new(ArcFluidBenchmark),
             Box::new(ArcCompositionalBenchmark),
@@ -281,6 +287,7 @@ mod tests {
             Box::new(SrttBenchmark),
             Box::new(FittsLawBenchmark),
             Box::new(BimanualBenchmark),
+            Box::new(ProprioceptiveDriftBenchmark),
             // Language
             Box::new(GardenPathBenchmark),
             Box::new(SemanticCoherenceBenchmark),
@@ -294,6 +301,14 @@ mod tests {
             Box::new(PublicGoodsBenchmark),
             Box::new(DictatorGameBenchmark),
             Box::new(MachiavelliBenchmark),
+            // Binding
+            Box::new(TemporalOrderBenchmark),
+            // Speech
+            Box::new(PhonemeDiscriminationBenchmark),
+            // Consciousness
+            Box::new(BlindSightBenchmark),
+            // Substrate
+            Box::new(SubstrateTransferBenchmark),
         ];
 
         let mut missing = Vec::new();

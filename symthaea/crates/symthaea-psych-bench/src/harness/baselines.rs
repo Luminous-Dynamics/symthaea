@@ -46,6 +46,14 @@ pub struct BaselineCollection {
     pub social: BaselineMap,
     /// Neuromodulator domain baselines (DA/NE/5-HT/ACh psychopharmacology).
     pub neuromod: BaselineMap,
+    /// Consciousness domain baselines (blindsight, etc.).
+    pub consciousness: BaselineMap,
+    /// Binding domain baselines (temporal order, etc.).
+    pub binding: BaselineMap,
+    /// Speech domain baselines (phoneme discrimination, etc.).
+    pub speech: BaselineMap,
+    /// Substrate independence baselines (transfer fidelity, etc.).
+    pub substrate: BaselineMap,
     /// GPT-4 baselines from CogBench (Coda et al., 2023).
     pub llm_cogbench: BaselineMap,
     /// GPT-4 baselines from ToMBench (Kosinski, 2023).
@@ -76,6 +84,10 @@ impl BaselineCollection {
             language: language_baselines(),
             social: social_baselines(),
             neuromod: neuromod_baselines(),
+            consciousness: consciousness_baselines(),
+            binding: binding_baselines(),
+            speech: speech_baselines(),
+            substrate: substrate_baselines(),
             llm_cogbench: llm_cogbench_baselines(),
             llm_tombench: llm_tombench_baselines(),
             llm_arc: llm_arc_baselines(),
@@ -891,6 +903,44 @@ pub fn metacognition_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Change Blindness (Rensink et al., 1997)
+    m.insert(
+        "cb_detection_with_disruption",
+        Baseline {
+            value: 0.45,
+            sd: Some(0.12),
+            source: "Rensink et al. (1997), change detection with blank disruption",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cb_detection_without_disruption",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Rensink et al. (1997), change detection without disruption",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cb_search_efficiency",
+        Baseline {
+            value: 0.60,
+            sd: Some(0.10),
+            source: "Rensink et al. (1997), fraction detected within 5 looks",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "cb_attention_benefit",
+        Baseline {
+            value: 0.35,
+            sd: Some(0.10),
+            source: "Simons & Levin (1997), attended minus unattended detection",
+            population: "human adults",
+        },
+    );
+
     m
 }
 
@@ -1397,6 +1447,44 @@ pub fn attention_baselines() -> BTreeMap<&'static str, Baseline> {
             value: 0.25,
             sd: Some(0.10),
             source: "Treisman & Gelade (1980), HDC-scale conjunction-feature slope difference",
+            population: "human adults",
+        },
+    );
+
+    // Mismatch Negativity (Näätänen et al., 1978, 2007)
+    m.insert(
+        "mmn_detection_accuracy",
+        Baseline {
+            value: 0.88,
+            sd: Some(0.06),
+            source: "Näätänen et al. (2007), oddball detection accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "mmn_false_alarm_rate",
+        Baseline {
+            value: 0.08,
+            sd: Some(0.04),
+            source: "Näätänen et al. (2007), false positive rate for standards",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "mmn_mismatch_magnitude",
+        Baseline {
+            value: 0.35,
+            sd: Some(0.10),
+            source: "Näätänen et al. (1978), MMN amplitude (normalized)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "mmn_attentional_independence",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.12),
+            source: "Näätänen et al. (2007), detection ratio under load vs no-load",
             population: "human adults",
         },
     );
@@ -2129,6 +2217,43 @@ pub fn motor_baselines() -> BaselineMap {
             value: 0.77,
             sd: Some(0.08),
             source: "Swinnen (2002), asymmetric bimanual accuracy",
+            population: "human adults",
+        },
+    );
+    // Proprioceptive Drift baselines (Botvinick & Cohen, 1998)
+    m.insert(
+        "synchronous_drift",
+        Baseline {
+            value: 0.25,
+            sd: Some(0.10),
+            source: "Botvinick & Cohen (1998), synchronous RHI drift (normalized)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "asynchronous_drift",
+        Baseline {
+            value: 0.05,
+            sd: Some(0.04),
+            source: "Botvinick & Cohen (1998), asynchronous control drift",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "drift_difference",
+        Baseline {
+            value: 0.20,
+            sd: Some(0.08),
+            source: "Botvinick & Cohen (1998), synchronous minus asynchronous drift",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "ownership_rate",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.15),
+            source: "Tsakiris & Haggard (2005), RHI ownership illusion rate",
             population: "human adults",
         },
     );
@@ -3177,6 +3302,174 @@ pub fn llm_arc_baselines() -> BaselineMap {
     m
 }
 
+/// Consciousness domain baselines (Blindsight).
+pub fn consciousness_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "supraliminal_accuracy",
+        Baseline {
+            value: 0.92,
+            sd: Some(0.05),
+            source: "Weiskrantz (1986), above-threshold forced-choice accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "subliminal_accuracy",
+        Baseline {
+            value: 0.65,
+            sd: Some(0.08),
+            source: "Azzopardi & Cowey (1997), below-threshold forced-choice accuracy",
+            population: "blindsight patients",
+        },
+    );
+    m.insert(
+        "awareness_dissociation",
+        Baseline {
+            value: 0.25,
+            sd: Some(0.10),
+            source: "Weiskrantz (1986), accuracy minus report rate for subliminal",
+            population: "blindsight patients",
+        },
+    );
+    m.insert(
+        "threshold_sharpness",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.12),
+            source: "Azzopardi & Cowey (1997), steepness of conscious transition",
+            population: "human adults",
+        },
+    );
+    m
+}
+
+/// Binding domain baselines (Temporal Order Judgment).
+pub fn binding_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "simultaneity_window",
+        Baseline {
+            value: 0.15,
+            sd: Some(0.05),
+            source: "Hirsh & Sherrick (1961), temporal order threshold (normalized)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "discrimination_slope",
+        Baseline {
+            value: 0.70,
+            sd: Some(0.12),
+            source: "Sternberg & Knoll (1973), psychometric function steepness",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "asymptotic_accuracy",
+        Baseline {
+            value: 0.95,
+            sd: Some(0.03),
+            source: "Hirsh & Sherrick (1961), accuracy at large temporal gaps",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "temporal_resolution",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.08),
+            source: "Hirsh & Sherrick (1961), 1 - simultaneity_window",
+            population: "human adults",
+        },
+    );
+    m
+}
+
+/// Speech domain baselines (Phoneme Discrimination).
+pub fn speech_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "cross_boundary_accuracy",
+        Baseline {
+            value: 0.90,
+            sd: Some(0.05),
+            source: "Liberman et al. (1957), cross-category phoneme discrimination",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "within_category_accuracy",
+        Baseline {
+            value: 0.55,
+            sd: Some(0.08),
+            source: "Liberman et al. (1957), within-category phoneme discrimination",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "categorical_perception_index",
+        Baseline {
+            value: 0.35,
+            sd: Some(0.10),
+            source: "Eimas et al. (1971), cross minus within accuracy",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "boundary_sharpness",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.10),
+            source: "Liberman et al. (1957), identification function steepness",
+            population: "human adults",
+        },
+    );
+    m
+}
+
+/// Substrate independence baselines (Substrate Transfer).
+pub fn substrate_baselines() -> BaselineMap {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "transfer_fidelity",
+        Baseline {
+            value: 0.85,
+            sd: Some(0.08),
+            source: "Putnam (1967), theoretical: state preservation across substrates",
+            population: "theoretical model",
+        },
+    );
+    m.insert(
+        "phi_preservation",
+        Baseline {
+            value: 0.80,
+            sd: Some(0.10),
+            source: "Tononi (2004), theoretical: Phi preservation across substrates",
+            population: "theoretical model",
+        },
+    );
+    m.insert(
+        "cross_substrate_correlation",
+        Baseline {
+            value: 0.75,
+            sd: Some(0.12),
+            source: "Putnam (1967), theoretical: output correlation across substrates",
+            population: "theoretical model",
+        },
+    );
+    m.insert(
+        "degradation_gradient",
+        Baseline {
+            value: 0.10,
+            sd: Some(0.05),
+            source: "Theoretical: fidelity loss per substrate hop",
+            population: "theoretical model",
+        },
+    );
+    m
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3200,6 +3493,10 @@ mod tests {
         assert!(!language_baselines().is_empty());
         assert!(!social_baselines().is_empty());
         assert!(!neuromod_baselines().is_empty());
+        assert!(!consciousness_baselines().is_empty());
+        assert!(!binding_baselines().is_empty());
+        assert!(!speech_baselines().is_empty());
+        assert!(!substrate_baselines().is_empty());
     }
 
     #[test]

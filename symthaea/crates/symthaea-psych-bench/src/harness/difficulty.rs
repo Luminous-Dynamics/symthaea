@@ -76,6 +76,12 @@ pub fn difficulty_model_for(name: &str) -> DifficultyModel {
             snr_reduction: 0.0,
             interference_scale: 0.6,
         },
+        "Motor::ProprioceptiveDrift" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.35,
+            snr_reduction: 0.40, // multisensory signal degradation
+            interference_scale: 0.0,
+        },
         "Affect::EmotionalStroop" => DifficultyModel {
             model_type: DifficultyModelType::Interference,
             temp_scale: 0.5,
@@ -278,6 +284,53 @@ pub fn difficulty_model_for(name: &str) -> DifficultyModel {
             interference_scale: 0.0,
         },
 
+        "Substrate::Transfer" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.35, // substrate noise amplification
+            interference_scale: 0.0,
+        },
+
+        // Binding — temporal discrimination is SNR-limited
+        "Binding::TemporalOrder" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.40, // temporal position signal degrades
+            interference_scale: 0.0,
+        },
+
+        // Speech — categorical perception is SNR-limited
+        "Speech::PhonemeDiscrimination" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.35,
+            snr_reduction: 0.35, // phoneme encoding signal degrades
+            interference_scale: 0.0,
+        },
+
+        // Consciousness — blindsight is SNR-limited (threshold detection)
+        "Consciousness::Blindsight" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.40, // stimulus signal degrades with difficulty
+            interference_scale: 0.0,
+        },
+
+        // Attention — mismatch negativity is SNR-limited (deviant detection)
+        "Attention::MismatchNegativity" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.35, // prediction error signal degrades
+            interference_scale: 0.0,
+        },
+
+        // Metacognition — change blindness is SNR-limited (scene comparison)
+        "Metacognition::ChangeBlindness" => DifficultyModel {
+            model_type: DifficultyModelType::Snr,
+            temp_scale: 0.3,
+            snr_reduction: 0.40, // change signal diluted by scene complexity
+            interference_scale: 0.0,
+        },
+
         // Default model: temperature-only scaling for everything else
         _ => DifficultyModel {
             model_type: DifficultyModelType::Default,
@@ -416,6 +469,13 @@ mod tests {
             "ToMBench::FauxPas",
             "ToMBench::Persuasion",
             "ToMBench::StrangeStory",
+            "Motor::ProprioceptiveDrift",
+            "Substrate::Transfer",
+            "Binding::TemporalOrder",
+            "Speech::PhonemeDiscrimination",
+            "Consciousness::Blindsight",
+            "Attention::MismatchNegativity",
+            "Metacognition::ChangeBlindness",
         ];
 
         for name in &registered {
