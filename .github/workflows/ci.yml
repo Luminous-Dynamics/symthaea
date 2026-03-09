@@ -472,7 +472,7 @@ jobs:
       - name: Install cargo-deny
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          command: check
+          command: check licenses bans sources
           arguments: --all-features
 
   audit:
