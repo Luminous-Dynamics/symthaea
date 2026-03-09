@@ -1886,10 +1886,10 @@ mod tests {
         link_type: LinkTypes,
         tag_bytes: Vec<u8>,
     ) -> ExternResult<ValidateCallbackResult> {
-        let base = AnyLinkableHash::from(fake_entry_hash());
-        let target = AnyLinkableHash::from(fake_entry_hash());
+        let _base = AnyLinkableHash::from(fake_entry_hash());
+        let _target = AnyLinkableHash::from(fake_entry_hash());
         let tag = LinkTag(tag_bytes);
-        let action = fake_create();
+        let _action = fake_create();
         // We call the same logic that the validate() function dispatches to.
         // Since we can't easily construct a full Op in unit tests, we inline
         // the match logic from the RegisterCreateLink arm.
