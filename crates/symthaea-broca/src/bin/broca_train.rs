@@ -101,6 +101,9 @@ fn main() {
         warmup_fraction: 0.1,
         patience: opts.patience,
         enable_diagnostics: opts.diagnostics,
+        train_network: opts.train_network,
+        network_lr_scale: opts.network_lr_scale,
+        embedding_target_norm: opts.embedding_target_norm,
     };
 
     tracing::info!(
@@ -109,6 +112,9 @@ fn main() {
         bptt_window = opts.bptt_window,
         patience = opts.patience,
         use_adam = true,
+        train_network = opts.train_network,
+        network_lr_scale = opts.network_lr_scale,
+        embedding_norm = opts.embedding_target_norm,
         diagnostics = opts.diagnostics,
         "Starting training"
     );
@@ -197,9 +203,7 @@ fn main() {
             let intent = (0..8)
                 .max_by(|&a, &b| channels.channels[a].total_cmp(&channels.channels[b]))
                 .unwrap_or(7);
-            let intent_names = [
-                "Ack", "Ans", "Clr", "Pro", "Unc", "Ref", "Con", "Unk",
-            ];
+            let intent_names = ["Ack", "Ans", "Clr", "Pro", "Unc", "Ref", "Con", "Unk"];
             println!(
                 "[{:>3}] intent={} psi={:.1} | {:>3} tok | \"{}\"",
                 i,
@@ -228,6 +232,12 @@ struct TrainOpts {
     generate_curriculum: Option<String>,
     /// After training, generate sample text from N random thoughts.
     sample_count: usize,
+    /// Train CfC network weights via BPTT (default: true).
+    train_network: bool,
+    /// CfC network LR scale relative to embedding LR (default: 0.3).
+    network_lr_scale: f32,
+    /// Target embedding L2 norm, 0 = disabled (default: 128.0).
+    embedding_target_norm: f32,
 }
 
 fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
@@ -245,6 +255,9 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
         genesis_phrase: "broca-training-default".to_string(),
         generate_curriculum: None,
         sample_count: 0,
+        train_network: true,
+        network_lr_scale: 0.3,
+        embedding_target_norm: 128.0,
     };
 
     let mut i = 1;
@@ -326,6 +339,25 @@ fn parse_args(args: &[String]) -> Result<TrainOpts, String> {
                     .parse()
                     .map_err(|_| "--samples must be a non-negative integer")?;
             }
+            "--no-network-train" => {
+                opts.train_network = false;
+            }
+            "--network-lr-scale" => {
+                i += 1;
+                opts.network_lr_scale = args
+                    .get(i)
+                    .ok_or("--network-lr-scale requires a number")?
+                    .parse()
+                    .map_err(|_| "--network-lr-scale must be a float")?;
+            }
+            "--embedding-norm" => {
+                i += 1;
+                opts.embedding_target_norm = args
+                    .get(i)
+                    .ok_or("--embedding-norm requires a number")?
+                    .parse()
+                    .map_err(|_| "--embedding-norm must be a float (0 to disable)")?;
+            }
             "--help" | "-h" => {
                 print_usage();
                 process::exit(0);
@@ -361,5 +393,8 @@ fn print_usage() {
     eprintln!("  --genesis PHRASE     Genesis seed phrase (default: broca-training-default)");
     eprintln!("  --curriculum PATH    Generate curriculum JSONL (1800 diverse pairs) and exit");
     eprintln!("  --samples N          Generate N sample outputs after training");
+    eprintln!("  --no-network-train   Only train embeddings, not CfC network weights");
+    eprintln!("  --network-lr-scale F CfC network LR scale (default: 0.3)");
+    eprintln!("  --embedding-norm F   Target embedding L2 norm, 0=off (default: 128.0)");
     eprintln!("  --help, -h           Show this help message");
 }

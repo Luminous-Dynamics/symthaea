@@ -1190,7 +1190,10 @@ mod tests {
         assert_eq!(app.causal_links[0].relationship, "causal");
         assert_eq!(app.causal_links[1].from, "myapp.service");
         assert_eq!(app.causal_links[1].relationship, "anomaly");
-        assert_eq!(app.causal_links[1].suggestion.as_deref(), Some("Restart myapp"));
+        assert_eq!(
+            app.causal_links[1].suggestion.as_deref(),
+            Some("Restart myapp")
+        );
     }
 
     #[test]

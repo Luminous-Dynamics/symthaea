@@ -326,4 +326,95 @@ mod tests {
         // but at least the mechanism works
         assert!(mem.len() == 10);
     }
+
+    #[test]
+    fn test_retrieve_by_action_matches() {
+        let mut mem = NixEpisodicMemory::new();
+        mem.record(make_episode(1, EpisodeOutcome::Success, 0.5));
+        mem.record(make_episode(2, EpisodeOutcome::Success, 0.5));
+        mem.record(make_episode(10, EpisodeOutcome::Success, 0.5));
+
+        // "action_1" should match exactly one
+        let results = mem.retrieve_by_action("action_1");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].action, "action_1");
+    }
+
+    #[test]
+    fn test_retrieve_by_action_partial_match() {
+        let mut mem = NixEpisodicMemory::new();
+        mem.record(make_episode(1, EpisodeOutcome::Success, 0.5));
+        mem.record(make_episode(2, EpisodeOutcome::Success, 0.5));
+
+        // "action_" matches all (common prefix)
+        let results = mem.retrieve_by_action("action_");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_retrieve_by_action_no_match() {
+        let mut mem = NixEpisodicMemory::new();
+        mem.record(make_episode(1, EpisodeOutcome::Success, 0.5));
+
+        let results = mem.retrieve_by_action("nonexistent");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_retrieve_by_action_empty_memory() {
+        let mem = NixEpisodicMemory::new();
+        let results = mem.retrieve_by_action("action_1");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_consolidation_keeps_important() {
+        let mut mem = NixEpisodicMemory {
+            episodes: Vec::new(),
+            phi_threshold: 0.1,
+            max_episodes: 3,
+        };
+
+        // Add 5 episodes with varying importance (prediction_error * phi)
+        for i in 0..5 {
+            let mut ep = make_episode(i, EpisodeOutcome::Success, 0.5);
+            ep.prediction_error = (i + 1) as f64 * 0.2; // higher i = more surprising
+            mem.record(ep);
+        }
+
+        // Should have been consolidated to 3
+        assert_eq!(mem.len(), 3);
+        // Remaining should be the 3 most important (highest prediction_error * phi)
+        for ep in &mem.episodes {
+            assert!(
+                ep.prediction_error >= 0.6,
+                "Low-importance episodes should have been evicted, got pe={:.1}",
+                ep.prediction_error
+            );
+        }
+    }
+
+    #[test]
+    fn test_episode_outcome_variants() {
+        let mut mem = NixEpisodicMemory::new();
+        mem.record(make_episode(1, EpisodeOutcome::Success, 0.5));
+        mem.record(make_episode(
+            2,
+            EpisodeOutcome::PartialSuccess("mostly worked".into()),
+            0.5,
+        ));
+        mem.record(make_episode(
+            3,
+            EpisodeOutcome::RolledBack("reverted".into()),
+            0.5,
+        ));
+        mem.record(make_episode(
+            4,
+            EpisodeOutcome::Failure("crashed".into()),
+            0.5,
+        ));
+
+        assert_eq!(mem.len(), 4);
+        assert_eq!(mem.failure_count(), 1);
+    }
 }

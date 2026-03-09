@@ -55,10 +55,7 @@ fn integrity_telemetry_populated_after_cycles() {
         integrity.canaries_passed,
         "canaries should pass with no tampering"
     );
-    assert!(
-        !integrity.has_critical,
-        "no critical anomalies expected"
-    );
+    assert!(!integrity.has_critical, "no critical anomalies expected");
 }
 
 #[test]

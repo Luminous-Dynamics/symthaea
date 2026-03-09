@@ -381,10 +381,8 @@ mod tests {
 
     #[test]
     fn test_extract_inputs_empty_root_inputs() {
-        let value: serde_json::Value = serde_json::from_str(
-            r#"{"locks": {"nodes": {"root": {"inputs": {}}}}}"#,
-        )
-        .unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(r#"{"locks": {"nodes": {"root": {"inputs": {}}}}}"#).unwrap();
         let inputs = FlakeRegistry::extract_inputs_from_locks(&value);
         assert!(inputs.is_empty());
     }

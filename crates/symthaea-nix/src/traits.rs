@@ -431,3 +431,195 @@ impl CausalDiscoveryEngine {
         (direction, confidence)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── ParsedCode & CodeEntity ──
+
+    #[test]
+    fn test_parsed_code_entities_of_kind() {
+        let mut code = ParsedCode::new("let x = 1;", "nix");
+        code.entities.push(CodeEntity::new(
+            EntityKind::Variable,
+            "x",
+            Span::default(),
+        ));
+        code.entities.push(CodeEntity::new(
+            EntityKind::Function,
+            "foo",
+            Span::default(),
+        ));
+        code.entities.push(CodeEntity::new(
+            EntityKind::Variable,
+            "y",
+            Span::default(),
+        ));
+        let vars = code.entities_of_kind(EntityKind::Variable);
+        assert_eq!(vars.len(), 2);
+        assert_eq!(vars[0].name, "x");
+        assert_eq!(vars[1].name, "y");
+    }
+
+    #[test]
+    fn test_code_entity_builders() {
+        let entity = CodeEntity::new(EntityKind::Function, "main", Span::default())
+            .with_source("fn main() {}".to_string())
+            .with_annotation("visibility", "pub");
+        assert_eq!(entity.source_text, Some("fn main() {}".to_string()));
+        assert_eq!(entity.annotations.get("visibility").unwrap(), "pub");
+    }
+
+    // ── Entity ──
+
+    #[test]
+    fn test_entity_builder() {
+        let entity = Entity::new("service", "nginx", 0, 5)
+            .with_confidence(0.9)
+            .with_metadata("type", "web");
+        assert_eq!(entity.entity_type, "service");
+        assert_eq!(entity.value, "nginx");
+        assert!((entity.confidence - 0.9).abs() < 1e-6);
+        assert_eq!(entity.metadata.get("type").unwrap(), "web");
+    }
+
+    // ── ValidationResult ──
+
+    #[test]
+    fn test_validation_result_valid() {
+        let v = ValidationResult::valid();
+        assert!(v.valid);
+        assert!(v.errors.is_empty());
+        assert!(v.warnings.is_empty());
+    }
+
+    #[test]
+    fn test_validation_result_invalid() {
+        let v = ValidationResult::invalid(vec!["bad input".to_string()]);
+        assert!(!v.valid);
+        assert_eq!(v.errors.len(), 1);
+        assert_eq!(v.errors[0], "bad input");
+    }
+
+    // ── ConsciousnessThresholds ──
+
+    #[test]
+    fn test_consciousness_thresholds_default() {
+        let t = ConsciousnessThresholds::default();
+        assert!((t.basic_query - 0.2).abs() < 1e-6);
+        assert!((t.state_modifying - 0.3).abs() < 1e-6);
+        assert!((t.system_critical - 0.4).abs() < 1e-6);
+        assert!((t.irreversible - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_threshold_for_action_types() {
+        let t = ConsciousnessThresholds::default();
+        assert!((t.threshold_for(ActionType::BasicQuery) - 0.2).abs() < 1e-6);
+        assert!((t.threshold_for(ActionType::Irreversible) - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_allows_action() {
+        let t = ConsciousnessThresholds::default();
+        // Phi 0.5 allows basic and state-modifying, but not irreversible
+        assert!(t.allows_action(ActionType::BasicQuery, 0.5));
+        assert!(t.allows_action(ActionType::StateModifying, 0.5));
+        assert!(t.allows_action(ActionType::SystemCritical, 0.5));
+        assert!(!t.allows_action(ActionType::Irreversible, 0.5));
+        // Phi 0.6 allows everything
+        assert!(t.allows_action(ActionType::Irreversible, 0.6));
+        // Phi 0.0 allows nothing
+        assert!(!t.allows_action(ActionType::BasicQuery, 0.0));
+    }
+
+    // ── PhiAwareScoring ──
+
+    #[test]
+    fn test_confidence_level_high() {
+        let level = PhiAwareScoring::confidence_level(0.8);
+        assert!(matches!(level, ConfidenceLevel::High { .. }));
+        assert!(level.recommendation().contains("confidence"));
+    }
+
+    #[test]
+    fn test_confidence_level_medium() {
+        let level = PhiAwareScoring::confidence_level(0.5);
+        assert!(matches!(level, ConfidenceLevel::Medium { .. }));
+        assert!(level.recommendation().contains("caution"));
+    }
+
+    #[test]
+    fn test_confidence_level_low() {
+        let level = PhiAwareScoring::confidence_level(0.3);
+        assert!(matches!(level, ConfidenceLevel::Low { .. }));
+        assert!(level.recommendation().contains("confirmation"));
+    }
+
+    #[test]
+    fn test_confidence_level_very_low() {
+        let level = PhiAwareScoring::confidence_level(0.1);
+        assert!(matches!(level, ConfidenceLevel::VeryLow { .. }));
+        assert!(level.recommendation().contains("explicit"));
+    }
+
+    #[test]
+    fn test_confidence_level_boundaries() {
+        // Exact boundaries
+        assert!(matches!(
+            PhiAwareScoring::confidence_level(0.6),
+            ConfidenceLevel::High { .. }
+        ));
+        assert!(matches!(
+            PhiAwareScoring::confidence_level(0.4),
+            ConfidenceLevel::Medium { .. }
+        ));
+        assert!(matches!(
+            PhiAwareScoring::confidence_level(0.2),
+            ConfidenceLevel::Low { .. }
+        ));
+        assert!(matches!(
+            PhiAwareScoring::confidence_level(0.0),
+            ConfidenceLevel::VeryLow { .. }
+        ));
+    }
+
+    // ── CausalDiscoveryEngine ──
+
+    #[test]
+    fn test_causal_engine_short_series() {
+        let mut engine = CausalDiscoveryEngine::new(42);
+        let (dir, conf) = engine.predict_with_confidence(&[1.0], &[2.0]);
+        assert_eq!(dir, CausalDirection::Forward);
+        assert!((conf - 0.5).abs() < 1e-6, "Short series should return 0.5");
+    }
+
+    #[test]
+    fn test_causal_engine_correlated() {
+        let mut engine = CausalDiscoveryEngine::new(42);
+        let x: Vec<f64> = (0..20).map(|i| i as f64).collect();
+        let y: Vec<f64> = (0..20).map(|i| i as f64 * 2.0).collect();
+        let (dir, conf) = engine.predict_with_confidence(&x, &y);
+        assert_eq!(dir, CausalDirection::Forward);
+        assert!(conf > 0.0, "Correlated series should have positive confidence");
+        assert!(conf <= 1.0);
+    }
+
+    #[test]
+    fn test_causal_engine_anticorrelated() {
+        let mut engine = CausalDiscoveryEngine::new(42);
+        let x: Vec<f64> = (0..20).map(|i| i as f64).collect();
+        let y: Vec<f64> = (0..20).map(|i| -(i as f64)).collect();
+        let (dir, _conf) = engine.predict_with_confidence(&x, &y);
+        assert_eq!(dir, CausalDirection::Backward);
+    }
+
+    #[test]
+    fn test_causal_engine_empty() {
+        let mut engine = CausalDiscoveryEngine::new(42);
+        let (dir, conf) = engine.predict_with_confidence(&[], &[]);
+        assert_eq!(dir, CausalDirection::Forward);
+        assert!((conf - 0.5).abs() < 1e-6);
+    }
+}

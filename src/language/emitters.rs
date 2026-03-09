@@ -1028,9 +1028,7 @@ fn compose_patterns(
             || purpose.contains("smallest")
             || purpose.contains("nth")
             || purpose.contains("kth"))
-        && (purpose.contains("sort")
-            || purpose.contains("element")
-            || purpose.contains("find the"))
+        && (purpose.contains("sort") || purpose.contains("element") || purpose.contains("find the"))
     {
         let n = extract_number_from_text(purpose).unwrap_or(1);
         if purpose.contains("smallest") {
@@ -3181,8 +3179,14 @@ mod tests {
         let props = generate_property_tests("sort", "sort a vector", Some(&sig));
         assert!(!props.is_empty(), "sort should generate property tests");
         let joined = props.join("\n");
-        assert!(joined.contains("idempotent"), "sort should test idempotency");
-        assert!(joined.contains("preserve length"), "sort should test length");
+        assert!(
+            joined.contains("idempotent"),
+            "sort should test idempotency"
+        );
+        assert!(
+            joined.contains("preserve length"),
+            "sort should test length"
+        );
     }
 
     #[test]
@@ -3190,7 +3194,10 @@ mod tests {
         let sig = parse_rust_signature("fn reverse(s: &str) -> String").unwrap();
         let props = generate_property_tests("reverse", "reverse a string", Some(&sig));
         assert!(!props.is_empty(), "reverse should generate property tests");
-        assert!(props.join("\n").contains("involution"), "reverse should test involution");
+        assert!(
+            props.join("\n").contains("involution"),
+            "reverse should test involution"
+        );
     }
 
     #[test]
@@ -3199,8 +3206,14 @@ mod tests {
         let props = generate_property_tests("add", "add two numbers", Some(&sig));
         assert!(!props.is_empty(), "add should generate property tests");
         let joined = props.join("\n");
-        assert!(joined.contains("commutative"), "add should test commutativity");
-        assert!(joined.contains("additive identity"), "add should test identity");
+        assert!(
+            joined.contains("commutative"),
+            "add should test commutativity"
+        );
+        assert!(
+            joined.contains("additive identity"),
+            "add should test identity"
+        );
     }
 
     #[test]
@@ -3208,7 +3221,10 @@ mod tests {
         let sig = parse_rust_signature("fn filter_pos(v: Vec<i32>) -> Vec<i32>").unwrap();
         let props = generate_property_tests("filter_pos", "filter positive numbers", Some(&sig));
         assert!(!props.is_empty(), "filter should generate property tests");
-        assert!(props.join("\n").contains("not increase length"), "filter should test size");
+        assert!(
+            props.join("\n").contains("not increase length"),
+            "filter should test size"
+        );
     }
 
     #[test]
@@ -3217,7 +3233,10 @@ mod tests {
         let props = generate_property_tests("abs", "absolute value", Some(&sig));
         assert!(!props.is_empty(), "abs should generate property tests");
         let joined = props.join("\n");
-        assert!(joined.contains("non-negative"), "abs should test non-negativity");
+        assert!(
+            joined.contains("non-negative"),
+            "abs should test non-negativity"
+        );
         assert!(joined.contains("|x| == |-x|"), "abs should test symmetry");
     }
 
@@ -3225,7 +3244,10 @@ mod tests {
     fn test_property_no_properties_for_unknown() {
         let sig = parse_rust_signature("fn mystery(x: i32) -> i32").unwrap();
         let props = generate_property_tests("mystery", "do something mysterious", Some(&sig));
-        assert!(props.is_empty(), "unknown purpose should generate no property tests");
+        assert!(
+            props.is_empty(),
+            "unknown purpose should generate no property tests"
+        );
     }
 
     // ── Pattern composition tests ──
@@ -3236,19 +3258,39 @@ mod tests {
         let spec = CodeSpec::new("rust", "freq", "Count frequency of each element")
             .with_signature("fn freq(items: Vec<i32>) -> std::collections::HashMap<i32, usize>");
         let result = emitter.emit_from_spec(&spec, &make_plan());
-        assert!(result.contains("HashMap::new()"), "Should use HashMap: {}", result);
-        assert!(result.contains("or_insert"), "Should use or_insert: {}", result);
-        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+        assert!(
+            result.contains("HashMap::new()"),
+            "Should use HashMap: {}",
+            result
+        );
+        assert!(
+            result.contains("or_insert"),
+            "Should use or_insert: {}",
+            result
+        );
+        assert!(
+            !result.contains("todo!"),
+            "Should not have todo: {}",
+            result
+        );
     }
 
     #[test]
     fn test_compose_sort_nth_largest() {
         let emitter = RustEmitter;
-        let spec = CodeSpec::new("rust", "third_largest", "Find the 3rd largest element by sort")
-            .with_signature("fn third_largest(nums: Vec<i32>) -> i32");
+        let spec = CodeSpec::new(
+            "rust",
+            "third_largest",
+            "Find the 3rd largest element by sort",
+        )
+        .with_signature("fn third_largest(nums: Vec<i32>) -> i32");
         let result = emitter.emit_from_spec(&spec, &make_plan());
         assert!(result.contains("sorted.sort()"), "Should sort: {}", result);
-        assert!(result.contains("sorted.len() - 3"), "Should index from end: {}", result);
+        assert!(
+            result.contains("sorted.len() - 3"),
+            "Should index from end: {}",
+            result
+        );
     }
 
     #[test]
@@ -3277,9 +3319,21 @@ mod tests {
         let spec = CodeSpec::new("rust", "all_pairs", "Find all pairs from a vector")
             .with_signature("fn all_pairs(nums: Vec<i32>) -> Vec<(i32, i32)>");
         let result = emitter.emit_from_spec(&spec, &make_plan());
-        assert!(result.contains("for i in"), "Should have outer loop: {}", result);
-        assert!(result.contains("for j in"), "Should have inner loop: {}", result);
-        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+        assert!(
+            result.contains("for i in"),
+            "Should have outer loop: {}",
+            result
+        );
+        assert!(
+            result.contains("for j in"),
+            "Should have inner loop: {}",
+            result
+        );
+        assert!(
+            !result.contains("todo!"),
+            "Should not have todo: {}",
+            result
+        );
     }
 
     #[test]
@@ -3288,8 +3342,20 @@ mod tests {
         let spec = CodeSpec::new("rust", "cartesian", "Cartesian product of two vectors")
             .with_signature("fn cartesian(a: Vec<i32>, b: Vec<i32>) -> Vec<(i32, i32)>");
         let result = emitter.emit_from_spec(&spec, &make_plan());
-        assert!(result.contains("for a in"), "Should iterate first vec: {}", result);
-        assert!(result.contains("for b in"), "Should iterate second vec: {}", result);
-        assert!(!result.contains("todo!"), "Should not have todo: {}", result);
+        assert!(
+            result.contains("for a in"),
+            "Should iterate first vec: {}",
+            result
+        );
+        assert!(
+            result.contains("for b in"),
+            "Should iterate second vec: {}",
+            result
+        );
+        assert!(
+            !result.contains("todo!"),
+            "Should not have todo: {}",
+            result
+        );
     }
 }

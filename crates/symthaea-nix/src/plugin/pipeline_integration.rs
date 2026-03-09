@@ -765,8 +765,7 @@ mod tests {
         }
 
         {
-            let proc =
-                NixPipelineProcessor::new().with_checkpoint_path(checkpoint_path.clone());
+            let proc = NixPipelineProcessor::new().with_checkpoint_path(checkpoint_path.clone());
             let edges_after_reload = proc.causal_graph().edge_count();
             assert!(
                 edges_after_reload >= edges_after_learning,

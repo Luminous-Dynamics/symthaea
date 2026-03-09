@@ -65,17 +65,12 @@ impl GardenPathBenchmark {
         )
         .normalize();
         // VERB = DO/HAPPEN (action or process)
-        let role_verb = ContinuousHV::weighted_bundle(
-            &[&prime_do, &prime_happen],
-            &[0.6, 0.4],
-        )
-        .normalize();
+        let role_verb =
+            ContinuousHV::weighted_bundle(&[&prime_do, &prime_happen], &[0.6, 0.4]).normalize();
         // PATIENT = SOMETHING that something HAPPENS to
-        let role_patient = ContinuousHV::weighted_bundle(
-            &[&prime_something, &prime_happen],
-            &[0.5, 0.5],
-        )
-        .normalize();
+        let role_patient =
+            ContinuousHV::weighted_bundle(&[&prime_something, &prime_happen], &[0.5, 0.5])
+                .normalize();
         // MODIFIER = LIKE/BECAUSE (descriptive/causal adjunct)
         let role_modifier = ContinuousHV::weighted_bundle(
             &[&prime_like, &prime_because, &prime_something],

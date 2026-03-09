@@ -275,4 +275,130 @@ mod tests {
 
         assert!(statement.confidence > question.confidence);
     }
+
+    #[test]
+    fn test_infer_from_hv_basic() {
+        let mut gi = GoalInference::new();
+        let hv = ContinuousHV::random(1024, 42);
+
+        let goal = gi.infer_from_hv(hv, "pre-encoded goal");
+        assert!((goal.confidence - 0.5).abs() < 1e-6, "infer_from_hv always returns 0.5 confidence");
+        assert_eq!(goal.description, "pre-encoded goal");
+        assert!(!goal.needs_clarification, "0.5 confidence should not need clarification");
+        assert!(goal.goal_state.norm() > 0.0);
+    }
+
+    #[test]
+    fn test_infer_from_hv_context_blending() {
+        let mut gi = GoalInference::new();
+        let hv1 = ContinuousHV::random(1024, 1);
+        let hv2 = ContinuousHV::random(1024, 2);
+
+        // First call populates working memory
+        let goal1 = gi.infer_from_hv(hv1.clone(), "first");
+        assert_eq!(gi.working_memory().len(), 1);
+
+        // Second call should blend with context from first
+        let goal2 = gi.infer_from_hv(hv2.clone(), "second");
+        assert_eq!(gi.working_memory().len(), 2);
+
+        // goal2 should differ from raw hv2 due to context blending
+        let sim_to_raw = goal2.goal_state.similarity(&hv2);
+        // With context blending, it won't be identical to the raw input
+        assert!(sim_to_raw.is_finite());
+    }
+
+    #[test]
+    fn test_infer_from_hv_empty_context() {
+        let mut gi = GoalInference::new();
+        assert!(gi.working_memory().is_empty());
+
+        // With empty working memory, context_vector().norm() should be ~0,
+        // so infer_from_hv should return the raw input vector
+        let hv = ContinuousHV::random(1024, 99);
+        let goal = gi.infer_from_hv(hv.clone(), "solo");
+
+        let sim = goal.goal_state.similarity(&hv);
+        // First call: context is just the input itself after push, so
+        // blending input + context (which includes input) should be close
+        assert!(sim > 0.5, "First infer_from_hv should stay close to input, got sim={sim}");
+    }
+
+    #[test]
+    fn test_current_goal_tracks_context() {
+        let mut gi = GoalInference::new();
+        let mut cb = NixCodebook::new();
+
+        // Initially no context
+        let initial = gi.current_goal();
+        assert!(initial.norm() < 1e-6, "Empty context should have near-zero norm");
+
+        // After inference, context should be non-zero
+        gi.infer("install firefox", &mut cb);
+        let after = gi.current_goal();
+        assert!(after.norm() > 0.0);
+    }
+
+    #[test]
+    fn test_estimate_confidence_branches() {
+        let mut gi = GoalInference::new();
+        let mut cb = NixCodebook::new();
+
+        // Single word → 0.3
+        let single = gi.infer("help", &mut cb);
+        assert!((single.confidence - 0.3).abs() < 1e-6);
+        gi.reset();
+
+        // Question → 0.4
+        let question = gi.infer("what is this?", &mut cb);
+        assert!((question.confidence - 0.4).abs() < 1e-6);
+        gi.reset();
+
+        // Action word + 2+ words → 0.8
+        let action = gi.infer("install firefox browser", &mut cb);
+        assert!((action.confidence - 0.8).abs() < 1e-6);
+        gi.reset();
+
+        // 3+ words, no action word → 0.5
+        let verbose = gi.infer("my system is slow", &mut cb);
+        assert!((verbose.confidence - 0.5).abs() < 1e-6);
+        gi.reset();
+
+        // 2 words, no action → 0.4
+        let two_words = gi.infer("system slow", &mut cb);
+        assert!((two_words.confidence - 0.4).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_describe_goal_branches() {
+        let mut gi = GoalInference::new();
+        let mut cb = NixCodebook::new();
+
+        let install = gi.infer("install firefox", &mut cb);
+        assert!(install.description.contains("Install"));
+        gi.reset();
+
+        let remove = gi.infer("remove firefox", &mut cb);
+        assert!(remove.description.contains("Remove"));
+        gi.reset();
+
+        let enable = gi.infer("enable nginx", &mut cb);
+        assert!(enable.description.contains("Enable"));
+        gi.reset();
+
+        let diag = gi.infer("why did it fail", &mut cb);
+        assert_eq!(diag.description, "Diagnose system issue");
+        gi.reset();
+
+        let opt = gi.infer("make it faster", &mut cb);
+        assert_eq!(opt.description, "Optimize system performance");
+        gi.reset();
+
+        let rebuild = gi.infer("rebuild the system", &mut cb);
+        assert_eq!(rebuild.description, "Apply system configuration");
+        gi.reset();
+
+        let other = gi.infer("hello world foo", &mut cb);
+        assert!(other.description.starts_with("Process:"));
+    }
 }

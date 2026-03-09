@@ -332,7 +332,7 @@ impl MoralAnomalyConfig {
 /// Uses Welford's online algorithm for numerically stable mean/variance.
 /// The system "learns" what drift and FE levels are normal and adjusts
 /// thresholds to `mean + sigma_factor * std_dev`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdaptiveAnomalyState {
     /// EMA of observed moral drift values.
     drift_ema: f64,
@@ -548,10 +548,12 @@ pub struct MoralTopology {
     convergence_baseline_count: usize,
     /// Cached last convergence report (for telemetry).
     last_convergence_report: TrajectoryConvergenceReport,
+    /// Registry of known hazard signature templates for convergence boosting.
+    hazard_registry: HazardSignatureRegistry,
 }
 
 /// A single point on the moral manifold trajectory.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MoralTrajectoryPoint {
     /// 8D harmony coordinates at this point.
     pub coordinates: [f64; N_HARMONIES],
@@ -603,6 +605,8 @@ pub struct MoralAnomalyReport {
     /// similarity_anomaly, entropy_decline, flourishing_deficit.
     /// 0.0 = no convergence; 1.0 = all three signals maximally triggered.
     pub convergence_severity: f64,
+    /// Name of matched hazard signature template (e.g. "weaponization"), if any.
+    pub matched_hazard: Option<String>,
     /// Composite anomaly score in \[0.0, 1.0\].
     pub anomaly_score: f64,
 }
@@ -633,6 +637,8 @@ pub struct TrajectoryConvergenceReport {
     pub convergence_detected: bool,
     /// Convergence severity in \[0.0, 1.0\].
     pub severity: f64,
+    /// Name of matched hazard signature template (if any).
+    pub matched_hazard: Option<String>,
 }
 
 impl MoralTopology {
@@ -661,6 +667,7 @@ impl MoralTopology {
             baseline_flourishing_ema: 0.0,
             convergence_baseline_count: 0,
             last_convergence_report: TrajectoryConvergenceReport::default(),
+            hazard_registry: HazardSignatureRegistry::with_defaults(),
         }
     }
 
@@ -692,6 +699,7 @@ impl MoralTopology {
             baseline_flourishing_ema: 0.0,
             convergence_baseline_count: 0,
             last_convergence_report: TrajectoryConvergenceReport::default(),
+            hazard_registry: HazardSignatureRegistry::with_defaults(),
         }
     }
 
@@ -767,6 +775,11 @@ impl MoralTopology {
     }
 
     /// Access cached persistent features from last `analyze()` call.
+    /// Access the hazard signature registry (for adding custom signatures).
+    pub fn hazard_registry_mut(&mut self) -> &mut HazardSignatureRegistry {
+        &mut self.hazard_registry
+    }
+
     pub fn last_persistent_features(&self) -> &[PersistentFeature] {
         &self.last_persistent_features
     }
@@ -979,7 +992,28 @@ impl MoralTopology {
         .clamp(0.0, 1.0);
         let fl_severity =
             (flourishing_deficit / ac.convergence_flourishing_floor.max(1e-9)).clamp(0.0, 1.0);
-        let severity = ((sim_severity + ent_severity + fl_severity) / 3.0).clamp(0.0, 1.0);
+        let mut severity = ((sim_severity + ent_severity + fl_severity) / 3.0).clamp(0.0, 1.0);
+
+        // Hazard signature matching: boost severity when trajectory matches known pattern
+        let matched_hazard = if convergence_detected && !recent_traj.is_empty() {
+            let n_f = recent_traj.len() as f64;
+            let mut centroid = [0.0f64; N_HARMONIES];
+            for p in &recent_traj {
+                for i in 0..N_HARMONIES {
+                    centroid[i] += p.coordinates[i];
+                }
+            }
+            for c in &mut centroid {
+                *c /= n_f;
+            }
+            let (name, boost) = self.hazard_registry.match_trajectory(&centroid);
+            if boost > 0.0 {
+                severity = (severity + boost).min(1.0);
+            }
+            name.map(String::from)
+        } else {
+            None
+        };
 
         let report = TrajectoryConvergenceReport {
             recent_similarity,
@@ -992,6 +1026,7 @@ impl MoralTopology {
             baseline_flourishing,
             convergence_detected,
             severity,
+            matched_hazard,
         };
         self.last_convergence_report = report.clone();
         report
@@ -1089,6 +1124,7 @@ impl MoralTopology {
             drift_alert,
             trajectory_convergence,
             convergence_severity,
+            matched_hazard: convergence_report.matched_hazard.clone(),
             anomaly_score,
         }
     }
@@ -1596,6 +1632,276 @@ impl PersistenceDiagram {
             bottleneck_distance,
             total_persistence,
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Cross-Session Persistence
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Serializable snapshot of moral topology state for cross-session persistence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoralTopologySnapshot {
+    pub trajectory: Vec<MoralTrajectoryPoint>,
+    pub harmony_prior: [f64; N_HARMONIES],
+    pub prior_count: usize,
+    pub baseline_similarity_ema: f64,
+    pub baseline_entropy_ema: f64,
+    pub baseline_flourishing_ema: f64,
+    pub convergence_baseline_count: usize,
+    pub adaptive_state: AdaptiveAnomalyState,
+    pub last_summary: MoralTopologySummary,
+    pub prev_summary: MoralTopologySummary,
+}
+
+impl MoralTopology {
+    /// Snapshot current state for cross-session persistence.
+    pub fn snapshot(&self) -> MoralTopologySnapshot {
+        MoralTopologySnapshot {
+            trajectory: self.trajectory.iter().cloned().collect(),
+            harmony_prior: self.harmony_prior,
+            prior_count: self.prior_count,
+            baseline_similarity_ema: self.baseline_similarity_ema,
+            baseline_entropy_ema: self.baseline_entropy_ema,
+            baseline_flourishing_ema: self.baseline_flourishing_ema,
+            convergence_baseline_count: self.convergence_baseline_count,
+            adaptive_state: self.adaptive_state.clone(),
+            last_summary: self.last_summary.clone(),
+            prev_summary: self.prev_summary.clone(),
+        }
+    }
+
+    /// Restore state from a cross-session snapshot.
+    pub fn restore(&mut self, snap: &MoralTopologySnapshot) {
+        self.trajectory = snap.trajectory.iter().cloned().collect();
+        self.harmony_prior = snap.harmony_prior;
+        self.prior_count = snap.prior_count;
+        self.baseline_similarity_ema = snap.baseline_similarity_ema;
+        self.baseline_entropy_ema = snap.baseline_entropy_ema;
+        self.baseline_flourishing_ema = snap.baseline_flourishing_ema;
+        self.convergence_baseline_count = snap.convergence_baseline_count;
+        self.adaptive_state = snap.adaptive_state.clone();
+        self.last_summary = snap.last_summary.clone();
+        self.prev_summary = snap.prev_summary.clone();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Hazard Signature Templates
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// A known hazardous convergence pattern in 8D harmony space.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HazardSignature {
+    pub name: String,
+    pub centroid: [f64; N_HARMONIES],
+    pub radius: f64,
+    pub severity_boost: f64,
+}
+
+/// Registry of known hazard signature templates.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HazardSignatureRegistry {
+    signatures: Vec<HazardSignature>,
+}
+
+impl HazardSignatureRegistry {
+    /// Create a registry with built-in hazard templates.
+    pub fn with_defaults() -> Self {
+        Self {
+            signatures: vec![
+                HazardSignature {
+                    name: "weaponization".into(),
+                    centroid: [0.2, -0.6, -0.5, -0.2, -0.5, -0.1, 0.1, 0.0],
+                    radius: 0.6,
+                    severity_boost: 0.3,
+                },
+                HazardSignature {
+                    name: "coercive_control".into(),
+                    centroid: [0.0, -0.2, 0.0, -0.5, -0.7, 0.3, -0.6, 0.0],
+                    radius: 0.5,
+                    severity_boost: 0.25,
+                },
+                HazardSignature {
+                    name: "ecological_destruction".into(),
+                    centroid: [-0.5, -0.3, -0.7, 0.2, 0.0, -0.3, -0.1, 0.0],
+                    radius: 0.55,
+                    severity_boost: 0.2,
+                },
+                HazardSignature {
+                    name: "surveillance_state".into(),
+                    centroid: [0.1, -0.1, 0.1, -0.3, -0.6, 0.5, -0.7, 0.0],
+                    radius: 0.5,
+                    severity_boost: 0.25,
+                },
+            ],
+        }
+    }
+
+    /// Add a custom hazard signature.
+    pub fn add(&mut self, sig: HazardSignature) {
+        self.signatures.push(sig);
+    }
+
+    /// Check if a trajectory centroid matches any hazard template.
+    pub fn match_trajectory(&self, centroid: &[f64; N_HARMONIES]) -> (Option<&str>, f64) {
+        let mut best_name: Option<&str> = None;
+        let mut best_boost = 0.0_f64;
+        for sig in &self.signatures {
+            let dist_sq: f64 = centroid
+                .iter()
+                .zip(sig.centroid.iter())
+                .map(|(a, b)| (a - b) * (a - b))
+                .sum();
+            let dist = dist_sq.sqrt();
+            if dist <= sig.radius && sig.severity_boost > best_boost {
+                best_name = Some(&sig.name);
+                best_boost = sig.severity_boost;
+            }
+        }
+        (best_name, best_boost)
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Threshold Calibration Harness
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// A labeled scenario set for threshold calibration.
+#[derive(Debug, Clone)]
+pub struct CalibrationScenario {
+    pub scenarios: Vec<ContinuousHV>,
+    pub is_adversarial: bool,
+    pub label: String,
+}
+
+/// ROC point at a given threshold.
+#[derive(Debug, Clone, Serialize)]
+pub struct RocPoint {
+    pub threshold: f64,
+    pub true_positive_rate: f64,
+    pub false_positive_rate: f64,
+    pub precision: f64,
+    pub f1: f64,
+}
+
+/// Result of a calibration sweep.
+#[derive(Debug, Clone, Serialize)]
+pub struct CalibrationResult {
+    pub roc_curve: Vec<RocPoint>,
+    pub auc: f64,
+    pub best_f1_threshold: f64,
+    pub best_f1: f64,
+}
+
+/// Sweep convergence thresholds to find optimal operating point.
+pub fn calibrate_convergence_threshold(
+    scenarios: &[CalibrationScenario],
+    thresholds: &[f64],
+    dim: usize,
+    base_config: &MoralAnomalyConfig,
+) -> CalibrationResult {
+    let total_positive = scenarios.iter().filter(|s| s.is_adversarial).count();
+    let total_negative = scenarios.len() - total_positive;
+    let mut roc_curve = Vec::with_capacity(thresholds.len());
+
+    for &threshold in thresholds {
+        let mut config = base_config.clone();
+        config.convergence_similarity_threshold = threshold;
+        let mut true_pos = 0usize;
+        let mut false_pos = 0usize;
+
+        for scenario in scenarios {
+            let basis = Arc::new(HarmonyBasis::new(dim));
+            let mut topo = MoralTopology::with_anomaly_config(
+                MoralTopologyConfig {
+                    dim,
+                    ..Default::default()
+                },
+                basis,
+                config.clone(),
+            );
+            for hv in &scenario.scenarios {
+                topo.add_scenario(hv.clone());
+            }
+            let report = topo.detect_trajectory_convergence();
+            if report.convergence_detected {
+                if scenario.is_adversarial {
+                    true_pos += 1;
+                } else {
+                    false_pos += 1;
+                }
+            }
+        }
+
+        let tpr = if total_positive > 0 {
+            true_pos as f64 / total_positive as f64
+        } else {
+            0.0
+        };
+        let fpr = if total_negative > 0 {
+            false_pos as f64 / total_negative as f64
+        } else {
+            0.0
+        };
+        let precision = if true_pos + false_pos > 0 {
+            true_pos as f64 / (true_pos + false_pos) as f64
+        } else {
+            0.0
+        };
+        let f1 = if precision + tpr > 0.0 {
+            2.0 * precision * tpr / (precision + tpr)
+        } else {
+            0.0
+        };
+
+        roc_curve.push(RocPoint {
+            threshold,
+            true_positive_rate: tpr,
+            false_positive_rate: fpr,
+            precision,
+            f1,
+        });
+    }
+
+    roc_curve.sort_by(|a, b| a.threshold.partial_cmp(&b.threshold).unwrap());
+
+    let mut sorted_by_fpr = roc_curve.clone();
+    sorted_by_fpr.sort_by(|a, b| {
+        a.false_positive_rate
+            .partial_cmp(&b.false_positive_rate)
+            .unwrap()
+    });
+    let auc: f64 = if sorted_by_fpr.len() >= 2 {
+        sorted_by_fpr
+            .windows(2)
+            .map(|w| {
+                (w[1].false_positive_rate - w[0].false_positive_rate)
+                    * (w[0].true_positive_rate + w[1].true_positive_rate)
+                    / 2.0
+            })
+            .sum()
+    } else {
+        0.0
+    };
+
+    let best = roc_curve
+        .iter()
+        .max_by(|a, b| a.f1.partial_cmp(&b.f1).unwrap())
+        .cloned()
+        .unwrap_or(RocPoint {
+            threshold: 0.15,
+            true_positive_rate: 0.0,
+            false_positive_rate: 0.0,
+            precision: 0.0,
+            f1: 0.0,
+        });
+
+    CalibrationResult {
+        roc_curve,
+        auc,
+        best_f1_threshold: best.threshold,
+        best_f1: best.f1,
     }
 }
 
@@ -2800,5 +3106,99 @@ mod tests {
         let report = topo.detect_trajectory_convergence();
         assert!(!report.convergence_detected);
         assert!((report.severity - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_snapshot_roundtrip() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..10 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 500 + i));
+        }
+        topo.analyze();
+        let _ = topo.detect_trajectory_convergence();
+        let snap = topo.snapshot();
+        assert_eq!(snap.trajectory.len(), 10);
+        assert!(snap.prior_count > 0);
+        let mut topo2 = MoralTopology::new(test_config());
+        topo2.restore(&snap);
+        assert_eq!(topo2.trajectory(100).len(), 10);
+    }
+
+    #[test]
+    fn test_snapshot_serialization() {
+        let mut topo = MoralTopology::new(test_config());
+        for i in 0..5 {
+            topo.add_scenario(ContinuousHV::random(TEST_DIM, 600 + i));
+        }
+        topo.analyze();
+        let snap = topo.snapshot();
+        let json = serde_json::to_string(&snap).expect("serialize");
+        let restored: MoralTopologySnapshot = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(restored.trajectory.len(), snap.trajectory.len());
+    }
+
+    #[test]
+    fn test_hazard_registry_defaults() {
+        let reg = HazardSignatureRegistry::with_defaults();
+        assert_eq!(reg.signatures.len(), 4);
+    }
+
+    #[test]
+    fn test_hazard_registry_match() {
+        let reg = HazardSignatureRegistry::with_defaults();
+        let centroid = [0.2, -0.6, -0.5, -0.2, -0.5, -0.1, 0.1, 0.0];
+        let (name, boost) = reg.match_trajectory(&centroid);
+        assert_eq!(name, Some("weaponization"));
+        assert!(boost > 0.0);
+        let benign = [0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8];
+        let (name, boost) = reg.match_trajectory(&benign);
+        assert!(name.is_none());
+        assert!((boost - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_hazard_custom_signature() {
+        let mut reg = HazardSignatureRegistry::default();
+        reg.add(HazardSignature {
+            name: "custom".into(),
+            centroid: [0.0; N_HARMONIES],
+            radius: 0.3,
+            severity_boost: 0.5,
+        });
+        let near_origin = [0.1, -0.1, 0.05, 0.0, 0.0, -0.05, 0.0, 0.0];
+        let (name, boost) = reg.match_trajectory(&near_origin);
+        assert_eq!(name, Some("custom"));
+        assert!((boost - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_calibration_basic() {
+        let dim = TEST_DIM;
+        let base = ContinuousHV::random(dim, 42);
+        let adversarial: Vec<_> = (0..6).map(|_i| base.perturb(0.02)).collect();
+        let benign: Vec<_> = (0..6)
+            .map(|i| ContinuousHV::random(dim, 2000 + i))
+            .collect();
+        let scenarios = vec![
+            CalibrationScenario {
+                scenarios: adversarial,
+                is_adversarial: true,
+                label: "converging".into(),
+            },
+            CalibrationScenario {
+                scenarios: benign,
+                is_adversarial: false,
+                label: "diverse".into(),
+            },
+        ];
+        let thresholds: Vec<f64> = (0..20).map(|i| i as f64 * 0.05).collect();
+        let result = calibrate_convergence_threshold(
+            &scenarios,
+            &thresholds,
+            dim,
+            &MoralAnomalyConfig::default(),
+        );
+        assert!(!result.roc_curve.is_empty());
+        assert!(result.auc >= 0.0 && result.auc <= 1.0);
     }
 }

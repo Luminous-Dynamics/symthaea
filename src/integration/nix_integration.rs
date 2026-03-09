@@ -310,8 +310,7 @@ impl NixPipelineHook for NixPipelineHookImpl {
                         .iter()
                         .filter(|p| observed.contains(p))
                         .count();
-                    let miss_ratio =
-                        1.0 - (hits as f32 / high_conf_predictions.len() as f32);
+                    let miss_ratio = 1.0 - (hits as f32 / high_conf_predictions.len() as f32);
                     // Factor in whether success/failure was expected
                     let outcome_predicted = predicted_refs.contains(&"success") == success;
                     let outcome_surprise = if outcome_predicted { 0.0f32 } else { 0.5 };
@@ -586,7 +585,11 @@ mod tests {
         let processor = NixPipelineProcessor::new().with_skip_observe(true);
         let mut hook = NixPipelineHookImpl::new(processor, bridge);
 
-        assert_eq!(hook.causal_surprise(), 0.0, "Initial surprise should be 0.0");
+        assert_eq!(
+            hook.causal_surprise(),
+            0.0,
+            "Initial surprise should be 0.0"
+        );
         hook.post_execute("nix-env -iA firefox", true, "installed");
         assert_eq!(
             hook.causal_surprise(),

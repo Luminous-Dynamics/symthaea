@@ -423,4 +423,84 @@ mod tests {
             svc_activation
         );
     }
+
+    #[test]
+    fn test_retrieve_finds_most_similar() {
+        let mut wm = WorkingMemory::with_capacity(7);
+        let target = make_hv(1);
+        wm.push(target.clone(), MemorySource::UserInput, "target".into());
+        wm.push(make_hv(100), MemorySource::UserInput, "other1".into());
+        wm.push(make_hv(200), MemorySource::UserInput, "other2".into());
+
+        let result = wm.retrieve(&target);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().label, "target");
+    }
+
+    #[test]
+    fn test_retrieve_empty_returns_none() {
+        let wm = WorkingMemory::new();
+        let query = make_hv(1);
+        assert!(wm.retrieve(&query).is_none());
+    }
+
+    #[test]
+    fn test_mean_activation() {
+        let mut wm = WorkingMemory::with_capacity(7);
+        assert!((wm.mean_activation() - 0.0).abs() < 1e-6, "Empty WM mean = 0");
+
+        wm.push(make_hv(1), MemorySource::UserInput, "a".into());
+        assert!((wm.mean_activation() - 1.0).abs() < 1e-6, "Single item at 1.0");
+
+        // Second push decays first to DECAY_RATE, new item is 1.0
+        wm.push(make_hv(2), MemorySource::UserInput, "b".into());
+        let expected = (DECAY_RATE + 1.0) / 2.0;
+        assert!(
+            (wm.mean_activation() - expected).abs() < 1e-6,
+            "Mean should be {:.3}, got {:.3}",
+            expected,
+            wm.mean_activation()
+        );
+    }
+
+    #[test]
+    fn test_take_evicted_lifecycle() {
+        let mut wm = WorkingMemory::with_capacity(2);
+        wm.push(make_hv(1), MemorySource::UserInput, "a".into());
+        wm.push(make_hv(2), MemorySource::UserInput, "b".into());
+
+        // No eviction yet
+        assert!(wm.take_evicted().is_none());
+
+        // 3rd push evicts lowest-activation item
+        wm.push(make_hv(3), MemorySource::UserInput, "c".into());
+        let evicted = wm.take_evicted();
+        assert!(evicted.is_some(), "Should have evicted an item");
+        assert_eq!(evicted.unwrap().label, "a"); // oldest, most decayed
+
+        // Second take should be None
+        assert!(wm.take_evicted().is_none());
+    }
+
+    #[test]
+    fn test_evicted_steps_survived() {
+        let mut wm = WorkingMemory::with_capacity(2);
+        wm.push(make_hv(1), MemorySource::UserInput, "a".into());
+        wm.push(make_hv(2), MemorySource::UserInput, "b".into());
+        wm.push(make_hv(3), MemorySource::UserInput, "c".into());
+
+        let evicted = wm.take_evicted().unwrap();
+        // "a" survived 2 decay cycles (push of b, push of c)
+        assert_eq!(evicted.steps_survived, 2);
+    }
+
+    #[test]
+    fn test_step_increments() {
+        let mut wm = WorkingMemory::new();
+        assert_eq!(wm.step(), 0);
+        wm.push(make_hv(1), MemorySource::UserInput, "a".into());
+        assert_eq!(wm.step(), 1);
+        wm.push(make_hv(2), MemorySource::UserInput, "b".into());
+        assert_eq!(wm.step(), 2);
+    }
 }

@@ -593,9 +593,24 @@ impl MoralAlgebra {
             description: "Do not harm innocents".to_string(),
             rule_hv: self.encode_obligation("do no harm"),
             violation_actions: vec![
-                "harm", "harmed", "hurt", "injure", "injured", "attack", "attacked", "abuse",
-                "abused", "kill", "killed", "murder", "murdered", "slay", "slaughter",
-                "to death", "to their death", "pushing a person",
+                "harm",
+                "harmed",
+                "hurt",
+                "injure",
+                "injured",
+                "attack",
+                "attacked",
+                "abuse",
+                "abused",
+                "kill",
+                "killed",
+                "murder",
+                "murdered",
+                "slay",
+                "slaughter",
+                "to death",
+                "to their death",
+                "pushing a person",
             ]
             .into_iter()
             .map(|s| s.to_string())

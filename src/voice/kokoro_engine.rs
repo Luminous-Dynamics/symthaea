@@ -87,7 +87,7 @@ impl KokoroEngine {
 
         // Create ONNX Runtime session (ort 2.0 API)
         let session = match ort::session::Session::builder()
-            .and_then(|builder| builder.with_model_from_file(&model_path))
+            .and_then(|builder| builder.commit_from_file(&model_path))
         {
             Ok(session) => session,
             Err(e) => {
@@ -142,15 +142,19 @@ impl KokoroEngine {
         let voice_idx = voice_id.unwrap_or(self.config.default_voice);
         let voice_embed = self.voices.get(voice_idx).or_else(|| self.voices.first())?;
 
-        // Prepare input tensors for ort 2.0 API (raw slices + shapes)
+        // Prepare input tensors for ort 2.0 API (Tensor::from_array)
         let seq_len = phoneme_ids.len();
         let input_ids: Vec<i64> = phoneme_ids.iter().map(|&id| id as i64).collect();
         let style: Vec<f32> = voice_embed.clone();
 
+        let input_ids_tensor = ort::value::Tensor::from_array((vec![1i64, seq_len as i64], input_ids)).ok()?;
+        let style_tensor = ort::value::Tensor::from_array((vec![1i64, voice_embed.len() as i64], style)).ok()?;
+        let speed_tensor = ort::value::Tensor::from_array((vec![1i64], vec![1.0f32])).ok()?;
+
         let outputs = match self.session.run(ort::inputs![
-            "input_ids" => (vec![1_i64, seq_len as i64], input_ids.as_slice()),
-            "style" => (vec![1_i64, voice_embed.len() as i64], style.as_slice()),
-            "speed" => (vec![1_i64], vec![1.0f32].as_slice()),
+            "input_ids" => input_ids_tensor,
+            "style" => style_tensor,
+            "speed" => speed_tensor,
         ]) {
             Ok(outputs) => outputs,
             Err(e) => {
@@ -161,21 +165,17 @@ impl KokoroEngine {
 
         // Extract audio output
         if let Some(output) = outputs.get("audio") {
-            if let Ok(tensor) = output.try_extract_raw_tensor::<f32>() {
-                let samples: Vec<f32> = tensor.1.to_vec();
-                if !samples.is_empty() {
-                    return Some(samples);
+            if let Ok((_shape, data)) = output.try_extract_tensor::<f32>() {
+                if !data.is_empty() {
+                    return Some(data.to_vec());
                 }
             }
         }
 
-        // Try alternative output name
-        if let Some((_, output)) = outputs.iter().next() {
-            if let Ok(tensor) = output.try_extract_raw_tensor::<f32>() {
-                let samples: Vec<f32> = tensor.1.to_vec();
-                if !samples.is_empty() {
-                    return Some(samples);
-                }
+        // Try alternative output name (first output)
+        if let Ok((_shape, data)) = outputs[0].try_extract_tensor::<f32>() {
+            if !data.is_empty() {
+                return Some(data.to_vec());
             }
         }
 

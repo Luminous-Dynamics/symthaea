@@ -139,9 +139,8 @@ impl SemanticCoherenceBenchmark {
                 //    weighting (recent tokens dominate), matching human recency
                 //    effects in discourse comprehension.
                 let alpha = config.language_coherence_alpha as f32;
-                context =
-                    ContinuousHV::weighted_bundle(&[&context, word], &[1.0 - alpha, alpha])
-                        .normalize();
+                context = ContinuousHV::weighted_bundle(&[&context, word], &[1.0 - alpha, alpha])
+                    .normalize();
 
                 // Measure coherence with topic via EMA tracking
                 let raw_coh = effective_topic.similarity(&context).clamp(-1.0, 1.0) as f64;
@@ -167,8 +166,8 @@ impl SemanticCoherenceBenchmark {
             // A disruption is detected when coherence drops below the pre-disruption
             // mean (tokens before the distractor position).
             let post_recovery = if distractor_pos + 3 < sequence_len && distractor_pos > 0 {
-                let pre_mean: f64 = token_coherences[..distractor_pos].iter().sum::<f64>()
-                    / distractor_pos as f64;
+                let pre_mean: f64 =
+                    token_coherences[..distractor_pos].iter().sum::<f64>() / distractor_pos as f64;
                 let at_disrupt = token_coherences[distractor_pos];
                 let after_disrupt = token_coherences[distractor_pos + 3];
                 if at_disrupt < pre_mean * 0.9 {

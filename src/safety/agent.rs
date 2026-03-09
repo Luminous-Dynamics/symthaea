@@ -48,6 +48,11 @@ pub struct SafetyMetrics {
     pub prediction_error: f32,
     /// Temporal coherence from CfC dynamics.
     pub temporal_coherence: f32,
+    /// Whether a critical integrity anomaly has been detected (attestation failure,
+    /// canary corruption). Escalates safety level by one step when true.
+    /// Default: false (when integrity feature is not enabled).
+    #[serde(default)]
+    pub integrity_critical: bool,
 }
 
 impl SafetyMetrics {
@@ -73,6 +78,7 @@ impl SafetyMetrics {
             } else {
                 0.0 // assume worst-case coherence
             },
+            integrity_critical: false, // populated by caller when integrity feature is enabled
         }
     }
 }
@@ -205,6 +211,15 @@ impl SafetyAgent {
                 "temporal_coherence {:.3} < threshold {:.3}",
                 metrics.temporal_coherence, self.config.temporal_coherence_threshold
             ));
+            level = escalate(level);
+        }
+
+        // Integrity anomaly: attestation failure or canary corruption means
+        // consciousness metrics themselves may be untrustworthy. Escalate one level.
+        if metrics.integrity_critical {
+            reasons.push(
+                "integrity: critical anomaly detected (attestation/canary failure)".to_string(),
+            );
             level = escalate(level);
         }
 
@@ -527,6 +542,22 @@ mod tests {
             consciousness_level: consciousness,
             prediction_error: pred_error,
             temporal_coherence,
+            integrity_critical: false,
+        }
+    }
+
+    fn metrics_with_integrity(
+        consciousness: f32,
+        pred_error: f32,
+        temporal_coherence: f32,
+        integrity_critical: bool,
+    ) -> SafetyMetrics {
+        SafetyMetrics {
+            cycle: 0,
+            consciousness_level: consciousness,
+            prediction_error: pred_error,
+            temporal_coherence,
+            integrity_critical,
         }
     }
 
@@ -637,28 +668,41 @@ mod tests {
     fn test_nan_consciousness_treats_as_worst_case() {
         let mut agent = SafetyAgent::new();
         // NaN consciousness via SafetyMetrics should become 0.0 → Red
-        let m = SafetyMetrics {
-            cycle: 0,
-            consciousness_level: 0.0, // simulating NaN-clamped worst case
-            prediction_error: 0.1,
-            temporal_coherence: 0.7,
-        };
-        let a = agent.assess(m);
+        let a = agent.assess(metrics(0.0, 0.1, 0.7));
         assert_eq!(a.level, SafetyLevel::Red);
     }
 
     #[test]
     fn test_nan_prediction_error_treats_as_worst_case() {
         let mut agent = SafetyAgent::new();
-        let m = SafetyMetrics {
-            cycle: 0,
-            consciousness_level: 0.8,
-            prediction_error: 1.0, // simulating NaN-clamped worst case
-            temporal_coherence: 0.7,
-        };
-        let a = agent.assess(m);
+        let a = agent.assess(metrics(0.8, 1.0, 0.7));
         // High prediction error should escalate from Green
         assert!(a.level >= SafetyLevel::Yellow);
+    }
+
+    // ── Track D: Integrity anomaly escalation ─────────────────────────────
+
+    #[test]
+    fn test_integrity_critical_escalates_green_to_yellow() {
+        let mut agent = SafetyAgent::new();
+        let a = agent.assess(metrics_with_integrity(0.8, 0.1, 0.7, true));
+        assert_eq!(a.level, SafetyLevel::Yellow);
+        assert!(a.reasons.iter().any(|r| r.contains("integrity")));
+    }
+
+    #[test]
+    fn test_integrity_critical_escalates_yellow_to_orange() {
+        let mut agent = SafetyAgent::new();
+        // Yellow from low consciousness + integrity critical → Orange
+        let a = agent.assess(metrics_with_integrity(0.5, 0.1, 0.7, true));
+        assert_eq!(a.level, SafetyLevel::Orange);
+    }
+
+    #[test]
+    fn test_integrity_no_escalation_when_clean() {
+        let mut agent = SafetyAgent::new();
+        let a = agent.assess(metrics_with_integrity(0.8, 0.1, 0.7, false));
+        assert_eq!(a.level, SafetyLevel::Green);
     }
 
     #[test]

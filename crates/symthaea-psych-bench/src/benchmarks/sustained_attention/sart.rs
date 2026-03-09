@@ -97,8 +97,8 @@ impl SartBenchmark {
                 commission_total += 1;
                 if respond {
                     commission += 1; // commission error
-                    // Failed inhibition: response tendency remains high
-                    // (error-related negativity effect — Hester et al., 2005)
+                                     // Failed inhibition: response tendency remains high
+                                     // (error-related negativity effect — Hester et al., 2005)
                 } else {
                     // Successful inhibition: temporarily suppresses automatic
                     // response tendency (post-inhibition slowing, Robertson et al., 1997).

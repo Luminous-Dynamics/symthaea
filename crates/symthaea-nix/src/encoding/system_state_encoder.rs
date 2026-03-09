@@ -319,10 +319,7 @@ mod tests {
         let mut cb = NixCodebook::new();
         let snap = SystemStateSnapshot {
             config_options: vec![
-                (
-                    "services.nginx.enable".to_string(),
-                    "true".to_string(),
-                ),
+                ("services.nginx.enable".to_string(), "true".to_string()),
                 (
                     "boot.loader.grub.device".to_string(),
                     "/dev/sda".to_string(),

@@ -18,13 +18,13 @@ use super::thresholds::{
     AGREEMENT_CRITICAL_THRESHOLD, AGREEMENT_EMA_DECAY, AGREEMENT_HIGH_CONFIDENCE_SCALE,
     AGREEMENT_LOW_CONFIDENCE_SCALE, AGREEMENT_LOW_EXPLORATION_SCALE,
     AGREEMENT_VELOCITY_DROP_EXPLORATION, AGREEMENT_VELOCITY_DROP_LR,
-    AGREEMENT_VELOCITY_DROP_THRESHOLD, CAUSAL_URGENCY_CONFIDENCE, COMPOUND_INSTABILITY_EXPLORATION,
-    COMPOUND_INSTABILITY_ERROR_SLOPE, COMPOUND_INSTABILITY_LR_SCALE,
-    COMPOUND_INSTABILITY_VELOCITY, CONTEXT_PHI_SCALE_BASE, CONTEXT_PHI_SCALE_RANGE,
-    CROSS_MODULE_AGREEMENT_HIGH, CROSS_MODULE_AGREEMENT_LOW, CROSS_MODULE_VARIANCE_AMPLIFICATION,
-    EMPATHIC_TONE_RATE_SCALE, EMPATHIC_TONE_THRESHOLD, ENTROPY_LR_MIN, ENTROPY_LR_RANGE,
-    EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD, EPISTEMIC_CAUTION_SCALE,
-    EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
+    AGREEMENT_VELOCITY_DROP_THRESHOLD, ATTENTION_BUDGET_GATED_LR_SCALE, CAUSAL_URGENCY_CONFIDENCE,
+    COMPOUND_INSTABILITY_ERROR_SLOPE, COMPOUND_INSTABILITY_EXPLORATION,
+    COMPOUND_INSTABILITY_LR_SCALE, COMPOUND_INSTABILITY_VELOCITY, CONTEXT_PHI_SCALE_BASE,
+    CONTEXT_PHI_SCALE_RANGE, CROSS_MODULE_AGREEMENT_HIGH, CROSS_MODULE_AGREEMENT_LOW,
+    CROSS_MODULE_VARIANCE_AMPLIFICATION, EMPATHIC_TONE_RATE_SCALE, EMPATHIC_TONE_THRESHOLD,
+    ENTROPY_LR_MIN, ENTROPY_LR_RANGE, EPISTEMIC_APPROVAL_LR_SCALE, EPISTEMIC_APPROVAL_THRESHOLD,
+    EPISTEMIC_CAUTION_SCALE, EPISTEMIC_CAUTION_THRESHOLD, EPISTEMIC_REJECTION_CONFIDENCE_SCALE,
     EPISTEMIC_REJECTION_LR_SCALE, EPISTEMIC_TRUST_SCALE, EPISTEMIC_TRUST_THRESHOLD,
     EVOLUTION_NEGATIVE_EXPLORATION_MAX, EVOLUTION_NEGATIVE_EXPLORATION_SCALE,
     EVOLUTION_PHI_THRESHOLD, EVOLUTION_POSITIVE_CONFIDENCE_MAX,
@@ -37,13 +37,12 @@ use super::thresholds::{
     REASONING_CHAIN_BOOST_SCALE, REASONING_CHAIN_CONFIDENCE_THRESHOLD, REST_BINDING_DAMPEN,
     REST_COHERENCE_WEIGHT, REST_MODULATION_BINDING_FRAC, REST_MODULATION_COHERENCE_FRAC,
     SOCIAL_LR_BASE, SOCIAL_LR_RANGE, SPEECH_RATE_CLAMP_MAX, SPEECH_RATE_CLAMP_MIN,
+    STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
+    STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
     SUBSYSTEM_LR_FACTOR_MAX, SUBSYSTEM_LR_FACTOR_MIN, TOM_ACCURACY_HIGH, TOM_ACCURACY_LOW,
     TOM_ACCURACY_SCALE, TRUST_DECAY_FACTOR, TRUST_SIGNAL_MIDPOINT, TRUST_SIGNAL_RATE,
     UNIFIED_QUALITY_AGREEMENT_WEIGHT, UNIFIED_QUALITY_ANOMALY_WEIGHT,
     UNIFIED_QUALITY_PREDICTION_WEIGHT,
-    ATTENTION_BUDGET_GATED_LR_SCALE,
-    STRUCTURAL_BOTTLENECK_LR_SCALE, STRUCTURAL_BOTTLENECK_THRESHOLD,
-    STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST, STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD,
 };
 use super::{CognitiveLoopService, CycleState};
 
@@ -112,8 +111,8 @@ impl CognitiveLoopService {
         // ── Phase 18: Context Phi Weight → Unified Psi modulation ────────────
         let context_phi_applied = context_phi_weight > 0.0 && context_phi_weight != 1.0;
         if context_phi_applied {
-            let scale = CONTEXT_PHI_SCALE_BASE as f64
-                + context_phi_weight * CONTEXT_PHI_SCALE_RANGE as f64;
+            let scale =
+                CONTEXT_PHI_SCALE_BASE as f64 + context_phi_weight * CONTEXT_PHI_SCALE_RANGE as f64;
             let adjusted_psi = (unified_psi * scale).clamp(0.0, 1.0);
             self.unification_engine.update_psi(adjusted_psi);
             self.stats.context_phi_applied_count += 1;
@@ -245,9 +244,9 @@ impl CognitiveLoopService {
         };
 
         // ── Phase 19: Reasoning chain confidence + depth → confidence ────────
-        let reasoning_chain_boosted =
-            reasoning_chain_confidence > REASONING_CHAIN_CONFIDENCE_THRESHOLD
-                && reasoning_chain_depth >= 3;
+        let reasoning_chain_boosted = reasoning_chain_confidence
+            > REASONING_CHAIN_CONFIDENCE_THRESHOLD
+            && reasoning_chain_depth >= 3;
         if reasoning_chain_boosted {
             let chain_boost = (reasoning_chain_confidence - REASONING_CHAIN_CONFIDENCE_THRESHOLD)
                 * REASONING_CHAIN_BOOST_SCALE;
@@ -271,8 +270,11 @@ impl CognitiveLoopService {
                 self.carryover.quality.interference_free_cycles = 0;
                 -dampen
             } else if harmonic_interferences == 0 {
-                self.carryover.quality.interference_free_cycles =
-                    self.carryover.quality.interference_free_cycles.saturating_add(1);
+                self.carryover.quality.interference_free_cycles = self
+                    .carryover
+                    .quality
+                    .interference_free_cycles
+                    .saturating_add(1);
                 // Session 13 Item 2: Grace period before harmonic all-clear boost.
                 // Require 3 consecutive interference-free cycles to prevent LR whiplash.
                 // Science: Kelso (1995) — stability requires sustained absence of perturbation.
@@ -743,8 +745,13 @@ impl CognitiveLoopService {
         if struct_bn > STRUCTURAL_BOTTLENECK_THRESHOLD as f64 && self.stats.total_cycles > 15 {
             self.scale_lr("structural_bottleneck", STRUCTURAL_BOTTLENECK_LR_SCALE);
         }
-        if struct_er > STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD as f64 && self.stats.total_cycles > 15 {
-            self.adjust_confidence("structural_emergence", STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST);
+        if struct_er > STRUCTURAL_EMERGENCE_CONFIDENCE_THRESHOLD as f64
+            && self.stats.total_cycles > 15
+        {
+            self.adjust_confidence(
+                "structural_emergence",
+                STRUCTURAL_EMERGENCE_CONFIDENCE_BOOST,
+            );
         }
 
         let consciousness_weights = consciousness_output.current_weights;
@@ -935,15 +942,14 @@ impl CognitiveLoopService {
             // Session 11 Item 7: Very low agreement → raise threshold for urgency escalation.
             // Subsystems disagree about error magnitude → require stronger signal before reacting.
             // Science: Tononi (2004) — incoherent integration requires cautious interpretation.
-            if cross_module_agreement < AGREEMENT_CRITICAL_THRESHOLD
-                && self.stats.total_cycles > 20
+            if cross_module_agreement < AGREEMENT_CRITICAL_THRESHOLD && self.stats.total_cycles > 20
             {
                 self.scale_threshold("low_agreement_caution", AGREEMENT_CRITICAL_CAUTION_SCALE);
             }
         }
-        self.stats.avg_cross_module_agreement =
-            self.stats.avg_cross_module_agreement * AGREEMENT_EMA_DECAY
-                + cross_module_agreement * (1.0 - AGREEMENT_EMA_DECAY);
+        self.stats.avg_cross_module_agreement = self.stats.avg_cross_module_agreement
+            * AGREEMENT_EMA_DECAY
+            + cross_module_agreement * (1.0 - AGREEMENT_EMA_DECAY);
 
         // Cross-module agreement velocity: rapid drops signal subsystem desynchronization.
         // Analogous to coherence_velocity but for inter-module rather than intra-module signals.
@@ -954,10 +960,9 @@ impl CognitiveLoopService {
         // When agreement drops AND errors are rising simultaneously → cascading failure.
         // Friston (2010): cascading precision failures require active recovery.
         let error_slope = perception.urgency.error_slope;
-        let compound_instability =
-            agreement_velocity < COMPOUND_INSTABILITY_VELOCITY
-                && error_slope > COMPOUND_INSTABILITY_ERROR_SLOPE
-                && self.stats.total_cycles > 30;
+        let compound_instability = agreement_velocity < COMPOUND_INSTABILITY_VELOCITY
+            && error_slope > COMPOUND_INSTABILITY_ERROR_SLOPE
+            && self.stats.total_cycles > 30;
         if compound_instability {
             // Stronger protective response than either alone
             self.scale_lr("compound_instability", COMPOUND_INSTABILITY_LR_SCALE);
@@ -995,9 +1000,8 @@ impl CognitiveLoopService {
                 * dynamics.core.prediction_coherence
                 + UNIFIED_QUALITY_AGREEMENT_WEIGHT * cross_module_agreement
                 + UNIFIED_QUALITY_ANOMALY_WEIGHT * anomaly_factor;
-            self.stats.avg_unified_quality =
-                self.stats.avg_unified_quality * QUALITY_EMA_DECAY
-                    + unified_quality_score * (1.0 - QUALITY_EMA_DECAY);
+            self.stats.avg_unified_quality = self.stats.avg_unified_quality * QUALITY_EMA_DECAY
+                + unified_quality_score * (1.0 - QUALITY_EMA_DECAY);
 
             if unified_quality_score > CROSS_MODULE_AGREEMENT_HIGH {
                 let quality_boost =
@@ -1053,8 +1057,11 @@ impl CognitiveLoopService {
         // Prevent total convergence when system is performing well.
         // Science: Dayan & Sejnowski (1996) — minimum exploration prevents local optima.
         if unified_quality_score > 0.7 {
-            self.carryover.quality.consecutive_high_quality =
-                self.carryover.quality.consecutive_high_quality.saturating_add(1);
+            self.carryover.quality.consecutive_high_quality = self
+                .carryover
+                .quality
+                .consecutive_high_quality
+                .saturating_add(1);
         } else {
             self.carryover.quality.consecutive_high_quality = 0;
         }

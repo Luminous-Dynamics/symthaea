@@ -1056,4 +1056,68 @@ mod tests {
         let nonexistent = config.find_nodes("nonexistent_node_type");
         assert!(nonexistent.is_empty(), "Should find no nonexistent nodes");
     }
+
+    // ── NixValue type conversion tests ──
+
+    #[test]
+    fn test_is_truthy() {
+        assert!(NixValue::Bool(true).is_truthy());
+        assert!(!NixValue::Bool(false).is_truthy());
+        assert!(!NixValue::Null.is_truthy());
+        assert!(!NixValue::String("".into()).is_truthy());
+        assert!(NixValue::String("hello".into()).is_truthy());
+        assert!(!NixValue::List(vec![]).is_truthy());
+        assert!(NixValue::List(vec![NixValue::Int(1)]).is_truthy());
+        assert!(NixValue::Int(42).is_truthy());
+        assert!(NixValue::Path("/nix/store".into()).is_truthy());
+        assert!(NixValue::Expression("pkgs.vim".into()).is_truthy());
+    }
+
+    #[test]
+    fn test_as_bool() {
+        assert_eq!(NixValue::Bool(true).as_bool(), Some(true));
+        assert_eq!(NixValue::Bool(false).as_bool(), Some(false));
+        assert_eq!(NixValue::Int(1).as_bool(), None);
+        assert_eq!(NixValue::String("true".into()).as_bool(), None);
+        assert_eq!(NixValue::Null.as_bool(), None);
+    }
+
+    #[test]
+    fn test_as_string() {
+        assert_eq!(
+            NixValue::String("hello".into()).as_string(),
+            Some("hello")
+        );
+        assert_eq!(
+            NixValue::Path("/etc/nixos".into()).as_string(),
+            Some("/etc/nixos")
+        );
+        assert_eq!(NixValue::Int(42).as_string(), None);
+        assert_eq!(NixValue::Bool(true).as_string(), None);
+        assert_eq!(NixValue::Null.as_string(), None);
+    }
+
+    #[test]
+    fn test_as_list() {
+        let items = vec![NixValue::Int(1), NixValue::Int(2)];
+        let list = NixValue::List(items.clone());
+        let result = list.as_list();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().len(), 2);
+
+        assert!(NixValue::String("not a list".into()).as_list().is_none());
+        assert!(NixValue::Null.as_list().is_none());
+
+        // Empty list
+        assert_eq!(NixValue::List(vec![]).as_list().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_is_truthy_attrset() {
+        use std::collections::HashMap;
+        assert!(!NixValue::AttrSet(HashMap::new()).is_truthy());
+        let mut map = HashMap::new();
+        map.insert("key".to_string(), NixValue::Bool(true));
+        assert!(NixValue::AttrSet(map).is_truthy());
+    }
 }

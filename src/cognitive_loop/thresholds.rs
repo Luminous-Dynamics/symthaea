@@ -1876,10 +1876,13 @@ mod tests {
         assert!(LOW_COHERENCE_EXPLORATION_THRESHOLD > 0);
         assert!(LOW_COHERENCE_EXPLORATION_BOOST > 0.0);
         assert!(LOW_COHERENCE_EXPLORATION_BOOST < 0.1); // don't over-explore
-        // Prediction horizon PE-adaptive scaling
+                                                        // Prediction horizon PE-adaptive scaling
         assert!(HORIZON_PE_CONTRACT_THRESHOLD > 0.0 && HORIZON_PE_CONTRACT_THRESHOLD < 1.0);
         assert!(HORIZON_PE_CONTRACT_RATE > 0.0 && HORIZON_PE_CONTRACT_RATE <= 1.0);
-        assert!(HORIZON_PE_EXPAND_THRESHOLD > 0.0 && HORIZON_PE_EXPAND_THRESHOLD < HORIZON_PE_CONTRACT_THRESHOLD);
+        assert!(
+            HORIZON_PE_EXPAND_THRESHOLD > 0.0
+                && HORIZON_PE_EXPAND_THRESHOLD < HORIZON_PE_CONTRACT_THRESHOLD
+        );
         assert!(HORIZON_PE_EXPAND_RATE > 0.0);
         assert!(HORIZON_SLOPE_THRESHOLD > 0.0);
         assert!(HORIZON_SLOPE_CONTRACT_CAP > 0.0);
@@ -1888,8 +1891,12 @@ mod tests {
         assert!(HORIZON_SLOPE_EXPAND_RATE > 0.0);
         // At max PE, contraction stays above floor
         let worst_pe_scale = 1.0 - (1.0 - HORIZON_PE_CONTRACT_THRESHOLD) * HORIZON_PE_CONTRACT_RATE;
-        assert!(worst_pe_scale > PREDICTION_HORIZON_MIN_SCALE,
-            "PE contraction ({}) would breach floor ({})", worst_pe_scale, PREDICTION_HORIZON_MIN_SCALE);
+        assert!(
+            worst_pe_scale > PREDICTION_HORIZON_MIN_SCALE,
+            "PE contraction ({}) would breach floor ({})",
+            worst_pe_scale,
+            PREDICTION_HORIZON_MIN_SCALE
+        );
     }
 
     #[test]

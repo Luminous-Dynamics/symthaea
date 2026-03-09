@@ -347,4 +347,140 @@ mod tests {
         // Should have 3 states: initial + 2 steps
         assert_eq!(trajectory.len(), 3);
     }
+
+    #[test]
+    fn test_action_category_from_command_all_branches() {
+        assert_eq!(
+            ActionCategory::from_command("nix-env -i firefox"),
+            ActionCategory::Install
+        );
+        assert_eq!(
+            ActionCategory::from_command("install vim"),
+            ActionCategory::Install
+        );
+        assert_eq!(
+            ActionCategory::from_command("nix-env -e firefox"),
+            ActionCategory::Remove
+        );
+        assert_eq!(
+            ActionCategory::from_command("remove vim"),
+            ActionCategory::Remove
+        );
+        assert_eq!(
+            ActionCategory::from_command("enable nginx"),
+            ActionCategory::Enable
+        );
+        assert_eq!(
+            ActionCategory::from_command("disable sshd"),
+            ActionCategory::Disable
+        );
+        assert_eq!(
+            ActionCategory::from_command("nixos-rebuild switch"),
+            ActionCategory::Rebuild
+        );
+        assert_eq!(
+            ActionCategory::from_command("switch to new config"),
+            ActionCategory::Rebuild
+        );
+        assert_eq!(
+            ActionCategory::from_command("rollback to previous"),
+            ActionCategory::Rollback
+        );
+        assert_eq!(
+            ActionCategory::from_command("nix-collect-garbage"),
+            ActionCategory::GarbageCollect
+        );
+        assert_eq!(
+            ActionCategory::from_command("gc old generations"),
+            ActionCategory::GarbageCollect
+        );
+        assert_eq!(
+            ActionCategory::from_command("update flake inputs"),
+            ActionCategory::Update
+        );
+        assert_eq!(
+            ActionCategory::from_command("upgrade system"),
+            ActionCategory::Update
+        );
+    }
+
+    #[test]
+    fn test_action_category_custom_unknown() {
+        let cat = ActionCategory::from_command("echo hello world");
+        assert!(matches!(cat, ActionCategory::Custom(_)));
+        if let ActionCategory::Custom(s) = cat {
+            assert_eq!(s, "echo hello world");
+        }
+    }
+
+    #[test]
+    fn test_action_category_case_insensitive() {
+        assert_eq!(
+            ActionCategory::from_command("INSTALL firefox"),
+            ActionCategory::Install
+        );
+        assert_eq!(
+            ActionCategory::from_command("NixOS-Rebuild Switch"),
+            ActionCategory::Rebuild
+        );
+    }
+
+    #[test]
+    fn test_has_learned_threshold() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+        let action = ActionCategory::Install;
+
+        // Not learned yet
+        assert!(!wm.has_learned(&action));
+
+        // Learn 2 transitions (not enough)
+        for i in 0..2 {
+            let before = ContinuousHV::random(dim, i);
+            let after = ContinuousHV::random(dim, i + 100);
+            wm.learn_transition(&before, ActionCategory::Install, &after);
+        }
+        assert!(!wm.has_learned(&action));
+
+        // 3rd transition crosses threshold
+        wm.learn_transition(
+            &ContinuousHV::random(dim, 50),
+            ActionCategory::Install,
+            &ContinuousHV::random(dim, 150),
+        );
+        assert!(wm.has_learned(&action));
+    }
+
+    #[test]
+    fn test_world_model_accessors() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+        assert_eq!(wm.learned_action_count(), 0);
+        assert_eq!(wm.total_observations(), 0);
+        assert!((wm.free_energy() - 1.0).abs() < 1e-6);
+
+        wm.learn_transition(
+            &ContinuousHV::random(dim, 1),
+            ActionCategory::Install,
+            &ContinuousHV::random(dim, 2),
+        );
+        assert_eq!(wm.learned_action_count(), 1);
+        assert_eq!(wm.total_observations(), 1);
+    }
+
+    #[test]
+    fn test_predict_unknown_action_returns_current() {
+        let dim = 512;
+        let mut wm = NixWorldModel::new(dim);
+        let state = ContinuousHV::random(dim, 1);
+        wm.observe(state.clone());
+
+        let predicted = wm.predict_state(&ActionCategory::Rollback);
+        let sim = predicted.similarity(&state);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "Unknown action should predict no change (sim={:.6})",
+            sim
+        );
+    }
 }

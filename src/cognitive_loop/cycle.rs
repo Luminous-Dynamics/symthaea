@@ -42,8 +42,8 @@ impl CognitiveLoopService {
         {
             // Night phase: run full integrity sweep (all attestations + all canaries)
             // Science: immune system deep maintenance during sleep (Besedovsky et al. 2012)
-            let is_night = self.biorhythm_mgr.rhythm.phase
-                == crate::chronobiology::CircadianPhase::Night;
+            let is_night =
+                self.biorhythm_mgr.rhythm.phase == crate::chronobiology::CircadianPhase::Night;
             self.integrity_manager.tick(
                 self.stats.total_cycles as usize,
                 self.config.cfc_config.delta_t,

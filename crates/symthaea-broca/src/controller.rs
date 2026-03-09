@@ -129,7 +129,8 @@ impl LanguageController {
         #[cfg(feature = "parallel")]
         if self.token_embeddings.len() > 128 {
             // Parallel for large vocabularies
-            return self.token_embeddings
+            return self
+                .token_embeddings
                 .par_iter()
                 .map(|emb| output_hv.similarity(emb))
                 .collect();
@@ -299,6 +300,119 @@ impl LanguageController {
     /// Get mutable reference to token embeddings (for training).
     pub fn token_embeddings_mut(&mut self) -> &mut Vec<ContinuousHV> {
         &mut self.token_embeddings
+    }
+
+    /// Normalize all token embeddings to a target L2 norm.
+    ///
+    /// Prevents embedding norm explosion during training (observed norms >3000
+    /// without regularization). Called at the end of each training epoch.
+    pub fn normalize_embeddings(&mut self, target_norm: f32) {
+        for emb in &mut self.token_embeddings {
+            let norm = emb.norm();
+            if norm > target_norm * 1.1 {
+                // Only normalize if significantly above target (avoid jitter)
+                let scale = target_norm / norm;
+                for v in emb.values.iter_mut() {
+                    *v *= scale;
+                }
+            }
+        }
+    }
+
+    /// Backpropagate a loss gradient through the CfC network.
+    ///
+    /// Given the gradient of the loss w.r.t. the network output HV (`d_output`),
+    /// this constructs a synthetic target for each neuron's backward() method and
+    /// applies gradients to the CfC weights (weight_hv, input_mask, tau_modulator).
+    ///
+    /// The `input_hv` should be the composed input that was fed during the forward
+    /// step: `thought_hv ⊗ token_emb[prev] ⊗ pos_emb[pos]`.
+    pub fn backward_step(
+        &mut self,
+        d_output: &ContinuousHV,
+        thought_hv: &ContinuousHV,
+        prev_token_id: u32,
+        pos: usize,
+        dt: f32,
+        network_lr: f32,
+    ) {
+        // Reconstruct the composed input from the forward step
+        let token_emb = self.get_token_embedding(prev_token_id);
+        let pos_emb = self.position_base.permute(pos);
+        let input_hv = thought_hv.bind(&token_emb).bind(&pos_emb);
+
+        let dt = if dt.is_finite() && dt > 0.0 {
+            dt
+        } else {
+            self.config.dt_per_token
+        };
+
+        // Backprop through the last layer: construct target = output - d_output
+        // This makes MSE-based backward() produce gradients aligned with d_output
+        let last_layer_idx = self.network.n_layers() - 1;
+
+        // For last layer: target = neuron_state - scale * d_output
+        // Each neuron gets the same gradient signal (since output = avg(states))
+        let inv_n = 1.0
+            / self
+                .network
+                .layer(last_layer_idx)
+                .map(|l| l.len())
+                .unwrap_or(1) as f32;
+
+        // Scale d_output by 1/n (since output = mean of neuron states)
+        let d_per_neuron = d_output.scale(inv_n);
+
+        // Get the input that was fed to each layer
+        let layer_input = self.network.layer_input(last_layer_idx, &input_hv);
+
+        // Apply gradients to last layer neurons
+        if let Some(layer) = self.network.layer_mut(last_layer_idx) {
+            for neuron in layer.iter_mut() {
+                // Target = state - d_output (gradient descent direction)
+                let target = neuron.state().subtract(&d_per_neuron);
+                let grads = neuron.backward(&layer_input, &target, dt);
+                neuron.apply_gradients(&grads, network_lr);
+            }
+        }
+
+        // Optionally backprop through earlier layers (1 layer of backprop is usually sufficient
+        // for shallow networks; deeper chains risk vanishing gradients in HDC)
+        if last_layer_idx > 0 {
+            // Gather d_input from last layer (average across neurons)
+            let mut d_prev = ContinuousHV::zero(HDC_DIMENSION);
+            if let Some(layer) = self.network.layer(last_layer_idx) {
+                for neuron in layer {
+                    let target = neuron.state().subtract(&d_per_neuron);
+                    let grads = neuron.backward(&layer_input, &target, dt);
+                    for (dp, &di) in d_prev.values.iter_mut().zip(grads.d_input.values.iter()) {
+                        *dp += di;
+                    }
+                }
+                let inv = 1.0 / layer.len() as f32;
+                for v in d_prev.values.iter_mut() {
+                    *v *= inv;
+                }
+            }
+
+            // Apply to layer 0 with reduced LR (gradient attenuation for stability)
+            let layer0_input = self.network.layer_input(0, &input_hv);
+            let d_prev_scaled = d_prev.scale(0.5); // Attenuate for stability
+            if let Some(layer) = self.network.layer_mut(0) {
+                let inv_n0 = 1.0
+                    / if layer.is_empty() {
+                        1.0
+                    } else {
+                        layer.len() as f32
+                    };
+                let d_per_n0 = d_prev_scaled.scale(inv_n0);
+                for neuron in layer.iter_mut() {
+                    let target = neuron.state().subtract(&d_per_n0);
+                    let grads = neuron.backward(&layer0_input, &target, dt);
+                    neuron.apply_gradients(&grads, network_lr * 0.5);
+                }
+            }
+        }
     }
 }
 

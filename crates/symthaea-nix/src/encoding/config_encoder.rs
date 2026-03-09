@@ -239,21 +239,24 @@ mod tests {
         // Boot/networking get 0.9
         assert!((ConfigEncoder::option_weight("boot.loader.grub.device") - 0.9).abs() < 1e-6);
         assert!((ConfigEncoder::option_weight("networking.firewall.enable") - 1.0).abs() < 1e-6); // has "enable"
-        // Services get 0.8
+                                                                                                  // Services get 0.8
         assert!((ConfigEncoder::option_weight("services.postgresql.port") - 0.8).abs() < 1e-6);
         // Packages get 0.7
-        assert!(
-            (ConfigEncoder::option_weight("environment.systemPackages") - 0.7).abs() < 1e-6
-        );
+        assert!((ConfigEncoder::option_weight("environment.systemPackages") - 0.7).abs() < 1e-6);
         // Users get 0.6
         assert!((ConfigEncoder::option_weight("users.users.tristan") - 0.6).abs() < 1e-6);
         // Default
-        assert!((ConfigEncoder::option_weight("nix.settings.auto-optimise-store") - 0.5).abs() < 1e-6);
+        assert!(
+            (ConfigEncoder::option_weight("nix.settings.auto-optimise-store") - 0.5).abs() < 1e-6
+        );
     }
 
     #[test]
     fn test_value_to_string_variants() {
-        assert_eq!(ConfigEncoder::value_to_string(&NixValue::Bool(true)), "true");
+        assert_eq!(
+            ConfigEncoder::value_to_string(&NixValue::Bool(true)),
+            "true"
+        );
         assert_eq!(ConfigEncoder::value_to_string(&NixValue::Int(42)), "42");
         assert_eq!(
             ConfigEncoder::value_to_string(&NixValue::String("hello".into())),
