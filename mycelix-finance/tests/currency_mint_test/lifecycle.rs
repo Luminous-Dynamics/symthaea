@@ -14,7 +14,6 @@
 
 use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
-use holochain::sweettest::*;
 use mycelix_finance_types::CurrencyStatus;
 
 #[tokio::test(flavor = "multi_thread")]
@@ -268,6 +267,96 @@ async fn test_lifecycle_all() {
         println!("  - Reactivate Active: rejected");
 
         println!("Scenario 14.2 PASSED");
+    }
+
+    // ── Scenario 15: Update chain regression — amend then read returns latest ──
+    println!("Scenario 15: Update Chain Regression (follow_update_chain)");
+    {
+        let def: CurrencyDefinition = conductor
+            .call(
+                &zome_a,
+                "create_currency",
+                CreateCurrencyInput {
+                    dao_did: "did:mycelix:dao:update-chain-test".into(),
+                    params: test_params("UpdateChain", "UC"),
+                    governance_proposal_id: None,
+                },
+            )
+            .await;
+
+        // Activate
+        let _: CurrencyDefinition = conductor
+            .call(
+                &zome_a,
+                "activate_currency",
+                ActivateCurrencyInput {
+                    currency_id: def.id.clone(),
+                },
+            )
+            .await;
+
+        // Amend params: change credit_limit from 40 → 99 and description
+        let mut new_params = test_params("UpdateChain", "UC");
+        new_params.credit_limit = 99;
+        new_params.description = "Amended to verify update chain".into();
+
+        let amended: CurrencyDefinition = conductor
+            .call(
+                &zome_a,
+                "amend_currency_params",
+                AmendCurrencyParamsInput {
+                    currency_id: def.id.clone(),
+                    new_params,
+                    governance_proposal_id: None,
+                },
+            )
+            .await;
+        assert_eq!(amended.params.credit_limit, 99);
+
+        // THE KEY ASSERTION: get_currency must return the AMENDED version,
+        // not the original. This is the regression test for follow_update_chain.
+        let fetched: Option<CurrencyDefinition> = conductor
+            .call(&zome_a, "get_currency", def.id.clone())
+            .await;
+        let f = fetched.expect("Currency should exist");
+        assert_eq!(
+            f.params.credit_limit, 99,
+            "get_currency must return latest version (credit_limit=99), not original (40)"
+        );
+        assert_eq!(
+            f.params.description, "Amended to verify update chain",
+            "get_currency must return latest description"
+        );
+        println!("  - get_currency returned amended params (credit_limit=99)");
+
+        // Amend AGAIN to verify multi-hop update chain
+        let mut params_v3 = test_params("UpdateChain", "UC");
+        params_v3.credit_limit = 150;
+        params_v3.description = "Second amendment".into();
+
+        let _: CurrencyDefinition = conductor
+            .call(
+                &zome_a,
+                "amend_currency_params",
+                AmendCurrencyParamsInput {
+                    currency_id: def.id.clone(),
+                    new_params: params_v3,
+                    governance_proposal_id: None,
+                },
+            )
+            .await;
+
+        let fetched2: Option<CurrencyDefinition> = conductor
+            .call(&zome_a, "get_currency", def.id.clone())
+            .await;
+        let f2 = fetched2.expect("Currency should exist");
+        assert_eq!(
+            f2.params.credit_limit, 150,
+            "get_currency must follow multi-hop update chain to latest (credit_limit=150)"
+        );
+        println!("  - Multi-hop update chain verified (credit_limit=150)");
+
+        println!("Scenario 15 PASSED");
     }
 
     println!("=== All lifecycle scenarios PASSED ===");

@@ -7,7 +7,6 @@
 
 use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
-use holochain::sweettest::*;
 
 #[tokio::test(flavor = "multi_thread")]
 #[ignore]

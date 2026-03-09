@@ -21,8 +21,6 @@
 
 use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
-use holochain::sweettest::*;
-use mycelix_finance_types::CurrencyStatus;
 
 /// Consolidated exchange tests — single conductor setup, 22 scenarios.
 #[tokio::test(flavor = "multi_thread")]

@@ -9,7 +9,6 @@
 
 use super::common::*;
 use currency_mint_integrity::CurrencyDefinition;
-use holochain::sweettest::*;
 
 /// Consolidated demurrage test: 10 scenarios sharing a single conductor.
 #[tokio::test(flavor = "multi_thread")]
