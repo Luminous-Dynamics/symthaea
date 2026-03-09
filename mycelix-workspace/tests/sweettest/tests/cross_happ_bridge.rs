@@ -110,7 +110,7 @@ async fn test_identity_to_governance_flow() {
         "description": "Verifying identity-governance bridge",
         "proposal_type": "Standard",
         "author": format!("did:mycelix:{}", agent.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -176,13 +176,18 @@ async fn test_multi_agent_multi_happ_sync() {
     let alice_zome = alice_identity_cell.zome("did_registry");
     let _: Record = alice_conductor.call(&alice_zome, "create_did", ()).await;
 
-    wait_for_dht_sync().await;
-
-    // Bob should see Alice's DID
+    // Wait for DHT propagation with retry (gossip can take variable time)
     let bob_zome = bob_identity_cell.zome("did_registry");
-    let alice_did: Option<Record> = bob_conductor
-        .call(&bob_zome, "get_did_document", alice_agent)
-        .await;
+    let mut alice_did: Option<Record> = None;
+    for _ in 0..10 {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        alice_did = bob_conductor
+            .call(&bob_zome, "get_did_document", alice_agent.clone())
+            .await;
+        if alice_did.is_some() {
+            break;
+        }
+    }
 
     assert!(
         alice_did.is_some(),

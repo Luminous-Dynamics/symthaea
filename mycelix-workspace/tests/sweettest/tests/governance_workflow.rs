@@ -17,6 +17,23 @@ use harness::*;
 use holochain::prelude::*;
 use serial_test::serial;
 
+/// Decode a Record's entry bytes into a serde_json::Value via msgpack.
+/// HC 0.6 stores entries as msgpack; `to_app_option::<serde_json::Value>()` doesn't work
+/// because `serde_json::Value` doesn't implement `TryFrom<SerializedBytes>`.
+fn decode_record_entry(record: &Record) -> serde_json::Value {
+    let entry = record
+        .entry()
+        .as_option()
+        .expect("Record should have an entry");
+    let bytes = match entry {
+        Entry::App(app_entry) => app_entry.bytes().to_vec(),
+        _ => panic!("Expected App entry"),
+    };
+    let value: serde_json::Value =
+        rmp_serde::from_slice(&bytes).expect("Should decode msgpack entry");
+    value
+}
+
 /// Test: Create a proposal and cast a vote.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
@@ -42,7 +59,7 @@ async fn test_create_proposal_and_vote() {
         "description": "Proposal to increase the community fund from 5% to 10% of network fees",
         "proposal_type": "Funding",
         "author": format!("did:mycelix:{}", proposer.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -103,7 +120,7 @@ async fn test_multi_voter_quorum() {
         "description": "Activate the bridge protocol for inter-hApp communication",
         "proposal_type": "Standard",
         "author": format!("did:mycelix:{}", proposer.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -222,7 +239,7 @@ async fn test_proposal_create_and_get() {
         "description": "Verify that proposals can be retrieved by ID after creation",
         "proposal_type": "Standard",
         "author": format!("did:mycelix:{}", agent.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -268,7 +285,7 @@ async fn test_get_active_proposals() {
         "description": "Should appear in active proposals list",
         "proposal_type": "Standard",
         "author": format!("did:mycelix:{}", agent.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -314,7 +331,7 @@ async fn test_get_proposals_by_author() {
         "description": "Should be returned when querying by author",
         "proposal_type": "Funding",
         "author": author_did,
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -386,7 +403,7 @@ async fn test_vote_and_tally() {
         "description": "Tests that vote tally aggregates correctly",
         "proposal_type": "Standard",
         "author": format!("did:mycelix:{}", proposer.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -462,7 +479,7 @@ async fn test_get_proposal_tally() {
         "description": "Tests get_proposal_tally after tally_votes",
         "proposal_type": "Standard",
         "author": format!("did:mycelix:{}", proposer.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -655,11 +672,7 @@ async fn test_council_membership() {
         .await;
 
     // Extract council ID from the record entry
-    let council_entry: serde_json::Value = council_record
-        .entry()
-        .to_app_option()
-        .expect("Should deserialize")
-        .expect("Should have entry");
+    let council_entry = decode_record_entry(&council_record);
     let council_id = council_entry["id"].as_str().expect("Council should have id").to_string();
 
     wait_for_dht_sync().await;
@@ -723,11 +736,7 @@ async fn test_council_hierarchy() {
         .call_zome_fn("councils", "create_council", parent_input)
         .await;
 
-    let parent_entry: serde_json::Value = parent_record
-        .entry()
-        .to_app_option()
-        .expect("Should deserialize")
-        .expect("Should have entry");
+    let parent_entry = decode_record_entry(&parent_record);
     let parent_id = parent_entry["id"].as_str().expect("Parent should have id").to_string();
 
     wait_for_dht_sync().await;
@@ -1071,11 +1080,7 @@ async fn test_mark_timelock_ready() {
         .await;
 
     // Extract timelock ID from the entry
-    let tl_entry: serde_json::Value = timelock_record
-        .entry()
-        .to_app_option()
-        .expect("Should deserialize")
-        .expect("Should have entry");
+    let tl_entry = decode_record_entry(&timelock_record);
     let timelock_id = tl_entry["id"].as_str().expect("Timelock should have id").to_string();
 
     wait_for_dht_sync().await;
@@ -1131,11 +1136,7 @@ async fn test_create_signing_committee() {
     );
 
     // Extract committee ID
-    let entry: serde_json::Value = committee_record
-        .entry()
-        .to_app_option()
-        .expect("Should deserialize")
-        .expect("Should have entry");
+    let entry = decode_record_entry(&committee_record);
     let committee_id = entry["id"].as_str().expect("Committee should have id").to_string();
 
     wait_for_dht_sync().await;
@@ -1210,7 +1211,7 @@ async fn test_bridge_query_governance() {
         "description": "Verify bridge can query governance data",
         "proposal_type": "Standard",
         "author": format!("did:mycelix:{}", agent.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,
@@ -1317,7 +1318,7 @@ async fn test_discussion_contribution() {
         "description": "Tests the discussion contribution system",
         "proposal_type": "Standard",
         "author": format!("did:mycelix:{}", agent.agent_pubkey),
-        "status": "Active",
+        "status": "Draft",
         "actions": "{}",
         "discussion_url": null,
         "voting_starts": now,

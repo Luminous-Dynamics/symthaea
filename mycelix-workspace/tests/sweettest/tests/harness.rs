@@ -26,7 +26,7 @@ impl DnaPaths {
     }
 
     pub fn governance() -> PathBuf {
-        Self::workspace_root().join("../mycelix-governance/dna/mycelix_governance.dna")
+        Self::workspace_root().join("../mycelix-governance/dna/mycelix_governance_dna.dna")
     }
 
     pub fn finance() -> PathBuf {
