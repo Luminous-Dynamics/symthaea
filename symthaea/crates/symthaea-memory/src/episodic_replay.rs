@@ -129,6 +129,10 @@ pub struct Episode {
     /// Eich (1980) — mood-dependent retrieval.
     #[serde(default)]
     pub bath_state_at_encoding: Option<[f32; 9]>,
+
+    /// Semantic embedding from neural encoder (for embedding-based retrieval).
+    #[serde(default)]
+    pub semantic_embedding: Option<Vec<f32>>,
 }
 
 impl Episode {
@@ -147,6 +151,7 @@ impl Episode {
             retrieval_count: 0,
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
+            semantic_embedding: None,
         }
     }
 
@@ -173,7 +178,14 @@ impl Episode {
             retrieval_count: 0,
             dopamine_at_encoding: None,
             bath_state_at_encoding: None,
+            semantic_embedding: None,
         }
+    }
+
+    /// Set semantic embedding for embedding-based retrieval.
+    pub fn with_semantic_embedding(mut self, embedding: Vec<f32>) -> Self {
+        self.semantic_embedding = Some(embedding);
+        self
     }
 
     /// Set dopamine level at encoding for DA-tagged replay prioritization.

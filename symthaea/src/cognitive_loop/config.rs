@@ -311,6 +311,13 @@ pub struct CognitiveLoopConfig {
     /// signals for empathic response formatting.
     pub enable_user_state_inference: bool,
 
+    /// Enable physiology coherence field.
+    /// When true, a CoherenceField tracks consciousness integration via hormone
+    /// modulation from the neuromodulator bath each cycle. Cortisol scatters coherence,
+    /// acetylcholine centers it, dopamine boosts relational resonance.
+    /// Science: McEwen (2007) — allostatic load; Porges (2011) — polyvagal theory.
+    pub enable_coherence_field: bool,
+
     /// Enable PsiAttestation generation for governance bridge.
     /// When true, the cognitive loop buffers PsiAttestationRecords after each cycle
     /// for the personal cluster to sign and submit to governance as authenticated
@@ -618,6 +625,7 @@ impl Default for CognitiveLoopConfig {
             enable_cross_modal_binding: false,
             enable_affective_bridge: false,
             enable_user_state_inference: false,
+            enable_coherence_field: false,
             enable_consciousness_thermodynamics: false,
             enable_phenomenal_binding: false,
             enable_hierarchical_free_energy: false,
@@ -790,6 +798,7 @@ impl ConsciousnessProfile {
         config.enable_cross_modal_binding = false;
         config.enable_affective_bridge = false;
         config.enable_user_state_inference = false;
+        config.enable_coherence_field = false;
         config.enable_consciousness_thermodynamics = false;
         config.enable_phenomenal_binding = false;
         config.enable_hierarchical_free_energy = false;
@@ -865,6 +874,7 @@ impl ConsciousnessProfile {
                 config.episodic_replay = true;
                 config.enable_psi_attestation = true;
                 config.enable_user_state_inference = true;
+                config.enable_coherence_field = true;
                 config.enable_visualization = true;
                 config.enable_soul_alignment = true;
             }
@@ -902,6 +912,7 @@ impl CognitiveLoopConfig {
             self.enable_cross_modal_binding,
             self.enable_affective_bridge,
             self.enable_user_state_inference,
+            self.enable_coherence_field,
             self.enable_consciousness_thermodynamics,
             self.enable_phenomenal_binding,
             self.enable_hierarchical_free_energy,
