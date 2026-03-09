@@ -4,6 +4,8 @@
 //! Detects inventory discrepancies, sensor anomalies, and timeline inconsistencies
 //! across timescales from 1 day to 1 year.
 
+#![allow(missing_docs)]
+
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};

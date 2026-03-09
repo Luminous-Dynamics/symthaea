@@ -85,8 +85,8 @@ fn lerp(a: &[f32; 3], b: &[f32; 3], t: f32) -> [f32; 3] {
 
 fn split_triangle(tri: &Triangle, plane: &Plane) -> (Vec<Triangle>, Vec<Triangle>) {
     let sides = plane.classify_tri(tri);
-    let hf = sides.iter().any(|s| *s == Side::Front);
-    let hb = sides.iter().any(|s| *s == Side::Back);
+    let hf = sides.contains(&Side::Front);
+    let hb = sides.contains(&Side::Back);
     if !hb {
         return (vec![tri.clone()], vec![]);
     }

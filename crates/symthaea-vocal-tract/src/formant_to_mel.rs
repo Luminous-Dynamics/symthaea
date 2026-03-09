@@ -339,7 +339,7 @@ impl FormantToMelConverter {
                 let audio = self.synthesize_source_filter(frame, voice_quality);
                 self.audio_buffer.extend_from_slice(&audio);
             }
-            self.prev_frame = Some(frame.clone());
+            self.prev_frame = Some(*frame);
             self.prev_vq = Some(*voice_quality);
         } else {
             let audio = self.synthesize_source_filter(frame, voice_quality);

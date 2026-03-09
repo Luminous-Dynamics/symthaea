@@ -104,9 +104,10 @@ impl Default for FoveationConfig {
 }
 
 /// How the ventral pipeline routes crop analysis.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RoutingStrategy {
     /// Heuristic: text-like → OCR, objects → embed, fallback → VQA.
+    #[default]
     Auto,
     /// SigLIP embedding only (fastest, ~100ms).
     AlwaysEmbed,
@@ -116,12 +117,6 @@ pub enum RoutingStrategy {
     AlwaysCaption,
     /// SigLIP + OCR + VQA cascade (most comprehensive, ~300ms).
     Full,
-}
-
-impl Default for RoutingStrategy {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 /// A salient region identified by the dorsal stream with pixel coordinates.
